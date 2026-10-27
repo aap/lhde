@@ -1,0 +1,374 @@
+--- a/dlls/uxtheme/msstyles.c (840a939ee52)
++++ b/vendor/wine/uxtheme/msstyles.c
+@@ -83,6 +83,7 @@
+     LPWSTR pszSizes;
+     LPWSTR pszSelectedSize = NULL;
+     LPWSTR tmp;
++    void *v4 = NULL;
+ 
+     TRACE("Opening %s\n", debugstr_w(lpThemeFile));
+ 
+@@ -105,6 +106,15 @@
+         goto invalid_theme;
+     }
+     version = *(WORD*)LoadResource(hTheme, hrsc);
++    /* flxp: Longhorn's compiled styles (4042-4074, 5048's aero): src/uxtheme/v4.cpp */
++    if(version == 4)
++    {
++        hr = FLXP_V4_Open(hTheme, pszColorName, pszSizeName, &v4,
++                          &pszColors, &pszSelectedColor, &pszSizes, &pszSelectedSize);
++        if(FAILED(hr))
++            goto invalid_theme;
++        goto theme_ok;
++    }
+     if(version != MSSTYLES_VERSION)
+     {
+         TRACE("Version of theme file is unsupported: 0x%04x\n", version);
+@@ -154,6 +164,10 @@
+     else
+         pszSelectedSize = pszSizes; /* Use the default size */
+ 
++    /* flxp: a colour or size the style does not have selects its first one
++     * (Longhorn's themes say Default/Normal, XP's NormalColor/NormalSize) */
++    if(!pszSelectedColor) pszSelectedColor = pszColors;
++    if(!pszSelectedSize) pszSelectedSize = pszSizes;
+     if(!pszSelectedColor || !pszSelectedSize) {
+         TRACE("Requested color/size (%s/%s) not found in theme\n",
+               debugstr_w(pszColorName), debugstr_w(pszSizeName));
+@@ -161,8 +175,10 @@
+         goto invalid_theme;
+     }
+ 
++theme_ok:
+     *tf = calloc(1, sizeof(THEME_FILE));
+     (*tf)->hTheme = hTheme;
++    (*tf)->v4 = v4;
+     
+     GetFullPathNameW(lpThemeFile, MAX_PATH, (*tf)->szThemeFile, NULL);
+     
+@@ -220,6 +236,7 @@
+                 DeleteObject (img->image);
+                 free(img);
+             }
++            if (tf->v4) FLXP_V4_Close(tf->v4);   /* flxp: the values the properties point to */
+             free(tf);
+         }
+     }
+@@ -245,6 +262,18 @@
+ }
+ 
+ /***********************************************************************
++ *      MSSTYLES_ParseThemeFile
++ *
++ * flxp: read the properties of a theme file without making it the active
++ * theme or applying its system metrics (libuxtheme, src/uxtheme)
++ */
++void MSSTYLES_ParseThemeFile(PTHEME_FILE tf)
++{
++    if (tf && !tf->classes)
++        MSSTYLES_ParseThemeIni(tf, FALSE);
++}
++
++/***********************************************************************
+  *      MSSTYLES_GetThemeIni
+  *
+  * Retrieves themes.ini from a theme
+@@ -896,6 +925,67 @@
+     }
+ }
+ 
++/* flxp: one [SysMetrics] value (factored out of MSSTYLES_ParseThemeIni for the v4 reader) */
++static void parse_sysmetric(PTHEME_FILE tf, struct PARSECOLORSTATE *colorState,
++                            struct PARSENONCLIENTSTATE *nonClientState, BOOL setMetrics,
++                            int iPropertyPrimitive, int iPropertyId, LPCWSTR lpValue, DWORD dwValueLen)
++{
++    if(iPropertyId >= TMT_FIRSTCOLOR && iPropertyId <= TMT_LASTCOLOR) {
++        if (!parse_handle_color_property (colorState, iPropertyId,
++            lpValue, dwValueLen))
++            FIXME("Invalid color value for %d\n", iPropertyId);
++    }
++    else if (setMetrics && (iPropertyId == TMT_FLATMENUS)) {
++        BOOL flatMenus = (*lpValue == 'T') || (*lpValue == 't');
++        SystemParametersInfoW (SPI_SETFLATMENU, 0, (PVOID)(INT_PTR)flatMenus, 0);
++    }
++    else if ((iPropertyId >= TMT_FIRSTFONT)
++        && (iPropertyId <= TMT_LASTFONT))
++    {
++        if (!parse_handle_nonclient_font (nonClientState,
++            iPropertyId, lpValue, dwValueLen))
++            FIXME("Invalid font value for %d\n", iPropertyId);
++    }
++    else if ((iPropertyId >= TMT_FIRSTSIZE)
++        && (iPropertyId <= TMT_LASTSIZE))
++    {
++        if (!parse_handle_nonclient_size (nonClientState,
++            iPropertyId, lpValue, dwValueLen))
++            FIXME("Invalid size value for %d\n", iPropertyId);
++    }
++    /* Catch all metrics, including colors */
++    MSSTYLES_AddMetric(tf, iPropertyPrimitive, iPropertyId, lpValue, dwValueLen);
++}
++
++/* flxp: the Longhorn-compiled format: the records of the selected variant,
++ * already in the ini's text form (src/uxtheme/v4.cpp) */
++static void MSSTYLES_ParseV4(PTHEME_FILE tf, BOOL setMetrics)
++{
++    const struct flxp_v4_record *r;
++    int i, n = FLXP_V4_Records(tf->v4, &r);
++    struct PARSECOLORSTATE colorState;
++    struct PARSENONCLIENTSTATE nonClientState;
++    PTHEME_CLASS cls;
++    PTHEME_PARTSTATE ps;
++
++    parse_init_color (&colorState);
++    parse_init_nonclient (&nonClientState);
++    for (i = 0; i < n; i++, r++) {
++        if (!*r->app && !lstrcmpiW(r->cls, L"SysMetrics")) {
++            parse_sysmetric(tf, &colorState, &nonClientState, setMetrics, r->prim, r->id, r->value, r->len);
++            continue;
++        }
++        cls = MSSTYLES_AddClass(tf, r->app, r->cls);
++        ps = MSSTYLES_AddPartState(cls, r->part, r->state);
++        MSSTYLES_AddProperty(ps, r->prim, r->id, r->value, r->len, !lstrcmpiW(r->cls, L"globals"));
++    }
++    if (setMetrics)
++    {
++        parse_apply_color (&colorState);
++        parse_apply_nonclient (&nonClientState);
++    }
++}
++
+ /***********************************************************************
+  *      MSSTYLES_ParseThemeIni
+  *
+@@ -922,9 +1012,14 @@
+     DWORD dwValueLen;
+     LPCWSTR lpValue;
+ 
+-    ini = MSSTYLES_GetActiveThemeIni(tf);
++    /* flxp: a v4 style has no ini; its records go through the same model */
++    ini = NULL;
++    if (tf->v4)
++        MSSTYLES_ParseV4(tf, setMetrics);
++    else
++        ini = MSSTYLES_GetActiveThemeIni(tf);
+ 
+-    while((lpName=UXINI_GetNextSection(ini, &dwLen))) {
++    while(ini && (lpName=UXINI_GetNextSection(ini, &dwLen))) {
+         if(CompareStringW(LOCALE_SYSTEM_DEFAULT, NORM_IGNORECASE, lpName, dwLen, L"SysMetrics", -1) == CSTR_EQUAL) {
+             struct PARSECOLORSTATE colorState;
+             struct PARSENONCLIENTSTATE nonClientState;
+@@ -935,34 +1030,9 @@
+             while((lpName=UXINI_GetNextValue(ini, &dwLen, &lpValue, &dwValueLen))) {
+                 lstrcpynW(szPropertyName, lpName, min(dwLen+1, ARRAY_SIZE(szPropertyName)));
+                 if(MSSTYLES_LookupProperty(szPropertyName, &iPropertyPrimitive, &iPropertyId)) {
+-                    if(iPropertyId >= TMT_FIRSTCOLOR && iPropertyId <= TMT_LASTCOLOR) {
+-                        if (!parse_handle_color_property (&colorState, iPropertyId, 
+-                            lpValue, dwValueLen))
+-                            FIXME("Invalid color value for %s\n", 
+-                                debugstr_w(szPropertyName)); 
+-                    }
+-		    else if (setMetrics && (iPropertyId == TMT_FLATMENUS)) {
+-			BOOL flatMenus = (*lpValue == 'T') || (*lpValue == 't');
+-			SystemParametersInfoW (SPI_SETFLATMENU, 0, (PVOID)(INT_PTR)flatMenus, 0);
+-		    }
+-		    else if ((iPropertyId >= TMT_FIRSTFONT) 
+-			&& (iPropertyId <= TMT_LASTFONT))
+-		    {
+-		        if (!parse_handle_nonclient_font (&nonClientState,
+-		            iPropertyId, lpValue, dwValueLen))
+-                            FIXME("Invalid font value for %s\n", 
+-                                debugstr_w(szPropertyName)); 
+-		    }
+-		    else if ((iPropertyId >= TMT_FIRSTSIZE)
+-			&& (iPropertyId <= TMT_LASTSIZE))
+-		    {
+-		        if (!parse_handle_nonclient_size (&nonClientState,
+-		            iPropertyId, lpValue, dwValueLen))
+-                            FIXME("Invalid size value for %s\n", 
+-                                debugstr_w(szPropertyName)); 
+-		    }
+-                    /* Catch all metrics, including colors */
+-                    MSSTYLES_AddMetric(tf, iPropertyPrimitive, iPropertyId, lpValue, dwValueLen);
++                    /* flxp: shared with the v4 reader */
++                    parse_sysmetric(tf, &colorState, &nonClientState, setMetrics,
++                                    iPropertyPrimitive, iPropertyId, lpValue, dwValueLen);
+                 }
+                 else {
+                     TRACE("Unknown system metric %s\n", debugstr_w(szPropertyName));
+@@ -1014,7 +1084,17 @@
+         }
+         cls = cls->next;
+     }
+-    UXINI_CloseINI(ini);
++    /* flxp: v4 styles name a base class (BCMAP) that comes before globals */
++    if (tf->v4) {
++        const struct flxp_v4_base *b;
++        int i, n = FLXP_V4_Bases(tf->v4, &b);
++        for (i = 0; i < n; i++, b++) {
++            PTHEME_CLASS c = MSSTYLES_FindClass(tf, b->app, b->cls);
++            PTHEME_CLASS base = MSSTYLES_FindClass(tf, b->base_app, b->base_cls);
++            if (c && base && c != base) c->overrides = base;
++        }
++    }
++    if (ini) UXINI_CloseINI(ini);   /* flxp */
+ 
+     if(!tf->classes) {
+         ERR("Failed to parse theme ini\n");
+@@ -1051,6 +1131,16 @@
+  */
+ PTHEME_CLASS MSSTYLES_OpenThemeClass(LPCWSTR pszAppName, LPCWSTR pszClassList, UINT dpi)
+ {
++    if(!tfActiveTheme) {
++        TRACE("there is no active theme\n");
++        return NULL;
++    }
++    return MSSTYLES_OpenThemeFileClass(tfActiveTheme, pszAppName, pszClassList, dpi);
++}
++
++/* flxp: MSSTYLES_OpenThemeClass for any theme file (libuxtheme, src/uxtheme) */
++PTHEME_CLASS MSSTYLES_OpenThemeFileClass(PTHEME_FILE tf, LPCWSTR pszAppName, LPCWSTR pszClassList, UINT dpi)
++{
+     PTHEME_CLASS cls = NULL;
+     WCHAR buf[MAX_THEME_APP_NAME + MAX_THEME_CLASS_NAME];
+     WCHAR szAppName[MAX_THEME_APP_NAME];
+@@ -1059,11 +1149,7 @@
+     LPCWSTR end;
+     DWORD len;
+ 
+-    if(!tfActiveTheme) {
+-        TRACE("there is no active theme\n");
+-        return NULL;
+-    }
+-    if(!tfActiveTheme->classes) {
++    if(!tf->classes) {
+ 	return NULL;
+     }
+ 
+@@ -1079,9 +1165,9 @@
+         if (szAppName[0] && pszAppName)
+             return NULL;
+ 
+-        cls = MSSTYLES_FindClass(tfActiveTheme, szAppName[0] ? szAppName : pszAppName, szClassName);
++        cls = MSSTYLES_FindClass(tf, szAppName[0] ? szAppName : pszAppName, szClassName);
+         /* Fall back to default class if the specified subclass is not found */
+-        if (!cls) cls = MSSTYLES_FindClass(tfActiveTheme, NULL, szClassName);
++        if (!cls) cls = MSSTYLES_FindClass(tf, NULL, szClassName);
+ 
+         if(cls) break;
+     }
+@@ -1092,13 +1178,13 @@
+         if (szAppName[0] && pszAppName)
+             return NULL;
+ 
+-        cls = MSSTYLES_FindClass(tfActiveTheme, szAppName[0] ? szAppName : pszAppName, szClassName);
++        cls = MSSTYLES_FindClass(tf, szAppName[0] ? szAppName : pszAppName, szClassName);
+         /* Fall back to default class if the specified subclass is not found */
+-        if (!cls) cls = MSSTYLES_FindClass(tfActiveTheme, NULL, szClassName);
++        if (!cls) cls = MSSTYLES_FindClass(tf, NULL, szClassName);
+     }
+     if(cls) {
+         TRACE("Opened app %s, class %s from list %s\n", debugstr_w(cls->szAppName), debugstr_w(cls->szClassName), debugstr_w(pszClassList));
+-	cls->tf = tfActiveTheme;
++	cls->tf = tf;
+         InterlockedIncrement(&cls->tf->refcount);
+         InterlockedIncrement(&cls->refcount);
+         cls->dpi = dpi;
+@@ -1181,7 +1267,7 @@
+ }
+ 
+ /* Prepare a bitmap to be used for alpha blending */
+-static BOOL prepare_alpha (HBITMAP bmp, BOOL* hasAlpha, BOOL *hasDefaultTransparentColour)
++static BOOL prepare_alpha (HBITMAP bmp, BOOL* hasAlpha, BOOL *hasDefaultTransparentColour, BOOL premultiplied)
+ {
+     DIBSECTION dib;
+     int n, stride;
+@@ -1234,7 +1320,7 @@
+         }
+         stride = (dib.dsBmih.biWidth * 2 + 3) & ~3;
+         p = dib.dsBm.bmBits;
+-        for (y = 0; y < dib.dsBmih.biHeight; ++y)
++        for (y = 0; y < abs(dib.dsBmih.biHeight); ++y)
+         {
+             p = (BYTE *)dib.dsBm.bmBits + stride * y;
+             for (n = 0; n < dib.dsBmih.biWidth; ++n, p += 2)
+@@ -1261,7 +1347,7 @@
+ 
+         stride = (dib.dsBmih.biWidth * 3 + 3) & ~3;
+         p = dib.dsBm.bmBits;
+-        for (y = 0; y < dib.dsBmih.biHeight; ++y)
++        for (y = 0; y < abs(dib.dsBmih.biHeight); ++y)
+         {
+             p = (BYTE *)dib.dsBm.bmBits + stride * y;
+             for (n = 0; n < dib.dsBmih.biWidth; ++n, p += 3)
+@@ -1280,7 +1366,7 @@
+         return TRUE;
+ 
+     /* If all alpha values are 0xff, don't use alpha blending */
+-    for (n = 0, p = dib.dsBm.bmBits; n < dib.dsBmih.biWidth * dib.dsBmih.biHeight; n++, p += 4)
++    for (n = 0, p = dib.dsBm.bmBits; n < dib.dsBmih.biWidth * abs(dib.dsBmih.biHeight); n++, p += 4)
+     {
+         if ((*hasAlpha = (p[3] != 0xff)))
+             break;
+@@ -1292,9 +1378,16 @@
+         return TRUE;
+ 
+     p = dib.dsBm.bmBits;
+-    n = dib.dsBmih.biHeight * dib.dsBmih.biWidth;
++    n = abs(dib.dsBmih.biHeight) * dib.dsBmih.biWidth;   /* flxp: DIB sections here are top-down */
+     /* AlphaBlend() wants premultiplied alpha, so do that now */
+-    while (n-- > 0)
++    while (premultiplied && n-- > 0)
++    {
++        /* flxp: Longhorn's compiler stored the images premultiplied already;
++         * only where alpha is 0 the colour is made 0 too */
++        if (!p[3]) p[0] = p[1] = p[2] = 0;
++        p += 4;
++    }
++    while (!premultiplied && n-- > 0)
+     {
+         int a = p[3]+1;
+         p[0] = (p[0] * a) >> 8;
+@@ -1338,7 +1431,7 @@
+     /* Not found? Load from resources */
+     img = malloc(sizeof(*img));
+     img->image = LoadImageW(tc->hTheme, szFile, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+-    prepare_alpha (img->image, hasAlpha, &has_default);
++    prepare_alpha (img->image, hasAlpha, &has_default, tc->tf->v4 != NULL);   /* flxp: v4 premultiplied */
+     img->hasAlpha = *hasAlpha;
+     img->hasDefaultTransparentColour = has_default;
+     if (hasDefaultTransparentColour)
+@@ -1357,7 +1450,9 @@
+     LONG total = 0;
+     BOOL gotNeg = FALSE;
+ 
+-    while(cur < lpStringEnd && (*cur < '0' || *cur > '9' || *cur == '-')) cur++;
++    /* flxp: stop at a minus sign too, so negative values parse (XP's parser
++     * reads them: Luna's caption button Offsets, v4 styles' text shadows) */
++    while(cur < lpStringEnd && (*cur < '0' || *cur > '9') && *cur != '-') cur++;
+     if(cur >= lpStringEnd) {
+         return FALSE;
+     }
+@@ -1397,7 +1492,11 @@
+     start = cur;
+     while(cur < lpStringEnd && *cur != ',') cur++;
+     end = cur;
+-    while(isSpace(*end)) end--;
++    /* flxp: trim trailing blanks inside [start, end). Wine looked at *end itself and stepped
++     * back onto the token's last character when the value ended in a blank (the line's \r),
++     * so a last token lost its last letter: "Tahoma, 8, Bold" was not bold, Luna's
++     * "Franklin Gothic Medium, 14, italic" start button not italic */
++    while(end > start && isSpace(end[-1])) end--;
+ 
+     lstrcpynW(lpBuff, start, min(buffSize, end-start+1));
+ 
+@@ -1490,7 +1589,8 @@
+ 
+     ZeroMemory(pFont, sizeof(LOGFONTW));
+     hr = MSSTYLES_GetFont (lpCur, lpEnd, &lpCur, pFont);
+-    if (SUCCEEDED (hr))
++    /* flxp: a negative size is a pixel height already (v4 styles' LOGFONTs) */
++    if (SUCCEEDED (hr) && pFont->lfHeight > 0)
+         pFont->lfHeight = -MulDiv(pFont->lfHeight, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+ 
+     return hr;

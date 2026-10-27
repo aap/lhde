@@ -1,0 +1,45 @@
+--- a/dlls/uxtheme/msstyles.h (840a939ee52)
++++ b/vendor/wine/uxtheme/msstyles.h
+@@ -86,6 +86,7 @@
+     PTHEME_CLASS classes;
+     PTHEME_PROPERTY metrics;
+     PTHEME_IMAGE images;
++    void *v4;   /* flxp: the Longhorn-compiled (PACKTHEM_VERSION 4) reader's state, src/uxtheme/v4.cpp */
+ } THEME_FILE, *PTHEME_FILE;
+ 
+ typedef struct _UXINI_FILE *PUXINI_FILE;
+@@ -94,6 +95,12 @@
+ void MSSTYLES_CloseThemeFile(PTHEME_FILE tf);
+ HRESULT MSSTYLES_SetActiveTheme(PTHEME_FILE tf, BOOL setMetrics);
+ PTHEME_CLASS MSSTYLES_OpenThemeClass(LPCWSTR pszAppName, LPCWSTR pszClassList, UINT dpi);
++/* flxp: libuxtheme (src/uxtheme) opens and reads theme files that are not the active theme */
++void MSSTYLES_ParseThemeFile(PTHEME_FILE tf);
++PTHEME_CLASS MSSTYLES_OpenThemeFileClass(PTHEME_FILE tf, LPCWSTR pszAppName, LPCWSTR pszClassList, UINT dpi);
++BOOL MSSTYLES_LookupPartStateName(LPCWSTR pszClass, int iPartId, int iStateId, LPCWSTR *pszPart, LPCWSTR *pszState);
++LPCWSTR MSSTYLES_LookupPropertyName(int iPropertyId, int *dwPrimitive);
++LPCWSTR MSSTYLES_LookupEnumName(int dwEnum, int dwValue);
+ HRESULT MSSTYLES_CloseThemeClass(PTHEME_CLASS tc);
+ BOOL MSSTYLES_LookupProperty(LPCWSTR pszPropertyName, int *dwPrimitive, int *dwId);
+ BOOL MSSTYLES_LookupEnum(LPCWSTR pszValueName, int dwEnum, int *dwValue);
+@@ -123,4 +130,21 @@
+ LPCWSTR UXINI_GetNextValue(PUXINI_FILE uf, DWORD *dwNameLen, LPCWSTR *lpValue, DWORD *dwValueLen);
+ BOOL UXINI_FindValue(PUXINI_FILE uf, LPCWSTR lpName, LPCWSTR *lpValue, DWORD *dwValueLen);
+ 
++/* flxp: the Longhorn-compiled format (PACKTHEM_VERSION 4), read by src/uxtheme/v4.cpp:
++ * the variant for a colour/size, and its property records as the same text the
++ * XP ini would hold (so the property getters and draw.c work unchanged). */
++struct flxp_v4_record {
++    LPCWSTR app, cls;       /* class "App::Class" split; "sysmetrics", "globals", "documentation" too */
++    int part, state;
++    int prim, id;           /* primitive type (TMT_INT ...), property id (TMT_*) */
++    LPCWSTR value;          /* ini-style text: "#123" is a resource id (bitmap, stream) */
++    DWORD len;
++};
++HRESULT FLXP_V4_Open(HMODULE hTheme, LPCWSTR pszColorName, LPCWSTR pszSizeName, void **v4,
++                     LPWSTR *pszColors, LPWSTR *pszSelectedColor, LPWSTR *pszSizes, LPWSTR *pszSelectedSize);
++int FLXP_V4_Records(void *v4, const struct flxp_v4_record **records);
++struct flxp_v4_base { LPCWSTR app, cls, base_app, base_cls; };   /* BCMAP: class -> base class */
++int FLXP_V4_Bases(void *v4, const struct flxp_v4_base **bases);
++void FLXP_V4_Close(void *v4);
++
+ #endif

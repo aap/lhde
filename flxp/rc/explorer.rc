@@ -1,0 +1,131 @@
+/* The explorer's own dialogs (flxp, not Wine). Layouts follow XP's shell32
+ * dialogs where there is one (Open With, Confirm File Delete, the General
+ * property page), in dialog units for "MS Shell Dlg" 8.
+ * Build: make rc/explorer.res (mingw windres); embedded by dialogs.cpp. */
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
+
+IDD_OPENWITH DIALOGEX 0, 0, 260, 232
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Open With"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            "", IDC_OW_ICON, 7, 7, 21, 20
+    LTEXT           "Choose the program you want to use to open this file:", -1, 40, 7, 213, 8
+    LTEXT           "File:", -1, 40, 22, 20, 8
+    LTEXT           "", IDC_OW_FILE, 62, 22, 191, 8, SS_NOPREFIX
+    GROUPBOX        "&Programs", -1, 7, 38, 246, 140
+    CONTROL         "", IDC_OW_TREE, "SysTreeView32", TVS_HASBUTTONS | TVS_LINESATROOT | TVS_SHOWSELALWAYS | TVS_DISABLEDRAGDROP | WS_BORDER | WS_TABSTOP, 14, 50, 232, 121
+    LTEXT           "", IDC_OW_TYPE, 7, 184, 246, 8, SS_NOPREFIX
+    AUTOCHECKBOX    "&Always use the selected program to open this kind of file", IDC_OW_ALWAYS, 7, 196, 246, 10
+    DEFPUSHBUTTON   "OK", IDOK, 149, 212, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 203, 212, 50, 14
+END
+
+IDD_CONFIRMDELETE DIALOGEX 0, 0, 262, 62
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Confirm File Delete"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            "", IDC_CD_ICON, 7, 7, 21, 20
+    LTEXT           "", IDC_CD_TEXT, 41, 11, 214, 26, SS_NOPREFIX
+    DEFPUSHBUTTON   "&Yes", IDYES, 151, 41, 50, 14
+    PUSHBUTTON      "&No", IDNO, 205, 41, 50, 14
+END
+
+IDD_MESSAGE DIALOGEX 0, 0, 240, 62
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION ""
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            "", IDC_MSG_ICON, 7, 7, 21, 20
+    LTEXT           "", IDC_MSG_TEXT, 41, 9, 192, 28, SS_NOPREFIX
+    DEFPUSHBUTTON   "OK", IDOK, 95, 41, 50, 14
+END
+
+IDD_BOOKMARKS DIALOGEX 0, 0, 300, 190
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Organize Bookmarks"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "Select a bookmark to rename, move or remove it. The Bookmarks menu lists them in this order.", -1, 7, 7, 286, 16
+    CONTROL         "", IDC_BM_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | LVS_SHAREIMAGELISTS | WS_BORDER | WS_TABSTOP, 7, 27, 226, 118
+    PUSHBUTTON      "Move &Up", IDC_BM_UP, 240, 27, 53, 14
+    PUSHBUTTON      "Move &Down", IDC_BM_DOWN, 240, 45, 53, 14
+    PUSHBUTTON      "&Remove", IDC_BM_REMOVE, 240, 63, 53, 14
+    LTEXT           "&Name:", -1, 7, 153, 24, 8
+    EDITTEXT        IDC_BM_NAME, 33, 151, 148, 12, ES_AUTOHSCROLL
+    PUSHBUTTON      "Re&name", IDC_BM_RENAME, 185, 150, 48, 14
+    DEFPUSHBUTTON   "OK", IDOK, 189, 169, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 243, 169, 50, 14
+END
+
+IDD_PROPERTIES DIALOGEX 0, 0, 227, 215
+STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "General"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            "", IDC_PR_ICON, 7, 7, 21, 20
+    EDITTEXT        IDC_PR_NAME, 53, 11, 167, 12, ES_AUTOHSCROLL | ES_READONLY
+    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 32, 213, 1
+    LTEXT           "Type of file:", -1, 7, 40, 58, 8
+    LTEXT           "", IDC_PR_TYPE, 70, 40, 150, 8, SS_NOPREFIX
+    LTEXT           "Opens with:", IDC_PR_OPENSL, 7, 55, 58, 8
+    LTEXT           "", IDC_PR_OPENS, 70, 55, 95, 8, SS_NOPREFIX
+    PUSHBUTTON      "&Change...", IDC_PR_CHANGE, 170, 52, 50, 14
+    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 72, 213, 1
+    LTEXT           "Location:", -1, 7, 80, 58, 8
+    LTEXT           "", IDC_PR_LOCATION, 70, 80, 150, 8, SS_NOPREFIX | SS_PATHELLIPSIS
+    LTEXT           "Size:", -1, 7, 94, 58, 8
+    LTEXT           "", IDC_PR_SIZE, 70, 94, 150, 8, SS_NOPREFIX
+    LTEXT           "Contains:", IDC_PR_CONTAINSL, 7, 108, 58, 8
+    LTEXT           "", IDC_PR_CONTAINS, 70, 108, 150, 8, SS_NOPREFIX
+    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 124, 213, 1
+    LTEXT           "Modified:", -1, 7, 132, 58, 8
+    LTEXT           "", IDC_PR_MODIFIED, 70, 132, 150, 8, SS_NOPREFIX
+    LTEXT           "Accessed:", -1, 7, 146, 58, 8
+    LTEXT           "", IDC_PR_ACCESSED, 70, 146, 150, 8, SS_NOPREFIX
+    LTEXT           "Changed:", -1, 7, 160, 58, 8
+    LTEXT           "", IDC_PR_CHANGED, 70, 160, 150, 8, SS_NOPREFIX
+    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 176, 213, 1
+    LTEXT           "Permissions:", -1, 7, 184, 58, 8
+    LTEXT           "", IDC_PR_PERMS, 70, 184, 150, 8, SS_NOPREFIX
+    LTEXT           "", IDC_PR_EXTRAL, 7, 198, 58, 8
+    LTEXT           "", IDC_PR_EXTRA, 70, 198, 150, 8, SS_NOPREFIX
+END
+
+/* Folder Options (Tools menu): XP's General and View pages reduced to what
+ * flxp has: the default view of folders never opened (with the Longhorn
+ * frame's icon size and thumbnails), Apply to All / Reset All Folders and
+ * two of the advanced settings. */
+IDD_FO_GENERAL DIALOGEX 0, 0, 227, 215
+STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "General"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    GROUPBOX        "Default view", -1, 7, 7, 213, 106
+    LTEXT           "Folders that have not been opened before are shown in this view. Ctrl+0 shows a folder in it again.", -1, 16, 20, 196, 18
+    LTEXT           "&View:", -1, 16, 46, 50, 8
+    COMBOBOX        IDC_FO_VIEW, 70, 44, 140, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Icon &size:", IDC_FO_ZOOML, 16, 64, 50, 8
+    COMBOBOX        IDC_FO_ZOOM, 70, 62, 140, 140, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "Show &thumbnails of pictures", IDC_FO_THUMBS, 16, 82, 194, 10
+    PUSHBUTTON      "Restore &Defaults", IDC_FO_RESTORE, 146, 94, 64, 14
+END
+
+IDD_FO_VIEW DIALOGEX 0, 0, 227, 215
+STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "View"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    GROUPBOX        "Folder views", -1, 7, 7, 213, 66
+    LTEXT           "You can apply the view (such as Details or Thumbnails) that you are using for this folder to all folders.", -1, 16, 20, 196, 24
+    PUSHBUTTON      "Apply to &All Folders", IDC_FO_APPLYALL, 16, 50, 92, 14
+    PUSHBUTTON      "&Reset All Folders", IDC_FO_RESETALL, 116, 50, 92, 14
+    GROUPBOX        "Advanced settings", -1, 7, 80, 213, 48
+    AUTOCHECKBOX    "&Remember each folder's view settings", IDC_FO_REMEMBER, 16, 94, 194, 10
+    AUTOCHECKBOX    "Show &hidden files and folders", IDC_FO_HIDDEN, 16, 110, 194, 10
+END

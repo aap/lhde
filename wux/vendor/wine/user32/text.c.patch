@@ -1,0 +1,20 @@
+--- a/dlls/user32/text.c (wine-7.0)
++++ b/vendor/wine/user32/text.c
+@@ -847,7 +847,7 @@
+     hpen = CreatePen (PS_SOLID, 1, GetTextColor (hdc));
+     oldPen = SelectObject (hdc, hpen);
+     MoveToEx (hdc, prefix_x, y, NULL);
+-    LineTo (hdc, prefix_end, y);
++    LineTo (hdc, prefix_end + 1, y);   /* flxp: Windows underlines the whole advance (LineTo excludes its end point) */
+     SelectObject (hdc, oldPen);
+     DeleteObject (hpen);
+ }
+@@ -983,7 +983,7 @@
+ 	if (flags & DT_SINGLELINE)
+ 	{
+ 	    if (flags & DT_VCENTER) y = rect->top +
+-	    	(rect->bottom - rect->top) / 2 - size.cy / 2;
++	    	(rect->bottom - rect->top - size.cy) / 2;   /* flxp: Windows rounds the difference, not each half (1px lower for odd heights) */
+ 	    else if (flags & DT_BOTTOM) y = rect->bottom - size.cy;
+         }
+ 

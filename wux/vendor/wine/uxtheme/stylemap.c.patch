@@ -1,0 +1,65 @@
+--- a/dlls/uxtheme/stylemap.c (840a939ee52)
++++ b/vendor/wine/uxtheme/stylemap.c
+@@ -1541,6 +1541,15 @@
+ BOOL MSSTYLES_LookupEnum(LPCWSTR pszValueName, int dwEnum, int *dwValue)
+ {
+     DWORD item = 0;
++    /* flxp: v4 styles (src/uxtheme/v4.cpp) give enum values as numbers */
++    if(pszValueName[0] >= '0' && pszValueName[0] <= '9') {
++        int v = 0;
++        LPCWSTR p = pszValueName;
++        while(*p >= '0' && *p <= '9') v = v * 10 + (*p++ - '0');
++        if(*p) return FALSE;
++        if(dwValue) *dwValue = v;
++        return TRUE;
++    }
+     /* Locate the enum block */
+     while(*mapEnum[item].szValueName && mapEnum[item].dwEnum != dwEnum) item++;
+     /* Now find the value in that block */
+@@ -1553,3 +1562,46 @@
+     }
+     return FALSE;
+ }
++
++/**********************************************************************
++ * flxp: reverse lookups for libuxtheme's listings (src/uxtheme)
++ */
++BOOL MSSTYLES_LookupPartStateName(LPCWSTR pszClass, int iPartId, int iStateId, LPCWSTR *pszPart, LPCWSTR *pszState)
++{
++    unsigned int i;
++    const MSSTYLES_CLASS_MAP *map;
++
++    if(pszPart) *pszPart = NULL;
++    if(pszState) *pszState = NULL;
++    for(i=0; i<ARRAY_SIZE(mapClass); i++) {
++        if(lstrcmpiW(mapClass[i].pszClass, pszClass)) continue;
++        for(map = mapClass[i].lpMap; *map->szName; map++) {
++            if(pszPart && iPartId && map->dwPartID == iPartId && map->dwStateID == 0 && !*pszPart)
++                *pszPart = map->szName;
++            if(pszState && iStateId && map->dwPartID == iPartId && map->dwStateID == iStateId && !*pszState)
++                *pszState = map->szName;
++        }
++        return TRUE;
++    }
++    return FALSE;
++}
++
++LPCWSTR MSSTYLES_LookupPropertyName(int iPropertyId, int *dwPrimitive)
++{
++    unsigned int i;
++    for(i=0; i<ARRAY_SIZE(mapProperty); i++)
++        if(mapProperty[i].dwPropertyID == iPropertyId) {
++            if(dwPrimitive) *dwPrimitive = mapProperty[i].dwPrimitiveType;
++            return mapProperty[i].szPropertyName;
++        }
++    return NULL;
++}
++
++LPCWSTR MSSTYLES_LookupEnumName(int dwEnum, int dwValue)
++{
++    DWORD item;
++    for(item = 0; *mapEnum[item].szValueName; item++)
++        if(mapEnum[item].dwEnum == dwEnum && mapEnum[item].dwValue == dwValue)
++            return mapEnum[item].szValueName;
++    return NULL;
++}

@@ -1,0 +1,35 @@
+; Wine's shell32 icons (LGPL), shipped in this directory. Toolbar images come
+; from comctl32's own bitmaps when no strip is given.
+[theme]
+name = Wine
+depth = 32
+
+[icons]
+folder = folder.ico
+folder_open = folder_open.ico
+document = document.ico
+text = document.ico
+drive = drive.ico
+computer = mycomputer.ico
+desktop = desktop.ico
+home = mydocs.ico
+image = image.ico
+audio = audio.ico
+video = video.ico
+zip = folder.ico
+pdf = document.ico
+exe = window.ico
+dll = control.ico
+html = internet.ico
+disc = optical_disc.ico
+settings = control.ico
+binary = document.ico
+network = network.ico
+favorites = favorites.ico
+search = search.ico
+trash = trash_file.ico
+help = help.ico
+pictures = image.ico
+control_panel = control.ico
+run = window.ico
+recent = recent.ico

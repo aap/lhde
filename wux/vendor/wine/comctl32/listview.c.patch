@@ -1,0 +1,880 @@
+--- a/dlls/comctl32/listview.c (wine-10.0)
++++ b/vendor/wine/comctl32/listview.c
+@@ -174,8 +174,20 @@
+   LPARAM lParam;
+   INT iIndent;
+   ITEM_ID *id;
++  INT iGroupId;   /* flxp: group view */
+ } ITEM_INFO;
+ 
++/* flxp: group view (LVM_ENABLEGROUPVIEW) in the icon views: a header row
++   with the group's title and a rule, then its items; LVGS_COLLAPSIBLE
++   groups fold on a click on the header. Details and list views ignore it. */
++typedef struct tagLV_GROUP_INFO
++{
++  INT id;
++  LPWSTR header;
++  UINT state;
++  INT top;        /* the header's row (not offset by Origin), set by LISTVIEW_Arrange */
++} LV_GROUP_INFO;
++
+ struct tagITEM_ID
+ {
+   UINT id;   /* item id */
+@@ -289,6 +301,7 @@
+ 
+   /* focus drawing */
+   BOOL bFocus;              /* control has focus */
++  BOOL bHideFocus;          /* flxp: UISF_HIDEFOCUS - no focus rectangle on themed items until a key is used */
+   INT nFocusedItem;
+   RECT rcFocus;             /* focus bounds */
+ 
+@@ -297,6 +310,12 @@
+   COLORREF clrBk;
+   COLORREF clrText;
+   COLORREF clrTextBk;
++  COLORREF clrOutline;          /* flxp: LVS_EX_BORDERSELECT outline (LVM_SETOUTLINECOLOR) */
++
++  /* flxp: group view */
++  BOOL groupView;
++  BOOL groupsDirty;              /* arrange before the next paint */
++  HDPA hdpaGroups;               /* LV_GROUP_INFO pointers, in display order */
+   HBITMAP hBkBitmap;
+ 
+   /* font */
+@@ -1035,6 +1054,9 @@
+     lpnmlvcd->nmcd.dwItemSpec = lplvItem->iItem + 1;
+     lpnmlvcd->iSubItem = lplvItem->iSubItem;
+     if (lplvItem->state & LVIS_SELECTED) lpnmlvcd->nmcd.uItemState |= CDIS_SELECTED;
++    /* flxp: the drop target of a drag (LVIS_DROPHILITED) is drawn selected with the
++       focus, as XP's listview does; Wine drew nothing for it */
++    if (lplvItem->state & LVIS_DROPHILITED) lpnmlvcd->nmcd.uItemState |= CDIS_SELECTED | CDIS_DROPHILITED;
+     if (lplvItem->state & LVIS_FOCUSED) lpnmlvcd->nmcd.uItemState |= CDIS_FOCUS;
+     if (lplvItem->iItem == infoPtr->nHotItem) lpnmlvcd->nmcd.uItemState |= CDIS_HOT;
+     lpnmlvcd->nmcd.lItemlParam = lplvItem->lParam;
+@@ -1054,6 +1076,31 @@
+     return result;
+ }
+ 
++/* flxp: Vista's themed item backgrounds. When the window's theme class has
++   LVP_LISTITEM (Longhorn's Explorer::ListView after SetWindowTheme(L"Explorer"):
++   the 4051 peach/grey rounded rectangles; XP's ListView class has none),
++   selected and hot items get that part behind icon and label instead of the
++   highlight colours. Returns the LISS_* state, 0 for a plain item. */
++static int LISTVIEW_ThemedItemState(const LISTVIEW_INFO *infoPtr, UINT cdstate, UINT lvstate)
++{
++    HTHEME theme = GetWindowTheme(infoPtr->hwndSelf);
++    BOOL hot = (cdstate & CDIS_HOT) != 0, drop = (lvstate & LVIS_DROPHILITED) || (cdstate & CDIS_DROPHILITED);
++
++    if (!theme || !IsThemePartDefined(theme, LVP_LISTITEM, 0)) return 0;
++    if (drop || ((cdstate & CDIS_SELECTED) && (infoPtr->bFocus || (infoPtr->dwStyle & LVS_SHOWSELALWAYS))))
++    {
++        if (!infoPtr->bFocus && !drop) return LISS_SELECTEDNOTFOCUS;
++        return hot ? LISS_HOTSELECTED : LISS_SELECTED;
++    }
++    return hot ? LISS_HOT : 0;
++}
++
++static BOOL LISTVIEW_HasThemedItems(const LISTVIEW_INFO *infoPtr)
++{
++    HTHEME theme = GetWindowTheme(infoPtr->hwndSelf);
++    return theme && IsThemePartDefined(theme, LVP_LISTITEM, 0);
++}
++
+ static void prepaint_setup (const LISTVIEW_INFO *infoPtr, HDC hdc, const NMLVCUSTOMDRAW *cd, BOOL SubItem)
+ {
+     COLORREF backcolor, textcolor;
+@@ -1062,11 +1109,19 @@
+     textcolor = cd->clrText;
+ 
+     /* apparently, for selected items, we have to override the returned values */
++    /* flxp: not when the theme draws the item (its text keeps its colour) */
++    if (!SubItem && LISTVIEW_ThemedItemState(infoPtr, cd->nmcd.uItemState, 0))
++    {
++        if (textcolor == CLR_DEFAULT) textcolor = comctl32_color.clrWindowText;
++        SetBkMode(hdc, TRANSPARENT);
++        SetTextColor(hdc, textcolor);
++        return;
++    }
+     if (!SubItem)
+     {
+         if (cd->nmcd.uItemState & CDIS_SELECTED)
+         {
+-            if (infoPtr->bFocus)
++            if (infoPtr->bFocus || (cd->nmcd.uItemState & CDIS_DROPHILITED))   /* flxp: drop target */
+             {
+                 backcolor = comctl32_color.clrHighlight;
+                 textcolor = comctl32_color.clrHighlightText;
+@@ -1709,6 +1764,9 @@
+ /* used to handle collapse main item column case */
+ static inline BOOL LISTVIEW_DrawFocusRect(const LISTVIEW_INFO *infoPtr, HDC hdc)
+ {
++    /* flxp: Longhorn draws no dotted rectangle on its themed items unless the
++       keyboard is used (XP's UISF_HIDEFOCUS rule; plain lists keep theirs) */
++    if (infoPtr->bHideFocus && LISTVIEW_HasThemedItems(infoPtr)) return FALSE;
+     return (infoPtr->rcFocus.left < infoPtr->rcFocus.right) ?
+             DrawFocusRect(hdc, &infoPtr->rcFocus) : FALSE;
+ }
+@@ -2492,6 +2550,9 @@
+ 	    Label.left = Box.left + (infoPtr->nItemWidth - labelSize.cx) / 2;
+ 	    Label.top  = Box.top + ICON_TOP_PADDING_HITABLE +
+ 		         infoPtr->iconSize.cy + ICON_BOTTOM_PADDING;
++	    /* flxp: border select (thumbnails) has XP's 4 px between the image
++	       and the label (lvicon.c g_cyLabelSpace), clear of the 3 px frame */
++	    if (infoPtr->dwLvExStyle & LVS_EX_BORDERSELECT) Label.top += 2;
+ 	    Label.right = Label.left + labelSize.cx;
+ 	    Label.bottom = Label.top + infoPtr->nItemHeight;
+ 	    if (!oversizedBox && labelSize.cy > infoPtr->ntmHeight)
+@@ -2775,6 +2836,254 @@
+  *   SUCCESS : TRUE
+  *   FAILURE : FALSE
+  */
++/* flxp: group view ----------------------------------------------------------- */
++
++static inline BOOL groups_active(const LISTVIEW_INFO *infoPtr)
++{
++    return infoPtr->groupView && DPA_GetPtrCount(infoPtr->hdpaGroups) > 0 &&
++        (infoPtr->uView == LV_VIEW_ICON || infoPtr->uView == LV_VIEW_SMALLICON);
++}
++
++/* the header row: the title (the list's font) with room above and below */
++static inline INT group_header_height(const LISTVIEW_INFO *infoPtr)
++{
++    return infoPtr->ntmHeight + 16;
++}
++
++static LV_GROUP_INFO *group_by_id(const LISTVIEW_INFO *infoPtr, INT id, INT *index)
++{
++    INT i;
++    for (i = 0; i < DPA_GetPtrCount(infoPtr->hdpaGroups); i++)
++    {
++        LV_GROUP_INFO *g = DPA_GetPtr(infoPtr->hdpaGroups, i);
++        if (g->id == id) { if (index) *index = i; return g; }
++    }
++    return NULL;
++}
++
++static inline INT item_group(const LISTVIEW_INFO *infoPtr, INT nItem)
++{
++    HDPA hdpaSubItems = DPA_GetPtr(infoPtr->hdpaItems, nItem);
++    ITEM_INFO *lpItem = hdpaSubItems ? DPA_GetPtr(hdpaSubItems, 0) : NULL;
++    return lpItem ? lpItem->iGroupId : I_GROUPIDNONE;
++}
++
++static void group_free(LV_GROUP_INFO *g)
++{
++    if (!g) return;
++    Free(g->header);
++    Free(g);
++}
++
++static BOOL LISTVIEW_MoveIconTo(const LISTVIEW_INFO *infoPtr, INT nItem, const POINT *lppt, BOOL isNew);
++
++/* each group: its header, then its items row by row from the left edge; the
++   items of a collapsed group are moved out of sight; items in no group
++   follow the last group without a header */
++static void LISTVIEW_ArrangeGroups(LISTVIEW_INFO *infoPtr)
++{
++    INT nListWidth = infoPtr->rcList.right - infoPtr->rcList.left;
++    INT n = DPA_GetPtrCount(infoPtr->hdpaGroups), hdr = group_header_height(infoPtr);
++    INT g, i, y = 0;
++    BYTE *placed = infoPtr->nItemCount ? Alloc(infoPtr->nItemCount) : NULL;
++    POINT pos;
++
++    if (infoPtr->nItemCount && !placed) return;
++    for (g = 0; g <= n; g++)
++    {
++        LV_GROUP_INFO *grp = g < n ? DPA_GetPtr(infoPtr->hdpaGroups, g) : NULL;
++        INT x = 0, count = 0;
++
++        if (grp)
++        {
++            grp->top = y;
++            y += (grp->state & LVGS_HIDDEN) ? 0 : hdr;
++        }
++        for (i = 0; i < infoPtr->nItemCount; i++)
++        {
++            if (placed[i] || (grp && item_group(infoPtr, i) != grp->id)) continue;
++            placed[i] = 1;
++            if (grp && (grp->state & (LVGS_COLLAPSED | LVGS_HIDDEN)))
++            {
++                pos.x = -32000; pos.y = grp->top;
++                LISTVIEW_MoveIconTo(infoPtr, i, &pos, FALSE);
++                continue;
++            }
++            if (x > 0 && x + infoPtr->nItemWidth > nListWidth)
++            {
++                x = 0;
++                y += infoPtr->nItemHeight;
++            }
++            pos.x = x; pos.y = y;
++            LISTVIEW_MoveIconTo(infoPtr, i, &pos, FALSE);
++            x += infoPtr->nItemWidth;
++            count++;
++        }
++        if (count) y += infoPtr->nItemHeight;
++        if (grp && !(grp->state & LVGS_HIDDEN)) y += 6;
++    }
++    Free(placed);
++    /* items inserted later go under the last row until the next arrange */
++    infoPtr->currIconPos.x = 0;
++    infoPtr->currIconPos.y = y;
++    infoPtr->groupsDirty = FALSE;
++}
++
++/* the group whose header row is at client point (x, y), or NULL */
++static LV_GROUP_INFO *group_header_at(const LISTVIEW_INFO *infoPtr, INT x, INT y)
++{
++    POINT Origin;
++    INT i, hdr = group_header_height(infoPtr);
++
++    if (!groups_active(infoPtr) || x < infoPtr->rcList.left || x >= infoPtr->rcList.right) return NULL;
++    LISTVIEW_GetOrigin(infoPtr, &Origin);
++    y -= Origin.y;
++    for (i = 0; i < DPA_GetPtrCount(infoPtr->hdpaGroups); i++)
++    {
++        LV_GROUP_INFO *g = DPA_GetPtr(infoPtr->hdpaGroups, i);
++        if (!(g->state & LVGS_HIDDEN) && y >= g->top && y < g->top + hdr) return g;
++    }
++    return NULL;
++}
++
++/* the headers: the title in grey, a pale blue rule to the right and, for a
++   collapsible group, a small triangle (up: expanded) at the right end - the
++   pre-reset Longhorn Save File concept (image9.jpeg) */
++static void LISTVIEW_RefreshGroups(const LISTVIEW_INFO *infoPtr, HDC hdc)
++{
++    POINT Origin;
++    RECT rcClip, r, tmp;
++    INT i, hdr = group_header_height(infoPtr);
++    HPEN pen, oldPen;
++    HBRUSH brush, oldBrush;
++
++    LISTVIEW_GetOrigin(infoPtr, &Origin);
++    if (GetClipBox(hdc, &rcClip) == ERROR) rcClip = infoPtr->rcList;
++    SetBkMode(hdc, TRANSPARENT);
++    for (i = 0; i < DPA_GetPtrCount(infoPtr->hdpaGroups); i++)
++    {
++        LV_GROUP_INFO *g = DPA_GetPtr(infoPtr->hdpaGroups, i);
++        RECT tr, line;
++        SIZE sz = { 0, 0 };
++        INT len, mid, gx;
++
++        if (g->state & LVGS_HIDDEN) continue;
++        r.left = infoPtr->rcList.left;
++        r.right = infoPtr->rcList.right;
++        r.top = g->top + Origin.y;
++        r.bottom = r.top + hdr;
++        if (!IntersectRect(&tmp, &r, &rcClip)) continue;
++        len = g->header ? lstrlenW(g->header) : 0;
++        tr = r;
++        tr.left += 8;
++        tr.right -= 44;
++        tr.top += 4;
++        if (len) GetTextExtentPoint32W(hdc, g->header, len, &sz);
++        SetTextColor(hdc, RGB(114, 114, 114));
++        if (len) DrawTextW(hdc, g->header, len, &tr, DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
++        mid = tr.top + (tr.bottom - tr.top) / 2 + 1;
++        line.left = min(tr.left + sz.cx + 10, tr.right);
++        line.right = r.right - 36;
++        line.top = mid;
++        line.bottom = mid + 1;
++        if (line.right > line.left)
++        {
++            brush = CreateSolidBrush(RGB(193, 204, 226));
++            FillRect(hdc, &line, brush);
++            DeleteObject(brush);
++        }
++        if (g->state & LVGS_COLLAPSIBLE)
++        {
++            POINT tri[3];
++            BOOL collapsed = (g->state & LVGS_COLLAPSED) != 0;
++            gx = r.right - 28;
++            tri[0].x = gx;     tri[0].y = collapsed ? mid - 2 : mid + 2;
++            tri[1].x = gx + 6; tri[1].y = tri[0].y;
++            tri[2].x = gx + 3; tri[2].y = collapsed ? mid + 1 : mid - 1;
++            pen = CreatePen(PS_SOLID, 1, RGB(97, 131, 179));
++            brush = CreateSolidBrush(RGB(97, 131, 179));
++            oldPen = SelectObject(hdc, pen);
++            oldBrush = SelectObject(hdc, brush);
++            Polygon(hdc, tri, 3);
++            SelectObject(hdc, oldPen);
++            SelectObject(hdc, oldBrush);
++            DeleteObject(pen);
++            DeleteObject(brush);
++        }
++    }
++}
++
++static LRESULT LISTVIEW_InsertGroup(LISTVIEW_INFO *infoPtr, INT index, const LVGROUP *lvg)
++{
++    LV_GROUP_INFO *g;
++
++    if (!lvg || !(lvg->mask & LVGF_GROUPID) || group_by_id(infoPtr, lvg->iGroupId, NULL)) return -1;
++    if (!(g = Alloc(sizeof(*g)))) return -1;
++    g->id = lvg->iGroupId;
++    if ((lvg->mask & LVGF_HEADER) && lvg->pszHeader)
++    {
++        INT len = lstrlenW(lvg->pszHeader);
++        if ((g->header = Alloc((len + 1) * sizeof(WCHAR)))) memcpy(g->header, lvg->pszHeader, (len + 1) * sizeof(WCHAR));
++    }
++    if (lvg->mask & LVGF_STATE) g->state = lvg->state & lvg->stateMask;
++    if (index < 0 || index > DPA_GetPtrCount(infoPtr->hdpaGroups)) index = DPA_GetPtrCount(infoPtr->hdpaGroups);
++    index = DPA_InsertPtr(infoPtr->hdpaGroups, index, g);
++    if (index < 0) { group_free(g); return -1; }
++    infoPtr->groupsDirty = TRUE;
++    LISTVIEW_InvalidateList(infoPtr);
++    return index;
++}
++
++static LRESULT LISTVIEW_SetGroupInfo(LISTVIEW_INFO *infoPtr, INT id, const LVGROUP *lvg)
++{
++    LV_GROUP_INFO *g = group_by_id(infoPtr, id, NULL);
++
++    if (!g || !lvg) return -1;
++    if ((lvg->mask & LVGF_HEADER) && lvg->pszHeader)
++    {
++        INT len = lstrlenW(lvg->pszHeader);
++        Free(g->header);
++        if ((g->header = Alloc((len + 1) * sizeof(WCHAR)))) memcpy(g->header, lvg->pszHeader, (len + 1) * sizeof(WCHAR));
++    }
++    if (lvg->mask & LVGF_STATE) g->state = (g->state & ~lvg->stateMask) | (lvg->state & lvg->stateMask);
++    infoPtr->groupsDirty = TRUE;
++    LISTVIEW_InvalidateList(infoPtr);
++    return id;
++}
++
++static LRESULT LISTVIEW_GetGroupInfo(const LISTVIEW_INFO *infoPtr, INT id, LVGROUP *lvg)
++{
++    LV_GROUP_INFO *g = group_by_id(infoPtr, id, NULL);
++
++    if (!g || !lvg) return -1;
++    if (lvg->mask & LVGF_STATE) lvg->state = g->state & lvg->stateMask;
++    if (lvg->mask & LVGF_GROUPID) lvg->iGroupId = g->id;
++    if ((lvg->mask & LVGF_HEADER) && lvg->pszHeader && lvg->cchHeader > 0)
++        lstrcpynW(lvg->pszHeader, g->header ? g->header : L"", lvg->cchHeader);
++    return id;
++}
++
++static LRESULT LISTVIEW_RemoveGroup(LISTVIEW_INFO *infoPtr, INT id)
++{
++    INT index;
++    LV_GROUP_INFO *g = group_by_id(infoPtr, id, &index);
++
++    if (!g) return -1;
++    DPA_DeletePtr(infoPtr->hdpaGroups, index);
++    group_free(g);
++    infoPtr->groupsDirty = TRUE;
++    LISTVIEW_InvalidateList(infoPtr);
++    return index;
++}
++
++static void LISTVIEW_RemoveAllGroups(LISTVIEW_INFO *infoPtr)
++{
++    while (DPA_GetPtrCount(infoPtr->hdpaGroups) > 0)
++        group_free(DPA_DeletePtr(infoPtr->hdpaGroups, DPA_GetPtrCount(infoPtr->hdpaGroups) - 1));
++    infoPtr->groupsDirty = TRUE;
++    LISTVIEW_InvalidateList(infoPtr);
++}
++
+ static BOOL LISTVIEW_Arrange(LISTVIEW_INFO *infoPtr, INT nAlignCode)
+ {
+     void (*next_pos)(LISTVIEW_INFO *, LPPOINT);
+@@ -2782,6 +3091,13 @@
+     INT i;
+ 
+     if (infoPtr->uView != LV_VIEW_ICON && infoPtr->uView != LV_VIEW_SMALLICON) return FALSE;
++
++    /* flxp: group view: the groups, top-aligned */
++    if (groups_active(infoPtr) && (nAlignCode == LVA_DEFAULT || nAlignCode == LVA_ALIGNTOP || nAlignCode == LVA_SNAPTOGRID))
++    {
++        LISTVIEW_ArrangeGroups(infoPtr);
++        return TRUE;
++    }
+   
+     TRACE("nAlignCode=%d\n", nAlignCode);
+ 
+@@ -4147,6 +4463,28 @@
+         }
+     }
+ 
++    /* flxp: themed items have a hot look (LISS_HOT): track the item under
++       the mouse, WM_MOUSELEAVE clears it */
++    if (LISTVIEW_HasThemedItems(infoPtr) && !LISTVIEW_IsHotTracking(infoPtr))
++    {
++        TRACKMOUSEEVENT trackinfo;
++        INT old = infoPtr->nHotItem;
++
++        ht.pt = pt;
++        LISTVIEW_HitTest(infoPtr, &ht, TRUE, TRUE);
++        if (ht.iItem != old)
++        {
++            infoPtr->nHotItem = ht.iItem;
++            if (old >= 0) LISTVIEW_InvalidateItem(infoPtr, old);
++            if (ht.iItem >= 0) LISTVIEW_InvalidateItem(infoPtr, ht.iItem);
++        }
++        trackinfo.cbSize = sizeof(trackinfo);
++        trackinfo.dwFlags = TME_LEAVE;
++        trackinfo.hwndTrack = infoPtr->hwndSelf;
++        trackinfo.dwHoverTime = HOVER_DEFAULT;
++        _TrackMouseEvent(&trackinfo);
++    }
++
+     /* see if we are supposed to be tracking mouse hovering */
+     if (LISTVIEW_IsHotTracking(infoPtr)) {
+         TRACKMOUSEEVENT trackinfo;
+@@ -4254,6 +4592,18 @@
+     item.lParam = 0;
+     if (!isNew && !LISTVIEW_GetItemW(infoPtr, &item)) return FALSE;
+ 
++    /* flxp: group view: the item's group (only stored, no notification) */
++    if (lpItem && (lpLVItem->mask & LVIF_GROUPID) && lpLVItem->iGroupId != I_GROUPIDCALLBACK &&
++        lpItem->iGroupId != lpLVItem->iGroupId)
++    {
++        lpItem->iGroupId = lpLVItem->iGroupId;
++        if (infoPtr->groupView)
++        {
++            infoPtr->groupsDirty = TRUE;
++            LISTVIEW_InvalidateList(infoPtr);
++        }
++    }
++
+     TRACE("oldState=%x, newState=%x\n", item.state, lpLVItem->state);
+     /* determine what fields will change */    
+     if ((lpLVItem->mask & LVIF_STATE) && ((item.state ^ lpLVItem->state) & stateMask & ~infoPtr->uCallbackMask))
+@@ -4623,6 +4973,8 @@
+     HIMAGELIST himl;
+     UINT format;
+     RECT *focus;
++    RECT rcTheme;
++    int themed;
+ 
+     /* now check if we need to update the focus rectangle */
+     focus = infoPtr->bFocus && (item->state & LVIS_FOCUSED) ? &infoPtr->rcFocus : 0;
+@@ -4662,7 +5014,55 @@
+     else
+         background = &rcSelect;
+ 
+-    if (nmlvcd->clrTextBk != CLR_NONE)
++    /* flxp: the theme's LVP_LISTITEM behind the item (LISTVIEW_ThemedItemState):
++       icon view the item box, details the row (full row select) or icon and
++       label, list/small icons icon and label; the label is not filled, the
++       focus rectangle goes 1 px inside the part (4051) */
++    themed = (item->iSubItem == 0 || (infoPtr->uView == LV_VIEW_DETAILS && (infoPtr->dwLvExStyle & LVS_EX_FULLROWSELECT))) ?
++             LISTVIEW_ThemedItemState(infoPtr, nmlvcd->nmcd.uItemState, item->state) : 0;
++    if (themed && item->iSubItem == 0)
++    {
++        if (infoPtr->uView == LV_VIEW_ICON)
++            UnionRect(&rcTheme, &rcBox, &rcLabel);
++        else if (infoPtr->uView == LV_VIEW_DETAILS && (infoPtr->dwLvExStyle & LVS_EX_FULLROWSELECT))
++        {
++            rcTheme = rcBox;
++            if (DPA_GetPtrCount(infoPtr->hdpaColumns) > 0)
++            {
++                INT last = SendMessageW(infoPtr->hwndHeader, HDM_ORDERTOINDEX, DPA_GetPtrCount(infoPtr->hdpaColumns) - 1, 0);
++                INT first = SendMessageW(infoPtr->hwndHeader, HDM_ORDERTOINDEX, 0, 0);
++                rcTheme.left = pos->x + LISTVIEW_GetColumnInfo(infoPtr, first)->rcHeader.left;
++                rcTheme.right = pos->x + LISTVIEW_GetColumnInfo(infoPtr, last)->rcHeader.right;
++            }
++        }
++        else
++        {
++            RECT text = rcLabel;
++            SIZE sz;
++            HDC hdc = nmlvcd->nmcd.hdc;
++            /* the label as wide as its text (List's label is the column width) */
++            if (GetTextExtentPoint32W(hdc, item->pszText ? item->pszText : L"", item->pszText ? lstrlenW(item->pszText) : 0, &sz))
++                text.right = min(text.right, text.left + IMAGE_PADDING + sz.cx + 2 * LABEL_HOR_PADDING);
++            UnionRect(&rcTheme, &rcIcon, &text);
++        }
++        /* flxp: hot and selected: 4051's Slate has no HOTSELECTED (the class's
++           white BORDERFILL showed: a hovered selected item looked unselected;
++           the checked build's is a copy of HOT): the selection with HOT over it
++           unless the theme defines the state itself (4074's lighter peach) */
++        PROPERTYORIGIN origin = PO_NOTFOUND;
++        if (themed == LISS_HOTSELECTED &&
++            (FAILED(GetThemePropertyOrigin(GetWindowTheme(infoPtr->hwndSelf), LVP_LISTITEM, LISS_HOTSELECTED, 3001 /* TMT_IMAGEFILE */, &origin)) || origin != PO_STATE))
++        {
++            DrawThemeBackground(GetWindowTheme(infoPtr->hwndSelf), nmlvcd->nmcd.hdc, LVP_LISTITEM, LISS_SELECTED, &rcTheme, NULL);
++            themed = LISS_HOT;
++        }
++        DrawThemeBackground(GetWindowTheme(infoPtr->hwndSelf), nmlvcd->nmcd.hdc, LVP_LISTITEM, themed, &rcTheme, NULL);
++    }
++
++    /* flxp: on a transparent icon list (the desktop) a selected label still
++       gets its highlight box, as XP's (prepaint_setup made the DC opaque) */
++    if (!themed && (nmlvcd->clrTextBk != CLR_NONE ||
++        (infoPtr->uView == LV_VIEW_ICON && GetBkMode(nmlvcd->nmcd.hdc) == OPAQUE)))
+         ExtTextOutW(nmlvcd->nmcd.hdc, background->left, background->top, ETO_OPAQUE, background, NULL, 0, NULL);
+ 
+     if (item->state & LVIS_FOCUSED)
+@@ -4693,6 +5093,11 @@
+         }
+         else
+             infoPtr->rcFocus = rcLabel;
++        if (themed && item->iSubItem == 0)
++        {
++            infoPtr->rcFocus = rcTheme;
++            InflateRect(&infoPtr->rcFocus, -1, -1);
++        }
+     }
+ 
+     /* state icons */
+@@ -4714,15 +5119,51 @@
+ 
+         TRACE("iImage=%d\n", item->iImage);
+ 
+-        if (item->state & (LVIS_SELECTED | LVIS_CUT) && infoPtr->bFocus)
++        BOOL border_select = infoPtr->uView == LV_VIEW_ICON && (infoPtr->dwLvExStyle & LVS_EX_BORDERSELECT);
++
++        if ((item->state & (LVIS_SELECTED | LVIS_CUT) && infoPtr->bFocus) || (item->state & LVIS_DROPHILITED))   /* flxp: drop target */
+             style = ILD_SELECTED;
+         else
+             style = ILD_NORMAL;
++        /* flxp: border select leaves a selected image as it is (XP lvicon.c) */
++        if (border_select && !(item->state & LVIS_CUT)) style = ILD_NORMAL;
++        /* flxp: so does a themed item background (4051) */
++        if (themed && !(item->state & LVIS_CUT)) style = ILD_NORMAL;
+ 
+         ImageList_DrawEx(himl, item->iImage, nmlvcd->nmcd.hdc, rcIcon.left, rcIcon.top,
+-                         rcIcon.right - rcIcon.left, rcIcon.bottom - rcIcon.top, infoPtr->clrBk,
++                         rcIcon.right - rcIcon.left, rcIcon.bottom - rcIcon.top, themed ? CLR_NONE : infoPtr->clrBk,
+                          item->state & LVIS_CUT ? RGB(255, 255, 255) : CLR_DEFAULT,
+                          style | (item->state & LVIS_OVERLAYMASK));
++
++        /* flxp: LVS_EX_BORDERSELECT (XP lvicon.c, the thumbnail view): a 1 px
++           outline over the icon cell's edge in the outline colour (default
++           COLOR_BTNFACE); selected, a 3 px frame outside the cell instead,
++           COLOR_HIGHLIGHT with the focus, COLOR_BTNFACE without
++           (SHOutlineRectThickness) */
++        if (border_select)
++        {
++            RECT r = rcIcon;
++            int cp = 1;
++            COLORREF clr = infoPtr->clrOutline == CLR_DEFAULT ? comctl32_color.clrBtnFace : infoPtr->clrOutline;
++            BOOL selected = (item->state & LVIS_DROPHILITED) ||
++                ((item->state & LVIS_SELECTED) && (infoPtr->bFocus || (infoPtr->dwStyle & LVS_SHOWSELALWAYS)));
++            if (selected && !themed)   /* flxp: a themed selection is the part around it */
++            {
++                cp = 3;
++                clr = (infoPtr->bFocus || (item->state & LVIS_DROPHILITED)) ? comctl32_color.clrHighlight : comctl32_color.clrBtnFace;
++                InflateRect(&r, cp, cp);
++            }
++            {
++                HDC hdc = nmlvcd->nmcd.hdc;
++                COLORREF save = SetBkColor(hdc, clr);
++                RECT e;
++                SetRect(&e, r.left, r.top, r.right, r.top + cp);       ExtTextOutW(hdc, 0, 0, ETO_OPAQUE, &e, NULL, 0, NULL);
++                SetRect(&e, r.left, r.top, r.left + cp, r.bottom);     ExtTextOutW(hdc, 0, 0, ETO_OPAQUE, &e, NULL, 0, NULL);
++                SetRect(&e, r.right - cp, r.top, r.right, r.bottom);   ExtTextOutW(hdc, 0, 0, ETO_OPAQUE, &e, NULL, 0, NULL);
++                SetRect(&e, r.left, r.bottom - cp, r.right, r.bottom); ExtTextOutW(hdc, 0, 0, ETO_OPAQUE, &e, NULL, 0, NULL);
++                SetBkColor(hdc, save);
++            }
++        }
+     }
+ 
+     /* Don't bother painting item being edited */
+@@ -4752,6 +5193,15 @@
+     if (infoPtr->uView == LV_VIEW_DETAILS && infoPtr->dwLvExStyle & LVS_EX_GRIDLINES)
+         rcLabel.bottom--;
+ 
++    /* flxp: icon labels on a transparent list (the desktop) get XP's drop
++       shadow (nt5src lvicon.c: clrBk CLR_NONE and not selected -> SHDT_SHADOWTEXT;
++       here: drawn transparent, i.e. not highlighted
++       -> DrawShadowText(white, black, 2, 2)); XP switches it with the
++       ListviewShadow setting, Vista with LVS_EX_TRANSPARENTSHADOWTEXT */
++    if (infoPtr->uView == LV_VIEW_ICON && infoPtr->clrBk == CLR_NONE && GetBkMode(nmlvcd->nmcd.hdc) == TRANSPARENT &&
++        (infoPtr->dwLvExStyle & LVS_EX_TRANSPARENTSHADOWTEXT))
++        DrawShadowText(nmlvcd->nmcd.hdc, item->pszText, -1, &rcLabel, format, nmlvcd->clrText, RGB(0, 0, 0), 2, 2);
++    else
+     DrawTextW(nmlvcd->nmcd.hdc, item->pszText, -1, &rcLabel, format);
+ }
+ 
+@@ -4785,7 +5235,7 @@
+     /* get information needed for drawing the item */
+     lvItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM | LVIF_STATE;
+     if (infoPtr->uView == LV_VIEW_DETAILS) lvItem.mask |= LVIF_INDENT;
+-    lvItem.stateMask = LVIS_SELECTED | LVIS_FOCUSED | LVIS_STATEIMAGEMASK | LVIS_CUT | LVIS_OVERLAYMASK;
++    lvItem.stateMask = LVIS_SELECTED | LVIS_FOCUSED | LVIS_STATEIMAGEMASK | LVIS_CUT | LVIS_OVERLAYMASK | LVIS_DROPHILITED;   /* flxp: drop target */
+     lvItem.iItem = nItem;
+     lvItem.iSubItem = 0;
+     lvItem.state = 0;
+@@ -5252,6 +5702,9 @@
+     cdmode = notify_customdraw(infoPtr, CDDS_PREPAINT, &nmlvcd);
+     if (cdmode & CDRF_SKIPDEFAULT) goto enddraw;
+ 
++    /* flxp: group view: the group headers */
++    if (groups_active(infoPtr)) LISTVIEW_RefreshGroups(infoPtr, hdc);
++
+     /* nothing to draw */
+     if(infoPtr->nItemCount == 0) goto enddraw;
+ 
+@@ -6208,6 +6661,14 @@
+     rcItem.left = LVIR_BOUNDS;
+     if (!LISTVIEW_GetItemRect(infoPtr, nItem, &rcItem)) return FALSE;
+ 
++    /* flxp: group view: an item in its group's first row brings the header along */
++    if (groups_active(infoPtr) && nItem >= 0 && nItem < infoPtr->nItemCount)
++    {
++        LV_GROUP_INFO *g = group_by_id(infoPtr, item_group(infoPtr, nItem), NULL);
++        if (g && !(g->state & LVGS_HIDDEN) && (LONG_PTR)DPA_GetPtr(infoPtr->hdpaPosY, nItem) == g->top + group_header_height(infoPtr))
++            rcItem.top -= group_header_height(infoPtr);
++    }
++
+     if (bPartial && IntersectRect(&rcTemp, &infoPtr->rcList, &rcItem)) return TRUE;
+     
+     if (rcItem.left < infoPtr->rcList.left || rcItem.right > infoPtr->rcList.right)
+@@ -6781,6 +7242,9 @@
+     else
+ 	pItemHdr = &lpItem->hdr;
+ 
++    /* flxp: group view */
++    if ((lpLVItem->mask & LVIF_GROUPID) && !lpLVItem->iSubItem) lpLVItem->iGroupId = lpItem->iGroupId;
++
+     /* Do we need to query the state from the app? */
+     if ((lpLVItem->mask & LVIF_STATE) && infoPtr->uCallbackMask && (!lpLVItem->iSubItem || is_subitem_invalid))
+     {
+@@ -7800,6 +8264,7 @@
+     if (!is_assignable_item(lpLVItem, infoPtr->dwStyle)) return -1;
+ 
+     if (!(lpItem = Alloc(sizeof(*lpItem)))) return -1;
++    lpItem->iGroupId = I_GROUPIDNONE;   /* flxp: group view */
+     
+     /* insert item in listview control data structure */
+     if ( !(hdpaSubItems = DPA_Create(8)) ) goto fail;
+@@ -7921,6 +8386,7 @@
+ 
+ 	LISTVIEW_MoveIconTo(infoPtr, nItem, &pt, TRUE);
+     }
++    if (infoPtr->groupView) infoPtr->groupsDirty = TRUE;   /* flxp: group view */
+ 
+     /* now is the invalidation fun */
+     LISTVIEW_ScrollOnInsert(infoPtr, nItem, 1);
+@@ -9018,6 +9484,16 @@
+     if (!pt || nItem < 0 || nItem >= infoPtr->nItemCount ||
+ 	!(infoPtr->uView == LV_VIEW_ICON || infoPtr->uView == LV_VIEW_SMALLICON)) return FALSE;
+ 
++    /* flxp: the first paint after the items were (re)inserted arranges every
++       icon when no item metrics exist yet, which threw away positions set
++       before it (the desktop restores its saved positions right after filling
++       the list); the conversion below needs nItemWidth too: compute them now */
++    if (infoPtr->bNoItemMetrics)
++    {
++        infoPtr->bNoItemMetrics = FALSE;
++        LISTVIEW_UpdateItemSize(infoPtr);
++    }
++
+     Pt = *pt;
+     LISTVIEW_GetOrigin(infoPtr, &Origin);
+ 
+@@ -9563,6 +10039,7 @@
+   SetWindowLongPtrW(hwnd, 0, (DWORD_PTR)infoPtr);
+ 
+   infoPtr->hwndSelf = hwnd;
++  infoPtr->bHideFocus = TRUE;
+   infoPtr->dwStyle = lpcs->style;    /* Note: may be changed in WM_CREATE */
+   map_style_view(infoPtr);
+   /* determine the type of structures to use */
+@@ -9573,6 +10050,7 @@
+   infoPtr->clrBk = CLR_NONE;
+   infoPtr->clrText = CLR_DEFAULT;
+   infoPtr->clrTextBk = CLR_DEFAULT;
++  infoPtr->clrOutline = CLR_DEFAULT;
+   LISTVIEW_SetBkColor(infoPtr, comctl32_color.clrWindow);
+ 
+   /* set default values */
+@@ -9609,6 +10087,7 @@
+   if (!(infoPtr->hdpaItemIds = DPA_Create(10))) goto fail;
+   if (!(infoPtr->hdpaPosX  = DPA_Create(10))) goto fail;
+   if (!(infoPtr->hdpaPosY  = DPA_Create(10))) goto fail;
++  if (!(infoPtr->hdpaGroups = DPA_Create(4))) goto fail;   /* flxp: group view */
+   if (!(infoPtr->hdpaColumns = DPA_Create(10))) goto fail;
+ 
+   return DefWindowProcW(hwnd, WM_NCCREATE, wParam, (LPARAM)lpcs);
+@@ -10055,6 +10534,13 @@
+ 
+   TRACE("(nVirtualKey=%d, lKeyData=%ld)\n", nVirtualKey, lKeyData);
+ 
++  /* flxp: the keyboard is used: the focus rectangle shows from now on */
++  if (infoPtr->bHideFocus && nVirtualKey != VK_CONTROL && nVirtualKey != VK_SHIFT && nVirtualKey != VK_MENU)
++  {
++      infoPtr->bHideFocus = FALSE;
++      if (infoPtr->nFocusedItem >= 0) LISTVIEW_InvalidateItem(infoPtr, infoPtr->nFocusedItem);
++  }
++
+   /* send LVN_KEYDOWN notification */
+   nmKeyDown.wVKey = nVirtualKey;
+   nmKeyDown.flags = 0;
+@@ -10309,6 +10795,24 @@
+   infoPtr->bMarqueeSelect = FALSE;
+   infoPtr->bScrolling = FALSE;
+ 
++  /* flxp: group view: a click on a collapsible group's header folds it */
++  {
++      LV_GROUP_INFO *g = group_header_at(infoPtr, x, y);
++      if (g)
++      {
++          infoPtr->bLButtonDown = FALSE;
++          if (!infoPtr->bFocus) SetFocus(infoPtr->hwndSelf);
++          if (g->state & LVGS_COLLAPSIBLE)
++          {
++              g->state ^= LVGS_COLLAPSED;
++              LISTVIEW_ArrangeGroups(infoPtr);
++              LISTVIEW_UpdateScroll(infoPtr);
++              LISTVIEW_InvalidateList(infoPtr);
++          }
++          return 0;
++      }
++  }
++
+   lvHitTestInfo.pt.x = x;
+   lvHitTestInfo.pt.y = y;
+ 
+@@ -10495,6 +10999,10 @@
+   DPA_Destroy(infoPtr->hdpaItemIds);
+   DPA_Destroy(infoPtr->hdpaPosX);
+   DPA_Destroy(infoPtr->hdpaPosY);
++  /* flxp: group view */
++  while (DPA_GetPtrCount(infoPtr->hdpaGroups) > 0)
++      group_free(DPA_DeletePtr(infoPtr->hdpaGroups, 0));
++  DPA_Destroy(infoPtr->hdpaGroups);
+   /* columns */
+   for (i = 0; i < DPA_GetPtrCount(infoPtr->hdpaColumns); i++)
+       Free(DPA_GetPtr(infoPtr->hdpaColumns, i));
+@@ -10790,6 +11298,14 @@
+ 	    LISTVIEW_Arrange(infoPtr, LVA_DEFAULT);
+ 	LISTVIEW_UpdateScroll(infoPtr);
+     }
++    /* flxp: group view: items or groups changed since the last arrange */
++    if (infoPtr->groupsDirty && groups_active(infoPtr))
++    {
++        if (infoPtr->bNoItemMetrics) { infoPtr->bNoItemMetrics = FALSE; LISTVIEW_UpdateItemSize(infoPtr); }
++        LISTVIEW_ArrangeGroups(infoPtr);
++        LISTVIEW_UpdateScroll(infoPtr);
++        LISTVIEW_InvalidateList(infoPtr);
++    }
+ 
+     if (infoPtr->hwndHeader)  UpdateWindow(infoPtr->hwndHeader);
+ 
+@@ -11448,7 +11964,17 @@
+   case LVM_EDITLABELW:
+     return (LRESULT)LISTVIEW_EditLabelT(infoPtr, (INT)wParam,
+                                         uMsg == LVM_EDITLABELW);
+-  /* case LVM_ENABLEGROUPVIEW: */
++  case LVM_ENABLEGROUPVIEW:   /* flxp: group view (icon views) */
++    if (!wParam == !infoPtr->groupView) return 0;
++    infoPtr->groupView = wParam != 0;
++    infoPtr->groupsDirty = TRUE;
++    if (infoPtr->uView == LV_VIEW_ICON || infoPtr->uView == LV_VIEW_SMALLICON)
++    {
++        LISTVIEW_Arrange(infoPtr, LVA_DEFAULT);
++        LISTVIEW_UpdateScroll(infoPtr);
++    }
++    LISTVIEW_InvalidateList(infoPtr);
++    return 1;
+ 
+   case LVM_ENSUREVISIBLE:
+     return LISTVIEW_EnsureVisible(infoPtr, (INT)wParam, (BOOL)lParam);
+@@ -11558,7 +12084,8 @@
+     LISTVIEW_GetOrigin(infoPtr, (LPPOINT)lParam);
+     return TRUE;
+ 
+-  /* case LVM_GETOUTLINECOLOR: */
++  case LVM_GETOUTLINECOLOR:   /* flxp */
++    return infoPtr->clrOutline;
+ 
+   case LVM_GETSELECTEDCOLUMN:
+     return infoPtr->selected_column;
+@@ -11618,7 +12145,8 @@
+     return LISTVIEW_InsertColumnT(infoPtr, (INT)wParam, (LPLVCOLUMNW)lParam,
+                                   uMsg == LVM_INSERTCOLUMNW);
+ 
+-  /* case LVM_INSERTGROUP: */
++  case LVM_INSERTGROUP:       /* flxp */
++    return LISTVIEW_InsertGroup(infoPtr, (INT)wParam, (const LVGROUP *)lParam);
+ 
+   /* case LVM_INSERTGROUPSORTED: */
+ 
+@@ -11628,7 +12156,33 @@
+ 
+   /* case LVM_INSERTMARKHITTEST: */
+ 
+-  /* case LVM_ISGROUPVIEWENABLED: */
++  case LVM_ISGROUPVIEWENABLED:   /* flxp */
++    return infoPtr->groupView;
++
++  case LVM_SETGROUPINFO:      /* flxp */
++    return LISTVIEW_SetGroupInfo(infoPtr, (INT)wParam, (const LVGROUP *)lParam);
++
++  case LVM_GETGROUPINFO:      /* flxp */
++    return LISTVIEW_GetGroupInfo(infoPtr, (INT)wParam, (LVGROUP *)lParam);
++
++  case LVM_GETGROUPSTATE:     /* flxp */
++  {
++    LV_GROUP_INFO *g = group_by_id(infoPtr, (INT)wParam, NULL);
++    return g ? (g->state & (UINT)lParam) : 0;
++  }
++
++  case LVM_GETGROUPCOUNT:     /* flxp */
++    return DPA_GetPtrCount(infoPtr->hdpaGroups);
++
++  case LVM_HASGROUP:          /* flxp */
++    return group_by_id(infoPtr, (INT)wParam, NULL) != NULL;
++
++  case LVM_REMOVEGROUP:       /* flxp */
++    return LISTVIEW_RemoveGroup(infoPtr, (INT)wParam);
++
++  case LVM_REMOVEALLGROUPS:   /* flxp */
++    LISTVIEW_RemoveAllGroups(infoPtr);
++    return 0;
+ 
+   case LVM_ISITEMVISIBLE:
+     return LISTVIEW_IsItemVisible(infoPtr, (INT)wParam);
+@@ -11734,7 +12288,12 @@
+     return LISTVIEW_SetItemTextT(infoPtr, (INT)wParam, (LPLVITEMW)lParam,
+                                  uMsg == LVM_SETITEMTEXTW);
+ 
+-  /* case LVM_SETOUTLINECOLOR: */
++  case LVM_SETOUTLINECOLOR: { /* flxp */
++    COLORREF old = infoPtr->clrOutline;
++    infoPtr->clrOutline = (COLORREF)lParam;
++    LISTVIEW_InvalidateList(infoPtr);
++    return old;
++  }
+ 
+   case LVM_SETSELECTEDCOLUMN:
+     infoPtr->selected_column = (INT)wParam;
+@@ -11817,6 +12376,17 @@
+   case WM_KEYDOWN:
+     return LISTVIEW_KeyDown(infoPtr, (INT)wParam, (LONG)lParam);
+ 
++  /* flxp: the focus rectangle's UI state (only these lists keep one) */
++  case WM_UPDATEUISTATE:
++  case WM_CHANGEUISTATE:
++    if (HIWORD(wParam) & UISF_HIDEFOCUS)
++    {
++        if (LOWORD(wParam) == UIS_SET) infoPtr->bHideFocus = TRUE;
++        else if (LOWORD(wParam) == UIS_CLEAR) infoPtr->bHideFocus = FALSE;
++        if (infoPtr->nFocusedItem >= 0) LISTVIEW_InvalidateItem(infoPtr, infoPtr->nFocusedItem);
++    }
++    return 0;
++
+   case WM_KILLFOCUS:
+     return LISTVIEW_KillFocus(infoPtr);
+ 
+@@ -11835,6 +12405,15 @@
+   case WM_MOUSEHOVER:
+     return LISTVIEW_MouseHover(infoPtr, (SHORT)LOWORD(lParam), (SHORT)HIWORD(lParam));
+ 
++  case WM_MOUSELEAVE:   /* flxp: themed hot item (LISTVIEW_MouseMove) */
++    if (LISTVIEW_HasThemedItems(infoPtr) && !LISTVIEW_IsHotTracking(infoPtr) && infoPtr->nHotItem >= 0)
++    {
++        INT old = infoPtr->nHotItem;
++        infoPtr->nHotItem = -1;
++        LISTVIEW_InvalidateItem(infoPtr, old);
++    }
++    return 0;
++
+   case WM_NCDESTROY:
+     return LISTVIEW_NCDestroy(infoPtr);
+ 

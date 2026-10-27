@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Explorer
+GenericName=File Manager
+Comment=Browse files and folders the Windows XP way
+Exec=@BINDIR@/flxp %F
+TryExec=@BINDIR@/flxp
+Icon=@DATADIR@/res/icons/mycomputer.ico
+Terminal=false
+MimeType=inode/directory;
+Categories=System;FileManager;

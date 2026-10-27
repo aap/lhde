@@ -1,0 +1,41 @@
+--- a/dlls/comctl32/comboex.c (wine-10.0)
++++ b/vendor/wine/comctl32/comboex.c
+@@ -378,10 +378,10 @@
+     if (!infoPtr->hwndEdit) return;
+ 
+     if (infoPtr->himl && !(infoPtr->dwExtStyle & CBES_EX_NOEDITIMAGEINDENT)) {
+-    	IMAGEINFO iinfo;
+-        iinfo.rcImage.left = iinfo.rcImage.right = 0;
+-	ImageList_GetImageInfo(infoPtr->himl, 0, &iinfo);
+-	xioff = iinfo.rcImage.right - iinfo.rcImage.left + CBE_SEP;
++        /* flxp: XP CCGetIconSize: the list's icon size, also while it is still empty */
++        INT cx = 0, cy = 0;
++        ImageList_GetIconSize(infoPtr->himl, &cx, &cy);
++        xioff = cx + CBE_SEP;
+     }  else xioff = 0;
+ 
+     GetClientRect (infoPtr->hwndCombo, &rect);
+@@ -391,8 +391,10 @@
+     /* reposition the Edit control based on whether icon exists */
+     COMBOEX_GetComboFontSize (infoPtr, &mysize);
+     TRACE("Combo font x %ld, y %ld\n", mysize.cx, mysize.cy);
+-    x = xioff + CBE_STARTOFFSET + 1;
+-    w = rect.right-rect.left - x - GetSystemMetrics(SM_CXVSCROLL) - 1;
++    /* flxp: XP ComboEx_SizeEditBox: one border in from the combo client minus
++     * its 2px edge, after the icon and COMBO_MARGIN (4) */
++    x = rect.left + GetSystemMetrics(SM_CXBORDER) + xioff;
++    w = rect.right - x - GetSystemMetrics(SM_CXVSCROLL);
+     h = mysize.cy + 1;
+     y = rect.bottom - h - 1;
+ 
+@@ -1343,7 +1345,9 @@
+ 
+     if (TRACE_ON(comboex)) COMBOEX_DumpItem (item);
+ 
+-    xbase = CBE_STARTOFFSET;
++    /* flxp: XP ComboEx_OnDrawItem: the edit field's image starts at the item
++     * rect's left, list items are indented by COMBO_BORDER (3) */
++    xbase = (dis->itemState & ODS_COMBOEXLBOX) ? dis->rcItem.left + 3 : dis->rcItem.left;
+     if ((item->mask & CBEIF_INDENT) && (dis->itemState & ODS_COMBOEXLBOX)) {
+ 	INT indent = item->iIndent;
+ 	if (indent == I_INDENTCALLBACK) {

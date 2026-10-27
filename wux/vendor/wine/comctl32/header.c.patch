@@ -1,0 +1,85 @@
+--- a/dlls/comctl32/header.c (wine-10.0)
++++ b/vendor/wine/comctl32/header.c
+@@ -287,6 +287,53 @@
+     }
+ }
+ 
++/* flxp: true when the normal item image is mostly see-through (a Vista header
++ * item: a separator line on the background), judged by its centre pixel drawn
++ * over black and over white; remembered for the last theme handle */
++static HTHEME see_through_theme;     /* flxp: forgotten on WM_THEMECHANGED (a handle may be reused) */
++static BOOL header_items_see_through (HTHEME theme)
++{
++    static BOOL last_out;
++    RECT r = { 0, 0, 40, 24 };
++    HDC dc;
++    HBITMAP bmp, old;
++    BITMAPINFO bi = {{ sizeof(BITMAPINFOHEADER), 40, -24, 1, 32, BI_RGB }};
++    DWORD *bits;
++    BOOL out;
++    if (theme == see_through_theme) return last_out;
++    see_through_theme = theme;
++    last_out = FALSE;
++    if (!IsThemeBackgroundPartiallyTransparent (theme, HP_HEADERITEM, HIS_NORMAL)) return FALSE;
++    dc = CreateCompatibleDC (0);
++    bmp = CreateDIBSection (dc, &bi, DIB_RGB_COLORS, (void **)&bits, NULL, 0);
++    if (!bmp) { DeleteDC (dc); return FALSE; }
++    old = SelectObject (dc, bmp);
++    memset (bits, 0, 40 * 24 * 4);
++    DrawThemeBackground (theme, dc, HP_HEADERITEM, HIS_NORMAL, &r, NULL);
++    out = !(bits[12 * 40 + 20] & 0xffffff);
++    memset (bits, 0xff, 40 * 24 * 4);
++    DrawThemeBackground (theme, dc, HP_HEADERITEM, HIS_NORMAL, &r, NULL);
++    out = out && (bits[12 * 40 + 20] & 0xffffff) == 0xffffff;
++    SelectObject (dc, old);
++    DeleteObject (bmp);
++    DeleteDC (dc);
++    last_out = out;
++    return out;
++}
++
++/* flxp: Vista-era styles (5112's aero) have see-through header items (a
++ * separator line, glows for hot/pressed) and a see-through Header background:
++ * the bar is the window colour under them. XP-era items are opaque but for a
++ * colour-keyed edge: nothing drawn, XP's look does not change. */
++static BOOL header_see_through_background (HTHEME theme, HDC hdc, const RECT *r)
++{
++    if (!header_items_see_through (theme)) return FALSE;
++    FillRect (hdc, r, GetSysColorBrush (COLOR_WINDOW));
++    if (IsThemePartDefined (theme, 0, 0))
++        DrawThemeBackground (theme, hdc, 0, 0, r, NULL);
++    return TRUE;
++}
++
+ static void
+ HEADER_FillItemFrame(HEADER_INFO *infoPtr, HDC hdc, RECT *r, const HEADER_ITEM *item, BOOL hottrack)
+ {
+@@ -294,6 +341,7 @@
+ 
+     if (theme) {
+         int state = (item->bDown) ? HIS_PRESSED : (hottrack ? HIS_HOT : HIS_NORMAL);
++        header_see_through_background (theme, hdc, r);
+         DrawThemeBackground (theme, hdc, HP_HEADERITEM, state, r, NULL);
+         GetThemeBackgroundContentRect (theme, hdc, HP_HEADERITEM, state, r, r);
+     }
+@@ -652,7 +700,11 @@
+     rcRest.left = x;
+     if ((x <= rect.right) && RectVisible(hdc, &rcRest) && (infoPtr->uNumItem > 0)) {
+         if (theme != NULL) {
+-            DrawThemeBackground(theme, hdc, HP_HEADERITEM, HIS_NORMAL, &rcRest, NULL);
++            /* flxp: XP's header.c draws the empty rest with part 0 (the bar);
++             * Wine's normal item is the same look in XP's styles */
++            if (header_see_through_background (theme, hdc, &rcRest)) ;
++            else
++                DrawThemeBackground(theme, hdc, HP_HEADERITEM, HIS_NORMAL, &rcRest, NULL);
+         }
+         else if (infoPtr->dwStyle & HDS_FLAT) {
+             hbrBk = GetSysColorBrush(COLOR_3DFACE);
+@@ -2237,6 +2289,7 @@
+ 	    return HEADER_Size (infoPtr);
+ 
+         case WM_THEMECHANGED:
++            see_through_theme = NULL;     /* flxp */
+             return HEADER_ThemeChanged (infoPtr);
+ 
+         case WM_PRINTCLIENT:

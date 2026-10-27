@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.freedesktop.impl.portal.desktop.flxp
+Exec=@BINDIR@/flxp-portal

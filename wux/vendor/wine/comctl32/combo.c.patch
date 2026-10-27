@@ -1,0 +1,27 @@
+--- a/dlls/comctl32/combo.c (wine-10.0)
++++ b/vendor/wine/comctl32/combo.c
+@@ -339,6 +339,24 @@
+          */
+         combo->buttonRect.left = combo->buttonRect.right - GetSystemMetrics(SM_CXVSCROLL);
+         combo->textRect.right = combo->buttonRect.left;
++
++        /* flxp: XP comboini.c: a themed button spans the whole height inside the
++         * theme's BorderSize (Luna: 1), right-aligned at the same inset */
++        {
++            HTHEME theme = GetWindowTheme(combo->self);
++            int border;
++            if (theme && SUCCEEDED(GetThemeInt(theme, 0, CBXS_NORMAL, TMT_BORDERSIZE, &border)))
++            {
++                RECT client;
++                GetClientRect(combo->self, &client);
++                combo->buttonRect.top = border;
++                /* the combo's own (closed) height, as XP's cyCombo */
++                combo->buttonRect.bottom = CBGetTextAreaHeight(combo, FALSE) + 2*COMBO_YBORDERSIZE() - border;
++                combo->buttonRect.right = client.right - border;
++                combo->buttonRect.left = combo->buttonRect.right - GetSystemMetrics(SM_CXVSCROLL);
++                combo->textRect.right = combo->buttonRect.left;
++            }
++        }
+     }
+ 
+     /* In the case of a dropdown, there is an additional spacing between the text area and the button. */

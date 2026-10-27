@@ -1,0 +1,222 @@
+--- a/dlls/comctl32/rebar.c (wine-10.0)
++++ b/vendor/wine/comctl32/rebar.c
+@@ -186,6 +186,7 @@
+     INT      iGrabbedBand;/* band number of band whose gripper was grabbed */
+ 
+     HDPA     bands;       /* pointer to the array of rebar bands */
++    MARGINS  mBand;       /* flxp: themed RP_BAND content margins (XP rebar.cpp _mBand) */
+ } REBAR_INFO;
+ 
+ /* fStatus flags */
+@@ -304,6 +305,20 @@
+ 
+ static const WCHAR themeClass[] = L"Rebar";
+ 
++/* flxp: XP's _CacheThemeInfo: cache the band content margins. XP lays every
++ * band out inside them (x starts at cxLeftWidth, each band adds left+right,
++ * each row adds top+bottom); Luna's Rebar.Band has ContentMargins 2,0,0,0. */
++static void REBAR_CacheThemeInfo(REBAR_INFO *infoPtr)
++{
++    HTHEME theme = GetWindowTheme(infoPtr->hwndSelf);
++    memset(&infoPtr->mBand, 0, sizeof(infoPtr->mBand));
++    if (theme && FAILED(GetThemeMargins(theme, NULL, RP_BAND, 0, TMT_CONTENTMARGINS, NULL, &infoPtr->mBand)))
++        memset(&infoPtr->mBand, 0, sizeof(infoPtr->mBand));
++}
++
++/* flxp: horizontal space a band takes besides its cx (XP _FudgeWidth without the edge) */
++#define BAND_MARGINS_CX(infoPtr) ((infoPtr)->mBand.cxLeftWidth + (infoPtr)->mBand.cxRightWidth)
++
+ static CHAR *
+ REBAR_FmtStyle(char *buffer, UINT style)
+ {
+@@ -631,8 +646,25 @@
+ 		    lpBand->clrFore;
+ 	    oldcolor = SetTextColor (hdc, new);
+ 	}
+-	DrawTextW (hdc, lpBand->lpText, -1, &lpBand->rcCapText,
+-		   DT_CENTER | DT_VCENTER | DT_SINGLELINE);
++	{
++	    /* flxp: XP _DrawBand: the text starts at the caption's left, its top is
++	     * (band centre - font height / 2 - 1), drawn with prefix processing,
++	     * through DrawThemeText (theme font and TextColor) when themed */
++	    TEXTMETRICW tm;
++	    RECT rcText = lpBand->rcCapText;
++	    UINT uFormat = DT_SINGLELINE;
++	    int yCenter = (lpBand->rcBand.top + lpBand->rcBand.bottom) / 2;
++	    if (!theme || FAILED(GetThemeTextMetrics (theme, hdc, 0, 0, &tm)))
++	        GetTextMetricsW (hdc, &tm);
++	    if (!(infoPtr->dwStyle & CCS_VERT)) {
++	        rcText.top = yCenter - tm.tmHeight / 2 - 1;
++	        rcText.bottom = rcText.top + tm.tmHeight;
++	    }
++	    if (SendMessageW (infoPtr->hwndSelf, WM_QUERYUISTATE, 0, 0) & UISF_HIDEACCEL)
++	        uFormat |= DT_HIDEPREFIX;
++	    if (!theme || FAILED(DrawThemeText (theme, hdc, 0, 0, lpBand->lpText, -1, uFormat, 0, &rcText)))
++	        DrawTextW (hdc, lpBand->lpText, -1, &rcText, uFormat);
++	}
+ 	if (oldBkMode != TRANSPARENT)
+ 	    SetBkMode (hdc, oldBkMode);
+ 	if (lpBand->clrFore != CLR_NONE)
+@@ -778,6 +810,9 @@
+ 
+           lpBand->rcChild.left  = lpBand->rcBand.left + lpBand->cxHeader;
+           lpBand->rcChild.right = lpBand->rcBand.right - REBAR_POST_CHILD;
++          /* flxp: XP (_ResizeChildren) gives a fixed-size band's child all of the band */
++          if (lpBand->fStyle & RBBS_FIXEDSIZE)
++              lpBand->rcChild.right = lpBand->rcBand.right;
+ 
+           if (lpBand->cyChild > 0) {
+ 
+@@ -1155,7 +1190,7 @@
+  * iBeginBand must be visible */
+ static void REBAR_SetRowRectsX(const REBAR_INFO *infoPtr, INT iBeginBand, INT iEndBand)
+ {
+-    int xPos = 0, i;
++    int xPos = infoPtr->mBand.cxLeftWidth, i;   /* flxp: XP starts a row at the left margin */
+     for (i = iBeginBand; i < iEndBand; i = next_visible(infoPtr, i))
+     {
+         REBAR_BAND *lpBand = REBAR_GetBand(infoPtr, i);
+@@ -1165,7 +1200,7 @@
+             lpBand->rcBand.left = xPos;
+             lpBand->rcBand.right = xPos + lpBand->cxEffective;
+         }
+-        xPos += lpBand->cxEffective + SEP_WIDTH;
++        xPos += lpBand->cxEffective + SEP_WIDTH + BAND_MARGINS_CX(infoPtr);   /* flxp: XP _BandWidth */
+     }
+ }
+ 
+@@ -1347,7 +1382,7 @@
+         if (i > iBeginBand)
+             width += SEP_WIDTH;
+         lpBand->cxEffective = max(lpBand->cxMinBand, lpBand->cx);
+-        width += lpBand->cxEffective;
++        width += lpBand->cxEffective + BAND_MARGINS_CX(infoPtr);   /* flxp */
+     }
+ 
+     extra = cx - width;
+@@ -1367,7 +1402,9 @@
+     {
+         if (*piRow > 0)
+             *pyPos += SEP_WIDTH;
++        *pyPos += infoPtr->mBand.cyTopHeight;    /* flxp: XP _Recalc */
+         *pyPos = REBAR_SetBandsHeight(infoPtr, iBeginBand, iEndBand, *pyPos);
++        *pyPos += infoPtr->mBand.cyBottomHeight;
+     }
+     (*piRow)++;
+ }
+@@ -1408,7 +1445,7 @@
+     {
+         lpBand = REBAR_GetBand(infoPtr, i);
+ 
+-        if (i > rowstart && (lpBand->fStyle & RBBS_BREAK || xMin + lpBand->cxMinBand > adjcx)) {
++        if (i > rowstart && (lpBand->fStyle & RBBS_BREAK || xMin + lpBand->cxMinBand + BAND_MARGINS_CX(infoPtr) > adjcx)) {
+             TRACE("%s break on band %d\n", (lpBand->fStyle & RBBS_BREAK ? "Hard" : "Soft"), i - 1);
+             REBAR_LayoutRow(infoPtr, rowstart, i, adjcx, &row, &yPos);
+             rowstart = i;
+@@ -1417,7 +1454,7 @@
+         else
+             xMin += SEP_WIDTH;
+ 
+-        xMin += lpBand->cxMinBand;
++        xMin += lpBand->cxMinBand + BAND_MARGINS_CX(infoPtr);   /* flxp */
+     }
+     if (rowstart < infoPtr->uNumBands)
+         REBAR_LayoutRow(infoPtr, rowstart, infoPtr->uNumBands, adjcx, &row, &yPos);
+@@ -1666,10 +1703,16 @@
+ 	HDC hdc = GetDC (0);
+ 	HFONT hOldFont = SelectObject (hdc, infoPtr->hFont);
+ 	SIZE size;
++	HTHEME theme = GetWindowTheme (infoPtr->hwndSelf);
++	RECT rcText = {0, 0, 0, 0};
+ 
+ 	lpBand->fStatus |= HAS_TEXT;
+-	GetTextExtentPoint32W (hdc, lpBand->lpText,
+-			       lstrlenW (lpBand->lpText), &size);
++	/* flxp: XP _BandCalcTextExtent: the theme font when themed, and DT_CALCRECT
++	 * so that a '&' prefix does not count */
++	if (!theme || FAILED(GetThemeTextExtent (theme, hdc, 0, 0, lpBand->lpText, -1, DT_CALCRECT, NULL, &rcText)))
++	    DrawTextW (hdc, lpBand->lpText, -1, &rcText, DT_CALCRECT);
++	size.cx = rcText.right - rcText.left;
++	size.cy = rcText.bottom - rcText.top;
+ 	header += ((infoPtr->dwStyle & CCS_VERT) ? (size.cy + REBAR_POST_TEXT) : (size.cx + REBAR_POST_TEXT));
+ 	textheight = (infoPtr->dwStyle & CCS_VERT) ? 0 : size.cy;
+ 
+@@ -1692,6 +1735,8 @@
+     update_min_band_height(infoPtr, lpBand);       /* update lpBand->cyMinBand from cyHeader and cyChild*/
+ 
+     lpBand->cxMinBand = lpBand->cxMinChild + lpBand->cxHeader + REBAR_POST_CHILD;
++    if (lpBand->fStyle & RBBS_FIXEDSIZE)   /* flxp: XP cxMin of the brand band is its child's */
++        lpBand->cxMinBand = lpBand->cxMinChild + lpBand->cxHeader;
+     if (lpBand->fStyle & RBBS_USECHEVRON && lpBand->cxMinChild < lpBand->cxIdeal)
+         lpBand->cxMinBand += CHEVRON_WIDTH;
+ }
+@@ -1842,6 +1887,11 @@
+ 
+     GetClientRect (infoPtr->hwndSelf, &cr);
+ 
++    /* flxp: like XP, paint the themed background over the whole client area
++     * first; with band margins not all of it is covered by band rects */
++    if (theme)
++        DrawThemeBackground (theme, hdc, 0, 0, &cr, NULL);
++
+     oldrow = -1;
+     for(i=0; i<infoPtr->uNumBands; i++) {
+         RECT rcBand;
+@@ -1865,6 +1915,7 @@
+ 		}
+ 		else {
+ 		    rcRowSep.bottom += SEP_WIDTH_SIZE;
++		    rcRowSep.left = 0;   /* flxp: XP etches rows across the client, margins included */
+ 		    rcRowSep.right = infoPtr->calcSize.cx;
+                     if (theme)
+                         DrawThemeEdge (theme, hdc, RP_BAND, 0, &rcRowSep, EDGE_ETCHED, BF_BOTTOM, NULL);
+@@ -1877,7 +1928,7 @@
+ 	}
+ 
+ 	/* draw band separator between bands in a row */
+-        if (infoPtr->dwStyle & RBS_BANDBORDERS && lpBand->rcBand.left > 0) {
++        if (infoPtr->dwStyle & RBS_BANDBORDERS && lpBand->rcBand.left > infoPtr->mBand.cxLeftWidth) {   /* flxp */
+ 	    RECT rcSep;
+ 	    rcSep = rcBand;
+ 	    if (infoPtr->dwStyle & CCS_VERT) {
+@@ -1891,6 +1942,7 @@
+ 	    else {
+                 rcSep.right = rcSep.left;
+ 		rcSep.left -= SEP_WIDTH_SIZE;
++		rcSep.bottom += GetSystemMetrics(SM_CYEDGE) / 2;   /* flxp: XP runs the etch 1px into the row etch below */
+                 if (theme)
+                     DrawThemeEdge (theme, hdc, RP_BAND, 0, &rcSep, EDGE_ETCHED, BF_RIGHT, NULL);
+                 else
+@@ -1925,7 +1977,14 @@
+         {
+             /* When themed, the background color is ignored (but not a
+              * background bitmap */
+-            DrawThemeBackground (theme, hdc, 0, 0, &cr, &rcBand);
++            /* flxp: the rebar background is already there; XP draws RP_BAND
++             * over the band and its margins */
++            RECT rcOuter = rcBand;
++            rcOuter.left -= infoPtr->mBand.cxLeftWidth;
++            rcOuter.right += infoPtr->mBand.cxRightWidth;
++            rcOuter.top -= infoPtr->mBand.cyTopHeight;
++            rcOuter.bottom += infoPtr->mBand.cyBottomHeight;
++            DrawThemeBackground (theme, hdc, RP_BAND, 0, &rcOuter, NULL);
+         }
+         else
+         {
+@@ -2931,6 +2990,7 @@
+     }
+ 
+     OpenThemeData(infoPtr->hwndSelf, themeClass);
++    REBAR_CacheThemeInfo(infoPtr);   /* flxp */
+ 
+     TRACE("created!\n");
+     return 0;
+@@ -3515,6 +3575,8 @@
+     HTHEME theme = GetWindowTheme (infoPtr->hwndSelf);
+     CloseThemeData (theme);
+     OpenThemeData(infoPtr->hwndSelf, themeClass);
++    REBAR_CacheThemeInfo(infoPtr);   /* flxp */
++    REBAR_Layout(infoPtr);
+     return 0;
+ }
+ 

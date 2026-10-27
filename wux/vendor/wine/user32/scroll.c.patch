@@ -1,0 +1,25 @@
+--- a/dlls/user32/scroll.c (wine-7.0)
++++ b/vendor/wine/user32/scroll.c
+@@ -571,7 +571,7 @@
+ 
+ void WINAPI USER_ScrollBarDraw( HWND hwnd, HDC hdc, INT nBar, enum SCROLL_HITTEST hit_test,
+                                 const struct SCROLL_TRACKING_INFO *tracking_info, BOOL arrows,
+-                                BOOL interior, RECT *rect, INT arrowSize, INT thumbPos,
++                                BOOL interior, RECT *rect, UINT enable_flags, INT arrowSize, INT thumbPos,
+                                 INT thumbSize, BOOL vertical )
+ {
+     SCROLLBAR_INFO *infoPtr;
+@@ -680,8 +680,11 @@
+           tracking_info->thumb_val, tracking_info->vertical, tracking_info->hit_test, draw_arrows,
+           draw_interior, wine_dbgstr_rect(&rect), arrow_size, thumb_pos, thumb_size, vertical,
+           GetCapture());
+-    user_api->pScrollBarDraw( hwnd, hdc, bar, hit_test, tracking_info, draw_arrows, draw_interior,
+-                              &rect, arrow_size, thumb_pos, thumb_size, vertical );
++    {
++        SCROLLBAR_INFO *flags_info = SCROLL_GetInternalInfo( hwnd, bar, FALSE );
++        user_api->pScrollBarDraw( hwnd, hdc, bar, hit_test, tracking_info, draw_arrows, draw_interior,
++                                  &rect, flags_info ? flags_info->flags : 0, arrow_size, thumb_pos, thumb_size, vertical );
++    }
+ }
+ 
+ void SCROLL_DrawNCScrollBar( HWND hwnd, HDC hdc, BOOL draw_horizontal, BOOL draw_vertical )

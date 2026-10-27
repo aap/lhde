@@ -1,0 +1,529 @@
+--- a/dlls/comctl32/toolbar.c (wine-10.0)
++++ b/vendor/wine/comctl32/toolbar.c
+@@ -122,6 +122,8 @@
+     RECT     rcBound;         /* bounding rectangle */
+     INT      nButtonHeight;
+     INT      nButtonWidth;
++    INT      nStringHeight;   /* flxp: tallest button string (XP dyIconFont) */
++    INT      iDropDownGap;    /* flxp: XP TB_SETDROPDOWNGAP */
+     INT      nBitmapHeight;
+     INT      nBitmapWidth;
+     INT      nIndent;
+@@ -200,7 +202,8 @@
+ #define SEPARATOR_WIDTH    8
+ #define TOP_BORDER         2
+ #define BOTTOM_BORDER      2
+-#define DDARROW_WIDTH      11
++#define DDARROW_WIDTH      TOOLBAR_DDArrowWidth()   /* flxp: XP uses SM_CYMENUCHECK (v6 TBInitMetrics) */
++static inline int TOOLBAR_DDArrowWidth(void) { return GetSystemMetrics(SM_CYMENUCHECK); }
+ #define ARROW_HEIGHT       3
+ #define INSERTMARK_WIDTH   2
+ 
+@@ -597,7 +600,7 @@
+  */
+ static void
+ TOOLBAR_DrawString (const TOOLBAR_INFO *infoPtr, RECT *rcText, LPCWSTR lpText,
+-                    const NMTBCUSTOMDRAW *tbcd, DWORD dwItemCDFlag)
++                    const NMTBCUSTOMDRAW *tbcd, DWORD dwItemCDFlag, DWORD dtFlags)
+ {
+     HDC hdc = tbcd->nmcd.hdc;
+     HFONT  hOldFont = 0;
+@@ -618,7 +621,7 @@
+ 	else if (state & CDIS_DISABLED) {
+ 	    clrOld = SetTextColor (hdc, tbcd->clrBtnHighlight);
+ 	    OffsetRect (rcText, 1, 1);
+-	    DrawTextW (hdc, lpText, -1, rcText, infoPtr->dwDTFlags);
++	    DrawTextW (hdc, lpText, -1, rcText, dtFlags);
+ 	    SetTextColor (hdc, comctl32_color.clr3dShadow);
+ 	    OffsetRect (rcText, -1, -1);
+ 	}
+@@ -634,7 +637,7 @@
+ 	    clrOld = SetTextColor (hdc, tbcd->clrText);
+ 	}
+ 
+-	DrawTextW (hdc, lpText, -1, rcText, infoPtr->dwDTFlags);
++	DrawTextW (hdc, lpText, -1, rcText, dtFlags);
+ 	SetTextColor (hdc, clrOld);
+ 	if ((state & CDIS_MARKED) && !(dwItemCDFlag & TBCDRF_NOMARK))
+ 	{
+@@ -799,10 +802,11 @@
+     TRACE("drawing index=%d, himl=%p, left=%d, top=%d, offset=%d\n",
+       index, himl, left, top, offset);
+ 
++    /* flxp: XP offsets a pressed image vertically only in list style */
+     if (draw_masked)
+-        TOOLBAR_DrawMasked (himl, index, tbcd->nmcd.hdc, left + offset, top + offset, draw_flags);
++        TOOLBAR_DrawMasked (himl, index, tbcd->nmcd.hdc, left + offset, top + ((infoPtr->dwStyle & TBSTYLE_LIST) ? offset : 0), draw_flags);
+     else
+-        ImageList_Draw (himl, index, tbcd->nmcd.hdc, left + offset, top + offset, draw_flags);
++        ImageList_Draw (himl, index, tbcd->nmcd.hdc, left + offset, top + ((infoPtr->dwStyle & TBSTYLE_LIST) ? offset : 0), draw_flags);
+ }
+ 
+ /* draws a blank frame for a toolbar button */
+@@ -869,6 +873,12 @@
+     if (pressed)
+         offset = (dwItemCDFlag & TBCDRF_NOOFFSET) ? 0 : 1;
+ 
++    /* flxp: XP draws the arrow with DrawScrollArrow (Marlett); measured on
++     * classic XP its triangle is 2px right of and 1px below Wine's */
++    {
++    RECT rcGlyph = *rcArrow;
++    OffsetRect(&rcGlyph, 2, 1);
++    rcArrow = &rcGlyph;
+     if (tbcd->nmcd.uItemState & (CDIS_DISABLED | CDIS_INDETERMINATE))
+     {
+         TOOLBAR_DrawArrow(hdc, rcArrow->left+1, rcArrow->top+1 + (rcArrow->bottom - rcArrow->top - ARROW_HEIGHT) / 2, comctl32_color.clrBtnHighlight);
+@@ -876,6 +886,48 @@
+     }
+     else
+         TOOLBAR_DrawArrow(hdc, rcArrow->left + offset, rcArrow->top + offset + (rcArrow->bottom - rcArrow->top - ARROW_HEIGHT) / 2, comctl32_color.clrBtnText);
++    }
++}
++
++/* flxp: measured on XP/Luna (screenshots/luna_exp_*, large and small icons):
++ * a themed split drop-down button that shows only its image (Explorer's
++ * Forward) is 7px wider than the classic bitmap + listgap + 2*cxEdge + arrow,
++ * and its image sits 2px right of the centre of the part left of the arrow
++ * (large: 52 wide, glyph at +9; small: 44, +9). A split button with text
++ * (Back) is 1px wider than classic (72 / 64), the image-only button's
++ * arrow glyph is 1px left of where Back's sits, the whole drop-down Views
++ * keeps the classic width. The XP SP1
++ * source attributes this to GetThemeBackgroundExtent/ContentRect of
++ * TP_SPLITBUTTON, which Luna gives no ContentMargins; the exact rule is not
++ * derivable from it, so reproduce the measurement. */
++#define THEMED_SPLIT_IMAGE_EXTRA   7
++#define THEMED_SPLIT_IMAGE_SHIFT   2
++#define THEMED_SPLIT_TEXT_EXTRA    1
++static BOOL TOOLBAR_IsThemedSplit(const TOOLBAR_INFO *infoPtr, const TBUTTON_INFO *btnPtr)
++{
++    return infoPtr->hTheme && (infoPtr->dwStyle & TBSTYLE_LIST) &&
++        button_has_ddarrow(infoPtr, btnPtr) && !(btnPtr->fsStyle & BTNS_WHOLEDROPDOWN) &&
++        btnPtr->iBitmap != I_IMAGENONE;
++}
++static BOOL TOOLBAR_IsThemedSplitImageOnly(const TOOLBAR_INFO *infoPtr, const TBUTTON_INFO *btnPtr)
++{
++    return TOOLBAR_IsThemedSplit(infoPtr, btnPtr) &&
++        (infoPtr->dwExStyle & TBSTYLE_EX_MIXEDBUTTONS) && !(btnPtr->fsStyle & BTNS_SHOWTEXT);
++}
++
++/* flxp: XP's toolbar dither (image.cpp g_hbrMonoDither) starts with 0xAAAA,
++ * Wine's shared 55AA brush has the opposite phase (checked buttons) */
++static HBRUSH TOOLBAR_DitherBrush(void)
++{
++    static HBRUSH brush;
++    static const WORD bits[] = { 0xaaaa, 0x5555, 0xaaaa, 0x5555, 0xaaaa, 0x5555, 0xaaaa, 0x5555 };
++    if (!brush)
++    {
++        HBITMAP bmp = CreateBitmap(8, 8, 1, 1, bits);
++        brush = CreatePatternBrush(bmp);
++        DeleteObject(bmp);
++    }
++    return brush;
+ }
+ 
+ /* draws a complete toolbar button */
+@@ -895,6 +947,7 @@
+     DWORD dwItemCustDraw;
+     DWORD dwItemCDFlag;
+     HTHEME theme = infoPtr->hTheme;
++    DWORD dtFlags = infoPtr->dwDTFlags;
+ 
+     rc = btnPtr->rect;
+     rcArrow = rc;
+@@ -947,50 +1000,61 @@
+         rcArrow.left = right;
+     }
+ 
+-    /* copy text & bitmap rects after adjusting for drop-down arrow
+-     * so that text & bitmap is centered in the rectangle not containing
+-     * the arrow */
+-    rcText = rc;
+-    rcBitmap = rc;
+-
+-    /* Center the bitmap horizontally and vertically */
+-    if (dwStyle & TBSTYLE_LIST)
+-    {
+-        if (lpText &&
+-            infoPtr->nMaxTextRows > 0 &&
+-            (!(infoPtr->dwExStyle & TBSTYLE_EX_MIXEDBUTTONS) ||
+-            (btnPtr->fsStyle & BTNS_SHOWTEXT)) )
+-            rcBitmap.left += GetSystemMetrics(SM_CXEDGE) + infoPtr->szPadding.cx / 2;
+-        else
+-            rcBitmap.left += GetSystemMetrics(SM_CXEDGE) + infoPtr->iListGap / 2;
+-    }
+-    else
+-        rcBitmap.left += ((rc.right - rc.left) - infoPtr->nBitmapWidth) / 2;
+-
+-    rcBitmap.top += infoPtr->szPadding.cy / 2;
+-
+-    TRACE("iBitmap=%d, start=(%ld,%ld) w=%d, h=%d\n", btnPtr->iBitmap, rcBitmap.left, rcBitmap.top,
+-      infoPtr->nBitmapWidth, infoPtr->nBitmapHeight);
+-    TRACE("Text=%s\n", debugstr_w(lpText));
+-    TRACE("iListGap=%d, padding = { %ld, %ld }\n", infoPtr->iListGap, infoPtr->szPadding.cx, infoPtr->szPadding.cy);
++    /* flxp: content placement after comctl32 v6 (XP) TBDrawButton/DrawFace.
++     * The content rectangle excludes the drop-down arrow (also for whole
++     * drop-down buttons, whose background still covers the arrow). */
++    {
++        RECT rcContent = rc;
++        BOOL fImage = btnPtr->iBitmap != I_IMAGENONE;
++        BOOL fText = lpText && infoPtr->nMaxTextRows > 0 &&
++            (!(infoPtr->dwExStyle & TBSTYLE_EX_MIXEDBUTTONS) || (btnPtr->fsStyle & BTNS_SHOWTEXT));
++        INT W, H, xIcon, yIcon;
++
++        if (hasDropDownArrow && !drawSepDropDownArrow)
++            rcContent.right = rcArrow.left;
++        W = rcContent.right - rcContent.left;
++        H = rcContent.bottom - rcContent.top;
++        rcText = rcContent;
+ 
+-    /* calculate text position */
+-    if (lpText)
+-    {
+-        InflateRect(&rcText, -GetSystemMetrics(SM_CXEDGE), 0);
+         if (dwStyle & TBSTYLE_LIST)
+         {
+-            rcText.left += infoPtr->nBitmapWidth + infoPtr->iListGap + 2;
++            if (!fText) xIcon = (W - infoPtr->nBitmapWidth) / 2 +
++                (TOOLBAR_IsThemedSplitImageOnly(infoPtr, btnPtr) ? THEMED_SPLIT_IMAGE_SHIFT : 0);   /* flxp */
++            else if (fImage) xIcon = infoPtr->szPadding.cx / 2;
++            else xIcon = 0;
++            yIcon = (H - infoPtr->nBitmapHeight) / 2;
++            rcText.right = rcContent.left + W - infoPtr->szPadding.cx;   /* dxText = dx - cxPad */
++            if (fImage)
++            {
++                /* XP: xText = left + xIcon + bitmap + gap, dxText -= bitmap + gap
++                 * (the icon offset is not taken off the text width) */
++                rcText.left += xIcon + infoPtr->nBitmapWidth + infoPtr->iListGap;
++                rcText.right = rcText.left + W - infoPtr->szPadding.cx - infoPtr->nBitmapWidth - infoPtr->iListGap;
++            }
++            if (!fImage)
++                dtFlags |= DT_CENTER;   /* XP: text-only list buttons centre their text */
+         }
+         else
+         {
+-            if (ImageList_GetImageCount(GETDEFIMAGELIST(infoPtr, 0)) > 0)
+-                rcText.top += infoPtr->szPadding.cy/2 + infoPtr->nBitmapHeight + 1;
++            xIcon = (W - infoPtr->nBitmapWidth) / 2;
++            if (fText && infoPtr->nBitmapHeight + infoPtr->szPadding.cy + GetSystemMetrics(SM_CYEDGE) < infoPtr->nButtonHeight)
++                yIcon = (H - infoPtr->nBitmapHeight - infoPtr->nStringHeight) / 2;
+             else
+-                rcText.top += infoPtr->szPadding.cy/2 + 2;
+-        }
++                yIcon = (H - infoPtr->nBitmapHeight) / 2;
++            rcText.top = rcContent.top + yIcon + infoPtr->nBitmapHeight + 1;
++            rcText.left = rcContent.left + infoPtr->szPadding.cx / 2;
++            rcText.right = rcText.left + W - infoPtr->szPadding.cx;
++        }
++        rcBitmap = rcContent;
++        rcBitmap.left = rcContent.left + xIcon;
++        rcBitmap.top = rcContent.top + yIcon;
+     }
+ 
++    TRACE("iBitmap=%d, start=(%ld,%ld) w=%d, h=%d\n", btnPtr->iBitmap, rcBitmap.left, rcBitmap.top,
++      infoPtr->nBitmapWidth, infoPtr->nBitmapHeight);
++    TRACE("Text=%s\n", debugstr_w(lpText));
++    TRACE("iListGap=%d, padding = { %ld, %ld }\n", infoPtr->iListGap, infoPtr->szPadding.cx, infoPtr->szPadding.cy);
++
+     /* Initialize fields in all cases, because we use these later
+      * NOTE: applications can and do alter these to customize their
+      * toolbars */
+@@ -1010,7 +1074,7 @@
+     tbcd.nmcd.uItemState = TOOLBAR_TranslateState(btnPtr, infoPtr->bCaptured);
+     tbcd.nmcd.hdc = hdc;
+     tbcd.nmcd.rc = btnPtr->rect;
+-    tbcd.hbrMonoDither = COMCTL32_hPattern55AABrush;
++    tbcd.hbrMonoDither = TOOLBAR_DitherBrush();   /* flxp */
+ 
+     /* FIXME: what are these used for? */
+     tbcd.hbrLines = 0;
+@@ -1040,7 +1104,7 @@
+ 
+     if (!(dwItemCDFlag & TBCDRF_NOOFFSET) &&
+         (btnPtr->fsState & (TBSTATE_PRESSED | TBSTATE_CHECKED)))
+-        OffsetRect(&rcText, 1, 1);
++        OffsetRect(&rcText, 1, (dwStyle & TBSTYLE_LIST) ? 1 : 0);   /* flxp: XP moves non-list text sideways only */
+ 
+     if (!theme && !(tbcd.nmcd.uItemState & CDIS_HOT) &&
+         ((tbcd.nmcd.uItemState & CDIS_CHECKED) || (tbcd.nmcd.uItemState & CDIS_INDETERMINATE)))
+@@ -1099,6 +1163,14 @@
+                 stateId = TS_HOT;
+                 
+             DrawThemeBackground (theme, hdc, TP_DROPDOWNBUTTON, stateId, &rcArrow, NULL);
++            /* flxp: measured, the image-only split button's arrow glyph sits 1px further left */
++            if (TOOLBAR_IsThemedSplitImageOnly(infoPtr, btnPtr))
++            {
++                RECT rcGlyph = rcArrow;
++                OffsetRect(&rcGlyph, -1, 0);
++                DrawThemeBackground (theme, hdc, TP_SPLITBUTTONDROPDOWN, stateId, &rcGlyph, NULL);
++            }
++            else
+             DrawThemeBackground (theme, hdc, TP_SPLITBUTTONDROPDOWN, stateId, &rcArrow, NULL);
+         }
+         else
+@@ -1107,13 +1179,17 @@
+ 
+     oldBkMode = SetBkMode (hdc, tbcd.nStringBkMode);
+     if (!(infoPtr->dwExStyle & TBSTYLE_EX_MIXEDBUTTONS) || (btnPtr->fsStyle & BTNS_SHOWTEXT))
+-        TOOLBAR_DrawString (infoPtr, &rcText, lpText, &tbcd, dwItemCDFlag);
++        TOOLBAR_DrawString (infoPtr, &rcText, lpText, &tbcd, dwItemCDFlag, dtFlags);
+     SetBkMode (hdc, oldBkMode);
+ 
+     TOOLBAR_DrawImage(infoPtr, btnPtr, rcBitmap.left, rcBitmap.top, &tbcd, dwItemCDFlag);
+ 
+     if (hasDropDownArrow && !drawSepDropDownArrow)
+     {
++        /* flxp: XP draws the whole-drop-down arrow with DrawScrollArrow (a Marlett
++         * glyph in an 11px font, pager.cpp); measured on XP its 5x3 triangle
++         * starts 2px left of the 13px arrow area (TOOLBAR_DrawArrow adds 2), 1px below centre */
++        OffsetRect(&rcArrow, -4, 1);
+         if (tbcd.nmcd.uItemState & (CDIS_DISABLED | CDIS_INDETERMINATE))
+         {
+             TOOLBAR_DrawArrow(hdc, rcArrow.left+1, rcArrow.top+1 + (rcArrow.bottom - rcArrow.top - ARROW_HEIGHT) / 2, comctl32_color.clrBtnHighlight);
+@@ -1122,10 +1198,11 @@
+         else if (tbcd.nmcd.uItemState & (CDIS_SELECTED | CDIS_CHECKED))
+         {
+             offset = (dwItemCDFlag & TBCDRF_NOOFFSET) ? 0 : 1;
+-            TOOLBAR_DrawArrow(hdc, rcArrow.left + offset, rcArrow.top + offset + (rcArrow.bottom - rcArrow.top - ARROW_HEIGHT) / 2, comctl32_color.clrBtnText);
++            /* flxp: the arrow takes the custom-draw text colour (default clrBtnText), so a toolbar on a dark band can have light arrows */
++            TOOLBAR_DrawArrow(hdc, rcArrow.left + offset, rcArrow.top + offset + (rcArrow.bottom - rcArrow.top - ARROW_HEIGHT) / 2, tbcd.clrText);
+         }
+         else
+-            TOOLBAR_DrawArrow(hdc, rcArrow.left, rcArrow.top + (rcArrow.bottom - rcArrow.top - ARROW_HEIGHT) / 2, comctl32_color.clrBtnText);
++            TOOLBAR_DrawArrow(hdc, rcArrow.left, rcArrow.top + (rcArrow.bottom - rcArrow.top - ARROW_HEIGHT) / 2, tbcd.clrText);   /* flxp: as above */
+     }
+ 
+     if (dwItemCustDraw & CDRF_NOTIFYPOSTPAINT)
+@@ -1593,51 +1670,80 @@
+ * Without text:
+ *   As for with bitmaps, but with szText.cx zero.
+ */
+-static inline SIZE TOOLBAR_MeasureButton(const TOOLBAR_INFO *infoPtr, SIZE sizeString,
+-                                         BOOL bHasBitmap, BOOL bValidImageList)
++static int TOOLBAR_ThemePart(const TOOLBAR_INFO *infoPtr, const TBUTTON_INFO *btnPtr)
++{
++    if (btnPtr && button_has_ddarrow(infoPtr, btnPtr))
++        return (btnPtr->fsStyle & BTNS_WHOLEDROPDOWN) ? TP_DROPDOWNBUTTON : TP_SPLITBUTTON;
++    return TP_BUTTON;
++}
++
++/* flxp: XP's GrowToolbar/TBWidthOfButton enlarge themed buttons by the theme
++ * background extent of the button part (XP SP1 source).  Measured on XP SP3
++ * with Luna (screenshots/luna_exp_*): 24px glyph buttons are 38px tall and
++ * 16px ones 30px, i.e. the height grows by the part's top+bottom SizingMargins
++ * (4+4), while the width stays at the classic cxPad + text + 2*cxEdge +
++ * bitmap + listgap (the checked "Folders" button is 74px wide and its icon
++ * and text sit at the classic offsets).  Luna declares ContentMargins = 0, so
++ * the growth cannot be the extent; replicate what is observed. */
++static void TOOLBAR_ThemeGrowButton(const TOOLBAR_INFO *infoPtr, int partId, SIZE *size)
++{
++    MARGINS m;
++    if (!infoPtr->hTheme) return;
++    if (FAILED(GetThemeMargins(infoPtr->hTheme, NULL, partId, TS_NORMAL, TMT_SIZINGMARGINS, NULL, &m)))
++        return;
++    size->cy += m.cyTopHeight + m.cyBottomHeight;
++}
++
++/* flxp: rewritten after comctl32 v6 (XP) GrowToolbar(GT_INSIDE) for the
++ * toolbar-wide size (btnPtr == NULL) and TBWidthOfButton for autosized
++ * buttons.  The bitmap slot (16x16 by default) always counts for the height,
++ * even without an image list, and text-only (I_IMAGENONE) list buttons do
++ * not get the bitmap gap.  bHasBitmap means "iBitmap != I_IMAGENONE". */
++static SIZE TOOLBAR_MeasureButton(const TOOLBAR_INFO *infoPtr, SIZE sizeString,
++                                  BOOL bHasBitmap, BOOL bValidImageList,
++                                  const TBUTTON_INFO *btnPtr)
+ {
+     SIZE sizeButton;
++    INT cxedge = GetSystemMetrics(SM_CXEDGE);
++
+     if (infoPtr->dwStyle & TBSTYLE_LIST)
+     {
+-        /* set button height from bitmap / text height... */
+-        sizeButton.cy = max((bHasBitmap ? infoPtr->nBitmapHeight : 0),
+-            sizeString.cy);
+-
+-        /* ... add on the necessary padding */
+-        if (bValidImageList)
++        /* HeightWithString: max(bitmap, text) + cyPad */
++        sizeButton.cy = max(infoPtr->nBitmapHeight, sizeString.cy) + infoPtr->szPadding.cy;
++        if (btnPtr)
+         {
+-            if (bHasBitmap)
+-                sizeButton.cy += DEFPAD_CY;
+-            else
+-                sizeButton.cy += LISTPAD_CY;
++            sizeButton.cx = 0;
++            if (sizeString.cx > 0)
++            {
++                sizeButton.cx = infoPtr->szPadding.cx + sizeString.cx;
++                if (button_has_ddarrow(infoPtr, btnPtr) && !(btnPtr->fsStyle & BTNS_WHOLEDROPDOWN))
++                    sizeButton.cx += infoPtr->iDropDownGap;
++                else
++                    sizeButton.cx += 2*cxedge;
++                if (bHasBitmap)
++                    sizeButton.cx += infoPtr->nBitmapWidth + infoPtr->iListGap;
++            }
++            else if (bHasBitmap)
++                sizeButton.cx = infoPtr->nBitmapWidth + infoPtr->iListGap + 2*cxedge;
+         }
+         else
+-            sizeButton.cy += infoPtr->szPadding.cy;
+-
+-        /* calculate button width */
+-        sizeButton.cx = 2*GetSystemMetrics(SM_CXEDGE) +
+-            infoPtr->nBitmapWidth + infoPtr->iListGap;
+-        if (sizeString.cx > 0)
+-            sizeButton.cx += sizeString.cx + infoPtr->szPadding.cx;
+-
++            sizeButton.cx = max(sizeString.cx, infoPtr->nBitmapWidth) +
++                infoPtr->nBitmapWidth + infoPtr->iListGap + infoPtr->szPadding.cx;
+     }
+     else
+     {
+-        if (bHasBitmap)
++        /* HeightWithString: bitmap, 1px, text below it */
++        sizeButton.cy = infoPtr->nBitmapHeight + infoPtr->szPadding.cy;
++        if (sizeString.cy > 0)
++            sizeButton.cy += sizeString.cy + 1;
++        if (btnPtr)
+         {
+-            sizeButton.cy = infoPtr->nBitmapHeight + DEFPAD_CY;
+-            if (sizeString.cy > 0)
+-                sizeButton.cy += 1 + sizeString.cy;
+-            sizeButton.cx = infoPtr->szPadding.cx +
+-                max(sizeString.cx, infoPtr->nBitmapWidth);
++            sizeButton.cx = infoPtr->szPadding.cx + sizeString.cx + (sizeString.cx > 0 ? 2*cxedge : 0);
++            if (bHasBitmap)
++                sizeButton.cx = max(sizeButton.cx, infoPtr->nBitmapWidth + infoPtr->szPadding.cx);
+         }
+         else
+-        {
+-            sizeButton.cy = sizeString.cy + infoPtr->szPadding.cy +
+-                NONLIST_NOTEXT_OFFSET;
+-            sizeButton.cx = infoPtr->szPadding.cx +
+-                max(2*GetSystemMetrics(SM_CXEDGE) + sizeString.cx, infoPtr->nBitmapWidth);
+-        }
++            sizeButton.cx = max(sizeString.cx, infoPtr->nBitmapWidth) + infoPtr->szPadding.cx;
+     }
+     return sizeButton;
+ }
+@@ -1660,12 +1766,14 @@
+     BOOL validImageList = FALSE;
+ 
+     TOOLBAR_CalcStrings (infoPtr, &sizeString);
++    infoPtr->nStringHeight = sizeString.cy;
+ 
+     TOOLBAR_DumpToolbar (infoPtr, __LINE__);
+ 
+     if (TOOLBAR_IsValidImageList(infoPtr, 0))
+         validImageList = TRUE;
+-    sizeButton = TOOLBAR_MeasureButton(infoPtr, sizeString, TRUE, validImageList);
++    sizeButton = TOOLBAR_MeasureButton(infoPtr, sizeString, TRUE, validImageList, NULL);
++    TOOLBAR_ThemeGrowButton(infoPtr, TP_BUTTON, &sizeButton);
+     infoPtr->nButtonWidth = sizeButton.cx;
+     infoPtr->nButtonHeight = sizeButton.cy;
+     infoPtr->iTopMargin = default_top_margin(infoPtr);
+@@ -1731,7 +1839,7 @@
+ 	{
+             if (btnPtr->cx)
+               cx = btnPtr->cx;
+-            else if (btnPtr->fsStyle & BTNS_AUTOSIZE)
++            else if ((btnPtr->fsStyle & BTNS_AUTOSIZE) || (infoPtr->dwExStyle & TBSTYLE_EX_MIXEDBUTTONS))   /* flxp: XP autosizes all mixed buttons */
+             {
+               SIZE sz;
+ 	      HDC hdc;
+@@ -1746,8 +1854,8 @@
+ 	      ReleaseDC (infoPtr->hwndSelf, hdc);
+ 
+               sizeButton = TOOLBAR_MeasureButton(infoPtr, sz,
+-                  TOOLBAR_IsValidBitmapIndex(infoPtr, infoPtr->buttons[i].iBitmap),
+-                  validImageList);
++                  btnPtr->iBitmap != I_IMAGENONE, validImageList, btnPtr);   /* flxp: XP tests I_IMAGENONE */
++              TOOLBAR_ThemeGrowButton(infoPtr, TOOLBAR_ThemePart(infoPtr, btnPtr), &sizeButton);
+               cx = sizeButton.cx;
+             }
+             else
+@@ -1757,6 +1865,8 @@
+              * for the drop down arrow */
+             if (!btnPtr->cx && button_has_ddarrow( infoPtr, btnPtr ))
+               cx += DDARROW_WIDTH;
++            if (!btnPtr->cx && TOOLBAR_IsThemedSplit(infoPtr, btnPtr))   /* flxp */
++              cx += TOOLBAR_IsThemedSplitImageOnly(infoPtr, btnPtr) ? THEMED_SPLIT_IMAGE_EXTRA : THEMED_SPLIT_TEXT_EXTRA;
+ 	}
+ 	if (btnPtr->fsState & TBSTATE_WRAP)
+ 		    bWrap = TRUE;
+@@ -4495,6 +4605,11 @@
+ 
+     cx = max(cx, infoPtr->szPadding.cx + infoPtr->nBitmapWidth);
+     cy = max(cy, infoPtr->szPadding.cy + infoPtr->nBitmapHeight);
++    {   /* flxp: XP GrowToolbar applies the theme extent here too */
++        SIZE s = { cx, cy };
++        TOOLBAR_ThemeGrowButton(infoPtr, TP_BUTTON, &s);
++        cx = s.cx; cy = s.cy;
++    }
+ 
+     if (cx != infoPtr->nButtonWidth || cy != infoPtr->nButtonHeight ||
+         top != infoPtr->iTopMargin)
+@@ -5277,15 +5392,6 @@
+     return 1;
+ }
+ 
+-static LRESULT TOOLBAR_Unkwn464(HWND hwnd, WPARAM wParam, LPARAM lParam)
+-{
+-    FIXME("hwnd %p, wParam %Ix, lParam %Ix\n", hwnd, wParam, lParam);
+-
+-    InvalidateRect(hwnd, NULL, TRUE);
+-    return 1;
+-}
+-
+-
+ static LRESULT
+ TOOLBAR_Create (HWND hwnd, const CREATESTRUCTW *lpcs)
+ {
+@@ -5302,7 +5408,7 @@
+ 
+     SystemParametersInfoW (SPI_GETICONTITLELOGFONT, 0, &logFont, 0);
+     infoPtr->hFont = infoPtr->hDefaultFont = CreateFontIndirectW (&logFont);
+-    infoPtr->hTheme = OpenThemeDataForDpi (NULL, themeClass, GetDpiForWindow (hwnd));
++    infoPtr->hTheme = OpenThemeDataForDpi (hwnd, themeClass, GetDpiForWindow (hwnd));   /* flxp: honour SetWindowTheme */
+ 
+     TOOLBAR_CheckStyle (infoPtr);
+ 
+@@ -6068,6 +6174,7 @@
+     infoPtr->szPadding.cx = DEFPAD_CX;
+     infoPtr->szPadding.cy = DEFPAD_CY;
+     infoPtr->iListGap = DEFLISTGAP;
++    infoPtr->iDropDownGap = 2*GetSystemMetrics(SM_CXEDGE);   /* flxp: XP DROPDOWN_GAP */
+     infoPtr->iTopMargin = default_top_margin(infoPtr);
+     infoPtr->dwStyle = lpcs->style;
+     infoPtr->tbim.iButton = -1;
+@@ -6538,7 +6645,7 @@
+ static LRESULT theme_changed (TOOLBAR_INFO *infoPtr)
+ {
+     CloseThemeData (infoPtr->hTheme);
+-    infoPtr->hTheme = OpenThemeDataForDpi (NULL, themeClass, GetDpiForWindow (infoPtr->hwndSelf));
++    infoPtr->hTheme = OpenThemeDataForDpi (infoPtr->hwndSelf, themeClass, GetDpiForWindow (infoPtr->hwndSelf));   /* flxp: honour SetWindowTheme */
+     InvalidateRect (infoPtr->hwndSelf, NULL, TRUE);
+     return 0;
+ }
+@@ -6790,6 +6897,7 @@
+ 	case TB_SETPADDING:
+ 	    return TOOLBAR_SetPadding (infoPtr, lParam);
+ 
++
+ 	case TB_SETPARENT:
+ 	    return TOOLBAR_SetParent (infoPtr, (HWND)wParam);
+ 
+@@ -6823,8 +6931,11 @@
+ 	case TB_GETIDEALSIZE:
+ 	    return TOOLBAR_GetIdealSize (infoPtr, wParam, lParam);
+ 
+-	case TB_UNKWN464:
+-	    return TOOLBAR_Unkwn464(hwnd, wParam, lParam);
++	case TB_UNKWN464:   /* flxp: this is XP's TB_SETDROPDOWNGAP (comctrlp.h), browseui's itbar sends cxEdge/2 */
++	    infoPtr->iDropDownGap = (INT)wParam;
++	    TOOLBAR_CalcToolbar(infoPtr);
++	    InvalidateRect(hwnd, NULL, TRUE);
++	    return TRUE;
+ 
+ /* Common Control Messages */
+ 

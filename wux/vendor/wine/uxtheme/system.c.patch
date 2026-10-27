@@ -1,0 +1,92 @@
+--- a/dlls/uxtheme/system.c (840a939ee52)
++++ b/vendor/wine/uxtheme/system.c
+@@ -418,6 +418,8 @@
+  *
+  * Change the current active theme
+  */
++static BOOL flxp_reloading;   /* flxp: see UXTHEME_ReloadTheme */
++
+ HRESULT UXTHEME_SetActiveTheme(PTHEME_FILE tf)
+ {
+     BOOL ret, loaded_before = FALSE, same_theme = FALSE;
+@@ -448,7 +450,8 @@
+                 WARN("Failed to get LoadedBefore: %ld\n", GetLastError());
+             RegCloseKey(hKey);
+         }
+-        if (loaded_before && same_theme)
++        /* flxp: a run-time reload (UXTHEME_ReloadTheme) applies the style's metrics again */
++        if (loaded_before && same_theme && !flxp_reloading)
+             return MSSTYLES_SetActiveTheme(tf, FALSE);
+ 
+         if (!loaded_before && ret)
+@@ -500,6 +503,16 @@
+     return hr;
+ }
+ 
++/* flxp: the ThemeManager key changed at run time (the session theme): load
++ * the theme as at start-up and tell every window, as ApplyTheme does */
++void UXTHEME_ReloadTheme(void)
++{
++    flxp_reloading = TRUE;
++    UXTHEME_LoadTheme();
++    flxp_reloading = FALSE;
++    UXTHEME_broadcast_msg (NULL, WM_THEMECHANGED);
++}
++
+ /***********************************************************************
+  *      UXTHEME_InitSystem
+  */
+@@ -585,17 +598,18 @@
+  * I'm using atoms as there may be large numbers of duplicated strings
+  * and they do the work of keeping memory down as a cause of that quite nicely
+  */
++/* flxp: store the strings themselves instead of atoms, so that the empty
++ * strings of SetWindowTheme(hwnd, L"", L"") (which disable theming for a
++ * window, as XP's menu band relies on) survive; AddAtomW("") fails. */
+ static HRESULT UXTHEME_SetWindowProperty(HWND hwnd, ATOM aProp, LPCWSTR pszValue)
+ {
+-    ATOM oldValue = (ATOM)(size_t)RemovePropW(hwnd, (LPCWSTR)MAKEINTATOM(aProp));
+-    if(oldValue)
+-        DeleteAtom(oldValue);
++    LPWSTR oldValue = RemovePropW(hwnd, (LPCWSTR)MAKEINTATOM(aProp));
++    free(oldValue);
+     if(pszValue) {
+-        ATOM atValue = AddAtomW(pszValue);
+-        if(!atValue
+-           || !SetPropW(hwnd, (LPCWSTR)MAKEINTATOM(aProp), (LPWSTR)MAKEINTATOM(atValue))) {
++        LPWSTR copy = wcsdup(pszValue);
++        if(!copy || !SetPropW(hwnd, (LPCWSTR)MAKEINTATOM(aProp), copy)) {
+             HRESULT hr = HRESULT_FROM_WIN32(GetLastError());
+-            if(atValue) DeleteAtom(atValue);
++            free(copy);
+             return hr;
+         }
+     }
+@@ -604,11 +618,10 @@
+ 
+ static LPWSTR UXTHEME_GetWindowProperty(HWND hwnd, ATOM aProp, LPWSTR pszBuffer, int dwLen)
+ {
+-    ATOM atValue = (ATOM)(size_t)GetPropW(hwnd, (LPCWSTR)MAKEINTATOM(aProp));
+-    if(atValue) {
+-        if(GetAtomNameW(atValue, pszBuffer, dwLen))
+-            return pszBuffer;
+-        TRACE("property defined, but unable to get value\n");
++    LPWSTR value = GetPropW(hwnd, (LPCWSTR)MAKEINTATOM(aProp));
++    if(value) {
++        lstrcpynW(pszBuffer, value, dwLen);
++        return pszBuffer;
+     }
+     return NULL;
+ }
+@@ -639,7 +652,10 @@
+         if(!pszUseClassList)
+             pszUseClassList = pszClassList;
+ 
+-        if (pszUseClassList)
++        /* flxp: SetWindowTheme(hwnd, L"", L"") turns theming off for the window */
++        if (pszAppName && !*pszAppName && pszUseClassList && !*pszUseClassList)
++            hTheme = NULL;
++        else if (pszUseClassList)
+             hTheme = MSSTYLES_OpenThemeClass(pszAppName, pszUseClassList, dpi);
+     }
+     if(IsWindow(hwnd))

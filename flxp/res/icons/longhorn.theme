@@ -1,0 +1,51 @@
+; Longhorn 4074 icons, read from its shell32.dll by resource id (same ids as
+; XP). The toolbar keeps XP's strip (from nt5src). Set longhorn_system32= in
+; flxp.ini to the extracted WINDOWS\system32 directory.
+[theme]
+name = Longhorn 4074
+base = $FLXP_LONGHORN_SYSTEM32
+depth = 32
+
+[icons]
+folder = pe:shell32.dll#4
+folder_open = pe:shell32.dll#5
+document = pe:shell32.dll#1
+text = pe:shell32.dll#152
+drive = pe:shell32.dll#9
+computer = pe:shell32.dll#16
+desktop = pe:shell32.dll#35
+home = pe:shell32.dll#235
+image = pe:shell32.dll#236
+audio = pe:shell32.dll#225
+video = pe:shell32.dll#224
+zip = pe:shell32.dll#4
+pdf = pe:shell32.dll#2
+exe = pe:shell32.dll#3
+dll = pe:shell32.dll#154
+html = pe:shell32.dll#178
+disc = pe:shell32.dll#12
+settings = pe:shell32.dll#151
+binary = pe:shell32.dll#154
+network = pe:shell32.dll#18
+favorites = pe:shell32.dll#173
+search = pe:shell32.dll#134
+trash = pe:shell32.dll#32
+help = pe:shell32.dll#24
+pictures = pe:shell32.dll#236
+control_panel = pe:shell32.dll#137
+run = pe:shell32.dll#25
+recent = pe:shell32.dll#20
+
+[toolbar]
+strip = $FLXP_NT5SRC/Source/XPSP1/NT/shell/shell32/tb_sh_def_24.bmp
+hot = $FLXP_NT5SRC/Source/XPSP1/NT/shell/shell32/tb_sh_hot_24.bmp
+size = 24
+small = $FLXP_NT5SRC/Source/XPSP1/NT/shell/shell32/tb_sh_def_16.bmp
+small_hot = $FLXP_NT5SRC/Source/XPSP1/NT/shell/shell32/tb_sh_hot_16.bmp
+small_size = 16
+back = 0
+forward = 1
+up = 28
+search = 17
+folders = 43
+views = 32

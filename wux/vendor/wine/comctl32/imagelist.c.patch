@@ -1,0 +1,26 @@
+--- a/dlls/comctl32/imagelist.c (wine-10.0)
++++ b/vendor/wine/comctl32/imagelist.c
+@@ -1218,14 +1218,19 @@
+     }
+     else if (state & ILS_SATURATE)
+     {
++        /* flxp: XP image.cpp TrueSaturateBits: gray = (54r + 183g + 19b) >> 8,
++         * then an alpha image is blended at constant alpha 150 (SP1 source;
++         * the XP screenshots' disabled Forward glyph fits 157 best). (Wine also
++         * multiplied by the alpha here, which the premultiply below does again,
++         * making disabled glyphs far too dark.) */
+         for (i = 0, ptr = bits; i < cx * cy; i++, ptr++)
+         {
+-            DWORD gray = (((*ptr & 0x00ff0000) >> 16) * 299 +
+-                          ((*ptr & 0x0000ff00) >>  8) * 587 +
+-                          ((*ptr & 0x000000ff) >>  0) * 114 + 500) / 1000;
+-            if (has_alpha) gray = gray * (*ptr >> 24) / 255;
++            DWORD gray = (((*ptr & 0x00ff0000) >> 16) * 54 +
++                          ((*ptr & 0x0000ff00) >>  8) * 183 +
++                          ((*ptr & 0x000000ff) >>  0) * 19) >> 8;
+             *ptr = (*ptr & 0xff000000)| (gray << 16) | (gray << 8) | gray;
+         }
++        if (has_alpha) func.SourceConstantAlpha = 157;
+     }
+     else if (style & ILD_PRESERVEALPHA)
+     {

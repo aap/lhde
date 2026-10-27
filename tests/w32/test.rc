@@ -1,0 +1,31 @@
+/* kerneltest's resources (tests/w32/kerneltest.cpp test_resources), compiled
+ * by make into build/tests/w32/test.res: string tables in two languages (the
+ * en-US one preferred), a named and a numbered bitmap, a dialog. */
+#pragma code_page(65001)
+#include <windows.h>
+
+LANGUAGE LANG_GERMAN, SUBLANG_NEUTRAL
+STRINGTABLE
+BEGIN
+    1 "Eins"
+END
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+STRINGTABLE
+BEGIN
+    1 "One"
+    17 "Seventeen"
+    18 "Größe ✓"
+    40 "Forty"
+END
+
+PALBMP BITMAP "pal.bmp"
+2 BITMAP "pal.bmp"
+
+100 DIALOG 0, 0, 100, 50
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION
+CAPTION "Test"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    DEFPUSHBUTTON "OK", IDOK, 25, 15, 50, 14
+END

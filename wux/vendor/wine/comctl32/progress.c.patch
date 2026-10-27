@@ -1,0 +1,39 @@
+--- a/dlls/comctl32/progress.c (wine-10.0)
++++ b/vendor/wine/comctl32/progress.c
+@@ -245,6 +245,18 @@
+     r.top = di->rect.top;
+     r.bottom = di->rect.bottom;
+     r.right = di->rect.left + end;
++    /* flxp: XP-era styles define only PP_CHUNK; PP_FILL is a Vista part */
++    if (!IsThemePartDefined (di->theme, PP_FILL, 0))
++    {
++        int x;
++        for (x = r.left; x < r.right; x += di->ledW + di->ledGap)
++        {
++            RECT c = r;
++            c.left = x; c.right = min (x + di->ledW, r.right);
++            DrawThemeBackground (di->theme, di->hdc, PP_CHUNK, 0, &c, NULL);
++        }
++        return;
++    }
+     DrawThemeBackground (di->theme, di->hdc, PP_FILL, di->state, &r, NULL);
+ }
+ 
+@@ -256,6 +268,17 @@
+     r.right = di->rect.right;
+     r.bottom = di->rect.bottom - start;
+     r.top = di->rect.bottom - end;
++    if (!IsThemePartDefined (di->theme, PP_FILLVERT, 0))
++    {
++        int y;
++        for (y = r.bottom; y > r.top; y -= di->ledW + di->ledGap)
++        {
++            RECT c = r;
++            c.bottom = y; c.top = max (y - di->ledW, r.top);
++            DrawThemeBackground (di->theme, di->hdc, PP_CHUNKVERT, 0, &c, NULL);
++        }
++        return;
++    }
+     DrawThemeBackground (di->theme, di->hdc, PP_FILLVERT, di->state, &r, NULL);
+ }
+ 

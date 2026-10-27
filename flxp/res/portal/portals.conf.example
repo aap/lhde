@@ -1,0 +1,4 @@
+# ~/.config/xdg-desktop-portal/portals.conf (or <desktop>-portals.conf):
+# the flxp file dialog for file choosers, everything else as before.
+[preferred]
+org.freedesktop.impl.portal.FileChooser=flxp

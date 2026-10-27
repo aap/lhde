@@ -1,0 +1,5 @@
+/* libuxtheme.so exports only the ut.h API; the shim, Wine and gdi stay inside */
+{
+    global: ut_*;
+    local: *;
+};

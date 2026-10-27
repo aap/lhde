@@ -1,0 +1,236 @@
+--- a/dlls/uxtheme/draw.c (840a939ee52)
++++ b/vendor/wine/uxtheme/draw.c
+@@ -492,6 +492,37 @@
+     }
+ }
+ 
++/* flxp: an edge piece of a nine-grid: sized (tiled/stretched) along the edge
++ * and, when the margins were shrunk, scaled across it (XP ninegrid2.cpp).
++ * along_x: the piece runs horizontally (top/bottom edge). */
++static BOOL UXTHEME_SidedBlt (HDC hdcDst, int xDst, int yDst, int wDst, int hDst,
++                              HDC hdcSrc, int xSrc, int ySrc, int wSrc, int hSrc,
++                              BOOL along_x, int sizingtype, INT transparent, COLORREF transcolor)
++{
++    HDC hdcTemp;
++    HBITMAP bmp, old;
++    BOOL ret;
++    int wTemp = along_x ? wDst : wSrc, hTemp = along_x ? hSrc : hDst;
++
++    if (along_x ? (hDst == hSrc) : (wDst == wSrc))
++        return UXTHEME_SizedBlt (hdcDst, xDst, yDst, wDst, hDst, hdcSrc, xSrc, ySrc, wSrc, hSrc,
++                                 sizingtype, transparent, transcolor);
++    if (wDst <= 0 || hDst <= 0) return TRUE;
++    /* size along the edge at the source thickness, then scale across */
++    hdcTemp = CreateCompatibleDC(hdcSrc);
++    bmp = CreateCompatibleBitmap(hdcSrc, wTemp, hTemp);
++    old = SelectObject(hdcTemp, bmp);
++    ret = UXTHEME_SizedBlt (hdcTemp, 0, 0, wTemp, hTemp, hdcSrc, xSrc, ySrc, wSrc, hSrc,
++                            sizingtype, ALPHABLEND_NONE, 0);
++    if (ret)
++        ret = UXTHEME_StretchBlt (hdcDst, xDst, yDst, wDst, hDst, hdcTemp, 0, 0, wTemp, hTemp,
++                                  transparent, transcolor);
++    SelectObject(hdcTemp, old);
++    DeleteObject(bmp);
++    DeleteDC(hdcTemp);
++    return ret;
++}
++
+ /* Get transparency parameters passed to UXTHEME_StretchBlt() - the parameters 
+  * depend on whether the image has full alpha  or whether it is 
+  * color-transparent or just opaque. */
+@@ -602,9 +633,9 @@
+ 
+     topleft.x = pRect->left;
+     topleft.y = pRect->top;
+-    if(halign == HA_CENTER)      topleft.x += (dstSize.x/2)-(srcSize.x/2);
++    if(halign == HA_CENTER)      topleft.x += (dstSize.x-srcSize.x)/2;   /* flxp: XP imagefile.cpp centres (dst - src) / 2 */
+     else if(halign == HA_RIGHT)  topleft.x += dstSize.x-srcSize.x;
+-    if(valign == VA_CENTER)      topleft.y += (dstSize.y/2)-(srcSize.y/2);
++    if(valign == VA_CENTER)      topleft.y += (dstSize.y-srcSize.y)/2;   /* flxp: XP imagefile.cpp centres (dst - src) / 2 */
+     else if(valign == VA_BOTTOM) topleft.y += dstSize.y-srcSize.y;
+ 
+     if(!UXTHEME_Blt(hdc, topleft.x, topleft.y, srcSize.x, srcSize.y,
+@@ -793,11 +824,11 @@
+         GetThemeEnumValue(hTheme, iPartId, iStateId, TMT_HALIGN, &halign);
+ 
+         if (halign == HA_CENTER)
+-            rcDst.left += (dstSize.x/2)-(drawSize.x/2);
++            rcDst.left += (dstSize.x-drawSize.x)/2;   /* flxp: XP imagefile.cpp centres (dst - src) / 2 */
+         else if (halign == HA_RIGHT)
+             rcDst.left = rcDst.right - drawSize.x;
+         if (valign == VA_CENTER)
+-            rcDst.top  += (dstSize.y/2)-(drawSize.y/2);
++            rcDst.top  += (dstSize.y-drawSize.y)/2;   /* flxp: XP imagefile.cpp centres (dst - src) / 2 */
+         else if (valign == VA_BOTTOM)
+             rcDst.top = rcDst.bottom - drawSize.y;
+         rcDst.right = rcDst.left + drawSize.x;
+@@ -809,7 +840,8 @@
+     }
+     else {
+         HDC hdcDst = NULL;
+-        MARGINS sm;
++        MARGINS sm, ssm;   /* flxp: destination and source sizing margins */
++        int srcMidLeft, srcMidTop;   /* flxp: where the source middle starts */
+         POINT org;
+ 
+         dstSize.x = abs(dstSize.x);
+@@ -817,96 +849,78 @@
+ 
+         GetThemeMargins(hTheme, hdc, iPartId, iStateId, TMT_SIZINGMARGINS, NULL, &sm);
+ 
+-        /* Resize sizing margins if destination is smaller */
+-        if (sm.cyTopHeight + sm.cyBottomHeight > dstSize.y || sm.cxLeftWidth + sm.cxRightWidth > dstSize.x) {
+-            if (sm.cyTopHeight + sm.cyBottomHeight > dstSize.y) {
+-                sm.cyTopHeight = MulDiv(sm.cyTopHeight, dstSize.y, srcSize.y);
+-                sm.cyBottomHeight = dstSize.y - sm.cyTopHeight;
+-            }
+-
+-            if (sm.cxLeftWidth + sm.cxRightWidth > dstSize.x) {
+-                sm.cxLeftWidth = MulDiv(sm.cxLeftWidth, dstSize.x, srcSize.x);
+-                sm.cxRightWidth = dstSize.x - sm.cxLeftWidth;
+-            }
++        /* flxp: XP ninegrid2.cpp: when the destination is smaller than both
++         * margins, the margins are split in proportion (left*dst/(left+right),
++         * rounding down) and the corner/side pieces are shrunk (nearest
++         * sampling) rather than clipped. Wine scaled by the image size and
++         * blitted the pieces 1:1, which put e.g. Luna's toolbar separator
++         * line one pixel too far right. */
++        ssm = sm;
++        if (sm.cyTopHeight + sm.cyBottomHeight > dstSize.y) {
++            sm.cyTopHeight = (sm.cyTopHeight + sm.cyBottomHeight) ?
++                sm.cyTopHeight * dstSize.y / (sm.cyTopHeight + sm.cyBottomHeight) : 0;
++            sm.cyBottomHeight = dstSize.y - sm.cyTopHeight;
++        }
++        if (sm.cxLeftWidth + sm.cxRightWidth > dstSize.x) {
++            sm.cxLeftWidth = (sm.cxLeftWidth + sm.cxRightWidth) ?
++                sm.cxLeftWidth * dstSize.x / (sm.cxLeftWidth + sm.cxRightWidth) : 0;
++            sm.cxRightWidth = dstSize.x - sm.cxLeftWidth;
+         }
+ 
+         hdcDst = hdc;
+         OffsetViewportOrgEx(hdcDst, rcDst.left, rcDst.top, &org);
+ 
+-        /* Upper left corner */
+-        if(!UXTHEME_Blt(hdcDst, 0, 0, sm.cxLeftWidth, sm.cyTopHeight,
+-                        hdcSrc, rcSrc.left, rcSrc.top, 
++        /* corners: shrunk to the new margins if needed */
++        if(!UXTHEME_StretchBlt(hdcDst, 0, 0, sm.cxLeftWidth, sm.cyTopHeight,
++                        hdcSrc, rcSrc.left, rcSrc.top, ssm.cxLeftWidth, ssm.cyTopHeight,
++                        transparent, transparentcolor) ||
++           !UXTHEME_StretchBlt(hdcDst, dstSize.x-sm.cxRightWidth, 0, sm.cxRightWidth, sm.cyTopHeight,
++                        hdcSrc, rcSrc.right-ssm.cxRightWidth, rcSrc.top, ssm.cxRightWidth, ssm.cyTopHeight,
++                        transparent, transparentcolor) ||
++           !UXTHEME_StretchBlt(hdcDst, 0, dstSize.y-sm.cyBottomHeight, sm.cxLeftWidth, sm.cyBottomHeight,
++                        hdcSrc, rcSrc.left, rcSrc.bottom-ssm.cyBottomHeight, ssm.cxLeftWidth, ssm.cyBottomHeight,
++                        transparent, transparentcolor) ||
++           !UXTHEME_StretchBlt(hdcDst, dstSize.x-sm.cxRightWidth, dstSize.y-sm.cyBottomHeight, sm.cxRightWidth, sm.cyBottomHeight,
++                        hdcSrc, rcSrc.right-ssm.cxRightWidth, rcSrc.bottom-ssm.cyBottomHeight, ssm.cxRightWidth, ssm.cyBottomHeight,
+                         transparent, transparentcolor)) {
+             hr = HRESULT_FROM_WIN32(GetLastError());
+-            goto draw_error; 
+-        }
+-        /* Upper right corner */
+-        if(!UXTHEME_Blt (hdcDst, dstSize.x-sm.cxRightWidth, 0, 
+-                         sm.cxRightWidth, sm.cyTopHeight,
+-                         hdcSrc, rcSrc.right-sm.cxRightWidth, rcSrc.top, 
+-                         transparent, transparentcolor)) {
+-            hr = HRESULT_FROM_WIN32(GetLastError());
+-            goto draw_error; 
+-        }
+-        /* Lower left corner */
+-        if(!UXTHEME_Blt (hdcDst, 0, dstSize.y-sm.cyBottomHeight, 
+-                         sm.cxLeftWidth, sm.cyBottomHeight,
+-                         hdcSrc, rcSrc.left, rcSrc.bottom-sm.cyBottomHeight, 
+-                         transparent, transparentcolor)) {
+-            hr = HRESULT_FROM_WIN32(GetLastError());
+-            goto draw_error; 
+-        }
+-        /* Lower right corner */
+-        if(!UXTHEME_Blt (hdcDst, dstSize.x-sm.cxRightWidth, dstSize.y-sm.cyBottomHeight, 
+-                         sm.cxRightWidth, sm.cyBottomHeight,
+-                         hdcSrc, rcSrc.right-sm.cxRightWidth, rcSrc.bottom-sm.cyBottomHeight, 
+-                         transparent, transparentcolor)) {
+-            hr = HRESULT_FROM_WIN32(GetLastError());
+-            goto draw_error; 
++            goto draw_error;
+         }
+ 
+         destCenterWidth  = dstSize.x - (sm.cxLeftWidth + sm.cxRightWidth);
+-        srcCenterWidth   = srcSize.x - (sm.cxLeftWidth + sm.cxRightWidth);
++        srcCenterWidth   = srcSize.x - (ssm.cxLeftWidth + ssm.cxRightWidth);
+         destCenterHeight = dstSize.y - (sm.cyTopHeight + sm.cyBottomHeight);
+-        srcCenterHeight  = srcSize.y - (sm.cyTopHeight + sm.cyBottomHeight);
++        srcCenterHeight  = srcSize.y - (ssm.cyTopHeight + ssm.cyBottomHeight);
++        /* flxp: margins that cover the whole image (4074 Slate's TaskBand::Toolbar
++         * BUTTON: 28 rows, margins 16 + 12) leave no source middle; stretched
++         * taller, XP's ninegrid2 fills the middle from the row at the boundary
++         * (the top part's last row); Wine drew nothing there (a transparent
++         * streak across the task buttons). The middle then is that row/column. */
++        srcMidLeft = rcSrc.left + ssm.cxLeftWidth;
++        srcMidTop  = rcSrc.top + ssm.cyTopHeight;
++        if (srcCenterHeight <= 0 && ssm.cyTopHeight > 0) { srcMidTop--; srcCenterHeight = 1; }
++        if (srcCenterWidth <= 0 && ssm.cxLeftWidth > 0) { srcMidLeft--; srcCenterWidth = 1; }
+ 
+         if(destCenterWidth > 0) {
+-            /* Center top */
+-            if(!UXTHEME_SizedBlt (hdcDst, sm.cxLeftWidth, 0,
+-                                  destCenterWidth, sm.cyTopHeight,
+-                                  hdcSrc, rcSrc.left+sm.cxLeftWidth, rcSrc.top,
+-                                  srcCenterWidth, sm.cyTopHeight,
+-                                  sizingtype, transparent, transparentcolor)) {
+-                hr = HRESULT_FROM_WIN32(GetLastError());
+-                goto draw_error;
+-            }
+-            /* Center bottom */
+-            if(!UXTHEME_SizedBlt (hdcDst, sm.cxLeftWidth, dstSize.y-sm.cyBottomHeight,
+-                                  destCenterWidth, sm.cyBottomHeight,
+-                                  hdcSrc, rcSrc.left+sm.cxLeftWidth, rcSrc.bottom-sm.cyBottomHeight,
+-                                  srcCenterWidth, sm.cyBottomHeight,
+-                                  sizingtype, transparent, transparentcolor)) {
++            /* Center top, center bottom (sized across, shrunk down if needed) */
++            if(!UXTHEME_SidedBlt (hdcDst, sm.cxLeftWidth, 0, destCenterWidth, sm.cyTopHeight,
++                                  hdcSrc, srcMidLeft, rcSrc.top, srcCenterWidth, ssm.cyTopHeight,
++                                  TRUE, sizingtype, transparent, transparentcolor) ||
++               !UXTHEME_SidedBlt (hdcDst, sm.cxLeftWidth, dstSize.y-sm.cyBottomHeight, destCenterWidth, sm.cyBottomHeight,
++                                  hdcSrc, srcMidLeft, rcSrc.bottom-ssm.cyBottomHeight, srcCenterWidth, ssm.cyBottomHeight,
++                                  TRUE, sizingtype, transparent, transparentcolor)) {
+                 hr = HRESULT_FROM_WIN32(GetLastError());
+                 goto draw_error;
+             }
+         }
+         if(destCenterHeight > 0) {
+-            /* Left center */
+-            if(!UXTHEME_SizedBlt (hdcDst, 0, sm.cyTopHeight,
+-                                  sm.cxLeftWidth, destCenterHeight,
+-                                  hdcSrc, rcSrc.left, rcSrc.top+sm.cyTopHeight,
+-                                  sm.cxLeftWidth, srcCenterHeight,
+-                                  sizingtype,
+-                                  transparent, transparentcolor)) {
+-                hr = HRESULT_FROM_WIN32(GetLastError());
+-                goto draw_error;
+-            }
+-            /* Right center */
+-            if(!UXTHEME_SizedBlt (hdcDst, dstSize.x-sm.cxRightWidth, sm.cyTopHeight,
+-                                  sm.cxRightWidth, destCenterHeight,
+-                                  hdcSrc, rcSrc.right-sm.cxRightWidth, rcSrc.top+sm.cyTopHeight,
+-                                  sm.cxRightWidth, srcCenterHeight,
+-                                  sizingtype, transparent, transparentcolor)) {
++            /* Left center, right center (sized down, shrunk across if needed) */
++            if(!UXTHEME_SidedBlt (hdcDst, 0, sm.cyTopHeight, sm.cxLeftWidth, destCenterHeight,
++                                  hdcSrc, rcSrc.left, srcMidTop, ssm.cxLeftWidth, srcCenterHeight,
++                                  FALSE, sizingtype, transparent, transparentcolor) ||
++               !UXTHEME_SidedBlt (hdcDst, dstSize.x-sm.cxRightWidth, sm.cyTopHeight, sm.cxRightWidth, destCenterHeight,
++                                  hdcSrc, rcSrc.right-ssm.cxRightWidth, srcMidTop, ssm.cxRightWidth, srcCenterHeight,
++                                  FALSE, sizingtype, transparent, transparentcolor)) {
+                 hr = HRESULT_FROM_WIN32(GetLastError());
+                 goto draw_error;
+             }
+@@ -918,7 +932,7 @@
+                 /* Center */
+                 if(!UXTHEME_SizedBlt (hdcDst, sm.cxLeftWidth, sm.cyTopHeight,
+                                       destCenterWidth, destCenterHeight,
+-                                      hdcSrc, rcSrc.left+sm.cxLeftWidth, rcSrc.top+sm.cyTopHeight,
++                                      hdcSrc, srcMidLeft, srcMidTop,
+                                       srcCenterWidth, srcCenterHeight,
+                                       sizingtype, transparent, transparentcolor)) {
+                     hr = HRESULT_FROM_WIN32(GetLastError());

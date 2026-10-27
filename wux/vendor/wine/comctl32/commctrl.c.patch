@@ -1,0 +1,109 @@
+--- a/dlls/comctl32/commctrl.c (wine-10.0)
++++ b/vendor/wine/comctl32/commctrl.c
+@@ -1660,26 +1660,93 @@
+ int WINAPI DrawShadowText(HDC hdc, LPCWSTR text, UINT length, RECT *rect, DWORD flags,
+                           COLORREF crText, COLORREF crShadow, int offset_x, int offset_y)
+ {
+-    int bkmode, ret;
++    /* flxp: XP's DrawShadowText (comctl32 v6 blur.cpp) instead of Wine's
++       offset-text semi-stub: the text is drawn into a 32bpp buffer with a 5px
++       margin, every touched pixel becomes fully covered, the coverage is box-
++       blurred 4 wide and 5 high (the sum of 5 rows over 4: up to 1.25 gain,
++       clamped) into premultiplied crShadow and alpha-blended at
++       (left - 4 + offset_x, top - 8 + offset_y), then the text is drawn on top.
++       XP's buffer is bottom-up and its vertical pass runs upwards in memory, so
++       a row takes the rows above it in the image; this buffer is top-down and
++       does the same explicitly. Zero coverage stays (0,0,0,0) as in XP's MMX
++       path. Net: a soft shadow about (0.5, 1) px off the text for XP's (2, 2). */
++    int bkmode, ret, cx, cy, x, y;
+     COLORREF clr;
+-    RECT r;
++    RECT rcMem;
++    BITMAPINFO bi;
++    HDC mem;
++    HBITMAP bmp, oldbmp;
++    HFONT oldfont;
++    DWORD *bits = NULL;
+ 
+-    FIXME("%p, %s, %d, %p, %#lx, %#lx, %#lx, %d, %d: semi-stub\n", hdc, debugstr_w(text),
++    TRACE("%p, %s, %d, %p, %#lx, %#lx, %#lx, %d, %d\n", hdc, debugstr_w(text),
+         length, rect, flags, crText, crShadow, offset_x, offset_y);
+ 
+-    bkmode = SetBkMode(hdc, TRANSPARENT);
+-    clr = SetTextColor(hdc, crShadow);
+-
+-    /* FIXME: for shadow we need to render normally, blur it, and blend with current background. */
+-    r = *rect;
+-    OffsetRect(&r, 1, 1);
+-    DrawTextW(hdc, text, length, &r, flags);
++    if (flags & DT_CALCRECT) return DrawTextW(hdc, text, length, rect, flags);
+ 
+-    SetTextColor(hdc, crText);
++    cx = rect->right - rect->left + 10;
++    cy = rect->bottom - rect->top + 10;
++    memset(&bi, 0, sizeof(bi));
++    bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
++    bi.bmiHeader.biWidth = cx;
++    bi.bmiHeader.biHeight = -cy;
++    bi.bmiHeader.biPlanes = 1;
++    bi.bmiHeader.biBitCount = 32;
++    bi.bmiHeader.biCompression = BI_RGB;
++    mem = CreateCompatibleDC(hdc);
++    bmp = (mem && cx > 0 && cy > 0) ? CreateDIBSection(mem, &bi, DIB_RGB_COLORS, (void **)&bits, NULL, 0) : NULL;
++    if (bmp && bits)
++    {
++        BYTE r = GetRValue(crShadow), g = GetGValue(crShadow), b = GetBValue(crShadow);
++        BLENDFUNCTION bf;
++
++        oldbmp = SelectObject(mem, bmp);
++        oldfont = SelectObject(mem, GetCurrentObject(hdc, OBJ_FONT));
++        memset(bits, 0, (size_t)cx * cy * 4);
++        SetTextColor(mem, crText);
++        SetBkColor(mem, crShadow);
++        SetBkMode(mem, TRANSPARENT);
++        SetRect(&rcMem, 5, 5, cx - 5, cy - 5);
++        DrawTextW(mem, text, length, &rcMem, flags);
++        for (x = 0; x < cx * cy; x++)
++            bits[x] = bits[x] ? 0xff : 0;
++        /* horizontal: x = average of x+1..x+4 (the last 5 columns stay) */
++        for (y = 0; y < cy; y++)
++        {
++            DWORD *p = bits + (size_t)y * cx;
++            int acc = cx > 3 ? p[0] + p[1] + p[2] + p[3] : 0;
++            for (x = 0; x < cx - 5; x++)
++            {
++                acc = acc - p[x] + p[x + 4];
++                p[x] = acc >> 2;
++            }
++        }
++        /* vertical: y = (y-4 .. y) / 4, clamped, from the bottom up so the rows used are unchanged; rows 0..4 stay */
++        for (y = cy - 1; y >= 5; y--)
++        {
++            for (x = 0; x < cx; x++)
++            {
++                DWORD *p = bits + (size_t)y * cx + x, a;
++                a = (p[0] + p[-cx] + p[-2 * cx] + p[-3 * cx] + p[-4 * cx]) >> 2;
++                if (a > 255) a = 255;
++                *p = a ? (a << 24) | ((((r * a + 128) >> 8) + 1) << 16) | ((((g * a + 128) >> 8) + 1) << 8) | (((b * a + 128) >> 8) + 1) : 0;
++            }
++        }
++        for (y = 0; y < 5 && y < cy; y++) memset(bits + (size_t)y * cx, 0, (size_t)cx * 4);
++        bf.BlendOp = AC_SRC_OVER;
++        bf.BlendFlags = 0;
++        bf.SourceConstantAlpha = 255;
++        bf.AlphaFormat = AC_SRC_ALPHA;
++        GdiAlphaBlend(hdc, rect->left - 4 + offset_x, rect->top - 8 + offset_y, cx, cy, mem, 0, 0, cx, cy, bf);
++        SelectObject(mem, oldfont);
++        SelectObject(mem, oldbmp);
++    }
++    if (bmp) DeleteObject(bmp);
++    if (mem) DeleteDC(mem);
+ 
+-    /* with text color on top of a shadow */
++    bkmode = SetBkMode(hdc, TRANSPARENT);
++    clr = SetTextColor(hdc, crText);
+     ret = DrawTextW(hdc, text, length, rect, flags);
+-
+     SetTextColor(hdc, clr);
+     SetBkMode(hdc, bkmode);
+ 

@@ -1,0 +1,102 @@
+--- a/dlls/comctl32/edit.c (wine-10.0)
++++ b/vendor/wine/comctl32/edit.c
+@@ -2763,8 +2763,17 @@
+                 }
+                 else
+                 {
+-                    default_left_margin = width / 2;
+-                    default_right_margin = width / 2;
++                    /* flxp: XP comctl32 v6 Edit_SetMargin: min(aveCharWidth / 2,
++                     * the largest negative A (left) / C (right) width) */
++                    ABC abc[256];
++                    int neg_a = 0, neg_c = 0, i;
++                    if (GetCharABCWidthsW(dc, 0, 255, abc))
++                        for (i = 0; i < 256; i++) {
++                            if (-abc[i].abcA > neg_a) neg_a = -abc[i].abcA;
++                            if (-abc[i].abcC > neg_c) neg_c = -abc[i].abcC;
++                        }
++                    default_left_margin = min(width / 2, neg_a);
++                    default_right_margin = min(width / 2, neg_c);
+                 }
+ 
+                 GetClientRect(es->hwndSelf, &rc);
+@@ -3492,10 +3501,24 @@
+  *	WM_LBUTTONUP
+  *
+  */
++/* flxp: X's PRIMARY: the selected text, as X programs offer theirs (not for
++   passwords); the middle button pastes it */
++BOOL WINAPI FlxpSetSelectionText(BOOL primary, const WCHAR *text, INT len);   /* src/w32/flxp_shell.h */
++HGLOBAL WINAPI FlxpGetSelectionText(BOOL primary);
++static void EDIT_FlxpPrimary(const EDITSTATE *es)
++{
++	INT s = min(es->selection_start, es->selection_end);
++	INT e = max(es->selection_start, es->selection_end);
++
++	if (e > s && !(es->style & ES_PASSWORD))
++		FlxpSetSelectionText(TRUE, es->text + s, e - s);
++}
++
+ static LRESULT EDIT_WM_LButtonUp(EDITSTATE *es)
+ {
+ 	if (es->bCaptureState) {
+ 		if (GetCapture() == es->hwndSelf) ReleaseCapture();
++		EDIT_FlxpPrimary(es);   /* flxp: a drag or a double click selected */
+ 	}
+ 	es->bCaptureState = FALSE;
+ 	return 0;
+@@ -3507,9 +3530,33 @@
+  *	WM_MBUTTONDOWN
+  *
+  */
+-static LRESULT EDIT_WM_MButtonDown(EDITSTATE *es)
++static LRESULT EDIT_WM_MButtonDown(EDITSTATE *es, INT x, INT y)
+ {
+-    SendMessageW(es->hwndSelf, WM_PASTE, 0, 0);
++    /* flxp: X's middle click: PRIMARY's text at the pointer (Wine pasted the clipboard) */
++    HGLOBAL h;
++    BOOL after_wrap;
++    INT c;
++
++    if (es->style & ES_READONLY)
++        return 0;
++    if (!(h = FlxpGetSelectionText(TRUE)))
++        return 0;
++    if (GetFocus() != es->hwndSelf)
++        SetFocus(es->hwndSelf);
++    c = EDIT_CharFromPos(es, x, y, &after_wrap);
++    EDIT_EM_SetSel(es, c, c, after_wrap);
++    {
++        LPWSTR src = GlobalLock(h), ptr;
++        INT len = lstrlenW(src);
++        if (!(es->style & ES_MULTILINE) && ((ptr = wcschr(src, '\n')))) {
++            len = ptr - src;
++            if (len && src[len - 1] == '\r')
++                --len;
++        }
++        EDIT_EM_ReplaceSel(es, TRUE, src, len, TRUE, TRUE);
++        GlobalUnlock(h);
++    }
++    GlobalFree(h);
+     return 0;
+ }
+ 
+@@ -4832,6 +4879,9 @@
+ 
+     case WM_KEYDOWN:
+         result = EDIT_WM_KeyDown(es, (INT)wParam);
++        /* flxp: Shift+arrows, Ctrl+A ...: the selection is PRIMARY */
++        if (IsWindow(hwnd) && ((GetKeyState(VK_SHIFT) & 0x8000) || (GetKeyState(VK_CONTROL) & 0x8000)))
++            EDIT_FlxpPrimary(es);
+         break;
+ 
+     case WM_KILLFOCUS:
+@@ -4851,7 +4901,7 @@
+         break;
+ 
+     case WM_MBUTTONDOWN:
+-        result = EDIT_WM_MButtonDown(es);
++        result = EDIT_WM_MButtonDown(es, (short)LOWORD(lParam), (short)HIWORD(lParam));
+         break;
+ 
+     case WM_MOUSEMOVE:
