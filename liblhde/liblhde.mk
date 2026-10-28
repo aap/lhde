@@ -2,7 +2,8 @@
 # resolver (<lhde/theme.h>) and the settings store (<lhde/settings.h>). Plain C, no X; style probing through libwuxtheme.
 # Included by the top-level Makefile, before luxnav.mk (libluxnav carries data.o).
 #   build/lib/liblhde.a, build/lib/liblhde.so.1 (+ .so), build/lib/pkgconfig/lhde.pc
-#   build/bin/lhde-theme                  the command-line tool (list, resolve NAME --why, set NAME, migrate, registry)
+#   build/bin/lhde-theme                  the command-line tool (list, resolve NAME --why, set NAME, migrate, registry, explain, dirs,
+#                                         find; explain.c is its own, not the library's)
 #   build/liblhde/tests/resolve           make check-liblhde: inheritance, none, defaults per style kind, fallbacks, cycles,
 #                                         the settings store and the migration, on fake files (no Microsoft files)
 LHDE_SRCS    = $(addprefix liblhde/,data.c ini.c style.c theme.c current.c settings.c compat.c)
@@ -39,9 +40,9 @@ export LHDEPC_INSTALL = $(call lhde_pc,$(PREFIX),$(LIBDIR),$(INCLUDEDIR))
 $(LHDEPC): liblhde/liblhde.mk
 	@mkdir -p $(dir $@)
 	printf '%s\n' "$$LHDEPC_BUILD" > $@
-build/bin/lhde-theme: $(O)/liblhde/lhde-theme.o $(LHDEA) $(UTSO)
+build/bin/lhde-theme: $(O)/liblhde/lhde-theme.o $(O)/liblhde/explain.o $(LHDEA) $(UTSO)
 	@mkdir -p $(dir $@)
-	$(CC) -o $@ $< $(LHDEA) -Lbuild/lib -lwuxtheme '-Wl,-rpath,$$ORIGIN/../lib'
+	$(CC) -o $@ $(O)/liblhde/lhde-theme.o $(O)/liblhde/explain.o $(LHDEA) -Lbuild/lib -lwuxtheme '-Wl,-rpath,$$ORIGIN/../lib'
 build/liblhde/tests/resolve: $(O)/liblhde/tests/resolve.o $(LHDEA) $(UTSO)
 	@mkdir -p $(dir $@)
 	$(CC) -o $@ $< $(LHDEA) -Lbuild/lib -lwuxtheme '-Wl,-rpath,$$ORIGIN/../../lib'
@@ -60,5 +61,5 @@ install-liblhde: $(LHDESO) $(LHDEA) build/bin/lhde-theme
 uninstall-liblhde:
 	rm -f $(DESTDIR)$(LIBDIR)/liblhde.so $(DESTDIR)$(LIBDIR)/liblhde.so.1 $(DESTDIR)$(LIBDIR)/liblhde.a $(DESTDIR)$(PKGCONFIGDIR)/lhde.pc
 	rm -rf $(DESTDIR)$(INCLUDEDIR)/lhde; rm -f $(DESTDIR)$(BINDIR)/lhde-theme
--include $(LHDE_OBJS:.o=.d) $(O)/liblhde/lhde-theme.d $(O)/liblhde/tests/resolve.d
+-include $(LHDE_OBJS:.o=.d) $(O)/liblhde/lhde-theme.d $(O)/liblhde/explain.d $(O)/liblhde/tests/resolve.d
 .PHONY: liblhde check-liblhde install-liblhde uninstall-liblhde

@@ -20,7 +20,16 @@
      lhde-theme setting SEC KEY [VALUE]    a per-user key of settings.ini: print it, or write it (VALUE "-" removes it)
      lhde-theme migrate [--force]          the one-time move from ~/.config/longhorn and ~/.config/lhshell (docs/SETTINGS.md)
      lhde-theme registry                   (re)write the compatibility themes.ini for flxp and print its path
-     lhde-theme dirs                       the data directories, the settings file, the user's theme directory */
+     lhde-theme explain [THEME]            where every visible part of THEME (default: the selected one, with its current layer)
+                                           comes from: one row per component, its file and tree, ok / off / missing -> fallback
+     lhde-theme dirs [--list | --windows | --user]
+                                           the three trees (program files, Windows files, user files) with sizes and the search
+                                           order; --list: only the search order, one directory per line (scripts); --windows:
+                                           the Windows tree's top ($LHDE_WINDOWS); --user: its lookup directory (index/)
+     lhde-theme find REL | KIND NAME       a data file by its relative name (styles/jade4074.msstyles) or by kind (style jade4074;
+                                           kinds: theme style scheme frames pack navbar icons wallpaper fonts resources source):
+                                           the path, exit 1 when no tree has it
+     lhde-theme path VALUE                 a theme value as a path: absolute and ~/ as they are, else find (else where it would be) */
 #define _GNU_SOURCE
 #include "lhde/data.h"
 #include "lhde/theme.h"
@@ -31,12 +40,15 @@
 #include <string.h>
 #include <unistd.h>
 
+int lhde_explain(const char *name);   /* explain.c */
+int lhde_dirs_report(void);
+
 static void usage(void)
 {
     fprintf(stderr, "usage: lhde-theme list | resolve NAME [--files] [--why | --get KEY | --shell] | current | set NAME |\n"
                     "                  layer | layer-set KEY VALUE | layer-clear | save-as FILE [TITLE] | delete NAME | styles | schemes |\n"
                     "                  set-key NAME KEY VALUE | setting SEC KEY [VALUE] | style NAME | migrate [--force] |\n"
-                    "                  registry | dirs\n");
+                    "                  registry | explain [THEME] | dirs [--list | --windows | --user] | find REL | find KIND NAME | path VALUE\n");
     exit(2);
 }
 
@@ -65,13 +77,24 @@ int main(int argc, char **argv)
     char err[1024], buf[PATH_MAX];
     if (!strcmp(cmd, "list")) { lhde_theme_list(list_one, NULL); return 0; }
     if (!strcmp(cmd, "dirs")) {
-        const char *d[LHDE_DATA_MAX]; int n = lhde_data_dirs(d, LHDE_DATA_MAX);
-        for (int i = 0; i < n; i++) printf("data %d  %s\n", i + 1, d[i]);
-        printf("user data  %s\n", lhde_data_user());
-        printf("settings   %s\n", lhde_settings_path(buf, sizeof buf));
-        printf("themes     %s\n", lhde_theme_user_dir(buf, sizeof buf));
+        if (argc > 2 && !strcmp(argv[2], "--list")) {
+            const char *d[LHDE_DATA_MAX]; int n = lhde_data_dirs(d, LHDE_DATA_MAX);
+            for (int i = 0; i < n; i++) printf("%s\n", d[i]);
+            return 0;
+        }
+        if (argc > 2 && !strcmp(argv[2], "--windows")) { printf("%s\n", lhde_windows_dir()); return 0; }
+        if (argc > 2 && !strcmp(argv[2], "--user")) { printf("%s\n", lhde_data_user()); return 0; }
+        return lhde_dirs_report();
+    }
+    if (!strcmp(cmd, "explain")) return lhde_explain(argc > 2 ? argv[2] : NULL);
+    if (!strcmp(cmd, "find")) {
+        if (argc < 3) usage();
+        const char *r = argc > 3 ? lhde_data_find_kind(argv[2], argv[3], buf, sizeof buf) : lhde_data_find(argv[2], buf, sizeof buf);
+        if (!r) { if (argc > 3 && !lhde_data_kind_rel(argv[2], argv[3], err, sizeof err)) fprintf(stderr, "lhde-theme: no kind %s\n", argv[2]); return 1; }
+        printf("%s\n", r);
         return 0;
     }
+    if (!strcmp(cmd, "path")) { if (argc < 3) usage(); printf("%s\n", lhde_data_resolve(argv[2], buf, sizeof buf)); return 0; }
     if (!strcmp(cmd, "current")) {
         const char *v = lhde_settings_get("theme", "name", buf, sizeof buf);
         if (!v) { fprintf(stderr, "lhde-theme: no [theme] name in %s\n", lhde_settings_path(buf, sizeof buf)); return 1; }
