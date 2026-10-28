@@ -73,8 +73,7 @@ startdesk() {
 		tr '\0' '\n' </proc/$p/environ 2>/dev/null | grep -qx "DISPLAY=$D" || continue
 		b=$(tr '\0' '\n' </proc/$p/environ | sed -n 's/^DBUS_SESSION_BUS_ADDRESS=//p'); [ -n "$b" ] && bus=$b; break
 	done
-	flxpini() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\\([^[:space:]].*\\)/\\1/p" "${XDG_CONFIG_HOME:-$HOME/.config}/flxp/flxp.ini" 2>/dev/null | tail -1; }
-	[ -n "$FLXP_ICONS$(flxpini icons)" ] || export FLXP_ICONS=longhorn
+	# no FLXP_ICONS here: an exported FLXP_<KEY> beats the theme, and every program the desktop starts inherits it
 	(cd "$HOME" && DISPLAY=$D DBUS_SESSION_BUS_ADDRESS=$bus setsid "$FLXPDESK" >"$STATE/flxp-desktop.log" 2>&1 </dev/null &)
 }
 

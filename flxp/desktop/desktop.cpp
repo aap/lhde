@@ -714,6 +714,32 @@ void drag_move(bool done)
     }
 }
 
+// The labels' font: XP's icon title font (SPI_GETICONTITLELOGFONT), which the session theme sets
+// (a style's size, a classic scheme's metrics). Returns true when it changed.
+static bool label_font()
+{
+    static HFONT cur;
+    static LOGFONTW have;
+    LOGFONTW lf = {};
+    SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof lf, &lf, 0);
+    if (getenv("FLXP_DEBUG")) fprintf(stderr, "flxp-desktop: icon title font height %d weight %d\n", (int)lf.lfHeight, (int)lf.lfWeight);
+    if (cur && !memcmp(&lf, &have, sizeof lf)) return false;
+    HFONT f = CreateFontIndirectW(&lf);
+    if (!f) return false;
+    SendMessageW(g.list, WM_SETFONT, (WPARAM)f, TRUE);
+    if (cur) DeleteObject(cur);
+    cur = f; have = lf;
+    return true;
+}
+
+// the label sizes changed: the list re-measures its items; keep the icons where the user put them
+static void arrange_after_font()
+{
+    SendMessageW(g.list, LVM_UPDATE, (WPARAM)-1, 0);
+    if (g.auto_arrange) arrange();
+    InvalidateRect(g.list, nullptr, TRUE);
+}
+
 LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
@@ -722,9 +748,7 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         g.list = CreateWindowExW(0, WC_LISTVIEWW, nullptr,
             WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_TABSTOP | LVS_ICON | LVS_SHAREIMAGELISTS | LVS_EDITLABELS,
             0, 0, g.width, g.height, h, (HMENU)IDC_LIST, nullptr, nullptr);
-        LOGFONTW lf = {};
-        SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof lf, &lf, 0);   // XP: the icon title font
-        SendMessageW(g.list, WM_SETFONT, (WPARAM)CreateFontIndirectW(&lf), FALSE);
+        label_font();
         SendMessageW(g.list, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)uiicons::large());
         SendMessageW(g.list, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)uiicons::small());
         // transparent: the list asks us (WM_ERASEBKGND) for its background; white labels with XP's shadow
@@ -775,9 +799,13 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         fill();
         return 0;
     case WM_THEMECHANGED:
-        // the session theme's wallpaper
+        // the session theme's wallpaper, icon set and icon title font (a style's size, a classic scheme's metrics)
         wallpaper_changed(true);
-        if (uiicons::sync()) InvalidateRect(g.list, nullptr, TRUE);   // the theme's icon set
+        if (uiicons::sync()) InvalidateRect(g.list, nullptr, TRUE);
+        if (label_font()) arrange_after_font();
+        break;
+    case WM_SETTINGCHANGE:
+        if (label_font()) arrange_after_font();
         break;
     case WM_FLXP_ROOTPROPERTY:
         // _LH_THEME, _LH_SETTINGS_CHANGED (a theme file, settings.ini's [desktop] wallpaper = none), a new record:
