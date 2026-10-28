@@ -74,10 +74,10 @@ bool set_desktop_background(const std::string& file, const std::string& mode, st
     if (!mode.empty()) kv.push_back({ "Desktop.mode", mode });
     // the user's "no picture" would hide it
     if (file != "none" && wallpaper_hidden()) store::set("desktop", "wallpaper", "");
-    std::string sel;
-    bool ok = store::set_theme_keys(theme, kv, &sel, err, false);
-    if (sel != theme) store::apply_theme(sel);
-    else store::notify("desktop");
+    // the selected theme's current layer (docs/THEME-FORMAT.md section 3): no theme file is written
+    if (store::get("theme", "name") != theme) store::apply_theme(theme);
+    bool ok = store::set_current_keys(kv, true, "desktop");
+    if (!ok && err) *err = "cannot write " + store::path();
     return ok;
 }
 

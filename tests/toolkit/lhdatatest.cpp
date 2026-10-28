@@ -160,6 +160,23 @@ int main()
     for (const store::ThemeEntry& e : store::theme_list()) n += e.name == "slate4051-modified" && e.group == 0;
     CHECK_EQ(std::to_string(n), "1");
 
+    // the current layer (THEME-FORMAT section 3): settings.ini [current] on top of the selected theme, no theme file
+    store::apply_theme("slate4051");   // settings.ini first (no display here)
+    CHECK_EQ(store::set_current_keys({ { "Desktop.mode", "center" }, { "Explorer.navbar", "vision" } }, false) ? "ok" : "fail", "ok");
+    resolve_theme("slate4051", t);
+    CHECK_EQ(t.value("Desktop.mode") + " " + t.value("Explorer.navbar") + " " + t.value("current"), "center vision 2");
+    resolve_theme_files("slate4051", t);
+    CHECK_EQ(t.value("Desktop.mode") + " " + t.value("current"), "fill 0");
+    resolve_theme_with("slate4051", { { "Desktop.mode", "tile" } }, t);
+    CHECK_EQ(t.value("Desktop.mode") + " " + t.value("Explorer.navbar"), "tile 4051");
+    CHECK_EQ(std::to_string(store::current_layer().size()), "2");
+    CHECK_EQ(store::set_current_keys({ { "Explorer.navbar", "" } }, false) ? std::to_string(store::current_layer().size()) : "fail", "1");
+    n = 0;
+    for (const store::ThemeEntry& e : store::theme_files()) n += e.group == 2;
+    CHECK_EQ(std::to_string(n), "0");
+    store::apply_theme("slate4051-modified");   // another theme: the layer is dropped
+    CHECK_EQ(std::to_string(store::current_layer().size()), "0");
+
     // flxp.ini's keys that are theme keys now are ignored there; the per-user ones stay
     write_setting("icons", "2k");
     write_setting("taskpane", "0");

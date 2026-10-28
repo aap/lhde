@@ -24,8 +24,9 @@ bool wallpaper_hidden();
 // the Desktop.wallpaper value for a picture: GROUP/STEM when it lies in a data directory's wallpapers/ (and no other
 // picture there has that stem), else the absolute path
 std::string wallpaper_value(const std::string& file);
-// Set as Desktop Background: Desktop.wallpaper (and Desktop.mode when not empty) of the session theme into its modified
-// copy (shell::store::set_theme_keys), the user's [desktop] wallpaper = none removed; the theme selected and announced.
+// Set as Desktop Background: Desktop.wallpaper (and Desktop.mode when not empty) into the session theme's current layer
+// (settings.ini [current], shell::store::set_current_keys: "NAME (Modified)", no theme file), the user's [desktop]
+// wallpaper = none removed; _LH_SETTINGS_CHANGED.
 bool set_desktop_background(const std::string& file, const std::string& mode, std::string* err = nullptr);
 
 } // namespace shell

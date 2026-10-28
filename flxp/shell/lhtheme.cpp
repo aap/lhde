@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <set>
+#include <vector>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include "config.h"
@@ -119,6 +120,24 @@ bool resolve_theme(const std::string& name, SessionTheme& out, std::string* err)
     lhde_theme* t = lhde_theme_resolve(name.c_str(), e, sizeof e);
     if (!t && name.find('/') != std::string::npos) t = lhde_theme_resolve(base_of(name).c_str(), e, sizeof e);   // "themes/aero"
     if (!t) { if (err) *err = e; return false; }
+    return take(t, out);
+}
+
+bool resolve_theme_files(const std::string& name, SessionTheme& out, std::string* err)
+{
+    char e[512] = "";
+    lhde_theme* t = name.empty() ? nullptr : lhde_theme_resolve_flags(name.c_str(), LHDE_RESOLVE_FILES, e, sizeof e);
+    if (!t) { if (err) *err = name.empty() ? "no theme name" : e; return false; }
+    return take(t, out);
+}
+
+bool resolve_theme_with(const std::string& name, const std::map<std::string, std::string>& layer, SessionTheme& out, std::string* err)
+{
+    char e[512] = "";
+    std::vector<const char*> kv;
+    for (auto& x : layer) { kv.push_back(x.first.c_str()); kv.push_back(x.second.c_str()); }
+    lhde_theme* t = name.empty() ? nullptr : lhde_theme_resolve_with(name.c_str(), kv.data(), (int)kv.size() / 2, e, sizeof e);
+    if (!t) { if (err) *err = name.empty() ? "no theme name" : e; return false; }
     return take(t, out);
 }
 

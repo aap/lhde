@@ -125,13 +125,13 @@ HMENU programs_menu()
     return m;
 }
 
-// the themes as liblhde lists them (the user's theme files, the shipped ones, the bare styles;
-// docs/THEME-FORMAT.md), for Settings > Theme
+// the theme files as liblhde lists them (the user's, the shipped ones; the bare styles are Display Properties' Appearance
+// tab now; docs/THEME-FORMAT.md), for Settings > Theme
 HMENU themes_menu()
 {
     theme_cmds.clear();
     const shell::SessionTheme& cur = shell::session_theme();
-    std::vector<shell::store::ThemeEntry> list = shell::store::theme_list();
+    std::vector<shell::store::ThemeEntry> list = shell::store::theme_files();
     if (list.empty()) return nullptr;
     HMENU m = CreatePopupMenu();
     for (size_t i = 0; i < list.size(); i++) {

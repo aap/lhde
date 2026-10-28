@@ -33,6 +33,11 @@ bool session_theme_from(const std::string& name, const std::string& published, u
                         std::string* err = nullptr);
 // Any theme by name (a theme file, an alias, a bare style; Display Properties' list and sample)
 bool resolve_theme(const std::string& name, SessionTheme& out, std::string* err = nullptr);
+// The same without the current layer (the theme files only: "the theme as shipped"), or with a layer of the caller's
+// instead of the stored one (Display Properties' preview of changes not applied yet; KEY = "Section.key")
+bool resolve_theme_files(const std::string& name, SessionTheme& out, std::string* err = nullptr);
+bool resolve_theme_with(const std::string& name, const std::map<std::string, std::string>& layer, SessionTheme& out,
+                        std::string* err = nullptr);
 // A theme's name after aliases and its file ("" for a bare style); false when NAME is no theme
 bool lookup_theme(const std::string& name, std::string& canon, std::string* file = nullptr);
 // NAME is one of the user's own theme files (~/.config/lhde/themes/NAME.theme): Save As renames, Delete removes it

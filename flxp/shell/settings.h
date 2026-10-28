@@ -67,11 +67,26 @@ bool set_theme_keys(const std::string& theme, const std::vector<KeyValue>& kv, s
 // The themes as liblhde lists them: the user's theme files, the shipped ones, the bare styles (group 0, 1, 2)
 struct ThemeEntry { std::string name, title, file; int group; };
 std::vector<ThemeEntry> theme_list();
+// the theme files only (groups 0 and 1): what Display Properties' Themes tab and the start menu's Theme list offer
+std::vector<ThemeEntry> theme_files();
+
+// The current layer (docs/THEME-FORMAT.md section 3, Windows' "NAME (Modified)"): settings.ini [current], the unsaved
+// theme keys on top of the selected theme. Display Properties and Set as Desktop Background write here, not a theme file.
+std::vector<KeyValue> current_layer();            // the selected theme's (lhde_current_keys)
+// the whole layer replaced (lhde_current_set: keys the theme gives anyway are dropped); no notification
+bool set_current_layer(const std::vector<KeyValue>& kv);
+// keys merged into the layer ("" removes one), then _LH_SETTINGS_CHANGED when notify_now
+bool set_current_keys(const std::vector<KeyValue>& kv, bool notify_now = true, const std::string& hint = "theme");
+// Save As: the selected theme with its layer as ~/.config/lhde/themes/FILE.theme (lhde_theme_save_as), selected, announced
+bool save_theme_as(const std::string& file, const std::string& title, std::string* err = nullptr);
+// Delete one of the user's theme files (lhde_theme_delete); the selected one: its base selected and announced
+bool delete_theme(const std::string& name);
 
 // _LH_SETTINGS_CHANGED to the root (data[0] serial: _LH_SETTINGS_SERIAL + 1,
 // data[1] the section hint's atom or 0). False without a display.
 bool notify(const std::string& section_hint = "");
-// A theme change in the documented order: settings.ini [theme] name, _LH_THEME, notify(hint).
+// A theme change in the documented order: settings.ini [theme] name (lhde_theme_select: the current layer of another
+// theme is dropped), _LH_THEME, notify(hint).
 bool apply_theme(const std::string& name, const std::string& hint = "theme");
 
 // lux (lhshell) runs: _LHSHELL_S<screen> is owned

@@ -338,6 +338,74 @@ std::vector<ThemeEntry> theme_list()
     return out;
 }
 
+std::vector<ThemeEntry> theme_files()
+{
+    std::vector<ThemeEntry> out;
+    for (ThemeEntry& e : theme_list()) if (e.group < 2) out.push_back(e);
+    return out;
+}
+
+// ---- the current layer -----------------------------------------------------------
+
+static void layer_one(const char* k, const char* v, void* ud) { ((std::vector<KeyValue>*)ud)->push_back(KeyValue{ k, v ? v : "" }); }
+
+std::vector<KeyValue> current_layer()
+{
+    std::vector<KeyValue> out;
+    lhde_current_keys(layer_one, &out);
+    return out;
+}
+
+bool set_current_layer(const std::vector<KeyValue>& kv)
+{
+    std::vector<const char*> a;
+    for (const KeyValue& e : kv) if (!e.value.empty()) { a.push_back(e.key.c_str()); a.push_back(e.value.c_str()); }
+    return lhde_current_set(a.data(), (int)a.size() / 2) >= 0;
+}
+
+bool set_current_keys(const std::vector<KeyValue>& kv, bool notify_now, const std::string& hint)
+{
+    std::vector<KeyValue> layer = current_layer();
+    for (const KeyValue& e : kv) {
+        auto it = std::find_if(layer.begin(), layer.end(), [&](const KeyValue& x) { return iequal(x.key, e.key); });
+        if (it != layer.end()) layer.erase(it);
+        if (!e.value.empty()) layer.push_back(e);
+    }
+    bool ok = set_current_layer(layer);
+    if (ok && notify_now) notify(hint);
+    return ok;
+}
+
+static bool announce_selected()
+{
+    std::string name = get("theme", "name");
+    Display* dpy = open_display();
+    if (!dpy) return false;
+    Atom a = XInternAtom(dpy, "_LH_THEME", False);
+    XChangeProperty(dpy, DefaultRootWindow(dpy), a, XInternAtom(dpy, "UTF8_STRING", False), 8, PropModeReplace,
+                    (const unsigned char*)name.data(), (int)name.size());
+    send_changed(dpy, "theme");
+    XCloseDisplay(dpy);
+    return true;
+}
+
+bool save_theme_as(const std::string& file, const std::string& title, std::string* err)
+{
+    char e[512] = "";
+    if (lhde_theme_save_as(file.c_str(), title.c_str(), e, sizeof e)) { if (err) *err = e; return false; }
+    announce_selected();
+    return true;
+}
+
+bool delete_theme(const std::string& name)
+{
+    std::string before = get("theme", "name");
+    int r = lhde_theme_delete(name.c_str());
+    if (r <= 0) return false;
+    if (before == name) announce_selected();
+    return true;
+}
+
 // ---- notification ----------------------------------------------------------------
 
 bool notify(const std::string& hint)
@@ -351,7 +419,7 @@ bool notify(const std::string& hint)
 
 bool apply_theme(const std::string& name, const std::string& hint)
 {
-    bool ok = set("theme", "name", name);
+    bool ok = lhde_theme_select(name.c_str()) >= 0 || set("theme", "name", name);
     Display* dpy = open_display();
     if (!dpy) return false;
     Atom a = XInternAtom(dpy, "_LH_THEME", False);
