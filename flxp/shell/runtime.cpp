@@ -319,9 +319,7 @@ std::string find_msstyles(const std::string& name)
         f = only_msstyles(d + "/" + name);
         if (!f.empty()) return f;
     }
-    // luna -> lhde's luna-xp.msstyles, jade4074 -> styles/jade4074-xp/: the XP-format copy
-    if (lower.size() < 3 || lower.compare(lower.size() - 3, 3, "-xp")) return find_msstyles(lower + "-xp");
-    return "";
+    return "";   // no -xp backport fallback: every component uses the real style (THEME-FORMAT section 10)
 }
 
 static void export_env(const char* var, const std::string& v)
@@ -336,7 +334,11 @@ std::string setup_theme()
     if (follows_session_theme()) {
         SessionTheme t;
         std::string err;
-        if (read_session_theme(t, &err)) {
+        bool got = read_session_theme(t, &err);
+        if (getenv("FLXP_DEBUG"))
+            fprintf(stderr, "flxp: session theme %s (%s): style.kind %s, path.style %s\n", got ? t.name.c_str() : "-",
+                    err.c_str(), t.value("style.kind").c_str(), t.value("path.style").c_str());
+        if (got) {
             set_session_theme(t);
             if (t.classic) {
                 // VisualStyle.style = classic: no visual style
