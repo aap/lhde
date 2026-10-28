@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """lhde-pack: a resource pack of raw, unmodified Windows files, made from ISOs (or WIMs, or Windows directories) by the rules in
 data/sources/<source>.ini (docs/USAGE.md "Getting the Windows resources", docs/LAYOUT.md "Asset policy"). lhde-import --pack
-turns a pack into lhde's data directory; nobody needs the ISOs after that.
+turns a pack into lhde's Windows tree (~/.local/share/lhde-windows); nobody needs the ISOs after that.
 
 usage: lhde-pack [--isos DIR]... [--sources ID,ID] [--all] [--out DIR] [--name NAME] [--no-tar] [--tmp DIR]
                  [--medium ID=PATH]... [--list]
@@ -24,7 +24,7 @@ import sys
 import tempfile
 import datetime
 _here = os.path.dirname(os.path.realpath(__file__))
-sys.path[:0] = [_here, os.path.join(_here, '..', 'share', 'lhde', 'tools')]   # the tree's tools/, or installed: <prefix>/bin + share/lhde/tools
+sys.path[:0] = [_here, os.path.join(_here, '..', 'lib', 'lhde', 'tools')]   # the tree's tools/, or installed: <prefix>/bin + lib/lhde/tools
 import lhdeimport as L
 
 

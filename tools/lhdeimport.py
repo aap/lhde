@@ -4,10 +4,11 @@ Two stages, one code path:
   lhde-pack    ISO / WIM / Windows directory  --(data/sources/<source>.ini: which files, from where)-->  a resource pack:
                the raw, unmodified Windows files as <source>/{system32,themes,fonts,wallpapers,...}, source.ini, and MANIFEST
                (sha256, size, pack path, source, in-image path); a directory and lhde-resources-<date>.tar.zst (or .tar.xz)
-  lhde-import  a pack (or an ISO / WIM / directory: packed into a temporary pack first)  -->  the data directory: styles/,
-               fonts/<source>, wallpapers/<source>, resources/<source> (copies of the raw files), then the recipes of
-               [frames] and [packs] (frame sets, luxshell's pack images) run on those copies into cache/ directories with a
-               manifest.ini each: derived pixels are always regenerated (lhde-import --rebuild-cache), never packed.
+  lhde-import  a pack (or an ISO / WIM / directory: packed into a temporary pack first)  -->  the Windows tree
+               ($LHDE_WINDOWS, default ~/.local/share/lhde-windows; lhdetree.py): each <source>/ of the pack copied as it is,
+               the index/ of symlinks the programs look things up through, then the recipes of [frames] and [packs] (frame
+               sets, luxshell's pack images) run on those files into generated/ with a manifest each: derived pixels are
+               always regenerated (lhde-import --regenerate), never packed.
 
 Run with python3 -I. Needs 7z (ISO, WIM, the compressed *.XX_ files of an I386/AMD64 layout; cabextract also works for those),
 Pillow, and lhde's ut-dump (build/bin or PATH) for the CompositedWindow and StartPanel recipes. Build 4015's pre-release WIM
@@ -45,7 +46,7 @@ def source_dirs():
     e = os.environ.get('LHDE_SOURCES')
     if e:
         out.append(e)
-    for d in (os.path.join(HERE, '..', 'data', 'sources'), os.path.join(HERE, '..', 'sources')):   # the tree / <prefix>/share/lhde
+    for d in (os.path.join(HERE, '..', 'data', 'sources'), os.path.join(HERE, '..', '..', '..', 'share', 'lhde', 'sources')):   # the tree / installed: <prefix>/lib/lhde/tools
         if os.path.isdir(d):
             out.append(os.path.realpath(d))
     return out
@@ -625,7 +626,9 @@ def write_pack(pack, lines, tarball):
 
 # ---------------------------------------------------------------- importing a pack (lhde-import --pack)
 def data_dir(arg=None):
-    return os.path.realpath(arg or os.environ.get('LHDE_DATA') or os.path.join(os.environ.get('XDG_DATA_HOME') or os.path.expanduser('~/.local/share'), 'lhde'))
+    """the Windows tree (lhdetree.windows_dir)"""
+    import lhdetree
+    return lhdetree.windows_dir(arg)
 
 
 def unpack(path, tmp):
@@ -669,8 +672,10 @@ def copy_tree(src, dst, force, rep):
             copy_file(s, os.path.join(dst, os.path.relpath(s, src)), force, rep)
 
 
-def import_pack(pack, data, force=False, recipes=True):
-    """every source of the pack into the data directory: the raw files, then the recipes"""
+def import_pack(pack, W, force=False, recipes=True):
+    """every source of the pack into the Windows tree W: W/<source>/ = the pack's <source>/ (raw files, source.ini), the
+    classic schemes into W/generated/schemes, the index, then the recipes into W/generated"""
+    import lhdetree
     srcs = sorted(d for d in os.listdir(pack) if os.path.isfile(os.path.join(pack, d, 'source.ini')))
     if not srcs:
         die('%s is no resource pack (no <source>/source.ini)' % pack)
@@ -679,43 +684,52 @@ def import_pack(pack, data, force=False, recipes=True):
         root = os.path.join(pack, sid)
         s = Source(os.path.join(root, 'source.ini'))
         rep = {'copied': 0, 'kept': 0}
-        # raw files: system32/ and explorer.exe -> resources/<id>, fonts/ -> fonts/<id>, wallpapers/ -> wallpapers/<id>
-        for sub, tgt in (('system32', 'resources'), ('fonts', 'fonts'), ('wallpapers', 'wallpapers')):
-            if os.path.isdir(os.path.join(root, sub)):
-                copy_tree(os.path.join(root, sub), os.path.join(data, tgt, sid), force, rep)
-        for f in os.listdir(root):
-            if os.path.isfile(os.path.join(root, f)) and f.lower().endswith(('.exe', '.dll')):
-                copy_file(os.path.join(root, f), os.path.join(data, 'resources', sid, f), force, rep)
-        # styles: [styles] NAME = pack path of the .msstyles; its Shell/ directory beside it -> styles/NAME/Shell
-        for name, rel in s.section('styles'):
-            p = ci_path(root, rel)
-            if not os.path.isfile(p):
-                log('  %s: style %s: %s is not in the pack' % (sid, name, rel))
-                continue
-            copy_file(p, os.path.join(data, 'styles', name + '.msstyles'), force, rep)
-            shell = next((os.path.join(os.path.dirname(p), x) for x in os.listdir(os.path.dirname(p)) if x.lower() == 'shell'), None)
-            if shell:
-                copy_tree(shell, os.path.join(data, 'styles', name, 'Shell'), force, rep)
-        log('%s (%s): %d files copied, %d kept' % (sid, s.title, rep['copied'], rep['kept']))
-        # classic schemes: [schemes] NAME = pack path of a hive INF (HIVEDEF.INF) -> styles/<scheme>.scheme (tools/lhdeschemes.py)
-        for name, rel in s.section('schemes'):
-            p = ci_path(root, rel)
-            if not os.path.isfile(p):
-                log('  %s: schemes %s: %s is not in the pack' % (sid, name, rel))
-                continue
-            import lhdeschemes
-            lhdeschemes.import_inf(p, os.path.join(data, 'styles'), force, '%s (%s)' % (rel, s.title), log)
+        for f in sorted(os.listdir(root)):
+            p = os.path.join(root, f)
+            if os.path.isdir(p):
+                copy_tree(p, os.path.join(W, sid, f), force, rep)
+            elif f.lower().endswith(('.exe', '.dll')):   # a loose binary of an older pack: with the others
+                copy_file(p, os.path.join(W, sid, 'system32', f), force, rep)
+            else:
+                copy_file(p, os.path.join(W, sid, f), True, rep)   # source.ini: always the pack's
+        log('%s (%s): %d files copied, %d kept -> %s' % (sid, s.title, rep['copied'], rep['kept'], os.path.join(W, sid)))
+        import_schemes(W, sid, s.ini, force)
         todo.append(s)
+    lhdetree.reindex(W)
     if recipes:
         for s in todo:
-            for kind in ('frames', 'packs'):
-                for target, spec in s.section(kind):
-                    run_recipe(data, kind, target, spec, s.id, force)
-    with open(os.path.join(data, 'import.log'), 'a') as f:
+            run_recipes(W, s.id, s.ini, force)
+    with open(os.path.join(W, 'import.log'), 'a') as f:
         f.write('# lhde-import --pack %s, %s: %s\n' % (pack, datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), ' '.join(srcs)))
 
 
-# ---------------------------------------------------------------- recipes (derived pixels: cache/ + manifest.ini)
+def import_schemes(W, sid, ini, force):
+    """[schemes] NAME = path of a hive INF (HIVEDEF.INF) in W/<sid> -> W/generated/schemes/<scheme>.scheme (tools/lhdeschemes.py)"""
+    import lhdetree
+    for name, rel in (list(ini.items('schemes')) if ini.has_section('schemes') else []):
+        p = lhdetree.ci_path(os.path.join(W, sid), rel)
+        if not os.path.isfile(p):
+            log('  %s: schemes %s: %s is not imported' % (sid, name, rel))
+            continue
+        import lhdeschemes
+        lhdeschemes.import_inf(p, os.path.join(W, 'generated', 'schemes'), force, '%s/%s' % (sid, rel), log)
+
+
+def run_recipes(W, sid, ini, force):
+    """a source's [frames] and [packs]: from the shipped sources/<sid>.ini when there is one (the recipes of this version),
+    else from the copy imported with it"""
+    import lhdetree
+    p = lhdetree.shipped_source_ini(sid)
+    if p:
+        ini = read_ini(p)
+    for kind in ('frames', 'packs'):
+        for target, spec in (list(ini.items(kind)) if ini.has_section(kind) else []):
+            run_recipe(os.path.join(W, 'index'), kind, target, spec, sid, force)
+
+
+# ---------------------------------------------------------------- recipes (derived pixels: generated/ + manifest.ini)
+# Every recipe gets `data` = the Windows tree's index/: it reads its inputs by their index names (styles/NAME.msstyles,
+# resources/<build>/imageres.dll) and writes below data/frames/<set>/ or data/packs/<build>/, i.e. into generated/.
 def tool(name):
     """lhde's programs: the build tree's build/bin, beside an installed tools/ (<prefix>/bin), PATH"""
     for d in (os.path.join(HERE, '..', 'build', 'bin'), os.path.join(HERE, '..', '..', '..', 'bin')):
@@ -728,8 +742,8 @@ def tool(name):
 def write_manifest(dirpath, recipe, args, inputs, outputs):
     os.makedirs(dirpath, exist_ok=True)
     with open(os.path.join(dirpath, 'manifest.ini'), 'w') as f:
-        f.write('; lhde-import recipe: the pixels in cache/ are derived from the imported files below and may be deleted;\n'
-                '; lhde-import --rebuild-cache makes them again (tools/lhdeimport.py)\n')
+        f.write('; lhde-import recipe: the files here are derived from the imported files below and may be deleted;\n'
+                '; lhde-import --regenerate makes them again (tools/lhdeimport.py)\n')
         f.write('[recipe]\nkind = %s\nargs = %s\nwhen = %s\noutputs = %d\n\n[inputs]\n' % (recipe, args, datetime.date.today(), outputs))
         for p, h in inputs:
             f.write('%s = %s\n' % (p, h))
@@ -793,7 +807,7 @@ def composited_pngs(data, style, out, only=None):
 
 def r_frames_composited(data, target, args):
     style = args[0] if args else target
-    out = os.path.join(data, 'frames', target, 'cache')
+    out = os.path.join(data, 'frames', target)
     n = composited_pngs(data, style, out)
     return [style_rel(data, style)], n
 
@@ -801,7 +815,7 @@ def r_frames_composited(data, target, args):
 def r_frames_vision(data, target, args):
     """Aero vision: the CompositedWindow sprites of the base style (aero-patch), cut by tools/build_aerovision.py"""
     style = args[0]
-    out = os.path.join(data, 'frames', target, 'cache')
+    out = os.path.join(data, 'frames', target)
     with tempfile.TemporaryDirectory() as t:
         composited_pngs(data, style, t, only=('close.png', 'max.png', 'min.png', 'restore.png'))
         os.makedirs(out, exist_ok=True)
@@ -810,8 +824,8 @@ def r_frames_vision(data, target, args):
 
 
 def r_frames_classic(data, target, args):
-    """a classic (msstyles-mode) frame set's PNG cache from its style (tools/msstyles2theme.py); the tuning keys ship in
-    data/frames/<target>/theme.ini, which is written only when the set is not shipped"""
+    """a classic (msstyles-mode) frame set's PNGs from its style (tools/msstyles2theme.py); the tuning keys ship in
+    data/frames/<target>/theme.ini, written into generated/ only when the set is not shipped"""
     style = args[0]
     color = args[1] if len(args) > 1 else None
     out = os.path.join(data, 'frames', target)
@@ -821,10 +835,10 @@ def r_frames_classic(data, target, args):
             cmd += ['--color', color]
         fonts = glob.glob(os.path.join(data, 'fonts', '*', 'trebuc*.ttf'))
         run(cmd)
-        os.makedirs(os.path.join(out, 'cache'), exist_ok=True)
+        os.makedirs(out, exist_ok=True)
         n = 0
         for f in glob.glob(os.path.join(t, '*.png')):
-            shutil.copyfile(f, os.path.join(out, 'cache', os.path.basename(f)))
+            shutil.copyfile(f, os.path.join(out, os.path.basename(f)))
             n += 1
         shipped = any(os.path.isfile(os.path.join(d, 'frames', target, 'theme.ini')) for d in shipped_data_dirs())
         if not shipped and os.path.isfile(os.path.join(t, 'theme.ini')):
@@ -847,7 +861,7 @@ def r_frames_udwm(data, target, args):
         rel = 'resources/%s/%s' % (build, alt[0])
         p = os.path.join(data, rel)
     pe = PE(p)
-    out = os.path.join(data, 'frames', target, 'cache')
+    out = os.path.join(data, 'frames', target)
     os.makedirs(out, exist_ok=True)
     n = 0
 
@@ -873,7 +887,7 @@ def r_frames_dwmwindow(data, target, args):
     style = args[0] if args else target
     rel = style_rel(data, style)
     pe = PE(os.path.join(data, rel))
-    out = os.path.join(data, 'frames', target, 'cache')
+    out = os.path.join(data, 'frames', target)
     with tempfile.TemporaryDirectory() as t:
         for n_, d in pe.items('STREAM'):
             open(os.path.join(t, 'STREAM_%s_1033.png' % n_), 'wb').write(d)
@@ -883,14 +897,14 @@ def r_frames_dwmwindow(data, target, args):
 
 
 def r_packs_imageres(data, target, args):
-    """packs/<build>/imageres/cache/<id>.png: every PNGFILE of the build's imageres.dll (base given: only those that differ from
+    """packs/<build>/imageres/<id>.png: every PNGFILE of the build's imageres.dll (base given: only those that differ from
     base's, the 4051 overrides of the 4051-slate pack)"""
     build = args[0]
     base = args[1] if len(args) > 1 else None
     rel = 'resources/%s/imageres.dll' % build
     ins = recipe_inputs(data, [rel])
     pe = PE(os.path.join(data, rel))
-    out = os.path.join(data, 'packs', target, 'imageres', 'cache')
+    out = os.path.join(data, 'packs', target, 'imageres')
     os.makedirs(out, exist_ok=True)
     ref = PE(os.path.join(data, 'resources/%s/imageres.dll' % base)) if base else None
     n = 0
@@ -908,14 +922,14 @@ SHELL32_IDS = (1, 3, 4, 16, 21, 23, 24, 25, 28, 134, 137, 235, 236, 237, 269, 34
 
 
 def r_packs_shell32(data, target, args):
-    """packs/<build>/shell32/<size>/cache/<id>.png: the shell32.dll icons luxshell's start menu and places use"""
+    """packs/<build>/shell32/<size>/<id>.png: the shell32.dll icons luxshell's start menu and places use"""
     build = args[0]
     rel = 'resources/%s/shell32.dll' % build
     recipe_inputs(data, [rel])
     pe = PE(os.path.join(data, rel))
     n = 0
     for size in (16, 24, 32, 48):
-        out = os.path.join(data, 'packs', target, 'shell32', str(size), 'cache')
+        out = os.path.join(data, 'packs', target, 'shell32', str(size))
         os.makedirs(out, exist_ok=True)
         for i in SHELL32_IDS:
             im = icon_image(pe, i, size)
@@ -944,7 +958,7 @@ def ut_sections(ut, style, color, prefixes):
 
 
 def r_packs_startpanel(data, target, args):
-    """packs/<build>/startpanel-<name>/cache/: the StartPanel / StartMenu:: classes of a style (one PNG per part/state, the
+    """packs/<build>/startpanel-<name>/: the StartPanel / StartMenu:: classes of a style (one PNG per part/state, the
     bitmaps un-premultiplied; startpanel.ini with the decoded values), as luxshell's menu.lua reads them"""
     name, style = args[0], args[1]
     color = args[2] if len(args) > 2 else None
@@ -954,7 +968,7 @@ def r_packs_startpanel(data, target, args):
     rel = style_rel(data, style)
     path = os.path.join(data, rel)
     pe = PE(path)
-    out = os.path.join(data, 'packs', target, 'startpanel-' + name, 'cache')
+    out = os.path.join(data, 'packs', target, 'startpanel-' + name)
     os.makedirs(out, exist_ok=True)
     ini = ['; StartPanel / StartMenu classes of styles/%s.msstyles%s (lhde-import, ut-dump; FONT = face, lfHeight, weight, italic)' % (style, ' colour ' + color if color else '')]
     n = 0
@@ -986,7 +1000,7 @@ def r_packs_startpanel(data, target, args):
 
 
 def r_packs_aero5112(data, target, args):
-    """packs/5112/imageres/cache: the Vista 5112 taskbar art of aero.msstyles 5112 under the Aero imageres ids it replaces (was
+    """packs/5112/imageres: the Vista 5112 taskbar art of aero.msstyles 5112 under the Aero imageres ids it replaces (was
     luxshell/shellpack-aero5112.sh): the Start pill (bitmap#502, 3 states) with the flag (explorer.exe icon 7103) and "Start"
     (Segoe UI 5112), the bar (#298), task buttons (#517) widened, the flash button (#296), the tray background (#528)"""
     from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -996,7 +1010,7 @@ def r_packs_aero5112(data, target, args):
     fontf = 'fonts/%s/segoeui.ttf' % build
     recipe_inputs(data, [exe, fontf])
     pe = PE(os.path.join(data, rel))
-    out = os.path.join(data, 'packs', target, 'imageres', 'cache')
+    out = os.path.join(data, 'packs', target, 'imageres')
     os.makedirs(out, exist_ok=True)
 
     def bmp(i):
@@ -1048,7 +1062,8 @@ RECIPES = {
 
 
 def shipped_data_dirs():
-    return [os.path.realpath(d) for d in (os.path.join(HERE, '..', 'data'), os.path.join(HERE, '..')) if os.path.isdir(os.path.join(d, 'themes'))]
+    import lhdetree
+    return lhdetree.shipped_dirs()
 
 
 def run_recipe(data, kind, target, spec, origin, force=False):
@@ -1076,17 +1091,29 @@ def run_recipe(data, kind, target, spec, origin, force=False):
         return False
 
 
-def rebuild_cache(data):
-    """every manifest of the data directory again: the caches deleted and regenerated from the imported files"""
+def regenerate(W, force=True):
+    """generated/ deleted and made again: every source's [schemes], [frames] and [packs], and the recipes of the styles in
+    local/ (lhde-import --style); then the index. Nothing is read but the Windows tree itself."""
+    import lhdetree
+    shutil.rmtree(os.path.join(W, 'generated'), ignore_errors=True)
+    for sid in lhdetree.sources_in(W):
+        p = lhdetree.source_ini(W, sid)
+        if p:
+            import_schemes(W, sid, read_ini(p), True)
+    lhdetree.reindex(W)
     n = 0
-    for kind in ('frames', 'packs'):
-        for m in sorted(glob.glob(os.path.join(data, kind, '*', 'manifest*.ini'))):
-            c = read_ini(m)
-            target = os.path.basename(os.path.dirname(m))
-            if kind == 'packs':
-                target = os.path.basename(m)[len('manifest-'):-4].replace('-', '/', 1)
-            spec = (c['recipe'].get('kind', '') + ' ' + c['recipe'].get('args', '')).strip()
-            if kind == 'frames':
-                shutil.rmtree(os.path.join(os.path.dirname(m), 'cache'), ignore_errors=True)
-            n += run_recipe(data, kind, target, spec, 'rebuild', True)
-    log('rebuilt %d caches' % n)
+    for sid in lhdetree.sources_in(W):
+        p = lhdetree.source_ini(W, sid)
+        if p:
+            run_recipes(W, sid, read_ini(p), True)
+            n += 1
+    for name, recipes in STYLE_RECIPES.items():
+        if os.path.isfile(os.path.join(W, 'local', 'themes', name + '.msstyles')):
+            for kind, target, spec in recipes:
+                run_recipe(os.path.join(W, 'index'), kind, target, spec, 'style', True)
+    lhdetree.reindex(W)
+    log('regenerated %s from %d sources' % (os.path.join(W, 'generated'), n))
+
+
+# the recipes a style dropped in by hand feeds (lhde-import --style NAME; regenerate): kind, target, spec
+STYLE_RECIPES = {'aero-patch': [('frames', 'aero-patch', 'composited aero-patch'), ('frames', 'aerovision', 'vision aero-patch')]}
