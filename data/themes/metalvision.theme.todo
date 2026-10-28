@@ -1,0 +1,23 @@
+; TODO, open (aap's themes.txt "??"; docs/THEME-FORMAT.md sections 8 and 10.5): Metal vision. Jade with Aero vision caption
+; buttons; its plate could come from 5048's opaque "Metal" uDWM bitmap 1001 or 5112's DWMMetal::DWMWindow.
+;
+; [Theme]
+; name     = Metal vision
+; build    = 4074
+;
+; [VisualStyle]
+; style    = jade4074
+;
+; [Glass]
+; frames         = none
+; frames_classic = metalvision
+; composition    = off
+;
+; [Shell]
+; pack     = 4074-aero
+;
+; [Explorer]
+; navbar   = vision
+;
+; [Desktop]
+; wallpaper = ?

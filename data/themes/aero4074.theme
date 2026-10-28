@@ -1,0 +1,29 @@
+; The longhorn.ms "Aero" patch style for 4074 (not a Microsoft file; styles/aero-patch.msstyles) with 4074's glass, as the
+; x11 lab tuned it (was the registry's [aero-patch], alias aero4074)
+[Theme]
+name     = Aero (4074)
+build    = 4074
+aliases  = aero-patch aero
+
+[VisualStyle]
+style    = aero-patch
+color    = Default
+size     = Normal
+
+[Glass]
+frames         = aero-patch
+frames_classic = jade4074-classic
+composition    = auto
+
+[Shell]
+taskbar  = avalon
+pack     = 4074-aero
+
+[Explorer]
+chrome   = longhorn
+navbar   = 4074
+
+[Desktop]
+wallpaper = demos/Aero Enmeshed     ; a demo image (not on the ISOs: lhde-import --from-workspace, else the build's Bliss)
+mode      = fill
+icons     = longhorn4074

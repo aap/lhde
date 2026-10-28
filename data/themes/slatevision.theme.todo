@@ -1,0 +1,24 @@
+; TODO (aap's themes.txt; docs/THEME-FORMAT.md section 8): Slate vision. Not a theme yet (the .todo suffix keeps it out of
+; the list): it needs the slatevision frame set (Slate 4074's decorations with Aero vision caption buttons, a recipe like
+; tools/build_aerovision.py) and a cherry blossom wallpaper.
+;
+; [Theme]
+; name     = Slate vision
+; build    = 4074
+;
+; [VisualStyle]
+; style    = slate4074
+;
+; [Glass]
+; frames         = none
+; frames_classic = slatevision      ; Aero caption buttons on Slate
+; composition    = off
+;
+; [Shell]
+; pack     = 4074-slate
+;
+; [Explorer]
+; navbar   = vision                 ; small | big
+;
+; [Desktop]
+; wallpaper = ?/cherry-blossom

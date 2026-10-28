@@ -1,0 +1,7 @@
+; basic5112 with composition: 5112's DWMWindow glass
+[Theme]
+name     = Aero (5112)
+base     = basic5112
+
+[Glass]
+composition = on

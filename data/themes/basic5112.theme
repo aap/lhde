@@ -1,0 +1,27 @@
+; Vista 5112 (Beta 1, July 2005) without composition: 5112's own Window class, the classic taskbar, the vision header
+[Theme]
+name     = Basic (5112)
+build    = 5112
+
+[VisualStyle]
+style    = aero5112
+color    = NormalColor
+size     = Normal
+
+[Glass]
+frames         = aero5112    ; DWMWindow's streams, for aero5112
+frames_classic = none
+composition    = off
+
+[Shell]
+taskbar  = classic
+pack     = 5112-aero         ; the 5112 Start pill, bar and task buttons, for taskbar = avalon
+
+[Explorer]
+chrome   = longhorn
+navbar   = vision
+
+[Desktop]
+wallpaper = 5112/Longhorn    ; the grass blades
+mode      = fill
+icons     = longhorn4074

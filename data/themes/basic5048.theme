@@ -1,0 +1,27 @@
+; Longhorn 5048 without composition (aap's themes.txt: "basic5048"): 5048's own Window class (the opaque frame of its
+; aero.msstyles), the classic taskbar, the vision header (luxnav) instead of the faithful one
+[Theme]
+name     = Basic (5048)
+build    = 5048
+
+[VisualStyle]
+style    = aero5048
+color    = NormalColor       ; its only scheme
+size     = Normal
+
+[Glass]
+frames         = aero5048    ; the uDWM bitmaps' glass, for aero5048 (composition on)
+frames_classic = none        ; the style's own decorations
+composition    = off
+
+[Shell]
+taskbar  = classic
+
+[Explorer]
+chrome   = longhorn
+navbar   = vision
+
+[Desktop]
+wallpaper = 5048/Longhorn    ; Windows/web/Wallpaper/Longhorn.jpg: the glass facade
+mode      = fill
+icons     = longhorn4074

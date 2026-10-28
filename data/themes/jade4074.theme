@@ -1,0 +1,28 @@
+; Jade as Longhorn 4074 shipped it, without composition (aap's themes.txt): its own classic decorations, the Jade/Aero bars
+[Theme]
+name     = Jade (4074)
+build    = 4074
+aliases  = jade jade4074-classic
+
+[VisualStyle]
+style    = jade4074
+color    = Default
+size     = Normal
+
+[Glass]
+frames         = none
+frames_classic = jade4074-classic
+composition    = off
+
+[Shell]
+taskbar  = avalon
+pack     = 4074-aero
+
+[Explorer]
+chrome   = longhorn
+navbar   = 4074
+
+[Desktop]
+wallpaper = 4074/Bliss
+mode      = fill
+icons     = longhorn4074

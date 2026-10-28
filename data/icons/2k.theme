@@ -1,0 +1,39 @@
+; Windows 2000 icons, read by resource id from resources/2k/shell32.dll (lhde-import); flxp's res/icons format (flxp/res/icons/*.theme):
+; pe:DLL#ID relative to [theme] base. The ids are XP's (Longhorn 4074 keeps them). The toolbar strips ([toolbar]) stay in
+; flxp's own recipes until the wux side reads them by id too (docs/THEME-FORMAT.md section 11).
+[theme]
+name = Windows 2000
+resources = resources/2k
+base = $LHDE_DATA/resources/2k
+depth = 4
+
+[icons]
+folder = pe:shell32.dll#4
+folder_open = pe:shell32.dll#5
+document = pe:shell32.dll#1
+text = pe:shell32.dll#152
+drive = pe:shell32.dll#9
+computer = pe:shell32.dll#16
+desktop = pe:shell32.dll#35
+home = pe:shell32.dll#235
+image = pe:shell32.dll#236
+audio = pe:shell32.dll#225
+video = pe:shell32.dll#224
+zip = pe:shell32.dll#4
+pdf = pe:shell32.dll#2
+exe = pe:shell32.dll#3
+dll = pe:shell32.dll#154
+html = pe:shell32.dll#178
+disc = pe:shell32.dll#12
+settings = pe:shell32.dll#151
+binary = pe:shell32.dll#154
+network = pe:shell32.dll#18
+favorites = pe:shell32.dll#173
+search = pe:shell32.dll#134
+trash = pe:shell32.dll#32
+help = pe:shell32.dll#24
+pictures = pe:shell32.dll#236
+control_panel = pe:shell32.dll#137
+run = pe:shell32.dll#25
+recent = pe:shell32.dll#20
+

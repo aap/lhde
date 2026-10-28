@@ -1,0 +1,29 @@
+; Aero vision (docs/NAVBAR.md): the aero patch style with the vision header drawn by luxnav (15 px top deco, the Explorer plate
+; cropped at the client's header, 13-row caption buttons); the Jade bars for now (a pack of its own later)
+[Theme]
+name     = Aero vision
+build    = 4074
+
+[VisualStyle]
+style    = aero-patch
+color    = Default
+size     = Normal
+
+[Glass]
+frames         = aerovision
+frames_classic = jade4074-classic
+composition    = auto
+
+[Shell]
+taskbar  = avalon
+pack     = 4074-aerovision   ; the aero table with glowing taskbar text
+
+[Explorer]
+chrome   = longhorn
+navbar   = vision            ; small | big (data/navbar/vision.ini)
+navbar_preset = small
+
+[Desktop]
+wallpaper = demos/exec_briefing_chadDesktop.dir_18_1   ; the chadDesktop demo (lhde-import --from-workspace; else 4074's Bliss)
+mode      = fill
+icons     = longhorn4074

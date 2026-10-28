@@ -1,0 +1,27 @@
+; Windows XP's Luna, HomeStead: the real XP style (styles/luna, from the Server 2003 ISO; decision 2), else Longhorn's copy
+; (luna4051, luna4074). The XP explorer, the classic taskbar; the classic frames tuned from 4051's copy (luna4051-olive)
+[Theme]
+name     = Windows XP (Luna, Olive Green)
+
+[VisualStyle]
+style    = luna
+color    = HomeStead
+size     = NormalSize
+
+[Glass]
+frames         = none
+frames_classic = luna4051-olive
+composition    = off
+
+[Shell]
+taskbar  = classic
+startpanel = luna-olive       ; luxshell's start menu with taskbar = avalon (packs/startpanels.lua)
+
+[Explorer]
+chrome   = xp
+navbar   = none
+
+[Desktop]
+wallpaper = 4074/Autumn
+mode      = fill
+icons     = xp

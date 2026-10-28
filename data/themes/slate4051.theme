@@ -1,0 +1,28 @@
+; Slate as Longhorn 4051 shipped it (aap's themes.txt): no composition, the Slate bars as 4051 drew them, the 4051 header
+[Theme]
+name     = Slate (4051)
+build    = 4051
+aliases  = slate4051-classic
+
+[VisualStyle]
+style    = slate4051
+color    = Default
+size     = Normal
+
+[Glass]
+frames         = none
+frames_classic = slate4051-classic
+composition    = off
+
+[Shell]
+taskbar  = avalon
+pack     = 4051-slate        ; bilinear scaling, 29 px bar, 4051's imageres, the clock tile in the list
+
+[Explorer]
+chrome   = longhorn
+navbar   = 4051              ; flxp's faithful 4051 header (one size)
+
+[Desktop]
+wallpaper = 4051/Bliss       ; the wheat field (Bliss of builds 4042-4053)
+mode      = fill
+icons     = longhorn4074

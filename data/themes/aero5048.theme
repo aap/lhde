@@ -1,0 +1,7 @@
+; basic5048 with composition: the glass of 5048's uDWM bitmaps
+[Theme]
+name     = Aero (5048)
+base     = basic5048
+
+[Glass]
+composition = on

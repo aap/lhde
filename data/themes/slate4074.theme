@@ -1,0 +1,28 @@
+; Slate as Longhorn 4074 shipped it: no composition, the 4074 Slate bars and header (four sizes)
+[Theme]
+name     = Slate (4074)
+build    = 4074
+aliases  = slate4074-classic
+
+[VisualStyle]
+style    = slate4074
+color    = Default
+size     = Normal
+
+[Glass]
+frames         = none
+frames_classic = slate4074-classic
+composition    = off
+
+[Shell]
+taskbar  = avalon
+pack     = 4074-slate
+
+[Explorer]
+chrome   = longhorn
+navbar   = 4074              ; small | medium | large | xlarge
+
+[Desktop]
+wallpaper = 4074/Bliss       ; the green leaves (Bliss of builds 4067-4082)
+mode      = fill
+icons     = longhorn4074
