@@ -92,7 +92,7 @@ check-lux: all
 # shell.lua), session/ (lhde-session and its files), tools/lhde-import, lhde-pack and the recipe builders
 SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh \
                 picom-glass.conf picom-glass-fvwm.conf lab.fvwm2rc
-TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py wim0108.py
+TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py lhdeschemes.py wim0108.py
 install-data:
 	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools $(DESTDIR)$(BINDIR) \
 	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources
@@ -104,13 +104,13 @@ install-data:
 	for d in data/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done
 	install -m 644 data/packs/startpanels.lua $(DESTDIR)$(DATADIR)/packs/
 	install -m 755 session/lhde-session $(DESTDIR)$(BINDIR)/
-	install -m 755 tools/lhde-import tools/lhde-pack $(DESTDIR)$(BINDIR)/
+	install -m 755 tools/lhde-import tools/lhde-pack tools/lhde-schemes $(DESTDIR)$(BINDIR)/
 	cd session && install -m 644 $(SESSION_FILES) $(DESTDIR)$(DATADIR)/session/
 	chmod 755 $(addprefix $(DESTDIR)$(DATADIR)/session/,lab.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh)
 	ln -sf $(BINDIR)/lhde-session $(DESTDIR)$(DATADIR)/session/lhde-session
 	cd tools && install -m 755 $(TOOL_FILES) $(DESTDIR)$(DATADIR)/tools/
 uninstall-data:
-	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(BINDIR)/lhde-pack
+	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(BINDIR)/lhde-pack $(DESTDIR)$(BINDIR)/lhde-schemes
 	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools \
 	       $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources
 

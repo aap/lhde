@@ -57,6 +57,16 @@ user's own copies, in two stages:
    explorer.exe's version (6.5.40xx Longhorn, 6.0.5048/5112, 6.0.3790 Server 2003, 5.0 Windows 2000) and the layout, pack into a
    temporary pack and import it (`--source ID` skips the detection). `--from-workspace ~/fun/longhorn` copies aap's research
    workspace as before (the demo wallpapers of aero4074 and aerovision come only from there).
+3. **Classic schemes** (Display Properties > Appearance > "Windows Classic style": Windows Standard, Windows Classic, Brick, ...,
+   High Contrast; docs/THEME-FORMAT.md section 2a): the `xp` and `2k` sources now carry the medium's `HIVEDEF.INF` (the default
+   user hive's setup data) and lhde-import turns its `Control Panel\Appearance\Schemes` values into `styles/<scheme>.scheme`.
+   Without a re-import, the stand-alone importer reads them straight from the ISO (7z) or an extracted `HIVEDEF.INF`:
+   ```
+   tools/lhde-schemes "/u/aap/lib/windows_isos/Windows Server 2003 R2 Enterprise Corp x64 CD1.iso"   # -> ~/.local/share/lhde/styles
+   tools/lhde-schemes --data /tmp/scratch-data --force I386/HIVEDEF.INF
+   ```
+   22 schemes (XP, Server 2003 and Windows 2000 have the same ones), the "(large)" / "(extra large)" variants as the font sizes of
+   their scheme. Without any, "Windows Standard" is the built-in classic colours.
 
 ## lhde-theme
 The resolver from the shell (docs/THEME-FORMAT.md, liblhde):
@@ -64,8 +74,13 @@ The resolver from the shell (docs/THEME-FORMAT.md, liblhde):
 lhde-theme list                         every theme: the user's, the shipped ones, bare styles
 lhde-theme resolve aero5048 --why       the record, each key with where it came from (file, base, default, fallback + reason)
 lhde-theme resolve luna --get path.style
-lhde-theme set jade4074                 settings.ini [theme] name, then _LH_THEME on $DISPLAY
-lhde-theme set-key aero4074 Glass.composition off    -> aero4074-modified.theme
+lhde-theme set jade4074                 settings.ini [theme] name (the current layer dropped), then _LH_THEME on $DISPLAY
+lhde-theme layer                        the current layer: settings.ini [current], the unsaved changes on top of the theme
+lhde-theme layer-set Glass.composition off   a key of the selected theme's layer ("-" removes it)
+lhde-theme save-as my-jade "My Jade"    the theme with its layer as ~/.config/lhde/themes/my-jade.theme, selected
+lhde-theme delete my-jade               one of your theme files
+lhde-theme styles | schemes             the visual styles and the classic schemes Display Properties lists
+lhde-theme set-key aero4074 Glass.composition off    -> aero4074-modified.theme (the earlier model; luxshell's flyout)
 lhde-theme setting sidebar width 200    a per-user key; without VALUE: print it
 lhde-theme style jade4074               what liblhde reads from a style (kind, format, build, family, first scheme)
 lhde-theme migrate                      ~/.config/longhorn + ~/.config/lhshell -> ~/.config/lhde (once)

@@ -697,6 +697,14 @@ def import_pack(pack, data, force=False, recipes=True):
             if shell:
                 copy_tree(shell, os.path.join(data, 'styles', name, 'Shell'), force, rep)
         log('%s (%s): %d files copied, %d kept' % (sid, s.title, rep['copied'], rep['kept']))
+        # classic schemes: [schemes] NAME = pack path of a hive INF (HIVEDEF.INF) -> styles/<scheme>.scheme (tools/lhdeschemes.py)
+        for name, rel in s.section('schemes'):
+            p = ci_path(root, rel)
+            if not os.path.isfile(p):
+                log('  %s: schemes %s: %s is not in the pack' % (sid, name, rel))
+                continue
+            import lhdeschemes
+            lhdeschemes.import_inf(p, os.path.join(data, 'styles'), force, '%s (%s)' % (rel, s.title), log)
         todo.append(s)
     if recipes:
         for s in todo:

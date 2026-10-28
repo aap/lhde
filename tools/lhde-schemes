@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""lhde-schemes: the classic Appearance schemes (Windows Standard, Brick, High Contrast, ...) from the user's own Windows
+2000 / XP / Server 2003 install medium into lhde's data directory as styles/NAME.scheme (docs/THEME-FORMAT.md section 2a).
+lhde-import runs the same code for the xp and 2k sources ([schemes] in data/sources/*.ini); this is the stand-alone way.
+
+usage:
+  lhde-schemes [--data DIR] [--force] FILE...
+FILE: a HIVEDEF.INF, or an install ISO (its I386/ or AMD64/HIVEDEF.INF is read with 7z).
+--data DIR: the data directory (default $LHDE_DATA, else ${XDG_DATA_HOME:-~/.local/share}/lhde); the files go to DIR/styles.
+--force: replace scheme files that exist.
+"""
+import os
+import subprocess
+import sys
+import tempfile
+_here = os.path.dirname(os.path.realpath(__file__))
+sys.path[:0] = [_here, os.path.join(_here, '..', 'share', 'lhde', 'tools')]
+import lhdeschemes as S
+
+
+def data_dir(arg):
+    if arg:
+        return arg
+    if os.environ.get('LHDE_DATA'):
+        return os.environ['LHDE_DATA']
+    return os.path.join(os.environ.get('XDG_DATA_HOME') or os.path.expanduser('~/.local/share'), 'lhde')
+
+
+def inf_from_iso(iso, tmp):
+    for member in ('AMD64/HIVEDEF.INF', 'I386/HIVEDEF.INF'):
+        r = subprocess.run(['7z', 'e', '-y', '-o' + tmp, iso, member], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        p = os.path.join(tmp, 'HIVEDEF.INF')
+        if r.returncode == 0 and os.path.isfile(p):
+            return p
+    return None
+
+
+def main():
+    args, data, force = [], None, False
+    a = sys.argv[1:]
+    while a:
+        x = a.pop(0)
+        if x == '--data' and a:
+            data = a.pop(0)
+        elif x == '--force':
+            force = True
+        elif x in ('-h', '--help'):
+            print(__doc__.strip())
+            return 0
+        else:
+            args.append(x)
+    if not args:
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    out = os.path.join(data_dir(data), 'styles')
+    total = 0
+    for f in args:
+        with tempfile.TemporaryDirectory() as tmp:
+            inf = f
+            if f.lower().endswith('.iso'):
+                inf = inf_from_iso(f, tmp)
+                if not inf:
+                    print('lhde-schemes: %s: no I386/ or AMD64/HIVEDEF.INF (7z)' % f, file=sys.stderr)
+                    continue
+            print('%s:' % f)
+            w, k = S.import_inf(inf, out, force, os.path.basename(f))
+            total += w + k
+    return 0 if total else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
