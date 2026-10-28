@@ -12,11 +12,11 @@ build/examples/extendframe: examples/extendframe.c
 	$(CC) -std=c99 -O2 -g -Wall -Wextra $(shell pkg-config --cflags $(EXAMPLES_PKGS)) -o $@ $< $(shell pkg-config --libs $(EXAMPLES_PKGS))
 build/examples/navdemo: examples/navdemo.c luxnav/lhnav.h $(LUXNAVA) $(UTSO)
 	@mkdir -p $(dir $@)
-	$(CC) -std=gnu11 -O2 -g -Wall -Wextra -DHAVE_UXTHEME -Iluxnav -Ilhtheme -idirafter . $(shell pkg-config --cflags $(EXAMPLES_PKGS) fontconfig) \
+	$(CC) -std=gnu11 -O2 -g -Wall -Wextra -DHAVE_UXTHEME -Iluxnav -Iliblhde -idirafter . $(shell pkg-config --cflags $(EXAMPLES_PKGS) fontconfig) \
 	    -o $@ $< $(LUXNAVA) -Lbuild/lib -lwuxtheme '-Wl,-rpath,$$ORIGIN/../lib' $(shell pkg-config --libs $(EXAMPLES_PKGS) fontconfig libpng) -lm
-build/examples/glassdemo: examples/glassdemo.c $(O)/lhtheme/lhde_data.o
+build/examples/glassdemo: examples/glassdemo.c $(O)/liblhde/data.o
 	@mkdir -p $(dir $@)
-	$(CC) -std=gnu11 -O2 -g -Wall -Ilhtheme $(shell pkg-config --cflags cairo-xlib x11) -o $@ $< $(O)/lhtheme/lhde_data.o $(shell pkg-config --libs cairo-xlib x11) -lm
+	$(CC) -std=gnu11 -O2 -g -Wall -Iliblhde $(shell pkg-config --cflags cairo-xlib x11) -o $@ $< $(O)/liblhde/data.o $(shell pkg-config --libs cairo-xlib x11) -lm
 
 examples: $(EXAMPLES)
 .PHONY: examples

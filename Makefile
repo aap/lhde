@@ -19,9 +19,10 @@
 #   luxwm/luxwm.mk        luxwm, luxwmc -> build/bin; its tests -> build/luxwm/tests
 #   luxshell/luxshell.mk  luxshell -> build/bin (its Lua stays in luxshell/, installed to DATADIR/luxshell)
 #   examples/examples.mk  extendframe, navdemo, glassdemo -> build/examples
-#   lhtheme/              lhde_data.c: the data directories (compiled into luxwm, luxnav, luxshell, the examples)
-#   data/ session/ tools/ installed as they are: DATADIR (themes.ini, wallpapers.ini, frames/*/*.ini,
-#                         packs/*), DATADIR/session + BINDIR/lhde-session, BINDIR/lhde-import
+#   liblhde/liblhde.mk    liblhde (lhde/data.h, lhde/theme.h, lhde/settings.h): the data directories, the theme resolver,
+#                         the settings store -> build/lib/liblhde.{a,so.1}, lhde.pc, build/bin/lhde-theme
+#   data/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme,
+#                         frames/*/*.ini, packs/*), DATADIR/session + BINDIR/lhde-session, BINDIR/lhde-import
 #
 # Every object is build/obj/<source path>.o (build/pic/... for the shared
 # library); every program goes to build/bin, so programs that look for each
@@ -70,6 +71,7 @@ LUX_COPT       ?= -Os -g -DNDEBUG
 all:
 
 include wuxtheme/wuxtheme.mk   # first: wux.mk leaves its objects out of libwux.a
+include liblhde/liblhde.mk     # before luxnav.mk and flxp.mk: libluxnav and flxp carry its data.o
 include luxnav/luxnav.mk       # before flxp.mk: its programs link $(LUXNAVA)
 include wux/wux.mk
 include flxp/flxp.mk
@@ -78,40 +80,46 @@ include luxwm/luxwm.mk
 include luxshell/luxshell.mk
 include examples/examples.mk
 
-all: libs programs tests luxwm luxshell examples
-libs: $(WUXA) $(UTA) $(UTSO) $(UTPC) $(LUXNAVA) $(LUXNAVSO) $(LUXNAVPC)
-programs: $(PROGRAMS) $(LUXWM_PROGRAMS) build/bin/luxshell
+all: libs programs tests liblhde luxwm luxshell examples
+libs: $(WUXA) $(UTA) $(UTSO) $(UTPC) $(LHDEA) $(LHDESO) $(LHDEPC) $(LUXNAVA) $(LUXNAVSO) $(LUXNAVPC)
+programs: $(PROGRAMS) $(LUXWM_PROGRAMS) build/bin/luxshell build/bin/lhde-theme
 
 # make check: tests/check.sh (tests/tests.mk), then the lux side's
 check: check-lux
 check-lux: all
-	@$(MAKE) --no-print-directory check-luxshell check-luxwm
+	@$(MAKE) --no-print-directory check-liblhde check-luxshell check-luxwm
 
-# data/ (text only: the registry, wallpapers.ini, the frame sets' theme.ini/nav.ini, the packs' shell.lua),
-# session/ (lhde-session and its files), tools/lhde-import and the recipe builders
+# data/ (text only: the theme files, navbar layouts, icon recipes, import sources, the frame sets' theme.ini/nav.ini, the packs'
+# shell.lua), session/ (lhde-session and its files), tools/lhde-import, lhde-pack and the recipe builders
 SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh \
                 picom-glass.conf picom-glass-fvwm.conf lab.fvwm2rc
+TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py wim0108.py
 install-data:
-	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools $(DESTDIR)$(BINDIR)
-	install -m 644 data/themes.ini data/wallpapers.ini $(DESTDIR)$(DATADIR)/
+	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools $(DESTDIR)$(BINDIR) \
+	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources
+	install -m 644 data/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
+	install -m 644 data/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
+	install -m 644 data/icons/*.theme $(DESTDIR)$(DATADIR)/icons/
+	install -m 644 data/sources/*.ini $(DESTDIR)$(DATADIR)/sources/
 	for d in data/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
 	for d in data/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done
 	install -m 644 data/packs/startpanels.lua $(DESTDIR)$(DATADIR)/packs/
 	install -m 755 session/lhde-session $(DESTDIR)$(BINDIR)/
-	install -m 755 tools/lhde-import $(DESTDIR)$(BINDIR)/
+	install -m 755 tools/lhde-import tools/lhde-pack $(DESTDIR)$(BINDIR)/
 	cd session && install -m 644 $(SESSION_FILES) $(DESTDIR)$(DATADIR)/session/
 	chmod 755 $(addprefix $(DESTDIR)$(DATADIR)/session/,lab.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh)
 	ln -sf $(BINDIR)/lhde-session $(DESTDIR)$(DATADIR)/session/lhde-session
-	install -m 755 tools/msstyles2theme.py tools/build_aerovision.py tools/build_aero5112.py $(DESTDIR)$(DATADIR)/tools/
+	cd tools && install -m 755 $(TOOL_FILES) $(DESTDIR)$(DATADIR)/tools/
 uninstall-data:
-	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(DATADIR)/themes.ini $(DESTDIR)$(DATADIR)/wallpapers.ini
-	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools
+	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(BINDIR)/lhde-pack
+	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools \
+	       $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources
 
 clean:
 	rm -rf build
 
-install: install-libs install-flxp install-luxnav install-luxwm install-luxshell install-data
-uninstall: uninstall-luxshell uninstall-luxwm uninstall-luxnav uninstall-data uninstall-libs uninstall-flxp
+install: install-libs install-liblhde install-flxp install-luxnav install-luxwm install-luxshell install-data
+uninstall: uninstall-luxshell uninstall-luxwm uninstall-luxnav uninstall-data uninstall-liblhde uninstall-libs uninstall-flxp
 
 .PHONY: all libs programs tests clean install uninstall check check-lux install-data uninstall-data
 .PRECIOUS: $(O)/%.o $(P)/%.o

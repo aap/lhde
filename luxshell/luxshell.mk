@@ -7,16 +7,16 @@
 
 LUXSHELL_PKGS   = x11 xext xfixes cairo cairo-xlib fontconfig freetype2 lua5.4 dbus-1
 LUXSHELL_CFLAGS = -std=gnu11 -O2 -g -Wall -Wextra -Wno-unused-parameter -Wno-misleading-indentation -MMD -MP -DHAVE_UXTHEME -DUT_HAVE_TEXT_EXTENT \
-                  -Iluxshell -Ilhtheme -idirafter . $(shell pkg-config --cflags $(LUXSHELL_PKGS))
-LUXSHELL_OBJS   = $(addprefix $(O)/luxshell/,luxshell.o scene.o text.o tray.o notify.o) $(O)/lhtheme/lhde_data.o
+                  -Iluxshell -Iliblhde -idirafter . $(shell pkg-config --cflags $(LUXSHELL_PKGS))
+LUXSHELL_OBJS   = $(addprefix $(O)/luxshell/,luxshell.o scene.o text.o tray.o notify.o)
 LUXSHELL_LUA    = $(wildcard luxshell/*.lua) $(wildcard luxshell/tiles/*.lua)
 
 $(O)/luxshell/%.o: luxshell/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(LUXSHELL_CFLAGS) -c $< -o $@
-build/bin/luxshell: $(LUXSHELL_OBJS) $(UTSO)
+build/bin/luxshell: $(LUXSHELL_OBJS) $(LHDEA) $(UTSO)
 	@mkdir -p $(dir $@)
-	$(CC) -o $@ $(LUXSHELL_OBJS) -Lbuild/lib -lwuxtheme '-Wl,-rpath,$$ORIGIN/../lib' $(shell pkg-config --libs $(LUXSHELL_PKGS)) -lm -ldl
+	$(CC) -o $@ $(LUXSHELL_OBJS) $(LHDEA) -Lbuild/lib -lwuxtheme '-Wl,-rpath,$$ORIGIN/../lib' $(shell pkg-config --libs $(LUXSHELL_PKGS)) -lm -ldl
 build/luxshell/tests/trayicon: luxshell/tests/trayicon.c
 	@mkdir -p $(dir $@)
 	$(CC) -std=gnu11 -O2 -g -Wall -o $@ $< $(shell pkg-config --cflags --libs x11 cairo cairo-xlib) -lm

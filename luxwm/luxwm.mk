@@ -1,6 +1,6 @@
 # luxwm, the window manager (was lhwm, a berry fork; docs/LUXWM.md), and luxwmc, its command client (was lhwmc / berryc).
 # Included by the top-level Makefile. Frames come from the visual style through libwuxtheme (build/lib/libwuxtheme.so.1,
-# rpath $ORIGIN/../lib) and from the frame sets in lhde's data directories (lhtheme/lhde_data.c).
+# rpath $ORIGIN/../lib) and from the frame sets in lhde's data directories, the theme from liblhde's resolver (liblhde/liblhde.mk).
 #   build/bin/luxwm build/bin/luxwmc
 #   build/luxwm/tests/frametest menutest desktopwin dockorder strutdock   (tests/regress.sh: make check-luxwm)
 
@@ -8,10 +8,10 @@ LUXWM_PKGS   = x11 xext xfixes xinerama fontconfig xft cairo cairo-xlib pangocai
 # berry's warnings; -Os as lhwm's configure chose (the regress baseline from the x11 build used the same)
 LUX_COPT    ?= -Os -g -DNDEBUG
 LUXWM_CFLAGS = -std=c99 $(LUX_COPT) -Wall -Wextra -Wredundant-decls -Wshadow -Wno-deprecated-declarations -MMD -MP \
-               -DHAVE_UXTHEME -Iluxwm -Ilhtheme -idirafter . $(shell pkg-config --cflags $(LUXWM_PKGS))
+               -DHAVE_UXTHEME -Iluxwm -Iliblhde -idirafter . $(shell pkg-config --cflags $(LUXWM_PKGS))
 LUXWM_LIBS   = -Lbuild/lib -lwuxtheme '-Wl,-rpath,$$ORIGIN/../lib' $(shell pkg-config --libs $(LUXWM_PKGS)) -lm
 LUXWM_TLIBS  = $(subst ../lib,../../lib,$(LUXWM_LIBS))   # build/luxwm/tests: the library two levels up
-LUXWM_CORE   = $(addprefix $(O)/luxwm/,frame.o frame_ut.o) $(O)/lhtheme/lhde_data.o
+LUXWM_CORE   = $(addprefix $(O)/luxwm/,frame.o frame_ut.o) $(LHDEA)
 LUXWM_OBJS   = $(addprefix $(O)/luxwm/,wm.o utils.o menu.o) $(LUXWM_CORE)
 LUXWM_TESTS  = $(addprefix build/luxwm/tests/,frametest menutest desktopwin dockorder strutdock)
 
@@ -22,10 +22,6 @@ $(O)/luxwm/%.o: luxwm/%.c
 $(O)/luxwm/tests/%.o: luxwm/tests/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(LUXWM_CFLAGS) -std=gnu99 -c $< -o $@
-# lhde_data: plain C shared by luxwm, luxnav (and through it navdemo, flxp) and luxshell
-$(O)/lhtheme/%.o: lhtheme/%.c
-	@mkdir -p $(dir $@)
-	$(CC) -std=gnu11 $(LUX_COPT) -fPIC -Wall -Wextra -MMD -MP -c $< -o $@
 
 build/bin/luxwm: $(LUXWM_OBJS) $(UTSO)
 	@mkdir -p $(dir $@)
@@ -61,6 +57,6 @@ install-luxwm: $(LUXWM_PROGRAMS)
 uninstall-luxwm:
 	rm -f $(addprefix $(DESTDIR)$(BINDIR)/,luxwm luxwmc lhwm lhwmc) $(addprefix $(DESTDIR)$(MANDIR)/man1/,luxwm.1 luxwmc.1)
 
--include $(LUXWM_OBJS:.o=.d) $(O)/luxwm/client.d $(patsubst build/luxwm/tests/%,$(O)/luxwm/tests/%.d,$(LUXWM_TESTS))
+-include $(patsubst %.o,%.d,$(filter %.o,$(LUXWM_OBJS))) $(O)/luxwm/client.d $(patsubst build/luxwm/tests/%,$(O)/luxwm/tests/%.d,$(LUXWM_TESTS))
 .PHONY: luxwm check-luxwm install-luxwm uninstall-luxwm
 .PRECIOUS: $(O)/luxwm/tests/%.o

@@ -4,14 +4,14 @@
 #   build/lib/libluxnav.a                 linked into flxp (the explorer header's vision mode) and navdemo
 #   build/lib/libluxnav.so.1 (+ .so)      for other programs
 #   build/lib/pkgconfig/luxnav.pc         pkg-config for the build tree; make install writes the installed one
-# libluxnav carries lhtheme/lhde_data.o (nav.ini's icon_dir is relative to lhde's data directories).
+# libluxnav carries liblhde/data.o (nav.ini's icon_dir is relative to lhde's data directories).
 
 LUXNAV_SRCS   = $(addprefix luxnav/,lhnav.c lhnav_px.c lhnav_res.c)
-LUXNAV_OBJS   = $(patsubst %.c,$(O)/%.o,$(LUXNAV_SRCS)) $(O)/lhtheme/lhde_data.o
+LUXNAV_OBJS   = $(patsubst %.c,$(O)/%.o,$(LUXNAV_SRCS)) $(O)/liblhde/data.o
 LUXNAVA       = build/lib/libluxnav.a
 LUXNAVSO      = build/lib/libluxnav.so.1
 LUXNAVPC      = build/lib/pkgconfig/luxnav.pc
-LUXNAV_CFLAGS = -std=gnu11 $(LUX_COPT) -fPIC -Wall -Wextra -MMD -MP -DHAVE_UXTHEME -DUT_HAVE_TEXT_EXTENT -Iluxnav -Ilhtheme -idirafter . \
+LUXNAV_CFLAGS = -std=gnu11 $(LUX_COPT) -fPIC -Wall -Wextra -MMD -MP -DHAVE_UXTHEME -DUT_HAVE_TEXT_EXTENT -Iluxnav -Iliblhde -idirafter . \
                 $(shell pkg-config --cflags libpng)
 LUXNAV_VERSION = 0.1
 
