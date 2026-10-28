@@ -339,6 +339,66 @@ the text). `examples/compare_navdemo_gditext.png`: concept crop, old (pango), ne
 Visually the GDI text is crisper: stems on whole pixels (full-strength verticals in "m", "l", "d"), darker and narrower, with
 GDI's integer advances (spacing slightly uneven, e.g. "sm all"); pango's was softer (slight hinting, fractional positions).
 
+## Where the art comes from (2026-10-28)
+
+aap under the 5048/5112 themes (navbar `vision`): "travel buttons with the arrows flipped horizontally, and I don't know where these
+even come from". They were luxnav's drawn orbs: 5048's and 5112's `aero.msstyles` have no `TravelBack/TravelFwd::AnimationButton`,
+they have Vista's `TravelBand`, which luxnav did not read; and the drawn orbs had their arrows mirrored. Now luxnav reads TravelBand,
+the drawn arrows point the Windows way (back left, forward right), a style without travel art is logged once
+(`lhnav: STYLE has no travel art: no TravelBack::AnimationButton, TravelFwd::AnimationButton (4051-4074, aero patch) / no TravelBand
+(Vista 5048, 5112); drawn orbs ...`), and every piece's source can be listed: `LHNAV_DEBUG=1` (any client, on every art load) or
+`NAVDEMO_DEBUG=1 examples/navdemo` (with the layout), through `lhnav_art_sources()`, e.g.
+
+```
+navdemo: art sources (nav.ini ~/.local/share/lhde/navbar/vision.ini)
+  style: ~/.local/share/lhde/styles/aero5048.msstyles
+  back         aero5048.msstyles TravelBand TRAVELBUTTONS IMAGEFILE, left half (18x24 at 4,2 on the plate), states DISABLED NORMAL HOT PRESSED
+  forward      aero5048.msstyles TravelBand TRAVELBUTTONS IMAGEFILE, right half (18x24 at 22,2 on the plate), states ...
+  plate        aero5048.msstyles TravelBand TRAVELBACKGROUNDS IMAGEFILE 61x28, states NORMAL HOT PRESSED DISABLED (the chevron's)
+  history      aero5048.msstyles TravelBand TRAVELBACKGROUNDS: the chevron, plate columns 51..60 (one list for both directions)
+  favorites    drawn
+  crumb arrow  aero5048.msstyles BreadcrumbBarToolbar::Toolbar SPLITBUTTONHORZARROW GLYPHIMAGEFILE 9x9, image 1 (open: image 2)
+  segment box  aero5048.msstyles BreadcrumbBarToolbar::Toolbar SPLITBUTTON IMAGEFILE, states HOT PRESSED (nine-gridded)
+  arrow box    aero5048.msstyles BreadcrumbBarToolbar::Toolbar SPLITBUTTONDROPDOWN IMAGEFILE, states HOT PRESSED
+  crumb text   aero5048.msstyles BreadcrumbBarToolbar::Toolbar TEXTCOLOR #00025c GLOWCOLOR #ffffff TEXTGLOWSIZE 4 (...)
+  tool 0       search field: the field: drawn; its magnifier: drawn
+```
+
+| Element | 4051/4074 styles, aero patch (`aero-patch`) | Vista TravelBand (5048, 5112) | nothing usable |
+| --- | --- | --- | --- |
+| back / forward | `TravelBack`/`TravelFwd::AnimationButton` ABBACKGROUND IMAGEFILE, DISABLED NORMAL HOT PRESSED (+SPLITPRESSED), Inactive/Max/MaxInactive variants; small: the rows above `CUSTOMSPLITRECT.top`, scaled to `orb_h`, HOT/PRESSED synthesized inside the orb; forward at `ANIMATIONBUTTONRECT.left` | `TravelBand` TRAVELBUTTONS: one image per state, back = left half, forward = right half; each button in its own state; unscaled | drawn orbs (38x44 + 27x44 at 38), scaled like the art |
+| plate behind them | (part of the button art) | `TravelBand` TRAVELBACKGROUNDS, unscaled, centred on the orb part; its state is the chevron's (DISABLED: neither direction possible) | none |
+| history drop-down | big: the art's rows below `CUSTOMSPLITRECT.top` (`LHNAV_BACK_MENU`, `LHNAV_FWD_MENU`); small: none | the plate's chevron (`LHNAV_BACK_MENU`, either direction), from where the HOT plate's box starts | none |
+| favorites star | `Favorites::AnimationButton` (+variants), `SmallFavorites::AnimationButton` up to 35 px | (5048/5112 have none) drawn | drawn star |
+| breadcrumb arrow | `BreadcrumbBarToolbar::Toolbar` / `BB::Toolbar` / `Toolbar` SPLITBUTTONHORZARROW GLYPHIMAGEFILE (image 2: open) | the same classes (5048: `BreadcrumbBarToolbar::Toolbar`) | drawn triangle |
+| segment / arrow boxes | the same class's SPLITBUTTON / SPLITBUTTONDROPDOWN, HOT PRESSED | the same | drawn rounded boxes |
+| breadcrumb colours, glow, font | the **theme's** style: `CompositedBreadcrumbBar::Toolbar`, else `BreadcrumbBarToolbar::Toolbar`, `BB::Toolbar` (never from `art_style`) | the same | (0,2,92), white glow 4 |
+| tool icons (search, bookmark, views, new folder) | `icon_dir`'s shell32.dll: icon groups 23 and 4, bitmaps 216/217 (214/215 at 24 px) cells 32 and 31; the client's `lhnav_set_icon` first | the same | drawn |
+| search box's magnifier, fields, separator line | drawn | drawn | drawn |
+
+**TravelBand** (read with `ut-dump --list STYLE TravelBand`, `--render`): 5048 plate 61x28 (one long well, the chevron at columns
+54..58; HOT/PRESSED light a box around it, DISABLED drops it), glyphs 36x24 (two 18x24 orbs; blue, HOT and PRESSED green, DISABLED
+grey back and an *empty* forward: 5048 hides forward when it is impossible, as its Explorer screenshot shows); 5112 plate 70x27 (two
+round wells, `CONTENTMARGINS 0 13 2 0`), glyphs 54x27 (two 27x27 blue orbs, DISABLED ghosted). Composition as browseui: the plate,
+then each half of the glyph strip in its button's state. Placement: with CONTENTMARGINS each button is centred in its half of the
+content width (5112: back at x 1, forward at 29, the wells' centres); without (5048) the strip sits at x 4, y 2, measured on
+`~/fun/longhorn/screenshots/WindowsVista-6.0.5048-Explorer.png` (plate at 8,25, back glyph at 12,27; template match, mean error 2 of 765). The band is never
+scaled: small preset: centred in the 30-row orb row; big preset: centred on the 44-row orb part of the 54-row art the big preset is
+measured on (header 69 rows as with the aero patch). 5112's TRAVELBUTTONS(DISABLED) bitmap comes out of libuxtheme with straight
+alpha (colour above alpha in 976 pixels); luxnav premultiplies such an image and logs it (a libuxtheme matter).
+
+**`art_style`** (nav.ini, global or per preset; `data/navbar/vision.ini` sets `auto`): `auto` = the theme's own style; a NAME =
+`styles/NAME.msstyles` in lhde's data directories (`lhde_data_find`), e.g. `art_style = aero-patch` for "luxnav with the patched
+aero resources" under 5048/5112; an absolute path = that file. It replaces the travel, favorites and breadcrumb art; text (fonts,
+colours, glow) stays the theme style's. A name that is not found or not a style falls back to `auto` with a log line. Which looks
+better for 5048/5112: the small preset with `auto` (crisp unscaled Vista orbs, the real 5048/5112 look) is closer to the builds;
+the big preset is drawn for the aero patch's 54-row orbs and looks emptier with the 27/28-row band, so there `aero-patch` fills it
+better (sheets: `aero5048-auto-vs-aeropatch.png`, `aero5112-auto-vs-aeropatch.png` of the 2026-10-28 session).
+
+Clients: navdemo reads the frame set's `nav.ini` and, when the frame set has none and the registry says `flxp_header_engine =
+lhnav` (aero5048, aero5112), `navbar/vision.ini` (liblhde's `path.navbar`). flxp's header (`vision_wanted`) still reads the frame
+set's `nav.ini` only, so under 5048/5112 it runs on lhnav's defaults (the small layout, `art_style` auto) until it does the same.
+
 ## Porting luxnav into flxp
 flxp's header (`~/src/flxp/src/explorer/header.cpp`, with `navbar.cpp` for the theme's navigation-bar skin and `lhbar.cpp` for the
 4051 command bar) would keep its Win32 child window and its behaviour, and hand the header's *contents* to luxnav.

@@ -8,9 +8,10 @@
    - plain C, no window system, no cairo, no pango: liblhnav depends on libuxtheme (and libpng); pixels are 32-bit premultiplied
      ARGB in native byte order (cairo's CAIRO_FORMAT_ARGB32, a 32-bit DIB section's), rows `stride` bytes apart; lhnav_paint
      composites OVER what is in the buffer (glass: transparent; opaque: the header pixmap);
-   - theme art comes from the visual style through libuxtheme (TravelBack/TravelFwd::AnimationButton, the breadcrumb toolbar's
-     SPLITBUTTON and SPLITBUTTONHORZARROW glyph, CompositedBreadcrumbBar::Toolbar's font and glow) with drawn fallbacks for
-     styles that lack them; all text is libuxtheme's DrawThemeText (GDI text on FreeType, as flxp draws it) in theme fonts
+   - theme art comes from the visual style through libuxtheme (TravelBack/TravelFwd::AnimationButton of 4051-4074 and the aero
+     patch, or Vista's TravelBand of 5048/5112; the breadcrumb toolbar's SPLITBUTTON and SPLITBUTTONHORZARROW glyph,
+     CompositedBreadcrumbBar::Toolbar's font and glow) with drawn fallbacks for styles that lack them (nav.ini `art_style`
+     takes the art from another style; lhnav_art_sources says where each piece came from); all text is libuxtheme's DrawThemeText (GDI text on FreeType, as flxp draws it) in theme fonts
      (lhnav_add_font_dir for the theme's font directories); with no style there is no text;
    - a header-only cairo helper (define LHNAV_WITH_CAIRO before including) for cairo clients.
 
@@ -148,6 +149,10 @@ typedef struct lhnav_metrics {
     char preset[48];    /* the preset lhnav_metrics_load chose ("" = none) */
     char art_dir[512];  /* optional directory with nav_back.png / nav_fwd.png (orb-only state strips: disabled, normal, hot,
                            pressed, stacked vertically) overriding the style's travel art; "" = none */
+    char art_style[256];/* nav.ini `art_style`: where the travel, favorites and breadcrumb art comes from. "" or "auto" = the
+                           style given to lhnav_new / lhnav_set_style (the theme's own); a NAME = styles/NAME.msstyles in lhde's
+                           data directories (lhde_data_find; e.g. aero-patch), an absolute path = that file. Text (fonts, the
+                           breadcrumb's colours and glow) stays the theme's style's. A style that cannot be opened: auto, logged */
 } lhnav_metrics;
 
 /* the defaults above (Aero vision, small-button variant) */
@@ -175,6 +180,14 @@ void   lhnav_free(lhnav *n);
    after it) */
 void   lhnav_set_metrics(lhnav *n, const lhnav_metrics *m);
 void   lhnav_set_style(lhnav *n, struct ut_theme *style);   /* the art is reloaded; the style must stay open while lhnav uses it */
+/* the client's name for that style (its file, e.g. the msstyles path), for the log and lhnav_art_sources; NULL = "the theme's
+   style". Call before lhnav_set_style / lhnav_new's first paint (takes effect on the next art load: set_style, set_metrics) */
+void   lhnav_set_style_name(lhnav *n, const char *name);
+/* where every piece of art comes from, one line per element ("back: aero5112.msstyles TravelBand TRAVELBUTTONS left half,
+   states NORMAL HOT PRESSED DISABLED", "favorites: drawn", "views: shell32.dll bitmap 216/217 cell 32", ...), for debugging
+   (LHNAV_DEBUG=1 in the environment prints it on every art load; navdemo prints it with NAVDEMO_DEBUG=1). Valid until the next
+   art load */
+const char *lhnav_art_sources(lhnav *n);
 
 void   lhnav_set_title(lhnav *n, const char *utf8);
 void   lhnav_set_path(lhnav *n, const char *const *segments, int count);   /* copied */

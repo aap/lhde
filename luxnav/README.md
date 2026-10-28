@@ -10,3 +10,7 @@ The C API keeps its `lhnav_` prefix and the header its name `lhnav.h` (as wuxthe
 examples/navdemo.c use it unchanged. flxp links libluxnav.a: the explorer's vision header is now always built in (the
 `LUXNAV_DIR` hook of step 2 is gone). Tuning: nav.ini of the frame set (data/frames/aerovision/nav.ini); its `icon_dir` is
 relative to lhde's data directories (`resources/4074`), `art_dir` to the frame set.
+`art_style` names the style the travel/favorites/breadcrumb art comes from (`auto` = the theme's; `aero-patch` =
+`styles/aero-patch.msstyles` through lhde_data_find). The travel art is TravelBack/TravelFwd::AnimationButton (4051-4074, aero
+patch), Vista's TravelBand (5048, 5112) or drawn orbs; `LHNAV_DEBUG=1` / `lhnav_art_sources()` list each piece's source
+(docs/NAVBAR.md "Where the art comes from").

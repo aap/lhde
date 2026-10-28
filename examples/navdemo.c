@@ -152,12 +152,13 @@ static void registry_value(const char *ini, const char *name, const char *key, c
 /* a registry value: absolute in the resolved registry luxwm publishes, else relative to lhde's data directories (lhde_data.h) */
 static void rel_path(char *out, size_t n, const char *ini, const char *v) { (void)ini; lhde_data_resolve(v, out, n); }
 static void load_theme(void) {
-    char name[64], ini[1024], ms[1200] = "", v[1200], frame[1200];
+    char name[64], ini[1024], ms[1200] = "", v[1200], frame[1200], engine[32] = "";
     read_string(root, a_lh_theme, name, sizeof name);
     read_string(root, a_themes_ini, ini, sizeof ini);
     if (name[0] && ini[0]) {
         registry_value(ini, name, "msstyles", v, sizeof v);
         if (v[0]) rel_path(ms, sizeof ms, ini, v);
+        registry_value(ini, name, "flxp_header_engine", engine, sizeof engine);   /* lhnav: the theme's navbar is vision */
         registry_value(ini, name, "flxp_longhorn_system32", v, sizeof v);   /* shell32.dll for the toolbar's icons */
         icon_dir_reg[0] = 0;
         if (v[0]) rel_path(icon_dir_reg, sizeof icon_dir_reg, ini, v);
@@ -176,15 +177,20 @@ static void load_theme(void) {
     read_string(root, a_theme, frame, sizeof frame);
     char *bar = strchr(frame, '|'); if (bar) *bar = 0;
     nav_path[0] = 0;
-    if (frame[0]) {
-        lhde_data_find_in(frame, "nav.ini", nav_path, sizeof nav_path);   /* beside theme.ini, or the frame set's copy in a data directory */
+    if (frame[0] && !lhde_data_find_in(frame, "nav.ini", nav_path, sizeof nav_path)) nav_path[0] = 0;   /* beside theme.ini, or the
+                                                                       frame set's copy in a data directory */
+    /* a frame set without one (aero5048, aero5112: their themes' navbar = vision): the navbar layout file, data/navbar/vision.ini
+       (liblhde's path.navbar; the registry only says flxp_header_engine = lhnav) */
+    if (!nav_path[0] && !strcmp(engine, "lhnav") && !lhde_data_find("navbar/vision.ini", nav_path, sizeof nav_path)) nav_path[0] = 0;
+    if (nav_path[0]) {
         /* nav.ini's own choice; p overrides it until the file's `preset =` is edited */
         lhnav_metrics tmp; lhnav_metrics_default(&tmp); lhnav_metrics_load(&tmp, nav_path);
         if (strcmp(tmp.preset, file_preset)) { if (file_preset[0] != 1) preset_sel[0] = 0; snprintf(file_preset, sizeof file_preset, "%s", tmp.preset); }
         lhnav_metrics_load_preset(&base_metrics, nav_path, preset_sel);
     }
     if (!nav) nav = lhnav_new(style, &base_metrics);
-    else lhnav_set_style(nav, style);
+    lhnav_set_style_name(nav, ms[0] ? ms : NULL);   /* for lhnav's log and art sources */
+    lhnav_set_style(nav, style);
 #ifdef HAVE_UXTHEME
     if (old) ut_close(old);   /* after lhnav let go of it */
 #endif
@@ -238,6 +244,7 @@ static void apply_metrics(void) {
         for (int i = 0; i < lhnav_tool_count(nav); i++) { int x, y, w, h; const char *a, *l; int k = lhnav_tool(nav, i, &a, &l);
             if (lhnav_rect(nav, LHNAV_TOOL + i, &x, &y, &w, &h))
                 fprintf(stderr, "  tool%-5d  %4d,%-4d   %4d      %dx%d  kind %d %s\n", i, x, y, y + bt, w, h, k, a ? a : ""); }
+        fprintf(stderr, "navdemo: art sources (nav.ini %s)\n%s", nav_path[0] ? nav_path : "(none)", lhnav_art_sources(nav));
     }
     long ext[4] = { 0, 0, lhnav_extend_top(nav), 0 }, flags = CLIENT_CAPTION | NO_TITLE | NO_ICON;
     long old[4] = { -1, -1, -1, -1 }; int on; long *o = read_cardinals(win, a_extend, 4, &on);

@@ -100,6 +100,7 @@ static void set_key(lhnav_metrics *m, const char *path, char *k, char *v)
     else if (!strcmp(k, "glow_strength")) m->glow_strength = atof(v);
     else if (!strcmp(k, "field_alpha")) m->field_alpha = atof(v);
     else if (!strcmp(k, "tools")) snprintf(m->tools, sizeof m->tools, "%s", *v ? v : "search_field");
+    else if (!strcmp(k, "art_style")) snprintf(m->art_style, sizeof m->art_style, "%s", strcasecmp(v, "auto") ? v : "");
     else if (!strcmp(k, "art_dir") || !strcmp(k, "icon_dir")) {
         char *d = k[0] == 'a' ? m->art_dir : m->icon_dir; size_t dn = sizeof m->art_dir;
         /* lhde: icon_dir is relative to the data directories (resources/4074, lhde_data.h); art_dir to the frame set (nav.ini's
@@ -227,6 +228,21 @@ struct lhnav {
     int fwd_x, split, art_w, art_h;    /* forward image's x relative to back (ANIMATIONBUTTONRECT), source rows used, size */
     int full_h;                        /* the full art's height (aero-patch 54) */
     int menu_x[2][2];                  /* the drop-down boxes' columns [back, fwd][first, end) in source pixels (hot art, rows >= split) */
+    /* Vista's TravelBand (5048, 5112): a plate (TRAVELBACKGROUNDS: both wells and the history chevron; its states are the
+       chevron's) under the glyph strip (TRAVELBUTTONS: back | forward, one image per state; back[0] / fwd[0] hold the halves).
+       Drawn unscaled (tk 1) */
+    int band;
+    px_img *plate[NSTATES];            /* [ST_DISABLED .. ST_PRESSED] */
+    int band_gx[2], band_gy;           /* back's / forward's glyph on the plate */
+    int band_menu_x;                   /* the chevron's hit area: plate columns [band_menu_x, plate width) */
+    double tk;                         /* the travel images' scale: k, or 1 for the band */
+    struct rect r_band;
+    /* the art's style (nav.ini art_style), when it is not the theme's: opened here */
+    struct ut_theme *art_ut;
+    char art_path[600];                /* art_ut's file */
+    char *style_name;                  /* lhnav_set_style_name */
+    char src[9][420];                  /* where each piece came from (SRC_*), "" = drawn / none */
+    char sources[4096];                /* lhnav_art_sources */
     px_img *sep;                       /* the breadcrumb separator glyph (SPLITBUTTONHORZARROW, normal) */
     px_img *sep_down;                  /* its open look (the glyph's second image: a down arrow), NULL = drawn */
     int dropbtn_part;                  /* SPLITBUTTONDROPDOWN of crumb_cls: the chevron's hot / pressed box, 0 = drawn */
@@ -256,6 +272,7 @@ struct lhnav {
 };
 
 static char *dupstr(const char *s) { return s ? strdup(s) : NULL; }
+static void note(const char *msg);
 
 static void art_clear(struct art *a)
 {
@@ -265,6 +282,7 @@ static void art_clear(struct art *a)
 static void art_free(lhnav *n)
 {
     for (int v = 0; v < 4; v++) { art_clear(&n->back[v]); art_clear(&n->fwd[v]); }
+    for (int s = 0; s < NSTATES; s++) px_img_free(&n->plate[s]);
     px_img_free(&n->sep); px_img_free(&n->sep_down);
     for (int a = 0; a < 2; a++) for (int v = 0; v < 4; v++) for (int k = 0; k < 4; k++) px_img_free(&n->fav[a][v][k]);
     for (int i = 0; i < NICONS; i++) { px_img_free(&n->icon[i][0]); px_img_free(&n->icon[i][1]); }
@@ -311,9 +329,8 @@ static int has_class(struct ut_theme *t, const char *cls)
 }
 
 /* one travel button variant from the style: the four states, orb only */
-static int load_travel(lhnav *n, struct art *a, const char *cls)
+static int load_travel(lhnav *n, struct ut_theme *t, struct art *a, const char *cls)
 {
-    struct ut_theme *t = n->ut;
     if (!has_class(t, cls)) return 0;
     int part = ut_part(t, "AnimationButton", "ABBACKGROUND"), img = ut_prop(t, "IMAGEFILE");
     static const char *const names[NSTATES] = { "DISABLED", "NORMAL", "HOT", "PRESSED", "SPLITPRESSED" };
@@ -335,6 +352,93 @@ static int load_travel(lhnav *n, struct art *a, const char *cls)
         for (int s = 0; s < NSTATES; s++) a->full[s] = px[s] ? px_img_from(px[s], w[0], h[0], h[0]) : NULL;
     }
     for (int s = 0; s < NSTATES; s++) if (px[s]) ut_free(px[s]);
+    return ok;
+}
+
+/* columns [x, x + cw) of a w-wide image, h rows, as a new buffer (stride 4 cw) */
+static uint32_t *sub_cols(const uint32_t *px, int w, int x, int cw, int h)
+{
+    uint32_t *o = malloc((size_t)cw * h * 4);
+    if (o) for (int y = 0; y < h; y++) memcpy(o + (size_t)y * cw, px + (size_t)y * w + x, (size_t)cw * 4);
+    return o;
+}
+
+/* Vista's TravelBand (5048, 5112, Vista; aap 2026-10-28). TRAVELBACKGROUNDS is the plate behind both buttons with the history
+   chevron at its right end (5048 61x28: one long well; 5112 70x27: two round wells; NORMAL, HOT / PRESSED = the chevron's box lit,
+   DISABLED = no chevron: neither direction possible); TRAVELBUTTONS the two glyph orbs side by side, back in the left half,
+   forward in the right one (5048 36x24, 5112 54x27), one image per state. Composed as browseui does: the plate in the chevron's
+   state, then each button's half of the strip in its own state. Where the halves go: with CONTENTMARGINS on the plate (5112:
+   0 13 2 0) each button is centred in its half of the content width (back at x 1, forward at 29: the two wells' centres);
+   without (5048) the strip sits whole at x 4, centred vertically (measured on a 5048 Explorer screenshot: plate at 8,25, back
+   glyph at 12,27). The chevron (the recent-pages list, LHNAV_BACK_MENU) is hit right of the glyphs, from where the HOT plate's
+   box starts. */
+/* a TRUESIZE image part at its own size, premultiplied; NULL when the part has no image. Free with free().
+   5112's TravelBand TRAVELBUTTONS(DISABLED) bitmap (#254, 2 bytes longer than its siblings) comes out of libuxtheme with straight
+   alpha (colour > alpha in 976 pixels: speckles when composited); an image with any such pixel is premultiplied here. */
+static uint32_t *true_size(struct ut_theme *t, const char *cls, int part, int state, int img, int *w, int *h)
+{
+    uint32_t *raw = ut_get_bitmap(t, cls, part, state, img, w, h);
+    if (!raw) return NULL;
+    size_t np = (size_t)*w * *h;
+    uint32_t *px = malloc(np * 4);
+    if (px) memcpy(px, raw, np * 4);
+    ut_free(raw);
+    int straight = 0;
+    for (size_t i = 0; px && i < np && !straight; i++) {
+        unsigned a = px[i] >> 24;
+        straight = (px[i] >> 16 & 255) > a || (px[i] >> 8 & 255) > a || (px[i] & 255) > a;
+    }
+    for (size_t i = 0; px && straight && i < np; i++) {
+        unsigned a = px[i] >> 24, r = (px[i] >> 16 & 255) * a / 255, g = (px[i] >> 8 & 255) * a / 255, b = (px[i] & 255) * a / 255;
+        px[i] = (uint32_t)a << 24 | r << 16 | g << 8 | b;
+    }
+    if (straight) {
+        char msg[200]; snprintf(msg, sizeof msg, "%s part %d state %d: straight alpha from libuxtheme, premultiplied", cls, part, state); note(msg);
+    }
+    return px;
+}
+
+static int load_band(lhnav *n, struct ut_theme *t)
+{
+    if (!has_class(t, "TravelBand")) return 0;
+    int pb = ut_part(t, "TravelBand", "TRAVELBACKGROUNDS"), pg = ut_part(t, "TravelBand", "TRAVELBUTTONS"), img = ut_prop(t, "IMAGEFILE");
+    if (pb <= 0 || pg <= 0) return 0;
+    static const char *const names[ST_SPLITPRESSED] = { "DISABLED", "NORMAL", "HOT", "PRESSED" };
+    uint32_t *bp[ST_SPLITPRESSED] = { 0 }, *gp[ST_SPLITPRESSED] = { 0 };
+    int bw[ST_SPLITPRESSED], bh[ST_SPLITPRESSED], gw[ST_SPLITPRESSED], gh[ST_SPLITPRESSED], ok = 1;
+    for (int s = 0; s < ST_SPLITPRESSED; s++) {
+        int sb = ut_state(t, "TravelBand", pb, names[s]), sg = ut_state(t, "TravelBand", pg, names[s]);
+        bp[s] = true_size(t, "TravelBand", pb, sb > 0 ? sb : 0, img, &bw[s], &bh[s]);
+        gp[s] = true_size(t, "TravelBand", pg, sg > 0 ? sg : 0, img, &gw[s], &gh[s]);
+        if (!bp[s] || !gp[s] || bw[s] != bw[0] || bh[s] != bh[0] || gw[s] != gw[0] || gh[s] != gh[0]) ok = 0;
+    }
+    if (ok && gw[0] >= 2) {
+        int pw = bw[0], ph = bh[0], sw = gw[0], sh = gh[0], hw = sw / 2;
+        ut_margins cm = { 0, 0, 0, 0 };
+        if (ut_get_margins(t, "TravelBand", pb, 0, ut_prop(t, "CONTENTMARGINS"), &cm) && (cm.left || cm.right || cm.top || cm.bottom)) {
+            double cw = (pw - cm.left - cm.right) / 2.0;
+            for (int i = 0; i < 2; i++) n->band_gx[i] = (int)floor(cm.left + i * cw + (cw - hw) / 2 + 0.5);
+        } else { n->band_gx[0] = 4; n->band_gx[1] = 4 + hw; }
+        n->band_gy = (int)floor((ph - sh) / 2.0);
+        for (int s = 0; s < ST_SPLITPRESSED; s++) {
+            n->plate[s] = px_img_from(bp[s], pw, ph, ph);
+            for (int i = 0; i < 2; i++) {
+                uint32_t *h = sub_cols(gp[s], sw, i ? sw - hw : 0, hw, sh);
+                struct art *a = i ? &n->fwd[0] : &n->back[0];
+                if (h) { a->st[s] = px_img_from(h, hw, sh, sh); a->full[s] = px_img_from(h, hw, sh, sh); free(h); }
+            }
+        }
+        int x0 = n->band_gx[1] + hw, first = pw;
+        for (int x = 0; x < pw && first == pw; x++) for (int y = 0; y < ph; y++) {
+            int d = (int)(bp[ST_HOT][(size_t)y * pw + x] >> 24) - (int)(bp[ST_NORMAL][(size_t)y * pw + x] >> 24);
+            if (d > 48 || d < -48) { first = x; break; }
+        }
+        n->band_menu_x = first > x0 && first < pw ? first : x0 < pw ? x0 : pw - 1;
+        n->band = 1;
+    } else ok = 0;
+    for (int s = 0; s < ST_SPLITPRESSED; s++) { free(bp[s]); free(gp[s]); }
+    if (ok) for (int s = 0; s < ST_SPLITPRESSED; s++) if (!n->plate[s] || !n->back[0].st[s] || !n->fwd[0].st[s]) ok = 0;
+    if (!ok) { n->band = 0; art_clear(&n->back[0]); art_clear(&n->fwd[0]); for (int s = 0; s < NSTATES; s++) px_img_free(&n->plate[s]); }
     return ok;
 }
 #endif
@@ -376,7 +480,7 @@ static void drawn_travel(struct art *a, int fwd)
             px_fill_circle(&c, cx, cy, r, &g);
             px_paint rim = px_solid(0.05, 0.15, 0.35, 0.8);
             px_stroke_circle(&c, cx, cy, r, 1, &rim);
-            double d = fwd ? 1 : -1, ar = r * 0.55;
+            double d = fwd ? -1 : 1, ar = r * 0.55;   /* the tip at cx - d * ar: back points left, forward right */
             double pts[] = { cx - d * ar, cy, cx + d * ar * 0.1, cy - ar * 0.8, cx + d * ar * 0.1, cy - ar * 0.3, cx + d * ar, cy - ar * 0.3,
                              cx + d * ar, cy + ar * 0.3, cx + d * ar * 0.1, cy + ar * 0.3, cx + d * ar * 0.1, cy + ar * 0.8 };
             px_paint arrow = px_solid(1, 1, 1, s == ST_DISABLED ? 0.5 : 0.95);
@@ -427,38 +531,114 @@ static void load_icons(lhnav *n)
 }
 
 static void fonts_load(lhnav *n);
+static int big(const lhnav *n);
+
+static const char *base_name(const char *p) { const char *b = p ? strrchr(p, '/') : NULL; return b ? b + 1 : p; }
+
+/* the name of a style lhnav uses, for the log and lhnav_art_sources */
+static const char *style_label(const lhnav *n, const struct ut_theme *t)
+{
+    if (t && t == n->art_ut) return base_name(n->art_path);
+    if (n->style_name && *n->style_name) return base_name(n->style_name);
+    return "the theme's style";
+}
+
+#ifdef HAVE_UXTHEME
+/* nav.ini art_style: open the named style (kept open while the name stays) */
+static void art_style_open(lhnav *n)
+{
+    const char *v = n->m.art_style;
+    char path[600] = "", msg[1400];
+    if (*v) {
+        size_t l = strlen(v);
+        if (v[0] == '/' || v[0] == '~') lhde_data_resolve(v, path, sizeof path);
+        else {
+            char rel[400];
+            snprintf(rel, sizeof rel, l > 9 && !strcasecmp(v + l - 9, ".msstyles") ? "styles/%s" : "styles/%s.msstyles", v);
+            if (!lhde_data_find(rel, path, sizeof path)) {
+                snprintf(msg, sizeof msg, "art_style = %s: no %s in lhde's data directories; the art comes from the theme's style", v, rel);
+                note(msg); path[0] = 0;
+            }
+        }
+    }
+    if (n->art_ut && !strcmp(path, n->art_path)) return;
+    if (n->art_ut) ut_close(n->art_ut);
+    n->art_ut = NULL; n->art_path[0] = 0;
+    if (!path[0]) return;
+    if ((n->art_ut = ut_open(path, NULL, NULL))) snprintf(n->art_path, sizeof n->art_path, "%s", path);
+    else { snprintf(msg, sizeof msg, "art_style = %s: %s is not a visual style; the art comes from the theme's style", v, path); note(msg); }
+}
+#endif
+
+enum { SRC_BACK, SRC_FWD, SRC_PLATE, SRC_MENU, SRC_FAV, SRC_SEP, SRC_BOX, SRC_DROP, SRC_COLOR, NSRC };
+static const char *const src_names[NSRC] = { "back", "forward", "plate", "history", "favorites", "crumb arrow", "segment box",
+                                             "arrow box", "crumb text" };
 
 static void load_art(lhnav *n)
 {
     art_free(n);
     n->fwd_x = 38; n->split = 44; n->crumb_cls[0] = 0; n->splitbtn_part = 0; n->dropbtn_part = 0;
     n->crumb_rgb = 0x00025c; n->glow_rgb = 0xffffff; n->glow = 4;
+    n->band = 0; n->band_menu_x = 0; n->band_gx[0] = n->band_gx[1] = n->band_gy = 0;
+    for (int i = 0; i < NSRC; i++) n->src[i][0] = 0;
     int have = 0;
+    const char *sl = style_label(n, NULL);
 #ifdef HAVE_UXTHEME
-    struct ut_theme *t = n->ut;
+    art_style_open(n);
+    struct ut_theme *t = n->art_ut ? n->art_ut : n->ut;   /* the art's style (nav.ini art_style, else the theme's) */
+    sl = style_label(n, t);
     if (t) {
         int part = ut_part(t, "AnimationButton", "ABBACKGROUND");
         ut_rect r;
         if (part > 0 && ut_get_rect(t, "TravelBack::AnimationButton", part, 0, ut_prop(t, "CUSTOMSPLITRECT"), &r) && r.top > 0) n->split = r.top;
         if (part > 0 && ut_get_rect(t, "TravelFwd::AnimationButton", part, 0, ut_prop(t, "ANIMATIONBUTTONRECT"), &r) && r.left > 0) n->fwd_x = r.left;
         static const char *const pre[4] = { "", "Inactive", "Max", "MaxInactive" };
-        if (load_travel(n, &n->back[0], "TravelBack::AnimationButton") && load_travel(n, &n->fwd[0], "TravelFwd::AnimationButton")) {
+        if (load_travel(n, t, &n->back[0], "TravelBack::AnimationButton") && load_travel(n, t, &n->fwd[0], "TravelFwd::AnimationButton")) {
             have = 1;
+            char vars[64] = "";
             for (int v = 1; v < 4; v++) {
                 char cb[64], cf[64];
                 snprintf(cb, sizeof cb, "%sTravelBack::AnimationButton", pre[v]); snprintf(cf, sizeof cf, "%sTravelFwd::AnimationButton", pre[v]);
-                if (!load_travel(n, &n->back[v], cb) || !load_travel(n, &n->fwd[v], cf)) { art_clear(&n->back[v]); art_clear(&n->fwd[v]); }
+                if (!load_travel(n, t, &n->back[v], cb) || !load_travel(n, t, &n->fwd[v], cf)) { art_clear(&n->back[v]); art_clear(&n->fwd[v]); }
+                else { strcat(vars, " "); strcat(vars, pre[v]); }
+            }
+            for (int i = 0; i < 2; i++)
+                snprintf(n->src[i], sizeof n->src[i], "%s %s ABBACKGROUND IMAGEFILE, states DISABLED NORMAL HOT PRESSED%s (small: rows 0..%d, "
+                         "HOT/PRESSED inside the orb over NORMAL); variants:%s", sl, i ? "TravelFwd::AnimationButton" : "TravelBack::AnimationButton",
+                         n->back[0].full[ST_SPLITPRESSED] ? " SPLITPRESSED" : "", n->split - 1, vars[0] ? vars : " none");
+            snprintf(n->src[SRC_MENU], sizeof n->src[SRC_MENU], "big: the travel art's drop-down part (rows from CUSTOMSPLITRECT.top %d), "
+                     "HOT/SPLITPRESSED of the same images; small: none", n->split);
+        } else {
+            for (int v = 0; v < 4; v++) { art_clear(&n->back[v]); art_clear(&n->fwd[v]); }
+            if (load_band(n, t)) {
+                have = 2;
+                n->split = 44; n->fwd_x = n->band_gx[1] - n->band_gx[0];
+                const px_img *pl = n->plate[ST_NORMAL];
+                snprintf(n->src[SRC_PLATE], sizeof n->src[SRC_PLATE], "%s TravelBand TRAVELBACKGROUNDS IMAGEFILE %dx%d, states NORMAL HOT PRESSED "
+                         "DISABLED (the chevron's)", sl, pl->w, pl->h);
+                for (int i = 0; i < 2; i++)
+                    snprintf(n->src[i], sizeof n->src[i], "%s TravelBand TRAVELBUTTONS IMAGEFILE, %s half (%dx%d at %d,%d on the plate), states "
+                             "DISABLED NORMAL HOT PRESSED", sl, i ? "right" : "left", n->back[0].st[ST_NORMAL]->w, n->back[0].st[ST_NORMAL]->h,
+                             n->band_gx[i], n->band_gy);
+                snprintf(n->src[SRC_MENU], sizeof n->src[SRC_MENU], "%s TravelBand TRAVELBACKGROUNDS: the chevron, plate columns %d..%d (one "
+                         "list for both directions: LHNAV_BACK_MENU)", sl, n->band_menu_x, pl->w - 1);
             }
         }
-        /* the breadcrumb: the composited toolbar's colours and glow (aero: (0,2,92), white, 4; its font: fonts_load), the split
-           button art for hover/pressed, the separator glyph */
-        const char *fc = has_class(t, "CompositedBreadcrumbBar::Toolbar") ? "CompositedBreadcrumbBar::Toolbar"
-                       : has_class(t, "BreadcrumbBarToolbar::Toolbar") ? "BreadcrumbBarToolbar::Toolbar" : has_class(t, "BB::Toolbar") ? "BB::Toolbar" : NULL;
-        if (fc) {
+        /* the breadcrumb: the composited toolbar's colours and glow (aero: (0,2,92), white, 4; its font: fonts_load), from the
+           theme's style (the text's) or else the art's; the split button art for hover/pressed and the separator glyph: the art's */
+        for (int k = 0; k < 2; k++) {
+            struct ut_theme *ct = k ? t : n->ut;
+            if (!ct || (k && ct == n->ut)) continue;
+            const char *fc = has_class(ct, "CompositedBreadcrumbBar::Toolbar") ? "CompositedBreadcrumbBar::Toolbar"
+                           : has_class(ct, "BreadcrumbBarToolbar::Toolbar") ? "BreadcrumbBarToolbar::Toolbar" : has_class(ct, "BB::Toolbar") ? "BB::Toolbar" : NULL;
+            if (!fc) continue;
             uint32_t c; int g;
-            if (ut_get_color(t, fc, 0, 0, ut_prop(t, "TEXTCOLOR"), &c)) n->crumb_rgb = c;
-            if (ut_get_color(t, fc, 0, 0, ut_prop(t, "GLOWCOLOR"), &c)) n->glow_rgb = c;
-            if (ut_get_int(t, fc, 0, 0, ut_prop(t, "TEXTGLOWSIZE"), &g) && g > 0) n->glow = g;
+            if (ut_get_color(ct, fc, 0, 0, ut_prop(ct, "TEXTCOLOR"), &c)) n->crumb_rgb = c;
+            if (ut_get_color(ct, fc, 0, 0, ut_prop(ct, "GLOWCOLOR"), &c)) n->glow_rgb = c;
+            if (ut_get_int(ct, fc, 0, 0, ut_prop(ct, "TEXTGLOWSIZE"), &g) && g > 0) n->glow = g;
+            snprintf(n->src[SRC_COLOR], sizeof n->src[SRC_COLOR], "%s %s TEXTCOLOR #%06x GLOWCOLOR #%06x TEXTGLOWSIZE %d (nav.ini crumb_rgb, glow_rgb, "
+                     "glow_size override)", style_label(n, ct), fc, n->crumb_rgb, n->glow_rgb, n->glow);
+            break;
         }
         static const char *const tb[3] = { "BreadcrumbBarToolbar::Toolbar", "BB::Toolbar", "Toolbar" };
         for (int i = 0; i < 3 && !n->crumb_cls[0]; i++) {
@@ -467,6 +647,8 @@ static void load_art(lhnav *n)
             uint32_t *px = p > 0 ? ut_get_bitmap(t, tb[i], p, 0, ut_prop(t, "IMAGEFILE"), &w, &h) : NULL;
             if (px) { snprintf(n->crumb_cls, sizeof n->crumb_cls, "%s", tb[i]); n->splitbtn_part = p; ut_free(px); }
         }
+        if (n->crumb_cls[0])
+            snprintf(n->src[SRC_BOX], sizeof n->src[SRC_BOX], "%s %s SPLITBUTTON IMAGEFILE, states HOT PRESSED (nine-gridded)", sl, n->crumb_cls);
         for (int i = 0; i < 3 && !n->sep; i++) {
             if (i < 2 && !has_class(t, tb[i])) continue;
             int p = ut_part(t, "Toolbar", "SPLITBUTTONHORZARROW"), w, h;
@@ -475,17 +657,23 @@ static void load_art(lhnav *n)
                 n->sep = px_img_from(px, w, h, h % w == 0 ? w : h);
                 if (h % w == 0 && h >= 2 * w) n->sep_down = px_img_from(px + (size_t)w * w, w, h - w, w);
                 ut_free(px);
+                snprintf(n->src[SRC_SEP], sizeof n->src[SRC_SEP], "%s %s SPLITBUTTONHORZARROW GLYPHIMAGEFILE %dx%d, image 1 (open: %s)", sl, tb[i],
+                         w, h % w == 0 ? w : h, n->sep_down ? "image 2" : "drawn down arrow");
             }
         }
         if (n->crumb_cls[0]) {
             int p = ut_part(t, "Toolbar", "SPLITBUTTONDROPDOWN"), w, h;
             uint32_t *px = p > 0 ? ut_get_bitmap(t, n->crumb_cls, p, 0, ut_prop(t, "IMAGEFILE"), &w, &h) : NULL;
-            if (px) { n->dropbtn_part = p; ut_free(px); }
+            if (px) {
+                n->dropbtn_part = p; ut_free(px);
+                snprintf(n->src[SRC_DROP], sizeof n->src[SRC_DROP], "%s %s SPLITBUTTONDROPDOWN IMAGEFILE, states HOT PRESSED", sl, n->crumb_cls);
+            }
         }
         /* the star orb: Favorites::AnimationButton and its variants, SmallFavorites (as flxp's navbar.cpp finds them) */
         {
-            static const char *const pre[4] = { "", "Inactive", "Max", "MaxInactive" }, *const sn[4] = { "DISABLED", "NORMAL", "HOT", "PRESSED" };
-            int part = ut_part(t, "AnimationButton", "ABBACKGROUND"), img = ut_prop(t, "IMAGEFILE");
+            static const char *const sn[4] = { "DISABLED", "NORMAL", "HOT", "PRESSED" };
+            int img = ut_prop(t, "IMAGEFILE");
+            char got[200] = "";
             for (int a = 0; a < 2 && part > 0; a++) for (int v = 0; v < 4; v++) {
                 char cls[64]; snprintf(cls, sizeof cls, "%s%sFavorites::AnimationButton", a ? "Small" : "", pre[v]);
                 if (!has_class(t, cls)) continue;
@@ -494,7 +682,9 @@ static void load_art(lhnav *n)
                     uint32_t *px = ut_get_bitmap(t, cls, part, st, img, &w, &h);
                     if (px) { n->fav[a][v][k] = px_img_from(px, w, h, h); ut_free(px); }
                 }
+                if (n->fav[a][v][1] && strlen(got) + strlen(cls) + 2 < sizeof got) { strcat(got, " "); strcat(got, cls); }
             }
+            if (got[0]) snprintf(n->src[SRC_FAV], sizeof n->src[SRC_FAV], "%s ABBACKGROUND IMAGEFILE of%s (Small* up to 35 px)", sl, got);
         }
     }
 #endif
@@ -502,20 +692,47 @@ static void load_art(lhnav *n)
         struct art b = { { 0 }, { 0 } }, f = { { 0 }, { 0 } };
         if (load_strip(&b, n->m.art_dir, "nav_back.png") && load_strip(&f, n->m.art_dir, "nav_fwd.png")) {
             for (int v = 0; v < 4; v++) { art_clear(&n->back[v]); art_clear(&n->fwd[v]); }
+            for (int s = 0; s < NSTATES; s++) px_img_free(&n->plate[s]);
+            n->band = 0; n->src[SRC_PLATE][0] = 0;
             n->back[0] = b; n->fwd[0] = f;
             n->split = b.st[0]->h;
-            if (!have) n->fwd_x = b.st[0]->w;
-            have = 1;
+            if (have != 1) n->fwd_x = b.st[0]->w;
+            if (have == 2) n->src[SRC_MENU][0] = 0;
+            have = 3;
+            for (int i = 0; i < 2; i++)
+                snprintf(n->src[i], sizeof n->src[i], "art_dir %.300s/%s (state strip DISABLED NORMAL HOT PRESSED)", n->m.art_dir, i ? "nav_fwd.png" : "nav_back.png");
         } else { art_clear(&b); art_clear(&f); }
     }
-    if (!have) { drawn_travel(&n->back[0], 0); drawn_travel(&n->fwd[0], 1); n->fwd_x = 38; n->split = 44; }
+    if (!have) {
+        char msg[700];
+#ifdef HAVE_UXTHEME
+        if (t) {
+            int hb = has_class(t, "TravelBack::AnimationButton"), hf = has_class(t, "TravelFwd::AnimationButton"), hv = has_class(t, "TravelBand");
+            snprintf(msg, sizeof msg, "%s has no travel art: %s%s%s%s (4051-4074, aero patch) / %s (Vista 5048, 5112); drawn orbs "
+                     "(nav.ini art_style = aero-patch takes another style's)", sl,
+                     hb && hf ? "TravelBack/TravelFwd::AnimationButton unusable" : "no ", hb ? "" : "TravelBack::AnimationButton",
+                     !hb && !hf ? ", " : "", hf ? "" : "TravelFwd::AnimationButton",
+                     hv ? "TravelBand without usable TRAVELBACKGROUNDS + TRAVELBUTTONS" : "no TravelBand");
+        } else
+#endif
+            snprintf(msg, sizeof msg, "no visual style: drawn travel orbs");
+        note(msg);
+        drawn_travel(&n->back[0], 0); drawn_travel(&n->fwd[0], 1); n->fwd_x = 38; n->split = 44;
+        snprintf(n->src[SRC_BACK], sizeof n->src[SRC_BACK], "drawn (lhnav's orb, 38x44)");
+        snprintf(n->src[SRC_FWD], sizeof n->src[SRC_FWD], "drawn (lhnav's orb, 27x44 at x 38)");
+        snprintf(n->src[SRC_MENU], sizeof n->src[SRC_MENU], "none");
+    }
     load_icons(n);
     n->art_w = n->fwd_x + n->fwd[0].st[ST_NORMAL]->w;
     n->art_h = n->back[0].st[ST_NORMAL]->h;
     n->full_h = n->back[0].full[ST_NORMAL]->h;
-    if (n->split > n->art_h) n->split = n->art_h;
+    if (n->split > n->art_h && !n->band) n->split = n->art_h;
+    if (n->band) {   /* the band is drawn unscaled: its nominal size is the small orb row's or the big art's (aero patch 44 + 10 rows) */
+        n->art_w = n->plate[ST_NORMAL]->w; n->art_h = n->plate[ST_NORMAL]->h;
+        if (big(n)) { n->split = 44; n->full_h = 54; } else n->split = n->full_h = n->art_h;
+    }
     /* the drop-down boxes: the columns where the hot art is (nearly) opaque below the split; none (orb-only art): flxp's margins */
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 2 && !n->band; i++) {
         const px_img *hs = (i ? n->fwd : n->back)[0].full[ST_HOT];
         int w = hs->w, h = hs->h, x0 = w, x1 = 0;
         for (int y = n->split; y < h; y++) {
@@ -526,6 +743,7 @@ static void load_art(lhnav *n)
         if (!i && x1 > n->fwd_x) x1 = n->fwd_x;   /* back's box ends where forward's starts */
         n->menu_x[i][0] = x0; n->menu_x[i][1] = x1;
     }
+    if (getenv("LHNAV_DEBUG")) fprintf(stderr, "lhnav: art sources\n%s", lhnav_art_sources(n));
 }
 
 static void tools_free(lhnav *n)
@@ -627,6 +845,10 @@ void lhnav_free(lhnav *n)
 {
     if (!n) return;
     art_free(n); tools_free(n); mc_clear(n);
+#ifdef HAVE_UXTHEME
+    if (n->art_ut) ut_close(n->art_ut);
+#endif
+    free(n->style_name);
     for (int i = 0; i < NICONS; i++) { px_img_free(&n->cicon[i][0]); px_img_free(&n->cicon[i][1]); }
     for (int i = 0; i < n->nseg; i++) free(n->seg[i]);
     free(n->seg); free(n->r_seg); free(n->r_sep); free(n->title); free(n->field[0]); free(n->field[1]); free(n->placeholder);
@@ -642,6 +864,38 @@ void lhnav_set_metrics(lhnav *n, const lhnav_metrics *m)
 }
 
 void lhnav_set_style(lhnav *n, struct ut_theme *style) { n->ut = style; load_art(n); apply_metrics(n); }
+void lhnav_set_style_name(lhnav *n, const char *name) { free(n->style_name); n->style_name = name && *name ? strdup(name) : NULL; }
+
+const char *lhnav_art_sources(lhnav *n)
+{
+    char *o = n->sources; size_t k = 0, cap = sizeof n->sources;
+#define ADD(...) do { if (k < cap) { int r_ = snprintf(o + k, cap - k, __VA_ARGS__); if (r_ > 0) k += (size_t)r_; } } while (0)
+    ADD("  style: %s%s%s\n", n->style_name ? n->style_name : n->ut ? "(the theme's, unnamed)" : "(none)",
+        n->art_ut ? "; art_style: " : "", n->art_ut ? n->art_path : "");
+    for (int i = 0; i < NSRC; i++) {
+        if (i == SRC_PLATE && !n->band) continue;
+        ADD("  %-12s %s\n", src_names[i], n->src[i][0] ? n->src[i] : i == SRC_COLOR ? "built-in (0,2,92), white glow 4" : i == SRC_MENU ? "none" : "drawn");
+    }
+    static const char *const kinds[] = { "", "search", "search field", "favorites", "bookmark", "views", "newfolder", "separator" };
+    for (int i = 0; i < n->ntools; i++) {
+        int kd = n->tools[i].kind, ic = kd == LHNAV_TOOL_SEARCH ? ICN_SEARCH : kd == LHNAV_TOOL_BOOKMARK ? ICN_FOLDER
+                                         : kd == LHNAV_TOOL_VIEWS ? ICN_VIEWS : kd == LHNAV_TOOL_NEWFOLDER ? ICN_NEWFOLDER : -1;
+        char what[600];
+        if (kd == LHNAV_TOOL_FAVORITES) snprintf(what, sizeof what, "%s", n->src[SRC_FAV][0] ? "the favorites star above" : "drawn star");
+        else if (kd == LHNAV_TOOL_SEARCH_FIELD) snprintf(what, sizeof what, "the field: drawn; its magnifier: drawn");
+        else if (kd == LHNAV_TOOL_SEPARATOR) snprintf(what, sizeof what, "drawn line");
+        else if (ic >= 0 && n->cicon[ic][0]) snprintf(what, sizeof what, "the client's (lhnav_set_icon \"%s\")", icon_names[ic]);
+        else if (ic >= 0 && n->icon[ic][0]) {
+            static const char *const res[NICONS] = { "icon group 23 (32 px)", "icon group 4", "bitmaps 216/217 (16 px) or 214/215 (24 px), cell 32",
+                                                     "bitmaps 216/217 (16 px) or 214/215 (24 px), cell 31" };
+            snprintf(what, sizeof what, "%s/shell32.dll %s", n->m.icon_dir, res[ic]);
+        } else snprintf(what, sizeof what, "drawn%s", n->m.icon_dir[0] ? " (not in icon_dir's shell32.dll)" : " (no icon_dir)");
+        ADD("  tool %-7d %s: %s\n", i, kinds[kd < 8 ? kd : 0], what);
+    }
+    if (n->r_search.w > 0 || !n->ntools) ADD("  %-12s drawn\n", "search glass");
+#undef ADD
+    return n->sources;
+}
 void lhnav_set_title(lhnav *n, const char *s) { free(n->title); n->title = dupstr(s); }
 void lhnav_set_history(lhnav *n, int b, int f) { n->can_back = b != 0; n->can_fwd = f != 0; }
 void lhnav_set_frame_state(lhnav *n, int focused, int maximized) { n->focused = focused != 0; n->maximized = maximized != 0; }
@@ -680,7 +934,7 @@ static void note(const char *msg)   /* a log line, once per distinct message */
 {
     static char seen[16][320];
     static int k;
-    for (int i = 0; i < 16; i++) if (!strcmp(seen[i], msg)) return;
+    for (int i = 0; i < 16; i++) if (seen[i][0] && !strncmp(seen[i], msg, sizeof seen[i] - 1)) return;   /* long ones: their start */
     snprintf(seen[k], sizeof seen[k], "%s", msg); k = (k + 1) % 16;
     fprintf(stderr, "lhnav: %s\n", msg);
 }
@@ -1119,11 +1373,22 @@ void lhnav_layout(lhnav *n, int width)
     n->k = rows > 0 ? (double)oh / rows : 1;
     /* the orb: back at pad_l, forward ANIMATIONBUTTONRECT.left (scaled) to its right */
     int bw = n->back[0].st[ST_NORMAL]->w, fw = n->fwd[0].st[ST_NORMAL]->w;
+    n->tk = n->k;
     n->r_back = (struct rect){ m->pad_l, top, (int)lround(bw * n->k), oh };
     n->r_fwd = (struct rect){ m->pad_l + (int)lround(n->fwd_x * n->k), top, (int)lround(fw * n->k), oh };
     int orb_r = n->r_fwd.x + n->r_fwd.w;
     /* the boxes, centred against the orb part (small: the whole row) */
     int orb_part = big(n) ? (int)lround(n->split * n->k) : oh;
+    n->r_band = (struct rect){ 0, 0, 0, 0 };
+    if (n->band) {   /* Vista's TravelBand: unscaled, centred on the orb part; the glyphs on the plate where load_band put them */
+        const px_img *pl = n->plate[ST_NORMAL];
+        int py = top + (int)floor((orb_part - pl->h) / 2.0);
+        n->tk = 1;
+        n->r_band = (struct rect){ m->pad_l, py, pl->w, pl->h };
+        n->r_back = (struct rect){ m->pad_l + n->band_gx[0], py + n->band_gy, bw, n->back[0].st[ST_NORMAL]->h };
+        n->r_fwd = (struct rect){ m->pad_l + n->band_gx[1], py + n->band_gy, fw, n->fwd[0].st[ST_NORMAL]->h };
+        orb_r = m->pad_l + pl->w;
+    }
     int by = top + (orb_part - m->box_h) / 2;
     int ax = orb_r + m->box_gap, sr = width - m->pad_r;
     /* the toolbar (nav.ini `tools`), right-aligned before pad_r; the search field (a search_field item, or an open `search`)
@@ -1182,12 +1447,14 @@ void lhnav_layout(lhnav *n, int width)
     /* hand placement, each element against its own automatic place */
     int ox = n->r_back.x, oy = n->r_back.y;
     { struct rect o = n->r_back; place(n, &o, &m->orb, 0); ox = o.x - ox; oy = o.y - oy; }
-    n->r_back.x += ox; n->r_back.y += oy; n->r_fwd.x += ox; n->r_fwd.y += oy;
+    n->r_back.x += ox; n->r_back.y += oy; n->r_fwd.x += ox; n->r_fwd.y += oy; n->r_band.x += ox; n->r_band.y += oy;
     place(n, &n->r_addr, &m->address, 1);
     if (n->r_search.w > 0) place(n, &n->r_search, &m->search, 1);
     /* the big variant's drop-down parts: below the split, the hot art's box columns */
     n->r_bmenu = n->r_fmenu = (struct rect){ 0, 0, 0, 0 };
-    if (big(n) && n->full_h > n->split) {
+    if (n->band)   /* the band's chevron: one list for both directions */
+        n->r_bmenu = (struct rect){ n->r_band.x + n->band_menu_x, n->r_band.y, n->r_band.w - n->band_menu_x, n->r_band.h };
+    else if (big(n) && n->full_h > n->split) {
         int my = n->r_back.y + (int)lround(n->split * n->k), mh = n->r_back.y + oh - my;
         n->r_bmenu = (struct rect){ n->r_back.x + (int)lround(n->menu_x[0][0] * n->k), my,
                                     (int)lround((n->menu_x[0][1] - n->menu_x[0][0]) * n->k), mh };
@@ -1264,7 +1531,7 @@ static int in(const struct rect *r, int x, int y) { return r->w > 0 && x >= r->x
 static int orb_alpha(lhnav *n, const px_img *s, const struct rect *r, int x, int y)
 {
     if (!s || !in(r, x, y)) return 0;
-    return (int)(px_img_at(s, (int)((x - r->x) / n->k), (int)((y - r->y) / n->k)) >> 24);
+    return (int)(px_img_at(s, (int)((x - r->x) / n->tk), (int)((y - r->y) / n->tk)) >> 24);
 }
 
 int lhnav_hit(lhnav *n, int x, int y)
@@ -1275,7 +1542,7 @@ int lhnav_hit(lhnav *n, int x, int y)
     if (in(&cap, x, y)) return LHNAV_BUTTONS;
     if (y < m->resize_rows) return LHNAV_RESIZE_TOP;
     /* the big variant's drop-down parts (only while their direction is possible, as 4074's browseui) */
-    if (n->can_back && in(&n->r_bmenu, x, y)) return LHNAV_BACK_MENU;
+    if ((n->can_back || (n->band && n->can_fwd)) && in(&n->r_bmenu, x, y)) return LHNAV_BACK_MENU;   /* the band's: either */
     if (n->can_fwd && in(&n->r_fmenu, x, y)) return LHNAV_FWD_MENU;
     /* the orb: back where its orb is solid, then forward, then the rest of back's well */
     const px_img *b = n->back[0].full[ST_NORMAL], *f = n->fwd[0].full[ST_NORMAL];
@@ -1387,12 +1654,13 @@ static int toolbar_bg(lhnav *n, px_cv *c, const struct rect *r, int part, int pr
 {
     (void)n; (void)c; (void)r; (void)part; (void)pressed;
 #ifdef HAVE_UXTHEME
-    if (n->ut && n->crumb_cls[0] && part > 0 && r->w > 0 && r->h > 0) {
+    struct ut_theme *t = n->art_ut ? n->art_ut : n->ut;   /* the art's style (nav.ini art_style) */
+    if (t && n->crumb_cls[0] && part > 0 && r->w > 0 && r->h > 0) {
         px_img *s = px_img_new(r->w, r->h);
         if (!s) return 0;
         ut_rect rr = { 0, 0, r->w, r->h };
-        int st = ut_state(n->ut, "Toolbar", part, pressed ? "PRESSED" : "HOT");
-        int ok = ut_draw_background(n->ut, n->crumb_cls, part, st > 0 ? st : pressed ? 3 : 2, s->px, r->w, r->h, r->w * 4, &rr, NULL);
+        int st = ut_state(t, "Toolbar", part, pressed ? "PRESSED" : "HOT");
+        int ok = ut_draw_background(t, n->crumb_cls, part, st > 0 ? st : pressed ? 3 : 2, s->px, r->w, r->h, r->w * 4, &rr, NULL);
         if (ok) px_blit(c, s, r->x, r->y, 1);
         px_img_free(&s);
         return ok;
@@ -1445,7 +1713,7 @@ static void paint_orb(lhnav *n, px_cv *c, struct art *a, struct art *a0, const s
     px_img *const *v = big(n) ? a->full : a->st, *const *v0 = big(n) ? a0->full : a0->st;
     if (st == ST_SPLITPRESSED && !v[st] && !v0[st]) st = ST_PRESSED;
     const px_img *s = v[st] ? v[st] : v0[st];
-    if (s) px_blit_scaled(c, s, r->x, r->y, n->k, 1);   /* box-filtered when shrunk */
+    if (s) px_blit_scaled(c, s, r->x, r->y, n->tk, 1);   /* box-filtered when shrunk */
 }
 
 /* image s drawn into the box (x, y, w, h) scaled to fit (aspect kept, centred), at alpha a */
@@ -1599,8 +1867,16 @@ void lhnav_paint(lhnav *n, uint32_t *px, int w, int h, int stride, int composite
     }
     /* 2. the orb */
     int v = (n->maximized ? 2 : 0) + (n->focused ? 0 : 1);
-    paint_orb(n, c, &n->fwd[v], &n->fwd[0], &n->r_fwd, LHNAV_FWD, LHNAV_FWD_MENU, n->can_fwd);
-    paint_orb(n, c, &n->back[v], &n->back[0], &n->r_back, LHNAV_BACK, LHNAV_BACK_MENU, n->can_back);
+    if (n->band) {   /* the TravelBand: the plate in the chevron's state, then each glyph in its own (no menu part of their own) */
+        int st = !n->can_back && !n->can_fwd ? ST_DISABLED : down_on(n, LHNAV_BACK_MENU) ? ST_PRESSED
+               : n->hover == LHNAV_BACK_MENU ? ST_HOT : ST_NORMAL;
+        if (n->plate[st]) px_blit(c, n->plate[st], n->r_band.x, n->r_band.y, 1);
+        paint_orb(n, c, &n->fwd[0], &n->fwd[0], &n->r_fwd, LHNAV_FWD, -1, n->can_fwd);
+        paint_orb(n, c, &n->back[0], &n->back[0], &n->r_back, LHNAV_BACK, -1, n->can_back);
+    } else {
+        paint_orb(n, c, &n->fwd[v], &n->fwd[0], &n->r_fwd, LHNAV_FWD, LHNAV_FWD_MENU, n->can_fwd);
+        paint_orb(n, c, &n->back[v], &n->back[0], &n->r_back, LHNAV_BACK, LHNAV_BACK_MENU, n->can_back);
+    }
     /* 3. the breadcrumb box: its field while editing (always / on hover by address_field), the segments otherwise */
     int hov_addr = n->hover == LHNAV_ADDRESS || n->hover == LHNAV_OVERFLOW || LHNAV_IS_CRUMB(n->hover) || LHNAV_IS_SEP(n->hover);
     if (n->r_addr.w > 0) {
