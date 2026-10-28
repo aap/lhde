@@ -67,12 +67,18 @@ copy() {
 	cp -RL "$1" "$2"
 	echo "  copied  ${2#$D/}"
 }
-# copy only the PNGs of directory SRC into DST (the text halves ship in data/)
+# copy only the PNGs of directory SRC into DST (the text halves ship in data/). Merges file by file: DST may
+# already exist with the shipped theme.ini/nav.ini in it (make install PREFIX=~/.local puts data/ into the same
+# ~/.local/share/lhde), so the directory is never removed; existing PNGs are kept unless --force.
 copypng() {
-	if [ -d "$2" ] && [ $force = 0 ]; then echo "  kept    ${2#$D/} (exists; --force replaces it)"; return 0; fi
-	rm -rf "$2"; mkdir -p "$2"
-	n=0; for f in "$1"/*.png; do [ -f "$f" ] || continue; cp -L "$f" "$2/"; n=$((n + 1)); done
-	echo "  copied  ${2#$D/} ($n PNG)"
+	mkdir -p "$2"
+	n=0 k=0
+	for f in "$1"/*.png; do
+		[ -f "$f" ] || continue
+		if [ -e "$2/$(basename "$f")" ] && [ $force = 0 ]; then k=$((k + 1)); continue; fi
+		cp -L "$f" "$2/"; n=$((n + 1))
+	done
+	echo "  copied  ${2#$D/} ($n PNG${k:+, $k kept})"
 }
 
 # ---- styles/: the workspace's resources/msstyles already has the build-qualified names ----
