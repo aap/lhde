@@ -67,6 +67,12 @@ static void look_build(const struct theme *t, struct look *L) {
         L->shadow = 0x808080; L->hilight = 0xffffff; L->dkshadow = 0x404040; L->flat = 0;
         snprintf(L->font, sizeof L->font, "Tahoma 11px");
     }
+    if (t->classic) {   /* Windows Classic: the scheme's colours (COLOR_ indices) and Metrics.menufont */
+        const unsigned *C = t->cl;
+        L->menu = C[4]; L->text = C[7]; L->gray = C[17]; L->hl = L->hlframe = C[13]; L->hltext = C[14];
+        L->face = C[15]; L->shadow = C[16]; L->hilight = C[20]; L->dkshadow = C[21]; L->light = C[22]; L->flat = 0;
+        snprintf(L->font, sizeof L->font, "%s", t->cl_menufont);
+    }
     L->aa = t->mode == THEME_MSSTYLES ? t->ms_font_aa : CAIRO_ANTIALIAS_SUBPIXEL;
     L->hint = t->mode == THEME_MSSTYLES && t->ms_hint ? t->ms_hint : CAIRO_HINT_STYLE_FULL;
     int item_t = 1, item_b = 1, sep_cy = 2, sep_t = -1, sep_b = -1;   /* XP: text height + CYEDGE + 2 */

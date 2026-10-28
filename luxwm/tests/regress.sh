@@ -22,6 +22,8 @@
 #   ext46.png      FRAMETEST_EXT="0 0 46 1"   (the 4074 Explorer header: 27 + 46 = 73 rows, NO_TITLE), focused
 #   ext46u.png     the same, inactive         ext46max.png    the same, maximised
 #   vision49.png, vision49max.png  only for frame sets with header_mode = crop (aerovision): FRAMETEST_EXT="0 0 22 0 9"
+#   classic/ classic.xl/ classic.hc/  Windows Classic frames (style = classic): the built-in Windows Standard scheme, its Extra
+#                  Large Fonts metrics, High Contrast colours with a 6 px border (specs "|classic|KEY=VALUE;...")
 # Each render also keeps frametest's stdout (margins, shape) as NAME.txt, compared too.
 # Classic fallbacks (docs/LUXWM.md "Classic fallback"): for every glass frame set whose style is a DWM-era one (5048, 5112: their
 # themes' frames_classic is none, the style's own decorations), <set>.classic/ holds the same renders of the style in msstyles mode.
@@ -122,6 +124,16 @@ if [ "$source" = lib ]; then
 		render_one "$spec" "$d"; n=$((n + 1))
 	done
 fi
+# Windows Classic (docs/LUXWM.md "Windows Classic frames"; no visual style, no data: the built-in Windows Standard scheme): classic/,
+# and the same frame at Extra Large Fonts metrics (classic.xl/) and with a 6 px sizing border in High Contrast Black's colours
+# (classic.hc/)
+hc='activecaption=128 0 128;gradientactivecaption=128 0 128;inactivecaption=0 128 0;gradientinactivecaption=0 128 0'
+hc="$hc;captiontext=255 255 255;inactivecaptiontext=255 255 255;activeborder=255 255 0;inactiveborder=0 128 0;btnface=0 0 0"
+hc="$hc;btntext=255 255 255;btnhighlight=255 255 255;btnshadow=128 128 128;3dlight=192 192 192;3ddkshadow=255 255 255"
+for c in "classic|" "classic.xl|captionwidth=24;captionheight=24;captionfont=Tahoma, -19, bold" \
+	"classic.hc|$hc;borderwidth=6;captionwidth=31;captionheight=31;captionfont=Tahoma, -24, bold"; do
+	d=$out/${c%%|*}; mkdir -p "$d"; render_one "|classic|${c#*|}" "$d"; n=$((n + 1))
+done
 checksums "$out" > "$R/out.sha256"
 if [ $mode = rebaseline ] || [ ! -f "$base" ]; then
 	cp "$R/out.sha256" "$base"

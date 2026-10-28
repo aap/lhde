@@ -4286,13 +4286,24 @@ lh_theme_apply(const char *arg, char *canon, size_t n)
 #define TV(k) (lhde_theme_get(t, k) ? lhde_theme_get(t, k) : "")
     const char *frames = TV("path.frames"), *classic = TV("path.frames_classic"), *style = TV("path.style");
     const char *color = TV("VisualStyle.color"), *size = TV("VisualStyle.size"), *comp = TV("Glass.composition");
-    if (!frames[0] && !classic[0] && !style[0]) {
-        fprintf(stderr, "luxwm: theme %s has no frame: no frame set and no visual style (%s); keeping the current one\n", TV("theme"), TV("VisualStyle.style"));
-        lhde_theme_free(t); return false;
-    }
-    /* the frame: the glass set with the theme's visual style (theme_load reads the style live through libuxtheme and takes only the
-       tuning keys from the directory; README "libuxtheme source"); without glass the classic set (or the style alone), always */
-    if (frames[0]) {
+    /* the frame: Windows Classic for style = classic (and for a theme with neither a frame set nor a visual style): the classic
+       colours and metrics of the record (Colors.*, Metrics.*: the scheme, the current layer) in the theme spec, "|classic|KEY=VALUE;..."
+       (frame.c classic_load; README "Windows Classic frames"); the glass set with the theme's visual style (theme_load reads the style
+       live through libuxtheme and takes only the tuning keys from the directory; README "libuxtheme source"); without glass the
+       classic set (or the style alone), always */
+    if (!strcmp(TV("style.kind"), "classic") || (!frames[0] && !classic[0] && !style[0])) {
+        static const char *metrics[] = { "borderwidth", "captionwidth", "captionheight", "captionfont", "menufont" };
+        size_t o = (size_t)snprintf(theme_req, sizeof theme_req, "|classic|smoothing=%s", TV("Fonts.smoothing"));
+        for (int i = 0; i < 31 + 5 && o < sizeof theme_req; i++) {
+            char k[64]; const char *nm = i < 31 ? lhde_color_name(i) : metrics[i - 31];
+            if (!nm) continue;
+            snprintf(k, sizeof k, "%s.%s", i < 31 ? "Colors" : "Metrics", nm);
+            const char *v = lhde_theme_get(t, k);
+            if (v && *v && !strchr(v, ';')) o += (size_t)snprintf(theme_req + o, sizeof theme_req - o, ";%s=%s", nm, v);
+        }
+        theme_req_classic[0] = 0;   /* no other frame without a compositor: this one is it */
+        theme_comp_off = true;
+    } else if (frames[0]) {
         snprintf(theme_req, sizeof theme_req, "%.1000s|%.1000s|%.63s|%.63s", frames, style, color, size);
         snprintf(theme_req_classic, sizeof theme_req_classic, "%s", classic[0] ? classic : "style");
         theme_comp_off = !strcasecmp(comp, "off");
@@ -4304,9 +4315,13 @@ lh_theme_apply(const char *arg, char *canon, size_t n)
     frame_fonts_set(TV("path.fonts"));   /* registered by the theme_load that follows (THEMES.md "fonts") */
     snprintf(theme_anim, sizeof theme_anim, "%s", TV("Glass.animations"));
     if (canon) snprintf(canon, n, "%s", TV("theme"));
-    fprintf(stderr, "luxwm: theme %s%s%s: frames %s (%s), classic %s, style %s %s %s%s\n", TV("theme"), strcmp(arg, TV("theme")) ? " for " : "",
-            strcmp(arg, TV("theme")) ? arg : "", frames[0] ? frames : "none", lhde_theme_why(t, "Glass.frames"),
-            classic[0] ? classic : "(the style's own)", style[0] ? style : "(none)", color, size, theme_comp_off ? ", composition off" : "");
+    if (!strncmp(theme_req, "|classic|", 9))
+        fprintf(stderr, "luxwm: theme %s%s%s: Windows Classic frames (style %s, scheme %s)\n", TV("theme"), strcmp(arg, TV("theme")) ? " for " : "",
+                strcmp(arg, TV("theme")) ? arg : "", TV("VisualStyle.style"), TV("VisualStyle.scheme")[0] ? TV("VisualStyle.scheme") : "none: Windows Standard");
+    else
+        fprintf(stderr, "luxwm: theme %s%s%s: frames %s (%s), classic %s, style %s %s %s%s\n", TV("theme"), strcmp(arg, TV("theme")) ? " for " : "",
+                strcmp(arg, TV("theme")) ? arg : "", frames[0] ? frames : "none", lhde_theme_why(t, "Glass.frames"),
+                classic[0] ? classic : "(the style's own)", style[0] ? style : "(none)", color, size, theme_comp_off ? ", composition off" : "");
     /* _LH_THEME_RESOLVED: ours when it describes another theme or another record (luxshell writes the same) */
     char *rec = lhde_theme_serialize(t, settings_serial());
     char *mine = record_body(rec), *pub = root_string_alloc(lh_resolved_atom), *theirs = record_body(pub);

@@ -85,6 +85,13 @@ struct theme {
     /* the visual style the theme names (the spec's, else theme.ini's msstyles/color/size; "" = none): a DWM theme's own classic frame
        is this style in msstyles mode, "|style|color|size" (registry frame_classic empty or "style", README "Classic fallback") */
     char style[1024], style_color[64], style_size[64];
+    /* Windows Classic (README "Windows Classic frames"; theme spec "|classic|KEY=VALUE;..."): no visual style, the frame drawn
+       like user32's non-client painting from the classic system colours and metrics. mode is THEME_MSSTYLES (its geometry:
+       cnBorders = 3 + ms_border, caption ms_cap_h + 1), t->ut is NULL; the caption buttons are cl_capw - 2 wide */
+    int classic;
+    unsigned cl[31];                    /* COLOR_SCROLLBAR .. COLOR_MENUBAR as 0xRRGGBB (Windows Standard where the theme has none) */
+    int cl_capw, cl_gradient;           /* Metrics.captionwidth (SM_CXSIZE); gradient captions (activecaption != gradientactivecaption) */
+    char cl_menufont[96];               /* Metrics.menufont as a pango description (the window menu) */
 };
 
 /* extended frame (CLIENT-PROTOCOL.md): the plate reaches l/r/t/b client pixels into the client (_LHWM_EXTEND_FRAME), flags from

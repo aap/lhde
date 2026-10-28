@@ -607,6 +607,67 @@ missing as `<theme>.classic/` (lib source only, the usual 8 renders x png+txt): 
 (32 new files). Regression after this round (lib source): 201 identical (169 + the 32 new) and the 11 known stale aero5112 files; frame.c
 only gained the registry/preset `style` value and the `style` fields, every existing render is byte-identical; `--compare-sources`: 0 differ.
 
+## Windows Classic frames (`style = classic`, 2026-10-28)
+
+docs/THEME-FORMAT.md sections 2a and 14: with `VisualStyle.style = classic` (Display Properties' "Windows Classic style", or
+`lhde-theme layer-set VisualStyle.style classic`) there is no visual style; the look is Windows' classic one from the record's
+`Colors.*` and `Metrics.*` (a scheme `styles/NAME.scheme`, the current layer; without either the built-in Windows Standard). Until
+now luxwm kept the previous theme's frames ("no frame set and no visual style"). `lh_theme_apply` now turns a record whose
+`style.kind` is `classic` (and any theme with neither a frame set nor a visual style) into the spec
+`|classic|smoothing=...;activecaption=R G B;...;borderwidth=N;captionwidth=N;captionheight=N;captionfont=...;menufont=...`
+(every `Colors.*` the record has and those five metrics); `frames_classic` and `Glass.frames` do not count then (the user chose no
+visual style: a frame set would draw one). `theme_load` gives it to `classic_load` (frame.c): `struct theme` keeps `classic = 1`,
+`cl[31]` (COLOR_ index order, Windows Standard for what is missing), `cl_capw`, the caption font in `ms_font` and the menu font in
+`cl_menufont`; the mode is `THEME_MSSTYLES` with `t->ut == NULL`, so margins, the shape (a plain rectangle), the hit test, the
+window menu's icon cell, `_LHWM_FRAME_METRICS` (text colours `captiontext` / `inactivecaptiontext`) and the size-hint gap fill
+(`btnface`) take the msstyles geometry. Log: `luxwm: theme slate4074: Windows Classic frames (style classic, scheme brick)`.
+
+`classic_paint` is user32's non-client painting (Windows 2000 / XP `xxxDrawCaptionBar`, `DrawEdge`, `DrawFrame`,
+`DrawFrameControl(DFC_CAPTION)`, `xxxDrawCaptionTemp`, GDI's `GradientFill`), for a sizable overlapped window with
+`WS_EX_WINDOWEDGE`:
+- frame: `DrawEdge(EDGE_RAISED)` (outer `3dlight` / `3ddkshadow`, inner `btnhighlight` / `btnshadow`; right and bottom are drawn
+  first, so they own the corners), then the sizing border, `borderwidth` px of `activeborder` / `inactiveborder`, then 1 px
+  `btnface`: cnBorders = 3 + `borderwidth` on every side (the msstyles formula). Maximised: the borders lie off-screen.
+- caption: `captionheight` rows (SM_CYSIZE), then a 1 px `btnface` separator (SM_CYCAPTION = `captionheight` + 1). Buttons
+  (`captionwidth` - 2) x (`captionheight` - 4), 2 px below the caption top; close 2 px from the right, 2 px gap, max and min
+  touching (min/max/close, restore while maximised); `DrawPushButton` with `BF_SOFT` (raised: `btnhighlight`, `3dlight` /
+  `3ddkshadow`, `btnshadow`; pushed: `EDGE_SUNKEN`, `3ddkshadow`, `btnshadow` / `btnhighlight`, `3dlight`, the glyph 1 px down
+  and right), face `btnface`, glyph `btntext`. Classic caption buttons have no hot state (`hover` is ignored).
+- glyphs: Marlett's `r` `0` `1` `2` at cell height e = min(w, h) of the button's inside (`lfHeight` = e, the cell centred), drawn as
+  bitmaps (no font needed; frame.c `cl_glyph`): bit-exact with 4051/XP at e = 10 (the 16 x 14 button: X 8 x 7 at (1,1), box 9 x 9
+  with a 2-row top, bar 6 x 2, restore two 6 x 6 boxes 2 right / 3 down); larger sizes follow Marlett's proportions (strokes
+  max(2, (e + 4) / 8)).
+- caption fill (`DrawCaptionTemp`): the whole bar first in `gradientactivecaption` (the brush around the buttons), then the icon
+  slot (a `captionheight` square, solid `activecaption`; the SM_CXSMICON = (`captionwidth` - 2) & ~1 icon 1 px right of centre),
+  then the text area (icon slot .. min button - 2) as `GradientFill(GRADIENT_FILL_RECT_H)` from `activecaption` to
+  `gradientactivecaption` (GDI's 8.24 fixed point, truncated; solid when the two colours are equal); inactive:
+  `inactivecaption` / `gradientinactivecaption` / `inactivecaptiontext`.
+- text: `captionfont` (`Tahoma, -11, bold` = "Tahoma Bold 11px"; points: -MulDiv(pt, 96, 72)), 2 px into the text area, the
+  baseline tmAscent below (top + bottom - tmHeight) / 2, `DT_END_ELLIPSIS` with "...". It is drawn with cairo's FreeType backend
+  and hinted advances (`cl_text`), as GDI places TrueType glyphs: pango's HarfBuzz advances put "Computer"'s `m` a pixel short.
+  A title with characters the matched face lacks goes through pango (font fallback). `Fonts.smoothing = cleartype`: subpixel
+  antialiasing, otherwise none (standard smoothing leaves Tahoma 8 bi-level).
+- the window menu (menu.c) takes `menu`, `menutext`, `graytext`, `highlight`, `highlighttext`, `btnface`, `btnshadow`,
+  `btnhighlight`, `3ddkshadow`, `3dlight` and `menufont`.
+
+Measured against Longhorn 4051's Windows Classic (`~/fun/longhorn/screenshots/lh4051-193915.png`, the Computer window at
+109,33, 800 wide, Windows Standard): edge rows 33/34, band 35/36, caption 37-54 (18), separator 55; buttons 16 x 14 at y 39, close
+x 887-902, max 869-884, min 853-868; icon slot 113-130, gradient 131-850 (`activecaption` 10 36 106 to 166 202 240), text at
+x 133, baseline 50. `frametest '|classic|' out.png 800 300 Computer 1 0 none ICON` against the screenshot's rows 33-55 (all 800
+columns, the icon slot left out, the system Tahoma Bold): 0 of 18400 pixels differ. The default icon (no client icon): the first of
+`packs/xp/shell32/16/3.png`, `packs/4074/shell32/16/3.png`, `packs/2k/shell32/16/3.png` that exists (and its 32 px size).
+
+`tests/regress.sh` renders `classic/` (the spec `|classic|`: the built-in Windows Standard, no data needed), `classic.xl/` (Extra
+Large Fonts metrics: 24/24, Tahoma -19 bold) and `classic.hc/` (High Contrast Black's colours, borderwidth 6, 31/31, Tahoma -24 bold),
+the usual 8 renders x png+txt each: 48 new baseline entries, the 212 existing ones identical. Lab (`:3`, no compositor, slate4074 with
+the layer `VisualStyle.style = classic`): xterm, flxp and flxp-settings with the schemes Windows Standard (none), Brick, Rainy Day,
+High Contrast Black; active / inactive, maximised, the window menu, a pushed restore button. flxp-settings' sample windows (Wine's
+user32 in wux) and the luxwm frame around it agree in edge, band, caption height and colours (the sample is a fixed-frame window:
+3 px border).
+
+When wuxtheme exports user32's helpers (THEME-FORMAT.md section 15: `ut_draw_edge`, `ut_draw_frame_control`, `ut_draw_caption`),
+`classic_paint` can call them instead of its own copies; the geometry and the text placement stay luxwm's.
+
 ## Maximised mode, the desktop layer, running without a compositor (M5a, `SHELL-DESIGN.md`)
 
 - `_LHWM_MAXIMIZED_MODE` (root, CARDINAL x 10, one per desktop like `_NET_WORKAREA`): 1 while the desktop's active
