@@ -9,12 +9,12 @@ and the `flxp_*` keys. Open points are marked **OPEN**.
 ## 1. Two layers
 **Components**, each chosen independently and referenced by **name**:
 
-| kind | where (user data dir first, then `$PREFIX/share/lhde`, then the build tree's `data/`) | what it is |
+| kind | where (relative names, looked up in `~/.config/lhde`, the Windows tree's `index/`, `$PREFIX/share/lhde`, the build tree's `data/`: docs/LAYOUT.md "The three trees") | what it is |
 | --- | --- | --- |
 | style | `styles/NAME.msstyles` (or `styles/NAME/*.msstyles`), shellstyle.dll beside it | the visual style: controls, classic decorations, menus, start panel |
 | scheme | `styles/NAME.scheme` | a classic Appearance scheme (Windows Standard, Brick, ...) for `style = classic` |
-| frames | `frames/NAME/` (`theme.ini` + pixels or a cache) | luxwm's frame set: glass, or a non-composited reskin (vision buttons) |
-| pack | `packs/NAME/` (`shell.lua` + pixels) | luxshell's Avalon bars, per build and family: `4051-slate`, `4074-slate`, `4074-aero`, `5112-aero` |
+| frames | `frames/NAME/` (`theme.ini` shipped + pixels in `lhde-windows/generated/frames/NAME`) | luxwm's frame set: glass, or a non-composited reskin (vision buttons) |
+| pack | `packs/NAME/` (`shell.lua` shipped; pixels in `lhde-windows/generated/packs/<build>`) | luxshell's Avalon bars, per build and family: `4051-slate`, `4074-slate`, `4074-aero`, `5112-aero` |
 | navbar | `navbar/NAME.ini` | navigation-bar layout family: `4051`, `4074`, `vision` (later `5048`, `5112`) |
 | icons | `icons/NAME.theme` | an icon set recipe (keys -> `resources/<build>/shell32.dll#id`) |
 | wallpaper | `wallpapers/[GROUP/]NAME.ext` | one `/` allowed: the build group (`4074/Bliss`) |
@@ -273,6 +273,12 @@ Differences from sections 1-8, decided on the lux side:
 6. Animations default per build (4051: 4074, 4074: 4074plus, 5048/5112: 5048, XP: none); `[theme] animations` is migrated away.
 7. The legacy `[override:NAME]` / `[override]` sections and `[desktop] wallpaper` are still honoured as a `settings` layer above the
    files, until flxp's dialog writes `NAME-modified.theme` (wux side).
+
+- **The three trees** (2026-10-28, later): the single data directory of this section is split into program files
+  (`$PREFIX/share/lhde`, `$PREFIX/lib/lhde`), the Windows files (`~/.local/share/lhde-windows`: `<build>/`, `local/`,
+  `generated/` (the former `cache/` directories), `index/`) and the user's (`~/.config/lhde`); the lookup is the same relative
+  names in that order (docs/LAYOUT.md "The three trees"). `lhde-theme explain [THEME]` shows the file and tree behind every
+  component of a resolved theme; `lhde-import --migrate` moves an old directory.
 
 ## 13. Next for the wux side (from the lux side's step-4 report, 2026-10-28)
 1. Link liblhde (`$(LHDEA)` or `lhde.pc`) and read the theme with `lhde_theme_resolve(_LH_THEME)` or

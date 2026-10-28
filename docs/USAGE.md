@@ -5,6 +5,34 @@
 Names: **luxwm** is the window manager; **lux** is the Lua/cairo Avalon-style shell (taskbar, sidebar, tiles, toasts, start menu; the directory and binary are `luxshell`, its windows' X class still `lhshell`); **flxp** is the Win32-style explorer, taskbar and desktop built on the **wux** win32 layer (`~/src/flxp`). Shared pieces: `themes.ini` (THEMES.md), `settings.ini` (SETTINGS.md).
 
 
+## When something looks wrong: where does this pixel come from?
+Start here. lhde keeps its files in three trees (docs/LAYOUT.md "The three trees"), and one command says which file every
+visible part of a theme comes from:
+```
+lhde-theme explain                  the selected theme (with its unsaved changes), one row per component
+lhde-theme explain aero5112         another theme
+lhde-theme dirs                     the three trees with their sizes, and the search order
+lhde-theme find style jade4074      one file by kind (theme style scheme frames pack navbar icons wallpaper fonts resources
+lhde-theme find frames/jade4074-classic/caption_1.png        source), or by its relative name
+lhde-theme resolve aero5112 --why   every theme key and where its value came from (file, base, default, fallback + reason)
+```
+`explain` prints, for the visual style (+ colour scheme for Windows Classic), the glass and the classic frame set, the taskbar,
+the shell pack (+ the imageres it was cut from), the start menu, the navigation bar (its layout file and art), the icon recipe
+(+ the DLLs it reads), the wallpaper, the fonts and the build's resources: the setting, a status (`ok`, `off`, or
+`missing -> fallback X` with the reason) and the file with its tree in brackets:
+
+| tree | where | what | may I edit it? |
+| --- | --- | --- | --- |
+| `[shipped]` | `$PREFIX/share/lhde` (code: `$PREFIX/lib/lhde`) | our text: theme files, navbar layouts, icon recipes, frame-set `theme.ini`, pack `shell.lua` | no: `make install` overwrites it; copy the file into `~/.config/lhde/<same path>` and edit that |
+| `[windows]` | `~/.local/share/lhde-windows` | the Windows files of each build (`<build>/system32, themes, fonts, wallpapers`), `local/` (dropped in), `generated/` (frame and pack PNGs) | no: `lhde-import` fills it; `generated/` may be deleted (`lhde-import --regenerate`) |
+| `[user]` | `~/.config/lhde` | `settings.ini`, your `themes/`, and any shipped file you override under its own name | yes |
+| `[source tree]` | `<tree>/data` | the shipped text when running from a build tree | yes (it is the repository) |
+
+Typical answers: a wrong frame -> the `frames` rows (which set, its `theme.ini`, its PNGs and the recipe that made them; glass
+sets of the 4042-4093 styles are read live from the `.msstyles`); a wrong taskbar or start orb -> `shell pack` (the pack's
+`shell.lua`, its images in `generated/packs/<build>` and the imageres they came from); a wrong icon -> `icons` (the recipe and
+the DLL). Before `lhde-import --migrate` the tree is `[old layout]` (`~/.local/share/lhde`, everything mixed).
+
 Three ways to run luxwm, pick by how much you want to see and touch:
 
 | | Where it appears | Interactive | Command |
@@ -40,30 +68,37 @@ user's own copies, in two stages:
    shell32, explorer, fonts, wallpapers) and 2k (Windows 2000). Adding a file or a build is editing or adding an ini.
    The pack of all ISOs here: 418 MB raw (2k 6, 4015 26, 4042 40, 4042main 34, 4051 40, 4053 40, 4066 40, 4074 43, 4093 46,
    5048 47, 5112 33, xp 23 MB), 117 MB as .tar.xz; about 2 minutes.
-2. **`lhde-import`** (every user): the pack into the data directory (`$LHDE_DATA`, else `~/.local/share/lhde`):
+2. **`lhde-import`** (every user): the pack into the Windows tree (`$LHDE_WINDOWS`, else `~/.local/share/lhde-windows`;
+   docs/LAYOUT.md "The three trees"):
    ```
    lhde-import --pack lhde-resources-2026-10-28.tar.xz        # or the directory
    lhde-import --style ~/aero.msstyles aero-patch              # a style dropped in by hand (the 4074 Aero patch: aero4074, aerovision)
-   lhde-import --rebuild-cache                                 # regenerate every derived cache from its manifest
+   lhde-import --regenerate                                    # delete generated/ and make it again from the imported files
+   lhde-import --reindex                                       # make index/ again (after moving files by hand)
+   lhde-import --migrate -n                                    # what the move from the old ~/.local/share/lhde would do; without -n: do it
    lhde-import --list
    ```
-   It copies styles (`styles/<name>.msstyles`, build-qualified: jade4074, slate4051, aero5112, luna = XP's own with
-   `styles/luna/Shell/<Scheme>/shellstyle.dll`, luna4051 / luna4074 = Longhorn's copies), `fonts/<source>`, `wallpapers/<source>`,
-   `resources/<source>` (shell32, imageres, explorer, browseui, comctl32, themeui, shellstyle, uDWM), then runs the recipes of each
-   source: frame sets (CompositedWindow streams, `msstyles2theme.py` caches, 5048's uDWM bitmaps, `build_aero5112.py`,
+   Each `<source>/` of the pack is copied as it is to `~/.local/share/lhde-windows/<source>/` (`system32/` with shell32,
+   imageres, explorer, browseui, comctl32, themeui, shellstyle, uDWM; `themes/` = the build's Resources/Themes; `fonts/`,
+   `wallpapers/`, `source.ini`); a style dropped in by hand goes to `local/themes/`. `index/` holds the names the programs ask
+   for, as relative symlinks: `styles/<name>.msstyles` (build-qualified: jade4074, slate4051, aero5112, luna = XP's own, whose
+   `styles/luna/` is XP's `themes/Luna/` with `Shell/<Scheme>/shellstyle.dll`; luna4051 / luna4074 = Longhorn's copies),
+   `resources/<source>`, `fonts/<source>`, `wallpapers/<source>`, `frames` and `packs` (-> `generated/`). Then the recipes of
+   each source run: frame sets (CompositedWindow streams, `msstyles2theme.py`, 5048's uDWM bitmaps, `build_aero5112.py`,
    `build_aerovision.py`) and luxshell's pack images (imageres PNGs, shell32 icons, start panels, the 5112 taskbar) into
-   `frames/<set>/cache/` and `packs/<build>/.../cache/`, each with a `manifest.ini` naming its inputs and their sha256.
+   `generated/frames/<set>/` and `generated/packs/<build>/`, each with a manifest naming its inputs and their sha256.
    Developer paths through the same rules: `lhde-import --iso FILE`, `--wim FILE`, `--dir WINDOWS-DIR` detect the build from
    explorer.exe's version (6.5.40xx Longhorn, 6.0.5048/5112, 6.0.3790 Server 2003, 5.0 Windows 2000) and the layout, pack into a
    temporary pack and import it (`--source ID` skips the detection). `--from-workspace ~/fun/longhorn` copies aap's research
-   workspace as before (the demo wallpapers of aero4074 and aerovision come only from there).
+   workspace (the demo wallpapers of aero4074 and aerovision come only from there; they land in `local/`).
 3. **Classic schemes** (Display Properties > Appearance > "Windows Classic style": Windows Standard, Windows Classic, Brick, ...,
    High Contrast; docs/THEME-FORMAT.md section 2a): the `xp` and `2k` sources now carry the medium's `HIVEDEF.INF` (the default
-   user hive's setup data) and lhde-import turns its `Control Panel\Appearance\Schemes` values into `styles/<scheme>.scheme`.
-   Without a re-import, the stand-alone importer reads them straight from the ISO (7z) or an extracted `HIVEDEF.INF`:
+   user hive's setup data) and lhde-import turns its `Control Panel\Appearance\Schemes` values into
+   `generated/schemes/<scheme>.scheme` (looked up as `styles/<scheme>.scheme`). Without a re-import, the stand-alone importer
+   reads them straight from the ISO (7z) or an extracted `HIVEDEF.INF` into `local/schemes/`:
    ```
-   tools/lhde-schemes "/u/aap/lib/windows_isos/Windows Server 2003 R2 Enterprise Corp x64 CD1.iso"   # -> ~/.local/share/lhde/styles
-   tools/lhde-schemes --data /tmp/scratch-data --force I386/HIVEDEF.INF
+   tools/lhde-schemes "/u/aap/lib/windows_isos/Windows Server 2003 R2 Enterprise Corp x64 CD1.iso"   # -> ~/.local/share/lhde-windows/local/schemes
+   tools/lhde-schemes --windows /tmp/scratch-windows --force I386/HIVEDEF.INF
    ```
    22 schemes (XP, Server 2003 and Windows 2000 have the same ones), the "(large)" / "(extra large)" variants as the font sizes of
    their scheme. Without any, "Windows Standard" is the built-in classic colours.
@@ -85,6 +120,9 @@ lhde-theme setting sidebar width 200    a per-user key; without VALUE: print it
 lhde-theme style jade4074               what liblhde reads from a style (kind, format, build, family, first scheme)
 lhde-theme migrate                      ~/.config/longhorn + ~/.config/lhshell -> ~/.config/lhde (once)
 lhde-theme registry                     the compatibility themes.ini for flxp
+lhde-theme explain [THEME]              where every visible part comes from ("When something looks wrong" above)
+lhde-theme dirs [--list|--windows|--user]   the three trees and the search order; --list for scripts
+lhde-theme find REL | find KIND NAME    one data file (exit 1 when no tree has it); lhde-theme path VALUE: a theme value as a path
 ```
 
 ## Themes and switching them

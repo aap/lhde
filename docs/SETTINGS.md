@@ -19,6 +19,14 @@ This section replaces the paths below; the dated sections after it are history (
   section (`lhde_theme_select`), Save As turns it into a theme file. luxshell's flyout and `_LHSHELL_COMMAND taskbar` write it too
   (`lh.current_set_key`, 2026-10-28); only `lhde-theme set-key` still writes `NAME-modified.theme` (`lhde_theme_set_key`).
 - `~/.config/lhshell/state.ini` keeps lux's runtime state (tile order); `mfu.ini` the launch counts. `~/.config/flxp/flxp.ini` stays flxp's.
+- `~/.config/lhde/` is also the first tree of every data lookup (docs/LAYOUT.md "The three trees", 2026-10-28): a copy of a
+  shipped file under its own relative name overrides the shipped one (`~/.config/lhde/navbar/4074.ini`,
+  `~/.config/lhde/frames/jade4074/theme.ini`, `~/.config/lhde/packs/4074-aero/shell.lua`), so nothing under `$PREFIX` needs
+  editing. lhde never puts Windows files here: those are `~/.local/share/lhde-windows` (lhde-import), the shipped text is
+  `$PREFIX/share/lhde` (make install). `lhde-theme explain` names the tree of every file a theme uses (`[user]` for these).
+- Environment, honoured by every lhde program and script: `XDG_CONFIG_HOME` (this tree), `LHDE_SETTINGS` (settings.ini alone),
+  `LHDE_WINDOWS` (another Windows tree), `LHDE_DATA` (one flat data directory instead of the Windows tree: tests, scratch
+  imports), `XDG_DATA_HOME` (where `lhde-windows` and an old `lhde` are looked for).
 
 **Migration** (`lhde_settings_migrate`; run by `lhde-session start`, luxshell at startup, `lhde-theme migrate`; once: nothing
 happens when `lhde/settings.ini` exists; a report goes to `lhde/migration.log`):
