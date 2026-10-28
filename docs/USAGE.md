@@ -21,6 +21,57 @@ instead), picom with `picom-glass.conf` (glx on real hardware, xrender in Xvfb),
 wallpaper, and the theme `aero4074` (`LAB_THEME=jade4074` for the shipped look). `LAB_PICOM=0` starts the lab without picom
 (`start`/`ensure`/`restart-picom` just say so); luxwm then shows the theme's classic frame (aero4074, jade4074: jade4074-classic).
 
+## Getting the Windows resources (lhde-pack, lhde-import)
+lhde ships no Microsoft files. Everything Windows-made (visual styles, DLLs for icons and art, fonts, wallpapers) comes from the
+user's own copies, in two stages:
+
+1. **`lhde-pack`** (once, by whoever has the ISOs): the raw, unmodified files each source needs, by the rules in
+   `data/sources/<source>.ini`, into a resource pack:
+   ```
+   tools/lhde-pack --isos /u/aap/lib/windows_isos --out ~/packs             # every default source whose ISO is there
+   tools/lhde-pack --isos DIR --sources 4074,5048,xp                         # a subset; --all adds 4074r2
+   tools/lhde-pack --medium 4074=~/fun/longhorn/wim/4074/3/WINDOWS --sources 4074   # an extracted tree instead of the ISO
+   tools/lhde-pack --list                                                    # the sources and whether their ISO was found
+   ```
+   Output: `lhde-resources-<date>/` with `<source>/{system32,themes,fonts,wallpapers}/`, `<source>/source.ini`, `MANIFEST`
+   (sha256, size, pack path, source, medium:in-image path), and `lhde-resources-<date>.tar.zst` (`.tar.xz` without zstd).
+   Sources: 4015 (pre-release WIM 1.8.1), 4042 (Lab06), 4042main, 4051, 4053, 4066 (I386 layout, `*.XX_` expanded), 4074,
+   4074r2 (not default), 4093, 5048, 5112, xp (Windows Server 2003 R2 x64 CD1: XP's Luna with its three schemes' shellstyle.dll,
+   shell32, explorer, fonts, wallpapers) and 2k (Windows 2000). Adding a file or a build is editing or adding an ini.
+   The pack of all ISOs here: 418 MB raw (2k 6, 4015 26, 4042 40, 4042main 34, 4051 40, 4053 40, 4066 40, 4074 43, 4093 46,
+   5048 47, 5112 33, xp 23 MB), 117 MB as .tar.xz; about 2 minutes.
+2. **`lhde-import`** (every user): the pack into the data directory (`$LHDE_DATA`, else `~/.local/share/lhde`):
+   ```
+   lhde-import --pack lhde-resources-2026-10-28.tar.xz        # or the directory
+   lhde-import --style ~/aero.msstyles aero-patch              # a style dropped in by hand (the 4074 Aero patch: aero4074, aerovision)
+   lhde-import --rebuild-cache                                 # regenerate every derived cache from its manifest
+   lhde-import --list
+   ```
+   It copies styles (`styles/<name>.msstyles`, build-qualified: jade4074, slate4051, aero5112, luna = XP's own with
+   `styles/luna/Shell/<Scheme>/shellstyle.dll`, luna4051 / luna4074 = Longhorn's copies), `fonts/<source>`, `wallpapers/<source>`,
+   `resources/<source>` (shell32, imageres, explorer, browseui, comctl32, themeui, shellstyle, uDWM), then runs the recipes of each
+   source: frame sets (CompositedWindow streams, `msstyles2theme.py` caches, 5048's uDWM bitmaps, `build_aero5112.py`,
+   `build_aerovision.py`) and luxshell's pack images (imageres PNGs, shell32 icons, start panels, the 5112 taskbar) into
+   `frames/<set>/cache/` and `packs/<build>/.../cache/`, each with a `manifest.ini` naming its inputs and their sha256.
+   Developer paths through the same rules: `lhde-import --iso FILE`, `--wim FILE`, `--dir WINDOWS-DIR` detect the build from
+   explorer.exe's version (6.5.40xx Longhorn, 6.0.5048/5112, 6.0.3790 Server 2003, 5.0 Windows 2000) and the layout, pack into a
+   temporary pack and import it (`--source ID` skips the detection). `--from-workspace ~/fun/longhorn` copies aap's research
+   workspace as before (the demo wallpapers of aero4074 and aerovision come only from there).
+
+## lhde-theme
+The resolver from the shell (docs/THEME-FORMAT.md, liblhde):
+```
+lhde-theme list                         every theme: the user's, the shipped ones, bare styles
+lhde-theme resolve aero5048 --why       the record, each key with where it came from (file, base, default, fallback + reason)
+lhde-theme resolve luna --get path.style
+lhde-theme set jade4074                 settings.ini [theme] name, then _LH_THEME on $DISPLAY
+lhde-theme set-key aero4074 Glass.composition off    -> aero4074-modified.theme
+lhde-theme setting sidebar width 200    a per-user key; without VALUE: print it
+lhde-theme style jade4074               what liblhde reads from a style (kind, format, build, family, first scheme)
+lhde-theme migrate                      ~/.config/longhorn + ~/.config/lhshell -> ~/.config/lhde (once)
+lhde-theme registry                     the compatibility themes.ini for flxp
+```
+
 ## Themes and switching them
 
 One setting for everything (`SHELL-DESIGN.md` 6.1, details for client authors in `THEMES.md`): the root property

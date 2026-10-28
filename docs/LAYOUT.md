@@ -2,7 +2,8 @@
 > `LAYOUT-draft.md` (2026-10-27, with the wux session's review at the end) in
 > step 2 of its plan; to be consolidated with ARCHITECTURE/PROTOCOL in step 5.
 > Step 2 as built (paths, build, what was left out): README.md. Step 3 (the lux side) as built: the
-> section "Step 3 as built" at the end of this file.
+> section "Step 3 as built" at the end of this file. Step 4 (lux side): "Step 4 as built (lux side)" at the end, and
+> docs/THEME-FORMAT.md section 12.
 
 # lhde: layout, asset policy and theme model (draft for the merge)
 
@@ -45,6 +46,19 @@ resources/   shell32/imageres/explorer DLLs for icons and framelets, by build na
 fonts/       per build
 wallpapers/  per build
 ```
+**The resource pack** (step 4): users need no ISOs. `tools/lhde-pack` takes, by the rules of `data/sources/<source>.ini`, only the
+raw, unmodified files each build contributes and writes `lhde-resources-<date>/` (and `.tar.zst`, else `.tar.xz`):
+```
+<source>/system32/   shell32.dll imageres.dll explorer.exe browseui.dll comctl32.dll themeui.dll [shellstyle.dll uDWM.dll shdocvw.dll]
+<source>/themes/     the build's Resources/Themes (<Style>/<style>.msstyles, Shell/<Scheme>/shellstyle.dll, *.theme)
+<source>/fonts/      Segoe UI 0.7/0.89, Tahoma, Trebuchet MS
+<source>/wallpapers/ Web/Wallpaper (setup layouts: the named *.JP_ / *.BM_)
+<source>/source.ini  the rules it was made with ([files]) and what lhde-import derives from it ([styles], [frames], [packs])
+MANIFEST             sha256, size, pack path, source, medium:in-image path (one line per file)
+```
+No derived pixels go into a pack: `lhde-import --pack` copies the raw files into the data directory and runs the recipes there
+(manifest-first `cache/` directories). The pack and the ISOs never enter the repository; `data/sources/*.ini` and the tools do.
+
 Tests: `make check` renders locally and compares checksums; it skips when `~/.local/share/lhde`
 is missing. Git history: start fresh (aap: no need to keep the messy past); the old x11 and flxp
 repos stay archived locally.
@@ -188,3 +202,22 @@ frames and packs manifest-first (frame.ini naming the style's streams, packs nam
 lhde-import; the theme files and liblhtheme replacing themes.ini, wallpapers.ini, presets and the resolved copy; the config move
 to `~/.config/lhde`. For the wux side: flxp reading the data directories itself (today through the resolved registry), and
 tests/check.sh's ut-dump honouring `LHDE_DATA` (it reads `LHDE_STYLES`).
+
+## Step 4 as built (lux side, 2026-10-28)
+1. `lhtheme/` is `liblhde/` (headers `<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`; `lhde_data.h` kept as a one-line
+   include): the data directories, the resolver, the settings store and migration, the compatibility registry; `liblhde.a`,
+   `liblhde.so.1`, `lhde.pc`, `lhde-theme`, `make check-liblhde`. Its style probe calls wuxtheme through weak symbols (a program
+   without libwuxtheme gets no probe). flxp and its tests link liblhde's objects (`flxp/flxp.mk` SHELLOBJS, build glue only).
+2. Theme files in `data/themes/`, `data/navbar/`, `data/icons/`, `data/sources/`; `data/themes.ini` and `data/wallpapers.ini` are
+   removed, flxp gets the generated registry (`_LH_THEMES_INI`). The source tree is recognised by `data/themes/` + `luxwm/wm.c`.
+3. Manifest-first caches: every lookup of `DIR/NAME` in the data directories also tries `DIR/cache/NAME`; lhde-import writes the
+   derived pixels there with a `manifest.ini` (`frames/<set>/manifest.ini`, `packs/<build>/manifest-<target>.ini`). A
+   CompositedWindow frame set (jade4074, aero-patch) needs no cache at all (luxwm reads the streams live); its cache serves
+   `LHWM_THEME_SOURCE=dir`.
+4. Compared with aap's existing data directory, the recipes reproduce: every classic frame cache (jade4074-classic,
+   slate4074-classic, slate4051-classic, luna4051-*: byte-identical), the CompositedWindow sets (aero-patch, jade4074,
+   aerovision's vision buttons: pixel-identical), the imageres and shell32 pack images and the five start panels (byte-identical;
+   startpanel.ini now has real DEFAULTPANESIZE values), the 5112 taskbar art (identical); aero5048 within 1 level (the
+   un-premultiply rounding of the original is not known), aero5112's plates differ in about 860 corner pixels of near-zero alpha
+   (the workspace's copy was retouched after build_aero5112.py; `old/` there).
+5. Settings: `~/.config/lhde/` (SETTINGS.md "lhde (step 4)"); `~/.config/lhwm/keys` stays.

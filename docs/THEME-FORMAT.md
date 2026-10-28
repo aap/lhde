@@ -182,3 +182,54 @@ Later: plex (various versions), plex vision.
   settings dialog writing `NAME-modified.theme`.
 - Order: lux side delivers `liblhde` + theme files first (with the compatibility registry so nothing breaks),
   wux side switches, lux side removes the old registry.
+
+## 12. Status: the lux side as built (2026-10-28)
+Implemented as specified unless listed under "Differences".
+
+- **liblhde** (`liblhde/`, `<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`; `build/lib/liblhde.{a,so.1}`, `lhde.pc`):
+  `lhde_theme_resolve(NAME)` returns the flat record (`SECTION.KEY` plus derived `theme`, `file`, `chain`, `style.kind|format|family`,
+  `path.style|shellstyle|frames|frames_classic|pack|navbar|icons|wallpaper|fonts|resources|scheme`) and for every key its source
+  (`lhde_theme_why`: `file PATH`, `base NAME (PATH)`, `settings: [override:NAME] ...`, `default: ...`, `fallback: REASON`).
+  Lookup order: the user's `~/.config/lhde/themes/NAME.theme`, `themes/NAME.theme` of the data directories, `[Theme] aliases`
+  (an addition: the x11-era names, `aero-patch` -> `aero4074`), a bare style. Base chains up to 8 files, cycles and deeper chains
+  are errors; a base that is missing ends the chain (reported). Style probe (section 5) through wuxtheme: `ut_format`, the classes
+  `CompositedWindow`, `DWMWindow` (also `DWMGlass::DWMWindow`), `Sidebar`, the first scheme/size, the family from VERSIONINFO's
+  OriginalFilename; the build from the build-qualified name (the styles' version blocks say 1.0.0.1). Kinds: v3 = xp; v4 with
+  DWMWindow, or without CompositedWindow at build >= 5000 = dwm; other v4 = longhorn (4051 row below build 4060, else 4074 row;
+  slate4051 has no CompositedWindow, only Sidebar). Fallbacks of section 6 incl. style `luna` -> `luna4051` -> `luna4074`, frames
+  not imported (a glass set needs its pixels or lhde-import's manifest), pack missing -> taskbar classic, icons -> xp -> wine,
+  wallpaper -> the build's own -> none (matched case-insensitively), fonts -> fontconfig, resources -> drawn art.
+- **Settings store and migration** (docs/SETTINGS.md "lhde (step 4)"); `lhde_theme_set_key` writes `NAME-modified.theme`
+  (a value equal to what the base gives removes the key).
+- **`lhde-theme`**: `list`, `resolve NAME [--why|--get KEY|--shell]`, `current`, `set NAME`, `set-key`, `setting`, `style`,
+  `migrate`, `registry`, `dirs`. `make check-liblhde` (`liblhde/tests/resolve.c`, 158 checks on fake files).
+- **Theme files** `data/themes/`: slate4051, slate4074, jade4074, aero4074, aerovision, basic5048, aero5048, basic5112, aero5112,
+  luna, luna-olive, luna-silver, noir (the tuned `color = Metallic`); `slatevision.theme.todo`, `metalvision.theme.todo` (commented,
+  not listed). `data/navbar/` (vision.ini, the old frames/aerovision/nav.ini, which stays as a symlink for flxp; 4051.ini and
+  4074.ini name flxp's header), `data/icons/` (longhorn4074, xp, 2k: flxp's res/icons format with `pe:shell32.dll#ID` and a
+  `resources = resources/BUILD` line; icons only, the toolbar strips stay in flxp's own recipes).
+- **Compatibility registry**: liblhde writes `$XDG_RUNTIME_DIR/lhde/<display>/themes.ini` + `wallpapers.ini` from the resolved
+  themes (every theme file, the user's, bare styles; paths absolute; `flxp_frame`, `flxp_icons`, `flxp_header_engine`,
+  `flxp_longhorn_system32`, `flxp_menubar_style`, `taskbar`, `start`, `[Compat] KEY` passed through); luxwm and luxshell publish
+  it as `_LH_THEMES_INI`. `data/themes.ini` and `data/wallpapers.ini` are gone (nothing reads them).
+- **luxwm** resolves `_LH_THEME` through liblhde (`lh_theme_apply`): frames + style, frames_classic (none = the style's own),
+  `composition = off` or no glass = always classic, `path.fonts`, `Glass.animations`; re-resolves on `_LH_SETTINGS_CHANGED` and
+  on a republished record. **luxshell** uses `lh.theme_resolve` (session.lua `S.resolve`); theme keys from its flyout and
+  `_LHSHELL_COMMAND taskbar` go into `NAME-modified.theme` and select it; per-user keys into `settings.ini`. Both publish
+  `_LH_THEME_RESOLVED` (`theme=`, `serial=`, the record) when it does not describe their record yet.
+- **Import**: `lhde-pack` / `lhde-import` (docs/USAGE.md "Getting the Windows resources"), sources in `data/sources/`.
+
+Differences from sections 1-8, decided on the lux side:
+1. Frame set names are kept (`jade4074-classic`, `slate4074-classic`, `slate4051-classic`, `luna4051-*`, `aero-patch`): the table's
+   "classic frames" column names them by style; renaming would change the frame regression (212 renders, still identical).
+2. `basic5048` / `basic5112`: `frames_classic = none` (5048's / 5112's own Window class, the tuned `frame_classic = style` of the
+   registry) instead of the table's jade4074.
+3. `luna-olive` / `luna-silver` keep their tuned wallpapers (4074/Autumn, 5048/winxp); `luna` has XP's Bliss.
+4. `aero4074` / `aerovision` name the demo wallpapers (`demos/...`), which no ISO has: imported by `--from-workspace`, else the
+   build's Bliss (a fallback the record reports).
+5. Additions: `[Theme] aliases`, `[Shell] startpanel` (the Luna start panels for taskbar = avalon), `[Compat]` (keys copied into
+   the compatibility registry). `Shell.sidebar` is the theme's default; the user's sidebar mode (`[sidebar] mode`, the minimise
+   button) stays per user and wins when set.
+6. Animations default per build (4051: 4074, 4074: 4074plus, 5048/5112: 5048, XP: none); `[theme] animations` is migrated away.
+7. The legacy `[override:NAME]` / `[override]` sections and `[desktop] wallpaper` are still honoured as a `settings` layer above the
+   files, until flxp's dialog writes `NAME-modified.theme` (wux side).

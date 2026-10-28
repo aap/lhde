@@ -2,6 +2,46 @@
 
 > **Imported from the Longhorn X11 lab** (`~/fun/longhorn/x11` at d353b69, SETTINGS.md) into lhde in step 3 of docs/LAYOUT.md. Program and path names are updated to lhde (lhwm → luxwm, lhwmc → luxwmc, lhshell → luxshell, lhnav → luxnav; x11/... and lhwm/themes, lhshell/themes, lhshell/assets → the lhde tree and data directories, see docs/LAYOUT.md and tools/lhde-import); the X atoms (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the window manager name "lhwm", luxnav's C API (`lhnav_*`, `lhnav.h`), configuration paths (`~/.config/longhorn`, `~/.config/lhwm/keys`, `~/.config/lhshell`) and setting values (`header_engine = lhnav`, `classic_start_menu = lhshell`) keep their names. Dated sections are history: they describe the x11 tree as it was (its compare_*.png and screenshots stay in the research workspace).
 
+## lhde (step 4, 2026-10-28): `~/.config/lhde`
+This section replaces the paths below; the dated sections after it are history (`[override:NAME]`, presets, the registry).
+
+- `${XDG_CONFIG_HOME:-~/.config}/lhde/settings.ini` (`$LHDE_SETTINGS` overrides it): `[theme] name` (the selected theme) and the
+  per-user keys that are not part of a theme: `[taskbar] autohide rows classic_start_menu`, `[sidebar] mode width stacking
+  with_classic yield_bottom locked`, `[clock]`, `[start] pinned mfu_count userpane`, `[desktop] desktop_black` and `wallpaper = none`
+  (the flyout's "Show the wallpaper" off), `[shell] max_fade_ms`, `[fonts] smoothing`, `[commands]`. Written by liblhde's store
+  (`lhde_settings_set`, luxshell's `lh.settings_set`, `lhde-theme setting`): comments, order and unknown keys kept, atomic, through
+  a symlink. The serial (`_LH_SETTINGS_SERIAL`, `_LH_SETTINGS_CHANGED`) stays the X clients' business, unchanged.
+- `~/.config/lhde/themes/NAME.theme`: the user's theme files (docs/THEME-FORMAT.md). A theme key changed anywhere (luxshell's
+  flyout, `_LHSHELL_COMMAND taskbar`, `lhde-theme set-key`, later Display Properties) goes into `NAME-modified.theme` (`base =
+  NAME`, only the changed keys; a key equal to the base's is removed) and that theme is selected; "Save As" renames it.
+- `~/.config/lhshell/state.ini` keeps lux's runtime state (tile order); `mfu.ini` the launch counts. `~/.config/flxp/flxp.ini` stays flxp's.
+
+**Migration** (`lhde_settings_migrate`; run by `lhde-session start`, luxshell at startup, `lhde-theme migrate`; once: nothing
+happens when `lhde/settings.ini` exists; a report goes to `lhde/migration.log`):
+1. `longhorn/themes/NAME.theme` (presets) -> `lhde/themes/<name>.theme` (file name lower case, spaces -> `-`, `-custom` when it
+   would shadow a shipped theme): `[VisualStyle] msstyles` -> `style` (a data-directory path becomes the style's name), `[Frames]
+   frame/frame_classic` -> `[Glass] frames/frames_classic` (`style` -> none), `[Composition]` -> `[Glass]` (follow/auto dropped),
+   `[Shell] shell` -> `pack` (old pack names mapped), `[Desktop] icons longhorn` -> `longhorn4074`, `[Explorer] frame` -> `chrome`;
+   the base through the aliases (`aero-patch` -> `aero4074`).
+2. `settings.ini` is copied with its comments; `[theme] name` follows aliases and renamed presets; each `[override:NAME]` becomes
+   `NAME-modified.theme` (keys mapped: taskbar -> Shell.taskbar, start -> Shell.start, icons -> Desktop.icons, frame ->
+   Explorer.chrome, composition -> Glass.composition (follow = auto), animations, wallpaper, mode; keys equal to the theme's own
+   are dropped, no file when nothing is left) and `[theme] name` moves to it when it was the selected theme; `[override]` (all
+   themes) goes into the selected theme's modified copy; the global fallbacks `[theme] composition`, `[theme] animations`,
+   `[taskbar] kind`, `[start] menu`, `[desktop] icons`, `[explorer] frame` are removed (the theme decides; the report names a
+   value that differed); an empty `[desktop] wallpaper` is removed.
+3. `lhshell/state.ini`: user-facing keys an old lux left there move into settings.ini (lux's rules below), the original is kept
+   as `state.ini.pre-lhde`.
+4. `longhorn/settings.ini` becomes `settings.ini.pre-lhde` and a symlink `longhorn/settings.ini -> ../lhde/settings.ini`, so flxp
+   (which reads the old path until the wux side switches, and writes through symlinks) shares the file.
+Until flxp writes theme files, its `[override:NAME]` / `[override]` sections are applied by the resolver as a `settings` layer.
+
+Result on a copy of aap's config (2026-10-28): the four presets (Aero lotus, MyAero, MyLuna, MySlate4051) became
+`aero-lotus`, `myaero`, `myluna`, `myslate4051`; `[override:aero4074] icons = xp` -> `aero4074-modified.theme` (Desktop.icons =
+xp); `[override:aero5112]` -> `aero5112-modified.theme` (Glass.composition = off; taskbar classic and frame longhorn are 5112's
+own now); `[override:aero5048]` left nothing (its values are basic5048's defaults); `[theme] name = aerovision` kept;
+`[theme] composition/animations`, `[taskbar] kind`, `[start] menu`, `[desktop] icons` removed; state.ini had only runtime state.
+
 One settings store for the whole desktop so luxwm, lux (the Lua/cairo Avalon-style shell, formerly
 "lhshell") and the flxp programs (explorer, flxp-taskbar, flxp-desktop, the Display Properties
 dialog, written with the "wux" win32 layer) read and write the same configuration. It complements
