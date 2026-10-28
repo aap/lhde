@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""lhde-pack: a resource pack of raw, unmodified Windows files, made from ISOs (or WIMs, or Windows directories) by the rules in
+data/sources/<source>.ini (docs/USAGE.md "Getting the Windows resources", docs/LAYOUT.md "Asset policy"). lhde-import --pack
+turns a pack into lhde's data directory; nobody needs the ISOs after that.
+
+usage: lhde-pack [--isos DIR]... [--sources ID,ID] [--all] [--out DIR] [--name NAME] [--no-tar] [--tmp DIR]
+                 [--medium ID=PATH]... [--list]
+  --isos DIR      where the ISOs are (several allowed; default $LHDE_ISOS, a :-list, else .); each source
+                  names its ISO file (iso = ...)
+  --sources A,B   only these sources (default: every source with default = yes whose ISO is found; --all: also the others,
+                  e.g. 4074r2, 4042main)
+  --medium ID=PATH  take source ID from PATH (an ISO, a WIM or an extracted Windows directory) instead of its ISO
+  --out DIR       where the pack goes (default .): DIR/NAME/ and DIR/NAME.tar.zst (zstd, else .tar.xz; --no-tar: the directory only)
+  --name NAME     default lhde-resources-<date>
+  --tmp DIR       scratch space for an extracted WIM (up to 1 GB at a time; default a temporary directory beside --out)
+  --list          the sources and whether their medium was found
+Pack layout: NAME/<source>/{system32,themes,fonts,wallpapers}/..., NAME/<source>/source.ini (the rules it was made with, and
+the recipes lhde-import runs), NAME/MANIFEST (sha256, size, pack path, source, medium:in-image path). Adding a file or a source
+is editing or adding an ini in data/sources/.
+"""
+import os
+import shutil
+import sys
+import tempfile
+import datetime
+_here = os.path.dirname(os.path.realpath(__file__))
+sys.path[:0] = [_here, os.path.join(_here, '..', 'share', 'lhde', 'tools')]   # the tree's tools/, or installed: <prefix>/bin + share/lhde/tools
+import lhdeimport as L
+
+
+def main():
+    a = sys.argv[1:]
+    isos, want, out, name, tar, tmpd, media, listing, allsrc = [], None, '.', None, True, None, {}, False, False
+    while a:
+        o = a.pop(0)
+        if o == '--isos': isos.append(a.pop(0))
+        elif o == '--sources': want = [x for x in a.pop(0).split(',') if x]
+        elif o == '--all': allsrc = True
+        elif o == '--out': out = a.pop(0)
+        elif o == '--name': name = a.pop(0)
+        elif o == '--no-tar': tar = False
+        elif o == '--tmp': tmpd = a.pop(0)
+        elif o == '--medium': k, v = a.pop(0).split('=', 1); media[k] = v
+        elif o == '--list': listing = True
+        elif o in ('-h', '--help'): print(__doc__); return 0
+        else: L.die('unknown argument %s (--help)' % o)
+    if not isos:
+        isos = [x for x in os.environ.get('LHDE_ISOS', '.').split(':') if x]
+    sources = L.load_sources()
+    if not sources:
+        L.die('no data/sources/*.ini found')
+
+    def medium(s):
+        if s.id in media:
+            return media[s.id]
+        for d in isos:
+            for f in os.listdir(d):
+                if any(f.lower() == i.lower() for i in s.isos):
+                    return os.path.join(d, f)
+        return None
+    if listing:
+        for s in sorted(sources.values(), key=lambda s: s.id):
+            m = medium(s)
+            print('%-10s %-8s %-4s %-55s %s' % (s.id, s.layout, 'yes' if s.default else 'no', s.title[:55], m or '(no %s)' % ' | '.join(s.isos)))
+        return 0
+    sel = [sources[x] for x in want] if want else [s for s in sources.values() if s.default or allsrc]
+    missing = [x for x in (want or []) if x not in sources]
+    if missing:
+        L.die('no source %s (lhde-pack --list)' % ', '.join(missing))
+    name = name or 'lhde-resources-%s' % datetime.date.today().isoformat()
+    os.makedirs(out, exist_ok=True)
+    pack = os.path.join(os.path.realpath(out), name)
+    os.makedirs(pack, exist_ok=True)
+    tmp = tempfile.mkdtemp(prefix='.lhde-pack-', dir=tmpd or os.path.realpath(out))
+    lines = []
+    try:
+        for s in sorted(sel, key=lambda s: s.id):
+            m = medium(s)
+            if not m:
+                L.log('%s: skipped, no %s in %s' % (s.id, ' | '.join(s.isos), ', '.join(isos)))
+                continue
+            L.log('%s: %s from %s' % (s.id, s.title, m))
+            shutil.rmtree(os.path.join(pack, s.id), ignore_errors=True)
+            try:
+                img, used = L.image_for(s, m, tmp)
+                lines += L.pack_image(s, img, pack, tmp, os.path.basename(m))
+            except Exception as e:
+                L.log('%s: failed: %s' % (s.id, e))
+            shutil.rmtree(tmp, ignore_errors=True)
+            os.makedirs(tmp, exist_ok=True)
+        # the MANIFEST: this run's sources replace their old lines
+        mf = os.path.join(pack, 'MANIFEST')
+        keep = []
+        if os.path.exists(mf):
+            done = set(s.id for s in sel)
+            keep = [l.rstrip('\n') for l in open(mf) if not l.startswith('#') and l.split('\t')[3] not in done]
+            os.unlink(mf)
+        L.write_pack(pack, keep + lines, False)
+        per = {}
+        for d in sorted(os.listdir(pack)):
+            p = os.path.join(pack, d)
+            if os.path.isdir(p):
+                per[d] = sum(os.path.getsize(os.path.join(r, f)) for r, ds, fs in os.walk(p) for f in fs)
+        for d, n in per.items():
+            print('  %-10s %8.1f MB' % (d, n / 1e6))
+        print('  %-10s %8.1f MB in %s' % ('total', sum(per.values()) / 1e6, pack))
+        if tar:
+            L.write_pack(pack, [], True)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

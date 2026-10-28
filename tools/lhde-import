@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""lhde-import: fill lhde's data directory with the user's own Windows resources (docs/USAGE.md "Getting the Windows resources",
+docs/LAYOUT.md "Asset policy"). The repository holds no Microsoft files; everything the programs draw from a Windows build
+lands here under build-qualified names: styles/ (jade4074.msstyles, luna.msstyles + luna/Shell/...), fonts/<source>,
+wallpapers/<source>, resources/<source> (shell32, imageres, explorer, browseui, shellstyle, comctl32, themeui, uDWM), and what
+the recipes derive from them: frames/<set>/cache + manifest.ini, packs/<build>/.../cache + manifest-*.ini.
+
+usage:
+  lhde-import --pack FILE|DIR                 the normal way: a resource pack (lhde-pack; a directory or .tar.zst / .tar.xz)
+  lhde-import --iso FILE [--source ID]        a Windows / Longhorn ISO: its build is detected (explorer.exe's version, the
+  lhde-import --wim FILE [--source ID]        layout), the files of data/sources/<build>.ini packed into a temporary pack and
+  lhde-import --dir PATH [--source ID]        imported from there (one code path with --pack); PATH = a Windows directory
+  lhde-import --style FILE [NAME]             drop one visual style in (styles/NAME.msstyles; NAME defaults to the file's
+                                              stem), with its Shell/ when it has one beside it, and run the recipes that read it
+                                              (aero-patch: the frame sets aero-patch and aerovision)
+  lhde-import --from-workspace DIR [--copy-resources]   aap's research workspace (~/fun/longhorn), copied as it is
+  lhde-import --rebuild-cache                 delete and regenerate every cache from its manifest
+  lhde-import --list                          what the data directory holds
+options: --data DIR (default $LHDE_DATA, else ${XDG_DATA_HOME:-~/.local/share}/lhde), --force (replace files that exist),
+         --no-recipes (raw files only), --tmp DIR (scratch for an extracted WIM; default beside the data directory)
+"""
+import os
+import shutil
+import sys
+import tempfile
+_here = os.path.dirname(os.path.realpath(__file__))
+sys.path[:0] = [_here, os.path.join(_here, '..', 'share', 'lhde', 'tools')]   # the tree's tools/, or installed: <prefix>/bin + share/lhde/tools
+import lhdeimport as L
+
+# what a dropped-in style feeds (recipes that read styles/NAME)
+STYLE_RECIPES = {'aero-patch': [('frames', 'aero-patch', 'composited aero-patch'), ('frames', 'aerovision', 'vision aero-patch')]}
+
+
+def from_workspace(ws, data, force, copyres):
+    """the research workspace's resources/ and x11/ (generated frame sets, lhshell/assets), as the first lhde-import did"""
+    R, X = os.path.join(ws, 'resources'), os.path.join(ws, 'x11')
+    if not (os.path.isdir(os.path.join(R, 'msstyles')) and os.path.isdir(os.path.join(X, 'lhwm', 'themes'))):
+        L.die('%s is not the Longhorn workspace (resources/msstyles, x11/lhwm/themes)' % ws)
+    rep = {'copied': 0, 'kept': 0}
+    for f in sorted(os.listdir(os.path.join(R, 'msstyles'))):
+        if f.endswith('.msstyles'):
+            L.copy_file(os.path.join(R, 'msstyles', f), os.path.join(data, 'styles', f), force, rep)
+    for sub in ('fonts', 'wallpapers'):
+        for b in sorted(os.listdir(os.path.join(R, sub))):
+            if os.path.isdir(os.path.join(R, sub, b)):
+                L.copy_tree(os.path.realpath(os.path.join(R, sub, b)), os.path.join(data, sub, b), force, rep)
+    for b in sorted(os.listdir(os.path.join(R, 'system32'))):
+        src, dst = os.path.realpath(os.path.join(R, 'system32', b)), os.path.join(data, 'resources', b)
+        if os.path.lexists(dst) and not force:
+            continue
+        if os.path.lexists(dst):
+            shutil.rmtree(dst) if os.path.isdir(dst) and not os.path.islink(dst) else os.unlink(dst)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if copyres:
+            for f in ('shell32.dll', 'imageres.dll', 'browseui.dll', 'shellstyle.dll', 'comctl32.dll', 'shdocvw.dll', 'themeui.dll', 'uDWM.dll'):
+                if os.path.isfile(os.path.join(src, f)):
+                    L.copy_file(os.path.join(src, f), os.path.join(dst, f), True, rep)
+            ex = os.path.join(src, '..', 'explorer.exe')
+            if os.path.isfile(ex):
+                L.copy_file(ex, os.path.join(dst, 'explorer.exe'), True, rep)
+        else:
+            os.symlink(src, dst)
+            L.log('  linked resources/%s -> %s' % (b, src))
+    names = {'aero': 'aero-patch', 'jade': 'jade4074', 'luna-blue': 'luna4051-blue', 'luna-olive': 'luna4051-olive', 'luna-silver': 'luna4051-silver'}
+    for d in sorted(os.listdir(os.path.join(X, 'lhwm', 'themes'))):
+        n = names.get(d, d)
+        src = os.path.join(X, 'lhwm', 'themes', d)
+        if not os.path.isdir(src) or not any(os.path.isfile(os.path.join(L.HERE, '..', p, 'frames', n, 'theme.ini')) for p in ('data', '')):
+            continue
+        for f in os.listdir(src):
+            if f.endswith('.png'):
+                L.copy_file(os.path.join(src, f), os.path.join(data, 'frames', n, 'cache', f), force, rep)
+    A = os.path.join(X, 'lhshell', 'assets')
+    for o, n in (('imageres', '4074/imageres'), ('shell32', '4074/shell32'), ('startpanel-jade', '4074/startpanel-jade'),
+                 ('startpanel-slate', '4074/startpanel-slate'), ('imageres-4051', '4051/imageres'), ('startpanel-luna-blue', '4051/startpanel-luna-blue'),
+                 ('startpanel-luna-olive', '4051/startpanel-luna-olive'), ('startpanel-luna-silver', '4051/startpanel-luna-silver'), ('aero5112', '5112/imageres')):
+        src = os.path.join(A, o)
+        if not os.path.isdir(src):
+            continue
+        for r, ds, fs in os.walk(src):
+            for f in fs:
+                rel = os.path.relpath(os.path.join(r, f), src)
+                L.copy_file(os.path.join(r, f), os.path.join(data, 'packs', n, os.path.dirname(rel), 'cache', os.path.basename(rel)), force, rep)
+    L.log('workspace %s: %d files copied, %d kept' % (ws, rep['copied'], rep['kept']))
+
+
+def listing(data):
+    if not os.path.isdir(data):
+        L.die('no data directory %s' % data)
+    for k in ('styles', 'frames', 'packs', 'resources', 'fonts', 'wallpapers'):
+        p = os.path.join(data, k)
+        print('%s/: %s' % (k, ' '.join(sorted(os.listdir(p))) if os.path.isdir(p) else '(none)'))
+
+
+def main():
+    a = sys.argv[1:]
+    o = {'force': False, 'recipes': True, 'copyres': False}
+    mode = arg = None
+    extra = []
+    while a:
+        x = a.pop(0)
+        if x in ('--pack', '--iso', '--wim', '--dir', '--from-workspace'):
+            mode, arg = x[2:], a.pop(0)
+        elif x == '--style':
+            mode, arg = 'style', a.pop(0)
+            if a and not a[0].startswith('--'):
+                extra.append(a.pop(0))
+        elif x == '--source': o['source'] = a.pop(0)
+        elif x == '--data': o['data'] = a.pop(0)
+        elif x == '--tmp': o['tmp'] = a.pop(0)
+        elif x == '--force': o['force'] = True
+        elif x == '--no-recipes': o['recipes'] = False
+        elif x == '--copy-resources': o['copyres'] = True
+        elif x == '--list': mode = 'list'
+        elif x == '--rebuild-cache': mode = 'rebuild'
+        elif x in ('-h', '--help'): print(__doc__); return 0
+        elif not x.startswith('-') and mode is None: mode, arg = ('pack' if os.path.isdir(x) or '.tar' in x else 'iso' if x.lower().endswith('.iso') else 'wim' if x.lower().endswith('.wim') else 'pack'), x
+        else: L.die('unknown argument %s (--help)' % x)
+    data = L.data_dir(o.get('data'))
+    if mode == 'list':
+        listing(data); return 0
+    if mode is None:
+        L.die('nothing to import from (--help)')
+    os.makedirs(data, exist_ok=True)
+    L.log('data directory %s' % data)
+    if mode == 'rebuild':
+        L.rebuild_cache(data); return 0
+    if mode == 'from-workspace':
+        from_workspace(os.path.realpath(arg), data, o['force'], o['copyres']); return 0
+    if mode == 'style':
+        name = extra[0] if extra else os.path.basename(arg).rsplit('.', 1)[0].lower()
+        rep = {'copied': 0, 'kept': 0}
+        L.copy_file(arg, os.path.join(data, 'styles', name + '.msstyles'), o['force'], rep)
+        shell = os.path.join(os.path.dirname(arg), 'Shell')
+        if os.path.isdir(shell):
+            L.copy_tree(shell, os.path.join(data, 'styles', name, 'Shell'), o['force'], rep)
+        L.log('styles/%s.msstyles (%d copied, %d kept)' % (name, rep['copied'], rep['kept']))
+        for kind, target, spec in STYLE_RECIPES.get(name, []):
+            if o['recipes']:
+                L.run_recipe(data, kind, target, spec, 'style', o['force'])
+        return 0
+    tmp = tempfile.mkdtemp(prefix='.lhde-import-', dir=o.get('tmp') or os.path.dirname(data))
+    try:
+        if mode == 'pack':
+            L.import_pack(L.unpack(os.path.realpath(arg), tmp), data, o['force'], o['recipes'])
+            return 0
+        sources = L.load_sources()
+        medium = os.path.realpath(arg)
+        if o.get('source'):
+            s = sources.get(o['source']) or L.die('no source %s' % o['source'])
+            img, _ = L.image_for(s, medium, tmp)
+        else:
+            s, img = L.detect(medium, sources, tmp)
+            if not s:
+                L.die('%s: no source matches (%s); name one with --source ID (data/sources/*.ini)' % (arg, img))
+        pack = os.path.join(tmp, 'pack')
+        lines = L.pack_image(s, img, pack, tmp, os.path.basename(medium))
+        L.write_pack(pack, lines, False)
+        L.import_pack(pack, data, o['force'], o['recipes'])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

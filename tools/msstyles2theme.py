@@ -182,8 +182,9 @@ class PEStyle:
     """a .msstyles PE file: the chosen variant's properties as ini sections, and its bitmaps"""
 
     def __init__(self, path, color=None, size=None):
-        sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'themes' / 'tools'))
-        from pe_resources import PEResources
+        # lhde: the PE reader of tools/lhdeimport.py (beside this file); the research workspace's pe_resources.py works the same
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from lhdeimport import PE as PEResources
         self.pe = PEResources(path)
         self.path = Path(path)
         self.version = struct.unpack('<H', self.pe.get('PACKTHEM_VERSION', 1)[:2])[0]
