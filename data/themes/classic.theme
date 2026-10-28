@@ -1,0 +1,35 @@
+; Windows Classic: no visual style, the Windows Standard Appearance scheme (styles/windows-standard.scheme,
+; built in when that file is missing). Frames, controls and menus drawn the way user32 draws them; the XP
+; explorer chrome without a navigation bar; the classic taskbar; no wallpaper (the desktop colour).
+; Not based on any other theme: everything a classic desktop needs is set here.
+[Theme]
+name     = Windows Classic
+aliases  = windows-classic-standard
+
+[VisualStyle]
+style    = classic
+scheme   = windows-standard
+
+[Glass]
+frames         = none
+frames_classic = none
+composition    = off
+animations     = none
+
+[Shell]
+taskbar  = classic
+start    = flxp
+sidebar  = none
+
+[Explorer]
+chrome   = xp
+navbar   = none
+
+[Desktop]
+wallpaper = none
+mode      = center
+color     = 58 110 165
+icons     = 2k
+
+[Fonts]
+smoothing = standard
