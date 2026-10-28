@@ -1,0 +1,210 @@
+#!/bin/sh
+# lhde-session: the Longhorn desktop session (first version: the x11 lab's xinitrc.lab and second-display.sh merged; d353b69).
+# luxwm in a restart loop, picom when the theme wants a compositor, luxshell (Avalon bars, sidebar), flxp-desktop (wallpaper and
+# icons), a terminal. The theme is the root property _LH_THEME (docs/THEMES.md, SHELL-DESIGN.md 6.1): luxwm publishes the
+# session's when it starts first, after that the root wins and luxwm, luxshell and the clients follow it live.
+#
+#   lhde-session start [--nested | --attach] [THEME]
+#         (default) a real X server on $LHDE_DISPLAY (default :1) and virtual terminal $LHDE_VT (default vt8), started with
+#                   startx from a console login (Xorg not setuid: log in on that tty first); Ctrl+Alt+F1 goes back
+#         --nested  a Xephyr window on the current $DISPLAY (1280x800, LHDE_GEOMETRY=WxH), the session inside it on
+#                   $LHDE_DISPLAY (default: the first free display from :2)
+#         --attach  the session on an X server that already runs on $LHDE_DISPLAY (an Xvfb, a bare Xorg); nothing is started
+#                   but the session's programs
+#         THEME     a themes.ini name or alias (aero-patch, jade4074, slate4074, slate4051, luna-xp, aero5048, aero5112, aerovision,
+#                   ...); default: the last one (settings.ini [theme] name), else aero-patch
+#   lhde-session theme NAME            switch the running session to NAME (root _LH_THEME; nothing restarts)
+#   lhde-session taskbar avalon|classic|classic+sidebar|none
+#                                      the bottom bar, live: luxshell's Avalon taskbar, flxp-taskbar (luxshell starts it; classic
+#                                      hides the sidebar, classic+sidebar keeps it above the bar) or none; luxshell keeps the
+#                                      choice per theme in settings.ini (written here when no luxshell runs)
+#   lhde-session shell on|off          start / stop luxshell
+#   lhde-session picom on|off          start / stop picom (glx backend; LHDE_PICOM_BACKEND=xrender for Xvfb)
+#   lhde-session desktop on|off        start / stop flxp-desktop; restarts luxshell without / with its own desktop layer
+#   lhde-session stop                  end the session (the X server of start and --nested ends with it)
+# The control commands act on $LHDE_DISPLAY, else on the one running session, else on $DISPLAY.
+# Environment: LHDE_PICOM=0/1 forces the compositor off/on for the session (luxshell too); LHDE_SHELL=0 without luxshell;
+# LHDE_DESKTOP=0 without flxp-desktop (luxshell then shows its own desktop layer); LHDE_WM=fvwm for an fvwm2 session (lab.fvwm2rc);
+# LHDE_TERMINAL=command (default urxvt, else xterm; none for no terminal); LHDE_DATA another data directory (as every lhde program);
+# the x11-era LAB_THEME / LAB_PICOM / LAB_SHELL / LAB_DESKTOP / LAB_WM and SECOND_DISPLAY still work.
+# State: $XDG_RUNTIME_DIR/lhde-session<DISPLAY>/ (theme, shell, desktop, logs; luxshell's Log Off runs `lhde-session stop` when it exists).
+SELF=$(readlink -f "$0")
+if [ -f "$(dirname "$SELF")/lhde-paths.sh" ]; then . "$(dirname "$SELF")/lhde-paths.sh"; else . "$(dirname "$SELF")/../share/lhde/session/lhde-paths.sh"; fi
+lhde_self "$SELF"; lhde_setup_paths
+: "${LHDE_THEME:=$LAB_THEME}" "${LHDE_PICOM:=$LAB_PICOM}" "${LHDE_SHELL:=$LAB_SHELL}" "${LHDE_DESKTOP:=$LAB_DESKTOP}" "${LHDE_WM:=${LAB_WM:-luxwm}}"
+RUN=${XDG_RUNTIME_DIR:-/tmp}
+
+statedir() { echo "$RUN/lhde-session$1"; }
+# the display a control command acts on
+target() {
+	if [ -n "$LHDE_DISPLAY$SECOND_DISPLAY" ]; then echo "${LHDE_DISPLAY:-$SECOND_DISPLAY}"; return; fi
+	n=0; for s in "$RUN"/lhde-session:*; do [ -f "$s/loop.pid" ] && [ -d "/proc/$(cat "$s/loop.pid")" ] && { n=$((n + 1)); one=${s##*/lhde-session}; }; done
+	if [ $n = 1 ]; then echo "$one"; else echo "${DISPLAY:-:1}"; fi
+}
+# a theme name or alias through the registry (themes.ini, THEMES.md): prints the registry name, nothing when unknown
+REG=$(lhde_registry)
+themename() { [ -n "$REG" ] && awk -v n="$1" '
+	/^[ \t]*\[/ { s = $0; gsub(/^[ \t]*\[|\][ \t]*$/, "", s); if (s == n) { print s; exit } next }
+	/^[ \t]*aliases[ \t]*=/ { v = $0; sub(/^[^=]*=/, "", v); sub(/[ \t][;#].*$/, "", v); k = split(v, a, /[ \t,]+/); for (i = 1; i <= k; i++) if (a[i] == n) { print s; exit } }' "$REG"; }
+nosuch() { echo "lhde-session: no such theme $1; have: $(sed -n 's/^[[:space:]]*\[\(.*\)\][[:space:]]*$/\1/p' "$REG" | tr '\n' ' ')(aliases: see $REG)" >&2; exit 1; }
+killon() { # kill processes named $1 whose DISPLAY is $D (never pkill -f: it matches this shell)
+	for p in $(pgrep -x "$1"); do tr '\0' '\n' </proc/$p/environ 2>/dev/null | grep -qx "DISPLAY=$D" && kill $p; done
+}
+running_on() { for p in $(pgrep -x "$1"); do tr '\0' '\n' </proc/$p/environ 2>/dev/null | grep -qx "DISPLAY=$D" && { echo $p; return 0; }; done; return 1; }
+LUXWM=$(lhde_bin luxwm) LUXSHELL=$(lhde_bin luxshell) FLXPDESK=$(lhde_bin flxp-desktop)
+PCONF=$LHDE_SESSION_DIR/picom-glass.conf
+picom_start() { # picom with the session's config (glx on real hardware; LHDE_PICOM_BACKEND=xrender for Xvfb, with lab.sh's blur)
+	if [ "${LHDE_PICOM_BACKEND:-glx}" = xrender ]; then set -- --backend xrender --blur-method gaussian --blur-size 5 --blur-deviation 1.2
+	else set -- --backend glx; fi
+	(DISPLAY=$D setsid picom --config "$PCONF" "$@" >"$STATE/picom.log" 2>&1 </dev/null &)
+}
+# (re)start luxshell; without its desktop layer while flxp-desktop is on. Its pack follows the session theme (_LH_THEME).
+startshell() {
+	killon luxshell
+	lhdesk=1; [ "$(cat "$STATE/desktop" 2>/dev/null)" = 1 ] && [ -x "$FLXPDESK" ] && lhdesk=0
+	(cd "$HOME" && DISPLAY=$D LHSHELL_DESKTOP=$lhdesk setsid "$LUXSHELL" >"$STATE/luxshell.log" 2>&1 </dev/null &)
+}
+startdesk() {
+	# from a control command the session environment is not ours: DISPLAY and the D-Bus address of luxshell or luxwm on $D
+	bus=$DBUS_SESSION_BUS_ADDRESS
+	for p in $(pgrep -x luxshell) $(pgrep -x luxwm); do
+		tr '\0' '\n' </proc/$p/environ 2>/dev/null | grep -qx "DISPLAY=$D" || continue
+		b=$(tr '\0' '\n' </proc/$p/environ | sed -n 's/^DBUS_SESSION_BUS_ADDRESS=//p'); [ -n "$b" ] && bus=$b; break
+	done
+	flxpini() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\\([^[:space:]].*\\)/\\1/p" "${XDG_CONFIG_HOME:-$HOME/.config}/flxp/flxp.ini" 2>/dev/null | tail -1; }
+	[ -n "$FLXP_ICONS$(flxpini icons)" ] || export FLXP_ICONS=longhorn
+	(cd "$HOME" && DISPLAY=$D DBUS_SESSION_BUS_ADDRESS=$bus setsid "$FLXPDESK" >"$STATE/flxp-desktop.log" 2>&1 </dev/null &)
+}
+
+# ---- the session itself (was xinitrc.lab): runs on $D, in the X server's client process (startx) or in the background ----
+session() {
+	D=$DISPLAY STATE=$(statedir "$DISPLAY"); mkdir -p "$STATE"
+	# no THEME given: the one saved last (settings.ini [theme] name, SETTINGS.md; a preset name as it is), else lux's state.ini
+	# from before the settings store, else aero-patch
+	iniget() { sed -n "/^\\[$2\\]/,/^\\[/s/^[[:space:]]*$3[[:space:]]*=[[:space:]]*\\([^;#]*[^[:space:];#]\\).*/\\1/p" "$1" 2>/dev/null | tail -1; }
+	lhstate() { cfg=${XDG_CONFIG_HOME:-$HOME/.config}; n=$(iniget "$cfg/longhorn/settings.ini" theme name)
+		[ -n "$n" ] && echo "$n" || iniget "$cfg/lhshell/state.ini" shell theme; }
+	[ -s "$STATE/theme" ] || echo "${LHDE_THEME:-$(lhstate)}" > "$STATE/theme"; [ -s "$STATE/theme" ] || echo aero-patch > "$STATE/theme"
+	[ -s "$STATE/shell" ] || echo "${LHDE_SHELL:-1}" > "$STATE/shell"
+	[ -s "$STATE/desktop" ] || echo "${LHDE_DESKTOP:-1}" > "$STATE/desktop"
+	rm -f "$STATE/quit"; echo $$ > "$STATE/loop.pid"
+	[ "$LHDE_MODE" = real ] && [ -f "$HOME/.xinit_all" ] && . "$HOME/.xinit_all"   # the x11 lab's personal X startup, real sessions only
+	[ -f "$HOME/.Xresources" ] && xrdb "$HOME/.Xresources" 2>/dev/null
+	# a session bus for luxshell's notification server (toasts via notify-send); a tty login has none
+	if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && [ "$LHDE_MODE" = real ]; then eval "$(dbus-launch --sh-syntax 2>/dev/null)"; fi
+	xset -b 2>/dev/null
+	# the root background once, from the settings luxshell and flxp-desktop read (lhwall.sh): the first frames already show the
+	# wallpaper the session keeps
+	. "$LHDE_SESSION_DIR/lhwall.sh"; lhwall_apply "$(cat "$STATE/theme")"
+	[ "$LHDE_WM" = fvwm ] && PCONF=$LHDE_SESSION_DIR/picom-glass-fvwm.conf
+	# picom only when the session's theme wants one (lhcomp_wanted: the per-theme composition switch, follow = the theme's frame
+	# mode); luxshell applies the same rule 1.5 s after it starts. LHDE_PICOM=0/1 forces it either way, for luxshell too.
+	case ${LHDE_PICOM:-} in
+	0) lhpicom=no; export LHSHELL_COMPOSITION=off ;;
+	1) lhpicom=yes; export LHSHELL_COMPOSITION=on ;;
+	*) lhpicom=$(lhcomp_wanted "$(cat "$STATE/theme")") ;;
+	esac
+	[ "$LHDE_WM" = fvwm ] && [ -z "$LHDE_PICOM" ] && lhpicom=yes   # fvwm: no luxshell to follow the theme
+	echo "lhde-session: theme $(cat "$STATE/theme"), picom $lhpicom, data $LHDE_USER_DATA" >&2
+	[ "$lhpicom" = yes ] && picom_start
+	term=${LHDE_TERMINAL:-$(command -v urxvt || command -v xterm)}
+	[ -n "$term" ] && [ "$term" != none ] && (cd "$HOME" && setsid $term >/dev/null 2>&1 </dev/null &)
+	[ -x "$FLXPDESK" ] || echo 0 > "$STATE/desktop"
+	if [ "$LHDE_WM" = fvwm ]; then exec fvwm2 -f "$LHDE_SESSION_DIR/lab.fvwm2rc"; fi
+	# luxwm in a loop: a restart (or a crash) brings it back without ending the session
+	while [ ! -f "$STATE/quit" ]; do
+		theme=$(cat "$STATE/theme")
+		(cd "$HOME" && LHWM_THEME="$theme" exec "$LUXWM" >>"$STATE/luxwm.log" 2>&1) &
+		wmpid=$!
+		# the desktop after luxwm (so luxwm sees it map and keeps it at the bottom) and with luxshell; started once
+		desk=$(cat "$STATE/desktop"); [ "$desk" != 0 ] && ! running_on flxp-desktop >/dev/null && ( sleep 1; startdesk ) &
+		[ "$(cat "$STATE/shell")" != 0 ] && ( sleep 1; startshell ) &
+		t0=$(date +%s); wait $wmpid
+		killon luxshell   # restarted with the next luxwm
+		# luxwm died at once (another WM holds the display): back off
+		if [ $(( $(date +%s) - t0 )) -lt 2 ]; then sleep 3; else sleep 0.3; fi
+	done
+	killon luxshell; killon flxp-desktop; killon picom
+	rm -f "$STATE/loop.pid"
+}
+
+cmd=${1:-start}; [ $# -gt 0 ] && shift
+case $cmd in
+__session) LHDE_MODE=${LHDE_MODE:-real}; session ;;
+start)
+	how=real
+	case $1 in --nested) how=nested; shift ;; --attach) how=attach; shift ;; esac
+	n=; [ -z "$1" ] || { n=$(themename "$1"); [ -n "$n" ] || nosuch "$1"; }
+	[ -x "$LUXWM" ] || { echo "lhde-session: no luxwm (make, or make install)" >&2; exit 1; }
+	case $how in
+	real)   D=${LHDE_DISPLAY:-${SECOND_DISPLAY:-:1}} ;;
+	nested) D=$LHDE_DISPLAY; if [ -z "$D" ]; then i=2; while [ -e /tmp/.X11-unix/X$i ] || [ -e /tmp/.X$i-lock ]; do i=$((i + 1)); done; D=:$i; fi ;;
+	attach) D=${LHDE_DISPLAY:-$DISPLAY}; DISPLAY=$D xdpyinfo >/dev/null 2>&1 || { echo "lhde-session: no X server on $D" >&2; exit 1; } ;;
+	esac
+	STATE=$(statedir "$D"); rm -rf "$STATE"; mkdir -p "$STATE"; [ -n "$n" ] && echo "$n" > "$STATE/theme"
+	export LHDE_THEME="$n"
+	case $how in
+	real)   LHDE_MODE=real exec startx "$SELF" __session -- "$D" "${LHDE_VT:-vt8}" -keeptty ;;
+	nested) (setsid Xephyr "$D" -screen "${LHDE_GEOMETRY:-1280x800}" -title "lhde $D" +extension GLX -ac -br -noreset >"$STATE/x.log" 2>&1 </dev/null &)
+	        i=0; until DISPLAY=$D xdpyinfo >/dev/null 2>&1; do i=$((i + 1)); [ $i -gt 50 ] && { echo "lhde-session: Xephyr did not start on $D" >&2; exit 1; }; sleep 0.1; done
+	        (DISPLAY=$D LHDE_MODE=nested setsid "$SELF" __session >"$STATE/session.log" 2>&1 </dev/null &)
+	        echo "lhde-session: nested on $D (log $STATE)" ;;
+	attach) (DISPLAY=$D LHDE_MODE=attach setsid "$SELF" __session >"$STATE/session.log" 2>&1 </dev/null &)
+	        echo "lhde-session: on $D (log $STATE)" ;;
+	esac ;;
+theme)
+	D=$(target); STATE=$(statedir "$D")
+	n=$(themename "$1"); [ -n "$n" ] || nosuch "$1"
+	[ -d "$STATE" ] && echo "$n" > "$STATE/theme"   # for luxwm restarts of the loop, while the root has no _LH_THEME
+	DISPLAY=$D xprop -root -f _LH_THEME 8u -set _LH_THEME "$n" && echo "theme $n on $D" || { echo "lhde-session: cannot set _LH_THEME on $D" >&2; exit 1; } ;;
+shell)
+	D=$(target); STATE=$(statedir "$D"); [ -d "$STATE" ] || { echo "lhde-session: no session on $D" >&2; exit 1; }
+	case $1 in off) echo 0 > "$STATE/shell"; killon luxshell ;; *) echo 1 > "$STATE/shell"; startshell ;; esac
+	echo "shell ${1:-on} on $D" ;;
+desktop)
+	D=$(target); STATE=$(statedir "$D"); [ -d "$STATE" ] || { echo "lhde-session: no session on $D" >&2; exit 1; }
+	case $1 in
+	off) echo 0 > "$STATE/desktop"; killon flxp-desktop
+	     # the root background of the theme in use (it was flxp-desktop's to paint since the session started)
+	     . "$LHDE_SESSION_DIR/lhwall.sh"; DISPLAY=$D lhwall_apply "$(cat "$STATE/theme" 2>/dev/null)" ;;
+	*)   [ -x "$FLXPDESK" ] || { echo "lhde-session: no flxp-desktop (make, or make install)" >&2; exit 1; }
+	     echo 1 > "$STATE/desktop"; killon flxp-desktop
+	     . "$LHDE_SESSION_DIR/lhwall.sh"; DISPLAY=$D lhwall_apply "$(cat "$STATE/theme" 2>/dev/null)"
+	     startdesk ;;
+	esac
+	[ "$(cat "$STATE/shell")" != 0 ] && startshell
+	echo "desktop ${1:-on} on $D" ;;
+taskbar)
+	D=$(target); STATE=$(statedir "$D")
+	# classic = the classic bar alone ([sidebar] with_classic = 0), classic+sidebar = with the sidebar above it (with_classic = 1)
+	case $1 in avalon|none) kind=$1 wc= ;; classic) kind=classic wc=0 ;; classic+sidebar) kind=classic wc=1 ;;
+	*) echo "usage: lhde-session taskbar avalon|classic|classic+sidebar|none" >&2; exit 1 ;; esac
+	if running_on luxshell >/dev/null; then
+		[ -n "$wc" ] && { DISPLAY=$D xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND "sidebar-with-classic $wc" || exit 1; sleep 0.2; }
+		DISPLAY=$D xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND "taskbar $kind" && echo "taskbar $1 on $D" || exit 1
+	else   # no luxshell: the next one starts with it (settings.ini [override:THEME] taskbar, [sidebar] with_classic; SETTINGS.md)
+		st=${LH_SETTINGS:-${XDG_CONFIG_HOME:-$HOME/.config}/longhorn/settings.ini}; mkdir -p "$(dirname "$st")"; touch "$st"
+		setini() { awk -v s="$1" -v k="$2" -v v="$3" 'BEGIN { done = 0 }
+			/^[ \t]*\[/ { if (sec && !done) { print k " = " v; done = 1 } sec = ($0 ~ "^[ \t]*\\[" s "\\]") }
+			sec && $0 ~ "^[ \t]*" k "[ \t]*=" { if (!done) print k " = " v; done = 1; next }
+			{ print }
+			END { if (!done) { if (!sec) print "[" s "]"; print k " = " v } }' "$st" > "$st.tmp" && mv "$st.tmp" "$st"; }
+		t=$(cat "$STATE/theme" 2>/dev/null); [ -n "$t" ] || t=$(sed -n '/^\[theme\]/,/^\[/s/^[[:space:]]*name[[:space:]]*=[[:space:]]*\([^;#]*[^[:space:];#]\).*/\1/p' "$st" | tail -1)
+		n=$(themename "$t"); [ -n "$n" ] && t=$n
+		if [ -n "$t" ]; then setini "override:$t" taskbar "$kind"; where="[override:$t] taskbar"; else setini taskbar kind "$kind"; where="[taskbar] kind"; fi
+		[ -n "$wc" ] && setini sidebar with_classic "$wc"
+		echo "no luxshell on $D: $st $where = $kind${wc:+, [sidebar] with_classic = $wc} (applies when it starts)"
+	fi ;;
+picom)
+	D=$(target); STATE=$(statedir "$D"); mkdir -p "$STATE"
+	case $1 in off) killon picom ;; *) killon picom; picom_start ;; esac; echo "picom ${1:-on} on $D" ;;
+stop)
+	D=$(target); STATE=$(statedir "$D")
+	[ -d "$STATE" ] && touch "$STATE/quit"
+	killon luxshell; killon flxp-desktop; killon luxwm; killon picom; killon fvwm2
+	# the X server this script started for --nested (Xephyr whose command line names the display)
+	for p in $(pgrep -x Xephyr); do tr '\0' '\n' </proc/$p/cmdline | grep -qx -- "$D" && kill $p; done
+	echo "stopped $D" ;;
+-h|--help|help) sed -n '2,/^SELF=/p' "$SELF" | sed '$d; s/^# \{0,1\}//' ;;
+*) echo "usage: lhde-session start [--nested|--attach] [THEME] | theme NAME | taskbar KIND | shell on|off | picom on|off | desktop on|off | stop" >&2; exit 2 ;;
+esac

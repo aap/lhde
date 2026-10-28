@@ -8,31 +8,11 @@
 #   res/        run-time data: icon themes (Wine's shell32 icons, theme files), the
 #               .desktop file, the portal files, tools/install-icons.sh
 
-# ---- luxnav (LUXNAV_DIR, see the top-level Makefile) ----------------------------------
-# lhnav.h includes <uxtheme/ut.h>, as it did against flxp's tree: build/compat
-# forwards that to wuxtheme/ut.h until luxnav includes <wuxtheme/ut.h>.
-LUXNAV_COMPAT = build/compat/uxtheme/ut.h
-$(LUXNAV_COMPAT):
-	@mkdir -p $(dir $@)
-	printf '%s\n' '/* lhde: <uxtheme/ut.h> for luxnav (LUXNAV_DIR) as long as it uses the old name */' '#include "../../../wuxtheme/ut.h"' > $@
-# header.o is rebuilt when LUXNAV_DIR changes (a stamp, as for the data directory)
-$(shell mkdir -p $(O)/flxp/explorer; [ -f $(O)/flxp/explorer/luxnav ] && [ "`cat $(O)/flxp/explorer/luxnav`" = '$(LUXNAV_DIR)' ] || echo '$(LUXNAV_DIR)' > $(O)/flxp/explorer/luxnav)
-$(O)/flxp/explorer/header.o: $(O)/flxp/explorer/luxnav
-ifneq ($(LUXNAV_DIR),)
-ifeq ($(wildcard $(LUXNAV_DIR)/lhnav.h),)
-$(error LUXNAV_DIR=$(LUXNAV_DIR) has no lhnav.h)
-endif
-LUXNAVOBJS = $(addprefix build/luxnav/,lhnav.o lhnav_px.o lhnav_res.o)
-LUXNAVA    = build/luxnav/liblhnav.a
-build/luxnav/%.o: $(LUXNAV_DIR)/%.c | $(LUXNAV_COMPAT)
-	@mkdir -p $(dir $@)
-	$(CC) -g -O2 -std=gnu11 -Wall -MMD -MP -DHAVE_UXTHEME -DUT_HAVE_TEXT_EXTENT -idirafter build/compat $(shell pkg-config --cflags libpng) -c $< -o $@
-$(LUXNAVA): $(LUXNAVOBJS)
-	rm -f $@; ar rcs $@ $^
-$(O)/flxp/explorer/header.o: CXXFLAGS += -DFLXP_HAVE_LHNAV -idirafter $(LUXNAV_DIR) -idirafter build/compat
-$(O)/flxp/explorer/header.o: | $(LUXNAVA) $(LUXNAV_COMPAT)
--include $(LUXNAVOBJS:.o=.d)
-endif
+# ---- luxnav (luxnav/luxnav.mk: build/lib/libluxnav.a, included before this file) ---------------------
+# The explorer header's vision mode (docs/flxp-NOTES.md "The vision header") is always built in: header.cpp includes
+# luxnav's lhnav.h, every program links libluxnav.a through WUX_LINK / W32DEPS ($(LUXNAVA)).
+$(O)/flxp/explorer/header.o: CXXFLAGS += -DFLXP_HAVE_LHNAV -Iluxnav
+$(O)/flxp/explorer/header.o: luxnav/lhnav.h | $(LUXNAVA)
 
 # ---- objects ----------------------------------------------------------------------------
 SHELLOBJS = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/shell/*.cpp))

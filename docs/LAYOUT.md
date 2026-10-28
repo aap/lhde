@@ -1,7 +1,8 @@
 > **Status: draft.** Copied unchanged from the research workspace's
 > `LAYOUT-draft.md` (2026-10-27, with the wux session's review at the end) in
 > step 2 of its plan; to be consolidated with ARCHITECTURE/PROTOCOL in step 5.
-> Step 2 as built (paths, build, what was left out): README.md.
+> Step 2 as built (paths, build, what was left out): README.md. Step 3 (the lux side) as built: the
+> section "Step 3 as built" at the end of this file.
 
 # lhde: layout, asset policy and theme model (draft for the merge)
 
@@ -139,3 +140,51 @@ order and ownership. Additions and two corrections:
 8. Wine's vendored code (LGPL) stays in `wux/vendor/wine` with its MANIFEST and patches.
 
 Ready to start step 2 (skeleton, import of wux/wuxtheme/flxp, top-level build) once aap says go.
+
+## Step 3 as built (lux session, 2026-10-28)
+Imported from `~/fun/longhorn/x11` at d353b69: luxwm/ (lhwm), luxnav/ (lhnav), luxshell/ (lhshell without assets/), examples/,
+session/, data/ (text only), tools/ (lhde-import, the recipe builders), docs/ (USAGE, THEMES, SETTINGS, NAVBAR, MSSTYLES-FORMAT,
+SHELL-DESIGN, LUXWM = lhwm/README, CLIENT-PROTOCOL, CLASSIC-DECO-NOTES; names updated, history kept), and lhtheme/ (new). One
+top-level build (`make`, `make check`, `make install`); README.md has the commands. Choices taken where this document left room:
+
+1. **Data directories.** lhtheme/lhde_data.c (the seed of step 4's resolver; compiled into luxwm, libluxnav, luxshell, glassdemo)
+   searches `$LHDE_DATA` (else `~/.local/share/lhde`), the install's `share/lhde`, `$XDG_DATA_DIRS/lhde`, the tree's `data/`. A
+   frame set or pack is split: its text ships (data/frames/NAME/theme.ini, data/packs/NAME/shell.lua), its pixels are imported;
+   the lookups find them together. session/lhde-paths.sh does the same for the scripts.
+2. **Registry stays for now**, its values relative to the data directories (`styles/...`, `frames/...`, `packs/...`, `fonts/...`,
+   `resources/<build>`). flxp resolves registry values against the registry's own directory and is not changed, so luxwm and
+   luxshell publish a resolved copy (`$XDG_RUNTIME_DIR/lhde/<display>/themes.ini` + wallpapers.ini, every path absolute,
+   refreshed when the source changes) as `_LH_THEMES_INI`. Goes away with the theme files of step 4.
+3. **Names in the data directory** (THEME-FORMAT comments, build-qualified): styles as the workspace has them (aero-patch, jade4074,
+   slate4074, slate4051, luna4051, luna-xp, aero5048, aero5112, royale, zune, noir, embedded, plex4015; backports
+   `styles/jade4074-xp/`, `styles/slate4074-xp/` with Shell/); frame sets aero-patch, jade4074, aero5048, aero5112, aerovision,
+   jade4074-classic, slate4074-classic, slate4051-classic, luna4051-{blue,olive,silver}; pack recipes 4074-aero, 4074-slate,
+   4051-slate, 5112-aero (not `5112`: packs/5112 is the build's pixel directory), 4074-aerovision; pack pixels per build
+   (`packs/4074/{imageres,shell32,startpanel-jade,startpanel-slate}`, `packs/4051/{imageres,startpanel-luna-*}`, `packs/5112/imageres`);
+   `resources/4074`, `resources/4051` (a build's system32), `resources/demo`; `fonts/4074|5048|5112`; `wallpapers/<build>`.
+4. **lhde-import, first version** (`--from-workspace DIR`): copies; `resources/<build>` are symlinks into the workspace's extracted
+   system32 (713 MB each, and flxp reads their `../Resources` and `../Microsoft.NET` siblings) unless `--copy-resources`. The
+   startpanel.ini files (StartPanel sections decoded from the styles by shellpack.sh) travel with the pack pixels, not in data/.
+5. **Names kept**: X atoms; the window manager's `_NET_WM_NAME` "lhwm" (luxshell and flxp's log-off match it); the X classes of
+   luxshell's and luxwm's own windows (`lhshell-*`, `lhwm-menu`); luxnav's C API and header (`lhnav_*`, `lhnav.h`; library
+   libluxnav, pkg-config luxnav); configuration paths (`~/.config/longhorn`, `~/.config/lhwm/keys`, `~/.config/lhshell`) and
+   `LHWM_*` / `LHSHELL_*` variables. Install-only symlinks lhwm, lhwmc, lhshell.
+6. **luxnav is always built** and linked into flxp (build glue in flxp/flxp.mk, the step-2 `LUXNAV_DIR` hook and build/compat removed).
+7. **lhde-session** = xinitrc.lab + second-display.sh, plus `start --attach` (a session on a running X server: how it was tested
+   here, on Xvfb); `desktop off` now repaints the root with the current theme's wallpaper. session/lab.sh stays the headless bench
+   (with a `shell` command).
+8. **Regression without reference images**: luxwm/tests/regress.sh compares SHA-256 with a baseline of this machine; the
+   baseline was taken from the x11 build's own renders (`--baseline-from-x11`): 212 renders, all identical.
+
+Left out (asset policy or obsolete): every .png/.bmp/.jpg of x11 (frame sets' PNGs, lhshell/assets, tests/ref, compare_*.png,
+screenshots; the art reaches the data directory through lhde-import), ref/, binaries, x11's README.md (the glass-experiment
+notes), lhwm's configure/Config.mk.in/config.h.in (config.h is static now), tools/uxtheme-flags.sh, lhnav/ut-flags.sh,
+lhwm/examples/compile_commands.json and berry's xephyr.sh (killall), the unused lhshell assets sidebar-jade74, sidebar-slate51,
+wallpaper/.
+
+Open for step 4 (lux side): lhde-import from ISO/WIM/Windows directories (and XP/2000 for `resources/xp`, `resources/2k`);
+frames and packs manifest-first (frame.ini naming the style's streams, packs naming imageres ids read live from
+`resources/<build>/imageres.dll`, PNGs only as a cache), the recipe builders (build_*.py, shellpack.sh, msstyles2theme.py) run by
+lhde-import; the theme files and liblhtheme replacing themes.ini, wallpapers.ini, presets and the resolved copy; the config move
+to `~/.config/lhde`. For the wux side: flxp reading the data directories itself (today through the resolved registry), and
+tests/check.sh's ut-dump honouring `LHDE_DATA` (it reads `LHDE_STYLES`).

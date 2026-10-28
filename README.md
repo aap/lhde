@@ -10,8 +10,15 @@ one build, for the parts that were separate projects:
 | `wuxtheme/` | libwuxtheme, the uxtheme library: `.msstyles` read and drawn without Windows (`<wuxtheme/ut.h>`, C API `ut_*`), and `ut-dump` | flxp `src/uxtheme` (libuxtheme) |
 | `flxp/`     | the explorer and shell: `shell/` `explorer/` `desktop/` `taskbar/` `filedlg/` `settings/`, `rc/` (its dialogs), `res/` (icon themes, .desktop, portal files, tools) | flxp |
 | `tests/`    | `toolkit/` and `w32/` test programs, `headless/` Xvfb scripts, `check.sh`, `demo.sh` | flxp `src/test`, `src/w32test` |
-| `luxwm/` `luxnav/` `luxshell/` `session/` `examples/` `tools/` `data/` | placeholders: the lux side imports lhwm, lhnav, lhshell, the session scripts, examples, tools and data here (step 3 of docs/LAYOUT.md) | ~/fun/longhorn/x11 |
-| `docs/`     | `LAYOUT.md` (layout, asset policy, theme model; draft), `flxp-NOTES.md` (flxp's notes, to be consolidated) | |
+| `luxwm/`    | the window manager: Longhorn frames (DWM glass frame sets, classic frames from the style through wuxtheme), EWMH, animations; `luxwmc`; `tests/` (frametest, regress) | x11 `lhwm/` |
+| `luxnav/`   | libluxnav, the Longhorn navigation bar (the vision header; C API `lhnav_*`, `lhnav.h`), linked into flxp and navdemo | x11 `lhnav/` |
+| `luxshell/` | the Avalon bars, sidebar, tiles, toasts, start menu: C core + Lua (`*.lua`, `tiles/`), `shellpack*.sh` | x11 `lhshell/` (without `assets/`) |
+| `lhtheme/`  | `lhde_data.c`: the data directories (and the registry's resolved copy); the seed of step 4's theme resolver | new |
+| `session/`  | `lhde-session` (start, theme, taskbar, shell, picom, desktop, stop), `lab.sh` (the headless bench), `lhwall.sh`, theme-reload/-watch, picom configs | x11 `xinitrc.lab`, `second-display.sh`, `lab.sh`, ... |
+| `examples/` | extendframe, navdemo, glassdemo | x11 `examples/`, `glassdemo.c` |
+| `tools/`    | `lhde-import` (fills the data directory), recipe builders (`msstyles2theme.py`, `build_aerovision.py`, `build_aero5112.py`) | x11 `lhwm/tools/` |
+| `data/`     | text only: `themes.ini`, `wallpapers.ini`, `frames/*/theme.ini` (+ `nav.ini`), `packs/*/shell.lua` | x11 `themes.ini`, `wallpapers.ini`, `lhwm/themes/*/*.ini`, `lhshell/themes/` |
+| `docs/`     | `LAYOUT.md` (layout, asset policy, theme model; draft), `flxp-NOTES.md` (flxp's notes); from x11: `USAGE.md`, `THEMES.md`, `SETTINGS.md`, `NAVBAR.md`, `SHELL-DESIGN.md`, `MSSTYLES-FORMAT.md`, `LUXWM.md` (was lhwm/README.md), `CLIENT-PROTOCOL.md`, `CLASSIC-DECO-NOTES.md` (to be consolidated in step 5) | |
 
 No Microsoft files are in this repository, and none may be added (docs/LAYOUT.md,
 "Asset policy"): no `.msstyles`, DLLs, fonts, wallpapers, extracted bitmaps or
@@ -23,8 +30,10 @@ run time from the user's own files (settings below).
 ## Building
 
 Needs a C++17 compiler and pkg-config with x11, xext, freetype2, fontconfig,
-libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal);
-`x86_64-w64-mingw32-windres` only to rebuild a changed `.rc`.
+libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, luxshell);
+for the lux side also xfixes, xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4);
+`x86_64-w64-mingw32-windres` only to rebuild a changed `.rc`. At run time the session
+uses picom, feh and xprop (xdotool, ImageMagick's import for the lab).
 
     make -j                      libs, programs and tests into build/
     make check                   tests/check.sh (below)
@@ -39,15 +48,22 @@ What `make` builds:
     build/lib/libwuxtheme.a              wuxtheme, linked into the flxp programs
     build/lib/libwuxtheme.so.1 (+ .so)   wuxtheme for other programs (exports ut_* only)
     build/lib/pkgconfig/wuxtheme.pc      pkg-config for the build tree (PKG_CONFIG_PATH=$PWD/build/lib/pkgconfig)
+    build/lib/libluxnav.a, libluxnav.so.1 (+ .so), pkgconfig/luxnav.pc   luxnav (flxp links the .a)
     build/bin/flxp flxp-desktop flxp-taskbar flxp-settings flxp-filedialog flxp-portal ut-dump
+    build/bin/luxwm luxwmc luxshell
+    build/examples/extendframe navdemo glassdemo
     build/tests/..., build/tests/w32/... test programs and demos (tests/demo.sh runs some)
+    build/luxwm/tests/frametest menutest desktopwin dockorder strutdock, build/luxshell/tests/trayicon
 
-The programs run uninstalled from `build/bin` (they find `flxp/res` in the source
-tree). Per component: `make wux`, `make wuxtheme`, `make flxp`, `make tests`.
+The programs run uninstalled from `build/bin` (they find `flxp/res`, `luxshell/` and `data/` in the source
+tree). Per component: `make wux`, `make wuxtheme`, `make flxp`, `make tests`, `make luxnav`, `make luxwm`,
+`make luxshell`, `make examples`.
 
-`make install` installs `bin/` (the six flxp programs and ut-dump),
-`lib/libwuxtheme.so.1` + `.so`, `include/wuxtheme/ut.h`, `lib/pkgconfig/wuxtheme.pc`,
-the data directory `$PREFIX/share/lhde` (`res/icons`), `share/applications/flxp.desktop`,
+`make install` installs `bin/` (the six flxp programs, ut-dump, luxwm, luxwmc, luxshell, lhde-session,
+lhde-import, and the compatibility symlinks lhwm, lhwmc, lhshell), `lib/libwuxtheme.so.1` + `.so`,
+`lib/libluxnav.so.1` + `.so`, `include/wuxtheme/ut.h`, `include/luxnav/lhnav.h`, `lib/pkgconfig/{wuxtheme,luxnav}.pc`,
+the man pages luxwm.1 and luxwmc.1 (`MANDIR`), the data directory `$PREFIX/share/lhde` (`res/icons`;
+`themes.ini`, `wallpapers.ini`, `frames/`, `packs/` from data/; `luxshell/` (the Lua); `session/`; `tools/`), `share/applications/flxp.desktop`,
 the portal backend's `flxp.portal` (in `PORTALDIR`, default
 `$PREFIX/share/xdg-desktop-portal/portals`; xdg-desktop-portal reads its own
 datadir, so set `PORTALDIR=/usr/share/xdg-desktop-portal/portals` for a system
@@ -58,15 +74,8 @@ old one) is still read as a fallback, `FLXP_DATA` overrides.
 
 ### luxnav (the explorer header's vision mode)
 
-luxnav is not in this tree yet. `LUXNAV_DIR` names the lhnav source directory
-to build it from (its lhnav.c, lhnav_px.c, lhnav_res.c, into build/luxnav):
-
-    make                                                    without the vision header (the default)
-    make LUXNAV_DIR=/u/aap/fun/longhorn/x11/lhnav           with it, as flxp built with its LHNAV_DIR
-
-lhnav includes `<uxtheme/ut.h>`; build/compat forwards that to `wuxtheme/ut.h`
-until it includes `<wuxtheme/ut.h>`. When luxnav/ is imported, the build
-switches to it.
+luxnav is in the tree (luxnav/, `make luxnav`); flxp links `build/lib/libluxnav.a` and always has the vision
+header (the step-2 `LUXNAV_DIR` hook and build/compat are gone).
 
 ### make check
 
@@ -77,6 +86,40 @@ incl. GTK, the file dialog in both looks) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without visual styles in `~/.local/share/lhde/styles` (`LHDE_STYLES`).
+Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac -p`), and luxwm's frame
+regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a
+baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the first run;
+`--baseline-from-x11 DIR` takes it from the x11 lab's build); skipped without imported styles.
+
+## The data directory and lhde-import
+
+The art comes from the user's own Windows files, imported once into the data directory
+`~/.local/share/lhde` (`$LHDE_DATA` instead, honoured by every lhde program and script; docs/LAYOUT.md
+"Asset policy"):
+
+    tools/lhde-import --from-workspace ~/fun/longhorn       copy what the research workspace has (first version)
+    tools/lhde-import --list                                what is there
+
+It fills `styles/` (build-qualified names: aero-patch, jade4074, slate4074, slate4051, luna4051, luna-xp,
+aero5048, aero5112, royale, ...; the XP backports as `styles/jade4074-xp/`, `styles/slate4074-xp/`),
+`frames/<name>/` (the frame sets' PNGs), `packs/<build>/` (luxshell's images: `4074/imageres`,
+`4074/shell32`, `4074/startpanel-*`, `4051/imageres`, `4051/startpanel-luna-*`, `5112/imageres`),
+`resources/<build>` (a build's system32; symlinks into the workspace unless `--copy-resources`),
+`resources/demo`, `fonts/<build>`, `wallpapers/<build>`. The lux programs search, in order: that
+directory, the install's `share/lhde`, `$XDG_DATA_DIRS/lhde`, the source tree's `data/`
+(lhtheme/lhde_data.h); the shipped text (data/) and the imported pixels of a frame set or pack are
+found together. Importing from an ISO, a WIM or a Windows directory is step 4.
+
+## Running
+
+    lhde-session start [THEME]               a real X session (startx on :1, vt8; log in on that tty first)
+    lhde-session start --nested [THEME]      in a Xephyr window
+    lhde-session start --attach [THEME]      on an X server already running on $LHDE_DISPLAY
+    lhde-session theme NAME | taskbar KIND | shell on|off | picom on|off | desktop on|off | stop
+    LAB=:2 session/lab.sh start; session/lab.sh shell; session/lab.sh theme jade4074; session/lab.sh shot; session/lab.sh stop
+
+From a build tree they use `build/bin`; installed, `$PREFIX/bin`. docs/USAGE.md is the user guide (from
+the x11 lab).
 
 ## Settings that point at your Windows files
 
@@ -95,5 +138,8 @@ programs fall back to Wine's icons, drawn lookalikes and fontconfig fonts.
 | `wallpaper_dirs` | Display Properties' wallpaper list (default `~/Pictures/Wallpapers` only) |
 | `taskpane_aurora` | the demo's aurora images (else `<longhorn_system32>/../../../../demo_resources`) |
 
-Program names, these settings files and the X properties (`_LH_*`, `_LHWM_*`) are
-unchanged from flxp and the Longhorn lab.
+`LHDE_DATA` (environment) replaces the user data directory for every lux program and script; the theme
+registry is `data/themes.ini` (luxwm and luxshell publish its resolved copy as `_LH_THEMES_INI`).
+Program names of the flxp side, these settings files and the X properties (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`) are
+unchanged from flxp and the Longhorn lab; the lux programs are renamed (lhwm → luxwm, lhwmc → luxwmc,
+lhshell → luxshell, lhnav → luxnav; the install keeps lhwm, lhwmc, lhshell symlinks).

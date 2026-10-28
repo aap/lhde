@@ -1,9 +1,10 @@
 # lhde, the Longhorn desktop environment: the top-level build.
 #
-#   make                  everything: libwux.a, libwuxtheme.{a,so.1}, the flxp
-#                         programs, ut-dump and the tests, into build/
-#   make check            the tests that need no Microsoft files (tests/check.sh)
-#   make install          PREFIX=/usr/local DESTDIR= (also LIBDIR, INCLUDEDIR, DATADIR,
+#   make                  everything: libwux.a, libwuxtheme.{a,so.1}, libluxnav.{a,so.1}, the flxp
+#                         programs, ut-dump, luxwm, luxwmc, luxshell, the examples and the tests, into build/
+#   make check            the tests that need no Microsoft files (tests/check.sh), luxshell's build
+#                         and Lua, luxwm's frame regression (skips without the user's styles)
+#   make install          PREFIX=/usr/local DESTDIR= (also BINDIR, LIBDIR, INCLUDEDIR, DATADIR, MANDIR,
 #                         PORTALDIR, DBUSSERVICEDIR); make uninstall
 #   make install-icons    copy the XP/2000 icon files from nt5src into DATADIR (NT5SRC=)
 #   make clean
@@ -14,7 +15,13 @@
 #   flxp/flxp.mk          flxp, flxp-desktop, flxp-taskbar, flxp-settings, flxp-filedialog,
 #                         flxp-portal -> build/bin
 #   tests/tests.mk        build/tests (toolkit tests), build/tests/w32 (shim tests), make check
-#   luxnav                not here yet: LUXNAV_DIR (below)
+#   luxnav/luxnav.mk      libluxnav (lhnav.h): build/lib/libluxnav.{a,so.1}, luxnav.pc; flxp's vision header
+#   luxwm/luxwm.mk        luxwm, luxwmc -> build/bin; its tests -> build/luxwm/tests
+#   luxshell/luxshell.mk  luxshell -> build/bin (its Lua stays in luxshell/, installed to DATADIR/luxshell)
+#   examples/examples.mk  extendframe, navdemo, glassdemo -> build/examples
+#   lhtheme/              lhde_data.c: the data directories (compiled into luxwm, luxnav, luxshell, the examples)
+#   data/ session/ tools/ installed as they are: DATADIR (themes.ini, wallpapers.ini, frames/*/*.ini,
+#                         packs/*), DATADIR/session + BINDIR/lhde-session, BINDIR/lhde-import
 #
 # Every object is build/obj/<source path>.o (build/pic/... for the shared
 # library); every program goes to build/bin, so programs that look for each
@@ -56,31 +63,56 @@ PKGCONFIGDIR   ?= $(LIBDIR)/pkgconfig
 PORTALDIR      ?= $(PREFIX)/share/xdg-desktop-portal/portals
 DBUSSERVICEDIR ?= $(PREFIX)/share/dbus-1/services
 
-# luxnav, the Longhorn navigation bar (the explorer header's vision mode,
-# docs/flxp-NOTES.md "The vision header"). Until the lux side imports it into
-# luxnav/, it is compiled from LUXNAV_DIR (its lhnav.c, lhnav_px.c, lhnav_res.c)
-# into build/luxnav against wuxtheme/ut.h. Empty (the default): flxp is built
-# without the vision header (flxp --info says so); LUXNAV_DIR=/path/to/lhnav
-# builds it in, as flxp did with its LHNAV_DIR.
-LUXNAV_DIR ?=
+MANDIR         ?= $(PREFIX)/share/man
+# the lux side's C optimisation (luxwm, luxnav, lhde_data; -Os as lhwm's configure chose)
+LUX_COPT       ?= -Os -g -DNDEBUG
 
 all:
 
 include wuxtheme/wuxtheme.mk   # first: wux.mk leaves its objects out of libwux.a
+include luxnav/luxnav.mk       # before flxp.mk: its programs link $(LUXNAVA)
 include wux/wux.mk
 include flxp/flxp.mk
 include tests/tests.mk
+include luxwm/luxwm.mk
+include luxshell/luxshell.mk
+include examples/examples.mk
 
-all: libs programs tests
-libs: $(WUXA) $(UTA) $(UTSO) $(UTPC)
-programs: $(PROGRAMS)
+all: libs programs tests luxwm luxshell examples
+libs: $(WUXA) $(UTA) $(UTSO) $(UTPC) $(LUXNAVA) $(LUXNAVSO) $(LUXNAVPC)
+programs: $(PROGRAMS) $(LUXWM_PROGRAMS) build/bin/luxshell
+
+# make check: tests/check.sh (tests/tests.mk), then the lux side's
+check: check-lux
+check-lux: all
+	@$(MAKE) --no-print-directory check-luxshell check-luxwm
+
+# data/ (text only: the registry, wallpapers.ini, the frame sets' theme.ini/nav.ini, the packs' shell.lua),
+# session/ (lhde-session and its files), tools/lhde-import and the recipe builders
+SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh \
+                picom-glass.conf picom-glass-fvwm.conf lab.fvwm2rc
+install-data:
+	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools $(DESTDIR)$(BINDIR)
+	install -m 644 data/themes.ini data/wallpapers.ini $(DESTDIR)$(DATADIR)/
+	for d in data/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
+	for d in data/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done
+	install -m 644 data/packs/startpanels.lua $(DESTDIR)$(DATADIR)/packs/
+	install -m 755 session/lhde-session $(DESTDIR)$(BINDIR)/
+	install -m 755 tools/lhde-import $(DESTDIR)$(BINDIR)/
+	cd session && install -m 644 $(SESSION_FILES) $(DESTDIR)$(DATADIR)/session/
+	chmod 755 $(addprefix $(DESTDIR)$(DATADIR)/session/,lab.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh)
+	ln -sf $(BINDIR)/lhde-session $(DESTDIR)$(DATADIR)/session/lhde-session
+	install -m 755 tools/msstyles2theme.py tools/build_aerovision.py tools/build_aero5112.py $(DESTDIR)$(DATADIR)/tools/
+uninstall-data:
+	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(DATADIR)/themes.ini $(DESTDIR)$(DATADIR)/wallpapers.ini
+	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools
 
 clean:
 	rm -rf build
 
-install: install-libs install-flxp
-uninstall: uninstall-libs uninstall-flxp
+install: install-libs install-flxp install-luxnav install-luxwm install-luxshell install-data
+uninstall: uninstall-luxshell uninstall-luxwm uninstall-luxnav uninstall-data uninstall-libs uninstall-flxp
 
-.PHONY: all libs programs tests clean install uninstall check
+.PHONY: all libs programs tests clean install uninstall check check-lux install-data uninstall-data
 .PRECIOUS: $(O)/%.o $(P)/%.o
 .DELETE_ON_ERROR:

@@ -35,7 +35,7 @@ $(WUXA): $(filter-out $(UTOBJS),$(WUX_OBJS))
 	@mkdir -p $(dir $@)
 	rm -f $@; ar rcs $@ $^
 
-# what a win32 program links: libwux whole, luxnav when built, libwuxtheme as an archive
+# what a win32 program links: libwux whole, luxnav (the explorer header), libwuxtheme as an archive
 WUX_LINK = -Wl,--whole-archive $(WUXA) -Wl,--no-whole-archive $(LUXNAVA) $(UTA)
 
 -include $(WUX_OBJS:.o=.d)

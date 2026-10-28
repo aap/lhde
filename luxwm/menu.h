@@ -1,0 +1,57 @@
+/* lhwm: popup menus drawn by the window manager (README "The window menu"). The system menu of a window (wm.c wmmenu_open) is the
+   first user; the API takes a plain item list so other context menus can reuse it.
+
+   Look, from the frame theme (struct theme, frame.h):
+   - the visual style opened through libuxtheme has a Menu class with POPUP* parts (the Longhorn 4074 Slate/Jade/Aero styles, the
+     Vista 5048/5112 Aero styles): POPUPBORDERS (else POPUPBACKGROUND), POPUPGUTTER, POPUPITEM in its four states, SEPARATOR /
+     POPUPSEPARATOR, the SYSTEM* glyphs; text colours from the POPUPITEM states, the font from [SysMetrics] MENUFONT;
+   - otherwise (XP styles such as Luna, which have no Menu class; or no library): XP's own COLOR_MENU drawing (ntuser mndraw.c) with
+     the style's [SysMetrics] colours and MENUFONT: FLATMENUS = the 1 px BTNSHADOW outline and a MENUHILIGHT bar framed in
+     HIGHLIGHT, else the raised 3D edge and a HIGHLIGHT bar; the system menu bitmaps (Marlett glyphs) in the check column.
+   Without the library the DWM themes fall back to the Jade 4074 values, msstyles themes to XP's Windows Standard colours. */
+#ifndef LHWM_MENU_H
+#define LHWM_MENU_H
+#include <X11/Xlib.h>
+#include "frame.h"
+
+enum { WMMENU_DISABLED = 1, WMMENU_SEPARATOR = 2, WMMENU_DEFAULT = 4 /* bold (the system menu's Close) */, WMMENU_CHECKED = 8 };
+/* the system menu bitmaps (XP HBMMENU_POPUP_*; Vista Menu.SYSTEM* parts) */
+enum { WMMENU_GLYPH_NONE, WMMENU_GLYPH_RESTORE, WMMENU_GLYPH_MINIMIZE, WMMENU_GLYPH_MAXIMIZE, WMMENU_GLYPH_CLOSE };
+
+struct wmmenu_item {
+    const char *text;                   /* "&Move": '&' marks the mnemonic, "&&" is a literal '&' */
+    const char *accel;                  /* shortcut shown right-aligned ("Alt+F4"), or NULL */
+    unsigned flags;                     /* WMMENU_* */
+    int glyph;                          /* WMMENU_GLYPH_* */
+    int id;
+    void (*cb)(void *arg, int id);      /* called after the menu has closed (may be NULL) */
+    void *arg;
+};
+
+/* how wmmenu_popup was asked: WMMENU_KEYBOARD = opened from the keyboard (first item selected, mnemonics underlined, as XP's
+   keyboard cues); WMMENU_FLIP = a context menu: put it left of / above the point when it does not fit (else it is shifted) */
+enum { WMMENU_KEYBOARD = 1, WMMENU_FLIP = 2 };
+#define WMMENU_CANCEL   (-1)
+#define WMMENU_DBLCLICK (-2)
+
+struct wmmenu_env {
+    Display *dpy; int screen; Window root;
+    Visual *visual; Colormap cmap; int depth;     /* an ARGB visual (depth 32) for the shadow; any other visual works without it */
+    const struct theme *theme;
+    int composited;                     /* a compositor runs: the drop shadow is real alpha; otherwise it is blended over a copy of the screen */
+    int bx, by, bw, bh;                 /* the area (monitor) the menu has to fit in, root coordinates */
+    /* events for other windows that arrive while the menu runs (Expose, MapRequest, ConfigureRequest); others stay queued */
+    void (*dispatch)(XEvent *ev, void *arg); void *dispatch_arg;
+    /* a press inside this root rectangle within dbl_ms of the opening returns WMMENU_DBLCLICK (double-click on the caption icon) */
+    int dbl_x, dbl_y, dbl_w, dbl_h; unsigned dbl_ms;
+};
+
+/* show the menu with its top-left corner at x, y (root) and run it until an item is chosen or it is dismissed (Esc, Alt, a click
+   outside). button: the mouse button that opened it and is still held (0: none): releasing it over an item chooses that item.
+   Returns the chosen index (its cb has been called), WMMENU_CANCEL or WMMENU_DBLCLICK. Modal: grabs pointer and keyboard. */
+int wmmenu_popup(const struct wmmenu_env *env, int x, int y, const struct wmmenu_item *items, int n, unsigned flags, unsigned button);
+
+/* LHWM_MENUTEST: render the menu as wmmenu_popup would draw it (selected item sel, -1 none) into a new image (caller destroys it),
+   for offline comparisons; *w, *h get the menu size without the shadow */
+cairo_surface_t *wmmenu_render(const struct theme *t, const struct wmmenu_item *items, int n, int sel, unsigned flags, int *w, int *h);
+#endif
