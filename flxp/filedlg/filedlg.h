@@ -1,5 +1,5 @@
 // The file Open/Save dialog in two looks, chosen like the explorer's frame
-// (filedlg= in flxp.ini, else frame=, the session theme's flxp_frame, lhwm):
+// (filedlg= in flxp.ini, else the session theme's Explorer.chrome, luxwm):
 // - XP: comdlg32's "Explorer-style" GetOpenFileName / GetSaveFileName
 //   (filenew.cpp) re-created on this toolkit against the src/shell namespace.
 //   Places bar, Look in combo, Back/Up/New Folder/Views toolbar, the file

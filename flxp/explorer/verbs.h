@@ -79,9 +79,9 @@ void add_bookmark(const std::string& dir);
 
 // The wallpaper (flxp-desktop paints it). is_wallpaper_image: a local BMP, PNG or
 // JPEG file (by its signature: what the desktop decodes; GIF is not). set_wallpaper
-// writes wallpaper= and wallpaper_mode= (stretch|center|tile|fill) into flxp.ini
-// and sets the root property _FLXP_WALLPAPER = "MODE PATH", which a running
-// flxp-desktop watches and applies at once. False (and a message) on failure.
+// writes the session theme's Desktop.wallpaper and Desktop.mode (stretch|center|
+// tile|fill) into its modified copy (shell::set_desktop_background) and announces
+// it; flxp-desktop follows the record. False (and a message) on failure.
 bool is_wallpaper_image(const Item& it);
 bool set_wallpaper(const std::string& path, const std::string& mode);
 

@@ -266,7 +266,7 @@ bool enabled() { init(); return g_enabled; }
 
 void theme_changed()
 {
-    // the session theme may name another strip (flxp_menubar_*): start over
+    // another session theme may want another strip (menubar_style by Explorer.chrome): start over
     if (g_frames) DeleteObject(g_frames);
     if (g_cache) DeleteObject(g_cache);
     g_frames = g_cache = nullptr;

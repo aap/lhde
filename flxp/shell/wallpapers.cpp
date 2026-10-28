@@ -1,117 +1,84 @@
-// A theme's desktop background: see wallpapers.h and x11/THEMES.md "Wallpapers".
+// A theme's desktop background: see wallpapers.h and docs/THEME-FORMAT.md.
 #include "wallpapers.h"
+#include <dirent.h>
+#include <algorithm>
 #include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
-#include <X11/Xlib.h>
-#include <X11/Xatom.h>
 #include "config.h"
 #include "lhdata.h"
 #include "settings.h"
 
 namespace shell {
 
-namespace {
-
-std::string root_prop(const char* prop)
+uint32_t parse_color(const std::string& v, uint32_t fallback)
 {
-    const char* d = getenv("DISPLAY");
-    if (!d || !*d) return "";
-    Display* dpy = XOpenDisplay(nullptr);
-    if (!dpy) return "";
-    std::string out;
-    Atom a = XInternAtom(dpy, prop, True);
-    if (a != None) {
-        Atom type; int format; unsigned long count, after; unsigned char* data = nullptr;
-        if (XGetWindowProperty(dpy, DefaultRootWindow(dpy), a, 0, 4096, False, AnyPropertyType, &type, &format, &count,
-                               &after, &data) == Success && data) {
-            if (format == 8) out.assign((const char*)data, count);
-            XFree(data);
-        }
-    }
-    XCloseDisplay(dpy);
-    return out;
-}
-
-std::string under(const std::string& file, const std::string& root)
-{
-    if (file.empty() || file[0] == '/' || file[0] == '~') return file;
-    return root + "/" + file;
-}
-
-} // namespace
-
-bool own_wallpaper(const SessionTheme& st, Wallpaper& out)
-{
-    if (st.name.empty()) return false;
-    for (const std::string& n : store::theme_names(st.name, st.ini)) {
-        std::string f = store::get("override:" + n, "wallpaper");
-        if (f.empty()) continue;
-        out.file = f;
-        out.mode = store::get("override:" + n, "mode");
-        return true;
-    }
-    store::Ini p;
-    if (!st.value("base").empty() && store::read_preset(st.name, p) && p.has("Desktop", "wallpaper")) {
-        out.file = st.value("wallpaper");   // lookup_session_theme made it absolute
-        out.mode = st.value("wallpaper_mode");
-        return !out.file.empty();
-    }
-    return false;
-}
-
-bool wallpapers_ini(const SessionTheme& st, Wallpaper& out)
-{
-    std::string path;
-    if (const char* e = getenv("LH_WALLPAPERS_INI")) path = e;
-    if (path.empty() && !st.ini.empty()) path = dir_of(st.ini) + "/wallpapers.ini";
-    struct stat sb;
-    if ((path.empty() || stat(path.c_str(), &sb) != 0) && !getenv("LH_WALLPAPERS_INI")) path = lhde_find("wallpapers.ini");
-    store::Ini ini;
-    if (path.empty() || !ini.load(path)) return false;
-    // the section: the registry name (a preset's base), then the entry's aliases, then [default]
-    std::string sec = st.value("base").empty() ? st.name : st.value("base");
-    std::vector<std::string> names = store::theme_names(sec, st.ini);
-    std::string use;
-    for (const std::string& n : names) if (!ini.keys(n).empty()) { use = n; break; }
-    std::string root = ini.get("default", "root", "../resources/wallpapers");
-    if (root[0] != '/' && root[0] != '~') {
-        // beside wallpapers.ini (a copy with its pictures), else lhde's data directories (wallpapers/)
-        std::string r = dir_of(path) + "/" + root;
-        root = stat(r.c_str(), &sb) == 0 ? r : lhde_resolve(root);
-    }
-    else if (root[0] == '~') root = home_dir() + root.substr(1);
-    while (root.size() > 1 && root.back() == '/') root.pop_back();
-    std::string file = use.empty() ? "" : ini.get(use, "file");
-    std::string mode = file.empty() ? "" : ini.get(use, "mode");
-    if (file.empty()) { file = ini.get("default", "file"); mode = ini.get("default", "mode"); }
-    if (file.empty()) return false;
-    out.file = under(file, root);
-    out.mode = mode;
-    return true;
+    unsigned r, g, b;
+    char extra;
+    if (sscanf(v.c_str(), " %u %u %u %c", &r, &g, &b, &extra) == 3 && r < 256 && g < 256 && b < 256) return r << 16 | g << 8 | b;
+    std::string h = v;
+    if (!h.empty() && h[0] == '#') h = h.substr(1);
+    else if (h.size() > 2 && h[0] == '0' && (h[1] == 'x' || h[1] == 'X')) h = h.substr(2);
+    if (h.size() == 6 && h.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos) return (uint32_t)strtoul(h.c_str(), nullptr, 16);
+    return fallback;
 }
 
 bool theme_wallpaper(const SessionTheme& st, Wallpaper& out)
 {
-    if (st.name.empty()) return false;
-    // lux's view, when it describes the theme in force
-    std::string cur = root_prop("_LH_THEME"), r = root_prop("_LH_THEME_RESOLVED");
-    bool same = false;   // the view must describe this theme (the dialog also asks for others)
-    for (const std::string& n : store::theme_names(st.name, st.ini)) same = same || n == cur;
-    if (same && !r.empty() && resolved_field(r, "name") == cur && !resolved_field(r, "wallpaper").empty()) {
-        out.file = resolved_field(r, "wallpaper");
-        out.mode = resolved_field(r, "mode");
-        return true;
-    }
-    Wallpaper w;
-    bool have = false;
-    std::string key = st.path("wallpaper");   // a themes.ini key (a preset's own was taken by own_wallpaper)
-    if (!key.empty()) { w.file = key; have = true; }
-    else have = wallpapers_ini(st, w);
-    if (!have) return false;
-    std::string pm = st.value("base").empty() ? "" : st.value("wallpaper_mode");   // a preset's [Desktop] mode
-    out.file = w.file;
-    out.mode = pm.empty() ? w.mode : pm;
+    out = Wallpaper();
+    out.color = parse_color(st.value("Desktop.color"));
+    out.mode = st.value("Desktop.mode");
+    std::string v = st.value("Desktop.wallpaper"), f = st.value("path.wallpaper");
+    if (v == "none" || f.empty()) return false;
+    struct stat sb;
+    if (stat(f.c_str(), &sb) != 0) return false;
+    out.file = f;
     return true;
+}
+
+bool wallpaper_hidden() { return strcasecmp(store::get("desktop", "wallpaper").c_str(), "none") == 0; }
+
+std::string wallpaper_value(const std::string& file)
+{
+    for (const std::string& d : lhde_dirs()) {
+        std::string root = d + "/wallpapers/";
+        if (file.compare(0, root.size(), root)) continue;
+        std::string rel = file.substr(root.size());
+        if (std::count(rel.begin(), rel.end(), '/') > 1) break;
+        size_t dot = rel.rfind('.');
+        if (dot == std::string::npos || dot < rel.rfind('/') + 1) break;
+        std::string stem = rel.substr(0, dot), dir = dir_of(file), sb = base_of(stem);
+        // another picture of the same stem (Bliss.jpg and Bliss.bmp): the path is unambiguous
+        int same = 0;
+        if (DIR* dd = opendir(dir.c_str())) {
+            while (dirent* e = readdir(dd)) {
+                std::string n = e->d_name;
+                size_t p = n.rfind('.');
+                if (p != std::string::npos && !strcasecmp(n.substr(0, p).c_str(), sb.c_str())) same++;
+            }
+            closedir(dd);
+        }
+        return same == 1 ? stem : file;
+    }
+    return file;
+}
+
+bool set_desktop_background(const std::string& file, const std::string& mode, std::string* err)
+{
+    const SessionTheme& st = session_theme();
+    std::string theme = st.name;
+    if (theme.empty()) theme = store::get("theme", "name");
+    if (theme.empty()) { if (err) *err = "no theme is selected (_LH_THEME, settings.ini [theme] name)"; return false; }
+    std::vector<store::KeyValue> kv = { { "Desktop.wallpaper", file == "none" ? "none" : wallpaper_value(file) } };
+    if (!mode.empty()) kv.push_back({ "Desktop.mode", mode });
+    // the user's "no picture" would hide it
+    if (file != "none" && wallpaper_hidden()) store::set("desktop", "wallpaper", "");
+    std::string sel;
+    bool ok = store::set_theme_keys(theme, kv, &sel, err, false);
+    if (sel != theme) store::apply_theme(sel);
+    else store::notify("desktop");
+    return ok;
 }
 
 } // namespace shell

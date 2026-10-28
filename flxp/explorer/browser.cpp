@@ -37,21 +37,23 @@ static std::u16string W(const std::string& s) { return w32::utf16_of(s.c_str());
 
 bool frame_auto()
 {
-    std::string fr = shell::setting("frame", "auto");
+    std::string fr = shell::theme_setting("frame", "auto");
     return fr != "xp" && fr != "longhorn";
 }
 
 bool want_longhorn(std::string* why)
 {
-    std::string fr = shell::setting("frame");   // per theme (settings.ini override, the registry's flxp_frame)
+    // FLXP_FRAME (--frame) for this run, else the session theme's Explorer.chrome (navbar none: xp)
+    std::string fr = shell::theme_setting("frame");
     if (fr == "xp" || fr == "longhorn") {
-        if (why) *why = std::string(getenv("FLXP_FRAME") && *getenv("FLXP_FRAME") ? "FLXP_FRAME / --frame" : "flxp.ini frame") + "=" + fr;
+        if (why) {
+            const char* e = getenv("FLXP_FRAME");
+            const shell::SessionTheme& st = shell::session_theme();
+            *why = e && *e ? "FLXP_FRAME / --frame=" + fr
+                           : "session theme " + st.name + ": Explorer.chrome=" + st.value("Explorer.chrome") +
+                             (st.value("Explorer.navbar") == "none" ? ", Explorer.navbar=none" : "");
+        }
         return fr == "longhorn";
-    }
-    std::string t = fr.empty() ? shell::session_theme().value("flxp_frame") : "";   // "auto" set for the theme: automatic
-    if (t == "xp" || t == "longhorn") {
-        if (why) *why = "session theme " + shell::session_theme().name + ": flxp_frame=" + t;
-        return t == "longhorn";
     }
     BOOL comp = FALSE;
     DwmIsCompositionEnabled(&comp);
@@ -59,7 +61,7 @@ bool want_longhorn(std::string* why)
     FlxpDwmGetFrameMetrics(&fm);
     WCHAR th[8];
     bool lhwm = comp || fm.bValid || FlxpDwmGetFrameThemePath(th, 8) == S_OK;
-    if (why) *why = lhwm ? "frame=auto, lhwm runs" : "frame=auto, no lhwm on this display";
+    if (why) *why = lhwm ? "chrome auto, luxwm runs" : "chrome auto, no luxwm on this display";
     return lhwm;
 }
 

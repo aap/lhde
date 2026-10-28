@@ -16,8 +16,10 @@ std::vector<std::string> data_dirs();         // $XDG_DATA_DIRS or /usr/local/sh
 // ([sections] and #/; comments ignored). An environment variable
 // FLXP_<KEY> (upper case) overrides the file. An empty value (in the file
 // or the environment) means unset: the fallback, i.e. automatic. Keys that the
-// shared store maps (shell/settings.h: icons, wallpaper, font_smoothing, ...)
-// fall back to $XDG_CONFIG_HOME/longhorn/settings.ini before the fallback.
+// shared store maps (shell/settings.h: font_smoothing, pinned) fall back to
+// ~/.config/lhde/settings.ini before the fallback. The keys that duplicated
+// theme keys (icons, frame, taskbar_kind, wallpaper, wallpaper_mode, themes_ini)
+// are ignored in flxp.ini (one note on stderr); the theme decides (lhtheme.h).
 std::string setting(const std::string& key, const std::string& fallback = "");
 std::string file_setting(const std::string& key, const std::string& fallback = "");   // flxp.ini (then settings.ini), no FLXP_<KEY>
 std::string settings_path();                  // $XDG_CONFIG_HOME/flxp/flxp.ini

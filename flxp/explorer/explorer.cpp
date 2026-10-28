@@ -1965,7 +1965,7 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         break;
     case WM_DWMCOMPOSITIONCHANGED:          // glass or the opaque header
     case WM_DWMCOLORIZATIONCOLORCHANGED:    // another lhwm theme: its caption height decides the header's
-        // lhwm started after us (frame=auto, no flxp_frame): the header now; it
+        // luxwm started after us (Explorer.chrome auto): the header now; it
         // is not taken away when lhwm goes (a restart deletes its properties)
         if (!g.longhorn && frame_auto() && want_longhorn()) set_frame_mode(true);
         if (g.header) header_refit(h);
@@ -1983,8 +1983,8 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     case WM_THEMECHANGED:                   // the session theme: the header's images, the command bar
         lhbar::theme_changed();             // before a 4051 command bar is made for this theme
         taskpane::theme_changed();
-        set_frame_mode(want_longhorn());    // Luna entries: the XP explorer (flxp_frame)
-        icons_changed();                    // the theme's icon set (flxp_icons)
+        set_frame_mode(want_longhorn());    // Explorer.chrome (Luna: the XP explorer)
+        icons_changed();                    // the theme's icon set (Desktop.icons)
         if (g.header) {
             header::theme_changed();
             header_refit(h);
@@ -2136,7 +2136,9 @@ static void print_info()
     std::string theme = getenv("FLXP_THEME") ? getenv("FLXP_THEME") : "";
     printf("theme        %s\n", theme.empty() ? "classic" : theme.c_str());
     const shell::SessionTheme& st = shell::session_theme();
-    if (!st.name.empty()) printf("session      %s (%s, followed; msstyles %s)\n", st.name.c_str(), st.ini.c_str(), st.path("msstyles").c_str());
+    if (!st.name.empty()) printf("session      %s (%s, followed; style %s, chrome %s, navbar %s %s)\n", st.name.c_str(), st.value("file").c_str(),
+                                 st.msstyles.empty() ? "classic" : st.msstyles.c_str(), st.value("Explorer.chrome").c_str(),
+                                 st.value("Explorer.navbar").c_str(), st.value("Explorer.navbar_preset").c_str());
     else printf("session      %s\n", shell::follows_session_theme() ? "(no _LH_THEME)" : "(not followed: theme_follow=0 or --theme)");
     printf("framelets    %s\n", header::framelet_source().c_str());
     printf("%s", shell::lhde_report().c_str());   // lhde's data directories: what each lookup found

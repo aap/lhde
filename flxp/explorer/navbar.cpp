@@ -163,7 +163,7 @@ void load_skin()
 {
     clear();
     std::string path = shell::theme_setting("navbar_msstyles");
-    if (path.empty()) path = shell::session_theme().path("msstyles");
+    if (path.empty()) path = shell::session_theme().msstyles;
     if (path.empty()) return;
     Style st(path);
     if (!st.t) return;

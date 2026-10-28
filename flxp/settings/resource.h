@@ -28,26 +28,19 @@
 
 #define IDC_SA_NAME     1401
 #define IDC_DT_LIST     1107
-#define IDC_DT_ICONS_SC  1108
 #define IDC_DT_ICONS_SRC 1109
 
-/* scope combos (value id + 10) and "where it comes from" texts (value id + 20) */
-#define IDC_AP_FRAME_SC   1211
-#define IDC_AP_TASKBAR_SC 1212
-#define IDC_AP_START_SC   1213
-#define IDC_AP_COMP_SC    1214
-#define IDC_AP_ANIM_SC    1215
+/* "where it comes from" texts (value id + 20) */
 #define IDC_AP_FRAME_SRC   1221
 #define IDC_AP_TASKBAR_SRC 1222
 #define IDC_AP_START_SRC   1223
 #define IDC_AP_COMP_SRC    1224
 #define IDC_AP_ANIM_SRC    1225
+#define IDC_AP_NAVBAR      1209
+#define IDC_AP_NAVBAR_SRC  1229
 
-/* the Sidebar group (lux's [sidebar]) */
+/* the Sidebar group (luxshell's [sidebar], per user) */
 #define IDC_AP_SBMODE      1206
 #define IDC_AP_SBSTACK     1207
 #define IDC_AP_SBCLASSIC   1208
-#define IDC_AP_SBMODE_SC   1216
-#define IDC_AP_SBCLASSIC_SC 1218
 #define IDC_AP_SBMODE_SRC  1226
-#define IDC_AP_SBCLASSIC_SRC 1228

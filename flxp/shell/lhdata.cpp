@@ -90,19 +90,13 @@ std::vector<std::string> lhde_subdirs(const std::string& rel)
     return out;
 }
 
-std::string lhde_registry()
-{
-    char out[PATH_MAX];
-    return lhde_registry_source(out, sizeof out) ? out : "";
-}
-
 std::string theme_build(const SessionTheme& t)
 {
-    std::string b = build_of(t.value("flxp_longhorn_system32"), "resources/");
-    if (b.empty()) b = digits4(t.value("base").empty() ? t.name : t.value("base"));
-    if (b.empty()) b = digits4(base_of(t.value("msstyles")));
-    if (b.empty()) b = digits4(base_of(dir_of(t.value("flxp_msstyles"))));   // styles/jade4074-xp/jade.msstyles
-    if (b.empty()) b = build_of(t.value("fonts"), "fonts/");
+    std::string b = t.value("Theme.build");
+    if (b.empty()) b = digits4(base_of(t.value("path.resources")));   // resources/4074
+    if (b.empty()) b = digits4(t.name);
+    if (b.empty()) b = digits4(base_of(t.value("path.style")));
+    if (b.empty()) b = digits4(base_of(t.value("path.fonts")));
     return b;
 }
 
@@ -149,21 +143,22 @@ std::string lhde_report()
         std::string w = lhde_where(rel);
         line(what, rel + ": " + (w.empty() ? std::string("not imported") : w) + (note.empty() ? "" : " (" + note + ")"));
     };
-    look("registry", "themes.ini", getenv("LH_THEMES_INI") && *getenv("LH_THEMES_INI") ? "$LH_THEMES_INI wins" : "");
-    look("", "wallpapers.ini");
     const SessionTheme& t = session_theme();
     std::string b = t.name.empty() ? "" : theme_build(t);
     if (!t.name.empty()) {
-        for (const char* k : { "msstyles", "flxp_msstyles" }) {
+        line("theme", t.name + " (" + t.value("file") + ")");
+        auto key = [&](const char* what, const char* k) {
             std::string v = t.value(k);
-            if (v.empty()) continue;
-            const char* what = strcmp(k, "msstyles") ? "  for flxp" : "msstyles";
-            if (v[0] == '/' || v[0] == '~') line(what, v + " (absolute in the registry)");
-            else look(what, v);
-        }
-        line("build", b.empty() ? "(none: not a Longhorn theme by name or registry)" : b + " (theme " + t.name + ")");
-        std::string f = t.value("fonts");
-        if (!f.empty()) look("theme fonts", f.substr(0, f.find(';')));
+            auto w = t.why.find(k);
+            line(what, (v.empty() ? std::string("(none)") : v) + (w != t.why.end() && !w->second.empty() ? "  [" + w->second + "]" : ""));
+        };
+        key("style", "path.style");
+        key("icons", "path.icons");
+        key("wallpaper", "path.wallpaper");
+        key("navbar", "path.navbar");
+        key("theme fonts", "path.fonts");
+        key("theme res", "path.resources");
+        line("build", b.empty() ? "(none)" : b);
     }
     bool have_b = false;
     std::vector<std::string> res = lhde_subdirs("resources");
@@ -175,8 +170,7 @@ std::string lhde_report()
     if (res.empty()) line("resources", "resources/: not imported");
     if (!b.empty() && !have_b) line("", "resources/" + b + ": not imported (the theme's build)");
     std::string set = setting("longhorn_system32"), sys = theme_setting("longhorn_system32");
-    line("system32", sys.empty() ? std::string("(none)") : sys + (!set.empty() ? " (flxp.ini / FLXP_LONGHORN_SYSTEM32)" :
-         !t.value("flxp_longhorn_system32").empty() ? " (the theme's flxp_longhorn_system32)" : " (the build's resources)"));
+    line("system32", sys.empty() ? std::string("(none)") : sys + (!set.empty() ? " (flxp.ini / FLXP_LONGHORN_SYSTEM32)" : " (the theme's path.resources)"));
     look("demo", "resources/demo/docLib", "the task band's aurora");
     look("", "resources/demo/aurora_strip.png");
     std::vector<std::string> fd = default_font_dirs();

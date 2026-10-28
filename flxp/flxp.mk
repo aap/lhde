@@ -16,8 +16,9 @@ $(O)/flxp/explorer/header.o: luxnav/lhnav.h | $(LUXNAVA)
 
 # ---- objects ----------------------------------------------------------------------------
 SHELLOBJS = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/shell/*.cpp)) $(LHDE_OBJS)
-# shell/lhdata: lhde's data directories and the generated registry (liblhde's objects, linked into every flxp program and test with the shell model)
-$(O)/flxp/shell/lhdata.o: CXXFLAGS += -Iliblhde
+# liblhde (<lhde/data.h>, <lhde/theme.h>, <lhde/settings.h>): the data directories, the theme resolver and the settings
+# store; its objects are linked into every flxp program and test with the shell model
+$(O)/flxp/shell/lhdata.o $(O)/flxp/shell/lhtheme.o $(O)/flxp/shell/settings.o $(O)/flxp/settings/settings.o: CXXFLAGS += -Iliblhde
 EXPLOBJS  = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/explorer/*.cpp))
 EXPLSHARED = $(filter-out $(O)/flxp/explorer/explorer.o,$(EXPLOBJS))   # everything but its main
 DESKOBJS  = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/desktop/*.cpp))

@@ -8,6 +8,7 @@
 #include "shell/bookmarks.h"
 #include "shell/config.h"
 #include "shell/settings.h"
+#include "shell/wallpapers.h"
 #include "shell/fileops.h"
 #include "shell/mime.h"
 #include "shell/xclip.h"
@@ -118,13 +119,13 @@ bool is_wallpaper_image(const Item& it)
 
 bool set_wallpaper(const std::string& path, const std::string& mode)
 {
-    // the shared store (settings.ini [desktop]; flxp.ini too if it names a wallpaper, it would win)
-    if (!shell::store::set_shared({ { "desktop", "wallpaper", path }, { "desktop", "mode", mode } })) {
-        error_box("Cannot write " + shell::store::path() + ".");
+    // Desktop.wallpaper / Desktop.mode into the session theme's modified copy (NAME-modified.theme, selected), then
+    // _LH_THEME / _LH_SETTINGS_CHANGED: flxp-desktop, luxshell and luxwm follow the record (shell/wallpapers.h)
+    std::string err;
+    if (!shell::set_desktop_background(path, mode, &err)) {
+        error_box("Cannot set the desktop background: " + err + ".");
         return false;
     }
-    FlxpSetRootString("_FLXP_WALLPAPER", (mode + " " + path).c_str());
-    shell::store::notify("desktop");
     return true;
 }
 

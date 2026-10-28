@@ -33,48 +33,41 @@ BEGIN
     LTEXT           "&Position:", -1, 189, 136, 50, 8
     COMBOBOX        IDC_DT_MODE, 189, 146, 50, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Desktop and folder &icons:", -1, 7, 188, 90, 8
-    COMBOBOX        IDC_DT_ICONS, 100, 186, 68, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_DT_ICONS_SC, 172, 186, 67, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_DT_ICONS, 100, 186, 139, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT           "", IDC_DT_ICONS_SRC, 100, 202, 139, 8
 END
 
-IDD_APPEARANCE DIALOGEX 0, 0, 246, 280
+IDD_APPEARANCE DIALOGEX 0, 0, 246, 262
 STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Appearance"
 FONT 8, "MS Shell Dlg"
 BEGIN
     LTEXT           "Explorer &frame:", -1, 7, 10, 58, 8
-    COMBOBOX        IDC_AP_FRAME, 66, 8, 100, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_AP_FRAME_SC, 170, 8, 69, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_AP_FRAME, 66, 8, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT           "", IDC_AP_FRAME_SRC, 66, 23, 173, 8
-    LTEXT           "&Taskbar:", -1, 7, 34, 58, 8
-    COMBOBOX        IDC_AP_TASKBAR, 66, 32, 100, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_AP_TASKBAR_SC, 170, 32, 69, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_AP_TASKBAR_SRC, 66, 47, 173, 8
-    LTEXT           "Side&bar:", -1, 7, 58, 58, 8
-    COMBOBOX        IDC_AP_SBSTACK, 66, 56, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "&Start menu:", -1, 7, 74, 58, 8
-    COMBOBOX        IDC_AP_START, 66, 72, 100, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_AP_START_SC, 170, 72, 69, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_AP_START_SRC, 66, 87, 173, 8
-    LTEXT           "&Composition:", -1, 7, 98, 58, 8
-    COMBOBOX        IDC_AP_COMP, 66, 96, 100, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_AP_COMP_SC, 170, 96, 69, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_AP_COMP_SRC, 66, 111, 173, 8
-    LTEXT           "&Animations:", -1, 7, 122, 58, 8
-    COMBOBOX        IDC_AP_ANIM, 66, 120, 100, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_AP_ANIM_SC, 170, 120, 69, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_AP_ANIM_SRC, 66, 135, 173, 8
-    GROUPBOX        "Sidebar (lux)", -1, 4, 147, 238, 58
-    LTEXT           "&Mode:", -1, 13, 161, 52, 8
-    COMBOBOX        IDC_AP_SBMODE, 66, 159, 100, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    COMBOBOX        IDC_AP_SBMODE_SC, 170, 159, 69, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_AP_SBMODE_SRC, 66, 174, 167, 8
-    AUTOCHECKBOX    "S&how the sidebar with the classic taskbar", IDC_AP_SBCLASSIC, 13, 185, 153, 10
-    COMBOBOX        IDC_AP_SBCLASSIC_SC, 170, 183, 69, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_AP_SBCLASSIC_SRC, 66, 195, 167, 8
-    LTEXT           "These settings belong to the theme selected on the Themes tab. ""This theme only"" keeps a change for that theme (in its preset, or as an override of the built-in theme). ""All themes"" sets it for every theme and drops the themes' own choices. ""Theme defaults"" goes back to what each theme brings.", -1, 7, 212, 232, 42
-    LTEXT           "The taskbar kind applies when the shell starts its bar again. The sidebar's place (Sidebar) is not per theme; Win+S switches it too.", -1, 7, 256, 232, 20
+    LTEXT           "&Navigation bar:", -1, 7, 34, 58, 8
+    COMBOBOX        IDC_AP_NAVBAR, 66, 32, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_NAVBAR_SRC, 66, 47, 173, 8
+    LTEXT           "&Taskbar:", -1, 7, 58, 58, 8
+    COMBOBOX        IDC_AP_TASKBAR, 66, 56, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_TASKBAR_SRC, 66, 71, 173, 8
+    LTEXT           "&Start menu:", -1, 7, 82, 58, 8
+    COMBOBOX        IDC_AP_START, 66, 80, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_START_SRC, 66, 95, 173, 8
+    LTEXT           "&Composition:", -1, 7, 106, 58, 8
+    COMBOBOX        IDC_AP_COMP, 66, 104, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_COMP_SRC, 66, 119, 173, 8
+    LTEXT           "&Animations:", -1, 7, 130, 58, 8
+    COMBOBOX        IDC_AP_ANIM, 66, 128, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_ANIM_SRC, 66, 143, 173, 8
+    GROUPBOX        "Sidebar (luxshell)", -1, 4, 156, 238, 62
+    LTEXT           "&Mode:", -1, 13, 170, 52, 8
+    COMBOBOX        IDC_AP_SBMODE, 66, 168, 167, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_SBMODE_SRC, 66, 183, 167, 8
+    LTEXT           "P&lace:", -1, 13, 194, 52, 8
+    COMBOBOX        IDC_AP_SBSTACK, 66, 192, 167, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "S&how the sidebar with the classic taskbar", IDC_AP_SBCLASSIC, 13, 206, 220, 10
+    LTEXT           "The settings above the Sidebar belong to the theme chosen on the Themes tab: Apply keeps a change in your copy of it, ""NAME (modified)"", which Save As names. The Sidebar's are yours for every theme.", -1, 7, 222, 232, 34
 END
 
 IDD_EFFECTS DIALOGEX 0, 0, 246, 222

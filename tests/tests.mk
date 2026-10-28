@@ -10,6 +10,7 @@ TOOLKIT_TESTS = $(patsubst tests/toolkit/%.cpp,build/tests/%,$(wildcard tests/to
 W32_TESTS     = $(patsubst tests/w32/%.cpp,build/tests/w32/%,$(wildcard tests/w32/*.cpp))
 NATIVE_OBJS   = $(patsubst %.cpp,$(O)/%.o,$(WUX_NATIVE)) $(SHELLOBJS)
 
+$(O)/tests/toolkit/lhdatatest.o: CXXFLAGS += -Iliblhde
 $(O)/tests/toolkit/%.o: tests/toolkit/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@

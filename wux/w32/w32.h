@@ -122,6 +122,10 @@ void init_user();
 HMODULE comctl32_module();                             // comctl.cpp: embedded comctl32 resources
 void init_theme();                                     // theme.cpp
 bool set_theme(const char* msstyles_path, const char* color, const char* size);
+// the session theme again from the root properties (_LH_THEME, _LH_THEME_RESOLVED, _LH_SETTINGS_SERIAL): a new record
+// becomes shell::session_theme(), a new style is loaded, WM_THEMECHANGED goes out when the look changed. Cheap when
+// nothing changed; called by the root hooks and by programs that must see the record before they act (flxp-desktop).
+void session_theme_refresh();
 void init_gdi();
 void init_kernel();
 

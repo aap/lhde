@@ -495,8 +495,8 @@ HBITMAP dib_from(const gdi::Bitmap* b)
 // 4074's images, read from its Avalon assembly. 4051 and 4074 have the same
 // images and no per-theme variants (Microsoft.Windows.Client.dll holds the only
 // framelet_* set). Looked for, in order: flxp.ini's (or FLXP_*'s)
-// explorer_resources, then next to its longhorn_system32; the same keys of the
-// session theme (flxp_explorer_resources, flxp_longhorn_system32); lhde's
+// explorer_resources, then next to its longhorn_system32; the session theme's
+// path.resources; lhde's
 // resources/<build> (shell/lhdata.h: the theme's build, then 4074, then the
 // others); then the places of extracted Longhorn images: <registry>/../wim and
 // longhorn_wim= in flxp.ini (no default), */*/WINDOWS/Microsoft.NET/Avalon (4074 first, then
@@ -522,11 +522,7 @@ std::vector<Candidate> framelet_candidates()
     if (!res.empty()) out.push_back({ res, origin_of("explorer_resources") });
     add_sys(shell::setting("longhorn_system32"), origin_of("longhorn_system32"));
     const shell::SessionTheme& st = shell::session_theme();
-    if (!st.name.empty()) {
-        std::string tr = st.path("flxp_explorer_resources");
-        if (!tr.empty()) out.push_back({ tr, "theme " + st.name + " flxp_explorer_resources" });
-        add_sys(st.path("flxp_longhorn_system32"), "theme " + st.name + " flxp_longhorn_system32");
-    }
+    if (!st.name.empty()) add_sys(shell::theme_setting("longhorn_system32"), "theme " + st.name + " path.resources");
     // lhde's resources/<build> (lhde-import: a build's system32, its Microsoft.NET beside it):
     // the theme's build, then the others, 4074 first (the header's reference)
     std::string dflt = shell::default_longhorn_system32();
@@ -536,7 +532,6 @@ std::vector<Candidate> framelet_candidates()
         return (shell::base_of(a) == "4074") > (shell::base_of(b) == "4074"); });
     for (const std::string& r : builds) if (r != dflt) add_sys(r, "lhde resources");
     std::vector<std::string> roots;
-    if (!st.ini.empty()) roots.push_back(shell::dir_of(st.ini) + "/../wim");
     std::string wim = shell::setting("longhorn_wim");
     if (!wim.empty()) roots.push_back(wim);
     for (const std::string& r : roots) {
@@ -2000,22 +1995,34 @@ std::string prefixed_setting(const std::string& key)
 
 bool vision_children_menu() { return prefixed_setting("header_crumb_menu") == "children"; }
 
-// header_engine = auto (default: lhnav when the frame theme has a nav.ini) | lhnav | flxp
+// Which header draws: flxp.ini's header_engine = lhnav | flxp when set (a developer's choice), else the session
+// theme's Explorer.navbar (docs/THEME-FORMAT.md): vision = luxnav with path.navbar (data/navbar/vision.ini),
+// 4051 | 4074 = flxp's own header. Without a session theme: luxnav when luxwm's frame set has a nav.ini.
 bool vision_wanted(std::string* ini, std::string* why)
 {
-    std::string e = prefixed_setting("header_engine");
-    if (e.empty()) e = "auto";
-    std::string dir = frame_theme_dir(), f = dir.empty() ? "" : dir + "/nav.ini";
-    struct stat st;
-    bool have = !f.empty() && stat(f.c_str(), &st) == 0;
+    std::string e = shell::setting(g_prefix + "header_engine");
+    if (e.empty() && !g_prefix.empty()) e = shell::setting("header_engine");
+    const shell::SessionTheme& st = shell::session_theme();
+    std::string nb = st.value("Explorer.navbar"), f = nb == "vision" ? st.value("path.navbar") : "";
+    struct stat sb;
+    if (f.empty() || stat(f.c_str(), &sb) != 0) {
+        std::string dir = frame_theme_dir();
+        f = dir.empty() ? "" : dir + "/nav.ini";
+    }
+    bool have = !f.empty() && stat(f.c_str(), &sb) == 0;
     *ini = have ? f : "";
     if (e == "flxp") { *why = "flxp (" + g_prefix + "header_engine=flxp)"; return false; }
     if (e == "lhnav") {
         *why = "lhnav (" + g_prefix + "header_engine=lhnav, " + (have ? f : std::string("no nav.ini: lhnav's defaults")) + ")";
         return true;
     }
-    if (have) { *why = "lhnav (auto: " + f + ")"; return true; }
-    *why = "flxp (auto: " + (dir.empty() ? std::string("no lhwm frame theme") : "no nav.ini in " + dir) + ")";
+    if (nb == "vision") {
+        *why = "lhnav (Explorer.navbar=vision, " + (have ? f : std::string("no navbar file: lhnav's defaults")) + ")";
+        return true;
+    }
+    if (!nb.empty()) { *why = "flxp (Explorer.navbar=" + nb + ")"; return false; }
+    if (have) { *why = "lhnav (no session theme; " + f + ")"; return true; }
+    *why = "flxp (no session theme, no nav.ini of luxwm's frame set)";
     return false;
 }
 
@@ -2035,10 +2042,8 @@ std::string vision_preset(const std::string& ini)
 // the session's visual style for lhnav (the file the shim loaded), nav.ini's preset
 void vision_load(const std::string& ini)
 {
-    // the registry's Longhorn msstyles, as navdemo and the navigation bar
-    // (navbar.cpp) open it; the style the shim loaded is often its XP backport
+    // the theme's visual style, as navdemo and the navigation bar (navbar.cpp) open it
     std::string path = shell::theme_setting("navbar_msstyles");
-    if (path.empty()) path = shell::session_theme().path("msstyles");
     if (path.empty()) path = shell::session_theme().msstyles;
     if (path != g_v.style_path || !g_v.nav) {
         ut_theme* old = g_v.style;
@@ -2862,11 +2867,18 @@ bool g_settings_read;
 bool on_value(const std::string& v) { return v != "0" && v != "off" && v != "no" && v != "false"; }
 
 // <prefix>header_size and the elements; the dialog's (prefix filedlg_) fall
-// back to the explorer's for the elements
+// back to the explorer's for the elements. The explorer's size without a
+// header_size of its own: the session theme's Explorer.navbar_preset (4074:
+// small | medium | large | xlarge; docs/THEME-FORMAT.md)
 void read_settings()
 {
     g_settings_read = true;
-    std::string sz = shell::setting(g_prefix + "header_size", g_default_size);
+    std::string dflt = g_default_size;
+    const shell::SessionTheme& st = shell::session_theme();
+    std::string np = st.value("Explorer.navbar_preset");
+    if (g_prefix.empty() && st.value("Explorer.navbar") != "vision" &&
+        (np == "small" || np == "medium" || np == "large" || np == "xlarge")) dflt = np;
+    std::string sz = shell::setting(g_prefix + "header_size", dflt);
     g_hsize = SIZE_MEDIUM;
     if (sz == "small" || sz == "tiny") g_hsize = SIZE_SMALL;
     else if (sz == "large") g_hsize = SIZE_LARGE;
@@ -3198,6 +3210,7 @@ void theme_changed()
     if (g_mag_icon) DeleteObject(g_mag_icon);   // the theme's longhorn_system32 may be another build's
     g_mag_icon = nullptr; g_mag_looked = false;
     g_mode = GLASS;             // fonts and layout again for whatever comes now
+    read_settings();            // the theme's navbar_preset may give another size
     composition_changed();
 }
 

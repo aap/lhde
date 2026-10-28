@@ -59,6 +59,8 @@ struct Desktop {
     HDC wall_dc = nullptr;              // the composed wallpaper (screen size)
     HBITMAP wall_bmp = nullptr;
     std::string wall_file, wall_mode;   // what wall_bmp shows
+    uint32_t wall_color = 0x3a6ea5;     // Desktop.color under it
+    bool wall_bmp_stale = false;        // the colour changed: compose again
     std::vector<Item> items;            // list index = items index
     std::map<std::string, POINT> pos;   // saved icon positions by name
     shell::SortBy sort = shell::SortBy::Name;
@@ -70,7 +72,7 @@ struct Desktop {
     bool drag_own = false;              // our FlxpDragFiles is running
     POINT drag_start = {};              // where it was grabbed (screen)
     int drop_item = -1;                 // the icon shown as the drop target
-    UINT w_workarea = 0, w_wallpaper = 0, w_settings = 0, w_resolved = 0;
+    UINT w_workarea = 0, w_theme = 0, w_settings = 0, w_resolved = 0;
     int64_t desk_mtime = 0;             // ~/Desktop, polled for changes (without inotify)
     shell::DirWatch watch;              // ~/Desktop followed with inotify: TIMER_FOLLOW after a change
     bool follow_armed = false;
@@ -117,59 +119,38 @@ void open_in_explorer(const std::string& path)
 
 // ---- wallpaper --------------------------------------------------------------------
 
-// The wallpaper, first match:
-// 1. the root property _FLXP_WALLPAPER = "MODE PATH" (Set as Desktop Background,
-//    Desktop Background..., or any other tool: an explicit choice for this X
-//    session; also beats a theme switch);
-// 2. wallpaper= (flxp.ini, or FLXP_WALLPAPER at start-up: a session script's
-//    default; after a theme switch only flxp.ini's counts);
-// 3. the session theme's (x11/THEMES.md "Wallpapers": [override:NAME], the preset, a themes.ini key, wallpapers.ini;
-//    shell/wallpapers.h; fill as lhshell's feh --bg-fill);
-// 4. after a switch to a theme without one: the start-up wallpaper.
-// XP's plain blue when none of them names a file, or when the first that is
-// set says "none" (settings.ini [desktop] wallpaper = none, _FLXP_WALLPAPER
-// "none", x11/SETTINGS.md): no image, the theme's wallpaper is not used.
-bool root_wallpaper(std::string& file, std::string& mode)
-{
-    char buf[4096];
-    int n = FlxpGetRootString("_FLXP_WALLPAPER", buf, sizeof buf);
-    if (n <= 0 || n >= (int)sizeof buf) return false;
-    std::string v(buf, (size_t)n);
-    size_t sp = v.find(' ');
-    if (sp == std::string::npos) { file = v; mode.clear(); }
-    else { mode = v.substr(0, sp); file = v.substr(sp + 1); }
-    if (mode != "stretch" && mode != "center" && mode != "tile" && mode != "fill" && mode != "fit") {
-        if (sp != std::string::npos && !mode.empty() && mode[0] == '/') file = v;   // a bare path with a space
-        mode.clear();
-    }
-    return !file.empty();
-}
-
+// The wallpaper (docs/THEME-FORMAT.md [Desktop]), first match:
+// 1. --wallpaper FILE / --wallpaper-mode (FLXP_WALLPAPER[_MODE]) at start-up, until the theme changes;
+// 2. settings.ini [desktop] wallpaper = none (luxshell's "Show the wallpaper" off): the colour only;
+// 3. the session theme's record: path.wallpaper (Desktop.wallpaper; none = the colour only), Desktop.mode,
+//    Desktop.color. Set as Desktop Background and Display Properties write those keys into the theme's
+//    modified copy; the record follows (_LH_THEME, _LH_SETTINGS_CHANGED, _LH_THEME_RESOLVED).
+// Without a session theme: XP's plain blue.
 void make_wallpaper(bool switched = false)
 {
+    if (switched) w32::session_theme_refresh();   // the record first (the shim's own hook may run after us)
     std::string file, mode;
-    if (!root_wallpaper(file, mode)) {
-        file = switched ? shell::file_setting("wallpaper") : shell::setting("wallpaper");
-        mode = switched ? shell::file_setting("wallpaper_mode") : shell::setting("wallpaper_mode");
-        const shell::SessionTheme& st = shell::session_theme();
-        std::string lc = file;
-        for (char& c : lc) c = (char)tolower((unsigned char)c);
-        // x11/THEMES.md "Wallpapers": none, the theme's [override:NAME] / preset, the user's file (settings.ini
-        // [desktop]; flxp.ini and the environment stay ahead of all), the theme's (themes.ini key, wallpapers.ini)
-        bool explicit_file = !file.empty() && file != shell::store::value_for("wallpaper");
-        shell::Wallpaper w;
-        if (lc != "none" && !explicit_file && shell::own_wallpaper(st, w)) {
-            file = w.file;
-            mode = w.mode.empty() ? shell::file_setting("wallpaper_mode", "fill") : w.mode;
-        } else if (file.empty() && shell::theme_wallpaper(st, w)) {
-            file = w.file;
-            mode = w.mode.empty() ? "fill" : w.mode;
-        } else if (switched && file.empty()) {
-            file = shell::setting("wallpaper");          // no theme wallpaper: keep the start-up one
-            mode = shell::setting("wallpaper_mode");
-        }
+    uint32_t color = DEFAULT_BACKGROUND;
+    static bool own_gone;                          // the theme changed since start-up: --wallpaper no longer counts
+    own_gone = own_gone || switched;
+    const char* ef = getenv("FLXP_WALLPAPER");
+    shell::Wallpaper w;
+    bool have = shell::theme_wallpaper(shell::session_theme(), w);
+    if (!shell::session_theme().name.empty()) color = w.color;
+    if (!own_gone && ef && *ef) {
+        file = ef;
+        const char* em = getenv("FLXP_WALLPAPER_MODE");
+        mode = em ? em : "";
+    } else if (shell::wallpaper_hidden()) {
+        file = "none";
+    } else if (have) {
+        file = w.file;
+        mode = w.mode.empty() ? "fill" : w.mode;
     }
-    if (file == g.wall_file && mode == g.wall_mode && g.wall_bmp) return;
+    if (color != g.wall_color) g.wall_bmp_stale = true;
+    g.wall_color = color;
+    if (file == g.wall_file && mode == g.wall_mode && g.wall_bmp && !g.wall_bmp_stale) return;
+    g.wall_bmp_stale = false;
     g.wall_file = file; g.wall_mode = mode;
     wallpaper::Image img;
     std::string err;
@@ -188,7 +169,7 @@ void make_wallpaper(bool switched = false)
     HBITMAP bmp = CreateDIBSection(g.wall_dc, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
     if (!bmp) return;
     // the whole screen (XP stretches over the monitor, not the work area)
-    wallpaper::compose(img, wallpaper::mode_from(mode.empty() ? "stretch" : mode), DEFAULT_BACKGROUND,
+    wallpaper::compose(img, wallpaper::mode_from(mode.empty() ? "stretch" : mode), g.wall_color,
                        (uint32_t*)bits, g.width, g.height, 0, 0, g.width, g.height);
     HGDIOBJ old = SelectObject(g.wall_dc, bmp);
     if (g.wall_bmp) DeleteObject(g.wall_bmp); else (void)old;
@@ -794,13 +775,14 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         fill();
         return 0;
     case WM_THEMECHANGED:
-        // the session theme's wallpaper (unless _FLXP_WALLPAPER or flxp.ini names one)
+        // the session theme's wallpaper
         wallpaper_changed(true);
         if (uiicons::sync()) InvalidateRect(g.list, nullptr, TRUE);   // the theme's icon set
         break;
     case WM_FLXP_ROOTPROPERTY:
-        // _LH_SETTINGS_CHANGED: settings.ini's [desktop] wallpaper/mode (shell/settings.h), the icon set (per theme)
-        if ((UINT)wp == g.w_wallpaper || (UINT)wp == g.w_settings || (UINT)wp == g.w_resolved) wallpaper_changed(true);
+        // _LH_THEME, _LH_SETTINGS_CHANGED (a theme file, settings.ini's [desktop] wallpaper = none), a new record:
+        // the theme's Desktop.* (the shim sends no WM_THEMECHANGED for a wallpaper alone)
+        if ((UINT)wp == g.w_theme || (UINT)wp == g.w_settings || (UINT)wp == g.w_resolved) wallpaper_changed(true);
         if ((UINT)wp == g.w_settings && uiicons::sync()) InvalidateRect(g.list, nullptr, TRUE);
         if ((UINT)wp == g.w_workarea) {
             // the struts moved: keep every icon inside the new work area
@@ -837,8 +819,8 @@ void usage(FILE* f)
         "usage: flxp-desktop [options]\n"
         "The flxp desktop: wallpaper and icons (~/Desktop, My Documents, My Computer,\n"
         "Recycle Bin) in a window of type _NET_WM_WINDOW_TYPE_DESKTOP covering the screen.\n"
-        "  --wallpaper FILE          BMP, PNG or JPEG (setting wallpaper=)\n"
-        "  --wallpaper-mode MODE     stretch, center, tile or fill (setting wallpaper_mode=)\n"
+        "  --wallpaper FILE          BMP, PNG, JPEG or WebP, until the theme changes (else the theme's Desktop.wallpaper)\n"
+        "  --wallpaper-mode MODE     stretch, center, tile, fill or fit\n"
         "  --theme NAME|PATH, --classic, --icons NAME|PATH   as for flxp\n"
         "  --quit-after MS           close after MS milliseconds (testing)\n");
 }
@@ -876,9 +858,9 @@ int main(int argc, char** argv)
     make_wallpaper();
     // desktop_fade_ms (the fade to black in lhwm's maximised mode) is gone with M5b: ignored
     g.w_workarea = FlxpWatchRootProperty("_NET_WORKAREA");
-    g.w_wallpaper = FlxpWatchRootProperty("_FLXP_WALLPAPER");
+    g.w_theme = FlxpWatchRootProperty("_LH_THEME");
     g.w_settings = FlxpWatchRootProperty("_LH_SETTINGS_CHANGED");
-    g.w_resolved = FlxpWatchRootProperty("_LH_THEME_RESOLVED");   // lux's wallpaper=/mode= for the theme in force
+    g.w_resolved = FlxpWatchRootProperty("_LH_THEME_RESOLVED");   // the record of the theme in force (luxwm, luxshell)
 
     WNDCLASSW wc = {};
     wc.lpfnWndProc = proc;

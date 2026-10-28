@@ -54,9 +54,12 @@ static const char template_text[] =
     "# crisp, the Luna start button and captions are smoothed. cleartype is drawn\n"
     "# as standard for now.\n"
     "font_smoothing =\n"
-    "# Icon theme: xp, 2k, longhorn, wine, or a path to a .theme file.\n"
-    "# Auto: xp, falling back to wine when its files cannot be found.\n"
-    "icons =\n"
+    "# The theme decides the icon set, the Explorer frame and navigation bar, the\n"
+    "# taskbar, the start menu and the wallpaper (Desktop.icons, Explorer.chrome,\n"
+    "# Explorer.navbar, Shell.taskbar, Shell.start, Desktop.wallpaper: docs/\n"
+    "# THEME-FORMAT.md; Display Properties writes NAME-modified.theme). flxp.ini's\n"
+    "# icons, frame, taskbar_kind, wallpaper and wallpaper_mode are ignored; for\n"
+    "# one run FLXP_ICONS, FLXP_FRAME (--frame), ... still count.\n"
     "# The Windows XP SP1 source tree (the xp and 2k icon themes read its .ico/.bmp\n"
     "# files; not needed after 'make install-icons').\n"
     "nt5src =\n"
@@ -78,8 +81,8 @@ static const char template_text[] =
     "# searched: lhde's styles/ (<name>.msstyles, <name>/), ~/.local/share/flxp/themes, <datadir>/themes,\n"
     "# ~/.wine/drive_c/windows/resources/themes, ~/.themes.\n"
     "theme_path =\n"
-    "# Follow the Longhorn session theme (the root property _LH_THEME, lhwm's\n"
-    "# themes.ini): its visual style replaces theme= and changes live with it;\n"
+    "# Follow the session theme (the root property _LH_THEME, a theme file that\n"
+    "# liblhde resolves): its visual style replaces theme= and changes live with it;\n"
     "# 0 = keep theme= (auto: 1). --theme for one run does not follow either.\n"
     "theme_follow =\n"
     "\n"
@@ -89,11 +92,7 @@ static const char template_text[] =
     "geometry =\n"
     "# Open Terminal Here: a /bin/sh command, %d = the quoted directory (auto: urxvt).\n"
     "terminal =\n"
-    "# Window frame: xp (the window manager's frame), longhorn (the Longhorn 4074\n"
-    "# header with Back/Forward, title, breadcrumb and search box, on lhwm's glass\n"
-    "# when it composites, else opaque in the colours of lhwm's caption or Slate,\n"
-    "# and the 4051 menu/command bar), auto: longhorn when lhwm runs at start.\n"
-    "frame =\n"
+
     "# The longhorn frame's menu bar row: the folder-type gradient of Longhorn's\n"
     "# slate.msstyles (default, document, music, picture, video, contact, game;\n"
     "# auto: document, read from longhorn_system32/../Resources/Themes/Slate) or\n"
@@ -107,7 +106,8 @@ static const char template_text[] =
     "# The longhorn header (View > Header; 4074's Toolbar Size and Toolbars):\n"
     "# small (36 rows under the caption, which keeps the title), medium (4051's\n"
     "# 54-row navigation bar), large, xlarge (32 / 49 more rows); auto: medium (the\n"
-    "# file dialog: filedlg_header_size, auto small). The elements: 1 or 0 (auto: 1).\n"
+    "# theme's Explorer.navbar_preset, else medium; the file dialog:\n"
+    "# filedlg_header_size, auto small). The elements: 1 or 0 (auto: 1).\n"
     "header_size =\n"
     "header_buttons =\n"
     "header_title =\n"
@@ -118,10 +118,10 @@ static const char template_text[] =
     "# 4074), uneven (the big pair scaled: bigger Back, smaller Forward, 4051 and\n"
     "# the concepts); auto: even where the style has Small buttons, else uneven.\n"
     "header_small_buttons =\n"
-    "# Which header draws: lhnav (the concept art's vision header, ~/fun/longhorn/\n"
-    "# x11/NAVBAR.md), flxp (the 4051/4074 header above); auto: lhnav when lhwm's\n"
-    "# frame theme has a nav.ini (Aero vision). header_preset: one of nav.ini's\n"
-    "# [preset NAME] sections (auto: nav.ini's own; the Small size: small).\n"
+    "# Which header draws: lhnav (luxnav, the vision header, docs/NAVBAR.md), flxp\n"
+    "# (the 4051/4074 header above); auto: the theme's Explorer.navbar (vision:\n"
+    "# lhnav). header_preset: one of the navbar file's [preset NAME] sections\n"
+    "# (auto: the theme's Explorer.navbar_preset, else the file's own; Small: small).\n"
     "# header_crumb_menu: siblings (4074, auto) or children (Vista) for a chevron.\n"
     "header_engine =\n"
     "header_preset =\n"
@@ -143,12 +143,7 @@ static const char template_text[] =
     "folders =\n"
     "# The places pane (Places and Bookmarks) where the Folders tree is when that\n"
     "# is off: on or off (auto: on).\n"
-    "places_pane =\n"
-    "\n"
-    "# flxp-desktop: the wallpaper (BMP, PNG, JPEG or WebP; auto: XP's plain blue) and how\n"
-    "# it covers the screen: stretch, center, tile or fill (auto: stretch).\n"
-    "wallpaper =\n"
-    "wallpaper_mode =\n";
+    "places_pane =\n";
 
 bool write_settings_template()
 {
@@ -224,7 +219,7 @@ void setup_fonts()
     static bool done;
     if (done) return;
     done = true;
-    std::string sm = setting("font_smoothing");
+    std::string sm = theme_setting("font_smoothing");
     gdi::set_font_smoothing(sm == "off" || sm == "0" ? gdi::SMOOTH_OFF :
                             sm == "cleartype" ? gdi::SMOOTH_CLEARTYPE : gdi::SMOOTH_STANDARD);
     // font_path, else the imported Windows fonts (lhde's fonts/<build> with Tahoma)
@@ -342,27 +337,28 @@ std::string setup_theme()
     // the Longhorn session theme wins over theme= unless theme_follow = 0 or
     // a theme was given for this run
     if (follows_session_theme()) {
-        std::string name, ini;
         SessionTheme t;
-        if (read_session_properties(name, ini)) {
-            if (!lookup_session_theme(name, ini, t)) {
-                if (is_preset_name(name)) fprintf(stderr, "flxp: preset %s: no base theme in %s; using theme=\n", name.c_str(), ini.c_str());
-                else fprintf(stderr, "flxp: session theme \"%s\" is not in %s; using theme=\n", name.c_str(), ini.c_str());
+        std::string err;
+        if (read_session_theme(t, &err)) {
+            set_session_theme(t);
+            if (t.classic) {
+                // VisualStyle.style = classic: no visual style
+                export_env("FLXP_THEME", ""); export_env("FLXP_THEME_COLOR", ""); export_env("FLXP_THEME_SIZE", "");
+                export_env("FLXP_THEME_FOLLOWED", t.name);
+                return "";
             }
+            if (t.msstyles.empty())
+                fprintf(stderr, "flxp: session theme %s: no visual style (%s: %s); using theme=\n", t.name.c_str(),
+                        t.value("VisualStyle.style").c_str(), t.why.count("path.style") ? t.why.at("path.style").c_str() : "not found");
             else {
-                set_session_theme(t);
-                if (t.msstyles.empty())
-                    fprintf(stderr, "flxp: no visual style flxp can load for session theme %s (%s: not a v3/v4 msstyles; a "
-                            "flxp_msstyles or an xp-backport is needed); using theme=\n", t.name.c_str(), t.path("msstyles").c_str());
-                else {
-                    export_env("FLXP_THEME", t.msstyles);
-                    export_env("FLXP_THEME_COLOR", t.color);
-                    export_env("FLXP_THEME_SIZE", t.size);
-                    export_env("FLXP_THEME_FOLLOWED", t.name);
-                    return t.msstyles;
-                }
+                export_env("FLXP_THEME", t.msstyles);
+                export_env("FLXP_THEME_COLOR", t.color);
+                export_env("FLXP_THEME_SIZE", t.size);
+                export_env("FLXP_THEME_FOLLOWED", t.name);
+                return t.msstyles;
             }
-        }
+        } else if (err != "no _LH_THEME" && err != "no display")
+            fprintf(stderr, "flxp: session theme: %s; using theme=\n", err.c_str());
     }
     if (getenv("FLXP_THEME_FOLLOWED")) {
         // inherited from a parent that followed a session theme that is gone now

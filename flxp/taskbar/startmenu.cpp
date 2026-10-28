@@ -125,18 +125,17 @@ HMENU programs_menu()
     return m;
 }
 
-// the sections of the session's theme registry (THEMES.md), then the user's
-// presets (~/.config/longhorn/themes/*.theme, x11/SETTINGS.md), for Settings > Theme
+// the themes as liblhde lists them (the user's theme files, the shipped ones, the bare styles;
+// docs/THEME-FORMAT.md), for Settings > Theme
 HMENU themes_menu()
 {
     theme_cmds.clear();
     const shell::SessionTheme& cur = shell::session_theme();
-    std::string reg = cur.ini.empty() ? shell::store::registry_path() : cur.ini;
-    std::vector<shell::store::ThemeEntry> list = shell::store::theme_list(reg);
+    std::vector<shell::store::ThemeEntry> list = shell::store::theme_list();
     if (list.empty()) return nullptr;
     HMENU m = CreatePopupMenu();
     for (size_t i = 0; i < list.size(); i++) {
-        if (i && list[i].preset && !list[i - 1].preset) AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+        if (i && list[i].group != list[i - 1].group) AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
         theme_cmds.push_back({ list[i].name, list[i].title.empty() ? list[i].name : list[i].title });
         append(m, CMD_THEME + (UINT)i, menu_text(theme_cmds[i].second), theme_cmds[i].first == cur.name ? MF_CHECKED : 0);
     }
@@ -456,7 +455,7 @@ bool command(UINT cmd)
     if (cmd >= CMD_APP && cmd - CMD_APP < app_cmds.size()) {
         launch(*app_cmds[cmd - CMD_APP]);
     } else if (cmd >= CMD_THEME && cmd - CMD_THEME < theme_cmds.size()) {
-        // settings.ini [theme] name, _LH_THEME, _LH_SETTINGS_CHANGED (shell/settings.h); a preset by its name
+        // settings.ini [theme] name, _LH_THEME, _LH_SETTINGS_CHANGED (shell/settings.h)
         if (!shell::store::apply_theme(theme_cmds[cmd - CMD_THEME].first)) xwm::set_root_utf8("_LH_THEME", theme_cmds[cmd - CMD_THEME].first);
     } else switch (cmd) {
     case CMD_DOCUMENTS: open_folder(home()); break;

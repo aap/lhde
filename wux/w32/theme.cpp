@@ -1,8 +1,8 @@
 // Visual styles: wiring the vendored uxtheme into the shim. A theme is
 // selected the way Windows does it, through the ThemeManager registry key,
-// which here lives in the shim's in-memory registry. The Longhorn session
-// theme (root _LH_THEME, shell/lhtheme) is followed at run time: a change
-// reloads the style and sends WM_THEMECHANGED to every window.
+// which here lives in the shim's in-memory registry. The session theme (root
+// _LH_THEME resolved by liblhde, shell/lhtheme) is followed at run time: a
+// change reloads the style and sends WM_THEMECHANGED to every window.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +15,6 @@
 #include "shell/lhtheme.h"
 #include "shell/config.h"
 #include "shell/runtime.h"
-#include "shell/settings.h"
 #include "gdi/font.h"
 extern "C" {
 #include "winreg.h"
@@ -76,49 +75,73 @@ static BOOL CALLBACK redraw_all(HWND h, LPARAM)
     return TRUE;
 }
 
-// The session theme changed (or the registry path): look it up and reload the
-// visual style if it is another one. Windows: the theme service's
-// WM_THEMECHANGED; here the root PropertyNotify, coalesced by the toolkit.
-static void session_theme_changed()
+// the record without the keys only flxp-desktop reads (the wallpaper) and the theme's identity (a switch to
+// NAME-modified.theme for a new wallpaper): a change there is no theme change for the windows
+static std::string look_of(const shell::SessionTheme& t)
 {
-    std::string name = win::root_string("_LH_THEME"), ini = win::root_string("_LH_THEMES_INI");
+    static const char* const skip[] = { "path.wallpaper", "theme", "file", "chain", "Theme.name", "Theme.base", "Theme.aliases" };
+    std::string out;
+    for (auto& kv : t.keys) {
+        bool own = kv.first.compare(0, 8, "Desktop.") == 0 && kv.first != "Desktop.icons";
+        for (const char* k : skip) own = own || kv.first == k;
+        if (!own) out += kv.first + "=" + kv.second + "\n";
+    }
+    return out;
+}
+
+// The session theme changed (_LH_THEME, the published record, or a theme file: _LH_SETTINGS_CHANGED): resolve it
+// (lhtheme.h) and reload the visual style if it is another one. Windows: the theme service's WM_THEMECHANGED; here
+// the root PropertyNotify, coalesced by the toolkit.
+void session_theme_refresh()
+{
+    if (!shell::follows_session_theme()) return;
+    std::string name = win::root_string("_LH_THEME");
     if (name.empty()) return;                        // nobody publishes a theme: keep ours
-    if (ini.empty()) ini = shell::store::registry_path();   // no registry published: lhde's (shell/lhdata.h)
+    long serial = 0;
+    if (win::root_cardinals("_LH_SETTINGS_SERIAL", &serial, 1) != 1) serial = 0;
     const shell::SessionTheme& cur = shell::session_theme();
     shell::SessionTheme t;
-    if (!shell::lookup_session_theme(name, ini, t)) {
-        fprintf(stderr, shell::is_preset_name(name) ? "flxp: preset %s: no base theme in %s; keeping %s\n"
-                : "flxp: session theme \"%s\" is not in %s; keeping %s\n", name.c_str(), ini.c_str(),
+    std::string err;
+    if (!shell::session_theme_from(name, win::root_string("_LH_THEME_RESOLVED"), (unsigned long)serial, t, &err)) {
+        fprintf(stderr, "flxp: session theme \"%s\": %s; keeping %s\n", name.c_str(), err.c_str(),
                 cur.name.empty() ? "the current style" : cur.name.c_str());
         return;
     }
-    if (t.name == cur.name && t.ini == cur.ini && t.value("base") == cur.value("base")) return;   // an alias replaced by its name, a rewrite
+    if (t.body == cur.body) return;                  // the same record (republished at another serial)
+    bool look = look_of(t) != look_of(cur);
     shell::set_session_theme(t);
     set_env("FLXP_THEME_FOLLOWED", t.name);               // children follow too
-    bool style = !t.msstyles.empty() && (t.msstyles != g_path || t.color != g_color || t.size != g_size);
-    if (t.msstyles.empty())
-        fprintf(stderr, "flxp: no visual style flxp can load for session theme %s; keeping the current one\n", t.name.c_str());
+    if (!look) return;                                    // the wallpaper only: flxp-desktop's business
+    bool style = t.classic ? !g_path.empty()
+                           : !t.msstyles.empty() && (t.msstyles != g_path || t.color != g_color || t.size != g_size);
+    if (t.msstyles.empty() && !t.classic)
+        fprintf(stderr, "flxp: no visual style for session theme %s (%s); keeping the current one\n", t.name.c_str(),
+                t.value("VisualStyle.style").c_str());
     if (style) {
         set_env("FLXP_THEME", t.msstyles); set_env("FLXP_THEME_COLOR", t.color); set_env("FLXP_THEME_SIZE", t.size);
         reset_syscolors();                               // the new style's [SysMetrics] start from classic
-        set_theme(t.msstyles.c_str(), t.color.c_str(), t.size.c_str());
+        set_theme(t.classic ? nullptr : t.msstyles.c_str(), t.color.c_str(), t.size.c_str());
         if (getenv("FLXP_DEBUG")) fprintf(stderr, "flxp: session theme %s: %s (%s/%s), window text %06x\n", t.name.c_str(),
-                                          t.msstyles.c_str(), t.color.c_str(), t.size.c_str(), (unsigned)GetSysColor(COLOR_WINDOWTEXT));
+                                          t.classic ? "classic" : t.msstyles.c_str(), t.color.c_str(), t.size.c_str(),
+                                          (unsigned)GetSysColor(COLOR_WINDOWTEXT));
     } else {
-        // the same style (aero4074 and jade4074 both load Jade): still a theme
-        // change for the windows (flxp_* keys, lhwm's frame)
+        // the same style (aero4074 and aerovision both load aero-patch): still a theme
+        // change for the windows (chrome, navbar, icons, luxwm's frame)
         EnumWindows(post_theme_changed, 1);
     }
     // repaint everything: system colours, non-client areas, unthemed parts
     EnumWindows(redraw_all, 0);
 }
 
-// _LH_SETTINGS_CHANGED (x11/SETTINGS.md): the settings every program follows
-// live. Font smoothing ([fonts] smoothing, under flxp.ini's font_smoothing):
-// the glyph caches are keyed by it, so a repaint is all it takes.
+// _LH_SETTINGS_CHANGED (docs/SETTINGS.md): the settings every program follows
+// live. A theme file may have changed (NAME-modified.theme): the record again.
+// Font smoothing (settings.ini [fonts] smoothing, else the theme's
+// Fonts.smoothing, under flxp.ini's font_smoothing): the glyph caches are keyed
+// by it, so a repaint is all it takes.
 static void settings_changed()
 {
-    std::string sm = shell::setting("font_smoothing");
+    session_theme_refresh();
+    std::string sm = shell::theme_setting("font_smoothing");
     int mode = sm == "off" || sm == "0" ? gdi::SMOOTH_OFF : sm == "cleartype" ? gdi::SMOOTH_CLEARTYPE : gdi::SMOOTH_STANDARD;
     if (mode == gdi::font_smoothing()) return;
     gdi::set_font_smoothing(mode);
@@ -134,9 +157,8 @@ void init_theme()
     g_theme_inited = true;
     win::on_root_property_change("_LH_SETTINGS_CHANGED", settings_changed);
     if (shell::follows_session_theme()) {
-        win::on_root_property_change("_LH_THEME", session_theme_changed);
-        win::on_root_property_change("_LH_THEMES_INI", session_theme_changed);
-        win::on_root_property_change("_LH_THEME_RESOLVED", session_theme_changed);   // a preset's base, from lhwm/lux
+        win::on_root_property_change("_LH_THEME", session_theme_refresh);
+        win::on_root_property_change("_LH_THEME_RESOLVED", session_theme_refresh);   // luxwm's / luxshell's record
     }
 }
 
