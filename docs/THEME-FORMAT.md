@@ -127,8 +127,8 @@ the desktop colour (COLOR_BACKGROUND) under the wallpaper; `Desktop.color` when 
 - Migration: existing `NAME-modified.theme` files stay what they are, ordinary user themes (their `base = NAME` and `name =
   TITLE (modified)`); nothing converts them. Delete them in Display Properties, or keep them under a better name with Save As.
 - `lhde_theme_set_key` (the earlier model: the first change writes `NAME-modified.theme` with `base = NAME`, only the changed
-  keys, `name = TITLE (modified)`, and selects it) still works for its callers (luxshell's flyout, `lhde-theme set-key`);
-  Display Properties no longer uses it.
+  keys, `name = TITLE (modified)`, and selects it) still works for its callers (`lhde-theme set-key`); Display Properties and
+  luxshell's flyout no longer use it (section 15).
 
 ## 4. The resolver (`lhtheme/`, the lux side writes it, everybody links it)
 `lhtheme_resolve(name)` returns one flat record `section.key = value` with inheritance, defaults and
@@ -324,3 +324,30 @@ aap: "currently everything is driven by the themes and doing any modifications w
   inactiveborder, btnface/btnhighlight/btnshadow/3ddkshadow/3dlight for the edges and buttons) and `Metrics.*` (captionheight,
   captionwidth, borderwidth, captionfont), i.e. Windows' classic DrawCaption / DrawEdge frame.
 
+## 15. The lux side of section 14 (2026-10-28, lux side)
+- **luxwm: Windows Classic frames.** A record with `style.kind = classic` (and a theme with neither a frame set nor a visual
+  style) gets the classic frame instead of keeping the previous one: luxwm passes the record's `Colors.*`, `Metrics.borderwidth /
+  captionwidth / captionheight / captionfont / menufont` and `Fonts.smoothing` to frame.c, which paints user32's non-client area
+  (DrawEdge, the sizing border, DrawFrameControl caption buttons with Marlett's glyphs as bitmaps, the GradientFill caption, the
+  text placed as GDI places it); `frames_classic` and `Glass.frames` do not apply then. Measured against Longhorn 4051's Windows
+  Classic: the caption of an 800 px window is pixel-identical (docs/LUXWM.md "Windows Classic frames"). The window menu takes the
+  scheme's menu colours and `Metrics.menufont`. `luxwm/tests/regress.sh`: `classic/`, `classic.xl/`, `classic.hc/`.
+- **luxshell: the layer.** The settings flyout (composition, taskbar, start menu) and `_LHSHELL_COMMAND taskbar KIND` write
+  `Shell.*` / `Glass.composition` into the current layer (`lhde_current_set_key`, the Lua binding `lh.current_set_key`; then
+  `_LH_SETTINGS_CHANGED` with the hint `current` and the record republished, `_LH_THEME` keeps its name); no `NAME-modified.theme`.
+  Theme switches go through `lhde_theme_select` (another theme's layer dropped), Save As through `lhde_theme_save_as`. The flyout's
+  theme list has the theme files only (the shipped ones, then the user's), the selected one with a layer reads "TITLE (Modified)"
+  (the resolved key `current` > 0; session.lua `e.modified`, `e.display`). Bindings: `lh.current_set_key`, `lh.current_keys`,
+  `lh.current_theme`, `lh.theme_select`, `lh.theme_save_as`. The per-user keys (`[sidebar] mode` and stacking, `[taskbar]
+  autohide`, `[desktop] wallpaper`) stay in settings.ini as before.
+- **Wanted from the wux side (wuxtheme):** wux already vendors Wine's user32 drawing code (`wux/vendor/wine/user32/uitools.c`:
+  `UITOOLS95_DrawRectEdge`, `UITOOLS95_DFC_ButtonPush`, `UITOOLS95_DrawFrameCaption`, and the caption painting behind flxp's
+  classic windows). If libwuxtheme exported three plain-C helpers that draw into a 32-bit pixel buffer with a caller-given
+  system-colour table (the 31 COLOR_ values) instead of the process's own, `ut_draw_edge(px, w, h, stride, rect, edge, flags,
+  colors)` (DrawEdge, BF_* / BDR_* as Windows), `ut_draw_frame_control(px, w, h, stride, rect, DFC_CAPTION, DFCS_* state,
+  colors)` (with the Marlett glyphs it renders: the font from the user's data, or its own bitmaps) and `ut_draw_caption(px, w, h,
+  stride, rect, flags DC_ACTIVE | DC_GRADIENT | DC_ICON | DC_TEXT, title, icon, font, colors)` (DrawCaptionTemp: icon slot,
+  GradientFill, text), luxwm's `classic_paint` would call them instead of its own copies (frame.c `cl_edge`, `cl_button`,
+  `cl_gradient`, `cl_text`), and the window manager's frame, flxp's own classic windows and Display Properties' sample would be
+  drawn by one implementation, byte for byte. luxwm keeps the geometry (cnBorders, the button rectangles, maximised), the hit test
+  and the shape.

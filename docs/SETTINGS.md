@@ -16,8 +16,8 @@ This section replaces the paths below; the dated sections after it are history (
   as `Section.key = value` (`VisualStyle.style = classic`, `Desktop.wallpaper = 2k/blulac16`, `Colors.activecaption = 255 0 0`).
   Display Properties and Set as Desktop Background write it (liblhde `lhde_current_set` / `lhde_current_set_key`; a key the theme
   gives anyway is dropped); the resolver applies it to that theme, so every client sees it; selecting another theme removes the
-  section (`lhde_theme_select`), Save As turns it into a theme file. luxshell's flyout and `lhde-theme set-key` still write
-  `NAME-modified.theme` (`lhde_theme_set_key`) until the lux side switches.
+  section (`lhde_theme_select`), Save As turns it into a theme file. luxshell's flyout and `_LHSHELL_COMMAND taskbar` write it too
+  (`lh.current_set_key`, 2026-10-28); only `lhde-theme set-key` still writes `NAME-modified.theme` (`lhde_theme_set_key`).
 - `~/.config/lhshell/state.ini` keeps lux's runtime state (tile order); `mfu.ini` the launch counts. `~/.config/flxp/flxp.ini` stays flxp's.
 
 **Migration** (`lhde_settings_migrate`; run by `lhde-session start`, luxshell at startup, `lhde-theme migrate`; once: nothing
