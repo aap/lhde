@@ -5,11 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <strings.h>
+#include <algorithm>
 #include <set>
 #include <vector>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include "config.h"
+#include "lhdata.h"
 #include "gdi/font.h"
 #include "runtime.h"
 #include "res/res.h"
@@ -70,11 +74,18 @@ bool exists(const std::string& p)
     return !p.empty() && stat(p.c_str(), &st) == 0 && S_ISREG(st.st_mode);
 }
 
+// a registry value: absolute, ~/, beside the registry (a copy that keeps its files with it), else in lhde's
+// data directories (styles/..., resources/4074, fonts/4074: the shipped data/themes.ini names them so)
 std::string absolute(const std::string& p, const std::string& registry)
 {
     if (p.empty() || p[0] == '/') return p;
     if (p[0] == '~') return home_dir() + p.substr(1);
-    return dir_of(registry) + "/" + p;
+    if (!registry.empty()) {
+        std::string r = dir_of(registry) + "/" + p;
+        struct stat st;
+        if (stat(r.c_str(), &st) == 0) return r;
+    }
+    return lhde_resolve(p);
 }
 
 // 3 for an XP-format visual style, 4 for Longhorn's compiled one, 0 if none
@@ -123,6 +134,7 @@ bool read_session_properties(std::string& name, std::string& ini)
     name = root_string(dpy, "_LH_THEME");
     ini = root_string(dpy, "_LH_THEMES_INI");
     XCloseDisplay(dpy);
+    if (ini.empty()) ini = lhde_registry();   // nobody published one: $LH_THEMES_INI, else the data directories'
     return !name.empty();
 }
 
@@ -138,6 +150,20 @@ std::string loadable_msstyles(const std::string& path, const std::string& regist
     size_t dot = b.rfind('.');
     if (dot != std::string::npos) b = b.substr(0, dot);
     for (char& c : b) if (c >= 'A' && c <= 'Z') c += 32;
+    // lhde's styles/: NAME-xp/*.msstyles (lhde-import's backports: styles/jade4074-xp/jade.msstyles)
+    for (const std::string& d : lhde_dirs()) {
+        std::string x = d + "/styles/" + b + "-xp";
+        if (DIR* dd = opendir(x.c_str())) {
+            std::vector<std::string> names;
+            while (dirent* e = readdir(dd)) {
+                size_t l = strlen(e->d_name);
+                if (l > 9 && !strcasecmp(e->d_name + l - 9, ".msstyles")) names.push_back(e->d_name);
+            }
+            closedir(dd);
+            std::sort(names.begin(), names.end());
+            for (const std::string& n : names) if (packthem_version(x + "/" + n) == 3) return x + "/" + n;
+        }
+    }
     std::vector<std::string> dirs;
     if (!registry.empty()) dirs.push_back(dir_of(dir_of(registry)) + "/themes/xp-backport");
     for (const std::string& d : theme_dirs()) dirs.push_back(d);
@@ -314,6 +340,11 @@ std::string theme_setting(const std::string& key, const std::string& fallback)
     std::string v = setting(key);
     if (!v.empty()) return v;
     v = g_theme.value("flxp_" + key);
+    if (v.empty() && key == "longhorn_system32") {
+        // lhde's resources/<build> of the theme's build (lhdata.h)
+        v = default_longhorn_system32();
+        return v.empty() ? fallback : v;
+    }
     if (v.empty()) return fallback;
     // path-valued keys are relative to the registry
     if (v[0] == '.' || v.find('/') != std::string::npos) return absolute(v, g_theme.ini);

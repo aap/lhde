@@ -1,6 +1,6 @@
 ; Longhorn 4074 icons, read from its shell32.dll by resource id (same ids as
-; XP). The toolbar keeps XP's strip (from nt5src). Set longhorn_system32= in
-; flxp.ini to the extracted WINDOWS\system32 directory.
+; XP). The toolbar keeps XP's strip (from nt5src). longhorn_system32: lhde's
+; resources/<build> (lhde-import) unless set in flxp.ini (a WINDOWS\system32).
 [theme]
 name = Longhorn 4074
 base = $FLXP_LONGHORN_SYSTEM32

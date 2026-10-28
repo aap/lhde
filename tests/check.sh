@@ -24,6 +24,9 @@ result gditest $? "$T/gditest.log"
 # the copy/move engine (in fresh directories under $TMPDIR and /dev/shm)
 build/tests/fileops_test > "$T/fileops.log" 2>&1
 result "fileops_test ($(tail -n 1 "$T/fileops.log"))" $? "$T/fileops.log"
+# flxp's lookups in lhde's data directories (shell/lhdata.h) on a fake import
+build/tests/lhdatatest > "$T/lhdata.log" 2>&1
+result "lhdatatest ($(tail -n 1 "$T/lhdata.log"))" $? "$T/lhdata.log"
 # libwuxtheme through its own API: every style the user imported
 styles=${LHDE_STYLES:-${XDG_DATA_HOME:-$HOME/.local/share}/lhde/styles}
 n=0

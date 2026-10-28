@@ -165,7 +165,7 @@ bool select_icon_theme(const std::string& name)
         return true;
     }
     if (want != "wine") {
-        const char* hint = want == "longhorn" ? "set longhorn_system32= (and nt5src=) in " :
+        const char* hint = want == "longhorn" ? "lhde-import resources/<build>, or set longhorn_system32= in " :
                            (want == "xp" || want == "2k") ? "set nt5src= in " : "check icons= in ";
         fprintf(stderr, "flxp: icon theme \"%s\" has no icon files here; using the Wine icons (%s%s%s)\n",
                 want.c_str(), hint, settings_path().c_str(), (want == "xp" || want == "2k") ? ", or make install-icons" : "");

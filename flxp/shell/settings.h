@@ -94,7 +94,7 @@ std::vector<std::string> preset_names();           // sorted
 bool read_preset(const std::string& name, Ini& out);
 bool delete_preset(const std::string& name);
 
-// The registry: _LH_THEMES_INI (root), else $LH_THEMES_INI, else flxp.ini's themes_ini
+// The registry: _LH_THEMES_INI (root), else $LH_THEMES_INI, else flxp.ini's themes_ini, else lhde's themes.ini (lhdata.h)
 std::string registry_path();
 struct ThemeEntry { std::string name, title; bool preset; };
 std::vector<ThemeEntry> theme_list(const std::string& registry);   // registry sections, then presets

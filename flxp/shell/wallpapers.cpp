@@ -1,9 +1,11 @@
 // A theme's desktop background: see wallpapers.h and x11/THEMES.md "Wallpapers".
 #include "wallpapers.h"
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include "config.h"
+#include "lhdata.h"
 #include "settings.h"
 
 namespace shell {
@@ -62,6 +64,8 @@ bool wallpapers_ini(const SessionTheme& st, Wallpaper& out)
     std::string path;
     if (const char* e = getenv("LH_WALLPAPERS_INI")) path = e;
     if (path.empty() && !st.ini.empty()) path = dir_of(st.ini) + "/wallpapers.ini";
+    struct stat sb;
+    if ((path.empty() || stat(path.c_str(), &sb) != 0) && !getenv("LH_WALLPAPERS_INI")) path = lhde_find("wallpapers.ini");
     store::Ini ini;
     if (path.empty() || !ini.load(path)) return false;
     // the section: the registry name (a preset's base), then the entry's aliases, then [default]
@@ -70,7 +74,11 @@ bool wallpapers_ini(const SessionTheme& st, Wallpaper& out)
     std::string use;
     for (const std::string& n : names) if (!ini.keys(n).empty()) { use = n; break; }
     std::string root = ini.get("default", "root", "../resources/wallpapers");
-    if (root[0] != '/' && root[0] != '~') root = dir_of(path) + "/" + root;
+    if (root[0] != '/' && root[0] != '~') {
+        // beside wallpapers.ini (a copy with its pictures), else lhde's data directories (wallpapers/)
+        std::string r = dir_of(path) + "/" + root;
+        root = stat(r.c_str(), &sb) == 0 ? r : lhde_resolve(root);
+    }
     else if (root[0] == '~') root = home_dir() + root.substr(1);
     while (root.size() > 1 && root.back() == '/') root.pop_back();
     std::string file = use.empty() ? "" : ini.get(use, "file");

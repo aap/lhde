@@ -9,6 +9,7 @@
 #include "config.h"
 #include "gdi/font.h"
 #include "lhtheme.h"
+#include "lhdata.h"
 
 namespace shell {
 
@@ -36,11 +37,15 @@ static const char template_text[] =
     "# for one run by the environment variable FLXP_<KEY> (FLXP_THEME=classic).\n"
     "[flxp]\n"
     "\n"
+    "# Paths are found in lhde's data directory (~/.local/share/lhde, filled by\n"
+    "# lhde-import; flxp --info shows what was found): the keys below that name\n"
+    "# files or directories are overrides only and best left empty.\n"
+    "#\n"
     "# Extra font directories (colon-separated), searched before the system's.\n"
     "# flxp draws with Tahoma, Microsoft Sans Serif and Marlett (Trebuchet MS and\n"
-    "# Verdana for some visual styles). Auto: fontconfig, then Wine's font\n"
-    "# directories, then whatever sans font fontconfig offers. Real Windows fonts\n"
-    "# can simply go into ~/.fonts instead.\n"
+    "# Verdana for some visual styles). Auto: the imported fonts/<build> with\n"
+    "# Tahoma, fontconfig, then Wine's font directories, then whatever sans font\n"
+    "# fontconfig offers. The session theme's fonts/<build> are added as well.\n"
     "font_path =\n"
     "\n"
     "# Smooth edges of screen fonts (XP's Display Properties > Appearance >\n"
@@ -55,10 +60,12 @@ static const char template_text[] =
     "# The Windows XP SP1 source tree (the xp and 2k icon themes read its .ico/.bmp\n"
     "# files; not needed after 'make install-icons').\n"
     "nt5src =\n"
-    "# An extracted Longhorn WINDOWS/system32 (the longhorn icon theme).\n"
+    "# An extracted Longhorn WINDOWS/system32 (the longhorn icon theme, the header's\n"
+    "# images; auto: the imported resources/<build> of the session theme's build).\n"
     "longhorn_system32 =\n"
     "# A directory of extracted Longhorn builds, <build>/<n>/WINDOWS/... (the\n"
-    "# longhorn header's images when longhorn_system32= does not have them).\n"
+    "# longhorn header's images when longhorn_system32= does not have them;\n"
+    "# auto: the imported resources/*).\n"
     "longhorn_wim =\n"
     "\n"
     "# Visual style: luna, another name found in the theme directories, a\n"
@@ -68,7 +75,7 @@ static const char template_text[] =
     "theme_color =\n"
     "theme_size =\n"
     "# More directories holding <name>/<name>.msstyles (colon-separated); always\n"
-    "# searched: ~/.local/share/flxp/themes, <datadir>/themes,\n"
+    "# searched: lhde's styles/ (<name>.msstyles, <name>/), ~/.local/share/flxp/themes, <datadir>/themes,\n"
     "# ~/.wine/drive_c/windows/resources/themes, ~/.themes.\n"
     "theme_path =\n"
     "# Follow the Longhorn session theme (the root property _LH_THEME, lhwm's\n"
@@ -220,7 +227,10 @@ void setup_fonts()
     std::string sm = setting("font_smoothing");
     gdi::set_font_smoothing(sm == "off" || sm == "0" ? gdi::SMOOTH_OFF :
                             sm == "cleartype" ? gdi::SMOOTH_CLEARTYPE : gdi::SMOOTH_STANDARD);
-    for (const std::string& d : split_path(setting("font_path"))) {
+    // font_path, else the imported Windows fonts (lhde's fonts/<build> with Tahoma)
+    std::vector<std::string> fp = split_path(setting("font_path"));
+    if (fp.empty()) fp = default_font_dirs();
+    for (const std::string& d : fp) {
         gdi::add_font_dir(d.c_str());
         for (int i = 0; i < n_wanted; i++)
             if (g_found[i].empty()) g_found[i] = find_in_dir(d, wanted[i].file);
@@ -244,7 +254,7 @@ void setup_fonts()
         bool exact;
         std::string f = system_match(wanted[i].family, exact);
         if (!exact && i == 0)
-            fprintf(stderr, "flxp: no Tahoma font; using %s (put tahoma.ttf in ~/.fonts or set font_path= in %s)\n",
+            fprintf(stderr, "flxp: no Tahoma font; using %s (lhde-import fonts/<build>, put tahoma.ttf in ~/.fonts or set font_path= in %s)\n",
                     f.empty() ? "fontconfig's default" : f.c_str(), settings_path().c_str());
     }
 }
@@ -268,6 +278,7 @@ std::vector<FontInfo> font_report()
 std::vector<std::string> theme_dirs()
 {
     std::vector<std::string> dirs = split_path(setting("theme_path"));
+    for (const std::string& d : lhde_dirs()) dirs.push_back(d + "/styles");   // lhde-import's styles/
     dirs.push_back(data_home() + "/flxp/themes");
     std::string d = data_path("themes");
     if (!d.empty()) dirs.push_back(d);
@@ -275,6 +286,21 @@ std::vector<std::string> theme_dirs()
     dirs.push_back((wp && *wp ? std::string(wp) : home_dir() + "/.wine") + "/drive_c/windows/resources/themes");
     dirs.push_back(home_dir() + "/.themes");
     return dirs;
+}
+
+// the one .msstyles in DIR, "" if none or several
+static std::string only_msstyles(const std::string& dir)
+{
+    std::string out;
+    int n = 0;
+    if (DIR* d = opendir(dir.c_str())) {
+        while (dirent* e = readdir(d)) {
+            size_t l = strlen(e->d_name);
+            if (l > 9 && !strcasecmp(e->d_name + l - 9, ".msstyles")) { out = dir + "/" + e->d_name; n++; }
+        }
+        closedir(d);
+    }
+    return n == 1 ? out : "";
 }
 
 std::string find_msstyles(const std::string& name)
@@ -297,7 +323,12 @@ std::string find_msstyles(const std::string& name)
         }
         std::string f = d + "/" + lower + ".msstyles";
         if (exists(f)) return f;
+        // lhde's styles/NAME/ with one style of another name (styles/slate4074-xp/slate.msstyles)
+        f = only_msstyles(d + "/" + name);
+        if (!f.empty()) return f;
     }
+    // luna -> lhde's luna-xp.msstyles, jade4074 -> styles/jade4074-xp/: the XP-format copy
+    if (lower.size() < 3 || lower.compare(lower.size() - 3, 3, "-xp")) return find_msstyles(lower + "-xp");
     return "";
 }
 
@@ -344,7 +375,7 @@ std::string setup_theme()
     if (strcasecmp(want.c_str(), "classic") && strcasecmp(want.c_str(), "none") && strcasecmp(want.c_str(), "off")) {
         path = find_msstyles(want);
         if (path.empty() && asked)
-            fprintf(stderr, "flxp: visual style \"%s\" not found (theme_path= in %s); using classic\n",
+            fprintf(stderr, "flxp: visual style \"%s\" not found (lhde's styles/, theme_path= in %s); using classic\n",
                     want.c_str(), settings_path().c_str());
     }
     export_env("FLXP_THEME", path);

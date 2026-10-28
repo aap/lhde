@@ -21,6 +21,7 @@
 #include "shell/fileops.h"
 #include "shell/mime.h"
 #include "shell/runtime.h"
+#include "shell/lhdata.h"
 #include "shell/lhtheme.h"
 #include "commands.h"
 #include "dialogs.h"
@@ -2138,6 +2139,7 @@ static void print_info()
     if (!st.name.empty()) printf("session      %s (%s, followed; msstyles %s)\n", st.name.c_str(), st.ini.c_str(), st.path("msstyles").c_str());
     else printf("session      %s\n", shell::follows_session_theme() ? "(no _LH_THEME)" : "(not followed: theme_follow=0 or --theme)");
     printf("framelets    %s\n", header::framelet_source().c_str());
+    printf("%s", shell::lhde_report().c_str());   // lhde's data directories: what each lookup found
     const shell::IconTheme& it = shell::icon_theme();
     printf("icons        %s%s\n", it.name.c_str(), it.toolbar.valid() ? "" : " (comctl32 toolbar images)");
     for (const shell::FontInfo& f : shell::font_report())

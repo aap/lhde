@@ -1,5 +1,6 @@
 // The shared settings store: see settings.h and x11/SETTINGS.md.
 #include "settings.h"
+#include "lhdata.h"
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -566,7 +567,8 @@ std::string registry_path()
         if (!r.empty()) return r;
     }
     if (const char* e = getenv("LH_THEMES_INI")) if (*e) return e;
-    return setting("themes_ini");
+    std::string s = setting("themes_ini");
+    return s.empty() ? lhde_registry() : s;   // lhde's data directories (themes.ini)
 }
 
 std::vector<ThemeEntry> theme_list(const std::string& registry)

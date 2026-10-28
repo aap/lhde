@@ -21,6 +21,7 @@
 #include "desktop/wallpaper.h"
 #include "explorer/uiicons.h"
 #include "filedlg/filedlg.h"
+#include "shell/lhdata.h"
 #include "shell/config.h"
 #include "shell/icons.h"
 #include "shell/lhtheme.h"
@@ -442,10 +443,12 @@ bool is_picture(const std::string& name)
     return e == "bmp" || e == "jpg" || e == "jpeg" || e == "png" || (e == "webp" && gdi::webp_supported());
 }
 
-// wallpaper_dirs (flxp.ini, ':' separated): every picture directly in them is listed
+// wallpaper_dirs (flxp.ini, ':' separated): every picture directly in them is listed; default
+// ~/Pictures/Wallpapers and lhde's wallpapers/<build> (shell/lhdata.h)
 std::vector<std::string> wallpaper_dirs()
 {
-    std::string v = shell::setting("wallpaper_dirs", "~/Pictures/Wallpapers");
+    std::string v = shell::setting("wallpaper_dirs");
+    if (v.empty()) v = shell::default_wallpaper_dirs();
     std::vector<std::string> out;
     size_t i = 0;
     while (i <= v.size()) {
@@ -501,14 +504,22 @@ void build_walls()
     struct stat st;
     for (const std::string& p : recent_wallpapers()) if (stat(expand(p).c_str(), &st) == 0) add(p);
     if (!cur.wallpaper.empty() && cur.wallpaper != "none") add(cur.wallpaper);
+    std::vector<std::string> lhde_walls = shell::lhde_subdirs("wallpapers");
     for (const std::string& d : wallpaper_dirs()) {
+        // lhde's wallpapers/<build>: the build after the name (4015, 4051 and 4074 each have a Bliss)
+        bool by_build = std::find(lhde_walls.begin(), lhde_walls.end(), d) != lhde_walls.end();
         std::vector<std::string> names;
         if (DIR* dd = opendir(d.c_str())) {
             while (dirent* e = readdir(dd)) if (e->d_name[0] != '.' && is_picture(e->d_name)) names.push_back(e->d_name);
             closedir(dd);
         }
         std::sort(names.begin(), names.end(), [](const std::string& a, const std::string& b) { return strcasecmp(a.c_str(), b.c_str()) < 0; });
-        for (const std::string& n : names) add(d + "/" + n);
+        for (const std::string& n : names) {
+            std::string p = d + "/" + n;
+            bool have = false;
+            for (const Wall& w : walls) have = have || w.value == p;
+            if (!have) walls.push_back(Wall{ by_build ? stem(p) + " (" + shell::base_of(d) + ")" : stem(p), p });
+        }
     }
 }
 

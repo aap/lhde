@@ -9,10 +9,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <string>
 #include <vector>
 #include "lhbar.h"
 #include "shell/config.h"
+#include "shell/lhdata.h"
 #include "shell/lhtheme.h"
 
 namespace lhbar {
@@ -108,6 +110,13 @@ void load_msstyles(const std::string& style)
         std::string sys = shell::theme_setting("longhorn_system32");
         if (sys.empty()) return;
         path = sys + "/../Resources/Themes/Slate/slate.msstyles";
+        // a copied resources/<build> (lhde-import --copy-resources) has no Resources/ beside it:
+        // lhde's styles/slate<build>.msstyles is the same file
+        struct stat st;
+        if (stat(path.c_str(), &st) != 0) {
+            std::string b = shell::base_of(sys), s = shell::lhde_find("styles/slate" + b + ".msstyles");
+            if (b.size() == 4 && !s.empty()) path = s;
+        }
     }
     HMODULE m = load_module(path);
     if (!m) return;

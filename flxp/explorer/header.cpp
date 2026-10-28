@@ -30,6 +30,7 @@
 #include "navbar.h"
 #include "gdi/png.h"
 #include "shell/config.h"
+#include "shell/lhdata.h"
 #include "shell/lhtheme.h"
 #include "shell/netres.h"
 #include "uiicons.h"
@@ -495,9 +496,10 @@ HBITMAP dib_from(const gdi::Bitmap* b)
 // images and no per-theme variants (Microsoft.Windows.Client.dll holds the only
 // framelet_* set). Looked for, in order: flxp.ini's (or FLXP_*'s)
 // explorer_resources, then next to its longhorn_system32; the same keys of the
-// session theme (flxp_explorer_resources, flxp_longhorn_system32); then the
-// places of extracted Longhorn images: <registry>/../wim and longhorn_wim= in
-// flxp.ini (no default), */*/WINDOWS/Microsoft.NET/Avalon (4074 first, then
+// session theme (flxp_explorer_resources, flxp_longhorn_system32); lhde's
+// resources/<build> (shell/lhdata.h: the theme's build, then 4074, then the
+// others); then the places of extracted Longhorn images: <registry>/../wim and
+// longhorn_wim= in flxp.ini (no default), */*/WINDOWS/Microsoft.NET/Avalon (4074 first, then
 // the newest build). The first file with all eight images wins.
 struct Candidate { std::string path, origin; };
 
@@ -525,6 +527,14 @@ std::vector<Candidate> framelet_candidates()
         if (!tr.empty()) out.push_back({ tr, "theme " + st.name + " flxp_explorer_resources" });
         add_sys(st.path("flxp_longhorn_system32"), "theme " + st.name + " flxp_longhorn_system32");
     }
+    // lhde's resources/<build> (lhde-import: a build's system32, its Microsoft.NET beside it):
+    // the theme's build, then the others, 4074 first (the header's reference)
+    std::string dflt = shell::default_longhorn_system32();
+    if (!dflt.empty()) add_sys(dflt, "lhde resources of the theme's build");
+    std::vector<std::string> builds = shell::lhde_subdirs("resources");
+    std::stable_sort(builds.begin(), builds.end(), [](const std::string& a, const std::string& b) {
+        return (shell::base_of(a) == "4074") > (shell::base_of(b) == "4074"); });
+    for (const std::string& r : builds) if (r != dflt) add_sys(r, "lhde resources");
     std::vector<std::string> roots;
     if (!st.ini.empty()) roots.push_back(shell::dir_of(st.ini) + "/../wim");
     std::string wim = shell::setting("longhorn_wim");
@@ -603,8 +613,8 @@ bool load_framelets()
     if (g_framelet_source.empty()) {
         static bool warned;
         if (!warned)
-            fprintf(stderr, "flxp: no Microsoft.Windows.Client.dll with 4074's framelet images (set explorer_resources= or "
-                    "longhorn_system32= in %s); drawing lookalike Back/Forward buttons\n", shell::settings_path().c_str());
+            fprintf(stderr, "flxp: no Microsoft.Windows.Client.dll with 4074's framelet images (lhde-import resources/4074, or "
+                    "explorer_resources= / longhorn_system32= in %s); drawing lookalike Back/Forward buttons\n", shell::settings_path().c_str());
         warned = true;
         return false;
     }

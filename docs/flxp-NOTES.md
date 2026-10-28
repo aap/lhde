@@ -3790,3 +3790,138 @@ segment (the concept's flag). Also: the title is lhnav's, so View > Header's
 sizes do not apply in vision mode (only Small -> `small`); the opaque vision
 header needs header_engine=lhnav because lhwm leaves aerovision without
 composition.
+
+## flxp finds its files through lhde_data: no path settings (2026-10-28)
+
+flxp.ini needs no paths any more. `flxp/shell/lhdata.{h,cpp}` wraps `lhtheme/lhde_data.c` (linked into
+every program and toolkit test with the shell model: `SHELLOBJS` carries `build/obj/lhtheme/lhde_data.o`;
+libluxnav's copy is then not pulled; lhde_data's API is unchanged). The search order is lhde_data's:
+`$LHDE_DATA` (else `${XDG_DATA_HOME:-~/.local/share}/lhde`), `<exe>/../share/lhde`, `$XDG_DATA_DIRS/lhde`,
+the source tree's `data/`. Every path key of flxp.ini stays as an override; the defaults under them:
+
+| what | where (first data directory that has it) | readers |
+|------|------------------------------------------|---------|
+| the registry | `_LH_THEMES_INI` (root) when published, else `$LH_THEMES_INI`, `themes_ini=`, else `themes.ini` (`lhde_registry_source`) | `shell/lhtheme.cpp` read_session_properties, `store::registry_path`, the shim's live switch (`wux/w32/theme.cpp`) |
+| a registry value (`styles/...`, `resources/4074`, `fonts/4074`) | beside the registry when it is there (a resolved copy keeps absolute paths anyway), else `lhde_data_resolve` | `SessionTheme::path`, `theme_setting` (all `flxp_*` path keys), the `fonts` key |
+| a style by name (`theme=`, `--theme`, FLXP_THEME) | `theme_path=`, then `styles/NAME.msstyles`, `styles/NAME/NAME.msstyles`, `styles/NAME/` holding one `.msstyles`, then the same for `NAME-xp` (`luna` = `styles/luna-xp.msstyles`, `jade4074` = `styles/jade4074-xp/jade.msstyles`), then ~/.local/share/flxp/themes, wine's, ~/.themes | `shell::find_msstyles` (the shim's `resolve_theme` now calls it) |
+| a Longhorn-compiled session style without `flxp_msstyles` | `styles/NAME-xp/*.msstyles` with PACKTHEM_VERSION 3 | `loadable_msstyles` |
+| `longhorn_system32` | the theme's `flxp_longhorn_system32`, else `resources/<build>` when imported | `theme_setting` (icons, header, task band, command bar, dialog glyphs, lhnav's icon_dir) |
+| framelets (`explorer_resources`, `longhorn_wim`) | after the keys: `resources/<build>` of the theme, then every `resources/*`, 4074 first: `../Microsoft.NET/Avalon/Microsoft.Windows.Client.dll` beside it (the import links resources/4074 to the build's system32) or `Microsoft.Windows.Client.dll` in it | `header.cpp` framelet_candidates |
+| the 4051 command bar's slate.msstyles | `<system32>/../Resources/Themes/Slate/slate.msstyles`, else `styles/slate<build>.msstyles` (the same file: cmp'd for 4051 and 4074) | `lhbar.cpp` |
+| the task band's aurora | `taskpane_aurora=`, `resources/demo`, `<system32>/../../../../demo_resources` | `taskpane.cpp` (needs `docLib/`, `search/`: the import has only `aurora_strip.png`, so aurora stays off unless resources/4074 links into the workspace) |
+| fonts | `font_path=`, else every `fonts/<build>` with tahoma.ttf (4074's; added unconditionally like font_path, so the real Tahoma beats a system one); the session theme's `fonts` key (`fonts/5112` = Segoe UI) as before | `setup_fonts`, `set_session_theme` |
+| wallpapers | `wallpaper_dirs=`, else `~/Pictures/Wallpapers` and every `wallpapers/<build>` (listed as "Bliss (4051)"); `wallpapers.ini` beside the registry, else in the data directories, its relative `root` beside it, else `lhde_data_resolve` | Display Properties' Desktop tab, `theme_wallpaper` (desktop, settings) |
+
+The build of a theme (`theme_build`): `flxp_longhorn_system32`'s `resources/NNNN`, else the 4 digits in the
+section's name (a preset's base), in its msstyles' name, in its flxp_msstyles' directory (`jade4074-xp`), else
+`fonts/NNNN`. slate4074, jade4074, aero-patch, aerovision: 4074; slate4051, luna, luna-olive, luna-silver
+(luna4051): 4051; aero5048/5112: 4074 (the registry's key); luna-xp, royale, zune, noir, embedded: 4074 (fonts).
+Without a session theme the digits of FLXP_THEME's file or directory name.
+
+`flxp --info` prints the lookups after `framelets`: the data directories in order, then themes.ini,
+wallpapers.ini, the theme's msstyles and flxp_msstyles, its build, its fonts, every `resources/*` (the theme's
+build marked, or "not imported"), longhorn_system32 and where it came from, resources/demo, the default font
+directory, the wallpaper directories, styles/, and "XP resources: not imported (nt5src= ...)". Each lookup says
+which data directory answered or "not imported".
+
+`make check` runs `build/tests/lhdatatest` (tests/toolkit/lhdatatest.cpp): a fake import in a temp directory
+($LHDE_DATA) and the registry elsewhere ($LH_THEMES_INI), 30 checks (registry, theme builds, path resolution,
+longhorn_system32 default and override, wallpapers.ini root, default fonts and wallpaper dirs, styles by name,
+--info's report).
+
+Remaining manual setting: `nt5src` only. The import has no XP resources (resources/ holds 4051, 4074 and demo;
+wallpapers/xp has pictures only). Every nt5src reader fails soft (checked with nt5src = a missing directory under
+Xvfb: luna and slate4074 explorer, dialog, taskbar draw, no crash): the xp/2k icon themes fall back to Wine's
+icons with one message, toolbar strips to comctl32's, browtb.bmp to the drawn X, start.bmp to the drawn flag,
+LogoffButtons to the drawn buttons, shellstyle's bitmaps to the drawn task pane, chess.bmp to the generic tile.
+
+### Measured: no path keys against the old explicit paths
+
+Xvfb :74 (1280x1024, `-noreset`, no window manager, no compositor: aero-patch opaque), the session theme set
+with `xprop -root _LH_THEME`, scratch HOME/XDG_*, LHDE_DATA = ~/.local/share/lhde (read only),
+FLXP_CLOCK_FORMAT=12:34, one fresh HOME and X server per shot. Old = the HEAD binaries before this change
+(git archive of 13d3f71), the user's flxp.ini plus theme_path=~/fun/longhorn/themes/xp-backport,
+longhorn_wim=~/fun/longhorn/wim, wallpaper_dirs = the old built-in list, and `_LH_THEMES_INI` = the resolved
+registry (as luxwm publishes it). New = this build, the user's flxp.ini without any path key (font_path,
+nt5src, longhorn_system32, theme_path, wallpapers removed), no `_LH_THEMES_INI` (the registry from the data
+directory); new-nt5 = the same plus nt5src. Pixels differing (`compare -metric AE`, whole screen):
+
+| theme | explorer | file dialog | taskbar | settings (Themes) | settings (Desktop tab) |
+|-------|----------|-------------|---------|-------------------|------------------------|
+| slate4074 | 0 / 0 | 0 / 0 | 469 / 0 | 0 / 0 | 1538 / 1538 |
+| aero-patch (opaque) | 0 / 0 | 0 / 0 | 470 / 0 | 0 / 0 | 1590 / 1590 |
+| luna (XP) | 48505 / 0 | 5907 / 0 | 470 / 0 | 0 / 0 | 2618 / 1578 |
+| aero5112 | 2530 / 0 | 0 / 0 | 466 / 0 | 0 / 0 | 1609 / 1609 |
+
+(new / new-nt5.) With nt5src kept, everything is pixel-identical except the Desktop tab's wallpaper list:
+the old run lists the user's own `wallpapers=` (recent Browse... picks, a path key the new flxp.ini drops) and
+the old built-in /u/aap/cfg/wallpaper directories; the new one lists the import's `wallpapers/<build>`
+(now labelled with the build: "Bliss (4015)", "Bliss (4051)", ...); the theme background row is the same
+(wallpapers.ini from the data directory). Without nt5src (no path key at all) the differences are all nt5src's:
+the taskbar's start flag (start.bmp, drawn instead), luna's xp icons and toolbar strips (Wine's icons,
+comctl32's images) in the explorer and the dialog, aero5112's XP-frame toolbar strip, luna's Desktop-tab icons.
+luna's longhorn_system32 is now resources/4051 (the old flxp.ini forced 4074 for every theme); the XP frame
+does not draw from it, so it changes no pixel. A missing nt5src directory fails soft (above).
+
+The baseline binaries came from `git archive 13d3f71`; the harness (run.sh, matrix.sh) stayed in the session's
+scratch directory. `make check`'s own part (tests/check.sh, LHDE_TEST_DISPLAYS=":76 :77 :78"): all passed,
+lhdatatest included. check-luxwm fails before it (see the report: ~/.local/share/lhde/frames/*/ hold only
+theme.ini, no PNG, so frametest stops at aero5048).
+
+### nt5src → an XP's own binaries (for lhde-import's XP/2000 source)
+
+From the .rc files and resource headers in nt5src (shell32/ids.h, shell/inc/tb_ids.h, browseui/resource.h,
+explorer/rcids.h, explorer/desktop2/resource.h, themes/themedir/shellstyle/common.h, comctl32/v6); spot-checked
+against the Longhorn 4015/4051/4074/5112 binaries (all checked ids agree; no XP binary on this machine).
+Icons are RT_GROUP_ICON, bitmaps RT_BITMAP. The 2k icon theme uses the 4-bit frames of the same icons.
+
+| nt5src file (shell/...) | binary | id | symbol / note |
+|---|---|---|---|
+| shell32/document.ico | shell32.dll | 1 | IDI_DOCUMENT |
+| shell32/docassoc.ico | shell32.dll | 2 | IDI_DOCASSOC |
+| shell32/app.ico | shell32.dll | 3 | IDI_APP |
+| shell32/folder.ico | shell32.dll | 4 | IDI_FOLDER |
+| shell32/folderop.ico | shell32.dll | 5 | IDI_FOLDEROPEN |
+| shell32/drivehar.ico | shell32.dll | 9 | IDI_DRIVEFIXED |
+| explorer/mycomp.ico | shell32.dll / explorer.exe | 16 / 100 | IDI_SERVER / ICO_MYCOMPUTER (the same file) |
+| shell32/mynet.ico | shell32.dll | 18 | IDI_MYNETWORK |
+| shell32/stdocs.ico | shell32.dll | 21 | IDI_STDOCS |
+| shell32/sthelp.ico | shell32.dll | 24 | IDI_STHELP |
+| shell32/strun.ico | shell32.dll | 25 | IDI_STRUN |
+| shell32/recycler.ico | shell32.dll | 32 | IDI_RECYCLER (33 = full) |
+| shell32/desktop.ico | shell32.dll | 35 | IDI_DESKTOP |
+| shell32/docfind.ico | shell32.dll | 134 | IDI_DOCFIND |
+| shell32/inifile.ico | shell32.dll | 151 | IDI_INIFILE |
+| shell32/txtfile.ico | shell32.dll | 152 | IDI_TXTFILE |
+| shell32/sysfile.ico | shell32.dll | 154 | IDI_SYSFILE |
+| shell32/fave.ico | shell32.dll | 173 | IDI_FAVORITES |
+| shell32/htt.ico | shell32.dll | 178 | IDI_HTTFILE |
+| shell32/genvideodoc.ico | shell32.dll | 224 | IDI_AP_FILMSTRP |
+| shell32/genericmusicdoc.ico | shell32.dll | 225 | IDI_AP_DMIDI |
+| shell32/pics.ico | shell32.dll | 226 | IDI_AP_PICS |
+| shell32/mydocs.ico | shell32.dll | 235 | IDI_MYDOCS |
+| shell32/mypics.ico | shell32.dll | 236 | IDI_MYPICS |
+| shell32/cdrom.ico | shell32.dll | 294 | IDI_MEDIACDROM (the drive: 12 IDI_DRIVECD) |
+| shell32/control.ico | none | - | in no .rc: use 137 IDI_CPLFLD (Control Panel folder) or 36 IDI_STCPANEL |
+| comctl32/v6/viewsm.bmp | comctl32.dll 6.0 (WinSxS) | 124 | IDB_VIEWTB_SMALL_COLOR (v5's 124 is an 8-bit image) |
+| comctl32/v6/histsm.bmp | comctl32.dll 6.0 (WinSxS) | 130 | IDB_HISTTB_SMALL_COLOR |
+| shell32/tb_sh_def_24.bmp, tb_sh_hot_24.bmp | shell32.dll | 214, 215 | IDB_TB_SH_DEF_24 / HOT_24 |
+| shell32/tb_sh_def_16.bmp, tb_sh_hot_16.bmp | shell32.dll | 216, 217 | IDB_TB_SH_DEF_16 / HOT_16 (Longhorn's are wider: 768 vs 752) |
+| shell32/tb_go_def_20.bmp, tb_go_hot_20.bmp | shell32.dll | 230, 231 | IDB_TB_GO_DEF_20 / HOT_20 |
+| shell32/brand_sml.bmp | shell32.dll | 240 | IDB_BRAND_BITMAP_MICRO (256 colours: 245) |
+| browseui/shdefhi.bmp, shhothi.bmp | browseui.dll | 276, 277 | IDB_SHSTDHICOLOR / HOTHICOLOR (2k toolbar) |
+| browseui/shdef16h.bmp, shhot16h.bmp | browseui.dll | 278, 279 | IDB_SHSTDHICOLOR16 / HOTHICOLOR16 |
+| browseui/browtb.bmp | browseui.dll | 545 | IDB_BROWSERTOOLBAR (Folders bar close) |
+| explorer/start.bmp | explorer.exe | 143 | IDB_START (not in 4051/4074 explorer.exe) |
+| explorer/startclassic.bmp | explorer.exe | 176 | IDB_STARTCLASSIC |
+| explorer/desktop2/logoffbuttons.bmp | explorer.exe | 7010 | IDB_LOGOFF_NORMAL |
+| explorer/desktop2/logoffbuttonshot.bmp | explorer.exe | 7011 | IDB_LOGOFF_HOT |
+| themes/themedir/shellstyle/V/up.bmp, uphot, down, downhot | shellstyle.dll | 100-103 | IDB_UP, UPHOT, DOWN, DOWNHOT |
+| themes/themedir/shellstyle/V/headersection.bmp | shellstyle.dll | 112 | IDB_HEADERSECTION (not in the classic one) |
+| windows/advcore/duser/directui/test/app/logonui/chess.bmp | logonui.exe | 114 | IDB_USER0 (the same bytes as shell/ext/logondui/chess.bmp); the picture accounts get is the file All Users/Application Data/Microsoft/User Account Pictures/Default Pictures/chess.bmp (another rendering) |
+
+shellstyle.dll per variant: blue = Luna.msstyles' `Shell\NormalColor\shellstyle.dll`, metallic =
+`Shell\Metallic\`, homestead = `Shell\Homestead\`, classic = `%windir%\system32\shellstyle.dll`. So an XP
+import needs: system32/{shell32,browseui,explorer.exe,logonui.exe}, WinSxS comctl32 6.0, Luna's three
+shellstyle.dll (lhde-import's styles/ copies Luna.msstyles; its Shell/ beside it would do) and system32's
+classic shellstyle.dll.

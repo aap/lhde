@@ -123,20 +123,21 @@ the x11 lab).
 
 ## Settings that point at your Windows files
 
-Settings live in `~/.config/flxp/flxp.ini` (any key also as `FLXP_<KEY>` in the
-environment; `flxp --info` shows what was found) and the session store
-`~/.config/longhorn/settings.ini`. None of these has a default; without them the
-programs fall back to Wine's icons, drawn lookalikes and fontconfig fonts.
+flxp needs none: it finds the imported art through the data directories above (`flxp/shell/lhdata.h` over
+`lhtheme/lhde_data.c`; `flxp --info` prints every lookup and which data directory answered, or "not imported").
+Settings live in `~/.config/flxp/flxp.ini` (any key also as `FLXP_<KEY>` in the environment) and the session
+store `~/.config/longhorn/settings.ini`; the path keys below are overrides only.
 
-| key | what reads it |
-|-----|---------------|
-| `nt5src` | the XP source tree: the xp/2k icon themes (`flxp/res/icons/{xp,2k}.theme`, `shell/icons.cpp`), the task pane's shellstyle bitmaps (`explorer/places.cpp`), start.bmp / LogoffButtons.bmp / the user tile (`taskbar/taskbar.cpp`, `startpanel.cpp`), browtb.bmp (Folders bar close button); `make install-icons` copies the icon files. To be replaced by resources from an imported XP's own DLLs (docs/LAYOUT.md review, point 1). |
-| `longhorn_system32` | an extracted Longhorn WINDOWS/system32 (longhorn icons, slate.msstyles gradients, framelets) |
-| `longhorn_wim` | a directory of extracted Longhorn builds (`<build>/<n>/WINDOWS`), searched for the header's framelet images (replaces the built-in ~/fun/longhorn/wim) |
-| `theme`, `theme_path` | the visual style by name or path, and more style directories (`theme_path` replaces the built-in ~/fun/longhorn/themes/xp-backport for style names) |
-| `font_path` | Windows font directories |
-| `wallpaper_dirs` | Display Properties' wallpaper list (default `~/Pictures/Wallpapers` only) |
-| `taskpane_aurora` | the demo's aurora images (else `<longhorn_system32>/../../../../demo_resources`) |
+| key | default (lhde's data directories) |
+|-----|-----------------------------------|
+| registry (`_LH_THEMES_INI`, `$LH_THEMES_INI`, `themes_ini`) | `themes.ini`; its relative values (`styles/...`, `resources/4074`, `fonts/4074`) are resolved there |
+| `theme`, `theme_path` | styles by name: `styles/NAME.msstyles`, `styles/NAME/` (one style inside: the -xp backports), else `NAME-xp` (`luna` is `styles/luna-xp.msstyles`); a session theme's Longhorn-compiled style falls back to `styles/NAME-xp/` |
+| `longhorn_system32` | the registry's `flxp_longhorn_system32`, else `resources/<build>` of the session theme's build (`slate4051`, `luna4051`: 4051; the 4074 themes: 4074) |
+| `explorer_resources`, `longhorn_wim` | the framelets: `Microsoft.Windows.Client.dll` beside (or in) `resources/<build>`, the theme's build first, then 4074 |
+| `font_path` | `fonts/<build>` with tahoma.ttf (4074's); the session theme's `fonts` (registry) are added too |
+| `wallpaper_dirs` | `~/Pictures/Wallpapers` and every `wallpapers/<build>`; the theme's wallpaper from `wallpapers.ini` (root `wallpapers/`) |
+| `taskpane_aurora` | `resources/demo` (needs the demo's `docLib/`, `search/` images; the import has only `aurora_strip.png` so far) |
+| `nt5src` | none: the XP source tree for the xp/2k icon themes (`flxp/res/icons/{xp,2k}.theme`), the task pane's shellstyle bitmaps (`explorer/places.cpp`), start.bmp / LogoffButtons.bmp / the user tile (`taskbar/taskbar.cpp`, `startpanel.cpp`), browtb.bmp (Folders bar close button); `make install-icons` copies the icon files. Without it: Wine's icons and drawn lookalikes. To be replaced by resources from an imported XP's own DLLs (docs/flxp-NOTES.md "flxp finds its files through lhde_data" has the resource table). |
 
 `LHDE_DATA` (environment) replaces the user data directory for every lux program and script; the theme
 registry is `data/themes.ini` (luxwm and luxshell publish its resolved copy as `_LH_THEMES_INI`).

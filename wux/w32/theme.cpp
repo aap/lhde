@@ -14,6 +14,8 @@
 #include "image.h"
 #include "shell/lhtheme.h"
 #include "shell/config.h"
+#include "shell/runtime.h"
+#include "shell/settings.h"
 #include "gdi/font.h"
 extern "C" {
 #include "winreg.h"
@@ -27,27 +29,14 @@ namespace w32 {
 static bool g_theme_inited;
 static std::string g_path, g_color, g_size;     // what is loaded
 
-// "luna" -> the first <dir>/luna/luna.msstyles found in the usual places.
+// "luna" -> the first <dir>/luna/luna.msstyles (or lhde's styles/luna-xp.msstyles, ...) found in
+// the usual places: shell::find_msstyles (theme_path=, lhde's styles/, wine's and ~/.themes)
 static std::string resolve_theme(const char* name)
 {
     std::string n = name;
     if (n.find('/') != std::string::npos) return n;
-    std::vector<std::string> dirs;
-    // theme_path= in flxp.ini (or $FLXP_THEME_PATH), then wine's and ~/.themes
-    { std::string p = shell::setting("theme_path"); size_t a = 0; while (a <= p.size()) { size_t b = p.find(':', a); if (b == std::string::npos) b = p.size(); if (b > a) dirs.push_back(p.substr(a, b - a)); a = b + 1; } }
-    if (const char* h = getenv("HOME")) {
-        dirs.push_back(std::string(h) + "/.wine/drive_c/windows/resources/themes");
-        dirs.push_back(std::string(h) + "/.themes");
-    }
-    std::string lower = n; for (char& c : lower) if (c >= 'A' && c <= 'Z') c += 32;
-    std::string upper = lower; upper[0] = (char)toupper(upper[0]);
-    for (const std::string& d : dirs)
-        for (const std::string& v : {n, lower, upper}) {
-            std::string f = d + "/" + v + "/" + lower + ".msstyles";
-            FILE* t = fopen(f.c_str(), "rb");
-            if (t) { fclose(t); return f; }
-        }
-    return n;
+    std::string f = shell::find_msstyles(n);
+    return f.empty() ? n : f;
 }
 
 bool set_theme(const char* path_or_name, const char* color, const char* size)
@@ -94,6 +83,7 @@ static void session_theme_changed()
 {
     std::string name = win::root_string("_LH_THEME"), ini = win::root_string("_LH_THEMES_INI");
     if (name.empty()) return;                        // nobody publishes a theme: keep ours
+    if (ini.empty()) ini = shell::store::registry_path();   // no registry published: lhde's (shell/lhdata.h)
     const shell::SessionTheme& cur = shell::session_theme();
     shell::SessionTheme t;
     if (!shell::lookup_session_theme(name, ini, t)) {

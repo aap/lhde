@@ -15,6 +15,7 @@
 #include "commands.h"
 #include "gdi/png.h"
 #include "shell/config.h"
+#include "shell/lhdata.h"
 #include "shell/lhtheme.h"
 #include "shell/netres.h"
 #include "shell/thumbs.h"
@@ -100,8 +101,8 @@ HFONT font(int px, int weight, bool underline)
 }
 
 // The demo's resource directory, only with taskpane_style = aurora:
-// taskpane_aurora (a directory), else next to the Longhorn images
-// (<longhorn_system32>/../../../../demo_resources).
+// taskpane_aurora (a directory), else lhde's resources/demo (shell/lhdata.h),
+// else next to the Longhorn images (<longhorn_system32>/../../../../demo_resources).
 // "" = none: the menu band's gradient (taskpane_style = menubar, the default;
 // "theme" is the old name).
 std::string aurora_dir()
@@ -113,6 +114,8 @@ std::string aurora_dir()
     std::vector<std::string> c;
     std::string set = shell::theme_setting("taskpane_aurora");
     if (!set.empty()) c.push_back(set);
+    std::string demo = shell::lhde_find("resources/demo");
+    if (!demo.empty()) c.push_back(demo);
     std::string sys = shell::theme_setting("longhorn_system32");
     if (!sys.empty()) c.push_back(sys + "/../../../../demo_resources");
     for (const std::string& d : c)
