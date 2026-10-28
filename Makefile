@@ -6,7 +6,6 @@
 #                         and Lua, luxwm's frame regression (skips without the user's styles)
 #   make install          PREFIX=/usr/local DESTDIR= (also BINDIR, LIBDIR, INCLUDEDIR, DATADIR, MANDIR,
 #                         PORTALDIR, DBUSSERVICEDIR); make uninstall
-#   make install-icons    copy the XP/2000 icon files from nt5src into DATADIR (NT5SRC=)
 #   make clean
 #
 # Components (each with its own fragment, included below):

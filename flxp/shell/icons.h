@@ -1,13 +1,17 @@
 // Icon themes: which files supply the shell's icons and toolbar images.
-// A theme is a small ini file (res/icons/<name>.theme, found with
-// data_path); the one selected by the icons setting (icons= in flxp.ini or
-// FLXP_ICONS; default "xp", falling back to "wine" when its files are not
-// there) maps icon keys to .ico files or to icon
-// resources inside a PE file ("pe:/path/shell32.dll#4"). No win32 here; the
-// explorer does the loading.
+// A theme is a small ini file, a recipe: lhde's icons/<name>.theme (data/icons,
+// found in the data directories) or flxp's res/icons/<name>.theme (wine, the
+// fallback); the one selected by the icons setting (the theme's Desktop.icons,
+// icons= in flxp.ini or FLXP_ICONS; default "xp", falling back to "wine" when
+// its files are not there) maps icon keys to .ico files or to resources inside
+// a PE file ("pe:shell32.dll#4"), resolved against [theme] resources =
+// resources/<build> (lhde-import's copy of that build's DLLs). No win32 here;
+// the explorer does the loading.
 #pragma once
 #include <string>
 #include <vector>
+
+namespace gdi { struct Bitmap; }
 
 namespace shell {
 
@@ -42,5 +46,20 @@ bool refresh_icon_theme();
 int icon_theme_generation();                             // + 1 on every selection
 std::string icon_file(const std::string& key);           // resolved source for a key ("" if unknown)
 void set_icon_dir(const std::string& dir);               // where <name>.theme files and the wine icons live
+std::string icon_theme_file(const std::string& name);    // the recipe a name selects ("" if none)
+
+// Windows art by resource id from lhde-import's resources/<build> (docs/flxp-NOTES.md
+// "XP and 2000 art by resource id"): resource_file("xp", "explorer.exe") is that file in
+// the first data directory that has it, "" when the build is not imported.
+std::string resource_file(const std::string& build, const std::string& file);
+// "pe:PATH#ID" for that file's resource ID, "" when the file is not imported
+std::string resource_src(const std::string& build, const std::string& file, int id);
+// XP's shellstyle.dll for a visual style: <style dir>/Shell/<color>/shellstyle.dll or
+// styles/NAME/Shell/<color>/ (lhde-import's copy beside styles/NAME.msstyles), the
+// colour matched case-insensitively; with no style (classic) system32's from resources/xp.
+// "" if there is none.
+std::string shellstyle_dll(const std::string& msstyles, const std::string& color);
+// An image from a source: "pe:PATH#ID" (that PE's RT_BITMAP ID) or an image file. Null if missing.
+gdi::Bitmap* load_art(const std::string& src);
 
 } // namespace shell

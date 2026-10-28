@@ -16,6 +16,9 @@ namespace shell { struct App; }
 
 namespace tb {
 
+// a bitmap of XP's explorer.exe by resource id (lhde-import's resources/xp), null when not imported
+HBITMAP xp_explorer_bitmap(int id, UINT flags);
+
 enum : UINT {
     WM_TB_XCHANGED = WM_APP + 1,    // xwm has news (posted from its thread)
 };

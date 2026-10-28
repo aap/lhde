@@ -869,16 +869,17 @@ void load_user()
     if (name.empty() && getenv("USER")) name = getenv("USER");
     P->user = name;
 
-    // ~/.face (the freedesktop/AccountsService picture), user_picture=, else XP's chess tile from the nt5src tree
+    // ~/.face (the freedesktop/AccountsService picture), user_picture=, else XP's chess tile
+    // (logonui.exe's IDB_USER0 114, when lhde-import has it in resources/xp)
     std::vector<std::string> cand = { home() + "/.face", home() + "/.face.icon", setting("user_picture") };
-    std::string nt5 = shell::setting("nt5src");
-    if (!nt5.empty()) cand.push_back(nt5 + "/Source/XPSP1/NT/windows/advcore/duser/directui/test/app/logonui/chess.bmp");
+    std::string chess = shell::resource_src("xp", "logonui.exe", 114);
+    if (!chess.empty()) cand.push_back(chess);
     bool show = P->user_h > 0;
     if (P->th) { BOOL b = TRUE; if (SUCCEEDED(GetThemeBool(P->th, SPP_USERPANE, 0, TMT_USERPICTURE, &b))) show = b; }
     if (!show) return;
     for (const std::string& c : cand) {
-        if (!is_file(c)) continue;
-        gdi::Bitmap* b = gdi::load_image(c);
+        if (c.rfind("pe:", 0) != 0 && !is_file(c)) continue;
+        gdi::Bitmap* b = shell::load_art(c);
         if (!b) continue;
         int w, h;
         gdi::fit_size(b->width, b->height, USERPIC, USERPIC, true, &w, &h);    // userpane.cpp: 48 on the longer side
@@ -912,13 +913,8 @@ void make_fonts()
 
 void load_classic_logoff()
 {
-    std::string nt5 = shell::setting("nt5src");
-    if (nt5.empty()) return;
-    const char* f[2] = { "logoffbuttons.bmp", "logoffbuttonshot.bmp" };
-    for (int i = 0; i < 2; i++) {
-        std::string p = nt5 + "/Source/XPSP1/NT/shell/explorer/desktop2/" + f[i];
-        if (is_file(p)) P->classic_logoff[i] = (HBITMAP)LoadImageW(nullptr, (LPCWSTR)W(p).c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
-    }
+    // explorer.exe's IDB_LOGOFF_NORMAL / _HOT (desktop2/logoffbuttons.bmp, logoffbuttonshot.bmp)
+    for (int i = 0; i < 2; i++) P->classic_logoff[i] = xp_explorer_bitmap(7010 + i, 0);
 }
 
 void destroy()

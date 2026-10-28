@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <string>
 #include "shell/config.h"
+#include "shell/icons.h"
 #include "shell/settings.h"
 #include "shell/lhtheme.h"
 #include "shell/runtime.h"
@@ -29,6 +30,20 @@ extern "C" {
 }
 
 namespace tb {
+
+// a bitmap of XP's explorer.exe (lhde-import's resources/xp): IDB_START 143, IDB_STARTCLASSIC 176,
+// IDB_LOGOFF_NORMAL / _HOT 7010 / 7011; null when XP is not imported
+HBITMAP xp_explorer_bitmap(int id, UINT flags)
+{
+    static HINSTANCE mod;
+    static bool tried;
+    if (!tried) {
+        tried = true;
+        std::string f = shell::resource_file("xp", "explorer.exe");
+        if (!f.empty()) mod = LoadLibraryExW((LPCWSTR)W(f).c_str(), nullptr, LOAD_LIBRARY_AS_DATAFILE);
+    }
+    return mod ? (HBITMAP)LoadImageW(mod, MAKEINTRESOURCEW(id), IMAGE_BITMAP, 0, 0, flags) : nullptr;
+}
 
 Bar g;
 
@@ -73,22 +88,12 @@ void make_fonts()
     g.font_caption_bold = CreateFontIndirectW(&ncm.lfCaptionFont);
 }
 
-std::string nt5_explorer_file(const char* name)
-{
-    std::string root = shell::setting("nt5src");
-    if (root.empty()) return "";
-    std::string p = root + "/Source/XPSP1/NT/shell/explorer/" + name;
-    return access(p.c_str(), R_OK) == 0 ? p : "";
-}
-
 void load_flag()
 {
     if (flag_list) ImageList_Destroy(flag_list);
     flag_list = nullptr;
     flag_size = SIZE{ g.theme ? 25 : 16, g.theme ? 20 : 16 };
-    std::string f = nt5_explorer_file(g.theme ? "start.bmp" : "startclassic.bmp");
-    if (f.empty()) return;
-    HBITMAP bmp = (HBITMAP)LoadImageW(nullptr, (LPCWSTR)W(f).c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION);
+    HBITMAP bmp = xp_explorer_bitmap(g.theme ? 143 : 176, LR_CREATEDIBSECTION);   // start.bmp / startclassic.bmp
     if (!bmp) return;
     BITMAP bm = {};
     GetObjectW(bmp, sizeof bm, &bm);
@@ -98,7 +103,7 @@ void load_flag()
     DeleteObject(bmp);
 }
 
-// Without the XP source tree: the four panes of the flag as plain squares
+// Without XP's explorer.exe: the four panes of the flag as plain squares
 void draw_flag(HDC hdc, int x, int y)
 {
     if (flag_list) { ImageList_Draw(flag_list, 0, hdc, x, y, ILD_TRANSPARENT); return; }

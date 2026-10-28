@@ -178,7 +178,8 @@ std::string lhde_report()
     std::vector<std::string> wd = lhde_subdirs("wallpapers");
     line("wallpapers", wd.empty() ? std::string("wallpapers/: not imported") : std::to_string(wd.size()) + " directories in " + dir_of(wd[0]));
     look("styles", "styles");
-    line("XP resources", "not imported (nt5src= in flxp.ini: " + (setting("nt5src").empty() ? std::string("unset") : setting("nt5src")) + ")");
+    look("XP art", "resources/xp", "the xp icons, toolbar strips, start flag, task pane, Log Off buttons");
+    look("", "resources/2k", "the 2k icons and toolbar");
     return out;
 }
 

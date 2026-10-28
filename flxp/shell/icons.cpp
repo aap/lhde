@@ -1,12 +1,18 @@
+#include "res/res.h"   // before anything that pulls in win32 names
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <dirent.h>
+#include <strings.h>
 #include <map>
 #include "icons.h"
 #include "config.h"
+#include "lhdata.h"
 #include "lhtheme.h"
+#include "gdi/bmp.h"
+#include "gdi/image.h"
 
 namespace shell {
 
@@ -44,7 +50,7 @@ static std::string expand(const std::string& v)
         else if (v[i] == '$') {
             size_t j = i + 1; while (j < v.size() && (isalnum((unsigned char)v[j]) || v[j] == '_')) j++;
             std::string var = v.substr(i + 1, j - i - 1);
-            if (var.rfind("FLXP_", 0) == 0) {   // flxp settings: $FLXP_NT5SRC is nt5src= in flxp.ini
+            if (var.rfind("FLXP_", 0) == 0) {   // flxp settings: $FLXP_LONGHORN_SYSTEM32 is longhorn_system32=
                 std::string key = var.substr(5);
                 for (char& c : key) if (c >= 'A' && c <= 'Z') c += 32;
                 out += theme_setting(key);   // or the session theme's flxp_<key>
@@ -58,27 +64,54 @@ static std::string expand(const std::string& v)
     return out;
 }
 
-// Resolve a source: absolute, pe:..., or relative to the theme base.
+// A relative path: "resources/BUILD/..." names another imported build's file (the longhorn4074
+// recipe's toolbar is XP's: pe:resources/xp/shell32.dll#214), anything else is relative to the base.
+static std::string relative(const IconTheme& t, const std::string& p)
+{
+    if (p.rfind("resources/", 0) == 0) {
+        std::string f = lhde_find(p);
+        return f.empty() ? "/nonexistent/" + p : f;   // not imported: missing, dropped like any missing file
+    }
+    return (t.base.empty() ? icon_dir() : t.base) + "/" + p;
+}
+
+// Resolve a source: absolute, pe:..., or relative (above).
 static std::string resolve(const IconTheme& t, const std::string& src)
 {
     if (src.empty()) return src;
     std::string s = expand(src);
     if (s.rfind("pe:", 0) == 0) {
         std::string rest = s.substr(3);
-        if (!rest.empty() && rest[0] != '/') rest = t.base + "/" + rest;
+        size_t hash = rest.rfind('#');
+        std::string id = hash == std::string::npos ? "" : rest.substr(hash);
+        if (!rest.empty() && rest[0] != '/') rest = relative(t, rest.substr(0, rest.size() - id.size())) + id;
         return "pe:" + rest;
     }
     if (s[0] == '/') return s;
-    return (t.base.empty() ? icon_dir() : t.base) + "/" + s;
+    return relative(t, s);
+}
+
+std::string icon_theme_file(const std::string& name)
+{
+    if (name.find('/') != std::string::npos) return name;
+    // lhde's recipes first (data/icons: xp, 2k, longhorn4074), then flxp's own (wine); the
+    // older name "longhorn" is longhorn4074
+    std::string n = name == "longhorn" ? "longhorn4074" : name;
+    std::string f = lhde_find("icons/" + n + ".theme");
+    if (!f.empty()) return f;
+    f = icon_dir() + "/" + name + ".theme";
+    return exists(f) ? f : "";
 }
 
 bool load_icon_theme(const std::string& name)
 {
-    std::string path = name.find('/') != std::string::npos ? name : icon_dir() + "/" + name + ".theme";
+    std::string path = icon_theme_file(name);
+    if (path.empty()) return false;
     FILE* f = fopen(path.c_str(), "r");
     if (!f) return false;
     IconTheme t;
     t.name = name;
+    bool has_resources = false;
     std::string section;
     char line[1024];
     while (fgets(line, sizeof line, f)) {
@@ -91,7 +124,12 @@ bool load_icon_theme(const std::string& name)
         size_t c = v.find(" ;"); if (c != std::string::npos) v = trim(v.substr(0, c));
         if (section == "theme") {
             if (k == "name") t.name = v;
-            else if (k == "base") {
+            else if (k == "resources") {   // resources/BUILD: lhde-import's DLLs, the base of pe: sources
+                t.base = lhde_find(expand(v));
+                if (t.base.empty()) t.base = "/nonexistent/" + v;   // not imported: the theme is unusable
+                has_resources = true;
+            }
+            else if (k == "base" && !has_resources) {   // a user's recipe: a directory of its own
                 t.base = expand(v);
                 if (!t.base.empty() && t.base[0] != '/') t.base = dir_of(path) + "/" + t.base;   // relative to the .theme file
             }
@@ -165,10 +203,13 @@ bool select_icon_theme(const std::string& name)
         return true;
     }
     if (want != "wine") {
-        const char* hint = want == "longhorn" ? "lhde-import resources/<build>, or set longhorn_system32= in " :
-                           (want == "xp" || want == "2k") ? "set nt5src= in " : "check icons= in ";
-        fprintf(stderr, "flxp: icon theme \"%s\" has no icon files here; using the Wine icons (%s%s%s)\n",
-                want.c_str(), hint, settings_path().c_str(), (want == "xp" || want == "2k") ? ", or make install-icons" : "");
+        std::string file = icon_theme_file(want);
+        if (file.empty())
+            fprintf(stderr, "flxp: no icon theme \"%s\" (icons/%s.theme in lhde's data directories); using the Wine icons\n",
+                    want.c_str(), want.c_str());
+        else
+            fprintf(stderr, "flxp: icon theme \"%s\" has no icon files here (%s: its resources/<build> not imported? "
+                    "lhde-import, docs/USAGE.md \"Getting the Windows resources\"); using the Wine icons\n", want.c_str(), file.c_str());
     }
     if (load_icon_theme("wine") && theme_usable(g_theme)) { drop_missing_toolbar(g_theme.toolbar); return want == "wine"; }
     g_theme = IconTheme();
@@ -199,6 +240,60 @@ std::string icon_file(const std::string& key)
     for (auto& kv : t.icons) if (kv.first == key) return kv.second;
     for (auto& kv : t.icons) if (kv.first == "document") return kv.second;
     return "";
+}
+
+std::string resource_file(const std::string& build, const std::string& file)
+{
+    return lhde_find("resources/" + build + "/" + file);
+}
+
+std::string resource_src(const std::string& build, const std::string& file, int id)
+{
+    std::string f = resource_file(build, file);
+    return f.empty() ? "" : "pe:" + f + "#" + std::to_string(id);
+}
+
+// DIR/NAME matched case-insensitively ("" if none)
+static std::string find_nocase(const std::string& dir, const std::string& name)
+{
+    DIR* d = opendir(dir.c_str());
+    if (!d) return "";
+    std::string out;
+    while (struct dirent* e = readdir(d))
+        if (!strcasecmp(e->d_name, name.c_str())) { out = dir + "/" + e->d_name; break; }
+    closedir(d);
+    return out;
+}
+
+std::string shellstyle_dll(const std::string& msstyles, const std::string& color)
+{
+    if (msstyles.empty()) return resource_file("xp", "shellstyle.dll");
+    // XP: %ResourceDir%\Themes\Luna\Shell\NormalColor\shellstyle.dll beside luna.msstyles;
+    // lhde-import: styles/NAME.msstyles with styles/NAME/Shell/<color>/
+    std::string dir = dir_of(msstyles), base = msstyles.substr(dir.size() + 1);
+    size_t dot = base.rfind('.');
+    if (dot != std::string::npos) base.resize(dot);
+    for (std::string shell : { find_nocase(dir, "Shell"), find_nocase(dir + "/" + base, "Shell") }) {
+        if (shell.empty()) continue;
+        std::string c = find_nocase(shell, color);
+        std::string f = c.empty() ? "" : find_nocase(c, "shellstyle.dll");
+        if (!f.empty()) return f;
+    }
+    return "";
+}
+
+gdi::Bitmap* load_art(const std::string& src)
+{
+    if (src.rfind("pe:", 0) != 0) return src.empty() ? nullptr : gdi::load_image(src);
+    size_t hash = src.rfind('#');
+    if (hash == std::string::npos) return nullptr;
+    res::Module* m = res::load(src.substr(3, hash - 3).c_str());
+    if (!m) return nullptr;
+    res::Blob b;
+    gdi::Bitmap* out = nullptr;
+    if (res::find(m, res::Id(res::RT_BITMAP), res::Id((uint32_t)atoi(src.c_str() + hash + 1)), b)) out = gdi::decode_bmp(b.data, b.size);
+    res::unload(m);
+    return out;
 }
 
 } // namespace shell

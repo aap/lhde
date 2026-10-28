@@ -1,11 +1,9 @@
-; Windows 2000 icons, read by resource id from resources/2k/shell32.dll (lhde-import); flxp's res/icons format (flxp/res/icons/*.theme):
-; pe:DLL#ID relative to [theme] base. The ids are XP's (Longhorn 4074 keeps them). The toolbar strips ([toolbar]) stay in
-; flxp's own recipes until the wux side reads them by id too (docs/THEME-FORMAT.md section 11).
+; Windows 2000 icons and toolbar art, read by resource id from lhde-import's resources/2k (Windows 2000 SP4's
+; shell32.dll and browseui.dll; docs/flxp-NOTES.md "XP and 2000 art by resource id"). Format: xp.theme.
 [theme]
 name = Windows 2000
 resources = resources/2k
-base = $LHDE_DATA/resources/2k
-depth = 4
+depth = 4        ; the 16-colour frames, as the XP-source-based 2k set had them
 
 [icons]
 folder = pe:shell32.dll#4
@@ -15,16 +13,16 @@ text = pe:shell32.dll#152
 drive = pe:shell32.dll#9
 computer = pe:shell32.dll#16
 desktop = pe:shell32.dll#35
-home = pe:shell32.dll#235
-image = pe:shell32.dll#236
-audio = pe:shell32.dll#225
-video = pe:shell32.dll#224
+home = pe:resources/xp/shell32.dll#235   ; not in 2000's shell32 (mydocs.dll, ...): XP's, 4-bit frames
+image = pe:resources/xp/shell32.dll#226   ; not in 2000's shell32 (mydocs.dll, ...): XP's, 4-bit frames
+audio = pe:resources/xp/shell32.dll#225   ; not in 2000's shell32 (mydocs.dll, ...): XP's, 4-bit frames
+video = pe:resources/xp/shell32.dll#224   ; not in 2000's shell32 (mydocs.dll, ...): XP's, 4-bit frames
 zip = pe:shell32.dll#4
 pdf = pe:shell32.dll#2
 exe = pe:shell32.dll#3
 dll = pe:shell32.dll#154
 html = pe:shell32.dll#178
-disc = pe:shell32.dll#12
+disc = pe:resources/xp/shell32.dll#294   ; not in 2000's shell32: XP's, 4-bit frames
 settings = pe:shell32.dll#151
 binary = pe:shell32.dll#154
 network = pe:shell32.dll#18
@@ -32,8 +30,22 @@ favorites = pe:shell32.dll#173
 search = pe:shell32.dll#134
 trash = pe:shell32.dll#32
 help = pe:shell32.dll#24
-pictures = pe:shell32.dll#236
+pictures = pe:resources/xp/shell32.dll#236   ; not in 2000's shell32 (mydocs.dll, ...): XP's, 4-bit frames
 control_panel = pe:shell32.dll#137
 run = pe:shell32.dll#25
-recent = pe:shell32.dll#20
+recent = pe:shell32.dll#21
 
+[toolbar]
+; browseui's IE5-era standard buttons (IDB_SHSTDHICOLOR 276 / HOTHICOLOR 277, 20 px; ..16 278/279)
+strip = pe:browseui.dll#276
+hot = pe:browseui.dll#277
+size = 20
+small = pe:browseui.dll#278
+small_hot = pe:browseui.dll#279
+small_size = 16
+back = 0
+forward = 1
+up = 28
+search = 17
+folders = 43
+views = 32

@@ -3,8 +3,9 @@
 //
 // XP look (visual styles and classic, the explorer's XP frame): sections as
 // XP's "Other Places" - a header with the title in Tahoma 8 bold and the
-// collapse chevron (headersection.bmp and up/down.bmp of the shellstyle
-// sources under nt5src= when found, drawn lookalikes otherwise; other
+// collapse chevron (shellstyle.dll's IDB_HEADERSECTION 112 and IDB_UP..DOWNHOT
+// 100-103 of the style's Shell/<color>/ or resources/xp's classic one, when
+// imported; drawn lookalikes otherwise; other
 // .msstyles: their ExplorerBar parts), a box below with 16 px icons and
 // link-coloured names that underline under the pointer, on the task pane's
 // gradient; Places and Bookmarks.

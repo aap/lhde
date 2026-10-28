@@ -5,8 +5,8 @@
 #   filedlg/    flxp-filedialog, flxp-portal (xdg-desktop-portal FileChooser backend)
 #   settings/   flxp-settings (Display Properties)
 #   rc/         flxp's own dialog templates (.rc, compiled to .res with mingw windres)
-#   res/        run-time data: icon themes (Wine's shell32 icons, theme files), the
-#               .desktop file, the portal files, tools/install-icons.sh
+#   res/        run-time data: the wine icon theme (Wine's shell32 icons), the
+#               .desktop file, the portal files
 
 # ---- luxnav (luxnav/luxnav.mk: build/lib/libluxnav.a, included before this file) ---------------------
 # The explorer header's vision mode (docs/flxp-NOTES.md "The vision header") is always built in: header.cpp includes
@@ -87,9 +87,8 @@ flxp: $(addprefix build/bin/,$(FLXP_PROGRAMS))
 # ---- install ------------------------------------------------------------------------------
 # bin/flxp and its helpers, the run-time data in $(DATADIR) (res/icons), the
 # .desktop file, the portal backend's .portal and D-Bus activation files.
-# make install-icons copies the XP/2000 icon files from nt5src
-# (NT5SRC=, else nt5src= in flxp.ini) into $(DATADIR).
-NT5SRC  ?= $(or $(FLXP_NT5SRC),$(shell sed -n 's/^nt5src *= *//p' $${XDG_CONFIG_HOME:-$$HOME/.config}/flxp/flxp.ini 2>/dev/null))
+# The xp/2k/longhorn4074 icon recipes are data/icons (installed with data/); their
+# art is read by resource id from lhde-import's resources/<build>.
 install-flxp: flxp
 	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(DATADIR)/res/icons $(DESTDIR)$(APPDIR) $(DESTDIR)$(PORTALDIR) $(DESTDIR)$(DBUSSERVICEDIR)
 	install -m 755 $(addprefix build/bin/,$(FLXP_PROGRAMS)) $(DESTDIR)$(BINDIR)/
@@ -97,14 +96,11 @@ install-flxp: flxp
 	sed 's|@BINDIR@|$(BINDIR)|g; s|@DATADIR@|$(DATADIR)|g' flxp/res/flxp.desktop.in > $(DESTDIR)$(APPDIR)/flxp.desktop
 	install -m 644 flxp/res/portal/flxp.portal $(DESTDIR)$(PORTALDIR)/flxp.portal
 	sed 's|@BINDIR@|$(BINDIR)|g' flxp/res/portal/org.freedesktop.impl.portal.desktop.flxp.service.in > $(DESTDIR)$(DBUSSERVICEDIR)/org.freedesktop.impl.portal.desktop.flxp.service
-install-icons:
-	flxp/res/tools/install-icons.sh xp '$(NT5SRC)' $(DESTDIR)$(DATADIR)
-	flxp/res/tools/install-icons.sh 2k '$(NT5SRC)' $(DESTDIR)$(DATADIR)
 uninstall-flxp:
 	rm -f $(addprefix $(DESTDIR)$(BINDIR)/,$(FLXP_PROGRAMS)) $(DESTDIR)$(APPDIR)/flxp.desktop
 	rm -f $(DESTDIR)$(PORTALDIR)/flxp.portal $(DESTDIR)$(DBUSSERVICEDIR)/org.freedesktop.impl.portal.desktop.flxp.service
-	rm -rf $(DESTDIR)$(DATADIR)/res $(DESTDIR)$(DATADIR)/icons
+	rm -rf $(DESTDIR)$(DATADIR)/res
 	-rmdir $(DESTDIR)$(DATADIR)
 
 -include $(FLXP_OBJS:.o=.d)
-.PHONY: flxp install-flxp install-icons uninstall-flxp
+.PHONY: flxp install-flxp uninstall-flxp

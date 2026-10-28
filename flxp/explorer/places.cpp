@@ -9,6 +9,8 @@
 #include "shell/apps.h"
 #include "shell/bookmarks.h"
 #include "shell/config.h"
+#include "shell/icons.h"
+#include "shell/lhdata.h"
 #include "shell/namespace.h"
 #include "gdi/image.h"
 #include "uxtheme.h"
@@ -175,12 +177,12 @@ static Look g_look;
 
 static void free_bmp(Bmp& b) { if (b.h) DeleteObject(b.h); b = Bmp(); }
 
-// A BMP from the shellstyle sources as a premultiplied DIB: 32bpp ones keep
+// A shellstyle.dll bitmap ("pe:DLL#ID") as a premultiplied DIB: 32bpp ones keep
 // their alpha (rcbmp(...,2,255,...)), others are keyed on magenta.
-static Bmp load_bmp(const std::string& path)
+static Bmp load_bmp(const std::string& src)
 {
     Bmp out;
-    gdi::Bitmap* b = gdi::load_image(path);
+    gdi::Bitmap* b = src.empty() ? nullptr : shell::load_art(src);
     if (!b) return out;
     BITMAPINFO bi = {};
     bi.bmiHeader.biSize = sizeof bi.bmiHeader;
@@ -229,25 +231,33 @@ static void load_look(HWND h)
         g_look.link_hot = RGB(0, 102, 204);
         return;
     }
-    std::string variant;
+    std::string variant, style_file, style_color;
     HTHEME th = OpenThemeData(h, L"ExplorerBar");
     if (th) {
         WCHAR file[512] = {}, color[64] = {};
         GetCurrentThemeName(file, 512, color, 64, nullptr, 0);
-        std::string f = lower(w32::utf8_of(file)), c = lower(w32::utf8_of(color));
+        style_file = w32::utf8_of(file); style_color = w32::utf8_of(color);
+        std::string f = lower(style_file), c = lower(style_color);
         if (f.size() >= 13 && f.compare(f.size() - 13, 13, "luna.msstyles") == 0)
             variant = c == "homestead" ? "homestead" : c == "metallic" ? "metallic" : "blue";
         else if (IsThemePartDefined(th, EBP_NORMALGROUPHEAD, 0)) {
             g_look.kind = ExplorerBar;
             g_look.theme = th;
             th = nullptr;
-        } else
+        } else {
             variant = "blue";
+            style_file.clear();   // another style without ExplorerBar parts: Luna's NormalColor bitmaps
+        }
         if (th) CloseThemeData(th);
     }
-    std::string dir;
-    std::string nt5 = shell::setting("nt5src");
-    if (!nt5.empty()) dir = nt5 + "/Source/XPSP1/NT/shell/themes/themedir/shellstyle/" + (variant.empty() ? "classic" : variant) + "/";
+    // XP's shellstyle.dll: the style's Shell/<color>/ (Luna's NormalColor, HomeStead, Metallic),
+    // classic: system32's (resources/xp)
+    if (!variant.empty() && style_file.empty()) {
+        style_file = shell::lhde_find("styles/luna.msstyles");
+        style_color = "NormalColor";
+    }
+    std::string dll = variant.empty() || !style_file.empty() ? shell::shellstyle_dll(variant.empty() ? "" : style_file, style_color) : "";
+    auto art = [&](int id) { return dll.empty() ? std::string() : "pe:" + dll + "#" + std::to_string(id); };
     if (g_look.kind == ExplorerBar) {
         HTHEME t = g_look.theme;
         COLORREF c1 = RGB(140, 170, 230), c2 = RGB(100, 135, 220);
@@ -296,12 +306,10 @@ static void load_look(HWND h)
             g_look.title_hot = g_look.link_hot = RGB(66, 142, 255);
             g_look.head1 = RGB(255, 255, 255); g_look.head2 = RGB(198, 211, 247);
         }
-        if (!dir.empty()) g_look.head = load_bmp(dir + "headersection.bmp");
+        g_look.head = load_bmp(art(112));   // IDB_HEADERSECTION
     }
-    if (!dir.empty()) {
-        g_look.up = load_bmp(dir + "up.bmp"); g_look.up_hot = load_bmp(dir + "uphot.bmp");
-        g_look.down = load_bmp(dir + "down.bmp"); g_look.down_hot = load_bmp(dir + "downhot.bmp");
-    }
+    g_look.up = load_bmp(art(100)); g_look.up_hot = load_bmp(art(101));        // IDB_UP, IDB_UPHOT
+    g_look.down = load_bmp(art(102)); g_look.down_hot = load_bmp(art(103));    // IDB_DOWN, IDB_DOWNHOT
 }
 
 static void make_fonts()
