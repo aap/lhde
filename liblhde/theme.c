@@ -56,7 +56,19 @@ void lhde_theme_free(lhde_theme *t)
 }
 
 /* ---------------------------------------------------------------- the format's keys (section 2) */
-static const char *const SECTIONS[] = { "Theme", "VisualStyle", "Glass", "Shell", "Explorer", "Desktop", "Fonts", "Cursors", "Sounds", NULL };
+static const char *const SECTIONS[] = { "Theme", "VisualStyle", "Glass", "Shell", "Explorer", "Desktop", "Fonts", "Cursors", "Sounds",
+                                        "Colors", "Metrics", NULL };
+/* the classic look (section 2a): COLOR_ names by index, NONCLIENTMETRICS + the icon title font */
+static const char *const COLORS[] = {
+    "scrollbar", "background", "activecaption", "inactivecaption", "menu", "window", "windowframe", "menutext", "windowtext",
+    "captiontext", "activeborder", "inactiveborder", "appworkspace", "highlight", "highlighttext", "btnface", "btnshadow",
+    "graytext", "btntext", "inactivecaptiontext", "btnhighlight", "3ddkshadow", "3dlight", "infotext", "infobk",
+    "alternatebtnface", "hotlight", "gradientactivecaption", "gradientinactivecaption", "menuhilight", "menubar", NULL };
+static const char *const METRICS[] = {
+    "borderwidth", "scrollwidth", "scrollheight", "captionwidth", "captionheight", "smcaptionwidth", "smcaptionheight",
+    "menuwidth", "menuheight", "captionfont", "smcaptionfont", "menufont", "statusfont", "messagefont", "icontitlefont", NULL };
+const char *lhde_color_name(int i) { return i >= 0 && i < (int)(sizeof COLORS / sizeof *COLORS) ? COLORS[i] : NULL; }
+const char *lhde_metric_name(int i) { return i >= 0 && i < (int)(sizeof METRICS / sizeof *METRICS) ? METRICS[i] : NULL; }
 static const char *const KEYS[] = {
     "Theme.name", "Theme.base", "Theme.build",
     "VisualStyle.style", "VisualStyle.color", "VisualStyle.size", "VisualStyle.scheme", "VisualStyle.shellstyle",
@@ -68,6 +80,8 @@ static const char *const KEYS[] = {
 int lhde_theme_is_key(const char *key)
 {
     for (int i = 0; KEYS[i]; i++) if (!strcasecmp(KEYS[i], key)) return 1;
+    if (!strncasecmp(key, "Colors.", 7)) { for (int i = 0; COLORS[i]; i++) if (!strcasecmp(COLORS[i], key + 7)) return 1; }
+    if (!strncasecmp(key, "Metrics.", 8)) { for (int i = 0; METRICS[i]; i++) if (!strcasecmp(METRICS[i], key + 8)) return 1; }
     return 0;
 }
 /* "visualstyle" -> "VisualStyle"; an unknown section as written */
@@ -270,7 +284,7 @@ static int wallpaper_find(const char *v, char *out, size_t n)
 }
 
 /* ---------------------------------------------------------------- resolution */
-static const char *src_name[] = { "file", "base", "settings", "default", "fallback", "derived" };
+static const char *src_name[] = { "file", "base", "settings", "default", "fallback", "derived", "current", "scheme" };
 
 /* the theme files' keys into t (absent ones only): depth 0 = the theme's own file */
 struct take_ctx { lhde_theme *t; int depth; const char *who, *path, *sec; const lhde_ini *ini; };
@@ -482,8 +496,49 @@ static void apply_fallbacks(lhde_theme *t, const lhde_style_info *si)
     put(t, "path.shellstyle", p, LHDE_FROM_DERIVED, "derived");
     p[0] = 0;
     v = get(t, "VisualStyle.scheme");
-    if (si->kind == LHDE_STYLE_CLASSIC && !is_none(v)) { char rel[300]; snprintf(rel, sizeof rel, "styles/%s.scheme", v); if (!lhde_data_find(rel, p, sizeof p)) p[0] = 0; }
+    if (si->kind == LHDE_STYLE_CLASSIC && !is_none(v)) {
+        char rel[300], nm[256]; snprintf(nm, sizeof nm, "%s", v); snprintf(rel, sizeof rel, "styles/%s.scheme", nm);
+        if (!lhde_data_find(rel, p, sizeof p) || !lhde__exists(p)) {
+            p[0] = 0;
+            snprintf(w, sizeof w, "scheme %s not imported (styles/%s.scheme): Windows Standard, the built-in classic colours", nm, nm);
+            fallback(t, "VisualStyle.scheme", "none", w);
+        }
+    }
     put(t, "path.scheme", p, LHDE_FROM_DERIVED, "derived");
+}
+
+/* section 2a: style = classic with a scheme: its [Colors] and [Metrics] (the size's [Metrics:SIZE] first) for every key the
+   theme files and the current layer leave out */
+struct scheme_ctx { lhde_theme *t; const char *sec, *why; };
+static void scheme_key(const char *k, const char *v, void *ud)
+{
+    struct scheme_ctx *c = ud;
+    char full[256]; snprintf(full, sizeof full, "%s.%s", c->sec, k);
+    for (char *q = strchr(full, '.') + 1; *q; q++) *q = (char)tolower((unsigned char)*q);
+    if (!lhde_theme_is_key(full) || has(c->t, full)) return;
+    put(c->t, full, v, LHDE_FROM_SCHEME, c->why);
+}
+static void apply_scheme(lhde_theme *t)
+{
+    const char *p = get(t, "path.scheme");
+    if (!p || !p[0]) return;
+    char path[PATH_MAX]; snprintf(path, sizeof path, "%s", p);
+    const char *sz = get(t, "VisualStyle.size");
+    char size[128]; snprintf(size, sizeof size, "%s", sz ? sz : "");
+    lhde_ini *ini = lhde_ini_load(path);
+    char why[PATH_MAX + 300];
+    const char *sn = get(t, "VisualStyle.scheme");
+    snprintf(why, sizeof why, "scheme %s (%s)", sn ? sn : "?", path);
+    for (int c = 0; c < 2; c++) {
+        const char *base = c ? "Metrics" : "Colors";
+        struct scheme_ctx x = { t, base, why };
+        if (size[0] && strcasecmp(size, "Normal") && strcasecmp(size, "NormalSize")) {
+            char sec[300]; snprintf(sec, sizeof sec, "%s:%s", base, size);
+            lhde_ini_keys(ini, sec, scheme_key, &x);
+        }
+        lhde_ini_keys(ini, base, scheme_key, &x);
+    }
+    lhde_ini_free(ini);
 }
 
 /* settings.ini on top of the files (legacy layers): flxp's [override:NAME] / [override], and [desktop] wallpaper */
@@ -513,7 +568,55 @@ static void choose_style(lhde_theme *t, lhde_style_info *si)
     lhde_style_probe("classic", si);
 }
 
-lhde_theme *lhde_theme_resolve(const char *name, char *err, size_t nerr)
+/* the current layer of settings.ini for theme canon (its [current] theme = canon), as key/value pairs (internal.h) */
+void lhde__layer_free(struct lhde__layer *l) { for (int i = 0; i < 2 * l->n; i++) free(l->kv[i]); free(l->kv); l->kv = NULL; l->n = l->cap = 0; }
+void lhde__layer_add(struct lhde__layer *l, const char *k, const char *v)
+{
+    if (l->n == l->cap) { int c = l->cap ? l->cap * 2 : 16; char **nk = realloc(l->kv, (size_t)c * 2 * sizeof *nk); if (!nk) return; l->kv = nk; l->cap = c; }
+    l->kv[2 * l->n] = strdup(k); l->kv[2 * l->n + 1] = strdup(v ? v : ""); l->n++;
+}
+static void layer_cb(const char *k, const char *v, void *ud)
+{
+    if (strchr(k, '.')) lhde__layer_add(ud, k, v);   /* `theme` is the owner, not a key */
+}
+void lhde__current_layer(const char *canon, struct lhde__layer *l)
+{
+    memset(l, 0, sizeof *l);
+    char p[PATH_MAX]; lhde_settings_path(p, sizeof p);
+    lhde_ini *ini = lhde_ini_load(p);
+    char owner[256] = "";
+    if (lhde_ini_get(ini, "current", "theme", owner, sizeof owner) && owner[0] && canon && !strcmp(owner, canon))
+        lhde_ini_keys(ini, "current", layer_cb, l);
+    lhde_ini_free(ini);
+}
+/* a layer key: Section.key with the section's spelling and the key lower case; "" when it is none (Theme.name/base/aliases) */
+void lhde__layer_key(const char *k, char *out, size_t n)
+{
+    out[0] = 0;
+    const char *dot = strchr(k, '.');
+    if (!dot || dot == k || !dot[1]) return;
+    char sec[64]; snprintf(sec, sizeof sec, "%.*s", (int)(dot - k), k);
+    snprintf(out, n, "%s.%s", canon_section(sec), dot + 1);
+    for (char *q = strchr(out, '.') + 1; *q; q++) *q = (char)tolower((unsigned char)*q);
+    if (!strcasecmp(out, "Theme.name") || !strcasecmp(out, "Theme.base") || !strcasecmp(out, "Theme.aliases")) out[0] = 0;
+}
+
+static lhde_theme *resolve_ex(const char *name, int flags, const char *const *kv, int nkv, char *err, size_t nerr);
+lhde_theme *lhde_theme_resolve(const char *name, char *err, size_t nerr) { return resolve_ex(name, 0, NULL, -1, err, nerr); }
+lhde_theme *lhde_theme_resolve_flags(const char *name, int flags, char *err, size_t nerr) { return resolve_ex(name, flags, NULL, -1, err, nerr); }
+lhde_theme *lhde_theme_resolve_with(const char *name, const char *const *kv, int n, char *err, size_t nerr)
+{
+    return resolve_ex(name, 0, kv, n < 0 ? 0 : n, err, nerr);
+}
+lhde_theme *lhde_theme_resolve_current(char *err, size_t nerr)
+{
+    char b[256];
+    if (!lhde_settings_get("theme", "name", b, sizeof b)) { if (err && nerr) snprintf(err, nerr, "no theme selected (settings.ini [theme] name)"); return NULL; }
+    char name[256]; snprintf(name, sizeof name, "%s", b);
+    return resolve_ex(name, 0, NULL, -1, err, nerr);
+}
+
+static lhde_theme *resolve_ex(const char *name, int flags, const char *const *kv, int nkv, char *err, size_t nerr)
 {
     if (err && nerr) err[0] = 0;
     struct tindex x; tindex_build(&x);
@@ -563,6 +666,21 @@ lhde_theme *lhde_theme_resolve(const char *name, char *err, size_t nerr)
     put(t, "chain", chain, LHDE_FROM_DERIVED, "the base chain");
     tindex_free(&x);
     apply_settings(t, canon);
+    /* the current layer: the stored one of this theme, or the caller's */
+    {
+        struct lhde__layer stored = { NULL, 0, 0 };
+        if (nkv < 0 && !(flags & LHDE_RESOLVE_FILES)) { lhde__current_layer(canon, &stored); kv = (const char *const *)stored.kv; nkv = stored.n; }
+        int applied = 0;
+        for (int i = 0; kv && i < nkv; i++) {
+            char k[256]; lhde__layer_key(kv[2 * i], k, sizeof k);
+            if (!k[0]) continue;
+            put(t, k, kv[2 * i + 1], LHDE_FROM_CURRENT, "current: settings.ini [current] (unsaved changes)");
+            applied++;
+        }
+        char nb[16]; snprintf(nb, sizeof nb, "%d", applied);
+        put(t, "current", nb, LHDE_FROM_DERIVED, "the current layer's keys applied");
+        lhde__layer_free(&stored);
+    }
     if (!has(t, "Theme.name")) put(t, "Theme.name", canon, LHDE_FROM_DEFAULT, "default: the theme's name");
     lhde_style_info si;
     choose_style(t, &si);
@@ -575,6 +693,7 @@ lhde_theme *lhde_theme_resolve(const char *name, char *err, size_t nerr)
     }
     apply_defaults(t, &si, si.kind == LHDE_STYLE_CLASSIC ? NULL : style_c);
     apply_fallbacks(t, &si);
+    if (si.kind == LHDE_STYLE_CLASSIC) apply_scheme(t);
     put(t, "style.kind", kind_name(si.kind), LHDE_FROM_DERIVED, "derived");
     char fmt[8]; snprintf(fmt, sizeof fmt, "%d", si.format);
     put(t, "style.format", fmt, LHDE_FROM_DERIVED, "derived");
@@ -676,4 +795,4 @@ int lhde_theme_set_key(const char *name, const char *key, const char *value, cha
     return r ? -1 : 1;
 }
 
-const char *lhde__src_name(int s) { return s >= 0 && s <= 5 ? src_name[s] : "?"; }
+const char *lhde__src_name(int s) { return s >= 0 && s <= 7 ? src_name[s] : "?"; }

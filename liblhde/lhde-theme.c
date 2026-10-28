@@ -4,8 +4,16 @@
      lhde-theme resolve NAME --get KEY     one value (scripts: lhde-session, lhwall.sh)
      lhde-theme resolve NAME --shell       the record as shell assignments (lhde_Glass_frames='...')
      lhde-theme current                    the selected theme (settings.ini [theme] name)
-     lhde-theme set NAME                   select a theme: settings.ini [theme] name, then the root _LH_THEME when $DISPLAY has
-                                           an X server (xprop); luxwm, luxshell and flxp follow the property
+     lhde-theme resolve NAME --files ...   the theme files only, without the current layer
+     lhde-theme set NAME                   select a theme: settings.ini [theme] name (the current layer of another theme is
+                                           dropped), then the root _LH_THEME when $DISPLAY has an X server (xprop); luxwm,
+                                           luxshell and flxp follow the property
+     lhde-theme layer                      the current layer: its theme, then its keys (settings.ini [current])
+     lhde-theme layer-set KEY VALUE        one key of the selected theme's current layer (VALUE "-" removes it)
+     lhde-theme layer-clear                drop the current layer
+     lhde-theme save-as FILE [TITLE]       the selected theme with its layer as ~/.config/lhde/themes/FILE.theme, selected
+     lhde-theme delete NAME                one of the user's theme files (the selected one: its base is selected)
+     lhde-theme styles | schemes           the visual styles / classic schemes Display Properties lists
      lhde-theme set-key NAME KEY VALUE     a theme key changed the way Display Properties and luxshell's flyout do it: into
                                            NAME-modified.theme (or the user's own NAME.theme); VALUE "-" removes the key
      lhde-theme style NAME                 what liblhde reads from a visual style (kind, format, build, family, first scheme)
@@ -25,7 +33,8 @@
 
 static void usage(void)
 {
-    fprintf(stderr, "usage: lhde-theme list | resolve NAME [--why | --get KEY | --shell] | current | set NAME |\n"
+    fprintf(stderr, "usage: lhde-theme list | resolve NAME [--files] [--why | --get KEY | --shell] | current | set NAME |\n"
+                    "                  layer | layer-set KEY VALUE | layer-clear | save-as FILE [TITLE] | delete NAME | styles | schemes |\n"
                     "                  set-key NAME KEY VALUE | setting SEC KEY [VALUE] | style NAME | migrate [--force] |\n"
                     "                  registry | dirs\n");
     exit(2);
@@ -37,6 +46,10 @@ static void list_one(const char *name, const char *title, const char *file, int 
     static const char *g[] = { "user", "shipped", "style" };
     printf("%-22s %-8s %s\n", name, g[group < 3 ? group : 2], title);
 }
+
+static void layer_one(const char *k, const char *v, void *ud) { (void)ud; printf("%s=%s\n", k, v); }
+static void style_one(const char *n, const char *p, void *ud) { (void)ud; printf("%-22s %s\n", n, p); }
+static void scheme_one(const char *n, const char *t, const char *p, void *ud) { (void)ud; (void)p; printf("%-28s %s\n", n, t); }
 
 static void shq(const char *s)
 {
@@ -66,14 +79,15 @@ int main(int argc, char **argv)
     }
     if (!strcmp(cmd, "resolve")) {
         if (argc < 3) usage();
-        int why = 0, sh = 0; const char *one = NULL;
+        int why = 0, sh = 0, files = 0; const char *one = NULL;
         for (int i = 3; i < argc; i++) {
             if (!strcmp(argv[i], "--why")) why = 1;
+            else if (!strcmp(argv[i], "--files")) files = 1;
             else if (!strcmp(argv[i], "--shell")) sh = 1;
             else if (!strcmp(argv[i], "--get") && i + 1 < argc) one = argv[++i];
             else usage();
         }
-        lhde_theme *t = lhde_theme_resolve(argv[2], err, sizeof err);
+        lhde_theme *t = lhde_theme_resolve_flags(argv[2], files ? LHDE_RESOLVE_FILES : 0, err, sizeof err);
         if (!t) { fprintf(stderr, "lhde-theme: %s\n", err); return 1; }
         if (one) { const char *v = lhde_theme_get(t, one); if (!v) { lhde_theme_free(t); return 1; } printf("%s\n", v); lhde_theme_free(t); return 0; }
         const char *k, *v, *w;
@@ -92,7 +106,7 @@ int main(int argc, char **argv)
         if (argc < 3) usage();
         char canon[256], file[PATH_MAX];
         if (!lhde_theme_lookup(argv[2], canon, sizeof canon, file, sizeof file)) { fprintf(stderr, "lhde-theme: no theme %s\n", argv[2]); return 1; }
-        if (lhde_settings_set("theme", "name", canon) < 0) { fprintf(stderr, "lhde-theme: cannot write %s\n", lhde_settings_path(buf, sizeof buf)); return 1; }
+        if (lhde_theme_select(canon) < 0) { fprintf(stderr, "lhde-theme: cannot write %s\n", lhde_settings_path(buf, sizeof buf)); return 1; }
         const char *d = getenv("DISPLAY");
         if (d && *d) {
             char c[600]; snprintf(c, sizeof c, "xprop -root -f _LH_THEME 8u -set _LH_THEME '%s' 2>/dev/null", canon);
@@ -101,6 +115,33 @@ int main(int argc, char **argv)
         printf("%s\n", canon);
         return 0;
     }
+    if (!strcmp(cmd, "layer")) {
+        char th[256]; lhde_current_theme(th, sizeof th);
+        printf("theme=%s\n", th);
+        lhde_current_keys(layer_one, NULL);
+        return 0;
+    }
+    if (!strcmp(cmd, "layer-set")) {
+        if (argc < 4) usage();
+        int r = lhde_current_set_key(argv[2], strcmp(argv[3], "-") ? argv[3] : NULL);
+        if (r < 0) { fprintf(stderr, "lhde-theme: cannot set %s (no theme selected, or not a theme key)\n", argv[2]); return 1; }
+        return 0;
+    }
+    if (!strcmp(cmd, "layer-clear")) return lhde_current_clear() < 0;
+    if (!strcmp(cmd, "save-as")) {
+        if (argc < 3) usage();
+        if (lhde_theme_save_as(argv[2], argc > 3 ? argv[3] : argv[2], err, sizeof err)) { fprintf(stderr, "lhde-theme: %s\n", err); return 1; }
+        printf("%s\n", argv[2]);
+        return 0;
+    }
+    if (!strcmp(cmd, "delete")) {
+        if (argc < 3) usage();
+        int r = lhde_theme_delete(argv[2]);
+        if (r <= 0) { fprintf(stderr, "lhde-theme: %s is not one of your theme files\n", argv[2]); return 1; }
+        return 0;
+    }
+    if (!strcmp(cmd, "styles")) { lhde_style_list(style_one, NULL); return 0; }
+    if (!strcmp(cmd, "schemes")) { lhde_scheme_list(scheme_one, NULL); return 0; }
     if (!strcmp(cmd, "set-key")) {
         if (argc < 5) usage();
         char sel[300];

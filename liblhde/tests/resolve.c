@@ -242,6 +242,84 @@ int main(void)
     CHECK(ser == 42); if (u) { EQ(G(u, "Glass.frames"), "jade4074"); EQ(G(u, "theme"), "aero"); }
     lhde_theme_free(u); free(s); lhde_theme_free(t);
 
+    /* ---- the current layer (settings.ini [current]), classic schemes, Save As, Delete ---- */
+    {
+        char b2[256], e2[256];
+        CHECK(lhde_theme_select("jadeclassic") == 1);   /* an alias: its theme */
+        EQ(lhde_settings_get("theme", "name", b2, sizeof b2), "jade");
+        put("data/icons/2k.theme", "[theme]\nresources = resources/xp\n");
+        CHECK(lhde_current_set_key("Desktop.icons", "2k") == 1);
+        EQ(lhde_current_theme(b2, sizeof b2), "jade");
+        CHECK(lhde_current_set_key("Glass.composition", "off") == 0);   /* jade's own value: not kept, nothing changed */
+        CHECK(lhde_current_keys(NULL, NULL) == 1);
+        CHECK(lhde_current_set_key("Theme.name", "x") == -1); CHECK(lhde_current_set_key("Bogus.key", "x") == -1);
+        t = R("jade");
+        EQ(G(t, "Desktop.icons"), "2k"); CHECK(lhde_theme_source(t, "Desktop.icons") == LHDE_FROM_CURRENT); EQ(G(t, "current"), "1");
+        HAS(W(t, "Desktop.icons"), "current");
+        lhde_theme_free(t);
+        t = lhde_theme_resolve_current(NULL, 0); CHECK(t); if (t) EQ(G(t, "Desktop.icons"), "2k"); lhde_theme_free(t);
+        t = lhde_theme_resolve_flags("jade", LHDE_RESOLVE_FILES, NULL, 0);
+        EQ(G(t, "Desktop.icons"), "longhorn4074"); EQ(G(t, "current"), "0");
+        lhde_theme_free(t);
+        t = R("aero"); EQ(G(t, "Desktop.icons"), "longhorn4074"); lhde_theme_free(t);   /* the layer is jade's */
+        s = lhde_theme_serialize(lhde_theme_resolve("jade", NULL, 0) ? (t = R("jade")) : NULL, 7);
+        HAS(s, "\nDesktop.icons=2k\n"); free(s); lhde_theme_free(t);
+        /* a preview of changes not applied */
+        const char *kv[] = { "visualstyle.STYLE", "classic", "Desktop.icons", "wine" };
+        t = lhde_theme_resolve_with("jade", kv, 2, NULL, 0);
+        EQ(G(t, "style.kind"), "classic"); EQ(G(t, "VisualStyle.style"), "classic"); EQ(G(t, "Desktop.icons"), "xp"); EQ(G(t, "current"), "2");   /* wine: no recipe here, the fallback */
+        lhde_theme_free(t);
+        /* classic schemes: [Colors] and [Metrics] (the size's first) under the files and the layer */
+        put("data/styles/brick.scheme", "[Scheme]\nname = Brick\n[Colors]\nactivecaption = 128 0 0\nwindow = 255 255 255\n"
+                                        "[Metrics]\ncaptionheight = 18\ncaptionfont = Tahoma, 8, bold\n[Metrics:Large Fonts]\ncaptionheight = 26\n");
+        CHECK(lhde_current_set_key("VisualStyle.style", "classic") == 1);
+        CHECK(lhde_current_set_key("VisualStyle.scheme", "brick") == 1);
+        t = R("jade");
+        EQ(G(t, "Colors.activecaption"), "128 0 0"); CHECK(lhde_theme_source(t, "Colors.activecaption") == LHDE_FROM_SCHEME);
+        EQ(G(t, "Metrics.captionheight"), "18"); EQ(G(t, "Metrics.captionfont"), "Tahoma, 8, bold"); HAS(G(t, "path.scheme"), "styles/brick.scheme");
+        lhde_theme_free(t);
+        CHECK(lhde_current_set_key("VisualStyle.size", "Large Fonts") == 1);
+        CHECK(lhde_current_set_key("Colors.ActiveCaption", "1 2 3") == 1);
+        t = R("jade");
+        EQ(G(t, "Metrics.captionheight"), "26"); EQ(G(t, "Colors.activecaption"), "1 2 3"); CHECK(lhde_theme_source(t, "Colors.activecaption") == LHDE_FROM_CURRENT);
+        EQ(G(t, "Colors.window"), "255 255 255");
+        lhde_theme_free(t);
+        CHECK(lhde_current_set_key("Colors.activecaption", "128 0 0") == 1);   /* the scheme's own again: dropped */
+        CHECK(!strstr(slurp("config/lhde/settings.ini"), "activecaption"));
+        const char *kv2[] = { "VisualStyle.style", "classic", "VisualStyle.scheme", "nosuch" };
+        t = lhde_theme_resolve_with("jade", kv2, 2, NULL, 0);
+        EQ(G(t, "VisualStyle.scheme"), "none"); HAS(W(t, "VisualStyle.scheme"), "Windows Standard"); EQ(G(t, "Colors.activecaption"), NULL);
+        lhde_theme_free(t);
+        int ns = 0, nst = 0;
+        void count_scheme(const char *n, const char *ti, const char *pa, void *ud);
+        void count_style(const char *n, const char *pa, void *ud);
+        CHECK(lhde_scheme_list(count_scheme, &ns) == 1 && ns == 1);
+        CHECK(lhde_style_list(count_style, &nst) == 9 && nst == 9);
+        /* Save As: base = jade + the layer, selected, the layer gone */
+        CHECK(lhde_theme_save_as("jade", "Jade", e2, sizeof e2) == -1); HAS(e2, "built-in");
+        CHECK(lhde_theme_save_as("My Jade", "x", e2, sizeof e2) == -1);
+        CHECK(lhde_theme_save_as("my-jade", "My Jade", e2, sizeof e2) == 0);
+        char *mj = slurp("config/lhde/themes/my-jade.theme");
+        HAS(mj, "base = jade"); HAS(mj, "name = My Jade"); HAS(mj, "icons = 2k"); HAS(mj, "scheme = brick"); HAS(mj, "[VisualStyle]");
+        EQ(lhde_settings_get("theme", "name", b2, sizeof b2), "my-jade"); EQ(lhde_current_theme(b2, sizeof b2), "");
+        t = R("my-jade"); EQ(G(t, "Desktop.icons"), "2k"); CHECK(lhde_theme_source(t, "Desktop.icons") == LHDE_FROM_FILE);
+        EQ(G(t, "Colors.activecaption"), "128 0 0"); lhde_theme_free(t);
+        /* a user's own theme saved again under another name: copied, keys kept */
+        CHECK(lhde_current_set_key("Desktop.mode", "tile") == 1);
+        CHECK(lhde_theme_save_as("my-jade2", "My Jade 2", e2, sizeof e2) == 0);
+        mj = slurp("config/lhde/themes/my-jade2.theme"); HAS(mj, "base = jade"); HAS(mj, "mode = tile"); HAS(mj, "icons = 2k");
+        /* selecting another theme drops the layer */
+        CHECK(lhde_current_set_key("Desktop.mode", "fit") == 1);
+        CHECK(lhde_theme_select("aero") == 1); EQ(lhde_current_theme(b2, sizeof b2), "");
+        /* Delete: the user's only; the selected one falls back to its base */
+        CHECK(lhde_theme_delete("jade") == 0);
+        CHECK(lhde_theme_delete("my-jade2") == 1);
+        lhde_theme_select("my-jade");
+        CHECK(lhde_theme_delete("my-jade") == 1);
+        EQ(lhde_settings_get("theme", "name", b2, sizeof b2), "jade");
+        { char c[PATH_MAX + 64]; snprintf(c, sizeof c, "%s/data/styles/brick.scheme", T); unlink(c); }
+    }
+
     /* ---- the settings store: comments, unknown keys and order kept ---- */
     put("config/lhde/settings.ini", "; my comment\n[theme]\nname = jade   ; the theme\n\n[mine]\nx = 1\n");
     char b[256];
@@ -315,3 +393,5 @@ void cnt_cb(const char *n, const char *ti, const char *f, int g, void *ud)
     int *c = ud;
     c[g]++;
 }
+void count_scheme(const char *n, const char *ti, const char *pa, void *ud) { (void)n; (void)pa; if (!strcmp(ti, "Brick")) (*(int *)ud)++; }
+void count_style(const char *n, const char *pa, void *ud) { (void)n; (void)pa; (*(int *)ud)++; }

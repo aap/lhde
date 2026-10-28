@@ -83,13 +83,48 @@ own header and `vision` is luxnav; when luxnav reproduces 4051/4074 pixel for pi
 the reference), the resolver switches and no theme file changes. `composition = on` with `frames = none`:
 the compositor runs (shadows, animations), windows keep classic frames; nobody should expect glass.
 
+## 2a. The classic look: `[Colors]`, `[Metrics]`, schemes (2026-10-28)
+With `style = classic` (no visual style) the look is Windows' classic one: system colours and non-client metrics. A theme
+file (or the current layer, section 3) may set them directly; `scheme = NAME` names a classic Appearance scheme,
+`styles/NAME.scheme`, which gives every key the files leave out. Without a scheme the built-in classic colours apply (wux's
+table = XP's "Windows Standard"), so "Windows Classic style" works without any import.
+```ini
+[Colors]                        ; the COLOR_ constant's name without COLOR_ (case-insensitive), "R G B"
+activecaption = 10 36 106       ; scrollbar background activecaption inactivecaption menu window windowframe menutext windowtext
+                                ; captiontext activeborder inactiveborder appworkspace highlight highlighttext btnface btnshadow
+                                ; graytext btntext inactivecaptiontext btnhighlight 3ddkshadow 3dlight infotext infobk
+                                ; alternatebtnface hotlight gradientactivecaption gradientinactivecaption menuhilight menubar
+[Metrics]                       ; NONCLIENTMETRICS in pixels, fonts as "Face, points[, bold][, italic]"
+borderwidth = 1                 ; scrollwidth scrollheight captionwidth captionheight smcaptionwidth smcaptionheight
+captionfont = Tahoma, 8, bold   ; menuwidth menuheight; captionfont smcaptionfont menufont statusfont messagefont icontitlefont
+```
+A scheme file `styles/NAME.scheme` has the same `[Colors]` and `[Metrics]`, a `[Scheme] name = Title` (and `sizes = Normal, Large
+Fonts, Extra Large Fonts`), and per font size `[Metrics:SIZE]` (and `[Colors:SIZE]` when the colours differ): `VisualStyle.size`
+picks one (XP's "Font size": Normal, Large Fonts, Extra Large Fonts). Schemes are the user's own data: `tools/lhde-schemes`
+imports XP's and Windows 2000's from the install media's default hive (`HIVEDEF.INF`, `Control Panel\Appearance\Schemes`),
+run by lhde-import for the `xp` and `2k` sources. Resolution: theme files, then the current layer, then the scheme's keys for
+what is still absent (source `scheme`); a scheme named but not imported falls back to `none` (the built-in colours).
+Only the classic look reads them: a visual style brings its own `[SysMetrics]`.
+
 ## 3. Values and inheritance
 - **absent** = inherit from `base`, else the style-derived default (section 5); **`none`** = switched off.
 - `base` chains, at most 8 deep, a cycle is an error.
-- Editing in Display Properties or luxshell's flyout never writes a shipped file: the first change writes
-  `~/.config/lhde/themes/NAME-modified.theme` with `base = NAME`, only the changed keys and
-  `name = TITLE (modified)`, and selects it; "Save As" renames it. Every theme key changed anywhere goes
-  there, so the dialog and the flyout agree.
+- **The current layer** (2026-10-28; Windows' "NAME (Modified)"): editing in Display Properties never writes a theme file.
+  `settings.ini [current]` holds the changed theme keys as `Section.key = value` plus `theme = NAME`, the theme they belong to;
+  liblhde's resolver applies them on top of that theme's files (source `current`; the derived key `current` counts them), so
+  `lhde_theme_resolve(NAME)` of the session theme, the published `_LH_THEME_RESOLVED`, luxwm, luxshell and flxp all see the
+  same look. A key whose value the theme gives anyway is not kept. Selecting another theme clears the layer
+  (`lhde_theme_select`, `lhde-theme set`); "Save As" writes `~/.config/lhde/themes/FILE.theme` (`base = NAME` and the layer's
+  keys, or a copy of the user's own theme file plus the keys; `name =` the title given), selects it and clears the layer;
+  Delete removes a user theme file (the selected one falls back to its base). API: `lhde_current_set_key`, `lhde_current_set`,
+  `lhde_current_keys`, `lhde_current_clear`, `lhde_current_theme`, `lhde_theme_select`, `lhde_theme_save_as`,
+  `lhde_theme_delete`, `lhde_theme_resolve_flags(NAME, LHDE_RESOLVE_FILES)` (the files only), `lhde_theme_resolve_with`
+  (a preview of a layer not stored), `lhde_theme_resolve_current`.
+- Migration: existing `NAME-modified.theme` files stay what they are, ordinary user themes (their `base = NAME` and `name =
+  TITLE (modified)`); nothing converts them. Delete them in Display Properties, or keep them under a better name with Save As.
+- `lhde_theme_set_key` (the earlier model: the first change writes `NAME-modified.theme` with `base = NAME`, only the changed
+  keys, `name = TITLE (modified)`, and selects it) still works for its callers (luxshell's flyout, `lhde-theme set-key`);
+  Display Properties no longer uses it.
 
 ## 4. The resolver (`lhtheme/`, the lux side writes it, everybody links it)
 `lhtheme_resolve(name)` returns one flat record `section.key = value` with inheritance, defaults and

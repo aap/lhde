@@ -5,7 +5,7 @@
 #   build/bin/lhde-theme                  the command-line tool (list, resolve NAME --why, set NAME, migrate, registry)
 #   build/liblhde/tests/resolve           make check-liblhde: inheritance, none, defaults per style kind, fallbacks, cycles,
 #                                         the settings store and the migration, on fake files (no Microsoft files)
-LHDE_SRCS    = $(addprefix liblhde/,data.c ini.c style.c theme.c settings.c compat.c)
+LHDE_SRCS    = $(addprefix liblhde/,data.c ini.c style.c theme.c current.c settings.c compat.c)
 LHDE_OBJS    = $(patsubst %.c,$(O)/%.o,$(LHDE_SRCS))
 LHDEA        = build/lib/liblhde.a
 LHDESO       = build/lib/liblhde.so.1

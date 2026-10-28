@@ -15,4 +15,12 @@ const char *lhde__build_of(const char *s, char *out, size_t n);
    in the new vocabulary; iterate i from 0, 0 when past the end */
 int lhde__legacy_override(const char *name, int i, char *key, size_t nk, char *val, size_t nv, char *why, size_t nw);
 const char *lhde__src_name(int src);                         /* file base settings default fallback derived */
+/* the current layer (lhde/theme.h): key/value pairs, kv[2i] = "Section.key", kv[2i+1] = value */
+struct lhde__layer { char **kv; int n, cap; };
+void lhde__layer_add(struct lhde__layer *l, const char *k, const char *v);
+void lhde__layer_free(struct lhde__layer *l);
+/* settings.ini [current]'s keys when its theme = canon (else empty) */
+void lhde__current_layer(const char *canon, struct lhde__layer *l);
+/* "visualstyle.STYLE" -> "VisualStyle.style": the record's spelling; "" for a key that is no layer key (Theme.name/base/aliases) */
+void lhde__layer_key(const char *k, char *out, size_t n);
 #endif
