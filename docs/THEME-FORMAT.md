@@ -150,3 +150,35 @@ Later: plex (various versions), plex vision.
    renamed) holding what every component shares: the data dirs (`lhde_data`), this resolver and the
    settings store, with the `lhde_` prefix that `lhde_data`, `lhde-import` and `lhde-session` already use.
 4. The `navbar_preset` value list per family is luxnav's/flxp's to keep in sync; the resolver only passes it on.
+
+## 10. Decisions (aap, 2026-10-28; recorded by the lux session)
+1. **Backports dropped.** The `-xp` backports were early tests meant for real XP. Every component uses
+   the theme's one style; Longhorn styles are rendered natively through wuxtheme. Differences found in
+   the side-by-side check become wuxtheme fixes (wux side). `styles/*-xp`, `flxp_msstyles` and the
+   `flxp_*` registry keys go away.
+2. **Luna** may come from XP or from a Longhorn build; both must work. The Server 2003 ISO
+   (`~/lib/windows_isos/`, `AMD64/LUNA.MS_`, `LUNA.TH_`, `BLISS.JP_`) gives the real XP Luna as `styles/luna`
+   (plus its colour schemes) and `wallpapers/xp/Bliss`; the 4051/4074 copies import as `luna4051`/`luna4074`.
+   The shipped `luna*` themes use `style = luna` and fall back to `luna4051` when only Longhorn was imported.
+3. **The library is `liblhde`**, directory `liblhde/` (today's `lhtheme/` renamed), prefix `lhde_`, headers
+   `<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`: the data dirs, this resolver and the settings
+   store. Lux side writes it; luxwm, luxshell (Lua binding), luxnav's callers and flxp link it.
+4. **XP-family resources** come from the Server 2003 ISO (x64 binaries carry the same resources) and the
+   Windows 2000 ISO (`5.00.2195.6717_x86fre_DTCServer_en-us.iso`) via `lhde-import`, into `resources/xp`
+   and `resources/2k` (shell32, explorer incl. `IDB_START` 143, browseui, shellstyle, comctl32, the icons);
+   flxp switches its nt5src readers to resource ids there (wux side).
+5. Metal vision: if it is built, its plate can come from 5048's opaque "Metal" uDWM bitmap 1001 or 5112's
+   `DWMMetal::DWMWindow` instead of a new drawing.
+
+## 11. Work split for step 4
+- **lux side:** `liblhde` (data, resolver with "came from", settings store incl. the migration from
+  `~/.config/longhorn` + `~/.config/lhshell` to `~/.config/lhde`), `data/themes/*.theme` for section 8,
+  `data/navbar/`, `data/icons/` recipes (taken over from flxp's `res/icons` with the wux side), `lhde-import`
+  from ISO/WIM/directory for Longhorn builds, 5048/5112 and XP/2000, frame sets and packs manifest-first with
+  a regenerable cache, luxwm and luxshell on the resolver, `_LH_THEME_RESOLVED` in the new format, a generated
+  compatibility `themes.ini` until flxp has switched, then removal of `data/themes.ini`/`wallpapers.ini`.
+- **wux side:** flxp, flxp-desktop, flxp-taskbar, flxp-settings and the file dialog on `liblhde`;
+  the backport removal and the side-by-side check; XP resources by id; `_FLXP_WALLPAPER` retired; the
+  settings dialog writing `NAME-modified.theme`.
+- Order: lux side delivers `liblhde` + theme files first (with the compatibility registry so nothing breaks),
+  wux side switches, lux side removes the old registry.
