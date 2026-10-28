@@ -23,8 +23,8 @@
 #   ext46u.png     the same, inactive         ext46max.png    the same, maximised
 #   vision49.png, vision49max.png  only for frame sets with header_mode = crop (aerovision): FRAMETEST_EXT="0 0 22 0 9"
 # Each render also keeps frametest's stdout (margins, shape) as NAME.txt, compared too.
-# Classic fallbacks (docs/LUXWM.md "Classic fallback"): for every registry entry (data/themes.ini) whose frame is frames/<set> and
-# whose frame_classic is `style` (or missing), <set>.classic/ holds the same renders of the style in msstyles mode.
+# Classic fallbacks (docs/LUXWM.md "Classic fallback"): for every glass frame set whose style is a DWM-era one (5048, 5112: their
+# themes' frames_classic is none, the style's own decorations), <set>.classic/ holds the same renders of the style in msstyles mode.
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 top=$(cd "$here/../.." && pwd)
@@ -94,15 +94,14 @@ render_one() { # SPEC OUTDIR [vision]
 		FRAMETEST_EXT="0 0 22 0 9" "$ft" "$1" "$2/vision49max.png" 640 480 "Frame test window" 1 1 > "$2/vision49max.txt"
 	fi
 }
-# the frame sets whose registry entry takes the style's own msstyles as its classic frame (frame_classic = style or none)
+# the glass frame sets whose style has a non-composited look of its own: 5048's and 5112's Window class (the basic5048/basic5112
+# themes, frames_classic = none) -- the style is v4 without CompositedWindow (lhde-theme style: kind = dwm)
 classic_own() {
-	awk -F'=' '
-		function flush() { if (fr != "" && (fc == "" || fc == "style")) print fr }
-		/^\[/ { flush(); fr = ""; fc = ""; next }
-		{ k = $1; v = $2; sub(/[ \t]+[;#].*/, "", v); gsub(/^[ \t]+|[ \t]+$/, "", k); gsub(/^[ \t]+|[ \t]+$/, "", v) }
-		k == "frame" && v ~ /^frames\// { fr = substr(v, 8) }
-		k == "frame_classic" { fc = v }
-		END { flush() }' "$top/data/themes.ini" | sort -u
+	for td in "$top"/data/frames/*/; do
+		grep -q '^mode *= *dwm' "$td/theme.ini" 2>/dev/null || continue
+		st=$(ini "$td/theme.ini" msstyles); st=${st#styles/}; st=${st%.msstyles}
+		[ -n "$st" ] && "$top/build/bin/lhde-theme" style "$st" 2>/dev/null | grep -qx 'kind=dwm' && basename "$td"
+	done | sort -u
 }
 ini() { sed -n "s/^$2 *= *//p" "$1" | head -1; }
 

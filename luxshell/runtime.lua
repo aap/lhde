@@ -66,63 +66,35 @@ local function R(id)
   end
   return img(id)
 end
--- settings.ini (SETTINGS.md) holds the user-facing keys; state.ini's move there once (S.migrate, state.ini.pre-settings kept)
+-- ~/.config/lhde/settings.ini (SETTINGS.md) holds the per-user keys; the one-time move from ~/.config/longhorn and ~/.config/lhshell
+-- (liblhde: presets and [override:NAME] become theme files)
 S.migrate()
--- _LH_THEME_RESOLVED (SETTINGS.md "Resolved theme"): UTF8_STRING "key=value;key=value;..." with ';' and '\' in values escaped
--- by '\': the effective theme after a preset's overrides and the user's settings, so lhwm and flxp need not parse presets
-local function res_escape(v) return (tostring(v or ""):gsub("\\", "\\\\"):gsub(";", "\\;")) end
-local function parse_resolved(v)
-  local t, items, cur, esc = {}, {}, {}, false
-  for c in (v or ""):gmatch(".") do
-    if esc then table.insert(cur, c); esc = false
-    elseif c == "\\" then esc = true
-    elseif c == ";" then table.insert(items, table.concat(cur)); cur = {}
-    else table.insert(cur, c) end
-  end
-  if #cur > 0 then table.insert(items, table.concat(cur)) end
-  for _, it in ipairs(items) do local k, val = it:match("^([^=]+)=(.*)$"); if k then t[k] = val end end
-  return t
-end
-lh.parse_resolved = parse_resolved
--- the effective values of a resolved entry (S.resolve): a preset's own keys win, then settings.ini ([desktop] wallpaper / mode),
--- then the registry (icons and animations: the per-theme chain, SETTINGS.md "Per-theme settings"); [desktop] wallpaper = none (the flyout's "Show the wallpaper" off) always wins
--- The wallpaper (THEMES.md "Wallpapers"), first set: [desktop] wallpaper = none; [override:NAME] wallpaper; the preset's
--- [Desktop] wallpaper; [desktop] wallpaper; the theme's (a themes.ini `wallpaper`, else wallpapers.ini [NAME], else [default]).
--- Its mode comes from the same layer ([override:NAME] mode, the preset's mode, [desktop] mode for a user's file, wallpapers.ini's
--- for the theme's), else [desktop] mode, else fill. v.wallpaper_src says which layer it was (LHSHELL_DEBUG log only).
-local function home(p) return (p:gsub("^~/", (os.getenv("HOME") or "") .. "/")) end
+-- the effective values of a resolved theme (S.resolve: liblhde's record, docs/THEME-FORMAT.md): the theme files, their base
+-- chain, the style's defaults and the fallbacks, with settings.ini's per-user [desktop] wallpaper = none (the flyout's "Show the
+-- wallpaper" off) and the legacy [override:NAME] sections applied by the resolver. v.wallpaper_src says where the wallpaper came from.
 local function effective(e)
-  local v, over = {}, e and e.over or {}
+  local v = {}
   for _, k in ipairs{ "msstyles", "color", "size", "frame", "frame_classic", "shell", "fonts", "startpanel" } do v[k] = e and e[k] or "" end
-  local swp, smode = S.get("desktop", "wallpaper"), S.get("desktop", "mode")
-  local owp = S.override_get(e, "wallpaper")
-  if swp == "none" then v.wallpaper, v.mode, v.wallpaper_src = "none", smode, "[desktop]"
-  elseif owp then v.wallpaper, v.mode, v.wallpaper_src = home(owp), S.override_get(e, "mode") or smode, "[override:" .. e.name .. "]"
-  elseif over.wallpaper then v.wallpaper, v.mode, v.wallpaper_src = e.wallpaper, over.mode and e.mode or smode, "preset"
-  elseif swp then v.wallpaper, v.mode, v.wallpaper_src = home(swp), smode, "[desktop]"
-  else
-    local f, m, src = S.theme_wallpaper(e)
-    v.wallpaper, v.mode, v.wallpaper_src = f or "", over.mode and e.mode or m or smode, src or "none"
-  end
-  v.mode = v.mode or "fill"
-  -- icons / animations: the per-theme chain (S.theme_value: [override:NAME] > preset > registry > global); empty = the default
-  local ic, ics = S.theme_value(e, "icons"); v.icons = ics ~= "default" and ic or ""
+  v.wallpaper, v.mode = e and e.wallpaper or "", e and e.mode or "fill"
+  v.wallpaper_src = e and e.why and e.why["Desktop.wallpaper"] or "?"
+  v.icons = e and e.icons or ""
   v.composition = e and e.composition or "auto"
-  local an, ans = S.theme_value(e, "animations"); v.animations = ans ~= "default" and an or ""
+  v.animations = e and e.v and e.v["Glass.animations"] or ""
   return v
 end
 lh.effective_theme = effective
-local RESOLVED_KEYS = { "msstyles", "color", "size", "frame", "frame_classic", "shell", "fonts", "wallpaper", "icons", "composition", "animations", "mode", "startpanel" }
+-- _LH_THEME_RESOLVED (THEME-FORMAT.md section 4): theme=NAME, serial= (_LH_SETTINGS_SERIAL), then the record's key=value lines;
+-- written when it does not describe this record yet (luxwm writes the same record when it resolves first)
 local function publish_resolved(e)
   if not e then return end
+  local serial = lh.root_prop("_LH_SETTINGS_SERIAL"); if math.type(serial) ~= "integer" then serial = 0 end
+  local mine = "theme=" .. e.name .. "\n" .. (e.record or "")
+  local cur = lh.root_prop("_LH_THEME_RESOLVED")
+  local body = type(cur) == "string" and cur:gsub("serial=[^\n]*\n", "", 1) or nil
+  if body ~= mine then lh.set_root_prop("_LH_THEME_RESOLVED", "theme=" .. e.name .. "\nserial=" .. serial .. "\n" .. (e.record or "")) end
   local v = effective(e)
-  local parts = { "name=" .. res_escape(e.name), "base=" .. res_escape(e.base), "title=" .. res_escape(e.title or e.name) }
-  for _, k in ipairs(RESOLVED_KEYS) do table.insert(parts, k .. "=" .. res_escape(v[k])) end
-  local str = table.concat(parts, ";")
-  if lh.root_prop("_LH_THEME_RESOLVED") ~= str then lh.set_root_prop("_LH_THEME_RESOLVED", str) end
-  -- bridge for flxp-desktop (SETTINGS.md "Resolved theme"): it takes a theme's wallpaper from the registry section's `wallpaper`
-  -- key, which moved to wallpapers.ini; its root property _FLXP_WALLPAPER ("MODE PATH", Set as Desktop Background) beats that,
-  -- and it watches it, so the effective wallpaper goes there too until flxp-desktop reads wallpaper=/mode= from this view
+  -- bridge for the unchanged flxp-desktop (SETTINGS.md "Resolved theme"; retired once it reads the record): its root property
+  -- _FLXP_WALLPAPER ("MODE PATH", or none) beats its other sources and it watches it
   local fw = v.wallpaper == "none" and "none" or v.wallpaper ~= "" and (v.mode .. " " .. v.wallpaper) or nil
   if fw and lh.root_prop("_FLXP_WALLPAPER") ~= fw then lh.set_root_prop("_FLXP_WALLPAPER", fw) end
   if (os.getenv("LHSHELL_DEBUG") or "") ~= "" then io.stderr:write(string.format("lux: wallpaper %s (%s) from %s\n", v.wallpaper, v.mode, v.wallpaper_src or "?")) end
@@ -130,30 +102,22 @@ end
 -- our own writes of _LH_THEME come back as PropertyNotify: counted here so the handler below ignores exactly those
 local theme_echo = {}
 local function set_theme_prop(v) theme_echo[v] = (theme_echo[v] or 0) + 1; lh.set_root_prop("_LH_THEME", v) end
--- startup: the root wins (SETTINGS.md "Conflicts"). _LH_THEME holds the selected name as chosen, a registry name or a preset
--- (SETTINGS.md "Preset names on _LH_THEME", 2026-10-25: every reader resolves it; lux no longer writes a preset's base there).
--- Only a session from before that decision can still show a preset's base on the root with the preset itself in
--- _LH_THEME_RESOLVED and settings.ini [theme] name (an older lux wrote all three): that preset is meant and goes back on the root.
--- (A picker that chose the base while lux was away wrote [theme] name = base, so a stale resolved view does not win.)
+-- startup: the root wins (SETTINGS.md "Conflicts"): _LH_THEME holds the selected name; else settings.ini [theme] name. liblhde
+-- resolves it (a theme file, an alias, a bare style); an alias goes back on the root as the theme's name.
 local theme_name, theme_entry
+S.registry_path()   -- the compatibility registry for flxp, published when nobody has
 do
   local root, file = lh.root_prop("_LH_THEME"), S.get("theme", "name")
   local want = root or file
-  if root then
-    local re = S.lookup(root)
-    local rv = parse_resolved(lh.root_prop("_LH_THEME_RESOLVED"))
-    if re and rv.name and rv.name ~= re.name and rv.base == re.name and file == rv.name then
-      local p = S.resolve(rv.name)
-      if p and p.preset and p.base == re.name then want = rv.name end
-    end
-  end
-  theme_entry = S.resolve(want)
+  local err
+  if want then theme_entry, err = S.resolve(want) end
+  if not theme_entry and root and file and file ~= root then theme_entry = S.resolve(file) end
   if theme_entry then
     theme_name = theme_entry.name
     publish_resolved(theme_entry)
-    if root ~= theme_entry.name then set_theme_prop(theme_entry.name) end    -- first one up publishes; an alias: the registry name
+    if root ~= theme_entry.name then set_theme_prop(theme_entry.name) end    -- first one up publishes; an alias: the theme's name
     S.set("theme", "name", theme_name)                                       -- the first writer brings the file in line
-  elseif want then io.stderr:write("lux: theme " .. want .. " is neither in " .. tostring(S.registry_path()) .. " nor a preset in " .. S.presets_dir .. "\n") end
+  elseif want then io.stderr:write("lux: theme " .. want .. ": " .. tostring(err) .. " (lhde-theme list)\n") end
 end
 if not (theme_entry and theme_entry.shell and load_pack(theme_entry.shell)) then load_pack(S.pack_dir(os.getenv("LHSHELL_THEME") or "4074-aero")) end
 -- themes.ini `fonts` (THEMES.md "Fonts"): the theme's font directories as fontconfig application fonts, so the packs' "Segoe UI 9"
@@ -204,7 +168,7 @@ end
 fold_sidebar_layer()
 for _, d in ipairs{ { "theme", "composition", "follow" }, { "desktop", "mode", "fill" }, { "desktop", "desktop_black", "0" },
                     { "taskbar", "kind", "avalon" }, { "taskbar", "autohide", "0" }, { "taskbar", "rows", "1" },
-                    { "sidebar", "mode", "full" }, { "sidebar", "width", "150" }, { "sidebar", "with_classic", "0" }, { "sidebar", "stacking", "top" },
+                    { "sidebar", "width", "150" }, { "sidebar", "with_classic", "0" }, { "sidebar", "stacking", "top" },
                     { "clock", "layout", "default" }, { "start", "menu", "flxp" }, { "shell", "max_fade_ms", "0" } } do
   if not S.has(d[1], d[2]) then S.set(d[1], d[2], d[3]) end
 end
@@ -213,7 +177,7 @@ local ROWS_MAX = 3                      -- Taskbar\RowCount 1..3 (Taskbar.Initia
 local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 local cfg = {
   autohide = S.get("taskbar", "autohide") == "1",
-  sidebar = S.get("sidebar", "mode") or "full",
+  sidebar = S.get("sidebar", "mode") or (theme_entry and theme_entry.v["Shell.sidebar"]) or "full",   -- the user's, else the theme's
   rows = clamp(math.floor(tonumber(S.get("taskbar", "rows") or "") or 1), 1, ROWS_MAX),
   sidebar_w = tonumber(S.get("sidebar", "width") or ""),
   sb_bottom = S.get("sidebar", "stacking") == "bottom",   -- [sidebar] stacking = bottom: the sidebar under the windows
@@ -1030,10 +994,13 @@ function lh.shell_set(k, v)
   elseif k == "sidebar_with_classic" then lh.set_sidebar_with_classic(v)
   elseif k == "sidebar_stacking" then lh.set_sidebar_stacking(v)
   elseif k == "wallpaper" then
-    S.set("desktop", "wallpaper", v and "" or "none")
+    if v then S.unset("desktop", "wallpaper") else S.set("desktop", "wallpaper", "none") end   -- per user; the resolver applies it
+    theme_entry = S.resolve(theme_name) or theme_entry
     set_wallpaper(theme_entry); publish_resolved(theme_entry)
   elseif k == "start_menu" then
-    S.set_theme_value(theme_entry, "start", v == "lux" and "lux" or "flxp"); lh.start_provider_check()   -- per theme, as the dialog
+    local sel = S.set_theme_value(theme_entry, "start", v == "lux" and "lux" or "flxp")   -- a theme key: NAME-modified.theme
+    if sel then lh.select_theme(sel, true) end
+    lh.start_provider_check()
   end
 end
 
@@ -1306,8 +1273,9 @@ end
 function lh.set_taskbar(kind)
   kind = taskbar_kind(kind)
   if not kind then return end
-  S.set_theme_value(theme_entry, "taskbar", kind)
+  local sel = S.set_theme_value(theme_entry, "taskbar", kind)   -- a theme key: NAME-modified.theme
   apply_taskbar(kind)
+  if sel then lh.select_theme(sel, true) end
 end
 -- the sidebar follows other docks' bottom struts live (lhwm rewrites _NET_WORKAREA on every strut change: the classic bar
 -- appearing, going away, autohiding)
@@ -1412,8 +1380,9 @@ local function apply_composition(entry) lh.compositor(composition_wanted(entry))
 function lh.composition_mode() return cfg.composition end
 function lh.set_composition_mode(m)
   if m ~= "follow" and m ~= "on" and m ~= "off" then return end
-  cfg.composition = m; S.set_theme_value(theme_entry, "composition", m)   -- per theme, as the dialog
-  apply_composition(theme_entry)
+  cfg.composition = m
+  local sel = S.set_theme_value(theme_entry, "composition", m)   -- a theme key: NAME-modified.theme
+  if sel then lh.select_theme(sel, true) else apply_composition(theme_entry) end
 end
 
 -- a theme switch (SETTINGS.md order: write settings.ini, set _LH_THEME, send _LH_SETTINGS_CHANGED; the message goes out from
@@ -1437,13 +1406,14 @@ local function apply_theme(e, root_set)
   S.set("theme", "name", e.name)
   publish_resolved(e)
   if root_set ~= e.name then set_theme_prop(e.name) end
-  io.stderr:write(string.format("luxshell: theme %s%s: pack %s%s, %d ms\n", e.name, e.preset and (" (preset over " .. e.base .. ")") or "", pack_dir, swapped and " (rebuilt)" or "", lh.now() - t0))
+  S.registry_path()   -- the compatibility registry follows the theme files
+  io.stderr:write(string.format("luxshell: theme %s%s: pack %s%s, %d ms\n", e.name, e.user and (" (the user's, base " .. e.base .. ")") or "", pack_dir, swapped and " (rebuilt)" or "", lh.now() - t0))
 end
 -- lh.select_theme(name, force): the settings flyout, a preset save (force: a preset saved again under the selected name is
 -- applied and published again), settings.ini changed by another writer
 function lh.select_theme(name, force)
   local e = S.resolve(name)
-  if not e then io.stderr:write("lux: theme " .. tostring(name) .. " is neither in the registry nor a preset\n") return false end
+  if not e then io.stderr:write("lux: theme " .. tostring(name) .. " is no theme\n") return false end
   if force or e.name ~= theme_name then apply_theme(e) end
   return true
 end
@@ -1453,7 +1423,7 @@ lh.on("lh-theme", function()
   if (theme_echo[want] or 0) > 0 then theme_echo[want] = theme_echo[want] - 1 return end   -- our own write
   if want == theme_name then lh.reload_pack("_LH_THEME " .. want .. " set again") return end   -- the same name again: reload the pack
   local e = S.resolve(want)                              -- registry first, then themes/NAME.theme
-  if not e then io.stderr:write("luxshell: _LH_THEME " .. want .. " is neither in " .. tostring(S.registry_path()) .. " nor a preset\n") return end
+  if not e then io.stderr:write("luxshell: _LH_THEME " .. want .. " is no theme (lhde-theme list)\n") return end
   if e.name == theme_name then if want ~= e.name then set_theme_prop(e.name) end return end   -- an alias of the current one
   apply_theme(e, want)
 end)
@@ -1463,7 +1433,11 @@ end)
 local function reload_settings()
   S.reload()
   local n = S.get("theme", "name")
-  if n and n ~= theme_name then lh.select_theme(n) end
+  if n and n ~= theme_name then lh.select_theme(n)
+  else   -- the same theme: its files (NAME-modified.theme) or a legacy [override:NAME] may have changed
+    local e = theme_name and S.resolve(theme_name)
+    if e and theme_entry and e.record ~= theme_entry.record then apply_theme(e, theme_name) end
+  end
   -- per theme (S.theme_value): [override:NAME] > the preset > the registry > the global key; applied, not written back
   local c = theme_composition(theme_entry)
   if c ~= cfg.composition then cfg.composition = c; apply_composition(theme_entry) end
@@ -1473,7 +1447,7 @@ local function reload_settings()
   if ah ~= cfg.autohide then lh.shell_set("autohide", ah) end
   local rows = tonumber(S.get("taskbar", "rows") or "")
   if rows and math.floor(rows) ~= tb.rows then lh.taskbar_set_rows(math.floor(rows)) end
-  local m = S.get("sidebar", "mode") or "full"
+  local m = S.get("sidebar", "mode") or (theme_entry and theme_entry.v["Shell.sidebar"]) or "full"
   if m ~= mode then set_mode(m) end
   local w = tonumber(S.get("sidebar", "width") or "")
   if w and clamp(math.floor(w), SB_MIN, SB_MAX) ~= sb.w then lh.sidebar_set_width(w) end

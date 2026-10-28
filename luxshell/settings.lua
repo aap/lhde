@@ -3,7 +3,8 @@
 --   lh.settings_flyout([x])  two columns: the theme list (registry, then the user's presets; Save as preset...), composition
 --                            (follow / on / off), taskbar (avalon / classic / none, M8) and its autohide, start menu (flxp / lux),
 --                            sidebar mode, wallpaper
---   lh.save_preset_box()     name box for "Save as preset...": writes themes/NAME.theme (SETTINGS.md) and selects it
+--   lh.save_preset_box()     name box for "Save as...": the current theme with its changes under a name of its own
+--                            (~/.config/lhde/themes/NAME.theme: NAME-modified renamed, else base = the theme) and selects it
 --   lh.run_box("run" | "search")  a one-line command box (Run: the line goes to sh; Search: the best matching application,
 --                            else an existing path through the file manager, else the line as a command)
 -- The settings themselves live in runtime.lua (lh.shell_get / lh.shell_set, lh.select_theme) and settings.ini (session.lua).
@@ -56,7 +57,7 @@ return function(ctx)
       for _, e in ipairs(S.themes()) do
         option("radio", e.title or e.name, e.name == cur, function() lh.select_theme(e.name); later() end)
       end
-      -- user presets (SETTINGS.md themes/NAME.theme): a registry entry with overrides
+      -- the user's theme files (~/.config/lhde/themes: NAME-modified and saved ones)
       local presets = S.presets()
       if #presets > 0 then
         line(); heading("Your themes")
@@ -65,10 +66,10 @@ return function(ctx)
         end
       end
       line()
-      option("action", "Save as preset...", false, function() lh.close_flyout(); lh.save_preset_box() end)
+      option("action", "Save as...", false, function() lh.close_flyout(); lh.save_preset_box() end)
       col = right
       -- the compositor rule (runtime.lua lh.compositor): follow the theme's `composition`, or always on / off. Composition, taskbar
-      -- and start menu are stored for the current theme ([override:NAME] or the preset, as Display Properties does; SETTINGS.md)
+      -- and start menu are theme keys: a change goes into NAME-modified.theme (THEME-FORMAT.md section 3) and selects it
       heading("Composition")
       for _, m in ipairs{ { "follow", "Follow the theme" }, { "on", "Always on" }, { "off", "Always off" } } do
         option("radio", m[2], lh.composition_mode() == m[1], function() lh.set_composition_mode(m[1]); refresh() end)
@@ -115,10 +116,10 @@ return function(ctx)
     lh.open_flyout(owner)
   end
 
-  ------------------------------------------------------------------ save as preset (SETTINGS.md themes/NAME.theme)
-  -- a name box; Enter writes $XDG_CONFIG_HOME/longhorn/themes/<file name>.theme with the current effective values (base = the
-  -- registry theme in use, or the current preset's base) and selects it. The file name is the typed name in lower case with
-  -- anything but letters, digits, '-' and '_' turned into '-'; a registry name gets "-custom" appended (the registry wins).
+  ------------------------------------------------------------------ Save As (THEME-FORMAT.md section 3)
+  -- a name box; Enter saves the current theme under that title (session.lua S.save_as: ~/.config/lhde/themes/<file name>.theme,
+  -- the NAME-modified file renamed, else a new file with base = the theme) and selects it. The file name is the title in lower
+  -- case with anything but letters, digits, '-', '_' and '.' turned into '-'; a shipped name gets "-custom" appended.
   function lh.save_preset_box()
     local owner = { text = "" }
     local entry, msg
@@ -128,7 +129,7 @@ return function(ctx)
       local root = N{ layout = "fill", w = W }
       root:add(N{ kind = "rect", fill = "#ffffff" })
       local col = root:add(N{ layout = "vbox" })
-      col:add(N{ kind = "text", text = "Save as preset", font = "Segoe UI,Tahoma Bold 14px", color = "#808080", margin = { 8, 8, 8, 2 } })
+      col:add(N{ kind = "text", text = "Save as", font = "Segoe UI,Tahoma Bold 14px", color = "#808080", margin = { 8, 8, 8, 2 } })
       local _, e = lh.theme_name()
       col:add(N{ kind = "text", text = "A name for the current look (" .. (e and (e.title or e.name) or "?") .. ", wallpaper, composition):", font = "Segoe UI,Tahoma 11px", color = "#606060", wrap = true, w = W, margin = { 8, 0, 8, 6 } })
       local box = col:add(N{ layout = "fill", h = 22, margin = { 8, 0, 8, 0 } })
@@ -143,26 +144,11 @@ return function(ctx)
       if name == "BackSpace" then owner.text = owner.text:gsub("[%z\1-\127\194-\244][\128-\191]*$", "")
       elseif name == "Return" or name == "KP_Enter" then
         local title = owner.text:gsub("^%s+", ""):gsub("%s+$", ""); if title == "" then return end
-        local file = title:lower():gsub("[^%w%-_]", "-"):gsub("%-+", "-"):gsub("^%-", ""):gsub("%-$", "")
-        if file == "" then file = "preset" end
-        if S.lookup(file) then file = file .. "-custom" end
         local _, e = lh.theme_name(); if not e then return end
-        local v = lh.effective_theme(e)
-        local vals = { name = file, title = title, base = e.base, msstyles = v.msstyles, color = v.color, size = v.size,
-          composition = v.composition, animations = v.animations, wallpaper = v.wallpaper, mode = v.mode, icons = v.icons,
-          startpanel = v.startpanel, fonts = v.fonts }
-        -- a pack of the data directories is saved by name (packs/NAME), anything else as its path
-        local pn = v.shell:match("/packs/([^/]+)/*$")
-        vals.shell = (pn and S.pack_dir(pn) == v.shell) and pn or v.shell
-        if e.over and e.over.frame then vals.frame = v.frame end
-        if e.over and e.over.frame_classic then vals.frame_classic = v.frame_classic end
-        -- the theme's taskbar / start menu ([override:NAME], ...) when they differ from what the base gives (SETTINGS.md Save As)
-        local b = S.resolve(e.base)
-        for _, k in ipairs{ "taskbar", "start" } do local tv = S.theme_value(e, k); if tv ~= S.theme_default(b, k) then vals[k] = tv end end
-        local path = S.save_preset(vals)
+        local file = S.save_as(title, e)
         lh.close_flyout()
-        if not path then io.stderr:write("lux: cannot write the preset " .. file .. "\n") return end
-        io.stderr:write("lux: saved preset " .. path .. "\n")
+        if not file then io.stderr:write("lux: cannot save the theme " .. title .. "\n") return end
+        io.stderr:write("lux: saved theme " .. file .. " (" .. title .. ")\n")
         lh.select_theme(file, true)
         return
       elseif text ~= "" then owner.text = owner.text .. text end

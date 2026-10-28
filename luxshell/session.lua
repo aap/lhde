@@ -1,26 +1,28 @@
--- Session state and settings (SHELL-DESIGN 6.1 / 6.2, SETTINGS.md): the theme registry (lhde: data/themes.ini in the data
--- directories, published as its resolved copy in _LH_THEMES_INI; lhtheme/lhde_data.h), user presets ($XDG_CONFIG_HOME/longhorn/themes/NAME.theme), the shared desktop settings
--- ($XDG_CONFIG_HOME/longhorn/settings.ini, read and written by lux, lhwm and flxp), lux's private runtime state
--- (~/.config/lhshell/state.ini: tile order) and the session commands (log off, stand by, shut down, restart, lock).
+-- Session state and settings (SHELL-DESIGN 6.1 / 6.2, SETTINGS.md, THEME-FORMAT.md): the theme through liblhde's resolver (the
+-- Lua binding lh.theme_*: theme files in data/themes/ and ~/.config/lhde/themes/, bare styles, aliases), the shared desktop
+-- settings (~/.config/lhde/settings.ini through liblhde's store: lh.settings_set; read here, cached), lux's private runtime
+-- state (~/.config/lhshell/state.ini: tile order) and the session commands (log off, stand by, shut down, restart, lock).
 --   local S = dofile("session.lua")
---   S.registry_path()          absolute path of themes.ini (published on the root when nobody has)
---   S.lookup(name)             registry entry for a name or alias: { name, title, msstyles, color, size, frame, frame_classic,
---                              shell, wallpaper, composition, aliases, fonts }, paths absolute; nil when unknown
---   S.themes()                 all registry entries in file order
---   S.presets()                the user presets (themes/*.theme) resolved over their base, sorted by name
---   S.theme_wallpaper(e)       the theme's wallpaper from wallpapers.ini (or a legacy themes.ini `wallpaper`): file, mode, source
---   S.override_get(e, key)     settings.ini [override:NAME] KEY (a registry theme's aliases too)
---   S.resolve(name)            a registry entry (name/alias) or else a preset: the entry with the preset's overrides; every
---                              result has .base (the registry name) and, for a preset, .preset (its path) and .over (set keys)
+--   S.resolve(name)            the theme NAME resolved (an alias gives its theme): an entry { name, title, file, user (its file is
+--                              the user's), v (the record: v["Glass.frames"], ...), why (where each key came from), record (the
+--                              _LH_THEME_RESOLVED text without serial), and the fields runtime.lua uses: shell (the pack's
+--                              directory), startpanel, fonts, msstyles, color, size, frame, frame_classic, composition (the frame
+--                              mode: auto when the theme has a glass frame set, else off), wallpaper, mode, icons }; nil, err
+--   S.lookup(name)             the theme's name when NAME is one (a theme file, an alias, a bare style), else nil
+--   S.themes()                 the shipped themes and the bare styles: { name, title, file, group } (group 1 shipped, 2 style)
+--   S.presets()                the user's theme files (group 0), with .base (their [Theme] base)
+--   S.theme_value(e, key)      taskbar | start | icons | composition | animations | sidebar of the resolved theme e (composition:
+--                              follow | on | off, the theme's auto is follow) and its source (file | base | settings | default |
+--                              fallback)
+--   S.set_theme_value(e, k, v) a theme key changed here (the flyout): written into NAME-modified.theme (or the user's own file) by
+--                              liblhde; returns the theme to select now (NAME-modified), nil when nothing changed
+--   S.save_as(title)           Save As: the current changes under a name of their own (NAME-modified renamed, else a new file
+--                              with base = the theme); returns the new theme's name
 --   S.get(sec, key)            settings.ini value (nil when missing or empty); S.has(sec, key): the key exists at all
---   S.set(sec, key, value)     writes it (only when it changed; unknown keys, comments and order kept) and sends
---                              _LH_SETTINGS_CHANGED once the current event is handled (several sets: one message)
---   S.theme_value(e, key)      the per-theme value of taskbar | start | icons | composition | animations for the resolved theme e
---                              ([override:NAME] > the preset's key > the registry > the global key > default), and its source;
---                              S.theme_default(e, key) the same without the override and the preset's key
---   S.set_theme_value(e, k, v) stores it for that theme (the preset or [override:NAME]; removed when it equals the default)
+--   S.set(sec, key, value)     writes it (liblhde: unknown keys, comments and order kept) and sends _LH_SETTINGS_CHANGED once the
+--                              current event is handled (several sets: one message); value nil removes it (S.unset)
 --   S.reload()                 forget the cached file (on _LH_SETTINGS_CHANGED from another writer)
---   S.migrate()                the one-time move of the user-facing keys from state.ini to settings.ini
+--   S.migrate()                the one-time move from ~/.config/longhorn and ~/.config/lhshell (liblhde lhde_settings_migrate)
 --   S.state_get(sec, key)      / S.state_set(sec, key, value): state.ini, runtime state only (LHSHELL_STATE overrides the path)
 --   S.command(name)            the shell command for logoff | standby | shutdown | restart | lock (settings.ini [commands] or
 --                              the defaults below); S.run(name) runs it
@@ -61,178 +63,111 @@ function S.pack_dir(v)
   return lh.data_resolve_dir(v, "shell.lua")
 end
 
------------------------------------------------------------------- registry
--- LH_THEMES_INI, else the published _LH_THEMES_INI, else themes.ini of the data directories; what we find unpublished is
--- published as its resolved copy (every path absolute, $XDG_RUNTIME_DIR/lhde/<display>/themes.ini; luxwm does the same); a
--- resolved copy is refreshed from its source when that changed (S.registry_path is called on every lookup)
-local reg_path, reg_copy
+------------------------------------------------------------------ themes (liblhde, THEME-FORMAT.md)
+local touched   -- below (settings.ini)
+-- the compatibility registry (an old-format themes.ini for flxp, generated by liblhde): published as _LH_THEMES_INI when nobody
+-- has; LH_THEMES_INI in the environment wins and is not published
 function S.registry_path()
-  if reg_path then if reg_copy then lh.registry_resolved(reg_path) end return reg_path end
   local env, pub = os.getenv("LH_THEMES_INI"), lh.root_prop("_LH_THEMES_INI")
-  local function copy(p) local r = lh.registry_resolved(p); reg_copy = r ~= nil; return r or p end
-  if env and env ~= "" and exists(env) then reg_path = env
-  elseif pub and pub ~= "" and exists(pub) then reg_path = copy(pub)
-  else local src = lh.registry_source(); if src then reg_path = copy(src) end end
-  if reg_path and not (pub and pub ~= "") and not (env and env ~= "") then lh.set_root_prop("_LH_THEMES_INI", reg_path) end
-  return reg_path
-end
--- x11/../resources/msstyles/jade4074.msstyles -> /u/.../resources/msstyles/jade4074.msstyles: the directory made canonical, the last
--- component kept, so a resources/ symlink stays the published path (resources/README.md) instead of the file it points to
-local function norm_path(p)
-  local d, f = p:match("^(.*)/([^/]+)$")
-  if not d then return lh.realpath(p) or p end
-  local rd = lh.realpath(d ~= "" and d or "/")
-  if not rd then return p end
-  if f == ".." or f == "." then return lh.realpath(p) or p end
-  return (rd == "/" and "" or rd) .. "/" .. f
-end
-function S.themes()
-  local path = S.registry_path(); if not path then return {} end
-  local out, base = {}, dirname(path)
-  for _, sec in ipairs(parse_ini(path) or {}) do
-    local e = { name = sec._name }
-    for k, v in pairs(sec) do if k ~= "_name" then e[k] = v end end
-    -- lhde: relative values are relative to the data directories (lhde_data.h), not to the registry's directory
-    for _, k in ipairs{ "msstyles", "wallpaper" } do
-      if e[k] and e[k] ~= "" and e[k]:sub(1, 1) ~= "/" then e[k] = lh.data_resolve(e[k]) end
-    end
-    for _, k in ipairs{ "frame", "frame_classic" } do
-      if e[k] and e[k] ~= "" and e[k] ~= "style" and e[k]:sub(1, 1) ~= "/" then e[k] = lh.data_resolve_dir(e[k], "theme.ini") end
-    end
-    if e.shell and e.shell ~= "" then e.shell = S.pack_dir(e.shell) end
-    if e.fonts then   -- fonts = DIR[;DIR...] (THEMES.md "Fonts"): each entry resolved, ';' separated again
-      local t = {}
-      for d in e.fonts:gmatch("[^;]+") do d = trim(d); if d ~= "" then table.insert(t, d:sub(1, 1) == "/" and d or lh.data_resolve(d)) end end
-      e.fonts = table.concat(t, ";")
-    end
-    table.insert(out, e)
-  end
-  return out
+  if env and env ~= "" and exists(env) then return env end
+  if pub and pub ~= "" and exists(pub) then return lh.registry_resolved(pub) or pub end
+  local p = lh.compat_registry()
+  if p then lh.set_root_prop("_LH_THEMES_INI", p) end
+  return p
 end
 function S.lookup(name)
   if not name or name == "" then return nil end
-  local base = name:gsub("/+$", ""):match("([^/]*)$")
-  for _, e in ipairs(S.themes()) do
-    if e.name == name or e.name == base then return e end
-    for a in (e.aliases or ""):gmatch("[^%s,]+") do if a == name or a == base then return e end end
-  end
-  return nil
+  local c = lh.theme_lookup(name)
+  if not c then c = lh.theme_lookup((name:gsub("/+$", ""):match("([^/]*)$"))) end   -- a path whose last component is one
+  return c
 end
-
------------------------------------------------------------------- wallpapers.ini (THEMES.md "Wallpapers")
--- [default] root (image directory, relative to the data directories; default wallpapers), file, mode; [THEME] file, mode.
--- LH_WALLPAPERS_INI overrides the path; default: wallpapers.ini next to the registry (the resolved copy has one), else the
--- data directories'.
-function S.wallpapers_path()
-  local env = os.getenv("LH_WALLPAPERS_INI"); if env and env ~= "" then return env end
-  local reg = S.registry_path()
-  local p = reg and (dirname(reg) .. "/wallpapers.ini")
-  if p and exists(p) then return p end
-  return lh.data_find("wallpapers.ini") or p or "wallpapers.ini"
-end
-local wp_cache, wp_stamp
-local function wallpapers()
-  local path = S.wallpapers_path()
-  local st = tostring(lh.mtime(path)) .. path
-  if wp_cache and wp_stamp == st then return wp_cache end
-  wp_cache, wp_stamp = { secs = {} }, st
-  for _, sec in ipairs(parse_ini(path) or {}) do wp_cache.secs[sec._name] = sec end
-  local d = wp_cache.secs.default or {}
-  local root = d.root or "wallpapers"
-  if root:sub(1, 1) ~= "/" then root = lh.data_resolve(root) end
-  wp_cache.root = lh.realpath(root) or root
-  return wp_cache
-end
-local function wp_file(w, f)
-  if f == "none" or f:sub(1, 1) == "/" then return f end
-  if f:sub(1, 2) == "~/" then return (os.getenv("HOME") or "") .. f:sub(2) end
-  return w.root .. "/" .. f
-end
--- the theme's own wallpaper for theme e (a registry entry or a preset: its base's): file (absolute, or "none"), mode, source
--- ("themes.ini" | "wallpapers.ini [NAME]" | "wallpapers.ini [default]"); nil when nothing names one
-function S.theme_wallpaper(e)
-  local b = e and S.lookup(e.base or e.name)
-  if b and b.wallpaper and b.wallpaper ~= "" then return b.wallpaper, nil, "themes.ini" end   -- legacy key: still wins
-  local w = wallpapers()
-  local names = {}
-  if b then table.insert(names, b.name); for a in (b.aliases or ""):gmatch("[^%s,]+") do table.insert(names, a) end end
-  table.insert(names, "default")
-  for _, n in ipairs(names) do
-    local sec = w.secs[n]
-    if sec and sec.file and sec.file ~= "" then return wp_file(w, sec.file), sec.mode, "wallpapers.ini [" .. n .. "]" end
-  end
-  return nil
-end
-
------------------------------------------------------------------- presets (SETTINGS.md "themes/NAME.theme")
--- [Theme] name (display name), base (a registry name); [VisualStyle] msstyles color size; [Composition] composition animations;
--- [Desktop] wallpaper mode icons; [Frames] frame frame_classic; [Shell] shell startpanel; [Fonts] fonts. Every key is optional
--- except base; the rest comes from the base entry. `shell` is a pack name (lhshell/themes/NAME) or a directory; relative paths
--- are relative to the preset file. composition: auto | off (on = auto: glass while a compositor runs, and lux starts one).
-S.preset_keys = {
-  VisualStyle = { "msstyles", "color", "size" }, Composition = { "composition", "animations" }, Desktop = { "wallpaper", "mode", "icons" },
-  Frames = { "frame", "frame_classic" }, Shell = { "shell", "startpanel", "taskbar", "start" }, Fonts = { "fonts" },
-}
-local function preset_path(name) return S.presets_dir .. "/" .. name .. ".theme" end
-local function load_preset(name)
-  if not name or name == "" or name:find("/", 1, true) then return nil end
-  local path = preset_path(name)
-  local secs = parse_ini(path); if not secs then return nil end
-  local by = {}; for _, sec in ipairs(secs) do by[sec._name:lower()] = sec end
-  local th = by.theme or {}
-  local base = S.lookup(th.base or "")
-  if not base then io.stderr:write("lux: preset " .. path .. ": base " .. tostring(th.base) .. " is not in the registry\n") return nil end
-  local e = {}; for k, v in pairs(base) do e[k] = v end
-  e.name, e.base, e.preset, e.title, e.aliases = name, base.name, path, (th.name and th.name ~= "") and th.name or name, nil
-  e.over = {}
-  local pdir = dirname(path)
-  local function abs(v) if v:sub(1, 1) == "/" then return v end if v:sub(1, 2) == "~/" then return (os.getenv("HOME") or "") .. v:sub(2) end return pdir .. "/" .. v end
-  for sname, keys in pairs(S.preset_keys) do
-    local sec = by[sname:lower()]
-    if sec then for _, k in ipairs(keys) do
-      local v = sec[k]
-      if v and v ~= "" then
-        if k == "shell" then v = v:find("/", 1, true) and S.pack_dir(abs(v)) or S.pack_dir(v)
-        elseif k == "msstyles" or k == "frame" or k == "frame_classic" or (k == "wallpaper" and v ~= "none") then v = abs(v)
-        elseif k == "fonts" then local t = {}; for d in v:gmatch("[^;]+") do d = trim(d); if d ~= "" then table.insert(t, abs(d)) end end v = table.concat(t, ";")
-        elseif k == "composition" then v = (v == "off" or v == "0") and "off" or "auto" end
-        e[k] = v; e.over[k] = true
-      end
-    end end
-  end
-  return e
+function S.themes()
+  local out = {}
+  for _, t in ipairs(lh.theme_list()) do if t.group ~= 0 and not t.name:match("%-xp$") then table.insert(out, t) end end
+  return out
 end
 function S.presets()
   local out = {}
-  for _, f in ipairs(lh.list_dir(S.presets_dir) or {}) do
-    local n = f:match("^(.+)%.theme$")
-    if n and not S.lookup(n) then local e = load_preset(n); if e then table.insert(out, e) end end   -- a registry name wins
+  for _, t in ipairs(lh.theme_list()) do
+    if t.group == 0 then
+      for _, sec in ipairs(parse_ini(t.file) or {}) do if sec._name:lower() == "theme" then t.base = sec.base end end
+      t.base = t.base or "?"; table.insert(out, t)
+    end
   end
-  table.sort(out, function(a, b) return a.title:lower() < b.title:lower() end)
   return out
 end
--- lookup order (SETTINGS.md): the registry (section name, alias, path), then themes/NAME.theme
+-- a resolved theme as runtime.lua uses it (see the header)
 function S.resolve(name)
-  local e = S.lookup(name)
-  if e then local c = {}; for k, v in pairs(e) do c[k] = v end c.base = e.name; c.over = {}; return c end
-  return load_preset(name)
-end
--- a preset file from a table of effective values: { name = file name, title, base, msstyles, color, size, composition,
--- animations, wallpaper, mode, icons, frame, frame_classic, shell, startpanel, fonts }; returns its path
-function S.save_preset(v)
-  local lines = { "; lux: saved " .. os.date("%Y-%m-%d %H:%M") .. " (Settings > Save as preset). Format: x11/SETTINGS.md; keys left out come from base.",
-    "[Theme]", "name = " .. (v.title or v.name), "base = " .. v.base }
-  local order = { "VisualStyle", "Composition", "Desktop", "Frames", "Shell", "Fonts" }
-  for _, sname in ipairs(order) do
-    local got = {}
-    for _, k in ipairs(S.preset_keys[sname]) do if v[k] and v[k] ~= "" then table.insert(got, k .. " = " .. v[k]) end end
-    if #got > 0 then table.insert(lines, ""); table.insert(lines, "[" .. sname .. "]"); for _, l in ipairs(got) do table.insert(lines, l) end end
+  if not name or name == "" then return nil, "no name" end
+  local r, err = lh.theme_resolve(name)
+  if not r then
+    local b = name:gsub("/+$", ""):match("([^/]*)$")
+    if b ~= name then r, err = lh.theme_resolve(b) end
+    if not r then return nil, err end
   end
-  local path = preset_path(v.name)
-  os.execute("mkdir -p " .. q(S.presets_dir))
+  local v = r.v
+  local function nz(x) if x == nil or x == "" then return nil end return x end
+  local udir = lh.theme_user_dir()
+  local e = { name = r.name, file = r.file, v = v, why = r.why, record = r.record, title = v["Theme.name"] or r.name,
+    user = r.file ~= "" and r.file:sub(1, #udir + 1) == udir .. "/",
+    base = nz(v["Theme.base"]) or r.name,
+    shell = nz(v["path.pack"]), startpanel = nz(v["Shell.startpanel"]), fonts = v["path.fonts"] or "",
+    msstyles = v["path.style"] or "", color = v["VisualStyle.color"] or "", size = v["VisualStyle.size"] or "",
+    frame = v["path.frames"] or "", frame_classic = v["path.frames_classic"] or "",
+    composition = (nz(v["path.frames"]) and v["Glass.composition"] ~= "off") and "auto" or "off",
+    wallpaper = v["Desktop.wallpaper"] == "none" and "none" or (v["path.wallpaper"] or ""), mode = v["Desktop.mode"] or "fill",
+    icons = v["Desktop.icons"] or "" }
+  return e
+end
+-- luxshell's packs by their x11-era names (LHSHELL_THEME=slate)
+S.pack_aliases = { aero = "4074-aero", slate = "4074-slate", slate4051 = "4051-slate", aero5112 = "5112-aero", aerovision = "4074-aerovision" }
+function S.pack_dir(v)
+  if not v or v == "" then return v end
+  if v:sub(1, 1) == "/" or v:sub(1, 2) == "~/" then return lh.data_resolve(v) end
+  local n = v:match("^packs/([^/]+)/*$") or v
+  if not n:find("/", 1, true) then n = S.pack_aliases[n] or n; return lh.data_resolve_dir("packs/" .. n, "shell.lua") end
+  return lh.data_resolve_dir(v, "shell.lua")
+end
+-- the theme keys the flyout and runtime.lua use, by their old names
+S.theme_keys = { taskbar = "Shell.taskbar", start = "Shell.start", icons = "Desktop.icons", composition = "Glass.composition",
+  animations = "Glass.animations", sidebar = "Shell.sidebar", wallpaper = "Desktop.wallpaper" }
+local srcname = function(why)
+  why = why or ""
+  for _, k in ipairs{ "file", "base", "settings", "default", "fallback" } do if why:sub(1, #k) == k then return k end end
+  return "derived"
+end
+function S.theme_value(e, key)
+  local k = S.theme_keys[key]; if not (k and e and e.v) then return nil, nil end
+  local v = e.v[k]
+  if key == "composition" and (v == "auto" or v == nil) then v = "follow" end
+  if key == "start" and v == "lhshell" then v = "lux" end
+  return v, srcname(e.why and e.why[k])
+end
+function S.theme_default(e, key) return S.theme_value(e, key) end
+function S.set_theme_value(e, key, value)
+  local k = S.theme_keys[key]; if not (k and e) then return nil end
+  if key == "composition" and value == "follow" then value = "auto" end
+  local sel, changed = lh.theme_set_key(e.name, k, value)
+  io.stderr:write(string.format("lux: theme %s: %s = %s -> %s%s\n", e.name, k, tostring(value), tostring(sel), changed and "" or " (unchanged)"))
+  if not changed then return nil end
+  touched("theme")
+  return sel
+end
+-- Save As (THEME-FORMAT.md section 3): NAME-modified renamed to the new name, else a new user file with base = the theme
+function S.save_as(title, e)
+  local file = title:lower():gsub("[^%w%-_%.]", "-"):gsub("%-+", "-"):gsub("^%-", ""):gsub("%-$", "")
+  if file == "" then file = "theme" end
+  if S.lookup(file) and S.lookup(file) ~= e.name then file = file .. "-custom" end
+  local dir = lh.theme_user_dir(); os.execute("mkdir -p " .. q(dir))
+  local path = dir .. "/" .. file .. ".theme"
+  local lines
+  if e.user and e.file ~= "" then lines = {}; for l in io.lines(e.file) do table.insert(lines, l) end
+  else lines = { "; saved by luxshell (Save As); keys left out come from base (docs/THEME-FORMAT.md)", "[Theme]", "name = " .. title, "base = " .. e.name } end
+  for i, l in ipairs(lines) do if l:match("^%s*name%s*=") then lines[i] = "name = " .. title break end end
   local f = io.open(path, "w"); if not f then return nil end
   f:write(table.concat(lines, "\n"), "\n"); f:close()
-  return path
+  if e.user and e.file ~= "" and e.file ~= path and e.name:match("%-modified$") then os.remove(e.file) end
+  return file
 end
 
 ------------------------------------------------------------------ ini files: read, edit in place
@@ -298,14 +233,13 @@ function S.state_get(sec, key)
 end
 function S.state_set(sec, key, value)
   local lines = read_lines(state_path)
-  if #lines == 0 then lines = { "; lux runtime state (tile order). The settings are in " .. "$XDG_CONFIG_HOME/longhorn/settings.ini (x11/SETTINGS.md)" } end
+  if #lines == 0 then lines = { "; lux runtime state (tile order). The settings are in " .. lh.settings_path() .. " (docs/SETTINGS.md)" } end
   lines_set(lines, sec, key, value)
   write_lines(state_path, lines)
 end
 
------------------------------------------------------------------- settings.ini (SETTINGS.md), shared with lhwm and flxp
-S.settings_path = os.getenv("LH_SETTINGS") or (cfg_home .. "/longhorn/settings.ini")
-S.presets_dir = dirname(S.settings_path) .. "/themes"
+------------------------------------------------------------------ settings.ini (SETTINGS.md), shared with luxwm and flxp
+S.settings_path = lh.settings_path()
 local cache, cache_stamp      -- { sec = { key = value } }, and the file's mtime + size when read
 local function stamp() local f = io.open(S.settings_path, "r"); if not f then return "none" end local n = f:seek("end"); f:close(); return tostring(lh.mtime(S.settings_path)) .. ":" .. tostring(n) end
 local function settings()
@@ -318,7 +252,7 @@ local function settings()
   end
   return cache
 end
-function S.reload() cache = nil end
+function S.reload() cache = nil; lh.settings_reload() end
 function S.has(sec, key) local t = settings()[sec]; return t ~= nil and t[key] ~= nil end
 function S.get(sec, key) local t = settings()[sec]; local v = t and t[key]; if v == nil or v == "" then return nil end return v end
 -- _LH_SETTINGS_CHANGED: data[0] a serial, data[1] the section when only one changed. The serial is the root CARDINAL
@@ -339,207 +273,29 @@ function S.notify()
   lh.send_root_message("_LH_SETTINGS_CHANGED", S.serial, #secs == 1 and lh.atom(secs[1]) or 0)
   if (os.getenv("LHSHELL_DEBUG") or "") ~= "" then io.stderr:write(string.format("lux: settings: sent _LH_SETTINGS_CHANGED %d (%s)\n", S.serial, table.concat(secs, " "))) end
 end
-local function touched(sec)   -- one message for every section changed while the current event is handled
+touched = function(sec)   -- one message for every section changed while the current event is handled
   dirty[sec] = true
   if not flush_timer then flush_timer = lh.timer(function() flush_timer = nil; S.notify() end, 0) end
 end
-local header = {
-  "; Shared desktop settings: lhwm, lux (the Avalon shell) and the flxp programs read and write this file (x11/SETTINGS.md).",
-  "; Every writer keeps keys it does not know; after a write it sends the root ClientMessage _LH_SETTINGS_CHANGED.",
-}
 function S.set(sec, key, value)
-  value = tostring(value or "")
+  if value ~= nil then value = tostring(value) end
   local cur = settings()[sec]
-  if cur and cur[key] == value then return false end                 -- unchanged: no write, no message
-  local lines = read_lines(S.settings_path)
-  if #lines == 0 then for _, l in ipairs(header) do table.insert(lines, l) end end
-  lines_set(lines, sec, key, value)
-  if not write_lines(S.settings_path, lines) then return false end
+  if value ~= nil and cur and cur[key] == value then return false end   -- unchanged: no write, no message
+  if not lh.settings_set(sec, key, value) then return false end
   cache = nil
   touched(sec)
   return true
 end
-
------------------------------------------------------------------- per-theme settings (SETTINGS.md "Per-theme settings" and
--- "Per-theme overrides: [override:NAME]"; THEMES.md "Per-theme shell settings"). The Appearance values belong to the theme: for
--- theme e (an S.resolve result, a registry entry or a preset) the value of KEY is the first set of
---   1. settings.ini [override:NAME] KEY (what flxp's Display Properties and lux's flyout write for a registry theme),
---   2. the preset's own key (e.preset: [Shell] taskbar / start, [Desktop] icons, [Composition] composition / animations),
---   3. the registry entry of e.base (taskbar, start, flxp_icons, animations; composition has no registry default here),
---   4. the global key ([taskbar] kind, [start] menu, [desktop] icons, [theme] composition / animations),
---   5. the built-in default.
--- The same chain and table as flxp's store::theme_value (src/shell/settings.cpp theme_keys), so the dialog and lux agree.
-S.theme_keys = {
-  taskbar     = { reg = "taskbar",    psec = "Shell",       pkey = "taskbar",     gsec = "taskbar", gkey = "kind",        dflt = "avalon" },
-  start       = { reg = "start",      psec = "Shell",       pkey = "start",       gsec = "start",   gkey = "menu",        dflt = "flxp" },
-  icons       = { reg = "flxp_icons", psec = "Desktop",     pkey = "icons",       gsec = "desktop", gkey = "icons",       dflt = "xp" },
-  composition = {                     psec = "Composition", pkey = "composition", gsec = "theme",   gkey = "composition", dflt = "follow" },
-  animations  = { reg = "animations", psec = "Composition", pkey = "animations",  gsec = "theme",   gkey = "animations",  dflt = "4074plus" },
-}
-local function preset_raw(e, psec, pkey)   -- the preset file's own value, read fresh (sections and keys case-insensitive)
-  if not (e and e.preset) then return nil end
-  local v
-  for _, sec in ipairs(parse_ini(e.preset) or {}) do
-    if sec._name:lower() == psec:lower() then
-      for k, x in pairs(sec) do if k ~= "_name" and k:lower() == pkey and x ~= "" then v = x end end
-    end
-  end
-  return v
-end
-local function norm(key, v)
-  if key == "composition" and v == "auto" then return "follow" end   -- a preset lux saved before: auto is the frame mode
-  if key == "start" and v == "lhshell" then return "lux" end
-  return v
-end
--- value, source ("override" | "preset" | "registry" | "global" | "default"); own = false: what the theme gives without 1-2
-local function chain(e, key, own)
-  local tk = S.theme_keys[key]; if not tk then return nil, nil end
-  if e and own then
-    local v = S.override_get(e, key); if v then return norm(key, v), "override" end
-    v = preset_raw(e, tk.psec, tk.pkey); if v then return norm(key, v), "preset" end
-  end
-  if e and tk.reg then
-    local b = S.lookup(e.base or e.name); local v = b and b[tk.reg]
-    if v and v ~= "" then return norm(key, v), "registry" end
-  end
-  local v = S.get(tk.gsec, tk.gkey); if v then return norm(key, v), "global" end
-  return tk.dflt, "default"
-end
-function S.theme_value(e, key) return chain(e, key, true) end
--- settings.ini [override:NAME] KEY for theme e; for a registry theme also [override:ALIAS] (2026-10-25: [aero4074] became
--- [aero-patch] with aero4074 as an alias, and an [override:aero4074] written before keeps applying). The section name wins.
-function S.override_get(e, key)
-  if not e then return nil end
-  local v = S.get("override:" .. e.name, key); if v then return v end
-  if e.preset then return nil end
-  local b = S.lookup(e.base or e.name)
-  for a in ((b and b.aliases) or ""):gmatch("[^%s,]+") do v = S.get("override:" .. a, key); if v then return v end end
-  return nil
-end
-function S.theme_default(e, key) return chain(e, key, false) end
--- store a per-theme value the way Display Properties does: into the preset when e is a preset, else into [override:NAME];
--- a value equal to what the theme gives without it (S.theme_default) removes the key (and an emptied [override:NAME]). The
--- global key is not written. Sends _LH_SETTINGS_CHANGED (hint "theme") like S.set. Returns true when a file changed.
-local function lines_remove(lines, issec, iskey)   -- one key out; its section too when nothing but blanks/comments is left
-  local out, hdr_at, keep = {}, nil, false
-  local function close() if hdr_at and not keep then while #out >= hdr_at do table.remove(out) end end hdr_at = nil end
-  for _, l in ipairs(lines) do
-    local s = l:match("^%s*%[([^%]]*)%]")
-    if s then
-      close()
-      if issec(trim(s)) then hdr_at, keep = #out + 1, false end
-      table.insert(out, l)
-    else
-      local k = l:match("^%s*([^=;#]-)%s*=")
-      if hdr_at and k and iskey(trim(k)) then -- dropped
-      else
-        if hdr_at and k then keep = true end
-        table.insert(out, l)
-      end
-    end
-  end
-  close()
-  while #out > 0 and not out[#out]:match("%S") do table.remove(out) end
-  return out
-end
--- S.unset(sec, key): remove a key from settings.ini (its section too when nothing else is left); sends _LH_SETTINGS_CHANGED like S.set
-function S.unset(sec, key)
-  if not S.has(sec, key) then return false end
-  local lines = lines_remove(read_lines(S.settings_path), function(s) return s == sec end, function(k) return k == key end)
-  if not write_lines(S.settings_path, lines) then return false end
-  cache = nil
-  touched(sec)
-  return true
-end
-function S.set_theme_value(e, key, value)
-  local tk = S.theme_keys[key]; if not (tk and e) then return false end
-  value = tostring(value or "")
-  local dflt = value == S.theme_default(e, key)
-  if e.preset then
-    local cur = preset_raw(e, tk.psec, tk.pkey)
-    local lines = read_lines(e.preset)
-    if dflt then
-      if cur == nil then return false end
-      lines = lines_remove(lines, function(s) return s:lower() == tk.psec:lower() end, function(k) return k:lower() == tk.pkey end)
-    else
-      if cur == value then return false end
-      local sname = tk.psec
-      for _, l in ipairs(lines) do local s = l:match("^%s*%[([^%]]*)%]"); if s and trim(s):lower() == sname:lower() then sname = trim(s) end end
-      lines_set(lines, sname, tk.pkey, value)
-    end
-    if not write_lines(e.preset, lines) then return false end
-  else
-    local sec = "override:" .. e.name
-    local lines = read_lines(S.settings_path)
-    if dflt then
-      if not S.has(sec, key) then return false end
-      lines = lines_remove(lines, function(s) return s == sec end, function(k) return k == key end)
-    else
-      if S.get(sec, key) == value then return false end
-      if #lines == 0 then for _, l in ipairs(header) do table.insert(lines, l) end end
-      lines_set(lines, sec, key, value)
-    end
-    if not write_lines(S.settings_path, lines) then return false end
-    cache = nil
-  end
-  do
-    io.stderr:write(string.format("lux: settings: %s for theme %s: %s %s\n", key, e.name, dflt and "back to the theme's" or "=", dflt and S.theme_value(e, key) or value))
-  end
-  touched("theme")
-  return true
-end
-
--- the one-time migration (SETTINGS.md): the user-facing keys of state.ini move to settings.ini (a key settings.ini already has
--- is not overwritten), state.ini keeps only the runtime state, and state.ini.pre-settings is the untouched original
-S.migration = {   -- state.ini [sec] key -> settings.ini [sec] key; a function maps the value (nil: not copied)
-  { "shell", "theme", "theme", "name" }, { "shell", "composition", "theme", "composition" },
-  { "shell", "wallpaper", "desktop", "wallpaper", function(v) return v == "0" and "none" or nil end },
-  { "shell", "desktop_black", "desktop", "desktop_black" },
-  { "taskbar", "enabled", "taskbar", "kind" }, { "taskbar", "autohide" }, { "taskbar", "rows" }, { "taskbar", "classic_start_menu" },
-  { "sidebar", "mode" }, { "sidebar", "width" }, { "sidebar", "with_classic" }, { "sidebar", "yield_bottom" }, { "sidebar", "stacking" },
-  -- the old [sidebar] layer is part of stacking now: below -> stacking = bottom, above (the default) is dropped
-  { "sidebar", "layer", "sidebar", "stacking", function(v) return v == "below" and "bottom" or nil end },
-  { "clock", "pinned" }, { "clock", "pinned_pack" }, { "clock", "layout" },
-  { "start", "pinned" }, { "start", "mfu_count" }, { "start", "userpane" },
-  { "commands", "*" },
-}
-local function mig_rule(sec, key)
-  for _, m in ipairs(S.migration) do if m[1] == sec and (m[2] == key or m[2] == "*") then return m end end
-end
+function S.unset(sec, key) if not S.has(sec, key) then return false end return S.set(sec, key, nil) end
+-- the one-time migration (SETTINGS.md "Migration"): ~/.config/longhorn and ~/.config/lhshell -> ~/.config/lhde, by liblhde
 function S.migrate()
-  local secs = parse_ini(state_path); if not secs then return 0 end
-  local todo = {}
-  for _, s in ipairs(secs) do
-    for k, v in pairs(s) do if k ~= "_name" and mig_rule(s._name, k) then table.insert(todo, { s._name, k, v }) end end
+  local n, rep = lh.settings_migrate()
+  if n and n > 0 then
+    io.stderr:write(rep)
+    cache = nil
+    for _, k in ipairs{ "theme", "desktop", "taskbar", "sidebar", "clock", "start", "commands" } do dirty[k] = true end
+    S.notify()
   end
-  if #todo == 0 then return 0 end
-  local bak = state_path .. ".pre-settings"
-  if not exists(bak) then os.execute("cp -p " .. q(state_path) .. " " .. q(bak)) end
-  -- settings.ini in SETTINGS.md's section order
-  local order = { theme = 1, desktop = 2, taskbar = 3, sidebar = 4, clock = 5, start = 6, commands = 7 }
-  local mapped = {}
-  for _, t in ipairs(todo) do
-    local m = mig_rule(t[1], t[2])
-    local fn = type(m[5]) == "function" and m[5] or nil
-    local ds, dk = m[3] or t[1], (m[4] and type(m[4]) == "string") and m[4] or t[2]
-    local v = t[3]; if fn then v = fn(v) end
-    if v ~= nil then table.insert(mapped, { ds, dk, v }) end
-  end
-  table.sort(mapped, function(a, b) local oa, ob = order[a[1]] or 9, order[b[1]] or 9; if oa ~= ob then return oa < ob end return a[2] < b[2] end)
-  local lines = read_lines(S.settings_path)
-  if #lines == 0 then for _, l in ipairs(header) do table.insert(lines, l) end end
-  local have = settings(); local n = 0
-  for _, m in ipairs(mapped) do
-    if not (have[m[1]] and have[m[1]][m[2]] ~= nil) then lines_set(lines, m[1], m[2], m[3]); n = n + 1 end
-  end
-  write_lines(S.settings_path, lines); cache = nil
-  -- state.ini without them
-  local st = lines_drop(read_lines(state_path), function(sec, key) return mig_rule(sec, key) ~= nil end)
-  if st[1] and st[1]:match("^; lhshell state") then st[1] = "; lux runtime state (tile order). The settings moved to " .. S.settings_path .. " (x11/SETTINGS.md)" end
-  write_lines(state_path, st)
-  io.stderr:write(string.format("lux: settings: moved %d key(s) from %s to %s (%d already there; original kept as %s)\n", n, state_path, S.settings_path, #mapped - n, bak))
-  for k in pairs(order) do dirty[k] = true end
-  S.notify()
   return n
 end
 

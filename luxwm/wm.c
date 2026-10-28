@@ -33,7 +33,9 @@
 #include "utils.h"
 #include "frame.h"
 #include "menu.h"
-#include "lhde_data.h"
+#include <lhde/data.h>
+#include <lhde/theme.h>
+#include <lhde/settings.h>
 #include <cairo/cairo-xlib.h>
 #include <X11/XKBlib.h>
 #include <X11/keysym.h>
@@ -103,26 +105,29 @@ static char theme_req[2200], theme_cur[2200], theme_written[2200];   /* requeste
 static bool compositor = false;
 static int xfixes_ev = -1;
 static Atom cm_atom, lhwm_theme_atom, lhwm_maxmode_atom, lhwm_max_atom;
-/* M6 (SHELL-DESIGN 6.1): the session theme is the root _LH_THEME (a name in the registry _LH_THEMES_INI, ../themes.ini);
-   lhwm maps it to frame / frame_classic / composition. _LHWM_THEME is the derived frame directory. */
-static char theme_req_classic[1024];   /* registry frame_classic of theme_req ("" = the theme.ini fallback_theme) */
-static bool theme_comp_off = false;    /* registry composition = off: always the classic frame */
+/* M6 (SHELL-DESIGN 6.1): the session theme is the root _LH_THEME, a theme name that liblhde resolves (docs/THEME-FORMAT.md:
+   theme files, bare styles, aliases); luxwm maps the record to frames / frames_classic / composition. _LHWM_THEME is the derived
+   frame directory. */
+static char theme_req_classic[1024];   /* the resolved frames_classic directory ("style" = the style's own decorations) */
+static bool theme_comp_off = false;    /* Glass.composition = off, or no glass frame set: always the classic frame */
 static bool theme_announce = false;    /* a switch was asked for: republish _LHWM_COMPOSITED and _LHWM_FRAME_METRICS even if unchanged */
-static char reg_ini[1024], lh_theme_cur[256];   /* the registry in use, the _LH_THEME name applied last (a registry name or a preset) */
+static char reg_ini[1024], lh_theme_cur[256];   /* the compatibility registry published (for flxp), the _LH_THEME name applied last */
 static Atom lh_theme_atom, lh_ini_atom;
 static Atom lhwm_reload_atom;          /* _LHWM_RELOAD: root ClientMessage or property, re-read the current theme (README "Live-editing a theme") */
 static int lh_theme_selfwrite;         /* _LH_THEME writes of lhwm's own (alias -> name) whose PropertyNotify is not a reload request */
 static bool theme_force;               /* theme_select: load and apply even when the spec is the one in use (reload) */
 static void theme_reload(const char *why);
-/* ../SETTINGS.md "Preset names on _LH_THEME": _LH_THEME may name a user preset (themes/NAME.theme); lhwm resolves it itself, through
-   lux's _LH_THEME_RESOLVED when that describes the same name. preset_anim: the preset's own [Composition] animations (wins over
-   settings.ini [theme] animations while the preset is selected, as in _LH_THEME_RESOLVED); lh_theme_preset: lh_theme_cur is one */
-static Atom lh_resolved_atom;
-static char preset_anim[64];
-static bool lh_theme_preset = false;
+/* _LH_THEME_RESOLVED (docs/THEME-FORMAT.md section 4): the record of the theme in effect, "key=value" lines with theme= and
+   serial=; luxwm publishes it when it resolved a theme the property does not describe yet, and re-resolves when somebody
+   republishes it for the current theme (a theme file changed: luxshell's flyout, Display Properties). theme_anim: the
+   theme's Glass.animations (settings_load) */
+static Atom lh_resolved_atom, lh_serial_atom;
+static char theme_anim[64];
+static char *theme_record;             /* the record luxwm applied last (serialized without serial=), to see changes */
 static void lh_resolved_property(void);
 static bool lh_theme_apply(const char *arg, char *canon, size_t n);
 static void lh_theme_property(void);
+static void theme_recheck(const char *why);
 static void registry_setup(const char *theme_arg);
 static bool root_string(Atom a, char *buf, size_t n);
 static char *root_string_alloc(Atom a);
@@ -969,6 +974,8 @@ handle_client_message(XEvent *e)
         theme_reload("_LHWM_RELOAD message");
     } else if (cme->message_type == lh_settings_atom && lh_settings_atom != None) {   /* ../SETTINGS.md "Change notification" */
         LOGP("_LH_SETTINGS_CHANGED serial %ld", cme->data.l[0]);
+        lhde_settings_reload();
+        theme_recheck("_LH_SETTINGS_CHANGED");   /* a theme file or a legacy [override:NAME] may have changed */
         settings_load(false);
     } else if (cme->message_type == net_berry[BerryClientEvent]) {
         LOGN("Received event from berryc");
@@ -3048,6 +3055,7 @@ setup(void)
         compositor = XGetSelectionOwner(display, cm_atom) != None;
         lh_theme_atom = XInternAtom(display, "_LH_THEME", False); lh_ini_atom = XInternAtom(display, "_LH_THEMES_INI", False);
         lh_resolved_atom = XInternAtom(display, "_LH_THEME_RESOLVED", False);
+        lh_serial_atom = XInternAtom(display, "_LH_SETTINGS_SERIAL", False);
         utf8string = XInternAtom(display, "UTF8_STRING", False);
         registry_setup(td);
         {   /* the session theme (_LH_THEME, published by whoever starts first) wins over -t / LHWM_THEME */
@@ -3057,7 +3065,7 @@ setup(void)
                 snprintf(lh_theme_cur, sizeof lh_theme_cur, "%s", canon);
                 if (strcmp(cur, canon)) XChangeProperty(display, root, lh_theme_atom, utf8string, 8, PropModeReplace, (unsigned char *)canon, strlen(canon));
             } else {
-                if (have) fprintf(stderr, "luxwm: _LH_THEME %s is neither in the registry nor a preset, using %s\n", cur, td);
+                if (have) fprintf(stderr, "luxwm: _LH_THEME %s is no theme, using %s\n", cur, td);
                 if (lh_theme_apply(td, canon, sizeof canon)) {
                     snprintf(lh_theme_cur, sizeof lh_theme_cur, "%s", canon);
                     if (!have) XChangeProperty(display, root, lh_theme_atom, utf8string, 8, PropModeReplace, (unsigned char *)canon, strlen(canon));
@@ -3065,7 +3073,7 @@ setup(void)
             }
         }
         theme_select();
-        if (lh_theme_preset && preset_anim[0]) settings_load(false);   /* the preset's own animations */
+        settings_load(false);   /* the theme's animations */
     }
     XDefineCursor(display, root, normal_cursor);
 
@@ -4205,89 +4213,119 @@ root_string_alloc(Atom a)
     return out;
 }
 
-/* themes.ini (lhde: data/themes.ini, its values relative to the data directories, lhtheme/lhde_data.h): LH_THEMES_INI, else
-   the root _LH_THEMES_INI, else the first themes.ini of the data directories. A registry found here (not published) is
-   published as its resolved copy (every path absolute, $XDG_RUNTIME_DIR/lhde/<display>/themes.ini), so readers that resolve
-   against the registry's directory (flxp, navdemo, the session scripts) see the same files; a published copy is refreshed
-   from its source when that changed (registry_refresh) */
+/* the compatibility registry (liblhde: an old-format themes.ini generated from the theme files, docs/THEME-FORMAT.md section 11)
+   for programs that do not read theme files yet (flxp): published as _LH_THEMES_INI when nobody has; LH_THEMES_INI in the
+   environment is used as it is and not published. Refreshed on every theme switch and reload (theme files may have changed). */
 static void
 registry_setup(const char *theme_arg)
 {
-    char rp[PATH_MAX], src[PATH_MAX], res[PATH_MAX];
+    char rp[PATH_MAX], gen[PATH_MAX];
     (void)theme_arg;
     const char *env = getenv("LH_THEMES_INI");
     bool published = root_string(lh_ini_atom, rp, sizeof rp) && access(rp, R_OK) == 0;
     reg_ini[0] = 0;
-    if (env && *env && access(env, R_OK) == 0) snprintf(reg_ini, sizeof reg_ini, "%.1000s", env);
-    else if (published) snprintf(reg_ini, sizeof reg_ini, "%.1000s", lhde_registry_resolved(rp, res, sizeof res) ? res : rp);
-    else if (lhde_registry_source(src, sizeof src)) snprintf(reg_ini, sizeof reg_ini, "%.1000s", lhde_registry_resolved(src, res, sizeof res) ? res : src);
-    if (!reg_ini[0]) { fprintf(stderr, "luxwm: no theme registry (themes.ini in %s or the other data directories); _LH_THEME is not followed\n", lhde_data_user()); return; }
-    fprintf(stderr, "luxwm: theme registry %s\n", reg_ini);
-    if (!published && !(env && *env))
-        XChangeProperty(display, root, lh_ini_atom, utf8string, 8, PropModeReplace, (unsigned char *)reg_ini, strlen(reg_ini));
+    if (env && *env && access(env, R_OK) == 0) { snprintf(reg_ini, sizeof reg_ini, "%.1000s", env); return; }
+    if (published) { snprintf(reg_ini, sizeof reg_ini, "%.1000s", lhde_registry_resolved(rp, gen, sizeof gen) ? gen : rp); return; }
+    if (!lhde_compat_registry(gen, sizeof gen)) { fprintf(stderr, "luxwm: cannot write the compatibility registry (flxp follows no theme)\n"); return; }
+    snprintf(reg_ini, sizeof reg_ini, "%.1000s", gen);
+    fprintf(stderr, "luxwm: compatibility registry %s\n", reg_ini);
+    XChangeProperty(display, root, lh_ini_atom, utf8string, 8, PropModeReplace, (unsigned char *)reg_ini, strlen(reg_ini));
 }
 
-/* the resolved registry again when its source changed (a theme switch or reload after editing data/themes.ini) */
+/* the generated registry again (a theme file may have changed) */
 static void
 registry_refresh(void)
 {
     char res[PATH_MAX];
-    if (reg_ini[0]) lhde_registry_resolved(reg_ini, res, sizeof res);   /* a resolved copy is rewritten in place; a source stays */
+    if (reg_ini[0]) lhde_registry_resolved(reg_ini, res, sizeof res);
+    else registry_setup(NULL);
 }
 
-/* a theme name (or an alias: an lhwm theme directory name or path, "aero", "themes/slate4074-classic") through the registry:
-   sets theme_req, theme_req_classic and theme_comp_off; canon gets the registry name. Nothing changes when it is unknown. */
+/* _LH_SETTINGS_SERIAL, the serial a record is resolved at */
+static unsigned long
+settings_serial(void)
+{
+    Atom ty; int fmt; unsigned long n, after; unsigned char *d = NULL; unsigned long v = 0;
+    if (lh_serial_atom != None && XGetWindowProperty(display, root, lh_serial_atom, 0, 1, False, XA_CARDINAL, &ty, &fmt, &n, &after, &d) == Success && d) {
+        if (fmt == 32 && n == 1) v = (unsigned long)*(long *)d;
+        XFree(d);
+    }
+    return v;
+}
+
+/* the record without its serial= line (to compare two records) */
+static char *
+record_body(const char *rec)
+{
+    if (!rec) return NULL;
+    char *out = malloc(strlen(rec) + 1), *o = out;
+    if (!out) return NULL;
+    for (const char *p = rec; *p; ) {
+        const char *e = strchr(p, '\n'); size_t l = e ? (size_t)(e - p + 1) : strlen(p);
+        if (strncmp(p, "serial=", 7)) { memcpy(o, p, l); o += l; }
+        p += l;
+    }
+    *o = 0;
+    return out;
+}
+
+/* a theme name (a theme file, a bare style, an alias such as aero-patch or jade4074-classic; also a path whose last component is
+   one) through liblhde: sets theme_req, theme_req_classic, theme_comp_off, the fonts and theme_anim; canon gets the theme's
+   name. Nothing changes when it is unknown. publish: write _LH_THEME_RESOLVED when it does not describe this record yet. */
 static bool
 lh_theme_apply(const char *arg, char *canon, size_t n)
 {
-    struct theme_reg r;
     char base[256]; size_t len = strlen(arg);
     while (len > 1 && arg[len - 1] == '/') len--;
     const char *b = arg + len; while (b > arg && b[-1] != '/') b--;
     snprintf(base, sizeof base, "%.*s", (int)(arg + len - b), b);
-    bool preset = false; char src[1400] = "", anim[64] = "";
-    if (!reg_ini[0]) return false;
-    if (!(theme_registry_lookup(reg_ini, arg, &r) || theme_registry_lookup(reg_ini, base, &r))) {
-        /* not a section or an alias: a user preset? (lux's resolved view of this name, else the preset file) */
-        char *res = root_string_alloc(lh_resolved_atom);
-        preset = theme_preset_lookup(reg_ini, arg, res, &r, src, sizeof src, anim, sizeof anim);
-        free(res);
-        if (!preset) return false;
+    char err[512];
+    lhde_theme *t = lhde_theme_resolve(arg, err, sizeof err);
+    if (!t && strcmp(base, arg)) t = lhde_theme_resolve(base, err, sizeof err);
+    if (!t) { fprintf(stderr, "luxwm: theme %s: %s\n", arg, err); return false; }
+#define TV(k) (lhde_theme_get(t, k) ? lhde_theme_get(t, k) : "")
+    const char *frames = TV("path.frames"), *classic = TV("path.frames_classic"), *style = TV("path.style");
+    const char *color = TV("VisualStyle.color"), *size = TV("VisualStyle.size"), *comp = TV("Glass.composition");
+    if (!frames[0] && !classic[0] && !style[0]) {
+        fprintf(stderr, "luxwm: theme %s has no frame: no frame set and no visual style (%s); keeping the current one\n", TV("theme"), TV("VisualStyle.style"));
+        lhde_theme_free(t); return false;
     }
-    if (!r.frame[0] && !r.msstyles[0])
-        return false;
-    /* the frame: its directory together with the entry's visual style (theme_load reads the style live through libuxtheme and takes
-       only the tuning keys from the directory; README "libuxtheme source"), or the style alone for an entry without a frame */
-    if (r.msstyles[0]) snprintf(theme_req, sizeof theme_req, "%.1000s|%.1000s|%.63s|%.63s", r.frame, r.msstyles, r.color, r.size);
-    else snprintf(theme_req, sizeof theme_req, "%s", r.frame);
-    /* frame_classic empty or "style" (lux's resolved view makes it an absolute ".../style"): the theme's own msstyles (theme_select) */
-    { const char *fc = r.frame_classic, *bn = strrchr(fc, '/'); struct stat sb;
-      bool own = !fc[0] || !strcmp(fc, "style") || (bn && !strcmp(bn + 1, "style") && stat(fc, &sb) != 0);
-      snprintf(theme_req_classic, sizeof theme_req_classic, "%s", own ? "style" : fc); }
-    theme_comp_off = r.comp_off;
-    frame_fonts_set(r.fonts);   /* registered by the theme_load that follows (THEMES.md "fonts") */
-    /* a preset keeps its own name on _LH_THEME (never rewritten to the base); an alias becomes the registry name */
-    if (canon) snprintf(canon, n, "%s", preset ? arg : r.name);
-    lh_theme_preset = preset;
-    snprintf(preset_anim, sizeof preset_anim, "%s", preset ? anim : "");
-    if (preset)
-        fprintf(stderr, "luxwm: theme %s: preset (base %s) from %s: frame %s, style %s %s %s, classic %s%s\n", arg, r.name, src,
-                r.frame[0] ? r.frame : "(none)", r.msstyles[0] ? r.msstyles : "(the frame's)", r.color, r.size,
-                !strcmp(theme_req_classic, "style") ? "(the theme's own msstyles)" : r.frame_classic, r.comp_off ? ", composition off" : "");
-    else
-        fprintf(stderr, "luxwm: theme %s%s%s: frame %s, classic %s%s\n", r.name, strcmp(arg, r.name) ? " for " : "", strcmp(arg, r.name) ? arg : "",
-                r.frame[0] ? r.frame : r.msstyles, !strcmp(theme_req_classic, "style") ? "(the theme's own msstyles)" : r.frame_classic,
-                r.comp_off ? ", composition off" : "");
+    /* the frame: the glass set with the theme's visual style (theme_load reads the style live through libuxtheme and takes only the
+       tuning keys from the directory; README "libuxtheme source"); without glass the classic set (or the style alone), always */
+    if (frames[0]) {
+        snprintf(theme_req, sizeof theme_req, "%.1000s|%.1000s|%.63s|%.63s", frames, style, color, size);
+        snprintf(theme_req_classic, sizeof theme_req_classic, "%s", classic[0] ? classic : "style");
+        theme_comp_off = !strcasecmp(comp, "off");
+    } else {
+        snprintf(theme_req, sizeof theme_req, "%.1000s|%.1000s|%.63s|%.63s", classic, style, color, size);
+        snprintf(theme_req_classic, sizeof theme_req_classic, "%s", classic[0] ? classic : "style");
+        theme_comp_off = true;
+    }
+    frame_fonts_set(TV("path.fonts"));   /* registered by the theme_load that follows (THEMES.md "fonts") */
+    snprintf(theme_anim, sizeof theme_anim, "%s", TV("Glass.animations"));
+    if (canon) snprintf(canon, n, "%s", TV("theme"));
+    fprintf(stderr, "luxwm: theme %s%s%s: frames %s (%s), classic %s, style %s %s %s%s\n", TV("theme"), strcmp(arg, TV("theme")) ? " for " : "",
+            strcmp(arg, TV("theme")) ? arg : "", frames[0] ? frames : "none", lhde_theme_why(t, "Glass.frames"),
+            classic[0] ? classic : "(the style's own)", style[0] ? style : "(none)", color, size, theme_comp_off ? ", composition off" : "");
+    /* _LH_THEME_RESOLVED: ours when it describes another theme or another record (luxshell writes the same) */
+    char *rec = lhde_theme_serialize(t, settings_serial());
+    char *mine = record_body(rec), *pub = root_string_alloc(lh_resolved_atom), *theirs = record_body(pub);
+    if (rec && (!theirs || strcmp(theirs, mine)))
+        XChangeProperty(display, root, lh_resolved_atom, utf8string, 8, PropModeReplace, (unsigned char *)rec, strlen(rec));
+    free(theme_record); theme_record = mine;
+    free(rec); free(pub); free(theirs);
+#undef TV
+    lhde_theme_free(t);
     return true;
 }
 
-/* root _LH_THEME changed (lhshell's settings, second-display.sh theme, xprop -root -f _LH_THEME 8u -set _LH_THEME slate4074):
-   load the theme's frame and announce it to clients (WM_THEMECHANGED: _LHWM_COMPOSITED and _LHWM_FRAME_METRICS are
-   rewritten even when unchanged). An alias is replaced by the registry name. */
+/* root _LH_THEME changed (luxshell's settings, lhde-session theme, lhde-theme set, xprop -root -f _LH_THEME 8u -set _LH_THEME
+   slate4074): load the theme's frame and announce it to clients (WM_THEMECHANGED: _LHWM_COMPOSITED and _LHWM_FRAME_METRICS are
+   rewritten even when unchanged). An alias is replaced by the theme's name. */
 static void
 lh_theme_property(void)
 {
-    char want[256], canon[256], prev[2200], prev_c[1024]; bool prev_off = theme_comp_off;
+    char want[256], canon[256], prev[2200], prev_c[1024], prev_anim[64]; bool prev_off = theme_comp_off;
     if (!root_string(lh_theme_atom, want, sizeof want))
         return;
     if (!strcmp(want, lh_theme_cur)) {   /* the name in use set again: a reload (unless it is lhwm's own alias rewrite coming back) */
@@ -4295,12 +4333,11 @@ lh_theme_property(void)
         theme_reload("_LH_THEME set to the theme in use");
         return;
     }
-    bool prev_preset = lh_theme_preset; char prev_anim[64]; snprintf(prev_anim, sizeof prev_anim, "%s", preset_anim);
     snprintf(prev, sizeof prev, "%s", theme_req); snprintf(prev_c, sizeof prev_c, "%s", theme_req_classic);
-    if (!reg_ini[0]) registry_setup(theme_req);   /* someone published _LH_THEMES_INI after we started without one */
-    else registry_refresh();
+    snprintf(prev_anim, sizeof prev_anim, "%s", theme_anim);
+    registry_refresh();
     if (!lh_theme_apply(want, canon, sizeof canon)) {
-        fprintf(stderr, "luxwm: _LH_THEME %s is neither in %s nor a preset; keeping %s\n", want, reg_ini[0] ? reg_ini : "(no registry)", lh_theme_cur);
+        fprintf(stderr, "luxwm: _LH_THEME %s is no theme; keeping %s\n", want, lh_theme_cur);
         return;
     }
     snprintf(lh_theme_cur, sizeof lh_theme_cur, "%s", canon);
@@ -4311,33 +4348,45 @@ lh_theme_property(void)
     theme_announce = true;
     if (!theme_select()) {
         snprintf(theme_req, sizeof theme_req, "%s", prev); snprintf(theme_req_classic, sizeof theme_req_classic, "%s", prev_c); theme_comp_off = prev_off;
-        lh_theme_preset = prev_preset; snprintf(preset_anim, sizeof preset_anim, "%s", prev_anim); }
-    settings_load(false);   /* a preset's own animations (or back to settings.ini's) */
+        snprintf(theme_anim, sizeof theme_anim, "%s", prev_anim); }
+    settings_load(false);   /* the theme's animations */
 }
 
-/* root _LH_THEME_RESOLVED changed (lux republishes it after a preset was saved again or a key feeding it changed): while the
-   current _LH_THEME is a preset of that name, apply it again (theme_select keeps everything when the derived spec is the same) */
+/* the current theme again from its files (a theme key changed: NAME-modified.theme written, _LH_SETTINGS_CHANGED or a
+   republished _LH_THEME_RESOLVED): applied when the record differs from the one in use */
+static void
+theme_recheck(const char *why)
+{
+    if (!lh_theme_cur[0]) return;
+    char *before = theme_record ? strdup(theme_record) : NULL;
+    char prev[2200], prev_c[1024], prev_anim[64], canon[256]; bool prev_off = theme_comp_off;
+    snprintf(prev, sizeof prev, "%s", theme_req); snprintf(prev_c, sizeof prev_c, "%s", theme_req_classic);
+    snprintf(prev_anim, sizeof prev_anim, "%s", theme_anim);
+    theme_record = NULL;
+    if (!lh_theme_apply(lh_theme_cur, canon, sizeof canon)) { free(theme_record); theme_record = before; return; }
+    bool same = before && theme_record && !strcmp(before, theme_record);
+    free(before);
+    if (same) return;
+    registry_refresh();
+    if (strcmp(theme_req, prev) || strcmp(theme_req_classic, prev_c) || theme_comp_off != prev_off) {
+        fprintf(stderr, "luxwm: theme %s changed (%s)\n", lh_theme_cur, why);
+        theme_announce = true;
+        if (!theme_select()) {
+            snprintf(theme_req, sizeof theme_req, "%s", prev); snprintf(theme_req_classic, sizeof theme_req_classic, "%s", prev_c); theme_comp_off = prev_off; }
+    }
+    if (strcmp(prev_anim, theme_anim)) settings_load(false);
+}
+
+/* root _LH_THEME_RESOLVED changed: when it describes the current theme and differs from what luxwm applied, resolve again */
 static void
 lh_resolved_property(void)
 {
-    if (!lh_theme_preset || !lh_theme_cur[0]) return;
-    char prev[2200], prev_c[1024], prev_anim[64]; bool prev_off = theme_comp_off;
-    snprintf(prev, sizeof prev, "%s", theme_req); snprintf(prev_c, sizeof prev_c, "%s", theme_req_classic);
-    snprintf(prev_anim, sizeof prev_anim, "%s", preset_anim);
-    char *res = root_string_alloc(lh_resolved_atom); struct theme_reg r; char src[1400], anim[64];
-    bool same = res && theme_preset_lookup(reg_ini, lh_theme_cur, res, &r, src, sizeof src, anim, sizeof anim) && !strcmp(src, "_LH_THEME_RESOLVED");
-    free(res);
-    if (!same) return;   /* describes another name (it is about to change too) */
-    char canon[256];
-    if (!lh_theme_apply(lh_theme_cur, canon, sizeof canon)) return;
-    if (!strcmp(theme_req, prev) && !strcmp(theme_req_classic, prev_c) && theme_comp_off == prev_off) {
-        if (strcmp(prev_anim, preset_anim)) settings_load(false);
-        return;
-    }
-    theme_announce = true;
-    if (!theme_select()) {
-        snprintf(theme_req, sizeof theme_req, "%s", prev); snprintf(theme_req_classic, sizeof theme_req_classic, "%s", prev_c); theme_comp_off = prev_off; }
-    settings_load(false);
+    char *pub = root_string_alloc(lh_resolved_atom), *body = record_body(pub);
+    bool differs = body && theme_record && strcmp(body, theme_record);
+    char name[256] = "";
+    if (pub && !strncmp(pub, "theme=", 6)) { const char *e = strchr(pub + 6, '\n'); snprintf(name, sizeof name, "%.*s", (int)(e ? e - pub - 6 : (long)strlen(pub + 6)), pub + 6); }
+    free(pub); free(body);
+    if (differs && !strcmp(name, lh_theme_cur)) theme_recheck("_LH_THEME_RESOLVED republished");
 }
 
 /* re-read the theme in use from disk, in place (README "Live-editing a theme"): the registry entry (or preset) of _LH_THEME again,
@@ -4349,11 +4398,11 @@ theme_reload(const char *why)
 {
     char prev[2200], prev_c[1024]; bool prev_off = theme_comp_off;
     snprintf(prev, sizeof prev, "%s", theme_req); snprintf(prev_c, sizeof prev_c, "%s", theme_req_classic);
-    if (lh_theme_cur[0] && reg_ini[0]) {
+    if (lh_theme_cur[0]) {
         char canon[256];
         registry_refresh();
         if (!lh_theme_apply(lh_theme_cur, canon, sizeof canon))
-            fprintf(stderr, "luxwm: reload: %s is no longer in %s; reloading %s as it was\n", lh_theme_cur, reg_ini, theme_req);
+            fprintf(stderr, "luxwm: reload: %s is no theme any more; reloading %s as it was\n", lh_theme_cur, theme_req);
     }
     theme_force = true; theme_announce = true;
     bool ok = theme_select();
@@ -5311,34 +5360,9 @@ anim_style_name(long v)
 static void
 settings_load(bool startup)
 {
-    char path[1024], val[64] = "", src[1100] = "config.h";
-    const char *x = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");
-    if (x && *x) snprintf(path, sizeof path, "%s/longhorn/settings.ini", x);
-    else snprintf(path, sizeof path, "%s/.config/longhorn/settings.ini", home ? home : ".");
-    FILE *f = fopen(path, "r");
-    if (f) {
-        char line[1024]; bool in_theme = false;
-        while (fgets(line, sizeof line, f)) {
-            char *p = line; while (*p == ' ' || *p == '\t') p++;
-            if (*p == '[') {   /* a section; a key may follow on the same line ("[theme] animations = 5048") */
-                char *e = strchr(p, ']'); if (!e) continue;
-                *e = 0; in_theme = !strcasecmp(p + 1, "theme");
-                for (p = e + 1; *p == ' ' || *p == '\t'; p++) ;
-            }
-            if (!in_theme || *p == ';' || *p == '#') continue;
-            char *eq = strchr(p, '='); if (!eq) continue;
-            char *k = p, *ke = eq; while (ke > k && (ke[-1] == ' ' || ke[-1] == '\t')) ke--; *ke = 0;
-            if (strcasecmp(k, "animations")) continue;
-            char *v = eq + 1; while (*v == ' ' || *v == '\t') v++;
-            char *ve = v; while (*ve && *ve != ';' && *ve != '#' && *ve != '\n' && *ve != '\r') ve++;
-            while (ve > v && (ve[-1] == ' ' || ve[-1] == '\t')) ve--;
-            *ve = 0;
-            snprintf(val, sizeof val, "%s", v); snprintf(src, sizeof src, "%s", path);
-        }
-        fclose(f);
-    }
-    if (lh_theme_preset && preset_anim[0]) {   /* the selected preset's own [Composition] animations wins (SETTINGS.md) */
-        snprintf(val, sizeof val, "%s", preset_anim); snprintf(src, sizeof src, "preset %s", lh_theme_cur); }
+    /* the theme's Glass.animations (docs/THEME-FORMAT.md; luxwm's own default is config.h's); LHWM_ANIMATIONS wins */
+    char val[64] = "", src[1100] = "config.h";
+    if (theme_anim[0]) { snprintf(val, sizeof val, "%s", theme_anim); snprintf(src, sizeof src, "theme %s", lh_theme_cur); }
     const char *env = getenv("LHWM_ANIMATIONS");
     if (env && *env) { snprintf(val, sizeof val, "%s", env); snprintf(src, sizeof src, "LHWM_ANIMATIONS"); }
     long v = ANIMATE_STYLE;

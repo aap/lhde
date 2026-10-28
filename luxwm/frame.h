@@ -152,20 +152,6 @@ void frame_buttons_rect(const struct theme *t, int w, int maximized, int *x, int
    and icon left out), cropped to columns [x0, x0 + cw) and rows [0, band_h). Caller destroys it. */
 cairo_surface_t *frame_header_image(const struct theme *t, int w, int h, int x0, int cw, int band_h, int focused, int hover, int pressed,
                                     int maximized, const struct frame_ext *ext);
-/* theme registry (../themes.ini, ../THEMES.md): the section NAME, or the one whose aliases list NAME; frame paths are resolved
-   against the registry's directory. 1 when found. */
-struct theme_reg { char name[64]; char frame[1024], frame_classic[1024]; int comp_off; char fonts[2048];
-                   char msstyles[1024], color[64], size[64]; };   /* msstyles resolved against the registry's directory */
-int  theme_registry_lookup(const char *ini, const char *name, struct theme_reg *r);
-/* a user preset (../SETTINGS.md "Preset names on _LH_THEME"): NAME is not a registry section or alias but
-   $XDG_CONFIG_HOME/longhorn/themes/NAME.theme (default ~/.config/longhorn/themes): its [Theme] base looked up in the registry, then
-   the overrides lhwm uses merged over it ([VisualStyle] msstyles/color/size, [Frames] frame/frame_classic, [Fonts] fonts,
-   [Composition] composition: off = the classic frame). resolved: the root's _LH_THEME_RESOLVED (lux) or NULL; when its name= is
-   NAME its key=value view is used instead of the file. r->name stays the base's section; base/src (may be NULL) get the base
-   name and where the values came from ("_LH_THEME_RESOLVED" or the file's path); anim gets the preset file's [Composition]
-   animations ("" when it sets none). 1 when resolved. */
-int  theme_preset_lookup(const char *ini, const char *name, const char *resolved, struct theme_reg *r, char *src, size_t nsrc,
-                         char *anim, size_t nanim);
 extern unsigned long frame_upload_serial;   /* request serial of the last frame_paint_ex2 upload (first request of it) */
 /* when set, the next frame_paint_ex3 uploads to an offscreen pixmap, calls frame_pre_upload(frame_pre_upload_arg) (the caller's
    window resize), then sets the shape and copies the pixels into the window; reset by that paint (README "Resize without flicker") */
