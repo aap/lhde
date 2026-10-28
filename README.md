@@ -85,7 +85,7 @@ headless scripts under Xvfb (clipboard between two explorers, drag and drop
 incl. GTK, the file dialog in both looks) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
-without visual styles in `~/.local/share/lhde/styles` (`LHDE_STYLES`).
+without visual styles in `styles/` of the data directory (`$LHDE_DATA`, else `~/.local/share/lhde`; `LHDE_STYLES` overrides).
 Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac -p`), and luxwm's frame
 regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a
 baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the first run;

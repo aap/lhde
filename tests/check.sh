@@ -2,7 +2,8 @@
 # make check: the tests that run without Microsoft files, from the top of the
 # tree after make. Each prints ok/FAIL/skip; the exit status is the number of
 # failures. Tests that need assets skip when these are absent:
-#   ut-dump      the visual styles in $LHDE_STYLES (default ~/.local/share/lhde/styles)
+#   ut-dump      the visual styles in $LHDE_STYLES (default: styles/ of the user data
+#                directory, $LHDE_DATA or ${XDG_DATA_HOME:-~/.local/share}/lhde)
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
@@ -28,7 +29,7 @@ result "fileops_test ($(tail -n 1 "$T/fileops.log"))" $? "$T/fileops.log"
 build/tests/lhdatatest > "$T/lhdata.log" 2>&1
 result "lhdatatest ($(tail -n 1 "$T/lhdata.log"))" $? "$T/lhdata.log"
 # libwuxtheme through its own API: every style the user imported
-styles=${LHDE_STYLES:-${XDG_DATA_HOME:-$HOME/.local/share}/lhde/styles}
+styles=${LHDE_STYLES:-${LHDE_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/lhde}/styles}
 n=0
 for f in "$styles"/*.msstyles "$styles"/*/*.msstyles; do
     [ -f "$f" ] || continue
