@@ -1521,6 +1521,9 @@ gdi::Point pointer_pos()
 
 gdi::Size screen_size()
 {
+    // before the display is open: liblhde probes a style (ut_open -> SystemParametersInfo) while
+    // flxp resolves the session theme at start-up
+    if (!dpy) return gdi::Size{1024, 768};
     return gdi::Size{DisplayWidth(dpy, screen), DisplayHeight(dpy, screen)};
 }
 
