@@ -3925,3 +3925,97 @@ shellstyle.dll per variant: blue = Luna.msstyles' `Shell\NormalColor\shellstyle.
 import needs: system32/{shell32,browseui,explorer.exe,logonui.exe}, WinSxS comctl32 6.0, Luna's three
 shellstyle.dll (lhde-import's styles/ copies Luna.msstyles; its Shell/ beside it would do) and system32's
 classic shellstyle.dll.
+
+## flxp on liblhde: the session theme from theme files (2026-10-28)
+
+docs/THEME-FORMAT.md section 13, items 1, 2, 3 and 6 (wux side). flxp no longer reads a registry: the compatibility
+`themes.ini`/`wallpapers.ini`, `_LH_THEMES_INI`, `[override:NAME]`/`[override]`, the presets of `~/.config/longhorn/themes`
+and every `flxp_*` key are gone from flxp's code.
+
+**Reading the theme** (`flxp/shell/lhtheme.{h,cpp}`): `SessionTheme` is liblhde's flat record (`keys`: `Section.key` and the
+derived `path.*`, `style.*`, `theme`, `file`; `why`: `lhde_theme_why`; `body`: the text without `serial=`, to compare two
+records; `msstyles` = `path.style`, `classic` for `style = classic`). `session_theme_from(name, published, serial)` takes
+`lhde_theme_parse(_LH_THEME_RESOLVED)` when its `theme=` is `_LH_THEME` and its `serial=` is `_LH_SETTINGS_SERIAL`, else
+`lhde_theme_resolve(_LH_THEME)` (an alias, a bare style, `themes/aero` work). `read_session_theme` does the same with a short X
+connection at start-up (`setup_theme`); `resolve_theme(NAME)` is any theme (the dialog's list and sample). The shim
+(`wux/w32/theme.cpp` `session_theme_refresh`, also exported as `w32::session_theme_refresh`) re-reads on `_LH_THEME`,
+`_LH_THEME_RESOLVED` and `_LH_SETTINGS_CHANGED` (a theme file changed: `NAME-modified.theme`); a record with the same body
+is nothing; one that differs only in `Desktop.*` (not `Desktop.icons`), `path.wallpaper` or the theme's identity (`theme`,
+`file`, `chain`, `Theme.name/base/aliases`: a switch to the modified copy) becomes the session theme without WM_THEMECHANGED
+(flxp-desktop handles it); anything else reloads the style when it changed and sends WM_THEMECHANGED as before.
+`path.fonts` is added to the font path (was the registry's `fonts`).
+
+**The key mapping** (`theme_setting`; `FLXP_<KEY>` in the environment, a run's option, still wins everywhere):
+
+| flxp key (old source) | now |
+|---|---|
+| the style, `color`, `size` (`msstyles`, `flxp_msstyles`) | `path.style`, `VisualStyle.color/size`; `style = classic`: no style; no `-xp` backport lookup for a session theme |
+| `icons` (`flxp_icons`, `[override] icons`, `[desktop] icons`) | `Desktop.icons` (`longhorn4074` is passed as `longhorn` while flxp's res/icons has no file of that name); `path.icons` is in the record for the icon code |
+| `frame` (`flxp_frame`, `[explorer] frame`) | `Explorer.chrome` (auto / xp / longhorn); `Explorer.navbar = none` gives xp (XP's toolbars) |
+| `header_engine` (auto: luxwm's frame set has a nav.ini) | `Explorer.navbar`: vision = luxnav with `path.navbar` (data/navbar/vision.ini), 4051 / 4074 = flxp's header; flxp.ini's `header_engine` stays a developer's override; without a session theme the old auto |
+| `header_preset` (`flxp_header_preset`) | `Explorer.navbar_preset` for navbar = vision (auto: the file's own preset); for 4051/4074 it is the explorer's default header size (small / medium / large / xlarge) under flxp.ini's `header_size` |
+| `taskbar_kind` (`taskbar`, `[taskbar] kind`) | `Shell.taskbar` |
+| `start_menu` (`start`, `[start] menu`) | `Shell.start = lux` -> lhshell; otherwise flxp.ini's `start_menu` (panel / classic, the user's) |
+| `longhorn_system32` (`flxp_longhorn_system32`) | flxp.ini, else `path.resources` when it is a Longhorn build's (resources/NNNN; not xp / 2k) |
+| `menubar_style` (`flxp_menubar_style`) | flxp.ini, else `document` for `Explorer.chrome = longhorn` |
+| `explorer_resources` (`flxp_explorer_resources`) | flxp.ini only (no theme sets it) |
+| `font_smoothing` (`[fonts] smoothing`) | settings.ini `[fonts] smoothing` (the user's, Effects tab), else `Fonts.smoothing` |
+| the wallpaper (`_FLXP_WALLPAPER`, flxp.ini, `[override:NAME]`, the preset, wallpapers.ini) | `path.wallpaper` (`Desktop.wallpaper`; none = colour), `Desktop.mode`, `Desktop.color`; settings.ini `[desktop] wallpaper = none` (luxshell's "Show the wallpaper" off) above it; `--wallpaper` until the theme changes |
+| the theme's build (`theme_build`) | `Theme.build`, else `path.resources`' build, else the digits of the name / style / fonts |
+
+**flxp.ini migration** (one note on stderr per key and process, `config.cpp retired_key`): THEME-FORMAT does not make flxp.ini
+keys user overrides of theme keys, so `icons`, `frame`, `taskbar_kind`, `wallpaper`, `wallpaper_mode` and `themes_ini` are
+ignored in flxp.ini ("flxp: .../flxp.ini's icons = 2k is ignored: the theme's Desktop.icons decides (Display Properties)");
+set the theme key in Display Properties instead. `start_menu = lhshell` is ignored the same way (`Shell.start`). The template
+no longer writes them. Every other flxp.ini key is unchanged.
+
+**The store** (`flxp/shell/settings.{h,cpp}`): `store::path()` is `lhde_settings_path()`, writes go through
+`lhde_settings_set`; `value_for` maps only the per-user keys `font_smoothing` and `pinned`. `store::set_theme_keys(THEME,
+{key, value}...)` writes with `lhde_theme_set_key` (THEME's own file when it is the user's, else `THEME-modified.theme`, the
+following keys into the name it returned), then `apply_theme(selected)` when the name changed, else `notify("theme")`.
+`store::theme_list()` is `lhde_theme_list` (group 0 the user's, 1 shipped, 2 bare styles). Removed: `theme_value`,
+`theme_default`, `set_theme_values`, `set_all_themes_values`, `registry_path`, `registry_section`, `theme_names`,
+`preset_*`; `lookup_session_theme`, `resolved_field`, `read_session_properties`, `loadable_msstyles`, `is_preset_name`,
+`lhde_registry`, `own_wallpaper`, `wallpapers_ini`.
+
+**Display Properties** (`flxp/settings/settings.cpp`, `flxp/rc/settings.rc`): the theme list is liblhde's (user's themes,
+shipped, then bare styles marked "(style)"). Theme keys shown with the line `lhde_theme_why` gives ("Set by the theme",
+"From the theme jade4074", "Set in your theme file (jade4074-modified.theme)", "The style's default", "Fallback: ..."):
+Desktop.icons (Desktop tab), Explorer.chrome, Explorer.navbar (new combo), Shell.taskbar, Shell.start, Glass.composition
+(auto/on/off), Glass.animations (Appearance tab), Desktop.wallpaper and Desktop.mode (Desktop tab). Apply writes the keys that
+differ from what the selected theme gives with `set_theme_keys` (the first change creates and selects NAME-modified), then
+the theme (once) or `_LH_SETTINGS_CHANGED`. The scope combos ("This theme only / All themes / Theme defaults") are gone.
+Per user in settings.ini: `[sidebar] mode` (shown: the user's, else the theme's `Shell.sidebar`), `stacking`,
+`with_classic`, `[fonts] smoothing`. The background list: (None) = `Desktop.wallpaper = none`; "NAME (theme background)" =
+the base theme's picture for a NAME-modified (choosing it removes the key again); pictures in a data directory's
+`wallpapers/` are written as `GROUP/STEM` (`2k/blulac16`), others as absolute paths (allowed in the user's files).
+Save As (section 3): pending changes applied, then NAME-modified.theme is renamed to the new name (title lower-cased,
+`[a-z0-9._-]`, spaces as `-`), another user theme is copied, a shipped theme or bare style gets a new file with `base =`
+it; the new theme is selected. Delete: a user theme file; its base is selected (applied when it was in force).
+
+**Set as Desktop Background** (`verbs::set_wallpaper` -> `shell::set_desktop_background`): `Desktop.wallpaper` + `Desktop.mode`
+into the session theme's modified copy, `[desktop] wallpaper = none` removed, the theme selected and announced; no
+`_FLXP_WALLPAPER`. **flxp-desktop** reads the record (`theme_wallpaper`: `path.wallpaper`, `Desktop.mode`, `Desktop.color`
+under and around the picture; was the constant 58,110,165), watches `_LH_THEME`, `_LH_SETTINGS_CHANGED`,
+`_LH_THEME_RESOLVED` and refreshes the record itself before it draws (`w32::session_theme_refresh`). luxshell still
+writes `_FLXP_WALLPAPER` (its bridge); nothing reads it now.
+
+**tests**: `lhdatatest` (now 55 checks) builds a fake import with theme files (the probe replaced, LHDE_TREE=0): the record,
+aliases, the mapped keys per theme, the published record current vs stale serial, `wallpaper_value`, `set_theme_keys` writing
+and selecting `slate4051-modified`, `theme_list`, the retired flxp.ini key, the store path, the report.
+`tests/check.sh`'s ut-dump takes `styles/` from `$LHDE_DATA` (else `~/.local/share/lhde`; `LHDE_STYLES` overrides).
+
+**Measured** (Xvfb :74-:76, luxwm from this tree, scratch HOME with copies of ~/.config/lhde and ~/.config/flxp,
+LHDE_DATA = ~/.local/share/lhde): HEAD before (37ac621, compatibility registry) against the same commit with only these
+changes, explorer + flxp-desktop per theme, whole screen: slate4051, slate4074, jade4074, luna: 0 pixels differ. aerovision:
+3113 px (the header title: luxnav now gets `path.navbar` = vision.ini with preset small, the old code found no nav.ini in
+luxwm's frame set and used luxnav's defaults); basic5112: the vision header with vision.ini's own preset (big) instead of
+luxnav's defaults (same cause; set `navbar_preset = small` in the theme for the compact one). Live: `_LH_THEME` switched
+among slate4051, slate4074, jade4074, luna, basic5112, aero4074, aerovision, aero5112 (picom for the aero ones) restyles
+explorer, desktop and taskbar; Display Properties: navbar 4074 -> vision on jade4074 wrote `jade4074-modified.theme`
+(`[Explorer] navbar = vision`), selected it, luxwm re-resolved and republished the record, the explorer switched to luxnav;
+a background from the list (`2k/blulac16`), (None) (`wallpaper = none`, the theme's colour), Save As (copy of a user theme,
+rename of slate4074-modified to `slate-three`), Delete (back to slate4074); Set as Desktop Background > Tile on a .bmp:
+`slate4074-modified.theme` with the absolute path and `mode = tile`, the desktop followed at once. Not reproduced but seen
+once on :74: after the navbar switch with an explorer under the dialog, the property sheet's margins kept stale pixels until
+the dialog was moved (a missed repaint, not seen in a run without the explorer underneath).

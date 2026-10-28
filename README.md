@@ -131,9 +131,9 @@ store `~/.config/lhde/settings.ini` (`~/.config/longhorn/settings.ini` is a syml
 
 | key | default (lhde's data directories) |
 |-----|-----------------------------------|
-| registry (`_LH_THEMES_INI`, `$LH_THEMES_INI`, `themes_ini`) | the compatibility `themes.ini` liblhde generates from the theme files (`$XDG_RUNTIME_DIR/lhde/<display>/`), every path absolute |
-| `theme`, `theme_path` | styles by name: `styles/NAME.msstyles`, `styles/NAME/` (one style inside: the -xp backports), else `NAME-xp` (`luna` is `styles/luna-xp.msstyles`); a session theme's Longhorn-compiled style falls back to `styles/NAME-xp/` |
-| `longhorn_system32` | the registry's `flxp_longhorn_system32`, else `resources/<build>` of the session theme's build (`slate4051`, `luna4051`: 4051; the 4074 themes: 4074) |
+| the session theme | `_LH_THEME` resolved by liblhde (the theme files; `_LH_THEME_RESOLVED` when it is current): style, icons, chrome, navigation bar, taskbar, start menu, wallpaper; flxp.ini's `icons`, `frame`, `taskbar_kind`, `wallpaper`, `wallpaper_mode`, `themes_ini` are ignored (docs/flxp-NOTES.md "flxp on liblhde") |
+| `theme`, `theme_path` | without a session theme: styles by name, `styles/NAME.msstyles`, `styles/NAME/` (one style inside), else `NAME-xp` |
+| `longhorn_system32` | the session theme's `path.resources` when it is a Longhorn build's (`resources/4051`, `resources/4074`, ...) |
 | `explorer_resources`, `longhorn_wim` | the framelets: `Microsoft.Windows.Client.dll` beside (or in) `resources/<build>`, the theme's build first, then 4074 |
 | `font_path` | `fonts/<build>` with tahoma.ttf (4074's); the session theme's `fonts` (registry) are added too |
 | `wallpaper_dirs` | `~/Pictures/Wallpapers` and every `wallpapers/<build>`; the theme's wallpaper from `wallpapers.ini` (root `wallpapers/`) |

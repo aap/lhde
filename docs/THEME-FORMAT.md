@@ -251,3 +251,7 @@ Differences from sections 1-8, decided on the lux side:
    (imported now); the toolbar strips' bitmap ids are still open.
 6. `tests/check.sh`'s ut-dump honours `LHDE_DATA`.
 7. Tell the lux side when done: it then removes the compatibility registry and the legacy `[override]` layer.
+
+Status (wux side, 2026-10-28): items 1, 2, 3 and 6 are done (docs/flxp-NOTES.md "flxp on liblhde: the session theme from
+theme files"): flxp reads `_LH_THEME_RESOLVED` / `lhde_theme_resolve`, writes theme keys with `lhde_theme_set_key`, no longer
+reads the compatibility registry, `[override:NAME]`/`[override]`, `_FLXP_WALLPAPER` or `flxp_*` keys; item 7 applies.
