@@ -13,11 +13,11 @@ one build, for the parts that were separate projects:
 | `luxwm/`    | the window manager: Longhorn frames (DWM glass frame sets, classic frames from the style through wuxtheme), EWMH, animations; `luxwmc`; `tests/` (frametest, regress) | x11 `lhwm/` |
 | `luxnav/`   | libluxnav, the Longhorn navigation bar (the vision header; C API `lhnav_*`, `lhnav.h`), linked into flxp and navdemo | x11 `lhnav/` |
 | `luxshell/` | the Avalon bars, sidebar, tiles, toasts, start menu: C core + Lua (`*.lua`, `tiles/`), `shellpack*.sh` | x11 `lhshell/` (without `assets/`) |
-| `lhtheme/`  | `lhde_data.c`: the data directories (and the registry's resolved copy); the seed of step 4's theme resolver | new |
+| `liblhde/`  | liblhde (`<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`): the data directories, the theme resolver, the settings store and its migration, the compatibility registry for flxp; `lhde-theme`; `tests/resolve.c` | new (was `lhtheme/`) |
 | `session/`  | `lhde-session` (start, theme, taskbar, shell, picom, desktop, stop), `lab.sh` (the headless bench), `lhwall.sh`, theme-reload/-watch, picom configs | x11 `xinitrc.lab`, `second-display.sh`, `lab.sh`, ... |
 | `examples/` | extendframe, navdemo, glassdemo | x11 `examples/`, `glassdemo.c` |
-| `tools/`    | `lhde-import` (fills the data directory), recipe builders (`msstyles2theme.py`, `build_aerovision.py`, `build_aero5112.py`) | x11 `lhwm/tools/` |
-| `data/`     | text only: `themes.ini`, `wallpapers.ini`, `frames/*/theme.ini` (+ `nav.ini`), `packs/*/shell.lua` | x11 `themes.ini`, `wallpapers.ini`, `lhwm/themes/*/*.ini`, `lhshell/themes/` |
+| `tools/`    | `lhde-pack` (a resource pack of raw Windows files from ISOs), `lhde-import` (a pack, ISO, WIM or Windows directory into the data directory, the recipes), `lhdeimport.py`, `wim0108.py`, recipe builders (`msstyles2theme.py`, `build_aerovision.py`, `build_aero5112.py`) | x11 `lhwm/tools/` |
+| `data/`     | text only: `themes/*.theme` (the shipped themes), `navbar/*.ini`, `icons/*.theme`, `sources/*.ini` (what lhde-pack takes from each Windows build), `frames/*/theme.ini`, `packs/*/shell.lua` | x11 `themes.ini`, `wallpapers.ini`, `lhwm/themes/*/*.ini`, `lhshell/themes/` |
 | `docs/`     | `LAYOUT.md` (layout, asset policy, theme model; draft), `flxp-NOTES.md` (flxp's notes); from x11: `USAGE.md`, `THEMES.md`, `SETTINGS.md`, `NAVBAR.md`, `SHELL-DESIGN.md`, `MSSTYLES-FORMAT.md`, `LUXWM.md` (was lhwm/README.md), `CLIENT-PROTOCOL.md`, `CLASSIC-DECO-NOTES.md` (to be consolidated in step 5) | |
 
 No Microsoft files are in this repository, and none may be added (docs/LAYOUT.md,
@@ -95,20 +95,21 @@ baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the 
 
 The art comes from the user's own Windows files, imported once into the data directory
 `~/.local/share/lhde` (`$LHDE_DATA` instead, honoured by every lhde program and script; docs/LAYOUT.md
-"Asset policy"):
+"Asset policy", docs/USAGE.md "Getting the Windows resources"):
 
-    tools/lhde-import --from-workspace ~/fun/longhorn       copy what the research workspace has (first version)
+    tools/lhde-pack --isos DIR --out PACKS                  a resource pack (raw files) from the ISOs in DIR
+    tools/lhde-import --pack PACKS/lhde-resources-DATE.tar.xz   the pack into the data directory, recipes run
+    tools/lhde-import --iso FILE | --wim FILE | --dir WINDOWS   the same from one medium (build detected)
+    tools/lhde-import --style FILE NAME                     a style dropped in (the Aero patch: aero-patch)
+    tools/lhde-import --from-workspace ~/fun/longhorn       aap's research workspace
     tools/lhde-import --list                                what is there
 
-It fills `styles/` (build-qualified names: aero-patch, jade4074, slate4074, slate4051, luna4051, luna-xp,
-aero5048, aero5112, royale, ...; the XP backports as `styles/jade4074-xp/`, `styles/slate4074-xp/`),
-`frames/<name>/` (the frame sets' PNGs), `packs/<build>/` (luxshell's images: `4074/imageres`,
-`4074/shell32`, `4074/startpanel-*`, `4051/imageres`, `4051/startpanel-luna-*`, `5112/imageres`),
-`resources/<build>` (a build's system32; symlinks into the workspace unless `--copy-resources`),
-`resources/demo`, `fonts/<build>`, `wallpapers/<build>`. The lux programs search, in order: that
-directory, the install's `share/lhde`, `$XDG_DATA_DIRS/lhde`, the source tree's `data/`
-(lhtheme/lhde_data.h); the shipped text (data/) and the imported pixels of a frame set or pack are
-found together. Importing from an ISO, a WIM or a Windows directory is step 4.
+It fills `styles/` (build-qualified: jade4074, slate4051, luna4051, aero5048, aero5112, luna = XP's own with
+`styles/luna/Shell/`), `fonts/<build>`, `wallpapers/<build>`, `resources/<build>` (copies of shell32, imageres,
+explorer, browseui, comctl32, themeui, shellstyle, uDWM), and the derived `frames/<set>/cache/` and
+`packs/<build>/.../cache/` (each with a manifest.ini; `--rebuild-cache`). The programs search, in order: that
+directory, the install's `share/lhde`, `$XDG_DATA_DIRS/lhde`, the source tree's `data/` (liblhde, lhde/data.h);
+a lookup of `DIR/NAME` also finds `DIR/cache/NAME`. Themes: `lhde-theme list`, `lhde-theme resolve NAME --why`.
 
 ## Running
 
@@ -124,13 +125,13 @@ the x11 lab).
 ## Settings that point at your Windows files
 
 flxp needs none: it finds the imported art through the data directories above (`flxp/shell/lhdata.h` over
-`lhtheme/lhde_data.c`; `flxp --info` prints every lookup and which data directory answered, or "not imported").
+`liblhde/data.c`; `flxp --info` prints every lookup and which data directory answered, or "not imported").
 Settings live in `~/.config/flxp/flxp.ini` (any key also as `FLXP_<KEY>` in the environment) and the session
-store `~/.config/longhorn/settings.ini`; the path keys below are overrides only.
+store `~/.config/lhde/settings.ini` (`~/.config/longhorn/settings.ini` is a symlink to it after the migration); the path keys below are overrides only.
 
 | key | default (lhde's data directories) |
 |-----|-----------------------------------|
-| registry (`_LH_THEMES_INI`, `$LH_THEMES_INI`, `themes_ini`) | `themes.ini`; its relative values (`styles/...`, `resources/4074`, `fonts/4074`) are resolved there |
+| registry (`_LH_THEMES_INI`, `$LH_THEMES_INI`, `themes_ini`) | the compatibility `themes.ini` liblhde generates from the theme files (`$XDG_RUNTIME_DIR/lhde/<display>/`), every path absolute |
 | `theme`, `theme_path` | styles by name: `styles/NAME.msstyles`, `styles/NAME/` (one style inside: the -xp backports), else `NAME-xp` (`luna` is `styles/luna-xp.msstyles`); a session theme's Longhorn-compiled style falls back to `styles/NAME-xp/` |
 | `longhorn_system32` | the registry's `flxp_longhorn_system32`, else `resources/<build>` of the session theme's build (`slate4051`, `luna4051`: 4051; the 4074 themes: 4074) |
 | `explorer_resources`, `longhorn_wim` | the framelets: `Microsoft.Windows.Client.dll` beside (or in) `resources/<build>`, the theme's build first, then 4074 |
