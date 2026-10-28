@@ -215,6 +215,8 @@ void session_theme_refresh()
     }
     if (t.body == cur.body) return;                  // the same record (republished at another serial)
     bool look = look_of(t) != look_of(cur);
+    // flxp: a classic scheme, size or Advanced edit (before cur, a reference to the session theme, is replaced)
+    bool classic_look = classic_look_of(t) != classic_look_of(cur) || (t.classic && !cur.classic);
     shell::set_session_theme(t);
     set_env("FLXP_THEME_FOLLOWED", t.name);               // children follow too
     if (!look) return;                                    // the wallpaper only: flxp-desktop's business
@@ -223,7 +225,6 @@ void session_theme_refresh()
     if (t.msstyles.empty() && !t.classic)
         fprintf(stderr, "flxp: no visual style for session theme %s (%s); keeping the current one\n", t.name.c_str(),
                 t.value("VisualStyle.style").c_str());
-    bool classic_look = classic_look_of(t) != classic_look_of(cur) || (t.classic && !cur.classic);
     if (style) {
         set_env("FLXP_THEME", t.msstyles); set_env("FLXP_THEME_COLOR", t.color); set_env("FLXP_THEME_SIZE", t.size);
         reset_syscolors();                               // the new style's [SysMetrics] start from classic

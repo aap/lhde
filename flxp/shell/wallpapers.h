@@ -15,7 +15,8 @@ struct Wallpaper {
     uint32_t color = 0x3a6ea5;   // 0xRRGGBB under and around the picture
 };
 
-// the theme's background; false when it has no picture (out.color is still its colour)
+// the theme's background; false when it has no picture (out.color is still its colour: Desktop.color, or for the classic
+// look Colors.background when the scheme or the current layer has it)
 bool theme_wallpaper(const SessionTheme& st, Wallpaper& out);
 // "R G B" (the format's), "#rrggbb" or "0xrrggbb" -> 0xRRGGBB; fallback when it is none of them
 uint32_t parse_color(const std::string& v, uint32_t fallback = 0x3a6ea5);

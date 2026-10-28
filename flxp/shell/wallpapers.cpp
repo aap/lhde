@@ -28,6 +28,8 @@ bool theme_wallpaper(const SessionTheme& st, Wallpaper& out)
 {
     out = Wallpaper();
     out.color = parse_color(st.value("Desktop.color"));
+    // the classic look (THEME-FORMAT section 2a): the desktop is COLOR_BACKGROUND, a scheme's or an Advanced edit's
+    if (st.classic && !st.value("Colors.background").empty()) out.color = parse_color(st.value("Colors.background"), out.color);
     out.mode = st.value("Desktop.mode");
     std::string v = st.value("Desktop.wallpaper"), f = st.value("path.wallpaper");
     if (v == "none" || f.empty()) return false;

@@ -12,13 +12,13 @@ STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Themes"
 FONT 8, "MS Shell Dlg"
 BEGIN
-    LTEXT           "A theme is a visual style plus window frames, a background and other elements that give the desktop one look.", -1, 7, 7, 232, 18
-    LTEXT           "&Theme:", -1, 7, 30, 100, 8
-    COMBOBOX        IDC_TH_LIST, 7, 41, 126, 160, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    PUSHBUTTON      "&Save As...", IDC_TH_SAVE, 137, 40, 52, 14
-    PUSHBUTTON      "&Delete", IDC_TH_DELETE, 193, 40, 46, 14
-    LTEXT           "Sample:", -1, 7, 60, 100, 8
-    CONTROL         "", IDC_TH_PREVIEW, "Static", SS_OWNERDRAW, 7, 71, 232, 144
+    LTEXT           "A theme is a background plus a visual style, window frames, icons and other elements to give your desktop one look with one click.", -1, 7, 5, 232, 24
+    LTEXT           "&Theme:", -1, 7, 31, 100, 9
+    COMBOBOX        IDC_TH_LIST, 7, 42, 128, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Save As...", IDC_TH_SAVE, 140, 40, 50, 14
+    PUSHBUTTON      "&Delete", IDC_TH_DELETE, 194, 40, 45, 14
+    LTEXT           "Sample:", -1, 7, 61, 100, 9
+    CONTROL         "", IDC_TH_PREVIEW, "Static", SS_OWNERDRAW, 7, 70, 232, 145
 END
 
 IDD_DESKTOP DIALOGEX 0, 0, 246, 222
@@ -37,9 +37,25 @@ BEGIN
     LTEXT           "", IDC_DT_ICONS_SRC, 100, 202, 139, 8
 END
 
-IDD_APPEARANCE DIALOGEX 0, 0, 246, 262
+IDD_APPEARANCE DIALOGEX 0, 0, 246, 222
 STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "Appearance"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    CONTROL         "", IDC_AP_PREVIEW, "Static", SS_OWNERDRAW, 7, 5, 232, 120
+    LTEXT           "&Windows and buttons:", -1, 7, 131, 100, 9
+    COMBOBOX        IDC_AP_STYLE, 7, 141, 131, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Color scheme:", -1, 7, 159, 100, 9
+    COMBOBOX        IDC_AP_COLOR, 7, 169, 131, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Font size:", -1, 7, 188, 100, 9
+    COMBOBOX        IDC_AP_SIZE, 7, 198, 131, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Effects...", IDC_AP_EFFECTS, 184, 180, 55, 14
+    PUSHBUTTON      "A&dvanced", IDC_AP_ADVANCED, 184, 198, 55, 14
+END
+
+IDD_SHELL DIALOGEX 0, 0, 246, 266
+STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "Shell"
 FONT 8, "MS Shell Dlg"
 BEGIN
     LTEXT           "Explorer &frame:", -1, 7, 10, 58, 8
@@ -48,35 +64,107 @@ BEGIN
     LTEXT           "&Navigation bar:", -1, 7, 34, 58, 8
     COMBOBOX        IDC_AP_NAVBAR, 66, 32, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT           "", IDC_AP_NAVBAR_SRC, 66, 47, 173, 8
-    LTEXT           "&Taskbar:", -1, 7, 58, 58, 8
-    COMBOBOX        IDC_AP_TASKBAR, 66, 56, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_AP_TASKBAR_SRC, 66, 71, 173, 8
-    LTEXT           "&Start menu:", -1, 7, 82, 58, 8
-    COMBOBOX        IDC_AP_START, 66, 80, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_AP_START_SRC, 66, 95, 173, 8
-    LTEXT           "&Composition:", -1, 7, 106, 58, 8
-    COMBOBOX        IDC_AP_COMP, 66, 104, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_AP_COMP_SRC, 66, 119, 173, 8
-    LTEXT           "&Animations:", -1, 7, 130, 58, 8
-    COMBOBOX        IDC_AP_ANIM, 66, 128, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_AP_ANIM_SRC, 66, 143, 173, 8
-    GROUPBOX        "Sidebar (luxshell)", -1, 4, 156, 238, 62
-    LTEXT           "&Mode:", -1, 13, 170, 52, 8
-    COMBOBOX        IDC_AP_SBMODE, 66, 168, 167, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_AP_SBMODE_SRC, 66, 183, 167, 8
-    LTEXT           "P&lace:", -1, 13, 194, 52, 8
-    COMBOBOX        IDC_AP_SBSTACK, 66, 192, 167, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    AUTOCHECKBOX    "S&how the sidebar with the classic taskbar", IDC_AP_SBCLASSIC, 13, 206, 220, 10
-    LTEXT           "The settings above the Sidebar belong to the theme chosen on the Themes tab: Apply keeps a change in your copy of it, ""NAME (modified)"", which Save As names. The Sidebar's are yours for every theme.", -1, 7, 222, 232, 34
+    LTEXT           "Navbar si&ze:", -1, 7, 58, 58, 8
+    COMBOBOX        IDC_AP_PRESET, 66, 56, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_PRESET_SRC, 66, 71, 173, 8
+    LTEXT           "&Taskbar:", -1, 7, 82, 58, 8
+    COMBOBOX        IDC_AP_TASKBAR, 66, 80, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_TASKBAR_SRC, 66, 95, 173, 8
+    LTEXT           "&Start menu:", -1, 7, 106, 58, 8
+    COMBOBOX        IDC_AP_START, 66, 104, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_START_SRC, 66, 119, 173, 8
+    LTEXT           "&Window frames:", -1, 7, 130, 58, 8
+    COMBOBOX        IDC_AP_FRAMES, 66, 128, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_FRAMES_SRC, 66, 143, 173, 8
+    LTEXT           "&Composition:", -1, 7, 154, 58, 8
+    COMBOBOX        IDC_AP_COMP, 66, 152, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_COMP_SRC, 66, 167, 173, 8
+    LTEXT           "&Animations:", -1, 7, 178, 58, 8
+    COMBOBOX        IDC_AP_ANIM, 66, 176, 173, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_ANIM_SRC, 66, 191, 173, 8
+    GROUPBOX        "Sidebar (luxshell)", -1, 4, 202, 238, 60
+    LTEXT           "&Mode:", -1, 13, 215, 52, 8
+    COMBOBOX        IDC_AP_SBMODE, 66, 213, 167, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_AP_SBMODE_SRC, 66, 227, 167, 8
+    LTEXT           "P&lace:", -1, 13, 238, 52, 8
+    COMBOBOX        IDC_AP_SBSTACK, 66, 236, 167, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "S&how the sidebar with the classic taskbar", IDC_AP_SBCLASSIC, 13, 250, 220, 10
 END
 
-IDD_EFFECTS DIALOGEX 0, 0, 246, 222
-STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
+IDD_EFFECTS DIALOGEX 0, 0, 272, 80
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Effects"
 FONT 8, "MS Shell Dlg"
 BEGIN
-    AUTOCHECKBOX    "&Use the following method to smooth edges of screen fonts:", IDC_EF_SMOOTH, 7, 8, 232, 10
-    COMBOBOX        IDC_EF_METHOD, 19, 22, 120, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "U&se the following method to smooth edges of screen fonts:", IDC_EF_SMOOTH, 7, 7, 250, 10
+    COMBOBOX        IDC_EF_METHOD, 20, 19, 80, 60, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Window animations and composition are on the Shell tab.", -1, 7, 40, 250, 9
+    DEFPUSHBUTTON   "OK", IDOK, 161, 59, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 215, 59, 50, 14
+END
+
+IDD_ADVANCED DIALOGEX 0, 0, 252, 238
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Advanced Appearance"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    CONTROL         "", IDC_ADV_PREVIEW, "Static", SS_OWNERDRAW, 7, 5, 238, 120
+    LTEXT           "If you select a windows and buttons setting other than Windows Classic, it will override the following settings.", -1, 7, 132, 238, 16
+    LTEXT           "&Item:", -1, 7, 159, 26, 9
+    COMBOBOX        IDC_ADV_ITEM, 7, 169, 131, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Si&ze:", IDC_ADV_SIZE_L, 142, 159, 30, 9
+    EDITTEXT        IDC_ADV_SIZE, 142, 169, 30, 13, ES_RIGHT | ES_NUMBER | WS_GROUP
+    CONTROL         "", IDC_ADV_SIZEUD, "msctls_updown32", WS_BORDER | WS_GROUP | UDS_AUTOBUDDY | UDS_ALIGNRIGHT | UDS_ARROWKEYS | UDS_SETBUDDYINT, 172, 169, 10, 13
+    LTEXT           "Co&lor 1:", IDC_ADV_COLOR1_L, 184, 159, 28, 9
+    CONTROL         "", IDC_ADV_COLOR1, "Button", BS_OWNERDRAW | WS_TABSTOP, 184, 169, 28, 13
+    LTEXT           "Color &2:", IDC_ADV_COLOR2_L, 216, 159, 28, 9
+    CONTROL         "", IDC_ADV_COLOR2, "Button", BS_OWNERDRAW | WS_TABSTOP, 216, 169, 28, 13
+    LTEXT           "&Font:", IDC_ADV_FONT_L, 7, 188, 40, 9
+    COMBOBOX        IDC_ADV_FONT, 7, 198, 131, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Siz&e:", IDC_ADV_FONTSIZE_L, 142, 188, 30, 8
+    COMBOBOX        IDC_ADV_FONTSIZE, 142, 198, 38, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Colo&r:", IDC_ADV_FONTCOLOR_L, 184, 188, 28, 9
+    CONTROL         "", IDC_ADV_FONTCOLOR, "Button", BS_OWNERDRAW | WS_TABSTOP, 184, 198, 28, 13
+    AUTOCHECKBOX    "B", IDC_ADV_BOLD, 216, 198, 14, 13, BS_PUSHLIKE
+    AUTOCHECKBOX    "I", IDC_ADV_ITALIC, 230, 198, 14, 13, BS_PUSHLIKE
+    DEFPUSHBUTTON   "OK", IDOK, 141, 219, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 195, 219, 50, 14
+END
+
+IDD_COLORPICK DIALOGEX 0, 0, 112, 118
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Color"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    CONTROL         "", 1600, "Button", BS_OWNERDRAW | WS_TABSTOP, 7, 7, 18, 13
+    CONTROL         "", 1601, "Button", BS_OWNERDRAW, 27, 7, 18, 13
+    CONTROL         "", 1602, "Button", BS_OWNERDRAW, 47, 7, 18, 13
+    CONTROL         "", 1603, "Button", BS_OWNERDRAW, 67, 7, 18, 13
+    CONTROL         "", 1604, "Button", BS_OWNERDRAW, 87, 7, 18, 13
+    CONTROL         "", 1605, "Button", BS_OWNERDRAW, 7, 22, 18, 13
+    CONTROL         "", 1606, "Button", BS_OWNERDRAW, 27, 22, 18, 13
+    CONTROL         "", 1607, "Button", BS_OWNERDRAW, 47, 22, 18, 13
+    CONTROL         "", 1608, "Button", BS_OWNERDRAW, 67, 22, 18, 13
+    CONTROL         "", 1609, "Button", BS_OWNERDRAW, 87, 22, 18, 13
+    CONTROL         "", 1610, "Button", BS_OWNERDRAW, 7, 37, 18, 13
+    CONTROL         "", 1611, "Button", BS_OWNERDRAW, 27, 37, 18, 13
+    CONTROL         "", 1612, "Button", BS_OWNERDRAW, 47, 37, 18, 13
+    CONTROL         "", 1613, "Button", BS_OWNERDRAW, 67, 37, 18, 13
+    CONTROL         "", 1614, "Button", BS_OWNERDRAW, 87, 37, 18, 13
+    CONTROL         "", 1615, "Button", BS_OWNERDRAW, 7, 52, 18, 13
+    CONTROL         "", 1616, "Button", BS_OWNERDRAW, 27, 52, 18, 13
+    CONTROL         "", 1617, "Button", BS_OWNERDRAW, 47, 52, 18, 13
+    CONTROL         "", 1618, "Button", BS_OWNERDRAW, 67, 52, 18, 13
+    CONTROL         "", 1619, "Button", BS_OWNERDRAW, 87, 52, 18, 13
+    LTEXT           "&Red:", -1, 7, 72, 20, 8
+    EDITTEXT        IDC_CP_R, 7, 81, 26, 12, ES_NUMBER
+    LTEXT           "&Green:", -1, 37, 72, 24, 8
+    EDITTEXT        IDC_CP_G, 37, 81, 26, 12, ES_NUMBER
+    LTEXT           "&Blue:", -1, 67, 72, 20, 8
+    EDITTEXT        IDC_CP_B, 67, 81, 26, 12, ES_NUMBER
+    CONTROL         "", IDC_CP_SAMPLE, "Static", SS_OWNERDRAW, 96, 81, 10, 12
+    DEFPUSHBUTTON   "OK", IDOK, 7, 99, 47, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 58, 99, 47, 14
 END
 
 IDD_SAVEAS DIALOGEX 0, 0, 200, 62
