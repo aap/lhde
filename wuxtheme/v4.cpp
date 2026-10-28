@@ -176,10 +176,26 @@ std::u16string logfont_text(const uint8_t* p, size_t n)
     memcpy(&lf, p, sizeof lf);
     std::u16string face;
     for (int i = 0; i < LF_FACESIZE && lf.lfFaceName[i]; i++) face += (char16_t)lf.lfFaceName[i];
+    // A face named by its full name ("Tahoma Bold", "Segoe UI Bold" at weight 400: 4074's
+    // StartPanel.MOREPROGRAMS, 5048's): Windows' font mapper matches the full name and draws
+    // the bold face; ours matches families only, so the style goes into the attributes
+    // (as font_text does for the text form). The XP backports wrote "Tahoma, 8, bold".
+    bool bold = lf.lfWeight >= FW_SEMIBOLD, italic = lf.lfItalic;
+    for (bool again = true; again;) {
+        again = false;
+        for (const char* st : {" Bold", " Italic"}) {
+            size_t n = strlen(st);
+            if (face.size() > n && ieq(narrow(face.substr(face.size() - n)), st)) {
+                face.resize(face.size() - n);
+                (st[1] == 'B' ? bold : italic) = true;
+                again = true;
+            }
+        }
+    }
     // a negative size: the pixel height itself (msstyles.c flxp: patch)
     std::string rest = ", " + std::to_string(lf.lfHeight > 0 ? -(int)lf.lfHeight : (int)lf.lfHeight);
-    if (lf.lfWeight >= FW_SEMIBOLD) rest += ", bold";
-    if (lf.lfItalic) rest += ", italic";
+    if (bold) rest += ", bold";
+    if (italic) rest += ", italic";
     if (lf.lfUnderline) rest += ", underline";
     if (lf.lfStrikeOut) rest += ", strikeout";
     return face + widen(rest);
