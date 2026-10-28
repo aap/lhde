@@ -233,3 +233,21 @@ Differences from sections 1-8, decided on the lux side:
 6. Animations default per build (4051: 4074, 4074: 4074plus, 5048/5112: 5048, XP: none); `[theme] animations` is migrated away.
 7. The legacy `[override:NAME]` / `[override]` sections and `[desktop] wallpaper` are still honoured as a `settings` layer above the
    files, until flxp's dialog writes `NAME-modified.theme` (wux side).
+
+## 13. Next for the wux side (from the lux side's step-4 report, 2026-10-28)
+1. Link liblhde (`$(LHDEA)` or `lhde.pc`) and read the theme with `lhde_theme_resolve(_LH_THEME)` or
+   `lhde_theme_parse(_LH_THEME_RESOLVED)` instead of `lookup_session_theme` and the registry. flxp's
+   `resolved_field` reads the old `name=;...` format and today falls back to the generated compatibility
+   registry. Keys: `path.style`, `VisualStyle.color/size`, `Explorer.chrome/navbar/navbar_preset`,
+   `Desktop.icons`/`path.icons`, `path.resources`, `path.wallpaper`, `Desktop.mode`, `Shell.taskbar/start`.
+2. Settings path via `lhde_settings_path()`; the dialog writes theme keys with `lhde_theme_set_key`
+   (`NAME-modified.theme`) instead of `[override:NAME]`, and no longer writes the global `[taskbar] kind`,
+   `[start] menu`, `[desktop] icons`, `[explorer] frame`.
+3. flxp-desktop reads `path.wallpaper`/`Desktop.mode` from the record; then luxshell stops writing
+   `_FLXP_WALLPAPER`.
+4. Backports (decision 1): the compatibility registry no longer emits `flxp_msstyles`, bare `*-xp` styles
+   are not listed; do the side-by-side check with the v4 styles.
+5. Icons from `data/icons/*.theme` (`resources =`), XP/2000 art by id from `resources/xp`, `resources/2k`
+   (imported now); the toolbar strips' bitmap ids are still open.
+6. `tests/check.sh`'s ut-dump honours `LHDE_DATA`.
+7. Tell the lux side when done: it then removes the compatibility registry and the legacy `[override]` layer.
