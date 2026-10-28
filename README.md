@@ -39,7 +39,6 @@ uses picom, feh and xprop (xdotool, ImageMagick's import for the lab).
     make check                   tests/check.sh (below)
     make install PREFIX=/usr/local [DESTDIR=]
     make uninstall PREFIX=...
-    make install-icons [NT5SRC=] copy the XP/2000 icon files from nt5src into the data dir
     make clean
 
 What `make` builds:
@@ -138,7 +137,7 @@ store `~/.config/lhde/settings.ini` (`~/.config/longhorn/settings.ini` is a syml
 | `font_path` | `fonts/<build>` with tahoma.ttf (4074's); the session theme's `fonts` (registry) are added too |
 | `wallpaper_dirs` | `~/Pictures/Wallpapers` and every `wallpapers/<build>`; the theme's wallpaper from `wallpapers.ini` (root `wallpapers/`) |
 | `taskpane_aurora` | `resources/demo` (needs the demo's `docLib/`, `search/` images; the import has only `aurora_strip.png` so far) |
-| `nt5src` | none: the XP source tree for the xp/2k icon themes (`flxp/res/icons/{xp,2k}.theme`), the task pane's shellstyle bitmaps (`explorer/places.cpp`), start.bmp / LogoffButtons.bmp / the user tile (`taskbar/taskbar.cpp`, `startpanel.cpp`), browtb.bmp (Folders bar close button); `make install-icons` copies the icon files. Without it: Wine's icons and drawn lookalikes. To be replaced by resources from an imported XP's own DLLs (docs/flxp-NOTES.md "flxp finds its files through lhde_data" has the resource table). |
+| (XP/2000 art) | no setting: the xp/2k/longhorn4074 icon recipes (`data/icons/*.theme`), the toolbar strips, the task pane's shellstyle bitmaps, the start flag, the Log Off buttons, the user tile and the Folders bar's close glyph are read by resource id from `resources/xp`, `resources/2k` (lhde-import; docs/flxp-NOTES.md "XP and 2000 art by resource id"). Without them: Wine's icons and drawn lookalikes. |
 
 `LHDE_DATA` (environment) replaces the user data directory for every lux program and script; the theme
 registry is `data/themes.ini` (luxwm and luxshell publish its resolved copy as `_LH_THEMES_INI`).

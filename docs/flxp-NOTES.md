@@ -14,10 +14,10 @@
 > policy"): they stay in the flxp archive (~/src/flxp). The research notes
 > `doc/concepts.md`, `doc/4051-explorer-research.md`, `doc/demo-resources.md`
 > moved to the research workspace (~/fun/longhorn/research-from-flxp/).
-> nt5src is still read at run time when `nt5src=` is set in flxp.ini (XP/2000
-> icon themes, task pane and start panel bitmaps, browtb.bmp); switching those
-> readers to resources in an imported XP's own DLLs is a later step (LAYOUT
-> review, point 1).
+> nt5src is no longer read (2026-10-28): the XP/2000 art comes by resource id
+> from lhde-import's resources/xp and resources/2k ("XP and 2000 art by resource
+> id" at the end); the icon recipes are data/icons/*.theme. Older sections that
+> name nt5src files describe that earlier state; nt5src stays a reference for humans.
 
 # flxp
 
@@ -30,8 +30,7 @@ visual styles (uxtheme/msstyles), with Longhorn themes as the fun goal.
     make explorer && build/explorer/explorer [DIR]     uninstalled, from anywhere
     make install [PREFIX=/usr/local]                   bin/flxp, bin/flxp-* helpers,
                                                        share/flxp/res, share/applications/flxp.desktop
-    make install-icons [NT5SRC=...]                    copy the xp/2k icon files from nt5src into
-                                                       share/flxp/icons/{xp,2k} (installed themes point there)
+    (make install-icons is gone: the xp/2k art is read from resources/xp, resources/2k)
     make uninstall [PREFIX=...]
     make desktop && build/desktop/flxp-desktop         the desktop (wallpaper + icons), see "The desktop"
     make taskbar && build/taskbar/flxp-taskbar         the taskbar, see "The taskbar"
@@ -174,6 +173,8 @@ GetLastError) is process-local and in memory.
 
 ## Icon themes
 
+(Superseded 2026-10-28: the recipes are lhde's data/icons/*.theme, read by
+resource id from resources/<build>; see "XP and 2000 art by resource id".)
 `FLXP_ICONS=wine|xp|2k|longhorn` selects a theme file in res/icons/*.theme
 (demo.sh defaults to xp). A theme maps icon keys to .ico files or to icon
 resources in a PE (`pe:shell32.dll#4`), gives a preferred colour depth (4 =
@@ -605,7 +606,7 @@ Installing the portal (not done; your config is untouched):
       -> bin/flxp-filedialog, bin/flxp-portal (install copies build/*/flxp-*),
          /usr/share/xdg-desktop-portal/portals/flxp.portal (PORTALDIR=),
          $(PREFIX)/share/dbus-1/services/org.freedesktop.impl.portal.desktop.flxp.service
-    sudo make install-icons      # so the installed dialog has the XP icons without nt5src
+    # (the XP icons come from lhde-import's resources/xp; no install-icons any more)
     # ~/.config/xdg-desktop-portal/portals.conf (res/portal/portals.conf.example):
     #   [preferred]
     #   org.freedesktop.impl.portal.FileChooser=flxp      (was: lxqt)
@@ -4019,3 +4020,121 @@ rename of slate4074-modified to `slate-three`), Delete (back to slate4074); Set 
 `slate4074-modified.theme` with the absolute path and `mode = tile`, the desktop followed at once. Not reproduced but seen
 once on :74: after the navbar switch with an explorer under the dialog, the property sheet's margins kept stale pixels until
 the dialog was moved (a missed repaint, not seen in a run without the explorer underneath).
+
+## The -xp backports dropped: the side-by-side check (2026-10-28)
+
+THEME-FORMAT decision 1: every component uses the theme's one style; the XP backports
+(`styles/jade4074-xp`, `styles/slate4074-xp`, `luna-xp`) and `flxp_msstyles` are gone. Before
+that, the same programs were rendered under the real v4 styles and under the backports that flxp
+used to load instead (the old registry: jade4074 and aero-patch -> jade4074-xp, slate4074 and
+slate4051 -> slate4074-xp; luna-xp.msstyles is byte-identical to the imported XP Luna, so luna
+has nothing to compare). Xvfb 1280x1024, no window manager, scratch HOME, the HEAD binaries of
+dcdd051, one registry with a v4 and a `-bp` section per theme (the `-bp` one adding
+`flxp_msstyles`), controls/comctl with FLXP_THEME = the style. Pixels differing (v4 vs backport):
+
+| theme | explorer (Longhorn chrome) | explorer (XP chrome) | file dialog | taskbar | start panel | settings | controls | comctl |
+|-------|-----|------|---|-----|------|----|------|------|
+| slate4074 | 0 | 3222 | 0 | 606 | 1115 (610 after the fix) | 0 | 0 | 1702 |
+| jade4074 | 0 | 3309 | 0 | 0 | 774 (0 after the fix) | 0 | 0 | 1733 |
+| aero-patch | 0 | 3309 | 0 | 0 | 774 (0 after the fix) | 0 | 0 | 1733 |
+| slate4051 (backport: 4074's) | 410 | 3266 | 344 | 606 | 1115 | 32 | 1138 | 5058 |
+
+Every difference, its cause (`ut-dump --list` of both, compared property by property) and the decision:
+
+1. **All Programs drawn regular instead of bold** (start panel, every Longhorn style): the v4 file stores
+   `StartPanel.MOREPROGRAMS` FONT as a LOGFONT with the face "Tahoma Bold" (Jade: "Segoe UI Bold") at weight
+   400; Windows' font mapper matches that full name and draws the bold face, ours matches families only; the
+   backport wrote "Tahoma, 8, bold". **Fixed in wuxtheme** (`v4.cpp` logfont_text: a " Bold"/" Italic" suffix
+   of the face becomes the attribute, as font_text already did for the text form; b702007). Also affects
+   `TaskBand.GROUPCOUNT` and the other "* Bold" faces of 4015-5112 (`ut-dump --get StartPanel 2 0 FONT`:
+   "Tahoma, -11, bold", weight 700).
+2. **Rebar band label** (XP chrome's "Address", comctl's rebar): slate's `Rebar` TEXTCOLOR is 255,255,255
+   (Jade's 0,2,92); the backports made both 0,0,0. The v4 value is what 4074 means: its Rebar text sits on the
+   dark `Document::Rebar.BACKGROUND` of the command bar (white on blue in flxp's Longhorn chrome, identical
+   there). In the XP chrome the plain Rebar background is light, so slate's label is white on light grey, as
+   a real comctl32 6 (DrawThemeText with the Rebar class) would draw it. **Accepted**: the backport's hand
+   tuning; no theme file pairs a Longhorn style with chrome = xp (Explorer.chrome = longhorn in all of them).
+3. **Rebar band edges** (XP chrome, comctl): `Rebar.BAND` EDGESHADOWCOLOR 125,125,125 (Jade 150) and no
+   EDGEHIGHLIGHTCOLOR in v4; the backports set 218 and 250 for a fainter etch. **Accepted** (hand tuning; the
+   style's own values are read correctly).
+4. **Toolbar separators** (XP chrome, comctl): 4074's `Toolbar.SEPARATOR` image (#274) is an 8x5 32-bit
+   bitmap with every pixel 0 - transparent on purpose (4074's command bar separates by spacing); the
+   backports drew their own line (`id9001.bmp`, 191,191,197) and gave Jade sizing margins. **Accepted**.
+5. **Slate's start button text** (taskbar, 606 px): `Start::Button` CONTENTMARGINS 7,19,2,4 in v4,
+   7,19,1,1 in the backport (Jade 1,2: its start button is identical anyway). **Accepted** (hand tuning).
+6. slate4051 only: its own parts (blue `Edit` BORDERCOLOR 77,124,175, its combo arrow and scroll bar
+   images, 4051's start button) against the 4074 backport it used to get. Not backport tuning: the v4 4051
+   style is the right one.
+7. Same in both: font sizes ("-11" pixels = "8" points at 96 dpi), TRANSPARENTCOLOR on images that have
+   alpha, IMAGECOUNT of the backports' padded strips, the v4-only classes (Navbar, AnimationButton, Link,
+   ListView groups, Menu POPUP* parts) the backports lacked.
+
+Result: under the v4 styles the Longhorn chrome, the file dialog, Display Properties and the controls test are
+identical to the backports; the start panel is identical after the font fix; what remains are the
+backports' hand-tuned rebar/separator/start-button values in the XP chrome. Screenshots: the session's
+scratch directory only (`bp/shots`), no Microsoft renders in the repo.
+
+## XP and 2000 art by resource id (2026-10-28)
+
+nt5src is gone from flxp's code and data (no `nt5src=`, no `make install-icons`, flxp/res/icons keeps only
+wine.theme). The art comes from lhde-import's `resources/xp` (Windows Server 2003 R2 x64: XP's resources)
+and `resources/2k` (Windows 2000 SP4), and from the Luna import's `styles/luna/Shell/<color>/shellstyle.dll`.
+
+- **Icon recipes** are `data/icons/{xp,2k,longhorn4074}.theme`, looked up as `icons/NAME.theme` in lhde's data
+  directories (`shell::icon_theme_file`; the old name `longhorn` is longhorn4074; flxp's res/icons/wine.theme
+  stays the fallback). `[theme] resources = resources/BUILD` is the base of `pe:DLL#ID` (`base =` still works
+  for a user's own recipe); a relative path starting with `resources/` names another build's file (the 2k
+  recipe's missing ids, longhorn4074's toolbar). `[toolbar]` sources are RT_BITMAP ids. A recipe whose
+  resources are not imported is unusable: Wine's icons, with one message naming lhde-import.
+- `shell::resource_file(build, file)`, `resource_src(build, file, id)`, `shellstyle_dll(style, color)`,
+  `load_art("pe:PATH#ID" | file)` (flxp/shell/icons.h); `tb::xp_explorer_bitmap(id, flags)` (taskbar.h).
+- Task pane (places.cpp): the style's `Shell/<color>/shellstyle.dll` beside it or in `styles/NAME/Shell/`
+  (XP's own layout, and lhde-import's), the colour matched case-insensitively; another style without
+  ExplorerBar parts takes Luna's NormalColor; classic takes `resources/xp/shellstyle.dll` (CLASS_SS).
+- `flxp --info` lists `resources/xp` and `resources/2k` instead of the nt5src line.
+
+The ids, verified against the imported DLLs (`bitmap` = extracted and byte-compared with the nt5src file it
+replaces; all identical unless noted):
+
+| what | source | id | check |
+|------|--------|----|-------|
+| toolbar strip 24 / hot | xp shell32.dll | 214 / 215 | 1128x24 32-bit, identical |
+| toolbar strip 16 / hot | xp shell32.dll | 216 / 217 | 752x16, identical (4074's: 768, one more cell, so longhorn4074 keeps XP's) |
+| Go button / hot | xp shell32.dll | 230 / 231 | 20x20, identical |
+| brand (throbber) | xp shell32.dll | 240 | 22x1100, identical |
+| 2k toolbar 20 / hot, 16 / hot | 2k browseui.dll (xp's the same) | 276 / 277, 278 / 279 | 940x20 and 753x16 8-bit, identical |
+| Folders bar close | xp browseui.dll | 545 | 39x11, identical |
+| start flag / classic | xp explorer.exe | 143 / 176 | 25x20 / 16x16, identical |
+| Log Off buttons / hot | xp explorer.exe | 7010 / 7011 | 72x24, identical |
+| task pane up, uphot, down, downhot | Luna Shell/{NormalColor,HomeStead,Metallic}/shellstyle.dll; classic: system32's | 100-103 | identical (all four colours checked) |
+| task pane header | the three Luna shellstyle.dll | 112 | 186x21 8-bit, identical (not in the classic one) |
+| user tile (chess) | xp logonui.exe | 114 | not imported yet: data/sources/xp.ini now lists `LOGONUI.EX_`; until a re-import the panel shows the name only |
+| file dialog view/hist strips | comctl32 6.0 | 124 / 130 | not imported: resources/xp/comctl32.dll is 5.82 (4-bit Windows 2000 art); 6.0 is in the ISO's `AMD64/ASMS01.CAB` (WinSxS), which lhde-import cannot unpack yet (a cabinet inside the layout). The xp recipe leaves them out: comctl32's own images |
+| icons | xp / 2k / 4074 shell32.dll | as in the recipes | RT_GROUP_ICON present for every id in xp and 4074; 2000's shell32 lacks 224, 225, 226, 235, 236, 294 (mydocs.dll et al.): the 2k recipe takes XP's, 4-bit frames |
+
+Recipe ids corrected to the files they replace: `image` 226 (pics.ico, was 236 = mypics), `disc` 294 (cdrom.ico,
+was 12 = the drive), `recent` 21 (stdocs.ico, was 20 = Programs) - in xp, 2k and longhorn4074 (the old
+longhorn recipe had the same three). `control_panel` stays 137 (IDI_CPLFLD): nt5src's control.ico is in no
+.rc file.
+
+### Measured against the nt5src build
+
+Old = dcdd051's binaries with nt5src= set; new = this change, no
+nt5src, LHDE_DATA = the user's import with `icons/` from this tree (the installed `~/.local/share/lhde/icons`
+are the lux side's earlier copies without [toolbar]: `make install` refreshes them; with the old copies the
+icons load and the toolbar falls back to comctl32's images). Pixels differing (whole screen):
+
+| theme | explorer (XP chrome) | task pane | Folders bar | taskbar | start panel | file dialog | settings |
+|-------|----|----|----|----|----|----|----|
+| luna | 0 | 0 | 0 | 0 | 4112 | 828 | 0 |
+| luna-olive (homestead), luna-silver (metallic) | | 0, 0 | | | | | |
+| classic + 2k icons | 297 (places pane included) | | 127 | 0 | 4457 | 814 | |
+| slate4074 (longhorn4074 icons) | 0 (Longhorn chrome), 0 (XP chrome) | | | | | | |
+
+Explained: luna's start panel = the chess tile (logonui.exe not imported) and Control Panel (137, Server
+2003's icon, against nt5src's unused control.ico); luna's file dialog = the view/hist strips (comctl32 6.0
+not imported). Classic + 2k = the real Windows 2000 icons where the old set had the XP icons' 4-bit frames
+(the generic document #1 with the 2000 window logo, My Computer #16, Control Panel #137, Run #25, Search
+#134) plus the chess tile. Everything else, including the taskbar's start flag and the task pane in all three
+Luna colours, is pixel-identical. (The run used FLXP_THEME=luna.msstyles for the taskbar: with the session
+theme alone flxp-taskbar draws unthemed in c7b2e82, as before this change - not an art problem.)

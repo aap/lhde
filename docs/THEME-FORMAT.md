@@ -255,3 +255,8 @@ Differences from sections 1-8, decided on the lux side:
 Status (wux side, 2026-10-28): items 1, 2, 3 and 6 are done (docs/flxp-NOTES.md "flxp on liblhde: the session theme from
 theme files"): flxp reads `_LH_THEME_RESOLVED` / `lhde_theme_resolve`, writes theme keys with `lhde_theme_set_key`, no longer
 reads the compatibility registry, `[override:NAME]`/`[override]`, `_FLXP_WALLPAPER` or `flxp_*` keys; item 7 applies.
+Items 4 and 5 are done too (docs/flxp-NOTES.md "The -xp backports dropped: the side-by-side check" and "XP and 2000 art
+by resource id"): one wuxtheme fix (v4 LOGFONTs named "Tahoma Bold"), the remaining differences are the backports' hand
+tuning (accepted); the toolbar strip ids are 214-217 (xp shell32), 276-279 (2k browseui); flxp has no nt5src setting. For the
+lux side: lhde-import should also take `AMD64/ASMS01.CAB`'s comctl32 6.0 (the file dialog's view/hist strips, 124/130) and,
+after this change's `LOGONUI.EX_` line in data/sources/xp.ini, re-import XP for the chess tile.

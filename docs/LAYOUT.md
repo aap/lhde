@@ -128,6 +128,8 @@ order and ownership. Additions and two corrections:
    (shell32.dll, explorer.exe, browseui.dll, shellstyle.dll), so `lhde-import` must accept an XP
    (and 2000) install or ISO as well, and fill `resources/xp/`, `resources/2k/`; the wux side switches
    those readers from nt5src paths to resource ids in those DLLs. The repo never needs nt5src.
+   *Done (2026-10-28):* flxp reads them by id from `resources/xp`, `resources/2k`; no `nt5src=` setting
+   (docs/flxp-NOTES.md "XP and 2000 art by resource id").
 2. **Reference screenshots** (flxp's `screenshots/*.png` from real XP, the lhwm regress refs) are
    Microsoft renders: they move to the research workspace; `make check` compares against locally
    generated baselines (checksums), as the draft says.
