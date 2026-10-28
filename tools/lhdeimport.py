@@ -500,9 +500,11 @@ def match_rules(src, members):
 
 def pack_image(src, image, pack, tmp, origin):
     """the source's files out of image into pack/<id>/; returns MANIFEST lines"""
+    import lhdetree
     pairs = match_rules(src, image.members())
     if not pairs:
         raise RuntimeError('%s: nothing matched (not this source?)' % src.id)
+    import lhdetree
     got = image.fetch(sorted(set(m for _, m, _ in pairs)), os.path.join(tmp, 'fetch'))
     lines, n = [], 0
     root = os.path.join(pack, src.id)
@@ -516,9 +518,11 @@ def pack_image(src, image, pack, tmp, origin):
         q = os.path.join(root, dest)
         os.makedirs(os.path.dirname(q), exist_ok=True)
         shutil.copyfile(local, q)
+        lhdetree.annotate_original(q, src.id, src.title, src.build, dest, m)
         lines.append('%s\t%d\t%s/%s\t%s\t%s' % (sha256(q), os.path.getsize(q), src.id, dest, src.id, origin + ':' + m))
         n += 1
     shutil.copyfile(src.path, os.path.join(root, 'source.ini'))
+    lhdetree.annotate_source_dirs(root, src.id, src.title, src.build)
     size = sum(os.path.getsize(os.path.join(r, f)) for r, ds, fs in os.walk(root) for f in fs)
     log('  %s: %d files, %.1f MB -> %s' % (src.id, n, size / 1e6, root))
     shutil.rmtree(os.path.join(tmp, 'fetch'), ignore_errors=True)
@@ -607,6 +611,12 @@ def detect(medium, sources, tmp):
     return None, '; '.join(tried)
 
 
+def _tar_xattrs():
+    """GNU tar keeps the user.* attributes (the annotations of docs/ANNOTATIONS.md) in a pax archive; --no-annotate: none"""
+    import lhdetree
+    return ['--xattrs', '--xattrs-include=user.*'] if lhdetree.ANNOTATE['on'] else []
+
+
 def write_pack(pack, lines, tarball):
     with open(os.path.join(pack, 'MANIFEST'), 'a') as f:
         if f.tell() == 0:
@@ -616,10 +626,10 @@ def write_pack(pack, lines, tarball):
     if tarball:
         if shutil.which('zstd'):
             out = pack.rstrip('/') + '.tar.zst'
-            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), '-I', 'zstd -19 -T0', '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
+            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), '-I', 'zstd -19 -T0', '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
         else:
             out = pack.rstrip('/') + '.tar.xz'
-            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), '-cJf', out, os.path.basename(pack.rstrip('/'))], check=True)
+            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), '-cJf', out, os.path.basename(pack.rstrip('/'))], check=True)
         log('pack archive %s (%.1f MB)' % (out, os.path.getsize(out) / 1e6))
         return out
 
@@ -637,10 +647,13 @@ def unpack(path, tmp):
         return path
     d = os.path.join(tmp, 'pack')
     os.makedirs(d, exist_ok=True)
-    if path.endswith('.zst'):
-        subprocess.run(['tar', '-C', d, '-I', 'zstd -d', '-xf', path], check=True)
-    else:
-        subprocess.run(['tar', '-C', d, '-xf', path], check=True)
+    comp = ['-I', 'zstd -d'] if path.endswith('.zst') else []
+    r = subprocess.run(['tar', '-C', d, *_tar_xattrs(), *comp, '-xf', path])   # restores the user.* annotations
+    if r.returncode:
+        log('tar could not restore the annotations (extended attributes); extracting without them')
+        shutil.rmtree(d, ignore_errors=True)
+        os.makedirs(d, exist_ok=True)
+        subprocess.run(['tar', '-C', d, *comp, '-xf', path], check=True)
     subs = [os.path.join(d, x) for x in os.listdir(d)]
     return subs[0] if len(subs) == 1 and os.path.isdir(subs[0]) and not os.path.exists(os.path.join(subs[0], 'source.ini')) else d
 
@@ -657,16 +670,23 @@ def ci_path(root, rel):
 
 
 def copy_file(src, dst, force, rep):
+    import lhdetree
     if os.path.exists(dst) and not force and os.path.getsize(dst) == os.path.getsize(src):
         rep['kept'] += 1
+        lhdetree.copy_xattrs(src, dst)
         return
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.copyfile(src, dst)
+    lhdetree.copy_xattrs(src, dst)   # a pack's annotations (docs/ANNOTATIONS.md)
     rep['copied'] += 1
 
 
 def copy_tree(src, dst, force, rep):
+    import lhdetree
     for r, ds, fs in os.walk(src):
+        if os.path.isdir(os.path.join(dst, os.path.relpath(r, src))) or not fs:
+            os.makedirs(os.path.join(dst, os.path.relpath(r, src)), exist_ok=True)
+            lhdetree.copy_xattrs(r, os.path.join(dst, os.path.relpath(r, src)))
         for f in fs:
             s = os.path.join(r, f)
             copy_file(s, os.path.join(dst, os.path.relpath(s, src)), force, rep)
@@ -684,6 +704,8 @@ def import_pack(pack, W, force=False, recipes=True):
         root = os.path.join(pack, sid)
         s = Source(os.path.join(root, 'source.ini'))
         rep = {'copied': 0, 'kept': 0}
+        os.makedirs(os.path.join(W, sid), exist_ok=True)
+        lhdetree.copy_xattrs(root, os.path.join(W, sid))
         for f in sorted(os.listdir(root)):
             p = os.path.join(root, f)
             if os.path.isdir(p):
@@ -699,6 +721,7 @@ def import_pack(pack, W, force=False, recipes=True):
     if recipes:
         for s in todo:
             run_recipes(W, s.id, s.ini, force)
+    lhdetree.annotate_tree(W)
     with open(os.path.join(W, 'import.log'), 'a') as f:
         f.write('# lhde-import --pack %s, %s: %s\n' % (pack, datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), ' '.join(srcs)))
 
@@ -1112,6 +1135,7 @@ def regenerate(W, force=True):
             for kind, target, spec in recipes:
                 run_recipe(os.path.join(W, 'index'), kind, target, spec, 'style', True)
     lhdetree.reindex(W)
+    lhdetree.annotate_tree(W)
     log('regenerated %s from %d sources' % (os.path.join(W, 'generated'), n))
 
 

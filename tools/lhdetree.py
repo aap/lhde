@@ -514,5 +514,278 @@ def migrate(old, W, cfg, dry, auto=False):
     return 1
 
 
+# ---------------------------------------------------------------- file annotations (docs/ANNOTATIONS.md; ~/src/luxfs x / lsx)
+# Extended attributes, best effort: a filesystem without user xattrs, or a failing call, warns once and the import goes on.
+# Existing attributes are never replaced (a hand-written desc stays), so annotating is idempotent.
+import errno
+import re
+
+ANNOTATE = {'on': True, 'warned': False}
+A_AUTHOR, A_BUILD, A_SOURCE, A_DESC, A_TAGS = 'user.lux.author', 'user.lux.build', 'user.lux.source', 'user.lux.desc', 'user.xdg.tags'
+
+
+def set_annotate(on):
+    ANNOTATE['on'] = bool(on)
+
+
+def _warn(path, e):
+    if not ANNOTATE['warned']:
+        ANNOTATE['warned'] = True
+        log('warning: cannot write file annotations (extended attributes) on %s: %s; going on without them (--no-annotate silences this)'
+            % (path, os.strerror(e.errno) if e.errno else e))
+
+
+def xput(path, attrs, replace=False):
+    """set the given {attribute: text} on path (not on symlinks); an attribute that is there is kept unless replace"""
+    if not ANNOTATE['on'] or os.path.islink(path) or not os.path.exists(path):
+        return
+    for k, v in attrs.items():
+        if not v:
+            continue
+        try:
+            if not replace:
+                try:
+                    os.getxattr(path, k)
+                    continue
+                except OSError as e:
+                    if e.errno != errno.ENODATA:
+                        raise
+            os.setxattr(path, k, v.encode('utf-8'))
+        except (OSError, AttributeError) as e:
+            _warn(path, e)
+            if getattr(e, 'errno', None) in (errno.ENOTSUP, errno.EOPNOTSUPP):
+                ANNOTATE['on'] = False   # no user xattrs here: stop trying
+            return
+
+
+def copy_xattrs(src, dst):
+    """the user.* attributes of src onto dst, for those dst lacks (a pack's annotations into the Windows tree)"""
+    if not ANNOTATE['on'] or os.path.islink(src) or not os.path.exists(dst):
+        return
+    try:
+        names = [n for n in os.listxattr(src) if n.startswith('user.')]
+        vals = {n: os.getxattr(src, n).decode('utf-8', 'replace') for n in names}
+    except OSError:
+        return
+    xput(dst, vals)
+
+
+def source_label(title, sid, build):
+    """'Longhorn build 4074 (WinHEC 2004; ...)' -> 'Longhorn 4074'; the XP source's '(from Windows Server 2003 R2 x64 CD1: ...)'
+    -> 'Windows Server 2003 R2 x64'; a second dump of a build keeps its id: 'Longhorn 4042 (4042main)'"""
+    m = re.search(r'\(from (.*?)(?: CD\d)?\s*[:)]', title)
+    if m:
+        return m.group(1).strip()
+    t = re.sub(r'\s*\(.*', '', title).replace(' build ', ' ').strip() or sid
+    return t if sid == build or sid in t.split() else '%s (%s)' % (t, sid)
+
+
+def short_name(title, sid, build):
+    """what a description calls the build: 'Longhorn 4074', 'Windows XP'"""
+    return 'Windows XP' if title.startswith('Windows XP') else source_label(title, sid, build)
+
+
+SYS32_NOTES = {'imageres.dll': 'icons, Avalon bar art', 'shell32.dll': 'shell icons and bitmaps', 'explorer.exe': 'the Explorer shell',
+               'browseui.dll': 'shell browser UI', 'comctl32.dll': 'common controls', 'themeui.dll': 'theme and Appearance UI',
+               'shellstyle.dll': 'shell styles (task pane, start panel)', 'udwm.dll': 'the DWM compositor'}
+FONT_FAMILIES = (('segoeui', 'Segoe UI', {'': '', 'b': ' Bold', 'i': ' Italic', 'z': ' Bold Italic'}),
+                 ('tahoma', 'Tahoma', {'': '', 'bd': ' Bold'}),
+                 ('trebuc', 'Trebuchet MS', {'': '', 'bd': ' Bold', 'bi': ' Bold Italic', 'it': ' Italic'}))
+
+
+def font_desc(stem):
+    s = stem.lower()
+    if s in ('seguibk', 'seguibd'):
+        return 'font Segoe UI (%s)' % s
+    for pre, fam, styles in FONT_FAMILIES:
+        if s.startswith(pre) and s[len(pre):] in styles:
+            return 'font ' + fam + styles[s[len(pre):]]
+    return None
+
+
+def kind_of(rel, name, short):
+    """(description, tags) of a file below a source's directory (rel with / separators)"""
+    parts = rel.split('/')
+    top, base = parts[0].lower(), parts[-1]
+    stem = base.rsplit('.', 1)[0]
+    if top == 'system32':
+        note = SYS32_NOTES.get(base.lower())
+        return '%s %s%s' % (short, base, ' (%s)' % note if note else ''), 'system32'
+    if top == 'fonts':
+        return font_desc(stem) or base, 'font'
+    if top == 'wallpapers':
+        return 'wallpaper ' + (stem.replace('_', ' ').replace('-', ' ').title() if stem == stem.lower() else stem), 'wallpaper'
+    if top == 'themes':
+        low = base.lower()
+        if low.endswith('.msstyles'):
+            d = parts[-2] if len(parts) > 2 else stem
+            return '%s visual style' % d, 'style'
+        if low.endswith('.theme'):
+            return '%s theme file' % stem, 'style'
+        if low == 'shellstyle.dll' and len(parts) > 2:
+            return '%s shell style' % parts[-2], 'style'
+        return base, 'style'
+    if top == 'setup':
+        return ('default user hive setup data (classic Appearance schemes)' if base.lower() == 'hivedef.inf' else base), 'setup'
+    return base, ''
+
+
+def dir_kind(rel, short):
+    parts = rel.split('/') if rel else []
+    if not parts:
+        return '%s files' % short, ''
+    top = parts[0].lower()
+    if len(parts) == 1:
+        return {'system32': '%s system32 files' % short, 'fonts': '%s fonts' % short, 'wallpapers': '%s wallpapers' % short,
+                'themes': '%s themes and visual styles' % short, 'setup': '%s setup data' % short}.get(top, parts[0]), \
+            {'fonts': 'font', 'wallpapers': 'wallpaper', 'themes': 'style'}.get(top, top)
+    if top == 'themes':
+        return ('%s visual style files' % parts[1] if len(parts) == 2 else '%s %s' % (parts[1], parts[-1])), 'style'
+    return parts[-1], top
+
+
+def annotate_original(path, sid, title, build, rel, inimage):
+    """a raw Windows file: made by Microsoft, of this build, from this medium's path"""
+    short = short_name(title, sid, build)
+    desc, tags = kind_of(rel, os.path.basename(rel), short)
+    xput(path, {A_AUTHOR: 'microsoft', A_BUILD: build,
+                A_SOURCE: '%s, %s' % (source_label(title, sid, build), inimage) if inimage else source_label(title, sid, build),
+                A_DESC: desc, A_TAGS: tags})
+
+
+def annotate_source_dirs(root, sid, title, build):
+    """root = <pack or tree>/<sid>: the directory itself and its subdirectories"""
+    short, label = short_name(title, sid, build), source_label(title, sid, build)
+    for r, ds, fs in os.walk(root):
+        rel = os.path.relpath(r, root).replace(os.sep, '/')
+        desc, tags = dir_kind('' if rel == '.' else rel, short)
+        xput(r, {A_AUTHOR: 'microsoft', A_BUILD: build, A_SOURCE: label, A_DESC: desc, A_TAGS: tags})
+
+
+def _inimage_rules(ini):
+    return [(k, [p.strip() for p in v.split('|') if p.strip()]) for k, v in section(ini, 'files')]
+
+
+def guess_inimage(rules, rel):
+    """the in-image path of a pack file, from the source's [files] rules (what the MANIFEST would say, without the real case
+    of a setup file's name)"""
+    for dest, pats in rules:
+        if dest.endswith('/'):
+            if rel.lower().startswith(dest.lower()) and pats:
+                m = re.search(r'[*?{]', pats[0])
+                head = pats[0] if not m else pats[0][:m.start()]
+                return (head[:head.rfind('/') + 1] if '/' in head else '') + rel[len(dest):]
+        elif dest.lower() == rel.lower() and pats:
+            return pats[0]
+    return None
+
+
+def _real_rel(W, p):
+    """p (an index/ name) as the Windows tree's real relative path"""
+    return os.path.relpath(os.path.realpath(p), os.path.realpath(W)).replace(os.sep, '/')
+
+
+RECIPE_DESC = {'composited': 'glass frame plates read live from the style', 'classic': 'classic window frames drawn from the style',
+               'vision': 'Vision caption buttons', 'udwm': 'frames from uDWM.dll', 'dwmwindow': 'frames from the DWMWindow streams'}
+
+
+def _annotate_generated_dir(W, d, kind, mpath, build_of):
+    """every file below d, from the manifest.ini at mpath"""
+    ini = read_ini(mpath)
+    recipe = ini.get('recipe', 'kind', fallback='?')
+    args = ini.get('recipe', 'args', fallback='').split()
+    ins = [_real_rel(W, os.path.join(W, 'index', k)) for k, _ in section(ini, 'inputs')]
+    ins = [i for i in ins if not i.startswith('..')]
+    setname = os.path.basename(d)
+    tags = 'generated,frames' if kind == 'frames' else 'generated,packs'
+    if kind == 'frames':
+        desc = 'frame set %s: %s' % (setname, RECIPE_DESC.get(recipe, recipe))
+    elif recipe == 'shell32':
+        desc = 'shell32.dll icons for luxshell (%s)' % (args[0] if args else setname)
+    elif recipe == 'startpanel':
+        desc = 'start panel parts of style %s (%s)' % (args[1] if len(args) > 1 else '?', args[0] if args else setname)
+        tags += ',startpanel'
+    else:
+        desc = 'imageres.dll PNG resources for luxshell (%s)' % (' over '.join(args[:2]) if args else setname)
+    attrs = {A_AUTHOR: 'lhde-import', A_DESC: desc, A_TAGS: tags,
+             A_SOURCE: 'generated by recipe %s from %s' % (recipe, ', '.join(ins) or '(the Windows tree)')}
+    b = next((build_of(i.split('/')[0]) for i in ins if i.split('/')[0] in build_of.known), None)
+    if b:
+        attrs[A_BUILD] = b
+    xput(d, attrs)
+    for r, ds, fs in os.walk(d):
+        xput(r, attrs)
+        for f in fs:
+            xput(os.path.join(r, f), attrs)
+
+
+def annotate_tree(W):
+    """annotate whatever the Windows tree holds that lacks annotations (lhde-import --annotate, and the end of an import)"""
+    if not ANNOTATE['on'] or not os.path.isdir(W):
+        return
+    info = {}
+    for sid in sources_in(W):
+        root = os.path.join(W, sid)
+        p = source_ini(W, sid)
+        ini = read_ini(p) if p else None
+        title = ini.get('source', 'title', fallback=sid) if ini and ini.has_section('source') else sid
+        build = ini.get('source', 'build', fallback=sid) if ini and ini.has_section('source') else sid
+        info[sid] = (title, build)
+        rules = _inimage_rules(ini)
+        annotate_source_dirs(root, sid, title, build)
+        for r, ds, fs in os.walk(root):
+            for f in fs:
+                q = os.path.join(r, f)
+                rel = os.path.relpath(q, root).replace(os.sep, '/')
+                if rel == 'source.ini' or os.path.islink(q):
+                    continue
+                annotate_original(q, sid, title, build, rel, guess_inimage(rules, rel))
+
+    class BuildOf:
+        known = set(info)
+
+        def __call__(self, sid):
+            return info[sid][1]
+    build_of = BuildOf()
+    G = os.path.join(W, 'generated')
+    if os.path.isdir(G):
+        xput(G, {A_AUTHOR: 'lhde-import', A_DESC: 'everything lhde-import derives from the imported files (lhde-import --regenerate)',
+                 A_TAGS: 'generated'})
+        for k, d in (('frames', 'frame sets'), ('packs', 'luxshell pack images'), ('schemes', 'classic Appearance schemes')):
+            xput(os.path.join(G, k), {A_AUTHOR: 'lhde-import', A_DESC: 'generated ' + d, A_TAGS: 'generated'})
+        for s in sorted(glob.glob(os.path.join(G, 'frames', '*', 'manifest.ini'))):
+            _annotate_generated_dir(W, os.path.dirname(s), 'frames', s, build_of)
+        for s in sorted(glob.glob(os.path.join(G, 'packs', '*', 'manifest-*.ini'))):
+            pd = os.path.dirname(s)
+            ini = read_ini(s)
+            rec = ini.get('recipe', 'kind', fallback='')
+            args = ini.get('recipe', 'args', fallback='').split()
+            sub = 'startpanel-' + args[0] if rec == 'startpanel' and args else 'shell32' if rec == 'shell32' else 'imageres'
+            if os.path.isdir(os.path.join(pd, sub)):
+                _annotate_generated_dir(W, os.path.join(pd, sub), 'packs', s, build_of)
+            xput(s, {A_AUTHOR: 'lhde-import', A_DESC: 'manifest of the %s recipe' % rec, A_TAGS: 'generated'})
+        for s in sorted(glob.glob(os.path.join(G, 'schemes', '*.scheme'))):
+            origin = None
+            try:
+                with open(s, errors='replace') as f:
+                    m = re.search(r'from (\S+)', f.read(600))
+                    origin = m.group(1) if m else None
+            except OSError:
+                pass
+            xput(s, {A_AUTHOR: 'lhde-import', A_DESC: 'classic Appearance scheme %s' % os.path.basename(s)[:-7], A_TAGS: 'generated,scheme',
+                     A_SOURCE: 'generated by recipe schemes (lhdeschemes) from %s' % (origin or 'a hive INF')})
+    L = os.path.join(W, 'local')
+    for f in sorted(glob.glob(os.path.join(L, 'themes', '*.msstyles'))):
+        xput(f, {A_DESC: '%s visual style (dropped in with lhde-import --style)' % os.path.basename(f)[:-9], A_TAGS: 'style'})
+    for f in sorted(glob.glob(os.path.join(L, 'schemes', '*.scheme'))):
+        xput(f, {A_DESC: 'classic Appearance scheme %s' % os.path.basename(f)[:-7], A_TAGS: 'scheme'})
+    for k in ('resources', 'fonts', 'wallpapers'):
+        for d in sorted(glob.glob(os.path.join(L, k, '*'))):
+            if os.path.isdir(d) and not os.path.islink(d):
+                xput(d, {A_DESC: 'local %s %s' % (k, os.path.basename(d)), A_TAGS: {'resources': 'system32'}.get(k, k.rstrip('s'))})
+    xput(L, {A_DESC: 'files that come from no source (lhde-import --style, lhde-schemes, copied by hand)'})
+    xput(W, {A_DESC: "lhde's Windows tree: imported Windows files, generated/ and local/ (docs/LAYOUT.md)"})
+
+
 if __name__ == '__main__':
     sys.exit('lhdetree.py is a module of lhde-import')

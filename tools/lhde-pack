@@ -4,7 +4,7 @@ data/sources/<source>.ini (docs/USAGE.md "Getting the Windows resources", docs/L
 turns a pack into lhde's Windows tree (~/.local/share/lhde-windows); nobody needs the ISOs after that.
 
 usage: lhde-pack [--isos DIR]... [--sources ID,ID] [--all] [--out DIR] [--name NAME] [--no-tar] [--tmp DIR]
-                 [--medium ID=PATH]... [--list]
+                 [--medium ID=PATH]... [--no-annotate] [--list]
   --isos DIR      where the ISOs are (several allowed; default $LHDE_ISOS, a :-list, else .); each source
                   names its ISO file (iso = ...)
   --sources A,B   only these sources (default: every source with default = yes whose ISO is found; --all: also the others,
@@ -13,6 +13,9 @@ usage: lhde-pack [--isos DIR]... [--sources ID,ID] [--all] [--out DIR] [--name N
   --out DIR       where the pack goes (default .): DIR/NAME/ and DIR/NAME.tar.zst (zstd, else .tar.xz; --no-tar: the directory only)
   --name NAME     default lhde-resources-<date>
   --tmp DIR       scratch space for an extracted WIM (up to 1 GB at a time; default a temporary directory beside --out)
+  --no-annotate   write no file annotations (extended attributes user.lux.*, user.xdg.tags; docs/ANNOTATIONS.md). Without it the
+                  files, the source directories and the pack carry author/build/source/desc/tags, and the tarball is made with
+                  tar --xattrs so that lhde-import --pack restores them
   --list          the sources and whether their medium was found
 Pack layout: NAME/<source>/{system32,themes,fonts,wallpapers}/..., NAME/<source>/source.ini (the rules it was made with, and
 the recipes lhde-import runs), NAME/MANIFEST (sha256, size, pack path, source, medium:in-image path). Adding a file or a source
@@ -26,6 +29,7 @@ import datetime
 _here = os.path.dirname(os.path.realpath(__file__))
 sys.path[:0] = [_here, os.path.join(_here, '..', 'lib', 'lhde', 'tools')]   # the tree's tools/, or installed: <prefix>/bin + lib/lhde/tools
 import lhdeimport as L
+import lhdetree as T
 
 
 def main():
@@ -42,6 +46,7 @@ def main():
         elif o == '--tmp': tmpd = a.pop(0)
         elif o == '--medium': k, v = a.pop(0).split('=', 1); media[k] = v
         elif o == '--list': listing = True
+        elif o == '--no-annotate': T.set_annotate(False)
         elif o in ('-h', '--help'): print(__doc__); return 0
         else: L.die('unknown argument %s (--help)' % o)
     if not isos:
@@ -71,6 +76,7 @@ def main():
     os.makedirs(out, exist_ok=True)
     pack = os.path.join(os.path.realpath(out), name)
     os.makedirs(pack, exist_ok=True)
+    T.xput(pack, {T.A_AUTHOR: 'lhde-pack', T.A_DESC: 'lhde resource pack: raw Windows files by source (lhde-import --pack)', T.A_TAGS: 'pack'})
     tmp = tempfile.mkdtemp(prefix='.lhde-pack-', dir=tmpd or os.path.realpath(out))
     lines = []
     try:
@@ -96,6 +102,7 @@ def main():
             keep = [l.rstrip('\n') for l in open(mf) if not l.startswith('#') and l.split('\t')[3] not in done]
             os.unlink(mf)
         L.write_pack(pack, keep + lines, False)
+        T.xput(mf, {T.A_AUTHOR: 'lhde-pack', T.A_DESC: 'sha256, size, pack path, source, in-image path of every file', T.A_TAGS: 'pack'})
         per = {}
         for d in sorted(os.listdir(pack)):
             p = os.path.join(pack, d)

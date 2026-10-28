@@ -18,3 +18,6 @@
   `build_aerovision.py` (the vision caption buttons), `build_aero5112.py` (the 5112 frame set from its DWMWindow streams).
 
 ut-dump stays with wuxtheme/; lhde-theme (the resolver's command line) with liblhde/.
+
+Both `lhde-pack` and `lhde-import` write file annotations (extended attributes, docs/ANNOTATIONS.md; `--no-annotate` to skip);
+`lhde-import --annotate` adds them to an existing tree.

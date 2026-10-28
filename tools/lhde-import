@@ -17,6 +17,8 @@ usage:
                                               (aero-patch: the frame sets aero-patch and aerovision)
   lhde-import --from-workspace DIR [--copy-resources]   aap's research workspace (~/fun/longhorn)
   lhde-import --regenerate                    delete generated/ and make it again from the imported files (--rebuild-cache)
+  lhde-import --annotate                      write the file annotations (extended attributes, docs/ANNOTATIONS.md) a tree lacks:
+                                              originals, generated files, directories; keeps attributes that are there; idempotent
   lhde-import --reindex                       make index/ again (after moving or deleting files by hand)
   lhde-import --migrate [-n]                  move an old-layout ~/.local/share/lhde (everything in one directory) into the
                                               three trees without reading any ISO; -n lists what it would do. Run it after
@@ -24,7 +26,8 @@ usage:
   lhde-import --list                          what the Windows tree holds
 options: --windows DIR (default $LHDE_WINDOWS, else ${XDG_DATA_HOME:-~/.local/share}/lhde-windows; --data DIR is the old
          spelling), --force (replace files that exist), --no-recipes (raw files only), --tmp DIR (scratch for an extracted WIM;
-         default beside the Windows tree), --old DIR (--migrate: the old directory, default ${XDG_DATA_HOME:-~/.local/share}/lhde)
+         default beside the Windows tree), --no-annotate (write no extended attributes: the importer annotates what it writes,
+         best effort, docs/ANNOTATIONS.md), --old DIR (--migrate: the old directory, default ${XDG_DATA_HOME:-~/.local/share}/lhde)
 """
 import os
 import shutil
@@ -97,6 +100,7 @@ def from_workspace(ws, W, force, copyres):
                 rel = os.path.relpath(os.path.join(r, f), src)
                 L.copy_file(os.path.join(r, f), os.path.join(G, 'packs', n, rel), force, rep)
     T.reindex(W)
+    T.annotate_tree(W)
     L.log('workspace %s: %d files copied, %d kept' % (ws, rep['copied'], rep['kept']))
 
 
@@ -131,6 +135,8 @@ def main():
         elif x == '--migrate': mode = 'migrate'
         elif x == '--auto': o['auto'] = True
         elif x == '--reindex': mode = 'reindex'
+        elif x == '--annotate': mode = 'annotate'
+        elif x == '--no-annotate': T.set_annotate(False)
         elif x == '--tmp': o['tmp'] = a.pop(0)
         elif x == '--force': o['force'] = True
         elif x == '--no-recipes': o['recipes'] = False
@@ -145,6 +151,16 @@ def main():
         listing(data); return 0
     if mode == 'migrate':
         T.migrate(os.path.abspath(o.get('old') or T.old_dir()), data, T.config_dir(), o['dry'], o.get('auto', False))
+        if not o['dry']:
+            T.annotate_tree(data)
+        return 0
+    if mode == 'annotate':
+        if not os.path.isdir(data):
+            L.die('no Windows tree %s' % data)
+        if not T.ANNOTATE['on']:
+            L.die('--annotate with --no-annotate')
+        T.annotate_tree(data)
+        L.log('annotated %s' % data)
         return 0
     if mode is None:
         L.die('nothing to import from (--help)')
@@ -168,6 +184,7 @@ def main():
         for kind, target, spec in L.STYLE_RECIPES.get(name, []):
             if o['recipes']:
                 L.run_recipe(os.path.join(data, 'index'), kind, target, spec, 'style', o['force'])
+        T.annotate_tree(data)
         return 0
     tmp = tempfile.mkdtemp(prefix='.lhde-import-', dir=o.get('tmp') or data)
     try:
