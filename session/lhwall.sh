@@ -11,7 +11,7 @@
 #                           apply_composition): Glass.composition on -> yes, off -> no, auto -> yes when the theme has a glass
 #                           frame set (path.frames), else no.
 # The sourcing script has sourced lhde-paths.sh and run lhde_setup_paths (lhde_bin finds lhde-theme in the build tree or beside
-# the install); LHDE_DATA and XDG_CONFIG_HOME are honoured as by every lhde program.
+# the install); LHDE_WINDOWS, LHDE_DATA and XDG_CONFIG_HOME are honoured as by every lhde program.
 lhw_theme() { lhw_lt=$(lhde_bin lhde-theme); if [ -n "$1" ]; then echo "$1"; else "$lhw_lt" current 2>/dev/null; fi; }
 lhw_get() { # THEME KEY
 	"$(lhde_bin lhde-theme)" resolve "$1" --get "$2" 2>/dev/null; }

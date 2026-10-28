@@ -2,7 +2,7 @@
 # lhde's headless test bench (was the x11 lab's lab.sh, d353b69): a display of its own (LAB=:2 by default; Xvfb, nothing appears on
 # your screen, or a visible Xephyr) with luxwm, picom and the wallpaper, for screenshots and scripted tests. lhde-session is the
 # real session; this is the bench. Programs come from the build tree when it runs from one (build/bin, build/examples), else from
-# beside the install; the art from lhde's data directories (LHDE_DATA honoured, as by every lhde program).
+# beside the install; the art from lhde's data directories (LHDE_WINDOWS and LHDE_DATA honoured, as by every lhde program).
 #   LAB_WM=fvwm for an fvwm2 session (lab.fvwm2rc), default luxwm; LAB_THEME=NAME a theme (lhde-theme list; aliases such as aero-patch work: jade4074,
 #   slate4074, slate4051, luna-xp, aero5048, aero5112, aerovision, ...); LAB_PICOM=0 without a compositor (luxwm then uses the
 #   theme's frame_classic); LAB_WMARGS="" restarts luxwm without -d (debug log); LAB_BACKEND=glx for picom's glx backend.

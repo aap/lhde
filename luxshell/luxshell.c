@@ -509,7 +509,7 @@ static int l_set_root_prop(lua_State *L) {
 /* lhde's data directories (liblhde, lhde/data.h): lh.data_find(rel) -> the first dir/rel that exists, or nil;
    lh.data_resolve(value) -> a registry value as a path; lh.data_resolve_dir(value, marker) -> the directory of value that has
    marker (frames/x + theme.ini, packs/x + shell.lua); lh.data_dirs() -> the list; lh.data_user() -> the user's data directory;
-   lh.component_dir(name) -> luxshell/ or session/ (tree or <prefix>/share/lhde), or nil; lh.registry_source() / lh.registry_resolved(src) */
+   lh.component_dir(name) -> luxshell/ or session/ (tree or <prefix>/lib/lhde), or nil; lh.registry_source() / lh.registry_resolved(src) */
 static int l_data_find(lua_State *L) { char b[4200]; if (lhde_data_find(luaL_checkstring(L, 1), b, sizeof b)) lua_pushstring(L, b); else lua_pushnil(L); return 1; }
 static int l_data_resolve(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_data_resolve(luaL_checkstring(L, 1), b, sizeof b)); return 1; }
 static int l_data_resolve_dir(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_data_resolve_dir(luaL_checkstring(L, 1), luaL_checkstring(L, 2), b, sizeof b)); return 1; }
@@ -943,7 +943,7 @@ static int xerror(Display *d, XErrorEvent *e) { if (xerror_quiet) return 0; char
 static volatile sig_atomic_t terminated;
 static void on_term(int sig) { (void)sig; terminated = 1; }
 int main(int argc, char **argv) {
-    /* the Lua code: $LUXSHELL_LUA, else luxshell/ of the source tree (a build tree's binary) or <prefix>/share/lhde/luxshell */
+    /* the Lua code: $LUXSHELL_LUA, else luxshell/ of the source tree (a build tree's binary) or <prefix>/lib/lhde/luxshell */
     char lua_dir[4200] = "", script_buf[4300], exe_dir[4200] = "";
     { const char *e = getenv("LUXSHELL_LUA"); if (e && *e) snprintf(lua_dir, sizeof lua_dir, "%s", e);
       else if (!lhde_component_dir("luxshell", lua_dir, sizeof lua_dir)) snprintf(lua_dir, sizeof lua_dir, "."); }

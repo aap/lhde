@@ -1,7 +1,7 @@
 # luxshell, the Avalon bars, sidebar, tiles, toasts and start menu (was lhshell / "lux"; docs/SHELL-DESIGN.md). Included by
 # the top-level Makefile. A C core (scene graph, X surfaces, tray, notifications, GDI text through libwuxtheme) running Lua
 # (runtime.lua and its modules, tiles/): system Lua 5.4 (pkg-config lua5.4) and libdbus.
-#   build/bin/luxshell                    finds its Lua in luxshell/ (build tree) or $(DATADIR)/luxshell (installed)
+#   build/bin/luxshell                    finds its Lua in luxshell/ (build tree) or $(PKGLIBDIR)/luxshell (installed)
 #   build/luxshell/tests/trayicon         an XEmbed tray icon for the notification area tile
 # The packs' text (data/packs/NAME/shell.lua) installs with data/; their images come from lhde-import (packs/<build>/...).
 
@@ -30,15 +30,15 @@ check-luxshell: build/bin/luxshell
 	else echo "ok    luxshell (built; no luac to check the Lua)"; fi
 
 install-luxshell: build/bin/luxshell
-	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(DATADIR)/luxshell/tiles
+	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(PKGLIBDIR)/luxshell/tiles
 	install -m 755 build/bin/luxshell $(DESTDIR)$(BINDIR)/
 	ln -sf luxshell $(DESTDIR)$(BINDIR)/lhshell
-	install -m 644 $(wildcard luxshell/*.lua) $(DESTDIR)$(DATADIR)/luxshell/
-	install -m 644 $(wildcard luxshell/tiles/*.lua) $(DESTDIR)$(DATADIR)/luxshell/tiles/
-	install -m 755 luxshell/shellpack.sh luxshell/shellpack-aero5112.sh $(DESTDIR)$(DATADIR)/luxshell/
+	install -m 644 $(wildcard luxshell/*.lua) $(DESTDIR)$(PKGLIBDIR)/luxshell/
+	install -m 644 $(wildcard luxshell/tiles/*.lua) $(DESTDIR)$(PKGLIBDIR)/luxshell/tiles/
+	install -m 755 luxshell/shellpack.sh luxshell/shellpack-aero5112.sh $(DESTDIR)$(PKGLIBDIR)/luxshell/
 uninstall-luxshell:
 	rm -f $(DESTDIR)$(BINDIR)/luxshell $(DESTDIR)$(BINDIR)/lhshell
-	rm -rf $(DESTDIR)$(DATADIR)/luxshell
+	rm -rf $(DESTDIR)$(PKGLIBDIR)/luxshell
 
 -include $(LUXSHELL_OBJS:.o=.d)
 .PHONY: luxshell check-luxshell install-luxshell uninstall-luxshell

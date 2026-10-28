@@ -1,6 +1,6 @@
 #!/bin/sh
 # luxwm's frame painter regression (make check-luxwm): render the frametest set of every frame set in data/frames (text from the
-# tree, pixels and styles from lhde's data directories: LHDE_DATA or ~/.local/share/lhde) and compare the SHA-256 of every
+# tree, pixels and styles from lhde's data directories: the Windows tree ~/.local/share/lhde-windows or LHDE_WINDOWS, LHDE_DATA) and compare the SHA-256 of every
 # render with a baseline made on this machine. No reference images are in the repository (docs/LAYOUT.md "Asset policy"): the
 # first run writes the baseline, later runs compare against it.
 #   luxwm/tests/regress.sh [--source dir|lib] [OUTDIR]     render into OUTDIR (default build/luxwm/regress/out) and compare;

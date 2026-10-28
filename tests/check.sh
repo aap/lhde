@@ -29,7 +29,7 @@ result "fileops_test ($(tail -n 1 "$T/fileops.log"))" $? "$T/fileops.log"
 build/tests/lhdatatest > "$T/lhdata.log" 2>&1
 result "lhdatatest ($(tail -n 1 "$T/lhdata.log"))" $? "$T/lhdata.log"
 # libwuxtheme through its own API: every style the user imported
-styles=${LHDE_STYLES:-${LHDE_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/lhde}/styles}
+styles=${LHDE_STYLES:-$(build/bin/lhde-theme find styles 2>/dev/null)}   # liblhde's lookup: the Windows tree's index/styles (docs/LAYOUT.md)
 n=0
 for f in "$styles"/*.msstyles "$styles"/*/*.msstyles; do
     [ -f "$f" ] || continue

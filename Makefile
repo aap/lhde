@@ -4,8 +4,11 @@
 #                         programs, ut-dump, luxwm, luxwmc, luxshell, the examples and the tests, into build/
 #   make check            the tests that need no Microsoft files (tests/check.sh), luxshell's build
 #                         and Lua, luxwm's frame regression (skips without the user's styles)
-#   make install          PREFIX=/usr/local DESTDIR= (also BINDIR, LIBDIR, INCLUDEDIR, DATADIR, MANDIR,
-#                         PORTALDIR, DBUSSERVICEDIR); make uninstall
+#   make install          PREFIX=/usr/local DESTDIR= (also BINDIR, LIBDIR, INCLUDEDIR, DATADIR, PKGLIBDIR, MANDIR,
+#                         PORTALDIR, DBUSSERVICEDIR); make uninstall. Program files only: the shipped data (text) into
+#                         DATADIR = $(PREFIX)/share/lhde, the code (Lua, shell, Python) into PKGLIBDIR = $(PREFIX)/lib/lhde.
+#                         The Windows files never come from here (lhde-import: ~/.local/share/lhde-windows), the user's
+#                         settings neither (~/.config/lhde); docs/LAYOUT.md "The three trees"
 #   make clean
 #
 # Components (each with its own fragment, included below):
@@ -16,12 +19,13 @@
 #   tests/tests.mk        build/tests (toolkit tests), build/tests/w32 (shim tests), make check
 #   luxnav/luxnav.mk      libluxnav (lhnav.h): build/lib/libluxnav.{a,so.1}, luxnav.pc; flxp's vision header
 #   luxwm/luxwm.mk        luxwm, luxwmc -> build/bin; its tests -> build/luxwm/tests
-#   luxshell/luxshell.mk  luxshell -> build/bin (its Lua stays in luxshell/, installed to DATADIR/luxshell)
+#   luxshell/luxshell.mk  luxshell -> build/bin (its Lua stays in luxshell/, installed to PKGLIBDIR/luxshell)
 #   examples/examples.mk  extendframe, navdemo, glassdemo -> build/examples
 #   liblhde/liblhde.mk    liblhde (lhde/data.h, lhde/theme.h, lhde/settings.h): the data directories, the theme resolver,
 #                         the settings store -> build/lib/liblhde.{a,so.1}, lhde.pc, build/bin/lhde-theme
-#   data/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme,
-#                         frames/*/*.ini, packs/*), DATADIR/session + BINDIR/lhde-session, BINDIR/lhde-import
+#   data/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme, sources/*.ini,
+#                         frames/*/*.ini, packs/*/shell.lua, packs/startpanels.lua), PKGLIBDIR/session + BINDIR/lhde-session,
+#                         PKGLIBDIR/tools + BINDIR/lhde-import, lhde-pack, lhde-schemes
 #
 # Every object is build/obj/<source path>.o (build/pic/... for the shared
 # library); every program goes to build/bin, so programs that look for each
@@ -55,6 +59,9 @@ BINDIR         ?= $(PREFIX)/bin
 LIBDIR         ?= $(PREFIX)/lib
 INCLUDEDIR     ?= $(PREFIX)/include
 DATADIR        ?= $(PREFIX)/share/lhde
+# the code that is not a binary: luxshell's Lua, lhde-session's helpers, lhde-import's Python. The programs find it as
+# <their bindir>/../lib/lhde (liblhde: lhde_component_dir), so it stays $(PREFIX)/lib/lhde whatever LIBDIR is.
+PKGLIBDIR      ?= $(PREFIX)/lib/lhde
 APPDIR         ?= $(PREFIX)/share/applications
 PKGCONFIGDIR   ?= $(LIBDIR)/pkgconfig
 # The file chooser portal backend: the .portal file goes where xdg-desktop-portal
@@ -89,13 +96,16 @@ check-lux: all
 	@$(MAKE) --no-print-directory check-liblhde check-luxshell check-luxwm
 
 # data/ (text only: the theme files, navbar layouts, icon recipes, import sources, the frame sets' theme.ini/nav.ini, the packs'
-# shell.lua), session/ (lhde-session and its files), tools/lhde-import, lhde-pack and the recipe builders
+# shell.lua) into DATADIR; session/ (lhde-session's helpers) and tools/ (lhde-import's Python) into PKGLIBDIR; the commands into
+# BINDIR. DATADIR/.lhde-install lists the shipped files (lhde-import --migrate tells them from the user's). An install made
+# before the three trees had session/, tools/ and luxshell/ in DATADIR: they are removed here.
 SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh \
                 picom-glass.conf picom-glass-fvwm.conf lab.fvwm2rc
-TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py lhdeschemes.py wim0108.py
+TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py lhdeschemes.py lhdetree.py wim0108.py
 install-data:
-	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools $(DESTDIR)$(BINDIR) \
-	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources
+	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(BINDIR) \
+	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \
+	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
 	install -m 644 data/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
 	install -m 644 data/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
 	install -m 644 data/icons/*.theme $(DESTDIR)$(DATADIR)/icons/
@@ -103,16 +113,22 @@ install-data:
 	for d in data/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
 	for d in data/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done
 	install -m 644 data/packs/startpanels.lua $(DESTDIR)$(DATADIR)/packs/
+	{ echo '# lhde: the files make install put into $(DATADIR) (program files; docs/LAYOUT.md)'; \
+	  cd data && ls themes/*.theme navbar/*.ini icons/*.theme sources/*.ini frames/*/*.ini packs/*/*.lua packs/startpanels.lua; \
+	  cd ../flxp && ls res/icons/*.theme res/icons/*.ico res/icons/*.bmp; } > $(DESTDIR)$(DATADIR)/.lhde-install
+	rm -rf $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools $(DESTDIR)$(DATADIR)/luxshell
 	install -m 755 session/lhde-session $(DESTDIR)$(BINDIR)/
 	install -m 755 tools/lhde-import tools/lhde-pack tools/lhde-schemes $(DESTDIR)$(BINDIR)/
-	cd session && install -m 644 $(SESSION_FILES) $(DESTDIR)$(DATADIR)/session/
-	chmod 755 $(addprefix $(DESTDIR)$(DATADIR)/session/,lab.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh)
-	ln -sf $(BINDIR)/lhde-session $(DESTDIR)$(DATADIR)/session/lhde-session
-	cd tools && install -m 755 $(TOOL_FILES) $(DESTDIR)$(DATADIR)/tools/
+	cd session && install -m 644 $(SESSION_FILES) $(DESTDIR)$(PKGLIBDIR)/session/
+	chmod 755 $(addprefix $(DESTDIR)$(PKGLIBDIR)/session/,lab.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh)
+	ln -sf $(BINDIR)/lhde-session $(DESTDIR)$(PKGLIBDIR)/session/lhde-session
+	cd tools && install -m 644 $(TOOL_FILES) $(DESTDIR)$(PKGLIBDIR)/tools/
 uninstall-data:
 	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(BINDIR)/lhde-pack $(DESTDIR)$(BINDIR)/lhde-schemes
-	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools \
-	       $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources
+	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar \
+	       $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources $(DESTDIR)$(DATADIR)/.lhde-install \
+	       $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
+	-rmdir $(DESTDIR)$(PKGLIBDIR)
 
 clean:
 	rm -rf build

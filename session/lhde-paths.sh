@@ -1,47 +1,36 @@
 # Sourced by lhde-session, lab.sh, lhwall.sh, the theme scripts and luxwm's regress: lhde's directories the way the programs
-# see them (liblhde, lhde/data.h). Set LHDE_SELF to the sourcing script's real path first (lhde_self below does it).
-#   lhde_data_dirs       the data directories in search order, one per line: $LHDE_DATA (else ${XDG_DATA_HOME:-~/.local/share}/lhde),
-#                        the install's <prefix>/share/lhde, $XDG_DATA_DIRS/lhde, the source tree's data/
-#   lhde_find REL        the first data directory's DIR/REL that exists (nothing when none has it)
-#   lhde_resolve VALUE   a registry value: absolute or ~/ as it is, else lhde_find (else the user dir's path)
+# see them. Every lookup goes through lhde-theme (liblhde/data.c, docs/LAYOUT.md "The three trees"); nothing here knows the
+# layout. Set LHDE_SELF to the sourcing script's real path first (lhde_self below does it).
+#   lhde_data_dirs       the search order, one directory per line (lhde-theme dirs --list): ~/.config/lhde, the Windows tree's
+#                        index ($LHDE_WINDOWS/index, or $LHDE_DATA), an old-layout ~/.local/share/lhde, the install's
+#                        <prefix>/share/lhde, $XDG_DATA_DIRS/lhde, the source tree's data/
+#   lhde_find REL        the first directory's DIR/REL that exists (nothing when none has it): lhde-theme find REL
+#   lhde_resolve VALUE   a theme value as a path: absolute or ~/ as it is, else lhde_find (else where it would be)
 #   lhde_bin NAME        a program: the build tree's build/bin or build/examples, else beside this script's install, else PATH
-#   LHDE_TOP             the source tree (when the script runs from one), LHDE_SHARE the install's share/lhde (else empty)
-#   LHDE_SESSION_DIR     session/ of the tree or share/lhde/session of the install
+#   LHDE_TOP             the source tree (when the script runs from one); LHDE_SHARE the install's share/lhde and LHDE_LIB its
+#                        lib/lhde (else empty); LHDE_USER_DATA the Windows tree's index (where lhde-import's files are found)
+#   LHDE_SESSION_DIR     session/ of the tree or lib/lhde/session of the install
 # A script in session/ of the tree: LHDE_TOP=<tree>. Installed: lhde-session in <prefix>/bin, the rest in
-# <prefix>/share/lhde/session (lhde-session sources <prefix>/share/lhde/session/lhde-paths.sh).
+# <prefix>/lib/lhde/session (lhde-session sources <prefix>/lib/lhde/session/lhde-paths.sh).
 lhde_self() { # SCRIPT -> LHDE_SELF_DIR (its directory, symlinks resolved)
 	LHDE_SELF_DIR=$(cd "$(dirname "$(readlink -f "$1")")" && pwd)
 }
 lhde_setup_paths() {
-	LHDE_TOP= LHDE_SHARE= LHDE_BINDIR=
+	LHDE_TOP= LHDE_SHARE= LHDE_LIB= LHDE_BINDIR=
 	d=$LHDE_SELF_DIR
 	if [ -d "$d/../data/themes" ] && [ -f "$d/../luxwm/wm.c" ]; then LHDE_TOP=$(cd "$d/.." && pwd)
-	elif [ -f "$d/../share/lhde/session/lhde-paths.sh" ]; then LHDE_SHARE=$(cd "$d/../share/lhde" && pwd); LHDE_BINDIR=$d
+	elif [ -f "$d/../lib/lhde/session/lhde-paths.sh" ]; then LHDE_LIB=$(cd "$d/../lib/lhde" && pwd); LHDE_BINDIR=$d
 	elif [ -f "$d/lhde-paths.sh" ] && [ "$(basename "$d")" = session ] && [ "$(basename "$(dirname "$d")")" = lhde ]; then
-		LHDE_SHARE=$(cd "$d/.." && pwd); LHDE_BINDIR=$(cd "$d/../../../bin" 2>/dev/null && pwd)
+		LHDE_LIB=$(cd "$d/.." && pwd); LHDE_BINDIR=$(cd "$d/../../../bin" 2>/dev/null && pwd)
 	fi
-	if [ -n "$LHDE_TOP" ]; then LHDE_SESSION_DIR=$LHDE_TOP/session; else LHDE_SESSION_DIR=$LHDE_SHARE/session; fi
-	LHDE_USER_DATA=${LHDE_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/lhde}
+	if [ -n "$LHDE_LIB" ] && [ -d "$LHDE_LIB/../../share/lhde" ]; then LHDE_SHARE=$(cd "$LHDE_LIB/../../share/lhde" && pwd); fi
+	if [ -n "$LHDE_TOP" ]; then LHDE_SESSION_DIR=$LHDE_TOP/session; else LHDE_SESSION_DIR=$LHDE_LIB/session; fi
+	LHDE_USER_DATA=$(lhde_theme_tool dirs --user 2>/dev/null)
 }
-lhde_data_dirs() {
-	{
-		echo "$LHDE_USER_DATA"
-		[ -n "$LHDE_SHARE" ] && echo "$LHDE_SHARE"
-		echo "${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" | tr ':' '\n' | sed 's|$|/lhde|'
-		[ -n "$LHDE_TOP" ] && echo "$LHDE_TOP/data"
-	} | while IFS= read -r x; do [ -d "$x" ] && echo "$x"; done
-}
-lhde_find() {
-	lhde_data_dirs | while IFS= read -r x; do [ -e "$x/$1" ] && { echo "$x/$1"; break; }; done
-}
-lhde_resolve() {
-	case $1 in
-	"") ;;
-	/*) echo "$1" ;;
-	"~/"*) echo "$HOME/${1#"~/"}" ;;
-	*) r=$(lhde_find "$1"); echo "${r:-$LHDE_USER_DATA/$1}" ;;
-	esac
-}
+lhde_theme_tool() { "$(lhde_bin lhde-theme)" "$@"; }
+lhde_data_dirs() { lhde_theme_tool dirs --list 2>/dev/null; }
+lhde_find() { lhde_theme_tool find "$1" 2>/dev/null; }
+lhde_resolve() { [ -n "$1" ] && lhde_theme_tool path "$1" 2>/dev/null; }
 lhde_bin() {
 	if [ -n "$LHDE_TOP" ]; then
 		for x in "$LHDE_TOP/build/bin/$1" "$LHDE_TOP/build/examples/$1" "$LHDE_TOP/session/$1" "$LHDE_TOP/tools/$1"; do [ -x "$x" ] && { echo "$x"; return; }; done

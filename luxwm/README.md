@@ -11,7 +11,7 @@ the manual is docs/LUXWM.md, the client protocol (extended glass frames, header 
   frame_ut.c (frames from a .msstyles through libwuxtheme), menu.c (the window menu), client.c (luxwmc), config.h (build
   configuration; was berry's configure output). `luxwm.mk` is its part of the top-level build.
 - Themes: the registry data/themes.ini (`frame = frames/NAME`), frame sets in data/frames/NAME (theme.ini, nav.ini) with their
-  pixels in the user's data directory (tools/lhde-import), found through lhtheme/lhde_data.c. luxwm publishes the registry's
+  pixels in the Windows tree (`~/.local/share/lhde-windows/generated/frames`, tools/lhde-import), found through liblhde/data.c. luxwm publishes the registry's
   resolved copy as `_LH_THEMES_INI`.
 - Names kept from lhwm: the X atoms (`_LHWM_*`), the window manager's `_NET_WM_NAME` "lhwm" (luxshell and flxp's log-off know
   it by that), `LHWM_*` environment variables, `~/.config/lhwm/keys`. `make install` adds `lhwm` and `lhwmc` symlinks.

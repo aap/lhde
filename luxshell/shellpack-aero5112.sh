@@ -11,11 +11,11 @@
 #                   9 9 12 16), widened to 127 px with its own margins (runtime.lua slices task buttons with a fixed 3 px grid)
 #   1183            TaskBand.FLASHBUTTON bitmap#296 (26x29, SIZINGMARGINS 12 10 12 12), widened the same way
 #   tray_bg.png     TrayNotifyHoriz::TrayNotify.BACKGROUND bitmap#528 (5x30), not used by runtime.lua yet (no classic tray)
-# lhde: a research tool. LHDE_WORKSPACE = the Longhorn workspace (default ~/fun/longhorn). Run alone it writes the data
-# directory's packs/5112/imageres ($LHDE_DATA, else ~/.local/share/lhde, as lhde-import lays it out); from shellpack.sh
+# lhde: a research tool. LHDE_WORKSPACE = the Longhorn workspace (default ~/fun/longhorn). Run alone it writes the Windows
+# tree's generated/packs/5112/imageres ($LHDE_WINDOWS, else ~/.local/share/lhde-windows, as lhde-import lays it out); from shellpack.sh
 # (SHELLPACK_OUT set) the x11 layout's aero5112/ there.
 L=${LHDE_WORKSPACE:-$HOME/fun/longhorn}
-if [ -n "$SHELLPACK_OUT" ]; then A=$SHELLPACK_OUT/aero5112; else A=${LHDE_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/lhde}/packs/5112/imageres; fi
+if [ -n "$SHELLPACK_OUT" ]; then A=$SHELLPACK_OUT/aero5112; else A=${LHDE_WINDOWS:-${XDG_DATA_HOME:-$HOME/.local/share}/lhde-windows}/generated/packs/5112/imageres; fi
 mkdir -p "$A"
 python3 -I - "$L" "$A" <<'PY'
 import sys, os, struct, io

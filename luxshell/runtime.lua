@@ -37,7 +37,7 @@ local screen_w, screen_h, screen_no = lh.screen()
 -- names the pack. At startup: _LH_THEME if someone (lhwm, a script) set it, else the persisted theme from state.ini, which
 -- is then published; LHSHELL_THEME (a pack directory) only when neither names a registry entry. A change of _LH_THEME
 -- swaps the pack live (rebuild_shell below), sets the wallpaper and persists the name.
-local function lua(f) return dofile(lh.lua_dir .. "/" .. f) end   -- luxshell's own Lua (lh.lua_dir: the tree's luxshell/ or <prefix>/share/lhde/luxshell)
+local function lua(f) return dofile(lh.lua_dir .. "/" .. f) end   -- luxshell's own Lua (lh.lua_dir: the tree's luxshell/ or <prefix>/lib/lhde/luxshell)
 -- lhde's own programs beside us first (build/bin of the tree, <prefix>/bin), then PATH: lh.prog("flxp-taskbar")
 function lh.prog(n) local p = lh.bin_dir .. "/" .. n; local f = io.open(p); if f then f:close() return "'" .. (p:gsub("'", "'\\''")) .. "'" end return n end
 local S = lua("session.lua"); lh.session = S

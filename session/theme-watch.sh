@@ -1,14 +1,14 @@
 #!/bin/bash
 # Watch the theme files and reload luxshell + luxwm on every save (docs/USAGE.md "Live-editing a theme"): themes/*.theme (the
-# data directories' and ~/.config/lhde/themes/), navbar/*.ini, frames/*/theme.ini and nav.ini (luxnav's tuning), packs/*/shell.lua in the data directories (the source tree's
-# data/ and the user's data directory), and luxshell's tiles/*.lua. Each change (a burst of saves within 0.3 s counts once) runs
+# data directories' and ~/.config/lhde/themes/), navbar/*.ini, frames/*/theme.ini and nav.ini (luxnav's tuning), packs/*/shell.lua in the data directories (lhde-theme
+# dirs --list: ~/.config/lhde, the install's share/lhde or the source tree's data/, the Windows tree's index), and luxshell's tiles/*.lua. Each change (a burst of saves within 0.3 s counts once) runs
 # session/theme-reload.sh on the display. inotifywait (inotify-tools) when installed (directories are watched, so editors that
 # replace the file are seen), else a 1 s mtime/size poll. Ctrl-C stops it.
 # Usage: session/theme-watch.sh [DISPLAY]   (default $DISPLAY, else :1)
 SELF=$(readlink -f "$0"); . "$(dirname "$SELF")/lhde-paths.sh"; lhde_self "$SELF"; lhde_setup_paths
 D=${1:-${DISPLAY:-:1}}
 RELOAD="$LHDE_SESSION_DIR/theme-reload.sh"
-LUA=${LHDE_TOP:+$LHDE_TOP/luxshell}; LUA=${LUA:-$LHDE_SHARE/luxshell}
+LUA=${LHDE_TOP:+$LHDE_TOP/luxshell}; LUA=${LUA:-$LHDE_LIB/luxshell}
 UTHEMES=${XDG_CONFIG_HOME:-$HOME/.config}/lhde/themes; mkdir -p "$UTHEMES"
 mapfile -t DIRS < <(lhde_data_dirs; echo "$LUA"; echo "$UTHEMES")
 PAT='(/themes/[^/]+\.theme|/[^/]+\.theme|/navbar/[^/]+\.ini|/frames/[^/]+/(theme|nav)\.ini|/packs/[^/]+/shell\.lua|/packs/startpanels\.lua|/tiles/[^/]+\.lua)$'

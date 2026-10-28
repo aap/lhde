@@ -56,7 +56,7 @@ local function exists(p) local f = io.open(p, "r"); if f then f:close() return t
 local function q(s) return "'" .. s:gsub("'", "'\\''") .. "'" end   -- shell quoting
 S.quote = q
 local function have(cmd) return os.execute("command -v " .. cmd .. " >/dev/null 2>&1") == true end
--- lhde: the session's scripts and files (picom-glass.conf, lhde-session): session/ of the tree or <prefix>/share/lhde/session
+-- lhde: the session's scripts and files (picom-glass.conf, lhde-session): session/ of the tree or <prefix>/lib/lhde/session
 S.session_dir = lh.component_dir("session") or "."
 -- luxshell's packs by their x11-era names (presets written before lhde say `shell = slate`)
 S.pack_aliases = { aero = "4074-aero", slate = "4074-slate", slate4051 = "4051-slate", aero5112 = "5112-aero", aerovision = "4074-aerovision" }
