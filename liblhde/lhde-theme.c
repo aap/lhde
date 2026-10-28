@@ -20,6 +20,7 @@
      lhde-theme setting SEC KEY [VALUE]    a per-user key of settings.ini: print it, or write it (VALUE "-" removes it)
      lhde-theme migrate [--force]          the one-time move from ~/.config/longhorn and ~/.config/lhshell (docs/SETTINGS.md)
      lhde-theme registry                   (re)write the compatibility themes.ini for flxp and print its path
+     lhde-theme explain --files THEME      the Windows-tree files THEME reads, one real path each (lhde-pack --profile essentials)
      lhde-theme explain [THEME]            where every visible part of THEME (default: the selected one, with its current layer)
                                            comes from: one row per component, its file and tree, ok / off / missing -> fallback
      lhde-theme dirs [--list | --windows | --user]
@@ -41,6 +42,7 @@
 #include <unistd.h>
 
 int lhde_explain(const char *name);   /* explain.c */
+int lhde_explain_files(const char *name);
 int lhde_dirs_report(void);
 
 static void usage(void)
@@ -48,7 +50,7 @@ static void usage(void)
     fprintf(stderr, "usage: lhde-theme list | resolve NAME [--files] [--why | --get KEY | --shell] | current | set NAME |\n"
                     "                  layer | layer-set KEY VALUE | layer-clear | save-as FILE [TITLE] | delete NAME | styles | schemes |\n"
                     "                  set-key NAME KEY VALUE | setting SEC KEY [VALUE] | style NAME | migrate [--force] |\n"
-                    "                  registry | explain [THEME] | dirs [--list | --windows | --user] | find REL | find KIND NAME | path VALUE\n");
+                    "                  registry | explain [THEME | --files THEME] | dirs [--list | --windows | --user] | find REL | find KIND NAME | path VALUE\n");
     exit(2);
 }
 
@@ -86,7 +88,12 @@ int main(int argc, char **argv)
         if (argc > 2 && !strcmp(argv[2], "--user")) { printf("%s\n", lhde_data_user()); return 0; }
         return lhde_dirs_report();
     }
-    if (!strcmp(cmd, "explain")) return lhde_explain(argc > 2 ? argv[2] : NULL);
+    if (!strcmp(cmd, "explain")) {
+        int files = 0; const char *nm = NULL;
+        for (int i = 2; i < argc; i++) { if (!strcmp(argv[i], "--files")) files = 1; else nm = argv[i]; }
+        if (files && !nm) usage();
+        return files ? lhde_explain_files(nm) : lhde_explain(nm);
+    }
     if (!strcmp(cmd, "find")) {
         if (argc < 3) usage();
         const char *r = argc > 3 ? lhde_data_find_kind(argv[2], argv[3], buf, sizeof buf) : lhde_data_find(argv[2], buf, sizeof buf);

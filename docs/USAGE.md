@@ -54,20 +54,46 @@ lhde ships no Microsoft files. Everything Windows-made (visual styles, DLLs for 
 user's own copies, in two stages:
 
 1. **`lhde-pack`** (once, by whoever has the ISOs): the raw, unmodified files each source needs, by the rules in
-   `data/sources/<source>.ini`, into a resource pack:
+   `data/sources/<source>.ini`, into a resource pack. Two **profiles**:
+   - `--profile essentials` (the default): only what a list of themes needs, small enough to hand to others. The themes are the
+     shipped ones (`data/themes/*.theme`, not `.todo`) or `--themes a,b,c`. The file set is not a list kept by hand: the pack is
+     imported into a scratch tree and, for each theme, `lhde-theme explain --files NAME` names the Windows files the resolver
+     reads (its visual style with Luna's `Shell/` colour schemes, the styles and DLLs its frame sets and pack images are made
+     from (the recipes' manifests name them), the DLLs of the icon recipe's `pe:` references, the wallpaper, the build's fonts
+     directory, the DLLs flxp, luxnav and luxshell open: shell32, browseui, explorer.exe, shellstyle, comctl32, themeui,
+     imageres, logonui, and `setup/hivedef.inf` for a classic scheme); the union is packed whole (DLLs are never cut). A build no
+     theme needs is left out entirely; only referenced styles are kept (one Luna, XP's, and `luna4051` for the classic Luna frames).
+   - `--profile museum`: every file of every source, as before (archaeology, and the input from which essentials is made).
    ```
-   tools/lhde-pack --isos /u/aap/lib/windows_isos --out ~/packs             # every default source whose ISO is there
-   tools/lhde-pack --isos DIR --sources 4074,5048,xp                         # a subset; --all adds 4074r2
+   tools/lhde-pack --isos /u/aap/lib/windows_isos --out ~/packs               # essentials for the shipped themes, from the ISOs
+   tools/lhde-pack --themes luna,jade4074,classic --isos DIR --out ~/packs    # essentials for three themes
+   tools/lhde-pack --profile museum --isos DIR --out ~/packs                  # everything: today's complete pack
+   tools/lhde-pack --from-pack ~/packs/lhde-resources-2026-10-28 --out ~/packs   # re-profile a museum pack: no ISO is read (seconds)
+   tools/lhde-pack --isos DIR --sources 4074,5048,xp --profile museum         # a subset; --all adds 4074r2
    tools/lhde-pack --medium 4074=~/fun/longhorn/wim/4074/3/WINDOWS --sources 4074   # an extracted tree instead of the ISO
-   tools/lhde-pack --list                                                    # the sources and whether their ISO was found
+   tools/lhde-pack --list                                                     # the sources and whether their ISO was found
    ```
-   Output: `lhde-resources-<date>/` with `<source>/{system32,themes,fonts,wallpapers}/`, `<source>/source.ini`, `MANIFEST`
-   (sha256, size, pack path, source, medium:in-image path), and `lhde-resources-<date>.tar.zst` (`.tar.xz` without zstd).
-   Sources: 4015 (pre-release WIM 1.8.1), 4042 (Lab06), 4042main, 4051, 4053, 4066 (I386 layout, `*.XX_` expanded), 4074,
+   `--from-pack` takes a pack directory or its tarball and reads nothing else; from ISOs, essentials makes the museum pack
+   first (in `--tmp`, about 400 MB, deleted after) and profiles it, so both ways give the same pack. `lhde-theme explain --files`
+   must be built (`make build/bin/lhde-theme`); it is also what you run to see what one theme reads:
+   `lhde-theme explain --files luna` (one real path per line, relative to the Windows tree).
+   Output: `lhde-resources-<date>[-essentials]/` with `<source>/{system32,themes,fonts,wallpapers}/`, `<source>/source.ini`, `MANIFEST`
+   (sha256, size, pack path, source, medium:in-image path; its `# profile:` and `# themes:` header lines say which profile and
+   themes made it) and the tarball `.tar.zst` (`.tar.xz` without zstd). `lhde-import --pack` takes either profile unchanged.
+   **Identical files are stored once** (both profiles): files with the same sha256, within or across builds (Trebuchet,
+   Tahoma, comctl32 repeat through the builds), are hard links in the pack directory (relative symlinks where the file system
+   has no hard links), `tar` stores them once, and `lhde-import --pack` copies every path as a normal file of its own (the
+   Windows tree has no links). A hard link is one inode, so one set of extended attributes: the pack's annotation names the
+   first path, the MANIFEST (one line per path) is the authority, and lhde-import annotates each imported file by its own
+   path. Sources: 4015 (pre-release WIM 1.8.1), 4042 (Lab06), 4042main, 4051, 4053, 4066 (I386 layout, `*.XX_` expanded), 4074,
    4074r2 (not default), 4093, 5048, 5112, xp (Windows Server 2003 R2 x64 CD1: XP's Luna with its three schemes' shellstyle.dll,
    shell32, explorer, fonts, wallpapers) and 2k (Windows 2000). Adding a file or a build is editing or adding an ini.
-   The pack of all ISOs here: 418 MB raw (2k 6, 4015 26, 4042 40, 4042main 34, 4051 40, 4053 40, 4066 40, 4074 43, 4093 46,
-   5048 47, 5112 33, xp 23 MB), 117 MB as .tar.xz; about 2 minutes.
+   Sizes with the ISOs here (2026-10-28; the tarball is `tar` + `xz -9e`, as no zstd is installed here): **museum** 418 MB
+   raw (377 MB stored once), 57 MB compressed; **essentials** for the 14 shipped themes 169 MB raw (164 MB stored once), 36 MB
+   compressed, in 5 builds (4051 4074 5048 5112 xp) and the 2k icon DLLs. About 20 s from the ISOs, 10 s `--from-pack` (the
+   tarball's xz is most of it).
+   Themes that need a file no medium has (`aero4074`, `aerovision`: `aero-patch.msstyles`; `noir`) report it missing in
+   `lhde-theme explain` with either profile: those styles go in with `lhde-import --style` (below).
 2. **`lhde-import`** (every user): the pack into the Windows tree (`$LHDE_WINDOWS`, else `~/.local/share/lhde-windows`;
    docs/LAYOUT.md "The three trees"):
    ```

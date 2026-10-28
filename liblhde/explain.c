@@ -15,6 +15,7 @@
 #include <unistd.h>
 
 int lhde_explain(const char *name);
+int lhde_explain_files(const char *name);
 int lhde_dirs_report(void);
 
 static int isdir(const char *p) { struct stat st; return p && p[0] && stat(p, &st) == 0 && S_ISDIR(st.st_mode); }
@@ -343,6 +344,137 @@ int lhde_explain(const char *name)
     printf("\nTrees: user = %s, windows = %s, shipped = the install's share/lhde (lhde-theme dirs). A key's source: lhde-theme resolve %s --why.\n",
            tilde(lhde_config_dir(buf, sizeof buf), w, sizeof w), tilde(lhde_windows_dir(), err, sizeof err), lhde_theme_get(t, "theme"));
     lhde_theme_free(t);
+    return 0;
+}
+
+
+/* ---- lhde-theme explain --files THEME: the Windows-tree files THEME reads (lhde-pack --profile essentials) ----
+   One path per line, relative to the Windows tree ($LHDE_WINDOWS) and real (<source>/system32/shell32.dll, never an index/
+   name), sorted, once each. What counts as read: the visual style, its shellstyle and Shell/ directory; the HIVEDEF.INF the
+   classic scheme is made from; every input of the manifest of the frame sets and the pack images the theme uses (those
+   recipes, run by lhde-import, name their inputs with sha256); the DLLs the icon recipe's pe: references name; the wallpaper;
+   the fonts directory; and of the theme's build the DLLs flxp, luxnav and luxshell open (FLXP_DLLS). Run it on a tree that
+   holds everything (a museum import); files from local/ or generated/ are not packed and are left out. */
+static const char *FLXP_DLLS[] = { "shell32.dll", "browseui.dll", "explorer.exe", "shellstyle.dll", "comctl32.dll", "themeui.dll",
+                                   "imageres.dll", "logonui.exe", NULL };
+static char *seen[4096]; static int nseen;
+
+static void emit_file(const char *path)
+{
+    char rp[PATH_MAX], wr[PATH_MAX];
+    if (!path || !path[0] || !realpath(path, rp) || !realpath(lhde_windows_dir(), wr)) return;
+    size_t l = strlen(wr);
+    if (strncmp(rp, wr, l) || rp[l] != '/') return;
+    const char *rel = rp + l + 1;
+    if (!strncmp(rel, "generated/", 10) || !strncmp(rel, "local/", 6) || !strncmp(rel, "index/", 6)) return;
+    struct stat st; if (stat(rp, &st) || !S_ISREG(st.st_mode)) return;
+    for (int i = 0; i < nseen; i++) if (!strcmp(seen[i], rel)) return;
+    if (nseen < 4096) seen[nseen++] = strdup(rel);
+}
+static void emit(const char *path)
+{
+    char rp[PATH_MAX]; struct stat st;
+    if (!path || !path[0] || !realpath(path, rp) || stat(rp, &st)) return;
+    if (!S_ISDIR(st.st_mode)) { emit_file(rp); return; }
+    DIR *d = opendir(rp); struct dirent *e; if (!d) return;
+    while ((e = readdir(d))) {
+        if (e->d_name[0] == '.') continue;
+        char q[PATH_MAX + 300]; snprintf(q, sizeof q, "%s/%s", rp, e->d_name);
+        emit(q);
+    }
+    closedir(d);
+}
+static void emit_input(const char *k, const char *v, void *ud)
+{
+    (void)v; (void)ud; char p[PATH_MAX];
+    if (lhde_data_find(k, p, sizeof p)) emit(p);
+}
+static void emit_manifest(const char *path)
+{
+    lhde_ini *m = lhde_ini_load(path);
+    if (!m) return;
+    lhde_ini_keys(m, "inputs", emit_input, NULL);
+    lhde_ini_free(m);
+}
+static int cmpstr(const void *a, const void *b) { return strcmp(*(char *const *)a, *(char *const *)b); }
+
+int lhde_explain_files(const char *name)
+{
+    char err[512], p[PATH_MAX], rel[PATH_MAX];
+    lhde_theme *t = lhde_theme_resolve(name, err, sizeof err);
+    if (!t) { fprintf(stderr, "lhde-theme: %s\n", err); return 1; }
+#define G(k) nz(lhde_theme_get(t, k))
+    /* the visual style, its shellstyle, and the Shell/ beside it (Luna's three colour schemes) */
+    if (G("path.style")[0]) {
+        emit(G("path.style"));
+        char rp[PATH_MAX], sh[PATH_MAX + 8];
+        if (realpath(G("path.style"), rp)) { char *sl = strrchr(rp, '/'); if (sl) { *sl = 0; snprintf(sh, sizeof sh, "%s/Shell", rp); emit(sh); } }
+    }
+    emit(G("path.shellstyle"));
+    /* the classic scheme is generated from a hive INF: xp's, else any source's */
+    if (G("path.scheme")[0]) {
+        const char *w = lhde_windows_dir(); DIR *d = opendir(w); struct dirent *e; char best[PATH_MAX] = "";
+        while (d && (e = readdir(d))) {
+            if (e->d_name[0] == '.') continue;
+            snprintf(p, sizeof p, "%s/%s/setup/hivedef.inf", w, e->d_name);
+            if (access(p, R_OK) == 0 && (!best[0] || !strcmp(e->d_name, "xp"))) snprintf(best, sizeof best, "%s", p);
+        }
+        if (d) closedir(d);
+        emit(best);
+    }
+    /* frame sets (glass, classic) and the shell pack's images: the inputs their manifests name */
+    const char *fk[2] = { G("Glass.frames"), G("Glass.frames_classic") };
+    for (int i = 0; i < 2; i++) if (!none(fk[i])) { snprintf(rel, sizeof rel, "frames/%s/manifest.ini", fk[i]); if (lhde_data_find(rel, p, sizeof p)) emit_manifest(p); }
+    const char *pk = G("Shell.pack");
+    if (!none(pk)) {
+        char b[16] = ""; size_t i = 0; while (pk[i] >= '0' && pk[i] <= '9' && i < sizeof b - 1) { b[i] = pk[i]; i++; } b[i] = 0;
+        char sp[256] = ""; const char *ov = lhde_theme_get(t, "Shell.startpanel");
+        if (ov && ov[0] && !none(ov)) snprintf(sp, sizeof sp, "%s", ov); else if (G("path.pack")[0]) pack_startpanel(G("path.pack"), sp, sizeof sp);
+        snprintf(rel, sizeof rel, "packs/%s", b);
+        if (b[0] && lhde_data_find(rel, p, sizeof p)) {
+            char pd[PATH_MAX]; snprintf(pd, sizeof pd, "%s", p);
+            DIR *d = opendir(pd); struct dirent *e;
+            while (d && (e = readdir(d))) if (!strncmp(e->d_name, "manifest", 8)) {
+                char mp[PATH_MAX + 300]; snprintf(mp, sizeof mp, "%s/%s", pd, e->d_name);
+                lhde_ini *m = lhde_ini_load(mp); char kind[64] = "", args[200] = "";
+                if (m) { lhde_ini_get(m, "recipe", "kind", kind, sizeof kind); lhde_ini_get(m, "recipe", "args", args, sizeof args); lhde_ini_free(m); }
+                if (!strcmp(kind, "startpanel")) {   /* only the start panel this theme shows (args: NAME STYLE ...) */
+                    char nm[256] = ""; sscanf(args, "%255s", nm);
+                    if (!sp[0] || strcmp(nm, sp)) continue;
+                }
+                emit_manifest(mp);
+            }
+            if (d) closedir(d);
+        }
+    }
+    /* icons: the DLLs of every pe: reference */
+    if (G("path.icons")[0]) {
+        FILE *f = fopen(G("path.icons"), "r"); char line[1024], res[256] = "", rp[PATH_MAX] = "";
+        lhde_ini *ini = lhde_ini_load(G("path.icons")); lhde_ini_get(ini, "theme", "resources", res, sizeof res); lhde_ini_free(ini);
+        if (res[0]) lhde_data_find(res, rp, sizeof rp);
+        while (f && fgets(line, sizeof line, f)) {
+            char *semi = strchr(line, ';'); if (semi) *semi = 0;
+            for (char *s = strstr(line, "pe:"); s; s = strstr(s + 3, "pe:")) {
+                char nm[256]; size_t i = 0; s += 3;
+                while (s[i] && s[i] != '#' && s[i] != ' ' && s[i] != '\t' && s[i] != '\n' && i < sizeof nm - 1) { nm[i] = s[i]; i++; }
+                nm[i] = 0; s -= 3;
+                if (!nm[0]) continue;
+                if (strchr(nm, '/')) { if (lhde_data_find(nm, p, sizeof p)) emit(p); }
+                else if (rp[0]) { snprintf(p, sizeof p, "%s/%s", rp, nm); emit(p); }
+            }
+        }
+        if (f) fclose(f);
+    }
+    emit(G("path.wallpaper"));
+    if (!none(G("Fonts.fonts"))) emit(G("path.fonts"));
+    if (G("Theme.build")[0] && G("path.resources")[0])
+        for (int i = 0; FLXP_DLLS[i]; i++) {
+            snprintf(p, sizeof p, "%s/%s", G("path.resources"), FLXP_DLLS[i]); emit(p);
+        }
+#undef G
+    lhde_theme_free(t);
+    qsort(seen, (size_t)nseen, sizeof *seen, cmpstr);
+    for (int i = 0; i < nseen; i++) printf("%s\n", seen[i]);
     return 0;
 }
 

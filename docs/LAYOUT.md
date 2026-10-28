@@ -128,17 +128,33 @@ fonts/       per build
 wallpapers/  per build
 ```
 **The resource pack** (step 4): users need no ISOs. `tools/lhde-pack` takes, by the rules of `data/sources/<source>.ini`, only the
-raw, unmodified files each build contributes and writes `lhde-resources-<date>/` (and `.tar.zst`, else `.tar.xz`):
+raw, unmodified files each build contributes and writes `lhde-resources-<date>[-essentials]/` (and `.tar.zst`, else `.tar.xz`):
 ```
 <source>/system32/   shell32.dll imageres.dll explorer.exe browseui.dll comctl32.dll themeui.dll [shellstyle.dll uDWM.dll shdocvw.dll]
 <source>/themes/     the build's Resources/Themes (<Style>/<style>.msstyles, Shell/<Scheme>/shellstyle.dll, *.theme)
 <source>/fonts/      Segoe UI 0.7/0.89, Tahoma, Trebuchet MS
 <source>/wallpapers/ Web/Wallpaper (setup layouts: the named *.JP_ / *.BM_)
+<source>/setup/      hivedef.inf (xp, 2k: the classic Appearance schemes)
 <source>/source.ini  the rules it was made with ([files]) and what lhde-import derives from it ([styles], [frames], [packs])
-MANIFEST             sha256, size, pack path, source, medium:in-image path (one line per file)
+MANIFEST             "# ..." header (format; "# profile: essentials|museum"; "# themes: ..."), then one line per path:
+                     sha256, size, pack path, source, medium:in-image path
 ```
-No derived pixels go into a pack: `lhde-import --pack` copies the raw files into the data directory and runs the recipes there
-(manifest-first `cache/` directories). The pack and the ISOs never enter the repository; `data/sources/*.ini` and the tools do.
+Two **profiles**, same layout and MANIFEST format (lhde-import --pack cannot tell them apart): `museum` holds everything the
+rules take; `essentials` (default) only the files a list of themes needs (the shipped themes, or `--themes`), a subset of the museum
+pack, made *from* it: the museum pack is imported into a scratch Windows tree and `lhde-theme explain --files THEME`
+(liblhde/explain.c, `lhde_explain_files`) prints, per theme, the real paths of the Windows files the resolver reads: style
+and Shell/ directory, the inputs of the manifests of its frame sets and pack images (the recipes record them with sha256), the
+icon recipe's `pe:` DLLs, the wallpaper, the build's fonts, the DLLs flxp/luxnav/luxshell open (`FLXP_DLLS`), and
+`setup/hivedef.inf` for a classic scheme. Builds nothing needs are absent. `lhde-pack --from-pack DIR` re-profiles an existing
+pack without ISOs (the day-to-day way); from ISOs it makes the museum pack in `--tmp` first.
+**Deduplication**: files with equal sha256 are stored once. Within the pack directory the later paths are hard links to the first
+(relative symlinks if links fail); `tar` (never `--hard-dereference`) stores them once; `lhde-import --pack` copies each path
+as a normal file (`copy_file` follows links), so the Windows tree, its index and the recipes never see a link. Extended
+attributes belong to the inode: the pack's annotation of a shared file is the first path's and is not copied on import
+(`shared()` in tools/lhdeimport.py); lhde-import annotates each imported file from its own path (`annotate_tree`). The MANIFEST
+keeps one line per path with its own in-image source and is the authority.
+No derived pixels go into a pack: `lhde-import --pack` copies the raw files into the Windows tree and runs the recipes there
+(manifest-first `generated/` directories). The pack and the ISOs never enter the repository; `data/sources/*.ini` and the tools do.
 
 Tests: `make check` renders locally and compares checksums; it skips when `~/.local/share/lhde`
 is missing. Git history: start fresh (aap: no need to keep the messy past); the old x11 and flxp

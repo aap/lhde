@@ -617,10 +617,18 @@ def _tar_xattrs():
     return ['--xattrs', '--xattrs-include=user.*'] if lhdetree.ANNOTATE['on'] else []
 
 
-def write_pack(pack, lines, tarball):
+def manifest_head(profile='museum', themes=None):
+    """the MANIFEST's header: the format line, then which profile made the pack (and for essentials, for which themes)"""
+    h = MANIFEST_HEAD + '# profile: %s\n' % profile
+    if themes:
+        h += '# themes: %s\n' % ' '.join(themes)
+    return h
+
+
+def write_pack(pack, lines, tarball, head=None):
     with open(os.path.join(pack, 'MANIFEST'), 'a') as f:
         if f.tell() == 0:
-            f.write(MANIFEST_HEAD)
+            f.write(head or manifest_head())
         for l in lines:
             f.write(l + '\n')
     if tarball:
@@ -629,9 +637,127 @@ def write_pack(pack, lines, tarball):
             subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), '-I', 'zstd -19 -T0', '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
         else:
             out = pack.rstrip('/') + '.tar.xz'
-            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), '-cJf', out, os.path.basename(pack.rstrip('/'))], check=True)
+            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), '-I', 'xz -9e -T0', '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
         log('pack archive %s (%.1f MB)' % (out, os.path.getsize(out) / 1e6))
         return out
+
+
+def dedup_pack(pack, lines):
+    """identical files (same sha256 in the MANIFEST lines) stored once: the first path of each stays, the others become hard
+    links to it (relative symlinks where the file system refuses hard links). tar keeps hard links as links, so the archive
+    holds the bytes once; lhde-import --pack copies every path as a normal file. Returns (files linked, bytes saved)."""
+    first, n, saved = {}, 0, 0
+    for l in lines:
+        f = l.split('\t')
+        if len(f) < 3 or l.startswith('#'):
+            continue
+        h, size, rel = f[0], int(f[1]), f[2]
+        q = os.path.join(pack, rel)
+        if not os.path.isfile(q) or os.path.islink(q):
+            continue
+        if h not in first:
+            first[h] = q
+            continue
+        a = first[h]
+        if os.path.samefile(a, q):
+            continue
+        tmp = q + '.dedup'
+        try:
+            os.link(a, tmp)
+        except OSError:
+            os.symlink(os.path.relpath(a, os.path.dirname(q)), tmp)
+        os.replace(tmp, q)
+        n += 1
+        saved += size
+    return n, saved
+
+
+def pack_sizes(pack):
+    """{source: (files, apparent bytes, unique bytes)} of a pack directory: unique counts each inode once (a hard link or a
+    symlink adds nothing), and '' is the whole pack, where a file shared between sources counts once"""
+    out, inodes = {}, set()
+    for sid in sorted(d for d in os.listdir(pack) if os.path.isdir(os.path.join(pack, d))):
+        nf = ap = un = 0
+        for r, ds, fs in os.walk(os.path.join(pack, sid)):
+            for f in fs:
+                q = os.path.join(r, f)
+                if os.path.islink(q):
+                    nf += 1
+                    ap += os.path.getsize(q)
+                    continue
+                st = os.stat(q)
+                nf += 1
+                ap += st.st_size
+                if (st.st_dev, st.st_ino) not in inodes:
+                    inodes.add((st.st_dev, st.st_ino))
+                    un += st.st_size
+        out[sid] = (nf, ap, un)
+    out[''] = (sum(v[0] for v in out.values()), sum(v[1] for v in out.values()), sum(v[2] for v in out.values()))
+    return out
+
+
+def shipped_themes():
+    """the shipped themes' names: data/themes/*.theme (not .theme.todo) of the tree or the install"""
+    import lhdetree
+    names = set()
+    for d in lhdetree.shipped_dirs():
+        names |= set(f[:-6] for f in os.listdir(os.path.join(d, 'themes')) if f.endswith('.theme'))
+    return sorted(names)
+
+
+def theme_files(M, themes, tmp):
+    """the files of the museum pack M that THEMES read: M is imported (recipes included) into a scratch Windows tree below tmp,
+    and `lhde-theme explain --files NAME` of each theme names what the resolver, the frame sets and pack images (their recipe
+    manifests), the icon recipe, the wallpaper, the fonts and the build's DLLs use. Returns {pack path} (<source>/<path>);
+    the scratch tree is isolated from the user's trees (own config and data homes)."""
+    W = os.path.join(tmp, 'win')
+    shutil.rmtree(W, ignore_errors=True)
+    log('importing %s into a scratch tree to ask the resolver (lhde-theme explain --files)' % M)
+    import_pack(M, W, True, True)
+    tool_ = tool('lhde-theme')
+    if not tool_:
+        die('lhde-theme not found (make build/bin/lhde-theme): the essentials profile asks the resolver what a theme reads')
+    env = dict(os.environ, LHDE_WINDOWS=W, XDG_CONFIG_HOME=os.path.join(tmp, 'config'), XDG_DATA_HOME=os.path.join(tmp, 'data'))
+    env.pop('LHDE_DATA', None)
+    need, why = set(), {}
+    for t in themes:
+        r = subprocess.run([tool_, 'explain', '--files', t], env=env, capture_output=True, text=True)
+        if r.returncode:
+            die('lhde-theme explain --files %s: %s' % (t, r.stderr.strip() or 'failed'))
+        fs = [x for x in r.stdout.split('\n') if x]
+        log('  %-14s %3d files' % (t, len(fs)))
+        need |= set(fs)
+    shutil.rmtree(W, ignore_errors=True)
+    return need
+
+
+def profile_pack(M, pack, themes, tmp, lines_in, need=None):
+    """a new pack of the files THEMES need, taken from the museum pack M (xattrs, source.ini and the source directories'
+    annotations kept; a source nothing needs is left out); returns its MANIFEST lines (those of M for the files taken)"""
+    import lhdetree
+    if need is None:
+        need = theme_files(M, themes, tmp)
+    by = {}
+    for l in lines_in:
+        by[l.split('\t')[2]] = l
+    lines, srcs = [], set()
+    for rel in sorted(need):
+        sid = rel.split('/')[0]
+        src = os.path.join(M, rel)
+        if not os.path.isfile(src):
+            log('  %s: not in the pack (the theme names it)' % rel)
+            continue
+        q = os.path.join(pack, rel)
+        os.makedirs(os.path.dirname(q), exist_ok=True)
+        shutil.copyfile(src, q)
+        lhdetree.copy_xattrs(src, q)
+        srcs.add(sid)
+        lines.append(by.get(rel) or '%s\t%d\t%s\t%s\t%s' % (sha256(q), os.path.getsize(q), rel, sid, 'pack:' + rel))
+    for sid in sorted(srcs):
+        shutil.copyfile(os.path.join(M, sid, 'source.ini'), os.path.join(pack, sid, 'source.ini'))
+        for r, ds, fs in os.walk(os.path.join(pack, sid)):
+            lhdetree.copy_xattrs(os.path.join(M, os.path.relpath(r, pack)), r)
+    return lines
 
 
 # ---------------------------------------------------------------- importing a pack (lhde-import --pack)
@@ -669,15 +795,23 @@ def ci_path(root, rel):
     return p
 
 
+def shared(p):
+    """a file of a deduplicated pack that has other names (hard link: one inode, so one set of annotations, the first path's;
+    symlink: none): its annotations are not copied, lhde-import's own (annotate_tree, from the file's real path) are right"""
+    return os.path.islink(p) or os.stat(p).st_nlink > 1
+
+
 def copy_file(src, dst, force, rep):
     import lhdetree
     if os.path.exists(dst) and not force and os.path.getsize(dst) == os.path.getsize(src):
         rep['kept'] += 1
-        lhdetree.copy_xattrs(src, dst)
+        if not shared(src):
+            lhdetree.copy_xattrs(src, dst)
         return
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copyfile(src, dst)
-    lhdetree.copy_xattrs(src, dst)   # a pack's annotations (docs/ANNOTATIONS.md)
+    shutil.copyfile(src, dst)   # a hard link or symlink of a deduplicated pack: a normal file of its own here
+    if not shared(src):
+        lhdetree.copy_xattrs(src, dst)   # a pack's annotations (docs/ANNOTATIONS.md)
     rep['copied'] += 1
 
 
