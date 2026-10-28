@@ -998,7 +998,7 @@ function lh.shell_set(k, v)
     theme_entry = S.resolve(theme_name) or theme_entry
     set_wallpaper(theme_entry); publish_resolved(theme_entry)
   elseif k == "start_menu" then
-    local sel = S.set_theme_value(theme_entry, "start", v == "lux" and "lux" or "flxp")   -- a theme key: NAME-modified.theme
+    local sel = S.set_theme_value(theme_entry, "start", v == "lux" and "lux" or "flxp")   -- a theme key: the current layer
     if sel then lh.select_theme(sel, true) end
     lh.start_provider_check()
   end
@@ -1252,8 +1252,8 @@ function lh.set_sidebar_stacking(v)
   io.stderr:write(string.format("lux: sidebar stacking %s (%s), %d ms\n", v, on and "under the windows, no strut" or "above the windows, strut", lh.now() - t0))
 end
 -- apply_taskbar(avalon | classic | none): the live switch; lh.set_taskbar(kind) (settings flyout, _LHSHELL_COMMAND "taskbar KIND")
--- also stores it for the current theme like Display Properties ([override:NAME] taskbar or the preset's [Shell] taskbar;
--- removed when it equals the theme's own default), not in the global [taskbar] kind
+-- also stores it for the current theme like Display Properties: Shell.taskbar in the current layer (settings.ini [current],
+-- dropped when it equals the theme's own value), not in the global [taskbar] kind
 local function apply_taskbar(kind)
   if kind == cfg.taskbar then if kind == "classic" then classic_start() end lh.start_provider_check() return end
   local old = cfg.taskbar; cfg.taskbar = kind
@@ -1273,7 +1273,7 @@ end
 function lh.set_taskbar(kind)
   kind = taskbar_kind(kind)
   if not kind then return end
-  local sel = S.set_theme_value(theme_entry, "taskbar", kind)   -- a theme key: NAME-modified.theme
+  local sel = S.set_theme_value(theme_entry, "taskbar", kind)   -- a theme key: the current layer
   apply_taskbar(kind)
   if sel then lh.select_theme(sel, true) end
 end
@@ -1381,7 +1381,7 @@ function lh.composition_mode() return cfg.composition end
 function lh.set_composition_mode(m)
   if m ~= "follow" and m ~= "on" and m ~= "off" then return end
   cfg.composition = m
-  local sel = S.set_theme_value(theme_entry, "composition", m)   -- a theme key: NAME-modified.theme
+  local sel = S.set_theme_value(theme_entry, "composition", m)   -- a theme key: the current layer
   if sel then lh.select_theme(sel, true) else apply_composition(theme_entry) end
 end
 
@@ -1403,18 +1403,19 @@ local function apply_theme(e, root_set)
   apply_composition(e)
   local k = theme_taskbar(e); if k ~= cfg.taskbar then apply_taskbar(k) end   -- and its taskbar ([override:NAME] taskbar, ...)
   lh.start_provider_check()                              -- and its start menu
-  S.set("theme", "name", e.name)
+  S.select(e.name)                                       -- [theme] name; another theme's current layer is dropped (liblhde)
   publish_resolved(e)
   if root_set ~= e.name then set_theme_prop(e.name) end
   S.registry_path()   -- the compatibility registry follows the theme files
   io.stderr:write(string.format("luxshell: theme %s%s: pack %s%s, %d ms\n", e.name, e.user and (" (the user's, base " .. e.base .. ")") or "", pack_dir, swapped and " (rebuilt)" or "", lh.now() - t0))
 end
--- lh.select_theme(name, force): the settings flyout, a preset save (force: a preset saved again under the selected name is
--- applied and published again), settings.ini changed by another writer
+-- lh.select_theme(name, force): the settings flyout, Save As, settings.ini changed by another writer; force: the selected theme
+-- applied again (a key of its current layer changed: the record is published again, _LH_THEME keeps its name and is not rewritten,
+-- luxwm and flxp follow the republished _LH_THEME_RESOLVED and _LH_SETTINGS_CHANGED)
 function lh.select_theme(name, force)
   local e = S.resolve(name)
   if not e then io.stderr:write("lux: theme " .. tostring(name) .. " is no theme\n") return false end
-  if force or e.name ~= theme_name then apply_theme(e) end
+  if e.name ~= theme_name then apply_theme(e) elseif force then apply_theme(e, e.name) end
   return true
 end
 lh.on("lh-theme", function()
@@ -1434,7 +1435,7 @@ local function reload_settings()
   S.reload()
   local n = S.get("theme", "name")
   if n and n ~= theme_name then lh.select_theme(n)
-  else   -- the same theme: its files (NAME-modified.theme) or a legacy [override:NAME] may have changed
+  else   -- the same theme: its files, its current layer ([current]) or a legacy [override:NAME] may have changed
     local e = theme_name and S.resolve(theme_name)
     if e and theme_entry and e.record ~= theme_entry.record then apply_theme(e, theme_name) end
   end

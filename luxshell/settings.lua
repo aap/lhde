@@ -1,10 +1,11 @@
 -- The settings flyout ("Control Panel" in the start menu, "Properties" in the taskbar and sidebar menus; SHELL-DESIGN 6.3/6.4) and the
 -- run / search box, both in the generic flyout chrome (flyout.lua: 1175 frame, Options row, white body like powerflyout.xaml).
---   lh.settings_flyout([x])  two columns: the theme list (registry, then the user's presets; Save as preset...), composition
+--   lh.settings_flyout([x])  two columns: the theme list (the shipped theme files, then the user's; the selected one with unsaved
+--                            changes, the current layer, reads "NAME (Modified)" as in Windows; Save as...), composition
 --                            (follow / on / off), taskbar (avalon / classic / none, M8) and its autohide, start menu (flxp / lux),
 --                            sidebar mode, wallpaper
---   lh.save_preset_box()     name box for "Save as...": the current theme with its changes under a name of its own
---                            (~/.config/lhde/themes/NAME.theme: NAME-modified renamed, else base = the theme) and selects it
+--   lh.save_preset_box()     name box for "Save as...": the current theme with its current layer under a name of its own
+--                            (~/.config/lhde/themes/NAME.theme, liblhde lhde_theme_save_as) and selects it
 --   lh.run_box("run" | "search")  a one-line command box (Run: the line goes to sh; Search: the best matching application,
 --                            else an existing path through the file manager, else the line as a command)
 -- The settings themselves live in runtime.lua (lh.shell_get / lh.shell_set, lh.select_theme) and settings.ini (session.lua).
@@ -53,23 +54,28 @@ return function(ctx)
       local function refresh() lh.timer(function() lh.settings_flyout() end, 0) end
       local function later() lh.timer(function() lh.settings_flyout() end, 300) end   -- after a switch that closed it (event "pack")
       heading("Theme")
-      local cur = lh.theme_name and lh.theme_name() or nil
+      local cur, cur_e = nil, nil
+      if lh.theme_name then cur, cur_e = lh.theme_name() end
+      -- the selected theme with a current layer: "TITLE (Modified)" (THEME-FORMAT.md section 14); selecting it again keeps the
+      -- changes, another theme drops them (liblhde lhde_theme_select)
+      local function label(e, t) if e.name == cur and cur_e and cur_e.modified then return t .. " (Modified)" end return t end
       for _, e in ipairs(S.themes()) do
-        option("radio", e.title or e.name, e.name == cur, function() lh.select_theme(e.name); later() end)
+        option("radio", label(e, e.title or e.name), e.name == cur, function() lh.select_theme(e.name); later() end)
       end
-      -- the user's theme files (~/.config/lhde/themes: NAME-modified and saved ones)
+      -- the user's theme files (~/.config/lhde/themes: saved ones, and NAME-modified files of the earlier model)
       local presets = S.presets()
       if #presets > 0 then
         line(); heading("Your themes")
         for _, e in ipairs(presets) do
-          option("radio", e.title .. "  (" .. e.base .. ")", e.name == cur, function() lh.select_theme(e.name); later() end)
+          option("radio", label(e, e.title) .. "  (" .. e.base .. ")", e.name == cur, function() lh.select_theme(e.name); later() end)
         end
       end
       line()
       option("action", "Save as...", false, function() lh.close_flyout(); lh.save_preset_box() end)
       col = right
       -- the compositor rule (runtime.lua lh.compositor): follow the theme's `composition`, or always on / off. Composition, taskbar
-      -- and start menu are theme keys: a change goes into NAME-modified.theme (THEME-FORMAT.md section 3) and selects it
+      -- and start menu are theme keys: a change goes into the current layer (settings.ini [current], THEME-FORMAT.md sections 3
+      -- and 14; no theme file is written) and the theme is applied again
       heading("Composition")
       for _, m in ipairs{ { "follow", "Follow the theme" }, { "on", "Always on" }, { "off", "Always off" } } do
         option("radio", m[2], lh.composition_mode() == m[1], function() lh.set_composition_mode(m[1]); refresh() end)
@@ -117,8 +123,8 @@ return function(ctx)
   end
 
   ------------------------------------------------------------------ Save As (THEME-FORMAT.md section 3)
-  -- a name box; Enter saves the current theme under that title (session.lua S.save_as: ~/.config/lhde/themes/<file name>.theme,
-  -- the NAME-modified file renamed, else a new file with base = the theme) and selects it. The file name is the title in lower
+  -- a name box; Enter saves the current theme under that title (session.lua S.save_as: ~/.config/lhde/themes/<file name>.theme
+  -- by liblhde, the layer's keys in it, the layer cleared) and selects it. The file name is the title in lower
   -- case with anything but letters, digits, '-', '_' and '.' turned into '-'; a shipped name gets "-custom" appended.
   function lh.save_preset_box()
     local owner = { text = "" }
@@ -131,7 +137,7 @@ return function(ctx)
       local col = root:add(N{ layout = "vbox" })
       col:add(N{ kind = "text", text = "Save as", font = "Segoe UI,Tahoma Bold 14px", color = "#808080", margin = { 8, 8, 8, 2 } })
       local _, e = lh.theme_name()
-      col:add(N{ kind = "text", text = "A name for the current look (" .. (e and (e.title or e.name) or "?") .. ", wallpaper, composition):", font = "Segoe UI,Tahoma 11px", color = "#606060", wrap = true, w = W, margin = { 8, 0, 8, 6 } })
+      col:add(N{ kind = "text", text = "A name for the current look (" .. (e and (e.display or e.title or e.name) or "?") .. ", wallpaper, composition):", font = "Segoe UI,Tahoma 11px", color = "#606060", wrap = true, w = W, margin = { 8, 0, 8, 6 } })
       local box = col:add(N{ layout = "fill", h = 22, margin = { 8, 0, 8, 0 } })
       box:add(N{ kind = "rect", fill = "#ffffff", stroke = "#7f9db9" })
       entry = box:add(N{ kind = "text", text = owner.text .. "|", font = F, color = "#000000", valign = "center", margin = { 4, 0, 4, 0 }, ellipsis = true })

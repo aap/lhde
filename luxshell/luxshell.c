@@ -527,6 +527,11 @@ static int l_registry_resolved(lua_State *L) { char b[4200]; if (lhde_registry_r
      lh.theme_lookup(name) -> the theme's name (aliases resolved) and its file ("" for a bare style), or nil
      lh.theme_set_key(name, "Sec.key", value | nil) -> the theme to select now (NAME-modified or NAME), or nil
      lh.theme_user_dir() -> ~/.config/lhde/themes
+     the current layer (THEME-FORMAT.md sections 3 and 14, Windows' "NAME (Modified)"; settings.ini [current]):
+     lh.current_set_key("Sec.key", value | nil) -> true when settings.ini changed, false when not, nil on an error (no theme
+     selected, not a theme key); lh.current_keys() -> { { key =, value = }, ... } of the selected theme; lh.current_theme() -> the
+     theme the layer belongs to ("" without one); lh.theme_select(name) -> true when settings.ini changed (the [theme] name, another
+     theme's layer dropped), false when not, nil on an error; lh.theme_save_as(file, title) -> true, or nil, error
      lh.settings_get(sec, key) -> value ("" when empty) or nil when absent; lh.settings_set(sec, key, value | nil) -> true when the
      file changed; lh.settings_path(); lh.settings_reload(); lh.settings_migrate() -> count, report; lh.compat_registry() -> path */
 static int l_theme_resolve(lua_State *L) {
@@ -568,6 +573,28 @@ static int l_theme_set_key(lua_State *L) {
     int r = lhde_theme_set_key(luaL_checkstring(L, 1), luaL_checkstring(L, 2), luaL_optstring(L, 3, NULL), sel, sizeof sel);
     if (r < 0) { lua_pushnil(L); return 1; }
     lua_pushstring(L, sel); lua_pushboolean(L, r > 0); return 2;
+}
+static int l_current_set_key(lua_State *L) {
+    int r = lhde_current_set_key(luaL_checkstring(L, 1), luaL_optstring(L, 2, NULL));
+    if (r < 0) lua_pushnil(L); else lua_pushboolean(L, r > 0);
+    return 1;
+}
+static void current_key_cb(const char *k, const char *v, void *ud) {
+    lua_State *L = ud; lua_newtable(L);
+    lua_pushstring(L, k); lua_setfield(L, -2, "key"); lua_pushstring(L, v ? v : ""); lua_setfield(L, -2, "value");
+    lua_rawseti(L, -2, (lua_Integer)lua_rawlen(L, -2) + 1);
+}
+static int l_current_keys(lua_State *L) { lua_newtable(L); lhde_current_keys(current_key_cb, L); return 1; }
+static int l_current_theme(lua_State *L) { char b[300]; lua_pushstring(L, lhde_current_theme(b, sizeof b)); return 1; }
+static int l_theme_select(lua_State *L) {
+    int r = lhde_theme_select(luaL_checkstring(L, 1));
+    if (r < 0) lua_pushnil(L); else lua_pushboolean(L, r > 0);
+    return 1;
+}
+static int l_theme_save_as(lua_State *L) {
+    char err[600] = "";
+    if (lhde_theme_save_as(luaL_checkstring(L, 1), luaL_checkstring(L, 2), err, sizeof err)) { lua_pushnil(L); lua_pushstring(L, err); return 2; }
+    lua_pushboolean(L, 1); return 1;
 }
 static int l_theme_user_dir(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_theme_user_dir(b, sizeof b)); return 1; }
 static int l_settings_get(lua_State *L) {
@@ -902,7 +929,8 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"data_find", l_data_find}, {"data_resolve", l_data_resolve}, {"data_resolve_dir", l_data_resolve_dir}, {"data_dirs", l_data_dirs}, {"data_user", l_data_user},
     {"component_dir", l_component_dir}, {"registry_source", l_registry_source}, {"registry_resolved", l_registry_resolved},
     {"theme_resolve", l_theme_resolve}, {"theme_record", l_theme_record}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},
-    {"theme_set_key", l_theme_set_key}, {"theme_user_dir", l_theme_user_dir}, {"settings_get", l_settings_get}, {"settings_set", l_settings_set},
+    {"theme_set_key", l_theme_set_key}, {"theme_user_dir", l_theme_user_dir}, {"current_set_key", l_current_set_key},
+    {"current_keys", l_current_keys}, {"current_theme", l_current_theme}, {"theme_select", l_theme_select}, {"theme_save_as", l_theme_save_as}, {"settings_get", l_settings_get}, {"settings_set", l_settings_set},
     {"settings_path", l_settings_path}, {"settings_reload", l_settings_reload}, {"settings_migrate", l_settings_migrate}, {"compat_registry", l_compat_registry},
     {"cm_owner", l_cm_owner}, {"kill", l_kill}, {"image_alpha", l_image_alpha}, {"fonts", l_fonts}, {"image_filter", l_image_filter}, {"image_flush", l_image_flush}, {"wm_moveresize", l_wm_moveresize}, {NULL, NULL} };
 static const luaL_Reg nodemeth[] = { {"add", l_node_add}, {"remove", l_node_remove}, {"clear", l_node_clear}, {"set", l_node_set}, {"bounds", l_node_bounds}, {"measure", l_node_measure}, {"desired", l_node_desired}, {NULL, NULL} };
