@@ -1,6 +1,6 @@
 #!/bin/bash
-# Watch the theme files and reload luxshell + luxwm on every save (docs/USAGE.md "Live-editing a theme"): themes.ini,
-# wallpapers.ini, frames/*/theme.ini and nav.ini (luxnav's tuning), packs/*/shell.lua in the data directories (the source tree's
+# Watch the theme files and reload luxshell + luxwm on every save (docs/USAGE.md "Live-editing a theme"): themes/*.theme (the
+# data directories' and ~/.config/lhde/themes/), navbar/*.ini, frames/*/theme.ini and nav.ini (luxnav's tuning), packs/*/shell.lua in the data directories (the source tree's
 # data/ and the user's data directory), and luxshell's tiles/*.lua. Each change (a burst of saves within 0.3 s counts once) runs
 # session/theme-reload.sh on the display. inotifywait (inotify-tools) when installed (directories are watched, so editors that
 # replace the file are seen), else a 1 s mtime/size poll. Ctrl-C stops it.
@@ -9,9 +9,10 @@ SELF=$(readlink -f "$0"); . "$(dirname "$SELF")/lhde-paths.sh"; lhde_self "$SELF
 D=${1:-${DISPLAY:-:1}}
 RELOAD="$LHDE_SESSION_DIR/theme-reload.sh"
 LUA=${LHDE_TOP:+$LHDE_TOP/luxshell}; LUA=${LUA:-$LHDE_SHARE/luxshell}
-mapfile -t DIRS < <(lhde_data_dirs; echo "$LUA")
-PAT='(/themes\.ini|/wallpapers\.ini|/frames/[^/]+/(theme|nav)\.ini|/packs/[^/]+/shell\.lua|/packs/startpanels\.lua|/tiles/[^/]+\.lua)$'
-files() { for d in "${DIRS[@]}"; do ls -d "$d/themes.ini" "$d/wallpapers.ini" "$d"/frames/*/theme.ini "$d"/frames/*/nav.ini "$d"/packs/*/shell.lua "$d"/packs/startpanels.lua "$d"/tiles/*.lua; done 2>/dev/null; }
+UTHEMES=${XDG_CONFIG_HOME:-$HOME/.config}/lhde/themes; mkdir -p "$UTHEMES"
+mapfile -t DIRS < <(lhde_data_dirs; echo "$LUA"; echo "$UTHEMES")
+PAT='(/themes/[^/]+\.theme|/[^/]+\.theme|/navbar/[^/]+\.ini|/frames/[^/]+/(theme|nav)\.ini|/packs/[^/]+/shell\.lua|/packs/startpanels\.lua|/tiles/[^/]+\.lua)$'
+files() { for d in "${DIRS[@]}"; do ls -d "$d"/themes/*.theme "$d"/*.theme "$d"/navbar/*.ini "$d"/frames/*/theme.ini "$d"/frames/*/nav.ini "$d"/packs/*/shell.lua "$d"/packs/startpanels.lua "$d"/tiles/*.lua; done 2>/dev/null; }
 reload() { echo "theme-watch: $1 changed"; "$RELOAD" "$D"; }
 echo "theme-watch: $(files | wc -l) files on display $D (${DIRS[*]})"
 if command -v inotifywait >/dev/null 2>&1; then

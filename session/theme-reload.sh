@@ -3,8 +3,8 @@
 #   luxshell: root property _LHSHELL_COMMAND = "reload" -> re-reads the pack's shell.lua, tiles/*.lua, the start panel data,
 #             changed images, and rebuilds the bars and tiles in place (runtime.lua lh.reload_pack)
 #   luxwm:    `luxwmc reload-theme`; when luxwmc is missing or does not know the command, the root ClientMessage _LHWM_RELOAD
-#             (python3-xlib) instead. A missing luxwm command is not an error. luxwm re-resolves the registry when
-#             data/themes.ini changed (its published copy is refreshed).
+#             (python3-xlib) instead. A missing luxwm command is not an error. Both resolve the theme again through
+#             liblhde (theme files edited: the new record), and the compatibility registry for flxp is rewritten.
 # Usage: session/theme-reload.sh [DISPLAY]   (default $DISPLAY, else :1)
 SELF=$(readlink -f "$0"); . "$(dirname "$SELF")/lhde-paths.sh"; lhde_self "$SELF"; lhde_setup_paths
 D=${1:-${DISPLAY:-:1}}

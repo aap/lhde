@@ -3,7 +3,7 @@
 # your screen, or a visible Xephyr) with luxwm, picom and the wallpaper, for screenshots and scripted tests. lhde-session is the
 # real session; this is the bench. Programs come from the build tree when it runs from one (build/bin, build/examples), else from
 # beside the install; the art from lhde's data directories (LHDE_DATA honoured, as by every lhde program).
-#   LAB_WM=fvwm for an fvwm2 session (lab.fvwm2rc), default luxwm; LAB_THEME=NAME a themes.ini name or alias (aero-patch, jade4074,
+#   LAB_WM=fvwm for an fvwm2 session (lab.fvwm2rc), default luxwm; LAB_THEME=NAME a theme (lhde-theme list; aliases such as aero-patch work: jade4074,
 #   slate4074, slate4051, luna-xp, aero5048, aero5112, aerovision, ...); LAB_PICOM=0 without a compositor (luxwm then uses the
 #   theme's frame_classic); LAB_WMARGS="" restarts luxwm without -d (debug log); LAB_BACKEND=glx for picom's glx backend.
 #   session/lab.sh start [xephyr]   start Xvfb (or a visible Xephyr window on $DISPLAY) on $LAB with luxwm, picom, wallpaper
@@ -16,7 +16,7 @@
 SELF=$(readlink -f "$0"); . "$(dirname "$SELF")/lhde-paths.sh"; lhde_self "$SELF"; lhde_setup_paths
 LAB=${LAB:-:2}; LOG=${TMPDIR:-/tmp}/lhdelab$LAB
 mkdir -p "$LOG"
-LUXWM=$(lhde_bin luxwm) LUXSHELL=$(lhde_bin luxshell) REG=$(lhde_registry)
+LUXWM=$(lhde_bin luxwm) LUXSHELL=$(lhde_bin luxshell)
 # Xvfb's software GLX does not refresh ARGB window textures, so the headless lab uses the xrender backend
 # (gaussian blur, size 5 / deviation 1.2 = the glass shader's ~1.2 px sigma); on real hardware (lhde-session) the glx backend is right.
 startpicom() {
@@ -25,10 +25,8 @@ startpicom() {
   if [ "${LAB_BACKEND:-xrender}" = glx ]; then (DISPLAY=$LAB setsid picom --config "$PCONF" --backend glx >"$LOG/picom.log" 2>&1 < /dev/null &)
   else (DISPLAY=$LAB setsid picom --config "$PCONF" --backend xrender --blur-method gaussian --blur-size 5 --blur-deviation 1.2 >"$LOG/picom.log" 2>&1 < /dev/null &); fi
 }
-# a theme name or alias through the registry (themes.ini, THEMES.md): prints the registry name, nothing when unknown
-themename() { awk -v n="$1" '
-  /^[ \t]*\[/ { s = $0; gsub(/^[ \t]*\[|\][ \t]*$/, "", s); if (s == n) { print s; exit } next }
-  /^[ \t]*aliases[ \t]*=/ { v = $0; sub(/^[^=]*=/, "", v); sub(/[ \t][;#].*$/, "", v); k = split(v, a, /[ \t,]+/); for (i = 1; i <= k; i++) if (a[i] == n) { print s; exit } }' "$REG"; }
+# a theme name (an alias, a bare style) through liblhde: prints the theme's name, nothing when unknown
+themename() { lhde_themename "$1"; }
 # what luxwm gets as LHWM_THEME: the registry name, or a frame set that is not in the registry. luxwm only uses it while the
 # display has no _LH_THEME yet (the session's setting wins; `theme` / LAB_THEME on restart-wm change that)
 wmtheme() { n=$(themename "${LAB_THEME:-aero-patch}"); if [ -n "$n" ]; then echo "$n"; else lhde_resolve "frames/$LAB_THEME"; fi; }
@@ -63,7 +61,7 @@ restart-wm) killlab fvwm2; killlab luxwm; sleep 0.5
   # an explicit LAB_THEME becomes the session theme (otherwise the running session's _LH_THEME stays)
   if [ -n "$LAB_THEME" ] && n=$(themename "$LAB_THEME") && [ -n "$n" ]; then DISPLAY=$LAB xprop -root -f _LH_THEME 8u -set _LH_THEME "$n"; fi
   startwm; echo "wm restarted on $LAB" ;;
-theme) n=$(themename "$2"); [ -n "$n" ] || { echo "no such theme; have: $(sed -n 's/^[[:space:]]*\[\(.*\)\][[:space:]]*$/\1/p' "$REG" | tr '\n' ' ')(aliases: see $REG)"; exit 1; }
+theme) n=$(themename "$2"); [ -n "$n" ] || { echo "no such theme; have: $(lhde_themes)"; exit 1; }
   DISPLAY=$LAB xprop -root -f _LH_THEME 8u -set _LH_THEME "$n" && echo "theme $n on $LAB" ;;
 restart-picom) if [ "${LAB_PICOM:-1}" = 0 ]; then startpicom; else killlab picom; sleep 0.5; startpicom; echo "picom restarted on $LAB"; fi ;;
 stop)

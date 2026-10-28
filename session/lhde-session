@@ -11,8 +11,9 @@
 #                   $LHDE_DISPLAY (default: the first free display from :2)
 #         --attach  the session on an X server that already runs on $LHDE_DISPLAY (an Xvfb, a bare Xorg); nothing is started
 #                   but the session's programs
-#         THEME     a themes.ini name or alias (aero-patch, jade4074, slate4074, slate4051, luna-xp, aero5048, aero5112, aerovision,
-#                   ...); default: the last one (settings.ini [theme] name), else aero-patch
+#         THEME     a theme (lhde-theme list: slate4051, slate4074, jade4074, aero4074, aerovision, basic5048, aero5048,
+#                   basic5112, aero5112, luna, luna-olive, luna-silver, the user's, bare styles; old names such as aero-patch
+#                   work as aliases); default: the last one (settings.ini [theme] name), else aero4074
 #   lhde-session theme NAME            switch the running session to NAME (root _LH_THEME; nothing restarts)
 #   lhde-session taskbar avalon|classic|classic+sidebar|none
 #                                      the bottom bar, live: luxshell's Avalon taskbar, flxp-taskbar (luxshell starts it; classic
@@ -27,6 +28,8 @@
 # LHDE_DESKTOP=0 without flxp-desktop (luxshell then shows its own desktop layer); LHDE_WM=fvwm for an fvwm2 session (lab.fvwm2rc);
 # LHDE_TERMINAL=command (default urxvt, else xterm; none for no terminal); LHDE_DATA another data directory (as every lhde program);
 # the x11-era LAB_THEME / LAB_PICOM / LAB_SHELL / LAB_DESKTOP / LAB_WM and SECOND_DISPLAY still work.
+# Settings: ~/.config/lhde/settings.ini and themes/ (docs/SETTINGS.md); the first start moves ~/.config/longhorn and
+# ~/.config/lhshell there (lhde-theme migrate).
 # State: $XDG_RUNTIME_DIR/lhde-session<DISPLAY>/ (theme, shell, desktop, logs; luxshell's Log Off runs `lhde-session stop` when it exists).
 SELF=$(readlink -f "$0")
 if [ -f "$(dirname "$SELF")/lhde-paths.sh" ]; then . "$(dirname "$SELF")/lhde-paths.sh"; else . "$(dirname "$SELF")/../share/lhde/session/lhde-paths.sh"; fi
@@ -41,12 +44,10 @@ target() {
 	n=0; for s in "$RUN"/lhde-session:*; do [ -f "$s/loop.pid" ] && [ -d "/proc/$(cat "$s/loop.pid")" ] && { n=$((n + 1)); one=${s##*/lhde-session}; }; done
 	if [ $n = 1 ]; then echo "$one"; else echo "${DISPLAY:-:1}"; fi
 }
-# a theme name or alias through the registry (themes.ini, THEMES.md): prints the registry name, nothing when unknown
-REG=$(lhde_registry)
-themename() { [ -n "$REG" ] && awk -v n="$1" '
-	/^[ \t]*\[/ { s = $0; gsub(/^[ \t]*\[|\][ \t]*$/, "", s); if (s == n) { print s; exit } next }
-	/^[ \t]*aliases[ \t]*=/ { v = $0; sub(/^[^=]*=/, "", v); sub(/[ \t][;#].*$/, "", v); k = split(v, a, /[ \t,]+/); for (i = 1; i <= k; i++) if (a[i] == n) { print s; exit } }' "$REG"; }
-nosuch() { echo "lhde-session: no such theme $1; have: $(sed -n 's/^[[:space:]]*\[\(.*\)\][[:space:]]*$/\1/p' "$REG" | tr '\n' ' ')(aliases: see $REG)" >&2; exit 1; }
+# a theme name (an alias, a bare style) through liblhde (lhde-theme resolve): prints the theme's name, nothing when unknown
+themename() { lhde_themename "$1"; }
+nosuch() { echo "lhde-session: no such theme $1; have: $(lhde_themes)" >&2; exit 1; }
+LHDE_THEME_TOOL=$(lhde_bin lhde-theme)
 killon() { # kill processes named $1 whose DISPLAY is $D (never pkill -f: it matches this shell)
 	for p in $(pgrep -x "$1"); do tr '\0' '\n' </proc/$p/environ 2>/dev/null | grep -qx "DISPLAY=$D" && kill $p; done
 }
@@ -79,12 +80,10 @@ startdesk() {
 # ---- the session itself (was xinitrc.lab): runs on $D, in the X server's client process (startx) or in the background ----
 session() {
 	D=$DISPLAY STATE=$(statedir "$DISPLAY"); mkdir -p "$STATE"
-	# no THEME given: the one saved last (settings.ini [theme] name, SETTINGS.md; a preset name as it is), else lux's state.ini
-	# from before the settings store, else aero-patch
-	iniget() { sed -n "/^\\[$2\\]/,/^\\[/s/^[[:space:]]*$3[[:space:]]*=[[:space:]]*\\([^;#]*[^[:space:];#]\\).*/\\1/p" "$1" 2>/dev/null | tail -1; }
-	lhstate() { cfg=${XDG_CONFIG_HOME:-$HOME/.config}; n=$(iniget "$cfg/longhorn/settings.ini" theme name)
-		[ -n "$n" ] && echo "$n" || iniget "$cfg/lhshell/state.ini" shell theme; }
-	[ -s "$STATE/theme" ] || echo "${LHDE_THEME:-$(lhstate)}" > "$STATE/theme"; [ -s "$STATE/theme" ] || echo aero-patch > "$STATE/theme"
+	# the one-time move of ~/.config/longhorn and ~/.config/lhshell to ~/.config/lhde (docs/SETTINGS.md "Migration")
+	"$LHDE_THEME_TOOL" migrate > "$STATE/migration.log" 2>&1
+	# no THEME given: the one saved last (settings.ini [theme] name, SETTINGS.md), else aero4074
+	[ -s "$STATE/theme" ] || echo "${LHDE_THEME:-$("$LHDE_THEME_TOOL" current 2>/dev/null)}" > "$STATE/theme"; [ -s "$STATE/theme" ] || echo aero4074 > "$STATE/theme"
 	[ -s "$STATE/shell" ] || echo "${LHDE_SHELL:-1}" > "$STATE/shell"
 	[ -s "$STATE/desktop" ] || echo "${LHDE_DESKTOP:-1}" > "$STATE/desktop"
 	rm -f "$STATE/quit"; echo $$ > "$STATE/loop.pid"
@@ -182,18 +181,12 @@ taskbar)
 	if running_on luxshell >/dev/null; then
 		[ -n "$wc" ] && { DISPLAY=$D xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND "sidebar-with-classic $wc" || exit 1; sleep 0.2; }
 		DISPLAY=$D xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND "taskbar $kind" && echo "taskbar $1 on $D" || exit 1
-	else   # no luxshell: the next one starts with it (settings.ini [override:THEME] taskbar, [sidebar] with_classic; SETTINGS.md)
-		st=${LH_SETTINGS:-${XDG_CONFIG_HOME:-$HOME/.config}/longhorn/settings.ini}; mkdir -p "$(dirname "$st")"; touch "$st"
-		setini() { awk -v s="$1" -v k="$2" -v v="$3" 'BEGIN { done = 0 }
-			/^[ \t]*\[/ { if (sec && !done) { print k " = " v; done = 1 } sec = ($0 ~ "^[ \t]*\\[" s "\\]") }
-			sec && $0 ~ "^[ \t]*" k "[ \t]*=" { if (!done) print k " = " v; done = 1; next }
-			{ print }
-			END { if (!done) { if (!sec) print "[" s "]"; print k " = " v } }' "$st" > "$st.tmp" && mv "$st.tmp" "$st"; }
-		t=$(cat "$STATE/theme" 2>/dev/null); [ -n "$t" ] || t=$(sed -n '/^\[theme\]/,/^\[/s/^[[:space:]]*name[[:space:]]*=[[:space:]]*\([^;#]*[^[:space:];#]\).*/\1/p' "$st" | tail -1)
-		n=$(themename "$t"); [ -n "$n" ] && t=$n
-		if [ -n "$t" ]; then setini "override:$t" taskbar "$kind"; where="[override:$t] taskbar"; else setini taskbar kind "$kind"; where="[taskbar] kind"; fi
-		[ -n "$wc" ] && setini sidebar with_classic "$wc"
-		echo "no luxshell on $D: $st $where = $kind${wc:+, [sidebar] with_classic = $wc} (applies when it starts)"
+	else   # no luxshell: a theme key (Shell.taskbar into THEME-modified.theme, THEME-FORMAT.md section 3) the next one starts with
+		t=$(cat "$STATE/theme" 2>/dev/null); [ -n "$t" ] || t=$("$LHDE_THEME_TOOL" current 2>/dev/null)
+		sel=$("$LHDE_THEME_TOOL" set-key "${t:-aero4074}" Shell.taskbar "$kind" | cut -d' ' -f1)
+		[ -n "$sel" ] && { "$LHDE_THEME_TOOL" set "$sel" >/dev/null; [ -d "$STATE" ] && echo "$sel" > "$STATE/theme"; }
+		[ -n "$wc" ] && "$LHDE_THEME_TOOL" setting sidebar with_classic "$wc"
+		echo "no luxshell on $D: theme $sel: Shell.taskbar = $kind (applies when it starts)"
 	fi ;;
 picom)
 	D=$(target); STATE=$(statedir "$D"); mkdir -p "$STATE"

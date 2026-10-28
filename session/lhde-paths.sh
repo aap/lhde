@@ -1,5 +1,5 @@
 # Sourced by lhde-session, lab.sh, lhwall.sh, the theme scripts and luxwm's regress: lhde's directories the way the programs
-# see them (lhtheme/lhde_data.h). Set LHDE_SELF to the sourcing script's real path first (lhde_self below does it).
+# see them (liblhde, lhde/data.h). Set LHDE_SELF to the sourcing script's real path first (lhde_self below does it).
 #   lhde_data_dirs       the data directories in search order, one per line: $LHDE_DATA (else ${XDG_DATA_HOME:-~/.local/share}/lhde),
 #                        the install's <prefix>/share/lhde, $XDG_DATA_DIRS/lhde, the source tree's data/
 #   lhde_find REL        the first data directory's DIR/REL that exists (nothing when none has it)
@@ -15,7 +15,7 @@ lhde_self() { # SCRIPT -> LHDE_SELF_DIR (its directory, symlinks resolved)
 lhde_setup_paths() {
 	LHDE_TOP= LHDE_SHARE= LHDE_BINDIR=
 	d=$LHDE_SELF_DIR
-	if [ -f "$d/../data/themes.ini" ] && [ -f "$d/../luxwm/wm.c" ]; then LHDE_TOP=$(cd "$d/.." && pwd)
+	if [ -d "$d/../data/themes" ] && [ -f "$d/../luxwm/wm.c" ]; then LHDE_TOP=$(cd "$d/.." && pwd)
 	elif [ -f "$d/../share/lhde/session/lhde-paths.sh" ]; then LHDE_SHARE=$(cd "$d/../share/lhde" && pwd); LHDE_BINDIR=$d
 	elif [ -f "$d/lhde-paths.sh" ] && [ "$(basename "$d")" = session ] && [ "$(basename "$(dirname "$d")")" = lhde ]; then
 		LHDE_SHARE=$(cd "$d/.." && pwd); LHDE_BINDIR=$(cd "$d/../../../bin" 2>/dev/null && pwd)
@@ -49,5 +49,7 @@ lhde_bin() {
 	[ -n "$LHDE_BINDIR" ] && [ -x "$LHDE_BINDIR/$1" ] && { echo "$LHDE_BINDIR/$1"; return; }
 	command -v "$1" 2>/dev/null
 }
-# the registry the programs read: $LH_THEMES_INI, else themes.ini of the data directories (its resolved copy is luxwm's business)
-lhde_registry() { if [ -n "$LH_THEMES_INI" ]; then echo "$LH_THEMES_INI"; else lhde_find themes.ini; fi; }
+# a theme name through liblhde (lhde-theme: theme files, aliases, bare styles): prints the theme's name, nothing when unknown
+lhde_themename() { [ -n "$1" ] && "$(lhde_bin lhde-theme)" resolve "$1" --get theme 2>/dev/null; }
+# the theme names, one line each (lhde-theme list)
+lhde_themes() { "$(lhde_bin lhde-theme)" list 2>/dev/null | awk '{ print $1 }' | tr '\n' ' '; }
