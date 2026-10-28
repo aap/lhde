@@ -4138,3 +4138,80 @@ not imported). Classic + 2k = the real Windows 2000 icons where the old set had 
 #134) plus the chess tile. Everything else, including the taskbar's start flag and the task pane in all three
 Luna colours, is pixel-identical. (The run used FLXP_THEME=luna.msstyles for the taskbar: with the session
 theme alone flxp-taskbar draws unthemed in c7b2e82, as before this change - not an art problem.)
+
+## Themes and Appearance apart: the current layer, Windows Classic (2026-10-28)
+
+aap: everything was a theme, and every change wrote yet another theme (`NAME-modified.theme`); the Themes list showed ~40
+entries (every bare style). Windows keeps Themes (`.theme` files) and Appearance (the visual style) apart; Display Properties
+does that now. docs/THEME-FORMAT.md sections 2a, 3 and 14.
+
+**Model**: the selected theme (`settings.ini [theme] name`) plus the current layer, `settings.ini [current]` (`theme = NAME`
+and `Section.key = value` lines): the unsaved changes, applied by liblhde's resolver to that theme (source `current`), so
+`_LH_THEME_RESOLVED`, luxwm, luxshell and every flxp program see the same record. Display Properties, Set as Desktop
+Background (`shell::set_desktop_background` -> `store::set_current_keys`) write only the layer; `store::apply_theme` (and the
+start menu's Theme list) select through `lhde_theme_select`, which drops another theme's layer. Save As
+(`store::save_theme_as` -> `lhde_theme_save_as`) writes `~/.config/lhde/themes/FILE.theme` (`base = NAME` + the layer, or a
+copy of the user's own file + the layer), selects it, clears the layer; Delete (`lhde_theme_delete`) removes a user theme
+file (the selected one falls back to its base). The existing `NAME-modified.theme` files are ordinary user themes now
+(nothing converts them; they show as "... (modified)" in the list until deleted or saved under another name).
+
+**Display Properties** (`flxp/settings/settings.cpp`, `flxp/rc/settings.rc`): state = the theme + the pending layer (a map),
+previews from `lhde_theme_resolve_with(theme, pending layer)` (`shell::resolve_theme_with`), "back to the theme" values from
+`resolve_theme_files` (a key whose value the theme's files give leaves the layer). Apply: `lhde_theme_select` when the theme
+changed, `lhde_current_set` (the whole layer; liblhde prunes keys the theme gives anyway), the per-user keys, `_LH_THEME` +
+`_LH_SETTINGS_CHANGED`. Tabs:
+- **Themes**: `store::theme_files()` (shipped + the user's, no bare styles) and "TITLE (Modified)" after its theme while the
+  layer has keys; picking another theme keeps the layer aside until Apply (pick "(Modified)" again to get it back, as XP);
+  the sample is the theme's background with a window in its look (libwuxtheme; classic: the classic preview).
+- **Desktop**: background list and position (`Desktop.wallpaper`, `Desktop.mode`), icons (`Desktop.icons`); "(theme
+  background)" is the theme files' picture.
+- **Appearance** (XP's layout): preview; "Windows and buttons" = `lhde_style_list` by display name (the style's
+  `documentation` DISPLAYNAME, a v3 style's THEMES_INI `[documentation] DisplayName`, else the file name; the build of a
+  build-qualified name appended: "Jade (4074)", two copies of one style get `[name]`) plus "Windows Classic style"; "Color
+  scheme" = the style's colours (THEMES_INI `[ColorScheme.X] DisplayName`: "Default (blue)", "Olive Green", "Silver") or the
+  classic schemes (`lhde_scheme_list`; "Windows Standard" = the built-in colours when not imported); "Font size" = the style's
+  sizes or the scheme's `sizes`. A style change writes `VisualStyle.style/color/size` and the window frames the style would
+  bring as a bare style (`Glass.frames`, `Glass.frames_classic`), nothing else of the theme. Effects... (font smoothing, the
+  user's `[fonts] smoothing`). Advanced (classic only): XP's per-item editor (3D Objects, Active/Inactive Title Bar and Window
+  Border, Application Background, Caption Buttons, Desktop, Disabled Menu Item, Icon, Menu, Message Box, Palette Title,
+  Scrollbar, Selected Items, Small Caption Buttons, ToolTip, Window: size, colour 1/2, font, size, colour, bold, italic) with
+  a colour picker (the 20 static colours, R/G/B) and fontconfig's families, into `Colors.*` / `Metrics.*` of the layer.
+- **Shell**: the Longhorn extras as theme keys with the line where each comes from ("Your change (Save As on the Themes tab
+  keeps it)" for a layer key): Explorer.chrome, navbar, navbar_preset (4074: small/medium/large/xlarge, vision: small/big),
+  Shell.taskbar, Shell.start, Glass.frames (`frames/` sets), composition, animations; the sidebar (per user).
+`--tab themes|desktop|appearance|shell` (`effects` opens Appearance).
+
+**The classic look** (`wux/w32/theme.cpp apply_classic_look`): with `VisualStyle.style = classic` the record's `Colors.*` go to
+SetSysColors and `Metrics.*` to SPI_SETNONCLIENTMETRICS / SPI_SETICONTITLELOGFONT (after `reset_syscolors` + `init_sysparams`:
+absent keys are the built-in Windows Standard), at start (`init_theme`) and live (a classic scheme, size or Advanced change:
+WM_SYSCOLORCHANGE, WM_SETTINGCHANGE, a repaint). The desktop colour is `Colors.background` then (`theme_wallpaper`). The
+classic preview is drawn with GDI from the record (DrawEdge-style edges, gradient captions, caption buttons, menu bar with
+Normal/Disabled/Selected, window text and scroll bar, a message box).
+
+**Schemes**: `tools/lhde-schemes` reads `HIVEDEF.INF` (`Control Panel\Appearance\Schemes`, SCHEMEDATA version 2: NONCLIENTMETRICSW
+500 bytes - its cbSize is garbage in most values - the icon title LOGFONTW, 29 COLORREFs) from the user's Server 2003 / XP /
+2000 medium (ISO via 7z, or the file) into `styles/<name>.scheme`; lhde-import does the same for the `xp` and `2k` sources
+(`[schemes]`, the INF packed as `setup/hivedef.inf`). 22 schemes, "(large)" / "(extra large)" folded into their scheme as
+`[Metrics:Large Fonts]` / `[Metrics:Extra Large Fonts]` (+ `[Colors:SIZE]` where Windows Classic and Rose differ); "Pumpkin
+(large)" stays a scheme of its own. Server 2003's and 2000's are byte-identical. To install them for the session:
+`tools/lhde-schemes "/u/aap/lib/windows_isos/Windows Server 2003 R2 Enterprise Corp x64 CD1.iso"` (into
+`~/.local/share/lhde/styles`), or re-import the xp/2k packs.
+
+**Lab** (Xvfb :76, luxwm, flxp-desktop, flxp-taskbar, explorer and Display Properties from this tree; scratch HOME and
+XDG_CONFIG_HOME with copies of ~/.config/lhde and ~/.config/flxp; LHDE_DATA = ~/.local/share/lhde read-only, the schemes in a
+scratch `XDG_DATA_DIRS` data directory): Themes lists the 13 shipped themes and the 4 old `*-modified` user themes, no bare
+styles. jade4074 -> Windows Classic style: `[current]` = style classic, scheme windows-standard, frames_classic none; Themes shows
+"Jade (4074) (Modified)"; no file appeared in themes/; explorer, taskbar, desktop and the dialog went classic live. Brick, then
+Windows Classic + Large Fonts: colours and metrics live in every flxp program (taskbar and dialog fonts grow), and at start-up
+of new programs. Advanced: Active Title Bar colour 1 red, size 26 -> `Colors.activecaption`, `Metrics.captionheight` in the
+layer. Save As "My Classic" -> `my-classic.theme` (base jade4074 + the layer), selected, `[current]` gone; Delete -> back to
+jade4074, file gone. Appearance on jade4074: Slate (4074) -> luxwm re-resolved on `_LH_SETTINGS_CHANGED` and drew Slate
+frames, flxp followed. luna: Olive Green -> luxwm and flxp olive; a background from the list -> `Desktop.wallpaper` in the
+layer; picking "Windows XP (Luna)" again + Apply -> layer dropped, Bliss and blue back. luxwm with style = classic keeps the
+previous frames ("no frame set and no visual style"): it has no classic frame renderer yet (THEME-FORMAT section 14).
+Tests: lhdatatest 63 (current layer, theme_files), liblhde resolve 226 (layer, schemes, Save As, Delete, select), check.sh
+all passed, luxwm regress 212 identical. Screenshots only in the session's scratch directory (`dp/`).
+
+Toolkit findings on the way: `GetDlgItemInt` read "2" from an edit holding "26" (with an up-down buddy; the dialog reads the
+text instead); a combo dropdown with 29 items and the default min-visible 30 reserved a vertical scroll bar it did not paint
+(a black strip; the style combo uses CB_SETMINVISIBLE 16 and gets a real, painted scroll bar).

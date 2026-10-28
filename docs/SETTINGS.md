@@ -11,9 +11,13 @@ This section replaces the paths below; the dated sections after it are history (
   (the flyout's "Show the wallpaper" off), `[shell] max_fade_ms`, `[fonts] smoothing`, `[commands]`. Written by liblhde's store
   (`lhde_settings_set`, luxshell's `lh.settings_set`, `lhde-theme setting`): comments, order and unknown keys kept, atomic, through
   a symlink. The serial (`_LH_SETTINGS_SERIAL`, `_LH_SETTINGS_CHANGED`) stays the X clients' business, unchanged.
-- `~/.config/lhde/themes/NAME.theme`: the user's theme files (docs/THEME-FORMAT.md). A theme key changed anywhere (luxshell's
-  flyout, `_LHSHELL_COMMAND taskbar`, `lhde-theme set-key`, later Display Properties) goes into `NAME-modified.theme` (`base =
-  NAME`, only the changed keys; a key equal to the base's is removed) and that theme is selected; "Save As" renames it.
+- `~/.config/lhde/themes/NAME.theme`: the user's theme files (docs/THEME-FORMAT.md), written by Save As (and `lhde-theme save-as`).
+- `settings.ini [current]` (2026-10-28): the current layer, Windows' "NAME (Modified)": `theme = NAME` and the changed theme keys
+  as `Section.key = value` (`VisualStyle.style = classic`, `Desktop.wallpaper = 2k/blulac16`, `Colors.activecaption = 255 0 0`).
+  Display Properties and Set as Desktop Background write it (liblhde `lhde_current_set` / `lhde_current_set_key`; a key the theme
+  gives anyway is dropped); the resolver applies it to that theme, so every client sees it; selecting another theme removes the
+  section (`lhde_theme_select`), Save As turns it into a theme file. luxshell's flyout and `lhde-theme set-key` still write
+  `NAME-modified.theme` (`lhde_theme_set_key`) until the lux side switches.
 - `~/.config/lhshell/state.ini` keeps lux's runtime state (tile order); `mfu.ini` the launch counts. `~/.config/flxp/flxp.ini` stays flxp's.
 
 **Migration** (`lhde_settings_migrate`; run by `lhde-session start`, luxshell at startup, `lhde-theme migrate`; once: nothing

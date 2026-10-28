@@ -150,8 +150,9 @@ order and ownership. Additions and two corrections:
    luxnav can take over the faithful ones.
 5. **Icon sets are recipes** like the navbars: `data/icons/*.theme` (flxp's res/icons format: keys to
    `resources/<build>/shell32.dll#id`), never files.
-6. **Settings dialog**: editing a shipped theme makes a user copy "NAME (modified)" automatically,
-   as Windows does; the per-theme scope combos go away with `[override:*]`.
+6. **Settings dialog**: editing a shipped theme makes it "NAME (modified)", as Windows does; the per-theme scope combos go
+   away with `[override:*]`. (2026-10-28: the change is the unsaved current layer in settings.ini, not a copy; Save As
+   writes a theme file. THEME-FORMAT section 3.)
 7. **Fonts**: per-build font dirs from the import, then fontconfig as the fallback (unchanged).
 8. Wine's vendored code (LGPL) stays in `wux/vendor/wine` with its MANIFEST and patches.
 

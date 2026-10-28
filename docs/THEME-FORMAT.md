@@ -27,7 +27,9 @@ A path (absolute or `~/`) is accepted in the user's own theme files only.
 
 **Theme files** tie them together, like Windows `.theme` files: shipped in
 `$PREFIX/share/lhde/themes/NAME.theme` (source: `data/themes/`), the user's in
-`~/.config/lhde/themes/NAME.theme`. A bare style in `styles/` is also a theme (section 5).
+`~/.config/lhde/themes/NAME.theme`. A bare style in `styles/` is also a theme (section 5) for the resolver and `lhde-theme`;
+Display Properties lists theme files only and offers the styles on its Appearance tab ("Windows and buttons"), as Windows
+keeps Themes and the visual style apart (2026-10-28).
 
 ## 2. The file
 ```ini
@@ -94,7 +96,8 @@ activecaption = 10 36 106       ; scrollbar background activecaption inactivecap
                                 ; captiontext activeborder inactiveborder appworkspace highlight highlighttext btnface btnshadow
                                 ; graytext btntext inactivecaptiontext btnhighlight 3ddkshadow 3dlight infotext infobk
                                 ; alternatebtnface hotlight gradientactivecaption gradientinactivecaption menuhilight menubar
-[Metrics]                       ; NONCLIENTMETRICS in pixels, fonts as "Face, points[, bold][, italic]"
+[Metrics]                       ; NONCLIENTMETRICS in pixels, fonts as "Face, size[, bold][, italic]" (size: points; negative:
+                                ; pixels, LOGFONT's lfHeight, as the importer writes them)
 borderwidth = 1                 ; scrollwidth scrollheight captionwidth captionheight smcaptionwidth smcaptionheight
 captionfont = Tahoma, 8, bold   ; menuwidth menuheight; captionfont smcaptionfont menufont statusfont messagefont icontitlefont
 ```
@@ -104,7 +107,8 @@ picks one (XP's "Font size": Normal, Large Fonts, Extra Large Fonts). Schemes ar
 imports XP's and Windows 2000's from the install media's default hive (`HIVEDEF.INF`, `Control Panel\Appearance\Schemes`),
 run by lhde-import for the `xp` and `2k` sources. Resolution: theme files, then the current layer, then the scheme's keys for
 what is still absent (source `scheme`); a scheme named but not imported falls back to `none` (the built-in colours).
-Only the classic look reads them: a visual style brings its own `[SysMetrics]`.
+Only the classic look reads them: a visual style brings its own `[SysMetrics]`. With the classic look `Colors.background` is
+the desktop colour (COLOR_BACKGROUND) under the wallpaper; `Desktop.color` when the scheme and the layer have none.
 
 ## 3. Values and inheritance
 - **absent** = inherit from `base`, else the style-derived default (section 5); **`none`** = switched off.
@@ -153,7 +157,8 @@ missing -> drawn art. Each substitution is in the resolved record's "came from".
 ## 7. Runtime
 `_LH_THEME` = the theme name. Whoever changes it writes `settings.ini [theme] name` first, then the
 property, then `_LH_SETTINGS_CHANGED`. `_FLXP_WALLPAPER` is retired: picking a picture is an Apply into the
-modified copy, and flxp-desktop reads the resolved record like everyone else.
+current layer (section 3), and flxp-desktop reads the resolved record like everyone else. A change of the current layer is a
+settings.ini write: `_LH_SETTINGS_CHANGED`, and every client resolves the session theme again (its record now has the layer).
 
 ## 8. The shipped themes (aap's themes.txt)
 | theme | style | glass / classic frames | composition | pack | navbar | wallpaper |
@@ -295,3 +300,27 @@ by resource id"): one wuxtheme fix (v4 LOGFONTs named "Tahoma Bold"), the remain
 tuning (accepted); the toolbar strip ids are 214-217 (xp shell32), 276-279 (2k browseui); flxp has no nt5src setting. For the
 lux side: lhde-import should also take `AMD64/ASMS01.CAB`'s comctl32 6.0 (the file dialog's view/hist strips, 124/130) and,
 after this change's `LOGONUI.EX_` line in data/sources/xp.ini, re-import XP for the chess tile.
+
+## 14. Themes and Appearance apart (2026-10-28, wux side)
+aap: "currently everything is driven by the themes and doing any modifications writes yet another theme". Now as in Windows:
+- **Themes** are the theme files only (the 13 shipped, the user's); a change anywhere is the current layer (section 3), shown as
+  "NAME (Modified)"; Save As makes it a theme file; selecting another theme drops it. No `NAME-modified.theme` is written by
+  Display Properties or Set as Desktop Background any more (the existing ones stay ordinary user themes).
+- **Appearance** = XP's tab: "Windows and buttons" (every `styles/` style by its DisplayName, plus "Windows Classic style"),
+  "Color scheme" (the style's colours; classic: the schemes of section 2a), "Font size", Effects..., Advanced (classic: the
+  per-item editor writing `Colors.*` / `Metrics.*` into the layer). The Longhorn extras moved to a **Shell** tab.
+- **For the lux side** (liblhde changes, all additive; nothing removed): `enum lhde_source` gained `LHDE_FROM_CURRENT`,
+  `LHDE_FROM_SCHEME`; `lhde_theme_resolve` applies the current layer when it belongs to the name resolved (the derived key
+  `current`); new `lhde_theme_resolve_flags` (`LHDE_RESOLVE_FILES`), `lhde_theme_resolve_with`, `lhde_theme_resolve_current`,
+  `lhde_current_theme/keys/set_key/set/clear`, `lhde_theme_select`, `lhde_theme_save_as`, `lhde_theme_delete`,
+  `lhde_style_list`, `lhde_scheme_list`, `lhde_color_name`, `lhde_metric_name`; `lhde_theme_is_key` accepts `Colors.*` /
+  `Metrics.*`; sections `[Colors]`, `[Metrics]`; a missing `styles/NAME.scheme` falls back to `VisualStyle.scheme = none`;
+  `lhde-theme set` clears another theme's layer, new `lhde-theme layer | layer-set | layer-clear | save-as | delete | styles |
+  schemes`, `resolve --files`. Wanted from the lux side: luxshell's flyout and `_LHSHELL_COMMAND taskbar` write the layer
+  (`lhde_current_set_key`, a `lh.current_set_key` binding) instead of `lhde_theme_set_key`, its theme switch through
+  `lhde_theme_select`, its theme list without the bare styles; luxwm: a frame for `style = classic` (today it keeps the previous
+  theme's frames: "no frame set and no visual style"), drawn from the record's `Colors.*` (activecaption,
+  gradientactivecaption, inactivecaption, gradientinactivecaption, captiontext, inactivecaptiontext, activeborder,
+  inactiveborder, btnface/btnhighlight/btnshadow/3ddkshadow/3dlight for the edges and buttons) and `Metrics.*` (captionheight,
+  captionwidth, borderwidth, captionfont), i.e. Windows' classic DrawCaption / DrawEdge frame.
+
