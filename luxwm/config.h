@@ -98,7 +98,7 @@
    Longhorn), ANIM_4074PLUS = 4074's fade + gentle centre zoom on open, the invented grow on restore from minimised and shrink on minimise, no picom
    animation on maximise/restore (default). Without a compositor the XP caption flight is used whatever this says.
    Runtime (2026-10-25): this is only the default. lhwm reads [theme] animations = 4074plus | 4074 | invented | 5048 | none from
-   $XDG_CONFIG_HOME/longhorn/settings.ini (../SETTINGS.md) at startup and on the root ClientMessage _LH_SETTINGS_CHANGED, and
+   lhde's settings store (~/.config/lhde/settings.ini, liblhde; docs/SETTINGS.md) at startup and on the root ClientMessage _LH_SETTINGS_CHANGED, and
    LHWM_ANIMATIONS=<name> overrides the file; "none" (value 0) sets no _LHWM_ANIMATE at all and turns off the XP caption flight too. */
 #define ANIM_4074 1
 #define ANIM_INVENTED 3

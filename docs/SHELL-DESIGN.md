@@ -1,4 +1,4 @@
-> **Imported from the Longhorn X11 lab** (`~/fun/longhorn/x11` at d353b69, SHELL-DESIGN.md) into lhde in step 3 of docs/LAYOUT.md. Program and path names are updated to lhde (lhwm → luxwm, lhwmc → luxwmc, lhshell → luxshell, lhnav → luxnav; x11/... and lhwm/themes, lhshell/themes, lhshell/assets → the lhde tree and data directories, see docs/LAYOUT.md and tools/lhde-import); the X atoms (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the window manager name "lhwm", luxnav's C API (`lhnav_*`, `lhnav.h`), configuration paths (`~/.config/longhorn`, `~/.config/lhwm/keys`, `~/.config/lhshell`) and setting values (`header_engine = lhnav`, `classic_start_menu = lhshell`) keep their names. Dated sections are history: they describe the x11 tree as it was (its compare_*.png and screenshots stay in the research workspace).
+> **Imported from the Longhorn X11 lab** (`~/fun/longhorn/x11` at d353b69, SHELL-DESIGN.md) into lhde in step 3 of docs/LAYOUT.md. Program and path names are updated to lhde (lhwm → luxwm, lhwmc → luxwmc, lhshell → luxshell, lhnav → luxnav; x11/... and lhwm/themes, lhshell/themes, lhshell/assets → the lhde tree and data directories, see docs/LAYOUT.md and tools/lhde-import); the X atoms (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the window manager name "lhwm", luxnav's C API (`lhnav_*`, `lhnav.h`), configuration paths (`~/.config/longhorn`, `~/.config/lhde/keys`, `~/.config/lhshell`) and setting values (`header_engine = lhnav`, `classic_start_menu = lhshell`) keep their names. Dated sections are history: they describe the x11 tree as it was (its compare_*.png and screenshots stay in the research workspace).
 
 > **Naming (2026-10-25):** the Lua/cairo Avalon-style shell designed here is called **lux** (directory/binary still `luxshell`); the win32 layer under flxp is **wux**. See USAGE.md.
 
@@ -542,7 +542,7 @@ flyout window and the properties window, and calls `initialize()` after `sidebar
 | Autohide (classic) | 500 ms poll, hide when pointer outside rect + 4*edge and not active; show on pointer movement > dblclk distance after 50 ms; slide 400 ms out / 200 ms in, 20 ms frames; 2 px remain visible | timer + `XQueryPointer` (or `MotionNotify` on a 2 px ARGB strip left at the edge); animate `XMoveWindow`; update the strut to 2 px while hidden (XP keeps the hidden bar out of the work area too: `tray.cpp:2607-2612` "don't subtract the tray if it is autohide") |
 | Autohide (Avalon) | driven by "focus within" (mouse over, flyout or popup open, tile focus); visible percent ± 20 every 20 ms = 100 ms linear slide; `2 + (size-2)*pct/100` px visible; a bar jumps to 0/100 when autohide is toggled (2.4.2) | same machinery with the theme pack choosing 100 ms linear vs 400/200 ms; focus-within = `EnterNotify`/`LeaveNotify` on the bar plus "a popup of ours is open" |
 | Always on top | `ABS_ALWAYSONTOP` | `_NET_WM_STATE_ABOVE` (dock windows are above normal windows in luxwm anyway) |
-| Persistence | `StuckRects2` TVSD, `Explorer\Sidebar\...` (see 2.4) | `~/.config/lhshell/state.ini`: edge, thickness, autohide, hideclock, tile list and heights |
+| Persistence | `StuckRects2` TVSD, `Explorer\Sidebar\...` (see 2.4) | `~/.local/state/lhde/luxshell-state.ini`: edge, thickness, autohide, hideclock, tile list and heights |
 
 ### 3.3 The maximised-window black layer
 
@@ -1076,7 +1076,7 @@ Windows has one setting (the active visual style + colour + size) and one broadc
   `FLXP_THEME_SIZE`). The file's location is published too, so nobody hardcodes it.
 - **Setting:** root property `_LH_THEME` (UTF8_STRING): the theme *name*. Root property
   `_LH_THEMES_INI` (UTF8_STRING): absolute path of the registry. Whoever starts first publishes the
-  persisted value: luxshell owns persistence (`~/.config/lhshell/state.ini`, key `theme`), luxwm
+  persisted value: luxshell owns persistence (`~/.local/state/lhde/luxshell-state.ini`, key `theme`), luxwm
   publishes `LHWM_THEME`/`-t` only if `_LH_THEME` is absent at startup (so `lhde-session THEME`
   keeps working: it writes the name into the state dir, luxwm maps it through the registry).
 - **Consumers:**

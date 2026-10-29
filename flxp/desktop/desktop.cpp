@@ -5,7 +5,7 @@
 // view over it shows ~/Desktop merged with My Documents, My Computer and the
 // Recycle Bin, with white labels and XP's drop shadow. Icons are placed
 // freely (no auto-arrange); positions are kept per name in
-// $XDG_CONFIG_HOME/flxp/desktop-positions. Folders open in an explorer window
+// $XDG_STATE_HOME/lhde/flxp-desktop-positions. Folders open in an explorer window
 // (a new flxp process, as the explorer itself does for every further folder),
 // files with their default application, and the context menus are the
 // explorer's (src/explorer/verbs). The desktop never fades: lhwm's maximised
@@ -92,7 +92,7 @@ std::string desktop_dir()
 
 std::string trash_dir() { return shell::data_home() + "/Trash/files"; }
 
-std::string positions_path() { return shell::config_home() + "/flxp/desktop-positions"; }
+std::string positions_path() { return shell::state_file("flxp-desktop-positions"); }
 
 // ---- the explorer -------------------------------------------------------------------
 

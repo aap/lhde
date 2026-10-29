@@ -1,7 +1,7 @@
 -- Session state and settings (SHELL-DESIGN 6.1 / 6.2, SETTINGS.md, THEME-FORMAT.md): the theme through liblhde's resolver (the
 -- Lua binding lh.theme_*: theme files in data/themes/ and ~/.config/lhde/themes/, bare styles, aliases), the shared desktop
 -- settings (~/.config/lhde/settings.ini through liblhde's store: lh.settings_set; read here, cached), lux's private runtime
--- state (~/.config/lhshell/state.ini: tile order) and the session commands (log off, stand by, shut down, restart, lock).
+-- state (~/.local/state/lhde/luxshell-state.ini: tile order) and the session commands (log off, stand by, shut down, restart, lock).
 --   local S = dofile("session.lua")
 --   S.resolve(name)            the theme NAME resolved (an alias gives its theme): an entry { name, title, file, user (its file is
 --                              the user's), v (the record: v["Glass.frames"], ...), why (where each key came from), record (the
@@ -29,7 +29,7 @@
 --                              current event is handled (several sets: one message); value nil removes it (S.unset)
 --   S.reload()                 forget the cached file (on _LH_SETTINGS_CHANGED from another writer)
 --   S.migrate()                the one-time move from ~/.config/longhorn and ~/.config/lhshell (liblhde lhde_settings_migrate)
---   S.state_get(sec, key)      / S.state_set(sec, key, value): state.ini, runtime state only (LHSHELL_STATE overrides the path)
+--   S.state_get(sec, key)      / S.state_set(sec, key, value): luxshell-state.ini, runtime state only (LHSHELL_STATE overrides the path)
 --   S.command(name)            the shell command for logoff | standby | shutdown | restart | lock (settings.ini [commands] or
 --                              the defaults below); S.run(name) runs it
 local S = {}
@@ -237,9 +237,9 @@ local function lines_drop(lines, drop)
   return out
 end
 
------------------------------------------------------------------- state.ini (lux's runtime state: tile order)
-local cfg_home = os.getenv("XDG_CONFIG_HOME") or ((os.getenv("HOME") or ".") .. "/.config")
-local state_path = os.getenv("LHSHELL_STATE") or (cfg_home .. "/lhshell/state.ini")
+------------------------------------------------------------------ luxshell-state.ini (lux's runtime state: tile order)
+-- ~/.local/state/lhde/luxshell-state.ini (docs/SETTINGS.md "Files"; LHSHELL_STATE overrides the path)
+local state_path = os.getenv("LHSHELL_STATE") or lh.state_file("luxshell-state.ini")
 S.state_path = state_path
 function S.state_get(sec, key)
   for _, s in ipairs(parse_ini(state_path) or {}) do if s._name == sec and s[key] and s[key] ~= "" then return s[key] end end
@@ -301,7 +301,8 @@ function S.set(sec, key, value)
   return true
 end
 function S.unset(sec, key) if not S.has(sec, key) then return false end return S.set(sec, key, nil) end
--- the one-time migration (SETTINGS.md "Migration"): ~/.config/longhorn and ~/.config/lhshell -> ~/.config/lhde, by liblhde
+-- the one-time migration (SETTINGS.md "Migration"): ~/.config/longhorn and ~/.config/lhshell -> ~/.config/lhde and
+-- ~/.local/state/lhde, by liblhde
 function S.migrate()
   local n, rep = lh.settings_migrate()
   if n and n > 0 then

@@ -533,7 +533,8 @@ static int l_registry_resolved(lua_State *L) { char b[4200]; if (lhde_registry_r
      theme the layer belongs to ("" without one); lh.theme_select(name) -> true when settings.ini changed (the [theme] name, another
      theme's layer dropped), false when not, nil on an error; lh.theme_save_as(file, title) -> true, or nil, error
      lh.settings_get(sec, key) -> value ("" when empty) or nil when absent; lh.settings_set(sec, key, value | nil) -> true when the
-     file changed; lh.settings_path(); lh.settings_reload(); lh.settings_migrate() -> count, report; lh.compat_registry() -> path */
+     file changed; lh.settings_path(); lh.config_file(NAME), lh.state_file(NAME) -> path; lh.settings_reload();
+     lh.settings_migrate() -> count, report; lh.compat_registry() -> path */
 static int l_theme_resolve(lua_State *L) {
     char err[600]; lhde_theme *t = lhde_theme_resolve(luaL_checkstring(L, 1), err, sizeof err);
     if (!t) { lua_pushnil(L); lua_pushstring(L, err); return 2; }
@@ -609,6 +610,10 @@ static int l_settings_set(lua_State *L) {
     lua_pushboolean(L, r > 0); return 1;
 }
 static int l_settings_path(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_settings_path(b, sizeof b)); return 1; }
+/* lh.config_file(NAME) / lh.state_file(NAME): the path of NAME in lhde's config directory (what the user chose) or state directory
+   (what we remember on our own: luxshell-state.ini, luxshell-mfu.ini); the directory is created (docs/SETTINGS.md "Files") */
+static int l_config_file(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_config_file(luaL_checkstring(L, 1), b, sizeof b)); return 1; }
+static int l_state_file(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_state_file(luaL_checkstring(L, 1), b, sizeof b)); return 1; }
 static int l_settings_reload(lua_State *L) { (void)L; lhde_settings_reload(); return 0; }
 static int l_settings_migrate(lua_State *L) {
     static char rep[65536]; int n = lhde_settings_migrate(0, rep, sizeof rep);
@@ -931,7 +936,7 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"theme_resolve", l_theme_resolve}, {"theme_record", l_theme_record}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},
     {"theme_set_key", l_theme_set_key}, {"theme_user_dir", l_theme_user_dir}, {"current_set_key", l_current_set_key},
     {"current_keys", l_current_keys}, {"current_theme", l_current_theme}, {"theme_select", l_theme_select}, {"theme_save_as", l_theme_save_as}, {"settings_get", l_settings_get}, {"settings_set", l_settings_set},
-    {"settings_path", l_settings_path}, {"settings_reload", l_settings_reload}, {"settings_migrate", l_settings_migrate}, {"compat_registry", l_compat_registry},
+    {"settings_path", l_settings_path}, {"config_file", l_config_file}, {"state_file", l_state_file}, {"settings_reload", l_settings_reload}, {"settings_migrate", l_settings_migrate}, {"compat_registry", l_compat_registry},
     {"cm_owner", l_cm_owner}, {"kill", l_kill}, {"image_alpha", l_image_alpha}, {"fonts", l_fonts}, {"image_filter", l_image_filter}, {"image_flush", l_image_flush}, {"wm_moveresize", l_wm_moveresize}, {NULL, NULL} };
 static const luaL_Reg nodemeth[] = { {"add", l_node_add}, {"remove", l_node_remove}, {"clear", l_node_clear}, {"set", l_node_set}, {"bounds", l_node_bounds}, {"measure", l_node_measure}, {"desired", l_node_desired}, {NULL, NULL} };
 static const luaL_Reg surfmeth[] = { {"root", l_surface_root}, {"show", l_surface_show}, {"hide", l_surface_hide}, {"move", l_surface_move}, {"raise", l_surface_raise}, {"lower", l_surface_lower}, {"set_layer", l_surface_layer}, {"stackpos", l_surface_stackpos}, {"damage", l_surface_damage}, {"id", l_surface_id},

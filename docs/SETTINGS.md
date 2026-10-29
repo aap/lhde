@@ -18,7 +18,14 @@ This section replaces the paths below; the dated sections after it are history (
   gives anyway is dropped); the resolver applies it to that theme, so every client sees it; selecting another theme removes the
   section (`lhde_theme_select`), Save As turns it into a theme file. luxshell's flyout and `_LHSHELL_COMMAND taskbar` write it too
   (`lh.current_set_key`, 2026-10-28); only `lhde-theme set-key` still writes `NAME-modified.theme` (`lhde_theme_set_key`).
-- `~/.config/lhshell/state.ini` keeps lux's runtime state (tile order); `mfu.ini` the launch counts. `~/.config/flxp/flxp.ini` stays flxp's.
+- **Two user directories, one rule each** (2026-10-29). What the user chose lives in `~/.config/lhde/` (`$XDG_CONFIG_HOME/lhde`):
+  `settings.ini`, `themes/`, `flxp.ini` (flxp's own preferences: views, dialog sizes, the terminal, ... any key also as
+  `FLXP_<KEY>` for one run), `keys` (luxwm's key bindings), and any shipped file overridden under its own name. What a program
+  remembers on its own lives in `~/.local/state/lhde/` (`$XDG_STATE_HOME/lhde`): `luxshell-state.ini` (the tile order),
+  `luxshell-mfu.ini` (launch counts), `flxp-views` (the view remembered per folder), `flxp-desktop-positions` (icon positions).
+  Losing the state directory costs nothing but convenience. liblhde gives the paths (`lhde_config_file`, `lhde_state_file`;
+  luxshell `lh.config_file`, `lh.state_file`; flxp `shell::settings_path`, `shell::state_file`) and `lhde-theme dirs` lists both.
+  No lhde program reads `~/.config/flxp`, `~/.config/lhshell`, `~/.config/lhwm` or `~/.config/longhorn` any more.
 - `~/.config/lhde/` is also the first tree of every data lookup (docs/LAYOUT.md "The three trees", 2026-10-28): a copy of a
   shipped file under its own relative name overrides the shipped one (`~/.config/lhde/navbar/4074.ini`,
   `~/.config/lhde/frames/jade4074/theme.ini`, `~/.config/lhde/packs/4074-aero/shell.lua`), so nothing under `$PREFIX` needs
@@ -44,9 +51,16 @@ happens when `lhde/settings.ini` exists; a report goes to `lhde/migration.log`):
    value that differed); an empty `[desktop] wallpaper` is removed.
 3. `lhshell/state.ini`: user-facing keys an old lux left there move into settings.ini (lux's rules below), the original is kept
    as `state.ini.pre-lhde`.
-4. `longhorn/settings.ini` becomes `settings.ini.pre-lhde` and a symlink `longhorn/settings.ini -> ../lhde/settings.ini`, so flxp
-   (which reads the old path until the wux side switches, and writes through symlinks) shares the file.
-Until flxp writes theme files, its `[override:NAME]` / `[override]` sections are applied by the resolver as a `settings` layer.
+4. `longhorn/settings.ini` is kept as `settings.ini.pre-lhde`.
+5. Every run, idempotent (2026-10-29): the files that were scattered over `~/.config/{flxp,lhshell,lhwm,longhorn}` move into the
+   two directories above: `flxp/flxp.ini` -> `lhde/flxp.ini`, where the keys that duplicated theme keys (`icons`, `frame`,
+   `taskbar_kind`, `wallpaper`, `wallpaper_mode`, `themes_ini`), `nt5src` and the path overrides the imported Windows tree makes
+   redundant (`font_path`, `longhorn_system32`, `longhorn_wim`, `explorer_resources`, `theme_path`) are removed and reported;
+   `flxp/views`, `flxp/desktop-positions`, `lhshell/state.ini`, `lhshell/mfu.ini` -> the state directory; `lhwm/keys` ->
+   `lhde/keys`; a `longhorn/settings.ini` symlink left by an earlier migration is removed; an emptied old directory is removed,
+   one still holding backups (`*.pre-lhde`, `*.pre-settings`) is left and named. A file that reappears in an old place (an older
+   program) is moved by the next run unless the new one exists. Run by `lhde-session start`, luxshell and luxwm at startup, and
+   the flxp programs when they first read their settings; the report is appended to `lhde/migration.log`.
 
 Result on a copy of aap's config (2026-10-28): the four presets (Aero lotus, MyAero, MyLuna, MySlate4051) became
 `aero-lotus`, `myaero`, `myluna`, `myslate4051`; `[override:aero4074] icons = xp` -> `aero4074-modified.theme` (Desktop.icons =
@@ -98,7 +112,7 @@ the theme registry (`data/themes.ini`, docs/history/THEMES.md) and the live root
   ```
   Everything not overridden comes from the base registry entry. "Save as…" in the settings UI
   writes one of these from the current state.
-- Program-private state stays private: lux's `~/.config/lhshell/state.ini` keeps only runtime
+- Program-private state stays private: lux's `~/.local/state/lhde/luxshell-state.ini` keeps only runtime
   state (tile order, launch counts, window positions) and migrates its user-facing keys to
   `settings.ini` once; flxp keeps `flxp.ini` for its own options; luxwm has none.
 

@@ -199,7 +199,7 @@ int default_view(bool zoomable)
     return v >= 0 ? v : builtin_default(zoomable);
 }
 void set_default(bool zoomable, int view) { shell::write_setting(default_key(zoomable), view < 0 ? "" : name_of(view)); }
-static std::string path() { return shell::config_home() + "/flxp/views"; }
+static std::string path() { return shell::state_file("flxp-views"); }
 
 // (re)read the file when it changed since the last read
 static void load()

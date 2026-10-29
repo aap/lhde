@@ -1,6 +1,6 @@
 # luxwm: a Longhorn-style window manager for X11
 
-> **Imported from the Longhorn X11 lab** (`~/fun/longhorn/x11` at d353b69, lhwm/README.md) into lhde in step 3 of docs/LAYOUT.md. Program and path names are updated to lhde (lhwm → luxwm, lhwmc → luxwmc, lhshell → luxshell, lhnav → luxnav; x11/... and lhwm/themes, lhshell/themes, lhshell/assets → the lhde tree and data directories, see docs/LAYOUT.md and tools/lhde-import); the X atoms (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the window manager name "lhwm", luxnav's C API (`lhnav_*`, `lhnav.h`), configuration paths (`~/.config/longhorn`, `~/.config/lhwm/keys`, `~/.config/lhshell`) and setting values (`header_engine = lhnav`, `classic_start_menu = lhshell`) keep their names. Dated sections are history: they describe the x11 tree as it was (its compare_*.png and screenshots stay in the research workspace).
+> **Imported from the Longhorn X11 lab** (`~/fun/longhorn/x11` at d353b69, lhwm/README.md) into lhde in step 3 of docs/LAYOUT.md. Program and path names are updated to lhde (lhwm → luxwm, lhwmc → luxwmc, lhshell → luxshell, lhnav → luxnav; x11/... and lhwm/themes, lhshell/themes, lhshell/assets → the lhde tree and data directories, see docs/LAYOUT.md and tools/lhde-import); the X atoms (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the window manager name "lhwm", luxnav's C API (`lhnav_*`, `lhnav.h`), configuration paths (`~/.config/longhorn`, `~/.config/lhde/keys`, `~/.config/lhshell`) and setting values (`header_engine = lhnav`, `classic_start_menu = lhshell`) keep their names. Dated sections are history: they describe the x11 tree as it was (its compare_*.png and screenshots stay in the research workspace).
 
 A fork of [berry](https://github.com/JLErvin/berry) (MIT, Joshua L Ervin; see LICENSE), keeping its
 reparent-free design: every client gets a separate decoration window stacked directly beneath it.
@@ -1296,7 +1296,7 @@ Minimise and restore animate the same way from every path: frame button, keybind
   every client and decoration window before mapping them; its value is the animation style (runtime since 2026-10-25, next item; config.h
   `ANIMATE_STYLE` is the default), and each value has its own rule set.
 - **Runtime style (2026-10-25, `SETTINGS.md` "Who writes what").** `settings_load()` reads `[theme] animations = 4074plus | 4074 |
-  invented | 5048 | none` from `$XDG_CONFIG_HOME/longhorn/settings.ini` (default `~/.config/longhorn/settings.ini`; a number 0/1/3/5/7
+  invented | 5048 | none` from `~/.config/lhde/settings.ini` (`$XDG_CONFIG_HOME/lhde/settings.ini`; a number 0/1/3/5/7
   is accepted too) at startup and again on the root ClientMessage `_LH_SETTINGS_CHANGED` (format 32, data[0] the writer's serial, sent
   with SubstructureNotifyMask). While a user preset is selected (`_LH_THEME` = a preset name, "EWMH and the shell") its own
   `[Composition] animations` wins over the file's (log `from preset NAME`). `LHWM_ANIMATIONS=<name>` overrides both (for the lab); a missing file or key, or an unknown name

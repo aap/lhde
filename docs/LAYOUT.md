@@ -56,10 +56,16 @@ WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_D
   import.log
 
 USER FILES                           yours; lhde writes only what you change in its settings UIs
-~/.config/lhde/                      ${XDG_CONFIG_HOME:-~/.config}/lhde
+~/.config/lhde/                      ${XDG_CONFIG_HOME:-~/.config}/lhde: what you chose (docs/SETTINGS.md "Files")
   settings.ini                         per-user settings, the selected theme and its current layer ("NAME (Modified)")
   themes/NAME.theme                    your themes (Save As)
+  flxp.ini                             flxp's preferences (any key also FLXP_<KEY> for one run)
+  keys                                 luxwm's key bindings
   <any shipped path>                   a copy of a shipped file under its own name overrides it (navbar/4074.ini, ...)
+~/.local/state/lhde/                 ${XDG_STATE_HOME:-~/.local/state}/lhde: what the programs remember on their own; losing it
+  luxshell-state.ini                   costs nothing but convenience. The tile order
+  luxshell-mfu.ini                     launch counts behind the start menu's frequently-used list
+  flxp-views, flxp-desktop-positions   the view remembered per folder, the desktop icons' positions
 ```
 
 **Lookup.** A program asks for a file by kind and name, i.e. by its relative name (`styles/jade4074.msstyles`,

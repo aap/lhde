@@ -181,7 +181,7 @@ std::string drop_dest(Browser& b, const FLXPDROP* d, int* item);
 void drop_highlight(Browser& b, int item);   // LVIS_DROPHILITED on item (-1: none)
 extern int g_drop_item;
 
-// ---- views remembered per folder: $XDG_CONFIG_HOME/flxp/views, "path\tview" lines ----
+// ---- views remembered per folder: $XDG_STATE_HOME/lhde/flxp-views, "path\tview" lines ----
 namespace views {
 int lookup(const std::string& folder, bool zoomable);   // -1: keep the current view
 void leaving(const std::string& folder, int view);      // remembered for this window

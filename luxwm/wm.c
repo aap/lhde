@@ -4442,7 +4442,7 @@ compositor_check(void)
     theme_select();
 }
 
-/* ---- keybindings: ~/.config/lhwm/keys (lines: MODS+Key action [arg]); actions: exec, close, kill, cycle, maximize, minimize, sysmenu (the window menu), workspace N, showdesktop, shell CMD (_LHSHELL_COMMAND), start (bare Super → _LHSHELL_START), none ---- */
+/* ---- keybindings: ~/.config/lhde/keys (lines: MODS+Key action [arg]); actions: exec, close, kill, cycle, maximize, minimize, sysmenu (the window menu), workspace N, showdesktop, shell CMD (_LHSHELL_COMMAND), start (bare Super → _LHSHELL_START), none ---- */
 struct keybind { unsigned mods; KeySym sym; char action[16]; char arg[240]; };
 static struct keybind keys[64]; static int nkeys = 0;
 static const char *default_keys[] = {
@@ -4470,8 +4470,10 @@ static void keys_add(const char *line) {
     if (k->sym != NoSymbol) nkeys++;
 }
 static void keys_setup(void) {
-    char path[MAXLEN]; const char *xdg = getenv("XDG_CONFIG_HOME"), *home = getenv("HOME");
-    if (xdg) snprintf(path, sizeof path, "%s/lhwm/keys", xdg); else snprintf(path, sizeof path, "%s/.config/lhwm/keys", home ? home : "");
+    /* the one-time move of ~/.config/{longhorn,lhshell,flxp,lhwm} into lhde's directories (lhde-session does it before us; a
+       luxwm started by hand does it here, so ~/.config/lhde/keys is where the file is by the time we read it) */
+    { static char rep[16384]; if (lhde_settings_migrate(0, rep, sizeof rep) > 0 && rep[0]) fputs(rep, stderr); }
+    char path[MAXLEN]; lhde_config_file("keys", path, sizeof path);
     FILE *f = fopen(path, "r");
     if (f) { char line[300]; while (fgets(line, sizeof line, f)) { line[strcspn(line, "\n")] = 0; if (line[0] && line[0] != '#') keys_add(line); } fclose(f); }
     else for (int i = 0; default_keys[i]; i++) keys_add(default_keys[i]);
@@ -5368,7 +5370,7 @@ anim_style_name(long v)
     return v == ANIM_4074PLUS ? "4074plus" : v == ANIM_4074 ? "4074" : v == ANIM_INVENTED ? "invented" : v == ANIM_5048 ? "5048" : v == ANIM_NONE ? "none" : "?";
 }
 
-/* [theme] animations from $XDG_CONFIG_HOME/longhorn/settings.ini (default ~/.config/longhorn/settings.ini; ../SETTINGS.md), read at
+/* [theme] animations from lhde's settings store (~/.config/lhde/settings.ini, liblhde; docs/SETTINGS.md), read at
    startup and on every _LH_SETTINGS_CHANGED; LHWM_ANIMATIONS=<name> overrides it, config.h ANIMATE_STYLE is the default. A change
    rewrites _LHWM_ANIMATE on every client and decoration window, so picom's rules switch live (a window in a running ANIM_INVENTED
    geometry animation gets the new value when that ends). */
@@ -5662,19 +5664,9 @@ main(int argc, char *argv[])
         }
     }
 
-    if (conf_path[0] == '\0') {
-        char *xdg_home = getenv("XDG_CONFIG_HOME");
-        if (xdg_home != NULL) {
-            snprintf(conf_path, MAXLEN * sizeof(char), "%s/%s", xdg_home, BERRY_AUTOSTART);
-        } else {
-            char *home = getenv("HOME");
-            if (home == NULL) {
-                LOGN("Warning $XDG_CONFIG_HOME and $HOME not found"
-                        "autostart will not be loaded.\n");
-                conf_found = false;
-            }
-            snprintf(conf_path, MAXLEN * sizeof(char), "%s/%s/%s", home, ".config", BERRY_AUTOSTART);
-        }
+    if (conf_path[0] == '\0') {   /* berry's autostart script, now ~/.config/lhde/luxwm-autostart; run only when it exists */
+        lhde_config_file(LUXWM_AUTOSTART, conf_path, MAXLEN);
+        if (access(conf_path, R_OK) != 0) conf_found = false;
     }
 
     if (font_name[0] == '\0') { // font not loaded

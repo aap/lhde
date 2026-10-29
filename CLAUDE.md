@@ -29,7 +29,8 @@ then README.md (build, install, run). docs/README.md lists every document.
   a screenshot; `session/lab.sh stop` cleans up. The lab uses picom's xrender backend; aap's real session (display `:1`) uses
   glx, and some things only show there. Do not kill or restart programs on `:1`.
 - Where does this pixel come from: `build/bin/lhde-theme explain THEME`; `lhde-theme resolve THEME --why`; `lhde-theme dirs`.
-- Settings and files: `~/.config/lhde` (the user's), `~/.local/share/lhde-windows` (imported Windows files; `lhde-import` is its
-  only writer), the install's `share/lhde` (ours). Never write into the Windows tree by hand.
+- Files: `~/.config/lhde` (what the user chose: settings.ini, themes/, flxp.ini, keys), `~/.local/state/lhde` (what programs
+  remember on their own), `~/.local/share/lhde-windows` (imported Windows files; `lhde-import` is its only writer), the install's
+  `share/lhde` (ours). No other directory is read; liblhde gives every path. Never write into the Windows tree by hand.
 - Names: X atoms (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the WM name "lhwm" and the C prefixes (`ut_`, `lhnav_`, `lhde_`) are
   stable; do not rename them.

@@ -133,8 +133,9 @@ the x11 lab).
 flxp needs none: it finds the imported art through the lookup above (`flxp/shell/lhdata.h` over
 `liblhde/data.c`; `flxp --info` prints every lookup and which data directory answered, or "not imported";
 `lhde-theme explain` the same for the whole theme).
-Settings live in `~/.config/flxp/flxp.ini` (any key also as `FLXP_<KEY>` in the environment) and the session
-store `~/.config/lhde/settings.ini` (`~/.config/longhorn/settings.ini` is a symlink to it after the migration); the path keys below are overrides only.
+Settings live in `~/.config/lhde/flxp.ini` (flxp's preferences; any key also as `FLXP_<KEY>` in the environment) and the session
+store `~/.config/lhde/settings.ini`; what flxp remembers on its own (views, icon positions) is in `~/.local/state/lhde/`
+(docs/SETTINGS.md "Files"). The path keys below exist as `FLXP_<KEY>` for one run only; the theme supplies the files.
 
 | key | default (lhde's data directories) |
 |-----|-----------------------------------|

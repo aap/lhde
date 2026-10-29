@@ -546,8 +546,10 @@ int lhde_dirs_report(void)
         tree_line("old layout", lhde_old_dir(), NULL);
         printf("    the old layout: Windows files mixed with program files; `lhde-import --migrate -n` shows the move, --migrate does it\n");
     }
-    printf("User files:\n");
-    tree_line("config", lhde_config_dir(buf, sizeof buf), NULL);
+    printf("User files (docs/SETTINGS.md \"Files\"):\n");
+    tree_line("config", lhde_config_dir(buf, sizeof buf), "what you chose: settings.ini, themes/, flxp.ini, keys, overridden shipped files");
+    if (isdir(buf)) entries(buf, "    ");
+    tree_line("state", lhde_state_dir(buf, sizeof buf), "what the programs remember: tile order, launch counts, remembered views, icon positions");
     if (isdir(buf)) entries(buf, "    ");
     printf("\nSearch order (first match wins; lhde-theme find REL looks a name up):\n");
     for (int i = 0; i < n; i++) printf("  %d. %-12s %s\n", i + 1, lhde_tree_name(lhde_data_dir_kind(i)), tilde(dirs[i], t, sizeof t));

@@ -23,6 +23,24 @@ const char *lhde_config_dir(char *out, size_t n)
     snprintf(out, n, "%s/lhde", c);
     return out;
 }
+const char *lhde_state_dir(char *out, size_t n)
+{
+    const char *x = getenv("XDG_STATE_HOME"), *h = getenv("HOME");
+    if (x && *x == '/') snprintf(out, n, "%s/lhde", x); else snprintf(out, n, "%s/.local/state/lhde", h ? h : ".");
+    return out;
+}
+const char *lhde_config_file(const char *name, char *out, size_t n)
+{
+    char d[PATH_MAX]; lhde_config_dir(d, sizeof d); lhde__mkdirs(d);
+    snprintf(out, n, "%s/%s", d, name);
+    return out;
+}
+const char *lhde_state_file(const char *name, char *out, size_t n)
+{
+    char d[PATH_MAX]; lhde_state_dir(d, sizeof d); lhde__mkdirs(d);
+    snprintf(out, n, "%s/%s", d, name);
+    return out;
+}
 const char *lhde_settings_path(char *out, size_t n)
 {
     const char *e = getenv("LHDE_SETTINGS");
@@ -323,10 +341,8 @@ static void st_key(const char *k, const char *v, void *ud)
     }
 }
 
-int lhde_settings_migrate(int force, char *report, size_t n)
+static int migrate_settings(int force, struct rep *r)
 {
-    struct rep r = { report, n, 0, 0 };
-    if (report && n) report[0] = 0;
     char ch[PATH_MAX], newp[PATH_MAX], cdir[PATH_MAX], udir[PATH_MAX], oldp[PATH_MAX + 64], olddir[PATH_MAX + 64], state[PATH_MAX + 64];
     lhde__config_home(ch, sizeof ch);
     lhde_settings_path(newp, sizeof newp);
@@ -339,8 +355,8 @@ int lhde_settings_migrate(int force, char *report, size_t n)
     int old_is_link = lstat(oldp, &lst) == 0 && S_ISLNK(lst.st_mode);
     if (lhde__exists(newp) && !force) return 0;
     if (!lhde__exists(oldp) && !lhde__is_dir(olddir) && !lhde__exists(state)) return 0;   /* nothing of the old layout */
-    if (lhde__mkdirs(udir)) { say(&r, "cannot create %s: %s", udir, strerror(errno)); return -1; }
-    say(&r, "lhde: migrating %s/{longhorn,lhshell} to %s", ch, cdir);
+    if (lhde__mkdirs(udir)) { say(r, "cannot create %s: %s", udir, strerror(errno)); return -1; }
+    say(r, "lhde: migrating %s/{longhorn,lhshell} to %s", ch, cdir);
     lhde_ini *dst = lhde__exists(newp) ? lhde_ini_load(newp) : (!old_is_link && lhde__exists(oldp) ? lhde_ini_load(oldp) : lhde_ini_new());
     if (!dst) return -1;
     int count = 0;
@@ -354,7 +370,7 @@ int lhde_settings_migrate(int force, char *report, size_t n)
             size_t l = strlen(e->d_name);
             if (l < 7 || strcmp(e->d_name + l - 6, ".theme")) continue;
             char src[PATH_MAX + 300], nn[256]; snprintf(src, sizeof src, "%s/%s", olddir, e->d_name);
-            if (migrate_preset(&r, src, udir, nn, sizeof nn)) count++;
+            if (migrate_preset(r, src, udir, nn, sizeof nn)) count++;
             if (nren < 64) { snprintf(ren[nren][0], 256, "%.*s", (int)(l - 6), e->d_name); snprintf(ren[nren][1], 256, "%s", nn); nren++; }
         }
         closedir(d);
@@ -365,7 +381,7 @@ int lhde_settings_migrate(int force, char *report, size_t n)
         char nv[256] = "";
         for (int i = 0; i < nren; i++) if (!strcmp(ren[i][0], v)) snprintf(nv, sizeof nv, "%s", ren[i][1]);
         if (!nv[0]) new_name(v, nv, sizeof nv);
-        if (strcmp(nv, v)) { lhde_ini_set(dst, "theme", "name", nv); say(&r, "  [theme] name = %s -> %s", v, nv); count++; }
+        if (strcmp(nv, v)) { lhde_ini_set(dst, "theme", "name", nv); say(r, "  [theme] name = %s -> %s", v, nv); count++; }
         snprintf(selected, sizeof selected, "%s", nv);
     }
     /* 3. [override:NAME] -> NAME-modified.theme; [override] (all themes) -> the selected theme's */
@@ -380,10 +396,10 @@ int lhde_settings_migrate(int force, char *report, size_t n)
         lhde_ini_keys(dst, ss.names[i], kv_add, &c);
         char tname[300]; snprintf(tname, sizeof tname, "%s-modified", canon);
         char origin[400]; snprintf(origin, sizeof origin, "settings.ini [%s]", ss.names[i]);
-        int stored = c.n ? write_modified(&r, udir, tname, canon, NULL, keys, vals, c.n, origin) : 0;
-        if (!stored) say(&r, "  %s: nothing that differs from %s, no theme file", origin, canon);
+        int stored = c.n ? write_modified(r, udir, tname, canon, NULL, keys, vals, c.n, origin) : 0;
+        if (!stored) say(r, "  %s: nothing that differs from %s, no theme file", origin, canon);
         lhde_ini_remove_section(dst, ss.names[i]); count++;
-        if (stored && !strcmp(selected, canon)) { lhde_ini_set(dst, "theme", "name", tname); say(&r, "  [theme] name = %s -> %s", canon, tname); snprintf(selected, sizeof selected, "%s", tname); }
+        if (stored && !strcmp(selected, canon)) { lhde_ini_set(dst, "theme", "name", tname); say(r, "  [theme] name = %s -> %s", canon, tname); snprintf(selected, sizeof selected, "%s", tname); }
     }
     if (lhde_ini_has_section(dst, "override")) {
         struct kv c = { keys, vals, 0, 32, "override" };
@@ -392,11 +408,11 @@ int lhde_settings_migrate(int force, char *report, size_t n)
             size_t sl = strlen(selected);
             char tname[300]; if (sl > 9 && !strcmp(selected + sl - 9, "-modified")) snprintf(tname, sizeof tname, "%s", selected); else snprintf(tname, sizeof tname, "%s-modified", selected);
             char base[256]; snprintf(base, sizeof base, "%s", selected); if (!strcmp(tname, selected)) { char *m = strstr(base, "-modified"); if (m) *m = 0; }
-            if (write_modified(&r, udir, tname, base, NULL, keys, vals, c.n, "settings.ini [override] (all themes; now the selected theme's)") && strcmp(selected, tname)) {
+            if (write_modified(r, udir, tname, base, NULL, keys, vals, c.n, "settings.ini [override] (all themes; now the selected theme's)") && strcmp(selected, tname)) {
                 lhde_ini_set(dst, "theme", "name", tname); snprintf(selected, sizeof selected, "%s", tname); }
         }
         lhde_ini_remove_section(dst, "override"); count++;
-        say(&r, "  [override] removed (no all-themes layer any more; other themes keep their own values)");
+        say(r, "  [override] removed (no all-themes layer any more; other themes keep their own values)");
     }
     /* 4. the global fallbacks of per-theme keys: the theme decides now */
     static const char *const gone[][3] = { { "theme", "composition", "the theme's Glass.composition" }, { "theme", "animations", "the theme's Glass.animations" },
@@ -411,19 +427,19 @@ int lhde_settings_migrate(int force, char *report, size_t n)
             if (map_override(lk, v, key, sizeof key, val, sizeof val)) {
                 lhde_theme *st = lhde_theme_resolve(selected, NULL, 0);
                 const char *have = st ? lhde_theme_get(st, key) : NULL;
-                if (have && strcmp(have, val)) say(&r, "  [%s] %s = %s differs from %s's %s = %s: the theme's value wins now (set it in the theme to keep it)",
+                if (have && strcmp(have, val)) say(r, "  [%s] %s = %s differs from %s's %s = %s: the theme's value wins now (set it in the theme to keep it)",
                                                    gone[i][0], gone[i][1], v, selected, key, have);
                 lhde_theme_free(st);
             }
         }
         lhde_ini_set(dst, gone[i][0], gone[i][1], NULL); count++;
-        say(&r, "  [%s] %s = %s removed: %s", gone[i][0], gone[i][1], v, gone[i][2]);
+        say(r, "  [%s] %s = %s removed: %s", gone[i][0], gone[i][1], v, gone[i][2]);
     }
-    if (lhde_ini_get(dst, "desktop", "wallpaper", v, sizeof v) && !v[0]) { lhde_ini_set(dst, "desktop", "wallpaper", NULL); say(&r, "  [desktop] wallpaper (empty) removed: the theme's"); }
+    if (lhde_ini_get(dst, "desktop", "wallpaper", v, sizeof v) && !v[0]) { lhde_ini_set(dst, "desktop", "wallpaper", NULL); say(r, "  [desktop] wallpaper (empty) removed: the theme's"); }
     /* 5. state.ini: user-facing keys left there by a lux from before the settings store */
     if (lhde__exists(state)) {
         lhde_ini *st = lhde_ini_load(state);
-        struct stctx c; memset(&c, 0, sizeof c); c.st = st; c.dst = dst; c.r = &r;
+        struct stctx c; memset(&c, 0, sizeof c); c.st = st; c.dst = dst; c.r = r;
         struct secs s2; s2.n = 0; lhde_ini_sections(st, sec_add, &s2);
         for (int i = 0; i < s2.n; i++) { c.sec = s2.names[i]; lhde_ini_keys(st, s2.names[i], st_key, &c); }
         if (c.nd) {
@@ -432,7 +448,7 @@ int lhde_settings_migrate(int force, char *report, size_t n)
             for (int i = 0; i < c.nd; i++) lhde_ini_set(st, c.drop[i][0], c.drop[i][1], NULL);
             lhde_ini_save(st, state);
             count += c.moved;
-        } else say(&r, "  %s: runtime state only, unchanged", state);
+        } else say(r, "  %s: runtime state only, unchanged", state);
         lhde_ini_free(st);
     }
     /* 6. the header, then the file; the old path becomes a symlink to it */
@@ -454,21 +470,104 @@ int lhde_settings_migrate(int force, char *report, size_t n)
         char *all = malloc(L);
         if (all) {
             snprintf(all, L, "%s%s%s", h, h[0] ? "\n" : "", body ? body : "");
-            if (lhde__write_file(newp, all)) { say(&r, "cannot write %s: %s", newp, strerror(errno)); free(all); free(h); free(t); lhde_ini_free(out); lhde_ini_free(dst); return -1; }
+            if (lhde__write_file(newp, all)) { say(r, "cannot write %s: %s", newp, strerror(errno)); free(all); free(h); free(t); lhde_ini_free(out); lhde_ini_free(dst); return -1; }
             free(all);
         }
         free(h); free(t); lhde_ini_free(out);
     }
     lhde_ini_free(dst);
-    say(&r, "  wrote %s", newp);
+    say(r, "  wrote %s", newp);
     if (lhde__exists(oldp) && !old_is_link) {
         char bak[PATH_MAX + 64]; snprintf(bak, sizeof bak, "%s.pre-lhde", oldp);
         if (!lhde__exists(bak)) rename(oldp, bak); else unlink(oldp);
-        char rel[PATH_MAX + 32]; snprintf(rel, sizeof rel, "../lhde/settings.ini");
-        if (!getenv("LHDE_SETTINGS") && symlink(rel, oldp) == 0) say(&r, "  %s -> %s (the old path, for programs that still read it; the original is %s)", oldp, rel, bak);
+        say(r, "  %s kept as %s", oldp, bak);
     }
     lhde_settings_reload();
-    /* the report is kept beside the settings */
-    if (report && report[0]) { char lp[PATH_MAX + 32]; snprintf(lp, sizeof lp, "%s/migration.log", cdir); lhde__write_file(lp, report); }
     return count ? count : 1;
+}
+
+/* ---- the files that were scattered over ~/.config/{flxp,lhshell,lhwm,longhorn}: into lhde's config and state directories ---- */
+static int move_file(const char *src, const char *dst)
+{
+    char d[PATH_MAX]; snprintf(d, sizeof d, "%s", dst); char *sl = strrchr(d, '/'); if (sl) { *sl = 0; lhde__mkdirs(d); }
+    if (rename(src, dst) == 0) return 0;
+    if (errno != EXDEV) return -1;
+    FILE *in = fopen(src, "rb"); if (!in) return -1;
+    char tmp[PATH_MAX + 8]; snprintf(tmp, sizeof tmp, "%s.tmp", dst);
+    FILE *out = fopen(tmp, "wb"); if (!out) { fclose(in); return -1; }
+    char buf[65536]; size_t k; int bad = 0;
+    while ((k = fread(buf, 1, sizeof buf, in)) > 0) if (fwrite(buf, 1, k, out) != k) { bad = 1; break; }
+    fclose(in); if (fclose(out) || bad || rename(tmp, dst)) { unlink(tmp); return -1; }
+    unlink(src); return 0;
+}
+/* one file: moved when the source exists and the destination does not; the source left alone when both exist (reported) */
+static int move_one(struct rep *r, const char *src, const char *dst, int *count)
+{
+    if (!lhde__exists(src)) return 0;
+    if (lhde__exists(dst)) { say(r, "  %s: left, %s exists already", src, dst); return 0; }
+    if (move_file(src, dst)) { say(r, "  cannot move %s to %s: %s", src, dst, strerror(errno)); return -1; }
+    say(r, "  %s -> %s", src, dst); (*count)++;
+    return 1;
+}
+/* flxp.ini keys that are not flxp's to keep: the ones that duplicated theme keys (the theme decides; FLXP_<KEY> in the
+   environment still counts for one run) and the path overrides that the resolver's imported Windows tree makes redundant */
+static void prune_flxp_ini(struct rep *r, const char *path)
+{
+    static const char *const gone[][2] = {
+        { "icons", "the theme's Desktop.icons" }, { "frame", "the theme's Explorer.chrome" }, { "taskbar_kind", "the theme's Shell.taskbar" },
+        { "wallpaper", "the theme's Desktop.wallpaper" }, { "wallpaper_mode", "the theme's Desktop.mode" }, { "themes_ini", "the theme files" },
+        { "nt5src", "XP's art is read by resource id from the imported resources/xp" },
+        { "font_path", "the theme's fonts (imported fonts/<build>, then fontconfig)" }, { "longhorn_system32", "the theme's resources/<build>" },
+        { "longhorn_wim", "the imported resources/<build>" }, { "explorer_resources", "the imported resources/<build>" },
+        { "theme_path", "styles come from the Windows tree (lhde-import --style FILE NAME drops one in)" }, { NULL, NULL } };
+    lhde_ini *ini = lhde_ini_load(path); if (!ini) return;
+    int changed = 0; char v[1024];
+    for (int i = 0; gone[i][0]; i++) {
+        if (!lhde_ini_get(ini, "flxp", gone[i][0], v, sizeof v)) continue;
+        if (v[0]) {
+            char env[64]; snprintf(env, sizeof env, "%s", gone[i][0]); for (char *c = env; *c; c++) *c = toupper((unsigned char)*c);
+            say(r, "    %s = %s removed: %s (FLXP_%s in the environment for one run)", gone[i][0], v, gone[i][1], env);
+        }
+        lhde_ini_set(ini, "flxp", gone[i][0], NULL); changed = 1;
+    }
+    if (changed) lhde_ini_save(ini, path);
+    lhde_ini_free(ini);
+}
+static int migrate_files(struct rep *r)
+{
+    char ch[PATH_MAX], cdir[PATH_MAX], sdir[PATH_MAX], src[PATH_MAX + 64], dst[PATH_MAX + 64];
+    lhde__config_home(ch, sizeof ch); lhde_config_dir(cdir, sizeof cdir); lhde_state_dir(sdir, sizeof sdir);
+    int count = 0, rc;
+    snprintf(src, sizeof src, "%s/flxp/flxp.ini", ch); snprintf(dst, sizeof dst, "%s/flxp.ini", cdir);
+    if ((rc = move_one(r, src, dst, &count)) > 0) prune_flxp_ini(r, dst);
+    snprintf(src, sizeof src, "%s/flxp/views", ch); snprintf(dst, sizeof dst, "%s/flxp-views", sdir); move_one(r, src, dst, &count);
+    snprintf(src, sizeof src, "%s/flxp/desktop-positions", ch); snprintf(dst, sizeof dst, "%s/flxp-desktop-positions", sdir); move_one(r, src, dst, &count);
+    snprintf(src, sizeof src, "%s/lhshell/state.ini", ch); snprintf(dst, sizeof dst, "%s/luxshell-state.ini", sdir); move_one(r, src, dst, &count);
+    snprintf(src, sizeof src, "%s/lhshell/mfu.ini", ch); snprintf(dst, sizeof dst, "%s/luxshell-mfu.ini", sdir); move_one(r, src, dst, &count);
+    snprintf(src, sizeof src, "%s/lhwm/keys", ch); snprintf(dst, sizeof dst, "%s/keys", cdir); move_one(r, src, dst, &count);
+    snprintf(src, sizeof src, "%s/longhorn/settings.ini", ch);
+    { struct stat st; if (lstat(src, &st) == 0 && S_ISLNK(st.st_mode) && unlink(src) == 0) { say(r, "  %s (a symlink to lhde's; nothing reads it) removed", src); count++; } }
+    static const char *const olddirs[] = { "flxp", "lhshell", "lhwm", "longhorn", NULL };
+    for (int i = 0; olddirs[i]; i++) {
+        snprintf(src, sizeof src, "%s/%s", ch, olddirs[i]);
+        if (lhde__is_dir(src) && rmdir(src) == 0) { say(r, "  %s (empty) removed", src); count++; }
+        else if (lhde__is_dir(src) && count) say(r, "  %s left: it still holds files (backups of the earlier migrations, or something that is not lhde's)", src);
+    }
+    return count;
+}
+
+int lhde_settings_migrate(int force, char *report, size_t n)
+{
+    struct rep r = { report, n, 0, 0 };
+    if (report && n) report[0] = 0;
+    int a = migrate_settings(force, &r);
+    if (a < 0) return -1;
+    int b = migrate_files(&r);
+    if (b < 0) return -1;
+    if (report && report[0]) {   /* the report is kept beside the settings, appended */
+        char cdir[PATH_MAX], lp[PATH_MAX + 32]; lhde_config_dir(cdir, sizeof cdir); lhde__mkdirs(cdir);
+        snprintf(lp, sizeof lp, "%s/migration.log", cdir);
+        FILE *f = fopen(lp, "a"); if (f) { fputs(report, f); if (report[strlen(report) - 1] != '\n') fputc('\n', f); fclose(f); }
+    }
+    return a + b;
 }

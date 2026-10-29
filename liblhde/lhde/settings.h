@@ -48,6 +48,13 @@ int lhde_ini_save(const lhde_ini *ini, const char *path);
 /* the settings file (above) and the directory of the user's theme files, ${XDG_CONFIG_HOME:-~/.config}/lhde/themes */
 const char *lhde_settings_path(char *out, size_t n);
 const char *lhde_config_dir(char *out, size_t n);       /* ${XDG_CONFIG_HOME:-~/.config}/lhde */
+/* The user's two directories (docs/SETTINGS.md "Files"). What the user chose: ${XDG_CONFIG_HOME:-~/.config}/lhde (settings.ini,
+   themes/, flxp.ini, keys, any shipped file overridden under its own name). What a program remembers on its own:
+   ${XDG_STATE_HOME:-~/.local/state}/lhde (luxshell-state.ini, luxshell-mfu.ini, flxp-views, flxp-desktop-positions). The two
+   calls below give the path of a named file in them and create the directory when it is missing. */
+const char *lhde_state_dir(char *out, size_t n);        /* ${XDG_STATE_HOME:-~/.local/state}/lhde */
+const char *lhde_config_file(const char *name, char *out, size_t n);
+const char *lhde_state_file(const char *name, char *out, size_t n);
 /* the value of SEC.KEY (the file is read again when its mtime or size changed); NULL when absent or empty */
 const char *lhde_settings_get(const char *sec, const char *key, char *buf, size_t n);
 /* write SEC.KEY (value NULL removes it); 1 when the file changed, 0 when the value was already that, -1 on an error */
@@ -67,10 +74,15 @@ void lhde_settings_reload(void);
        style, [Composition] -> [Glass], [Frames] frame -> frames, [Shell] shell -> pack, [Desktop] icons longhorn -> longhorn4074)
      - lhshell/state.ini: the user-facing keys its own migration left there (before 2026-10-25) move into settings.ini
        (lux's old rules), the runtime state (tile order) stays
-     - then longhorn/settings.ini is kept as settings.ini.pre-lhde and replaced by a symlink to ../lhde/settings.ini, so a
-       program that still reads the old path (flxp until the wux side switches) reads and writes the same file
-   Runs once: nothing happens when lhde/settings.ini exists (force = 1: again, keeping what lhde/ has). report gets a
-   human-readable summary (may be NULL). Returns the number of items moved, 0 when there was nothing to do, -1 on an error. */
+     - then longhorn/settings.ini is kept as settings.ini.pre-lhde
+   That part runs once: nothing happens when lhde/settings.ini exists (force = 1: again, keeping what lhde/ has).
+   Then, every time (idempotent, a few stats when there is nothing to do), the files that were scattered over other
+   directories move to the two of lhde (above): flxp/flxp.ini -> lhde/flxp.ini (the keys that duplicated theme keys and the
+   path overrides the resolver makes redundant are removed and reported), flxp/views and flxp/desktop-positions ->
+   state/lhde/flxp-views, flxp-desktop-positions; lhshell/state.ini, mfu.ini -> state/lhde/luxshell-state.ini, luxshell-mfu.ini;
+   lhwm/keys -> lhde/keys; a longhorn/settings.ini symlink (which an earlier migration made) is removed; an emptied old
+   directory is removed. report gets a human-readable summary (may be NULL), also appended to lhde/migration.log.
+   Returns the number of items moved, 0 when there was nothing to do, -1 on an error. */
 int lhde_settings_migrate(int force, char *report, size_t n);
 
 #ifdef __cplusplus

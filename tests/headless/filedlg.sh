@@ -8,7 +8,7 @@
 D=${1:-:73}
 T=$(mktemp -d)
 B=$(cd "$(dirname "$0")/../.." && pwd)/build/bin/flxp-filedialog
-mkdir -p $T/home/.config/flxp $T/dir/Projects $T/dir/Photos
+mkdir -p $T/home/.config/lhde $T/dir/Projects $T/dir/Photos
 for f in notes.txt todo.txt Budget.xls Accounts.xls readme.md; do echo x > "$T/dir/$f"; done
 export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config DISPLAY=$D
 Xvfb $D -screen 0 1280x800x24 -nolisten tcp >/dev/null 2>&1 & XP=$!
@@ -75,30 +75,30 @@ echo "-- longhorn only"
 run longhorn geom -- --save > /dev/null; full=$(cut -dx -f2 $T/geom)
 run longhorn alt+h sleep geom Escape -- --save > /dev/null; small=$(cut -dx -f2 $T/geom)
 check "hide explorer shrinks" "yes" "$([ -n "$small" ] && [ -n "$full" ] && [ "$small" -lt $((full - 150)) ] && echo yes || echo "no ($full -> $small)")"
-check "hide explorer remembered" "filedlg_explorer = 0" "$(grep '^filedlg_explorer' $HOME/.config/flxp/flxp.ini)"
+check "hide explorer remembered" "filedlg_explorer = 0" "$(grep '^filedlg_explorer' $HOME/.config/lhde/flxp.ini)"
 run longhorn geom alt+b sleep Escape -- --save > /dev/null; again=$(cut -dx -f2 $T/geom)
 check "starts hidden" "$small" "$again"
-check "browse folders remembered" "filedlg_explorer = 1" "$(grep '^filedlg_explorer' $HOME/.config/flxp/flxp.ini)"
+check "browse folders remembered" "filedlg_explorer = 1" "$(grep '^filedlg_explorer' $HOME/.config/lhde/flxp.ini)"
 check "accept while hidden" "0 $T/dir/kept.txt|" "$(run longhorn alt+h ctrl+a type:kept.txt Return -- --save)"
 run longhorn alt+b sleep Escape -- --save > /dev/null
 # Show in Groups from the list's background menu (right-click: View > Show in Groups)
-check "groups on by default" "" "$(grep '^filedlg_groups' $HOME/.config/flxp/flxp.ini)"
+check "groups on by default" "" "$(grep '^filedlg_groups' $HOME/.config/lhde/flxp.ini)"
 run longhorn click3:650,300 v g sleep Escape -- --open > /dev/null
-check "groups off remembered" "filedlg_groups = 0" "$(grep '^filedlg_groups' $HOME/.config/flxp/flxp.ini)"
+check "groups off remembered" "filedlg_groups = 0" "$(grep '^filedlg_groups' $HOME/.config/lhde/flxp.ini)"
 run longhorn click3:650,300 v g sleep Escape -- --open > /dev/null
-check "groups on again" "filedlg_groups = 1" "$(grep '^filedlg_groups' $HOME/.config/flxp/flxp.ini)"
-check "size remembered" "yes" "$(grep -q '^filedlg_size = [0-9]*x[0-9]*' $HOME/.config/flxp/flxp.ini && echo yes)"
+check "groups on again" "filedlg_groups = 1" "$(grep '^filedlg_groups' $HOME/.config/lhde/flxp.ini)"
+check "size remembered" "yes" "$(grep -q '^filedlg_size = [0-9]*x[0-9]*' $HOME/.config/lhde/flxp.ini && echo yes)"
 # The view keys (browser::view_key): Ctrl+3 big icons with thumbnails, Ctrl+1
 # Details keeping the thumbnails toggle, Ctrl+2 Icons at 48 px, Ctrl+0 the
 # default view (Longhorn: Icons at 48 px with thumbnails); remembered in filedlg_view
 run longhorn ctrl+3 sleep Escape -- --open > /dev/null
-check "ctrl+3 thumbnails" "filedlg_view = thumbnails@96" "$(grep '^filedlg_view' $HOME/.config/flxp/flxp.ini)"
+check "ctrl+3 thumbnails" "filedlg_view = thumbnails@96" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
 run longhorn ctrl+1 sleep Escape -- --open > /dev/null
-check "toggle kept in details" "filedlg_view = details+thumbnails@96" "$(grep '^filedlg_view' $HOME/.config/flxp/flxp.ini)"
+check "toggle kept in details" "filedlg_view = details+thumbnails@96" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
 run longhorn ctrl+2 sleep Escape -- --open > /dev/null
-check "ctrl+2 icons" "filedlg_view = thumbnails@48" "$(grep '^filedlg_view' $HOME/.config/flxp/flxp.ini)"
+check "ctrl+2 icons" "filedlg_view = thumbnails@48" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
 run longhorn ctrl+4 ctrl+0 sleep Escape -- --open > /dev/null
-check "ctrl+0 default view" "filedlg_view = thumbnails@48" "$(grep '^filedlg_view' $HOME/.config/flxp/flxp.ini)"
+check "ctrl+0 default view" "filedlg_view = thumbnails@48" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
 
 kill $XP 2>/dev/null
 rm -rf $T

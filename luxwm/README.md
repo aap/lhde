@@ -14,6 +14,6 @@ the manual is docs/LUXWM.md, the client protocol (extended glass frames, header 
   pixels in the Windows tree (`~/.local/share/lhde-windows/generated/frames`, tools/lhde-import), found through liblhde/data.c. luxwm publishes the registry's
   resolved copy as `_LH_THEMES_INI`.
 - Names kept from lhwm: the X atoms (`_LHWM_*`), the window manager's `_NET_WM_NAME` "lhwm" (luxshell and flxp's log-off know
-  it by that), `LHWM_*` environment variables, `~/.config/lhwm/keys`. `make install` adds `lhwm` and `lhwmc` symlinks.
+  it by that), `LHWM_*` environment variables, `~/.config/lhde/keys`. `make install` adds `lhwm` and `lhwmc` symlinks.
 - tests/: frametest (renders frames offline), menutest, regress.sh, and small X clients for the lab (desktopwin, dockorder,
   strutdock); examples/: berry's autostart and sxhkdrc samples (its xephyr.sh dev script, which runs killall, is not imported).

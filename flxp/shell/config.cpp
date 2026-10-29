@@ -26,6 +26,27 @@ static std::string env_or(const char* var, const std::string& fallback)
 
 std::string config_home() { return env_or("XDG_CONFIG_HOME", home_dir() + "/.config"); }
 std::string data_home() { return env_or("XDG_DATA_HOME", home_dir() + "/.local/share"); }
+std::string state_home() { return env_or("XDG_STATE_HOME", home_dir() + "/.local/state"); }
+
+// liblhde's one-time move of the files an earlier flxp kept in ~/.config/flxp (flxp.ini, views, desktop-positions) into lhde's
+// directories (docs/SETTINGS.md "Files"); weak: flxp-portal links without liblhde and only reads
+extern "C" int lhde_settings_migrate(int force, char *report, size_t n) __attribute__((weak));
+static void migrate_once()
+{
+    static bool done = false;
+    if (done || !lhde_settings_migrate) return;
+    done = true;
+    static char rep[16384];
+    if (lhde_settings_migrate(0, rep, sizeof rep) > 0 && rep[0]) fputs(rep, stderr);
+}
+
+static std::string lhde_dir(const std::string& base)
+{
+    std::string d = base + "/lhde";
+    mkdir(d.c_str(), 0755);   // the parent exists in practice (~/.config, ~/.local/state); the write is atomic and fails loudly otherwise
+    return d;
+}
+std::string state_file(const char* name) { migrate_once(); return lhde_dir(state_home()) + "/" + name; }
 
 static std::vector<std::string> split_dirs(const char* var, const char* fallback)
 {
@@ -81,7 +102,7 @@ static const char* retired_key(const std::string& key)
 std::string file_setting(const std::string& key, const std::string& fallback)
 {
     std::string text;
-    if (!read_file(config_home() + "/flxp/flxp.ini", text)) return store_or(key, fallback);
+    if (!read_file(settings_path(), text)) return store_or(key, fallback);
     size_t i = 0;
     while (i < text.size()) {
         size_t j = text.find('\n', i);
@@ -116,7 +137,7 @@ std::string setting(const std::string& key, const std::string& fallback)
     return file_setting(key, fallback);
 }
 
-std::string settings_path() { return config_home() + "/flxp/flxp.ini"; }
+std::string settings_path() { migrate_once(); return lhde_dir(config_home()) + "/flxp.ini"; }
 
 bool write_setting(const std::string& key, const std::string& value)
 {

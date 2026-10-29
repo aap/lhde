@@ -1,6 +1,6 @@
 # How to use the Longhorn X11 lab
 
-> **Imported from the Longhorn X11 lab** (`~/fun/longhorn/x11` at d353b69, USAGE.md) into lhde in step 3 of docs/LAYOUT.md. Program and path names are updated to lhde (lhwm → luxwm, lhwmc → luxwmc, lhshell → luxshell, lhnav → luxnav; x11/... and lhwm/themes, lhshell/themes, lhshell/assets → the lhde tree and data directories, see docs/LAYOUT.md and tools/lhde-import); the X atoms (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the window manager name "lhwm", luxnav's C API (`lhnav_*`, `lhnav.h`), configuration paths (`~/.config/longhorn`, `~/.config/lhwm/keys`, `~/.config/lhshell`) and setting values (`header_engine = lhnav`, `classic_start_menu = lhshell`) keep their names. Dated sections are history: they describe the x11 tree as it was (its compare_*.png and screenshots stay in the research workspace).
+> **Imported from the Longhorn X11 lab** (`~/fun/longhorn/x11` at d353b69, USAGE.md) into lhde in step 3 of docs/LAYOUT.md. Program and path names are updated to lhde (lhwm → luxwm, lhwmc → luxwmc, lhshell → luxshell, lhnav → luxnav; x11/... and lhwm/themes, lhshell/themes, lhshell/assets → the lhde tree and data directories, see docs/LAYOUT.md and tools/lhde-import); the X atoms (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the window manager name "lhwm", luxnav's C API (`lhnav_*`, `lhnav.h`), configuration paths (`~/.config/longhorn`, `~/.config/lhde/keys`, `~/.config/lhshell`) and setting values (`header_engine = lhnav`, `classic_start_menu = lhshell`) keep their names. Dated sections are history: they describe the x11 tree as it was (its compare_*.png and screenshots stay in the research workspace).
 
 Names: **luxwm** is the window manager; **lux** is the Lua/cairo Avalon-style shell (taskbar, sidebar, tiles, toasts, start menu; the directory and binary are `luxshell`, its windows' X class still `lhshell`); **flxp** is the Win32-style explorer, taskbar and desktop built on the **wux** win32 layer (`~/src/flxp`). Shared pieces: `themes.ini` (docs/history/THEMES.md), `settings.ini` (SETTINGS.md).
 
@@ -144,7 +144,7 @@ lhde-theme styles | schemes             the visual styles and the classic scheme
 lhde-theme set-key aero4074 Glass.composition off    -> aero4074-modified.theme (the earlier model; luxshell's flyout)
 lhde-theme setting sidebar width 200    a per-user key; without VALUE: print it
 lhde-theme style jade4074               what liblhde reads from a style (kind, format, build, family, first scheme)
-lhde-theme migrate                      ~/.config/longhorn + ~/.config/lhshell -> ~/.config/lhde (once)
+lhde-theme migrate                      ~/.config/{longhorn,lhshell,flxp,lhwm} -> ~/.config/lhde + ~/.local/state/lhde (once)
 lhde-theme registry                     the compatibility themes.ini for flxp
 lhde-theme explain [THEME]              where every visible part comes from ("When something looks wrong" above)
 lhde-theme dirs [--list|--windows|--user]   the three trees and the search order; --list for scripts
@@ -156,7 +156,7 @@ lhde-theme find REL | find KIND NAME    one data file (exit 1 when no tree has i
 One setting for everything (`SHELL-DESIGN.md` 6.1, details for client authors in `docs/history/THEMES.md`): the root property
 `_LH_THEME` holds a theme *name* from the registry `themes.ini`. luxwm picks its frames from it, luxshell its taskbar/sidebar
 pack and the wallpaper, and clients (extendframe, flxp) their visual style and glass; all of them follow a change live, nothing
-restarts. lux remembers the last theme in `~/.config/longhorn/settings.ini` (`[theme] name`, below) and publishes it when a session
+restarts. lux remembers the last theme in `~/.config/lhde/settings.ini` (`[theme] name`, below) and publishes it when a session
 starts without one. Your own variants of a theme (presets) are described under "Settings and presets" below.
 
 | Name | Frames | Shell pack | Compositor |
@@ -212,7 +212,7 @@ icon is redrawn at once.
 when no registry theme is known.
 
 Session commands (luxshell, 6.2; the start menu's Log Off / Stand by / Shut down use them after a confirmation flyout): `logoff`, `standby`, `shutdown`, `restart`, `lock`, overridable
-in `~/.config/longhorn/settings.ini` under `[commands]` (`name = shell command`). Defaults: `logoff` = `lhde-session stop` in
+in `~/.config/lhde/settings.ini` under `[commands]` (`name = shell command`). Defaults: `logoff` = `lhde-session stop` in
 the tty8 session, else `luxwmc quit` (luxwm exits cleanly: its root properties are deleted, the windows stay mapped; the
 lab's `restart-wm` brings it back); `standby` = `zzz` if installed, else `loginctl suspend`; `shutdown` = `loginctl poweroff`;
 `restart` = `loginctl reboot`; `lock` = `xlock` or `slock` if installed. From a terminal:
@@ -241,7 +241,7 @@ property `_FLXP_WALLPAPER` (SETTINGS.md "Resolved theme": the registry has no `w
 owns the desktop (`LHSHELL_DESKTOP=0`, i.e. flxp-desktop on, or a `_NET_WM_WINDOW_TYPE_DESKTOP` window of another client), so the
 session shows one wallpaper from the first frame on.
 
-Inside the session (default keys, override in `~/.config/lhwm/keys`, one binding per line):
+Inside the session (default keys, override in `~/.config/lhde/keys`, one binding per line):
 
 | Keys | Action |
 | --- | --- |
@@ -326,7 +326,7 @@ button states. Nothing here touches your fvwm session except picom, which you st
 
 **Start menu.** (By default the menu is now flxp's start panel, see "Start menu: flxp's start panel everywhere" below; what follows is lux's own, `[start] menu = lux` or the fallback.) Click the start button or press Super alone (luxwm grabs the bare Super key and, when it is released with no
 other key or click in between, sends the root client message `_LHSHELL_START`; the Mod4 bindings keep working, unbound
-Super+key combinations are swallowed while Super is held; `Super_L none` in `~/.config/lhwm/keys` turns it off). It is the
+Super+key combinations are swallowed while Super is held; `Super_L none` in `~/.config/lhde/keys` turns it off). It is the
 XP start panel in the theme's msstyles `StartPanel` look (Jade for aero4074/jade4074, Slate with the user pane for the
 Slate themes): pinned programs (bold, "Internet"/"E-mail" with the program as subtitle for the default browser and mail
 client), the most used programs, "All Programs" (a cascade by freedesktop category, 16 px icons from your icon theme),
@@ -335,7 +335,7 @@ Log Off / Stand by (Slate: Shut down). Those ask first in a small flyout with **
 preselected; Enter confirms, Esc or a click elsewhere cancels). Keys: arrows move (Left/Right across the columns), Tab
 switches column, typing jumps to the next item with that initial, Return opens, Right/Return on All Programs opens the
 cascade (then Up/Down/Right/Left/Return), Esc or Super closes. A click outside closes it; the start button shows its pressed
-image while it is open. Launch counts are kept in `~/.config/lhshell/mfu.ini` (`LHSHELL_MFU` for another file).
+image while it is open. Launch counts are kept in `~/.local/state/lhde/luxshell-mfu.ini` (`LHSHELL_MFU` for another file).
 
 **Context menus** (2026-10-26; Longhorn 4074's Avalon menus, sources in `SHELL-DESIGN.md` "Context menus"). All three are drawn
 in the 4074 Avalon menu look (white, 1 px grey frame with a drop shadow, 19 px rows, the theme's highlight: Slate's tan
@@ -345,7 +345,7 @@ in the 4074 Avalon menu look (white, 1 px grey frame with a drop shadow, 19 px r
   next to the sidebar), then lux's own *Lock the Sidebar* (`[sidebar] locked = 1`: the width sizer no longer drags) and
   *Stacking* ▸ *Top (above the windows)* / *Bottom (part of the desktop)* (the same as Super+s); then 4074's parts list: every
   module 4074 had, checked when it is in the sidebar. Ours are *Classic Tray* (the notification area tile), *Power (Transient)*
-  and *Clock*: clicking one adds or removes that tile (remembered in `~/.config/lhshell/state.ini [sidebar] tiles`); the others
+  and *Clock*: clicking one adds or removes that tile (remembered in `~/.local/state/lhde/luxshell-state.ini [sidebar] tiles`); the others
   (Basket, Contacts, News Feed, Notification History, People nearby, Quick Launch, Search, Slide Show, Sync, Web Host Tile) are
   greyed: not implemented. The parts list works in the `full` mode (greyed in `pinned`).
 - **Tile menu**: right-click a tile; a tile without a flyout (the tray tile) also opens it with a click on its arrow at the
@@ -496,15 +496,15 @@ loads (a broken `theme.ini`) keeps the running one. luxwm's C code and `config.h
 ## Settings and presets (lux, SETTINGS.md)
 
 **Where.** lux keeps its settings in the desktop-wide `$XDG_CONFIG_HOME/longhorn/settings.ini` (default
-`~/.config/longhorn/settings.ini`, `LH_SETTINGS` for another file), which luxwm and the flxp programs share (SETTINGS.md). lux
+`~/.config/lhde/settings.ini`, `LH_SETTINGS` for another file), which luxwm and the flxp programs share (SETTINGS.md). lux
 writes every change back in place (other programs' keys, comments and order are kept) and then sends the root ClientMessage
 `_LH_SETTINGS_CHANGED`; when another program (flxp's Display Properties, a script) changes the file and sends that message, lux
 reads it again and applies what changed, live. A hand edit is picked up by sending it yourself, e.g.
 `python3 -c 'from Xlib import display,protocol,X; d=display.Display(); r=d.screen().root; r.send_event(protocol.event.ClientMessage(window=r, client_type=d.intern_atom("_LH_SETTINGS_CHANGED"), data=(32,[1,0,0,0,0])), event_mask=X.SubstructureNotifyMask); d.flush()'`,
-or by restarting lux. `~/.config/lhshell/state.ini` keeps only lux's runtime state (the tile order; launch counts are in
+or by restarting lux. `~/.local/state/lhde/luxshell-state.ini` keeps only lux's runtime state (the tile order; launch counts are in
 `mfu.ini`).
 
-**Migration.** The first lux of this version moves the user-facing keys of `~/.config/lhshell/state.ini` to `settings.ini`
+**Migration.** The first lux of this version moves the user-facing keys of `~/.local/state/lhde/luxshell-state.ini` to `settings.ini`
 (a key `settings.ini` already has is not overwritten), removes them from state.ini and keeps the untouched original as
 `state.ini.pre-settings`. Renamed on the way: `[shell] theme` -> `[theme] name`, `[shell] composition` -> `[theme] composition`,
 `[taskbar] enabled` -> `[taskbar] kind`, `[shell] wallpaper = 0` -> `[desktop] wallpaper = none`, `[shell] desktop_black` ->
@@ -600,7 +600,7 @@ keeps the button pressed from the click (or Super) until the panel's window unma
 | `[commands]` | `picom` | the compositor command for the rule above (default: `$LHSHELL_PICOM_CMD`, else picom with `picom-glass.conf` and glx) |
 | `[commands]` | `filemanager`, `run`, `search` | file manager for the places (default flxp, rox, else xdg-open); Run (default `rofi -show run` if installed, else lux's own run box); Search (default: lux's box, which starts the best-matching program) |
 
-`~/.config/lhshell/state.ini` (`LHSHELL_STATE`): `[sidebar] tiles` = the tile order, `notifications;clock;power` (written by
+`~/.local/state/lhde/luxshell-state.ini` (`LHSHELL_STATE`): `[sidebar] tiles` = the tile order, `notifications;clock;power` (written by
 Move Up / Move Down; default: the pack's list).
 
 ## Second pair of eyes: Codex vision (`tools/eyes.sh`)

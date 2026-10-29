@@ -92,6 +92,7 @@ int main(void)
     snprintf(p, sizeof p, "%s/data", T); setenv("LHDE_DATA", p, 1);
     snprintf(p, sizeof p, "%s/config", T); setenv("XDG_CONFIG_HOME", p, 1);
     snprintf(p, sizeof p, "%s/run", T); setenv("XDG_RUNTIME_DIR", p, 1);
+    snprintf(p, sizeof p, "%s/state", T); setenv("XDG_STATE_HOME", p, 1);
     setenv("HOME", T, 1); setenv("XDG_DATA_DIRS", "/nonexistent", 1); setenv("LHDE_TREE", "0", 1);
     unsetenv("LHDE_SETTINGS"); unsetenv("LH_THEMES_INI"); unsetenv("DISPLAY");
     lhde_data_reset();
@@ -351,6 +352,11 @@ int main(void)
     put("config/longhorn/themes/My Aero.theme", "[Theme]\nname = My Aero\nbase = aero\n[Desktop]\nwallpaper = /pics/a.jpg\nicons = longhorn\n"
         "[Composition]\ncomposition = off\n[Shell]\nshell = slate\n");
     put("config/lhshell/state.ini", "; lhshell state\n[shell]\ntheme = aero\n[sidebar]\ntiles = power;clock\nlayer = below\n[clock]\npinned = 1\n");
+    put("config/lhshell/mfu.ini", "[mfu]\nfirefox.desktop = 3 1\n");
+    put("config/flxp/flxp.ini", "# flxp settings\n[flxp]\nfont_path = /elsewhere/Fonts\nicons = xp\nnt5src = /x\ntheme_path =\nterminal = urxvt\nfiledlg_size = 951x576\n");
+    put("config/flxp/views", "/home/me/Pictures\ticons@96\n");
+    put("config/flxp/desktop-positions", "a 1 2\n");
+    put("config/lhwm/keys", "Mod4+Return exec urxvt\n");
     static char rep[16384];
     int m = lhde_settings_migrate(0, rep, sizeof rep);
     CHECK(m > 0);
@@ -365,14 +371,31 @@ int main(void)
     char *my = slurp("config/lhde/themes/my-aero.theme");
     HAS(my, "base = aero"); HAS(my, "wallpaper = /pics/a.jpg"); HAS(my, "icons = longhorn4074"); HAS(my, "[Glass]\ncomposition = off");
     HAS(my, "pack = 4074-slate");
-    char *st = slurp("config/lhshell/state.ini");
+    /* the scattered files: into the config and state directories (the state.ini moved after its user-facing keys left it) */
+    char *st = slurp("state/lhde/luxshell-state.ini");
     HAS(st, "tiles = power;clock"); CHECK(!strstr(st, "theme = aero")); CHECK(!strstr(st, "layer"));
-    { struct stat ls; snprintf(p, sizeof p, "%s/config/longhorn/settings.ini", T);
-      CHECK(lstat(p, &ls) == 0 && S_ISLNK(ls.st_mode));
-      snprintf(p, sizeof p, "%s/config/longhorn/settings.ini.pre-lhde", T); CHECK(lstat(p, &ls) == 0 && S_ISREG(ls.st_mode)); }
+    HAS(slurp("state/lhde/luxshell-mfu.ini"), "firefox.desktop = 3 1");
+    HAS(slurp("state/lhde/flxp-views"), "icons@96"); HAS(slurp("state/lhde/flxp-desktop-positions"), "a 1 2");
+    HAS(slurp("config/lhde/keys"), "Mod4+Return exec urxvt");
+    char *fi = slurp("config/lhde/flxp.ini");
+    HAS(fi, "# flxp settings"); HAS(fi, "terminal = urxvt"); HAS(fi, "filedlg_size = 951x576");
+    CHECK(!strstr(fi, "font_path")); CHECK(!strstr(fi, "icons")); CHECK(!strstr(fi, "nt5src")); CHECK(!strstr(fi, "theme_path"));
+    HAS(rep, "font_path = /elsewhere/Fonts removed");
+    { struct stat ls;
+      snprintf(p, sizeof p, "%s/config/longhorn/settings.ini", T); CHECK(lstat(p, &ls) != 0);   /* no symlink: nothing reads the old path */
+      snprintf(p, sizeof p, "%s/config/longhorn/settings.ini.pre-lhde", T); CHECK(lstat(p, &ls) == 0 && S_ISREG(ls.st_mode));
+      snprintf(p, sizeof p, "%s/config/flxp", T); CHECK(lstat(p, &ls) != 0);                     /* emptied directories go */
+      snprintf(p, sizeof p, "%s/config/lhwm", T); CHECK(lstat(p, &ls) != 0);
+      snprintf(p, sizeof p, "%s/config/lhshell", T); CHECK(lstat(p, &ls) == 0);                  /* keeps state.ini.pre-lhde */ }
     CHECK(lhde_settings_migrate(0, rep, sizeof rep) == 0);   /* once */
-    lhde_settings_set("sidebar", "width", "200");            /* written through the old path's symlink too */
-    HAS(slurp("config/longhorn/settings.ini"), "width = 200");
+    /* a file that reappears in an old place (an old program) is moved by the next run, unless the new one exists */
+    put("config/lhwm/keys", "Mod4+x close\n");
+    CHECK(lhde_settings_migrate(0, rep, sizeof rep) == 0); HAS(slurp("config/lhde/keys"), "Mod4+Return");
+    { char b[PATH_MAX + 64]; snprintf(b, sizeof b, "%s/config/lhde/keys", T); unlink(b); }
+    CHECK(lhde_settings_migrate(0, rep, sizeof rep) > 0); HAS(slurp("config/lhde/keys"), "Mod4+x close");
+    /* the path helpers */
+    { char b[PATH_MAX]; snprintf(p, sizeof p, "%s/state/lhde/x.ini", T); EQ(lhde_state_file("x.ini", b, sizeof b), p);
+      snprintf(p, sizeof p, "%s/config/lhde/x.ini", T); EQ(lhde_config_file("x.ini", b, sizeof b), p); }
 
     /* ---- the compatibility registry ---- */
     char reg[PATH_MAX];

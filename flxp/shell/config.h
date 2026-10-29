@@ -8,11 +8,13 @@ namespace shell {
 
 std::string home_dir();                       // $HOME, else the passwd entry
 std::string config_home();                    // $XDG_CONFIG_HOME or ~/.config
+std::string state_home();                     // $XDG_STATE_HOME or ~/.local/state
+std::string state_file(const char* name);     // $XDG_STATE_HOME/lhde/NAME: what flxp remembers on its own (views, icon positions)
 std::string data_home();                      // $XDG_DATA_HOME or ~/.local/share
 std::vector<std::string> config_dirs();       // $XDG_CONFIG_DIRS or /etc/xdg
 std::vector<std::string> data_dirs();         // $XDG_DATA_DIRS or /usr/local/share:/usr/share
 
-// flxp settings: $XDG_CONFIG_HOME/flxp/flxp.ini, plain "key=value" lines
+// flxp settings: $XDG_CONFIG_HOME/lhde/flxp.ini (docs/SETTINGS.md "Files"), plain "key=value" lines
 // ([sections] and #/; comments ignored). An environment variable
 // FLXP_<KEY> (upper case) overrides the file. An empty value (in the file
 // or the environment) means unset: the fallback, i.e. automatic. Keys that the
@@ -22,7 +24,7 @@ std::vector<std::string> data_dirs();         // $XDG_DATA_DIRS or /usr/local/sh
 // are ignored in flxp.ini (one note on stderr); the theme decides (lhtheme.h).
 std::string setting(const std::string& key, const std::string& fallback = "");
 std::string file_setting(const std::string& key, const std::string& fallback = "");   // flxp.ini (then settings.ini), no FLXP_<KEY>
-std::string settings_path();                  // $XDG_CONFIG_HOME/flxp/flxp.ini
+std::string settings_path();                  // $XDG_CONFIG_HOME/lhde/flxp.ini
 // Sets key = value in flxp.ini, keeping the rest of the file (comments, order,
 // the other keys): the first "key =" line is rewritten in place, else the line
 // is appended (the file is created with a [flxp] section if missing). False if

@@ -56,10 +56,11 @@ the ones that matter for orientation:
 | `_LHSHELL_COMMAND`, `_LHSHELL_START`, `_LH_STARTMENU_OPEN`, `_LH_STARTMENU_S<n>` | luxshell, luxwm, flxp-taskbar | commands to the shell (taskbar kind, ...), the Start key, whether a start menu is open, who owns the start menu |
 | `_LH_THEMES_INI` | luxwm, luxshell | the path of the generated compatibility registry; nothing reads it any more and it is slated for removal |
 
-Settings a user made live in `~/.config/lhde/settings.ini` (the selected theme, its unsaved current layer, per-user keys such as
-the sidebar mode and taskbar autohide); theme files the user saved in `~/.config/lhde/themes/`. flxp still keeps its own
-preferences in `~/.config/flxp/flxp.ini`, luxshell its runtime state in `~/.config/lhshell/`; consolidating those is pending
-(docs/SETTINGS.md).
+What the user chose lives in `~/.config/lhde/`: `settings.ini` (the selected theme, its unsaved current layer, per-user keys
+such as the sidebar mode and taskbar autohide), `themes/` (saved theme files), `flxp.ini` (flxp's preferences), `keys`
+(luxwm's bindings). What a program remembers on its own lives in `~/.local/state/lhde/` (luxshell's tile order and launch
+counts, flxp's remembered views and icon positions). Nothing else is read (docs/SETTINGS.md "Files"); an earlier layout's
+files are moved there once by liblhde's migration, which every program runs at startup.
 
 ## Where things are duplicated, on purpose or not yet resolved
 

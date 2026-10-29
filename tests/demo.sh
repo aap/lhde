@@ -10,8 +10,8 @@
 #   tests/demo.sh texplorer [DIR] the explorer under Slate
 #   tests/demo.sh filedlg [ARGS]  the file dialog (flxp-filedialog --help; FLXP_THEME=classic for classic)
 # Slate and Jade: $FLXP_SLATE / $FLXP_JADE (a .msstyles path), else the names
-# slate / jade looked up in the theme directories (theme_path= in flxp.ini).
-# The explorer takes its fonts, icons and theme from ~/.config/flxp/flxp.ini
+# slate / jade looked up in the Windows tree (lhde-import --style).
+# The explorer takes its settings from ~/.config/lhde/flxp.ini
 # (written on first run; see build/bin/flxp --help and --info).
 cd "$(dirname "$0")/.."
 SLATE=${FLXP_SLATE:-slate}

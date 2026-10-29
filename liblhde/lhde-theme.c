@@ -18,7 +18,8 @@
                                            NAME-modified.theme (or the user's own NAME.theme); VALUE "-" removes the key
      lhde-theme style NAME                 what liblhde reads from a visual style (kind, format, build, family, first scheme)
      lhde-theme setting SEC KEY [VALUE]    a per-user key of settings.ini: print it, or write it (VALUE "-" removes it)
-     lhde-theme migrate [--force]          the one-time move from ~/.config/longhorn and ~/.config/lhshell (docs/SETTINGS.md)
+     lhde-theme migrate [--force]          the one-time move of ~/.config/{longhorn,lhshell,flxp,lhwm} into ~/.config/lhde and
+                                           ~/.local/state/lhde (docs/SETTINGS.md "Migration")
      lhde-theme registry                   (re)write the compatibility themes.ini for flxp and print its path
      lhde-theme explain --files THEME      the Windows-tree files THEME reads, one real path each (lhde-pack --profile essentials)
      lhde-theme explain [THEME]            where every visible part of THEME (default: the selected one, with its current layer)
@@ -199,7 +200,7 @@ int main(int argc, char **argv)
         static char rep[65536];
         int r = lhde_settings_migrate(argc > 2 && !strcmp(argv[2], "--force"), rep, sizeof rep);
         fputs(rep, stdout);
-        if (r == 0) printf("lhde-theme: nothing to migrate (%s exists, or no ~/.config/longhorn)\n", lhde_settings_path(buf, sizeof buf));
+        if (r == 0) printf("lhde-theme: nothing to migrate (%s exists; no file left in ~/.config/{longhorn,lhshell,flxp,lhwm})\n", lhde_settings_path(buf, sizeof buf));
         return r < 0;
     }
     if (!strcmp(cmd, "registry")) {
