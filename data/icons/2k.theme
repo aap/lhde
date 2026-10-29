@@ -1,5 +1,5 @@
 ; Windows 2000 icons and toolbar art, read by resource id from lhde-import's resources/2k (Windows 2000 SP4's
-; shell32.dll and browseui.dll; docs/flxp-NOTES.md "XP and 2000 art by resource id"). Format: xp.theme.
+; shell32.dll and browseui.dll; docs/history/flxp-NOTES.md "XP and 2000 art by resource id"). Format: xp.theme.
 [theme]
 name = Windows 2000
 resources = resources/2k

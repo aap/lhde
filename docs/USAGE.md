@@ -2,7 +2,7 @@
 
 > **Imported from the Longhorn X11 lab** (`~/fun/longhorn/x11` at d353b69, USAGE.md) into lhde in step 3 of docs/LAYOUT.md. Program and path names are updated to lhde (lhwm → luxwm, lhwmc → luxwmc, lhshell → luxshell, lhnav → luxnav; x11/... and lhwm/themes, lhshell/themes, lhshell/assets → the lhde tree and data directories, see docs/LAYOUT.md and tools/lhde-import); the X atoms (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the window manager name "lhwm", luxnav's C API (`lhnav_*`, `lhnav.h`), configuration paths (`~/.config/longhorn`, `~/.config/lhwm/keys`, `~/.config/lhshell`) and setting values (`header_engine = lhnav`, `classic_start_menu = lhshell`) keep their names. Dated sections are history: they describe the x11 tree as it was (its compare_*.png and screenshots stay in the research workspace).
 
-Names: **luxwm** is the window manager; **lux** is the Lua/cairo Avalon-style shell (taskbar, sidebar, tiles, toasts, start menu; the directory and binary are `luxshell`, its windows' X class still `lhshell`); **flxp** is the Win32-style explorer, taskbar and desktop built on the **wux** win32 layer (`~/src/flxp`). Shared pieces: `themes.ini` (THEMES.md), `settings.ini` (SETTINGS.md).
+Names: **luxwm** is the window manager; **lux** is the Lua/cairo Avalon-style shell (taskbar, sidebar, tiles, toasts, start menu; the directory and binary are `luxshell`, its windows' X class still `lhshell`); **flxp** is the Win32-style explorer, taskbar and desktop built on the **wux** win32 layer (`~/src/flxp`). Shared pieces: `themes.ini` (docs/history/THEMES.md), `settings.ini` (SETTINGS.md).
 
 
 ## When something looks wrong: where does this pixel come from?
@@ -153,7 +153,7 @@ lhde-theme find REL | find KIND NAME    one data file (exit 1 when no tree has i
 
 ## Themes and switching them
 
-One setting for everything (`SHELL-DESIGN.md` 6.1, details for client authors in `THEMES.md`): the root property
+One setting for everything (`SHELL-DESIGN.md` 6.1, details for client authors in `docs/history/THEMES.md`): the root property
 `_LH_THEME` holds a theme *name* from the registry `themes.ini`. luxwm picks its frames from it, luxshell its taskbar/sidebar
 pack and the wallpaper, and clients (extendframe, flxp) their visual style and glass; all of them follow a change live, nothing
 restarts. lux remembers the last theme in `~/.config/longhorn/settings.ini` (`[theme] name`, below) and publishes it when a session
@@ -179,7 +179,7 @@ The old luxwm theme directory names still work everywhere a name is taken (`alia
 `data/wallpapers.ini` (one `[NAME]` section with `file` and `mode`, plus `[default]`), not in themes.ini: the 4074 themes get the
 4074 leaves, slate4074 Stonehenge, slate4051 4051's wheat field, aero-patch the 4093 tree, aero5048 5048's glass facade, the Luna
 and XP styles Bliss and XP stock pictures. Your own choice still wins: settings.ini `[desktop] wallpaper` (Display Properties'
-Desktop tab), a preset's `[Desktop] wallpaper`, or `[override:NAME] wallpaper` for one theme (THEMES.md "Wallpapers").
+Desktop tab), a preset's `[Desktop] wallpaper`, or `[override:NAME] wallpaper` for one theme (docs/history/THEMES.md "Wallpapers").
 
 **4051 vs 4074 Slate.** Builds after ~4060 look like 4074: their Avalon bars scale images nearest-neighbour, so the start
 button (imageres 1156, 74x23, drawn 79x29) has the blocky flag; 4051 scaled bilinear (the smooth flag). `slate4051` has its own
@@ -187,14 +187,14 @@ pack for that and for 4051's other differences: a 29 px bar, the images of 4051'
 arrows), the clock as a tile in the list with the 96 px face, no power tile. 4051 really ran the classic Win32 taskbar there; the
 Avalon taskbar with the 4051 start button stands in for it (`data/packs/4051-slate/shell.lua`, `lhshell/compare_4051_4074.png`).
 
-**Fonts.** Each theme names its font directories (`fonts =` in themes.ini, THEMES.md "Fonts"); luxwm and luxshell load them while the
+**Fonts.** Each theme names its font directories (`fonts =` in themes.ini, docs/history/THEMES.md "Fonts"); luxwm and luxshell load them while the
 theme is active, so captions, taskbar and menus use the Segoe UI that 4074 ships (`wim/4074/3/WINDOWS/Fonts/seguibk.ttf`, version
 0.7) instead of a fallback. Nothing is installed system-wide. `LHWM_DEBUG=1` (luxwm) and `LHSHELL_DEBUG=1` (luxshell) log the face the
 caption / pack font resolves to.
 Since 2026-10-27 lux draws all its text with libuxtheme's GDI text (the glyphs flxp and luxnav draw: whole-pixel stems instead of
 pango's fractional positions); `make` needs a libuxtheme with the text calls, found as luxnav finds it
 (`(gone: the top-level build)`: flxp's build tree `~/src/flxp` until it is installed). In Aero vision the task buttons' text is black on
-a white halo (pack `aerovision`, THEMES.md "luxshell packs" `taskbar_text`).
+a white halo (pack `aerovision`, docs/history/THEMES.md "luxshell packs" `taskbar_text`).
 
 **Window icons.** Captions and task buttons show the window's `_NET_WM_ICON` (the size nearest at or above 16 px), else its
 `WM_HINTS` icon pixmap (xterm, xclock, Xt/Motif/FOX programs), else the theme's default icon: on the glass themes the Windows flag
@@ -591,7 +591,7 @@ keeps the button pressed from the click (or Super) until the panel's window unma
 | `[clock]` | `layout` * | `default`, `digtime`, `digtimemonthday`, `digtimeweekday`, `minical`, `cal` |
 | `[start]` | `menu` * | `flxp` (default: flxp-taskbar's start panel, see above) or `lux`; the fallback after `[override:NAME] start` and themes.ini `start` |
 | `[override:NAME]` | `taskbar`, `start`, `composition`, `icons`, `animations`, `frame` | the per-theme values for theme NAME (written by Display Properties and lux's flyout; above). lux also reads `[override:ALIAS]` for a registry theme's aliases (`[override:aero4074]` for aero-patch) |
-| `[override:NAME]` | `wallpaper`, `mode` | a wallpaper for theme NAME only (before `[desktop] wallpaper`; THEMES.md "Wallpapers"); nothing writes it yet |
+| `[override:NAME]` | `wallpaper`, `mode` | a wallpaper for theme NAME only (before `[desktop] wallpaper`; docs/history/THEMES.md "Wallpapers"); nothing writes it yet |
 | `[start]` | `pinned` | `a.desktop;b.desktop` (default: the default web browser and mail client from `xdg-settings`/`xdg-mime`, else an installed one) |
 | `[start]` | `mfu_count` | number of most-used programs (default 6) |
 | `[start]` | `userpane` | `1` / `0` to force the user pane (`$USER` + `~/.face`) on or off (default: when the theme has one) |

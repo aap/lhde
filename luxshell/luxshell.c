@@ -629,7 +629,7 @@ static int l_cm_owner(lua_State *L) { char name[32]; snprintf(name, sizeof name,
 static int l_kill(lua_State *L) { lua_pushboolean(L, kill((pid_t)luaL_checkinteger(L, 1), SIGTERM) == 0); return 1; }
 /* lh.image_alpha(path, [strips, strip]): the highest alpha (0..255) in an image or in one of its vertical state strips
    (the start menu's cascade highlight: Slate's StartMenu::Toolbar.BUTTON hot strip is empty) */
-/* lh.fonts("DIR[;DIR...]"): the theme's font directories (themes.ini `fonts`, THEMES.md "Fonts") become the process's fontconfig
+/* lh.fonts("DIR[;DIR...]"): the theme's font directories (themes.ini `fonts`, docs/history/THEMES.md "Fonts") become the process's fontconfig
    application fonts, replacing the previous set (FcConfigAppFontClear; the fallback lookups of text.c), and libuxtheme's font
    directories (ut_add_font_dir, text.c: libuxtheme only adds, so a directory of an earlier theme stays known to it). Returns the
    face and file the given description (default: "Segoe UI 9") now resolves to, and whether the set changed. Called at pack load

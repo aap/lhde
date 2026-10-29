@@ -12,7 +12,7 @@
 #include <string.h>
 int main(int argc, char **argv) {
     if (argc < 3) { fprintf(stderr, "usage: frametest THEMEDIR out.png [W H TITLE FOCUSED [MAXIMIZED [HOVER [ICON]]]]\n"); return 2; }
-    /* FRAMETEST_FONTS="DIR[;DIR]": the registry's fonts = (THEMES.md), registered as lhwm does before the theme loads */
+    /* FRAMETEST_FONTS="DIR[;DIR]": the registry's fonts = (docs/history/THEMES.md), registered as lhwm does before the theme loads */
     if (getenv("FRAMETEST_FONTS")) frame_fonts_set(getenv("FRAMETEST_FONTS"));
     const char *src = getenv("FRAMETEST_SOURCE");
     if (src && !strcmp(src, "dir")) frame_theme_source = FRAME_SRC_DIR;

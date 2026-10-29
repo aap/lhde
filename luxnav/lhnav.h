@@ -121,7 +121,7 @@ typedef struct lhnav_metrics {
     int crumb_dy;       /* breadcrumb text correction, rows */
     /* fonts: "" = the style's CompositedBreadcrumbBar::Toolbar FONT (else its theme font closest to Segoe UI 12 px); else a
        description "Family[, Family2] [Bold] [Italic] SIZE[px]" (pango's form; SIZE without px = points at 96 dpi), drawn in the
-       style's theme font closest to it (libuxtheme draws theme fonts only: a log line says which; THEMES.md wux request 2) */
+       style's theme font closest to it (libuxtheme draws theme fonts only: a log line says which; docs/history/THEMES.md wux request 2) */
     char title_font[96], crumb_font[96];
     /* colours 0xRRGGBB; 0xFFFFFFFF = from the style (crumbs: TEXTCOLOR; glow: GLOWCOLOR) or the built-in default */
     uint32_t title_rgb, crumb_rgb, glow_rgb, plain_rgb;   /* plain_rgb: all text when not composited (no glow), e.g. the caption text colour */

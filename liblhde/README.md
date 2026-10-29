@@ -1,4 +1,4 @@
-# liblhde: the desktop-wide library (docs/THEME-FORMAT.md section 10.3)
+# liblhde: the desktop-wide library (docs/history/THEME-FORMAT-status.md section 10.3)
 
 What every lhde component shares, prefix `lhde_`, plain C, no X (style probing through libwuxtheme):
 

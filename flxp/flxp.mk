@@ -9,7 +9,7 @@
 #               .desktop file, the portal files
 
 # ---- luxnav (luxnav/luxnav.mk: build/lib/libluxnav.a, included before this file) ---------------------
-# The explorer header's vision mode (docs/flxp-NOTES.md "The vision header") is always built in: header.cpp includes
+# The explorer header's vision mode (docs/history/flxp-NOTES.md "The vision header") is always built in: header.cpp includes
 # luxnav's lhnav.h, every program links libluxnav.a through WUX_LINK / W32DEPS ($(LUXNAVA)).
 $(O)/flxp/explorer/header.o: CXXFLAGS += -DFLXP_HAVE_LHNAV -Iluxnav
 $(O)/flxp/explorer/header.o: luxnav/lhnav.h | $(LUXNAVA)

@@ -81,7 +81,7 @@ const char *lhde_tree(void);
 /* forget the cached directory list (after $LHDE_DATA, $LHDE_WINDOWS, $XDG_DATA_HOME or $XDG_CONFIG_HOME changed: tests) */
 void lhde_data_reset(void);
 
-/* ---- the compatibility registry (docs/THEME-FORMAT.md section 11; liblhde/compat.c) ----
+/* ---- the compatibility registry (docs/history/THEME-FORMAT-status.md section 11; liblhde/compat.c) ----
    Until flxp reads theme files itself, liblhde writes an old-format themes.ini (one section per theme: shipped theme files,
    the user's, bare styles; every path absolute) and wallpapers.ini from the resolved themes into
    $XDG_RUNTIME_DIR/lhde/<display>/ (else /tmp/lhde-<uid>/<display>/); luxwm and luxshell publish its path as _LH_THEMES_INI.

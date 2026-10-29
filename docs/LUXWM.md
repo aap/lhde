@@ -122,7 +122,7 @@ What `luxshell` (the taskbar/sidebar) relies on, all in `wm.c`:
   `_LHWM_RESTORE_GEOMETRY` (written on maximise).
 - `ConfigureNotify` of root children no longer re-queries the monitors (only the root's own); a `ConfigureRequest`
   from a hidden window keeps it off screen (size only).
-- Session theme (M6, `SHELL-DESIGN.md` 6.1, `THEMES.md`): root `_LH_THEME` (UTF8_STRING) is a theme name in the registry
+- Session theme (M6, `SHELL-DESIGN.md` 6.1, `docs/history/THEMES.md`): root `_LH_THEME` (UTF8_STRING) is a theme name in the registry
   `../themes.ini`, whose absolute path is root `_LH_THEMES_INI`. luxwm follows it (below, "Maximised mode": runtime theme
   switching); at startup the root's value wins over `-t`/`LHWM_THEME`, which luxwm publishes only when `_LH_THEME` is missing.
   luxwm publishes `_LH_THEMES_INI` when missing (`LH_THEMES_INI`, else `../themes.ini` from the binary's directory, the theme
@@ -329,7 +329,7 @@ theme.ini (squared glass, overlay, buttons, title) the right 100 columns of 500/
 
 ## Classic msstyles mode (`mode = msstyles`)
 
-The non-composited Longhorn/XP look, drawn the way uxtheme's nctheme.cpp does it (see CLASSIC-DECO-NOTES.md),
+The non-composited Longhorn/XP look, drawn the way uxtheme's nctheme.cpp does it (see docs/history/CLASSIC-DECO-NOTES.md),
 from a decompiled visual style. Since 2026-10-24 the style itself is read live through libuxtheme when luxwm has it ("libuxtheme source"
 below); the generated directories are then caches (the fallback without the library, and the tuning keys). Themes are generated, not
 hand-made:
@@ -413,7 +413,7 @@ caption text:
   advance width rounds differently (+-1 px after a few words).
 - Jade asks for Segoe UI 9. Until 2026-10-24 it was not available here and the `Segoe UI,Tahoma 12px` fallback (Tahoma) was taken
   to match the screenshots; but 4074 ships Segoe UI 0.7 (`WINDOWS/Fonts/seguibk.ttf`), which the registry's `fonts =` now loads, and
-  the Jade Task Manager caption fits it better than Tahoma (`THEMES.md` "Fonts", `compare_fonts.png`). The pixel counts above were
+  the Jade Task Manager caption fits it better than Tahoma (`docs/history/THEMES.md` "Fonts", `compare_fonts.png`). The pixel counts above were
   measured with Tahoma.
 - The Display Properties "Active Window" sample is not a real window: its text sits 1 px further right (and 1 px
   higher for Jade) and a light band lies under its caption; real windows (Task Manager) match exactly in position.
@@ -467,7 +467,7 @@ hinting of Trebuchet vs GDI; 488 of 4200 pixels in the text box, 639 with subpix
 ## libuxtheme source (2026-10-24)
 
 luxwm reads the `.msstyles` itself through the shared visual-style library (`~/src/flxp/src/uxtheme`, `~/.local/include/uxtheme/ut.h`,
-`libuxtheme.so.1`; `THEMES.md` "One uxtheme for everything", step 1). The theme directories under `themes/` are now caches: the
+`libuxtheme.so.1`; `docs/history/THEMES.md` "One uxtheme for everything", step 1). The theme directories under `themes/` are now caches: the
 fallback for an luxwm built without the library, and the place for tuning keys. A registry entry whose `msstyles` names any v3 (XP) or
 v4 (Longhorn-compiled) style gets classic frames without running `tools/msstyles2theme.py` (`[luna-xp]` in `../themes.ini`: the real XP
 `luna.msstyles`, copied from the Wine prefix to `resources/msstyles/luna-xp.msstyles`, no directory at all; likewise `[royale]`, `[zune]`,
@@ -556,7 +556,7 @@ theme directories as before (checked: builds and links without `-luxtheme`, 128 
   (FreeType mono vs GDI glyphs). Exactly the 4051-copy numbers. luna-xp and luna-blue differ from each other only in 36 (active) / 27 (inactive)
   corner pixels of the buttons (+-1 level: XP stores straight alpha and premultiplies on load, the 4051 copy is stored premultiplied). The HomeStead and
   Metallic schemes of the same file load the same way.
-- XP styles from `XP_Themes.zip` (2026-10-25; `THEMES.md` "Microsoft's later XP styles"): `[royale]`, `[zune]`, `[noir]` (scheme
+- XP styles from `XP_Themes.zip` (2026-10-25; `docs/history/THEMES.md` "Microsoft's later XP styles"): `[royale]`, `[zune]`, `[noir]` (scheme
   Metallic), `[embedded]` have no directory and load like `[luna-xp]` (whose style is now the copy `resources/msstyles/luna-xp.msstyles`).
   `compare_xp_styles.png`: frametest renders (active, inactive, maximised) of all of them plus Royale Noir's NormalColor scheme (= Royale),
   and the Luna caption next to the XP SP3 screenshot; no reference screenshots of the other four exist here. All four open through the
@@ -665,7 +665,7 @@ High Contrast Black; active / inactive, maximised, the window menu, a pushed res
 user32 in wux) and the luxwm frame around it agree in edge, band, caption height and colours (the sample is a fixed-frame window:
 3 px border).
 
-When wuxtheme exports user32's helpers (THEME-FORMAT.md section 15: `ut_draw_edge`, `ut_draw_frame_control`, `ut_draw_caption`),
+When wuxtheme exports user32's helpers (docs/history/THEME-FORMAT-status.md section 15: `ut_draw_edge`, `ut_draw_frame_control`, `ut_draw_caption`),
 `classic_paint` can call them instead of its own copies; the geometry and the text placement stay luxwm's.
 
 ## Maximised mode, the desktop layer, running without a compositor (M5a, `SHELL-DESIGN.md`)
@@ -853,7 +853,7 @@ msstyles themes: the keys apply to MAXCAPTION, but no shipped style defines a MA
 `TEXTSHADOWCOLOR = 0 0 0`, `TEXTSHADOWTYPE = CONTINUOUS` in 4074 Jade and Slate and 4051 Slate; the converter already writes that shadow
 as `maxcaption.shadow.1`), so they keep CAPTIONTEXT.
 
-**Fonts** (`THEMES.md` "Fonts"): the registry's `fonts = DIR[;DIR]` (frame.c `theme_registry_lookup` → `frame_fonts_set`) plus the
+**Fonts** (`docs/history/THEMES.md` "Fonts"): the registry's `fonts = DIR[;DIR]` (frame.c `theme_registry_lookup` → `frame_fonts_set`) plus the
 theme.ini `font_files` (now files or directories) are registered at every theme load as the process's fontconfig application fonts,
 replacing the previous set (`FcConfigAppFontClear`, then `FcConfigAppFontAddDir`/`AddFile` on the current config, then pango's default
 font map is dropped; only when the set changed). `LHWM_DEBUG=1` logs the resolved face per theme load, e.g. `caption font "Segoe UI 9" ->

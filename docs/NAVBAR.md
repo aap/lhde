@@ -289,7 +289,7 @@ concept]`, the magnifier's field out, `newfolder views separator bookmark search
 big). `luxwm/tests/regress.sh`: unchanged (169 identical + the known 11 aero5112); no luxwm change.
 
 ### Text and pixels without pango and cairo (2026-10-27, fourth pass)
-Decision (THEMES.md "Request for the wux side"): all desktop text goes through libuxtheme's GDI-faithful text, luxnav first, so
+Decision (docs/history/THEMES.md "Request for the wux side"): all desktop text goes through libuxtheme's GDI-faithful text, luxnav first, so
 flxp can link libluxnav directly and its text looks exactly like flxp's.
 - **Dependencies**: `libluxnav.so` needs `libuxtheme.so.1` and `libpng16` (plus libc/libm); `make -C luxnav flags` prints the client
   flags. `(gone: the top-level build)` picks libuxtheme: flxp's build tree `~/src/flxp` (`src/uxtheme/ut.h` via `-idirafter`,

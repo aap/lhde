@@ -4213,7 +4213,7 @@ root_string_alloc(Atom a)
     return out;
 }
 
-/* the compatibility registry (liblhde: an old-format themes.ini generated from the theme files, docs/THEME-FORMAT.md section 11)
+/* the compatibility registry (liblhde: an old-format themes.ini generated from the theme files, docs/history/THEME-FORMAT-status.md section 11)
    for programs that do not read theme files yet (flxp): published as _LH_THEMES_INI when nobody has; LH_THEMES_INI in the
    environment is used as it is and not published. Refreshed on every theme switch and reload (theme files may have changed). */
 static void
@@ -4312,7 +4312,7 @@ lh_theme_apply(const char *arg, char *canon, size_t n)
         snprintf(theme_req_classic, sizeof theme_req_classic, "%s", classic[0] ? classic : "style");
         theme_comp_off = true;
     }
-    frame_fonts_set(TV("path.fonts"));   /* registered by the theme_load that follows (THEMES.md "fonts") */
+    frame_fonts_set(TV("path.fonts"));   /* registered by the theme_load that follows (docs/history/THEMES.md "fonts") */
     snprintf(theme_anim, sizeof theme_anim, "%s", TV("Glass.animations"));
     if (canon) snprintf(canon, n, "%s", TV("theme"));
     if (!strncmp(theme_req, "|classic|", 9))

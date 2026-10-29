@@ -56,7 +56,7 @@ return function(ctx)
       heading("Theme")
       local cur, cur_e = nil, nil
       if lh.theme_name then cur, cur_e = lh.theme_name() end
-      -- the selected theme with a current layer: "TITLE (Modified)" (THEME-FORMAT.md section 14); selecting it again keeps the
+      -- the selected theme with a current layer: "TITLE (Modified)" (docs/history/THEME-FORMAT-status.md section 14); selecting it again keeps the
       -- changes, another theme drops them (liblhde lhde_theme_select)
       local function label(e, t) if e.name == cur and cur_e and cur_e.modified then return t .. " (Modified)" end return t end
       for _, e in ipairs(S.themes()) do

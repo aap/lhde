@@ -12,7 +12,7 @@
 --                              }; nil, err
 --   S.lookup(name)             the theme's name when NAME is one (a theme file, an alias, a bare style), else nil
 --   S.themes()                 the shipped theme files: { name, title, file, group } (group 1; bare styles are not themes: the
---                              Appearance of Display Properties picks them, THEME-FORMAT.md section 14)
+--                              Appearance of Display Properties picks them, docs/history/THEME-FORMAT-status.md section 14)
 --   S.presets()                the user's theme files (group 0), with .base (their [Theme] base)
 --   S.theme_value(e, key)      taskbar | start | icons | composition | animations | sidebar of the resolved theme e (composition:
 --                              follow | on | off, the theme's auto is follow) and its source (file | base | settings | default |

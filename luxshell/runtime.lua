@@ -120,7 +120,7 @@ do
   elseif want then io.stderr:write("lux: theme " .. want .. ": " .. tostring(err) .. " (lhde-theme list)\n") end
 end
 if not (theme_entry and theme_entry.shell and load_pack(theme_entry.shell)) then load_pack(S.pack_dir(os.getenv("LHSHELL_THEME") or "4074-aero")) end
--- themes.ini `fonts` (THEMES.md "Fonts"): the theme's font directories as fontconfig application fonts, so the packs' "Segoe UI 9"
+-- themes.ini `fonts` (docs/history/THEMES.md "Fonts"): the theme's font directories as fontconfig application fonts, so the packs' "Segoe UI 9"
 -- is 4074's Segoe UI 0.7 (lhshell.c lh.fonts; the set is replaced on every theme switch). Returns true when the set changed.
 local function apply_fonts(e)
   local fam, file, changed = lh.fonts(e and e.fonts or "", T.font)
@@ -128,7 +128,7 @@ local function apply_fonts(e)
   return changed
 end
 apply_fonts(theme_entry)
--- themes.ini `startpanel` (THEMES.md): a start panel other than the pack's own, e.g. the Luna themes use the Slate taskbar pack
+-- themes.ini `startpanel` (docs/history/THEMES.md): a start panel other than the pack's own, e.g. the Luna themes use the Slate taskbar pack
 -- with Luna's StartPanel (assets/startpanel-luna-<scheme>); its metrics and menu colours come from themes/startpanels.lua
 local pack_own = {}
 local function apply_startpanel(e)

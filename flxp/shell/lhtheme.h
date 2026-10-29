@@ -52,7 +52,7 @@ const SessionTheme& session_theme();
 void set_session_theme(const SessionTheme& t);
 
 // flxp's keys that the theme decides, from the session theme's record (FLXP_<KEY> in the environment still wins: a run's
-// option). The mapping (docs/flxp-NOTES.md "flxp on liblhde"):
+// option). The mapping (docs/history/flxp-NOTES.md "flxp on liblhde"):
 //   icons              Desktop.icons (longhorn4074 -> longhorn while flxp's res/icons has no file of that name)
 //   frame              Explorer.chrome (auto | xp | longhorn; navbar none -> xp)
 //   taskbar_kind       Shell.taskbar

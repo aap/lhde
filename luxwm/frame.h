@@ -138,7 +138,7 @@ cairo_surface_t *frame_icon_from_netwm(const unsigned long *data, unsigned long 
 cairo_surface_t *frame_icon_from_pixmap(Display *dpy, Pixmap icon, Pixmap mask, int want);
 /* the theme's default icon nearest >= want (not a new reference; NULL when the theme has none) */
 cairo_surface_t *theme_default_icon(const struct theme *t, int want);
-/* fonts (THEMES.md "fonts"): the registry's font directories/files (';' separated, absolute), registered as fontconfig application
+/* fonts (docs/history/THEMES.md "fonts"): the registry's font directories/files (';' separated, absolute), registered as fontconfig application
    fonts together with the next theme_load's font_files (the set is replaced, so a theme without them does not see them) */
 void frame_fonts_set(const char *list);
 /* LHWM_DEBUG: log the face fontconfig/pango resolve the theme's caption font to */

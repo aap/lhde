@@ -1,4 +1,4 @@
--- Start panels that differ from the shell pack's own (themes.ini `startpanel = NAME`, THEMES.md; runtime.lua apply_startpanel).
+-- Start panels that differ from the shell pack's own (themes.ini `startpanel = NAME`, docs/history/THEMES.md; runtime.lua apply_startpanel).
 -- Each entry replaces the pack's `startpanel` (packs/<build>/startpanel-* from lhde-import / shellpack.sh), `startmenu` (metrics, startmenu.lua) and `menu`
 -- (flat-menu colours of the context menus and of the All Programs cascade where the msstyles has no hot button image).
 --

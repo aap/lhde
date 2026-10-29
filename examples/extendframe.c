@@ -12,7 +12,7 @@
         there is none (another WM), a gradient of our own; keep the extension set, it is what asks lhwm for the pixmap;
      5. caption behaviour in the header comes from _NET_WM_MOVERESIZE (drag) and _NET_WM_STATE (double-click maximise);
      6. a PropertyNotify on the root for _LH_THEME, _LHWM_COMPOSITED or _LHWM_FRAME_METRICS is WM_THEMECHANGED: look the
-        theme up in the registry (_LH_THEMES_INI, ../THEMES.md; a uxtheme client loads its msstyles), re-read
+        theme up in the registry (_LH_THEMES_INI, docs/history/THEMES.md; a uxtheme client loads its msstyles), re-read
         _LHWM_COMPOSITED and repaint (glass or the header pixmap); the extension stays set.
 
    -c (experimental, CLIENT-PROTOCOL.md "CLIENT_CAPTION"): the window also takes the caption rows. lhwm grows it up to the frame's
@@ -96,7 +96,7 @@ static void read_root_string(Atom a, char *buf, size_t n) {
     }
 }
 
-/* the registry (THEMES.md): plain ini, [name] sections with key = value; we only want msstyles. A real client takes msstyles,
+/* the registry (docs/history/THEMES.md): plain ini, [name] sections with key = value; we only want msstyles. A real client takes msstyles,
    color and size and reloads its visual style (flxp: the FLXP_THEME / _COLOR / _SIZE triple). Relative paths are relative to
    the registry file. */
 static void read_theme(void) {

@@ -212,7 +212,7 @@ void set_root_string(const char* prop, const std::string& value);   // UTF8_STRI
 // publishes no _NET_ACTIVE_WINDOW (no EWMH WM: use the focus instead).
 int wm_active(Window* w);
 // fn runs once after changes of the watched root property, when the pending X
-// events have been handled (a burst of changes is one call; THEMES.md step 2)
+// events have been handled (a burst of changes is one call; docs/history/THEMES.md step 2)
 void on_root_property_change(const char* prop, void (*fn)());
 Rect work_area();
 

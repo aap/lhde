@@ -21,7 +21,7 @@ pack     = 4074-aerovision   ; the aero table with glowing taskbar text
 [Explorer]
 chrome   = longhorn
 navbar   = vision            ; small | big (data/navbar/vision.ini)
-navbar_preset = small
+navbar_preset = auto
 
 [Desktop]
 wallpaper = demos/exec_briefing_chadDesktop.dir_18_1   ; the chadDesktop demo (lhde-import --from-workspace; else 4074's Bliss)

@@ -48,7 +48,7 @@ std::string icon_file(const std::string& key);           // resolved source for 
 void set_icon_dir(const std::string& dir);               // where <name>.theme files and the wine icons live
 std::string icon_theme_file(const std::string& name);    // the recipe a name selects ("" if none)
 
-// Windows art by resource id from lhde-import's resources/<build> (docs/flxp-NOTES.md
+// Windows art by resource id from lhde-import's resources/<build> (docs/history/flxp-NOTES.md
 // "XP and 2000 art by resource id"): resource_file("xp", "explorer.exe") is that file in
 // the first data directory that has it, "" when the build is not imported.
 std::string resource_file(const std::string& build, const std::string& file);

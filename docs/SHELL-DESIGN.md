@@ -895,9 +895,9 @@ otherwise popup_menu); `surface-press` passes the surface id as a 4th argument. 
 
 ## M6 design: one theme setting for everything, session commands, start menu, minimal mode
 
-Status 2026-10-23: step 1 (registry, `_LH_THEME`, consumers, `THEMES.md`, session commands, `luxwmc quit`) implemented and
+Status 2026-10-23: step 1 (registry, `_LH_THEME`, consumers, `docs/history/THEMES.md`, session commands, `luxwmc quit`) implemented and
 verified on the lab (`:3`); details in `docs/LUXWM.md` ("EWMH and the shell", "Maximised mode"), `docs/CLIENT-PROTOCOL.md`
-"Theme changes", `THEMES.md` and `USAGE.md` "Themes and switching them". Deviations: `color`/`size` are `Default`/`Normal`
+"Theme changes", `docs/history/THEMES.md` and `USAGE.md` "Themes and switching them". Deviations: `color`/`size` are `Default`/`Normal`
 (the 4074/4051 `.theme` files), not `NormalColor`/`NormalSize`; registry paths are relative to the file (`frame =
 data/frames/jade4074`, `shell = data/packs/4074-aero`), not bare names; old luxwm theme names are `aliases`; a fifth name
 `jade4074-classic` (`composition = off`) covers the old `jade4074-classic` frame theme; the session-command confirmation
@@ -995,7 +995,7 @@ rule); user docs in `USAGE.md` ("Resizing the bars", "Clock tile", "Compositor r
   glass frames; slate4051 likewise; the flyout's Always off / Always on stop and start it.
 
 Status 2026-10-24 (step 4, aap's review: Slate start button, 4051 vs 4074, layering, toggle glyph); user docs in `USAGE.md`
-("4051 vs 4074 Slate", "Stacking", state.ini `[sidebar] layer`, `[clock] pinned_pack`) and `THEMES.md` ("luxshell packs").
+("4051 vs 4074 Slate", "Stacking", state.ini `[sidebar] layer`, `[clock] pinned_pack`) and `docs/history/THEMES.md` ("luxshell packs").
 - **Slate start button "not full height".** Root cause: the rows work put the StartButton in a canvas slot (so it stays one row
   high at the top of a taller bar) with the pack's `start = { w = 78, h = 23 }`, i.e. 1156's own size; before, as a Dock=Left
   child of the dock panel, it had been stretched to the full bar height regardless of `h`. Now Width 83 / Height 29 with the 4 px
@@ -1003,7 +1003,7 @@ Status 2026-10-24 (step 4, aap's review: Slate start button, 4051 vs 4074, layer
   the bar at rows 834..863 and 1155 (50x28) stretched whole to 30 rows nearest-neighbour (rows 7 and 21 repeat; a 7 px top grid
   does not fit), so the pack's bg grid is 0. Ours against the shot: start button mean squared error 0.03 per pixel, bar column
   1.6 (one row: pixman's 16.16 stepping repeats row 6 where the shot repeats row 7).
-- **Image filter per pack** (`filter = nearest | bilinear` in shell.lua, THEMES.md "luxshell packs"; scene.c `scene_filter`,
+- **Image filter per pack** (`filter = nearest | bilinear` in shell.lua, docs/history/THEMES.md "luxshell packs"; scene.c `scene_filter`,
   node `filter`, `lh.image_filter`): stretched nine-grid pieces and magnified images use it, shrinking stays BEST. Evidence, all
   as fits of 1156 / 1179 drawn 79x29 over the bar's own background column: 4074 Slate (`lh4074-181533.png`) nearest 54 vs
   bilinear 250, Aero without DWM (`lh4074-181415.png`) 129 vs 266, Aero glass (`4074-dwm.png`) 1868 vs 2047 (blur under it);
@@ -1043,7 +1043,7 @@ default (no pack set `T.default_icon`; zenity, extendframe, xmessage and every f
 the size pick (nearest to 16, scaled with FILTER_GOOD). Now: `icon_from_netwm` takes the smallest image >= 16 (else the largest), both
 paths scale once with `CAIRO_FILTER_BEST`, both packs have `default_icon = "shell32/16/3.png"` (task_button used `R()`, the imageres
 mapper, for it; now a plain assets path). The `@icon:<window>` entry is replaced on each icon PropertyNotify and the task list rebuilt
-(`window` event), so a changed icon shows at once (checked with xprop set/delete). Fonts: themes.ini `fonts =` (THEMES.md "Fonts")
+(`window` event), so a changed icon shows at once (checked with xprop set/delete). Fonts: themes.ini `fonts =` (docs/history/THEMES.md "Fonts")
 is applied by `lh.fonts()` (lhshell.c: FcConfigAppFontClear + AddDir, new pango font map) at startup and on every `_LH_THEME` change
 (the bars are rebuilt when the set changed), so the packs' "Segoe UI 9" is 4074's Segoe UI 0.7 instead of DejaVu Sans;
 `LHSHELL_DEBUG=1` logs the resolved face. `[shell] desktop_black` (M5b). Comparisons: `lhshell/compare_icons.png`,
@@ -1071,7 +1071,7 @@ Windows has one setting (the active visual style + colour + size) and one broadc
   composition = auto           ; auto | off  (off = always classic frames, like USESCOMPOSITION=FALSE)
   ```
   Names to ship: `aero4074`, `jade4074`, `slate4074`, `slate4051`. Paths are absolute or relative
-  to the file. flxp reads the same file (document the format in `docs/THEMES.md`; it is plain ini
+  to the file. flxp reads the same file (document the format in `docs/history/THEMES.md`; it is plain ini
   and the msstyles/color/size triple maps straight onto `FLXP_THEME`, `FLXP_THEME_COLOR`,
   `FLXP_THEME_SIZE`). The file's location is published too, so nobody hardcodes it.
 - **Setting:** root property `_LH_THEME` (UTF8_STRING): the theme *name*. Root property
@@ -1148,10 +1148,10 @@ colours from the ini. Keyboard: Esc closes, arrows navigate, typing jumps.
   work area follows the struts (M2), maximised windows refit (M2).
 
 ### Order of work
-1. Registry + `_LH_THEME` + lhwm/lhshell/extendframe consumers + `docs/THEMES.md` + session
+1. Registry + `_LH_THEME` + lhwm/lhshell/extendframe consumers + `docs/history/THEMES.md` + session
    commands + `luxwmc quit` (one agent, luxwm + luxshell).
 2. Start menu + autohide + sidebar modes + settings flyout (one agent, luxshell; flxp is told the
-   registry format via THEMES.md).
+   registry format via docs/history/THEMES.md).
 
 ## M5b design: maximised windows the Longhorn way (2026-10-24)
 
@@ -1216,7 +1216,7 @@ the classic taskbar.
 | Start menu | the classic Start button sends the root client message `_LHSHELL_START` (already used by the Super key); luxshell shows its StartPanel menu anchored above the button rect passed in the message's data (x, y, w, h) instead of its own button. |
 | Tray icons | one XEmbed tray manager per display: when flxp-tray owns `_NET_SYSTEM_TRAY_S0`, luxshell's notifications tile hides itself (it polls the selection owner), and vice versa. |
 | Clock | `_ToggleClock` semantics (COMPOSITION.md §11): if the sidebar shows a clock, the tray clock is hidden; luxshell publishes `_LHSHELL_CLOCK_VISIBLE` (CARDINAL) on the root; flxp-tray reads it. |
-| Theme | `_LH_THEME` + `themes.ini` (THEMES.md): flxp-tray loads the msstyles it names (`flxp_msstyles` when set) and switches live; its `[sysmetrics]`/`TaskBar` classes give sizes. |
+| Theme | `_LH_THEME` + `themes.ini` (docs/history/THEMES.md): flxp-tray loads the msstyles it names (`flxp_msstyles` when set) and switches live; its `[sysmetrics]`/`TaskBar` classes give sizes. |
 | Autohide / position | its own (explorer's `StuckRects2` logic, 2.1); persisted in its own ini. luxshell's taskbar autohide is independent. |
 | Black layers when maximised | the classic taskbar has none (that is Avalon-only, 2.4.3); nothing to do. |
 | Composition | none needed; it is an opaque dock. Shadows: picom rule `window_type = 'dock'` already disables them. |
@@ -1549,7 +1549,7 @@ to read in Aero vision.
   baseline within 0.5 px (pango's centred blocks sat on half pixels), block x identical; text widths +-2 px. Ellipsis is GDI's
   ("A very long window ..." keeps the blank). `lhshell/compare_text_gdi.png`: task buttons, clock, menu, toast at 4x, pango
   above GDI.
-- **Text on glass** (pack key `taskbar_text = plain | glow`, THEMES.md "luxshell packs"): `glow` draws the task buttons' titles
+- **Text on glass** (pack key `taskbar_text = plain | glow`, docs/history/THEMES.md "luxshell packs"): `glow` draws the task buttons' titles
   and the minimized sidebar's taskbar clock black over a white halo (luxnav's treatment; `taskbar_glow = { color, text, size,
   strength }`). New pack `themes/aerovision` (`aero` + `taskbar_text = "glow"`, `clock_pack = "aero"` so the clock's pinned
   choice made in aero holds), used by themes.ini `[aerovision]`; `aero` keeps `plain` (white).

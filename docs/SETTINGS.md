@@ -57,7 +57,7 @@ own now); `[override:aero5048]` left nothing (its values are basic5048's default
 One settings store for the whole desktop so luxwm, lux (the Lua/cairo Avalon-style shell, formerly
 "lhshell") and the flxp programs (explorer, flxp-taskbar, flxp-desktop, the Display Properties
 dialog, written with the "wux" win32 layer) read and write the same configuration. It complements
-the theme registry (`data/themes.ini`, THEMES.md) and the live root properties (`_LH_THEME`,
+the theme registry (`data/themes.ini`, docs/history/THEMES.md) and the live root properties (`_LH_THEME`,
 `_LHWM_*`, `_LHSHELL_*`).
 
 ## Files
@@ -130,11 +130,11 @@ root property, on every theme change and whenever a key that feeds it changes:
   `fonts=/a\;/b`). Paths are absolute. Empty value = not set (e.g. `animations=`: the program's own default).
 - Values are the effective ones: a preset's own key, else settings.ini (`[desktop] wallpaper/mode/icons`, `[theme]
   animations`), else the registry entry (`icons` falls back to the entry's `flxp_icons`). `wallpaper=none` means no image.
-  `wallpaper` / `mode` follow the order of THEMES.md "Wallpapers" (2026-10-25): `[desktop] wallpaper = none`, `[override:NAME]
+  `wallpaper` / `mode` follow the order of docs/history/THEMES.md "Wallpapers" (2026-10-25): `[desktop] wallpaper = none`, `[override:NAME]
   wallpaper`/`mode`, the preset's `[Desktop]`, `[desktop] wallpaper`/`mode`, a themes.ini `wallpaper` key (none ships), then
   `data/wallpapers.ini [NAME]` and `[default]`. The property's format did not change; registry themes now always carry a
   `wallpaper=` (from wallpapers.ini) where before it came from their themes.ini key. Paths are under
-  `/u/aap/fun/longhorn/resources/` (THEMES.md "Resources").
+  `/u/aap/fun/longhorn/resources/` (docs/history/THEMES.md "Resources").
 - `_FLXP_WALLPAPER` (2026-10-25, lux, interim): flxp-desktop takes a registry theme's wallpaper from the section's `wallpaper` key,
   which no section has any more, and reads `_LH_THEME_RESOLVED` only for presets. So that it needs no change, lux also writes the
   effective wallpaper to flxp-desktop's own root property `_FLXP_WALLPAPER` (`MODE PATH`, or `none`; UTF8_STRING) whenever it
@@ -161,7 +161,7 @@ root property, on every theme change and whenever a key that feeds it changes:
 ## Notes for the flxp team (2026-10-25: resources/, XP styles, wallpapers.ini)
 - **Wallpaper and icons: use the resolved view.** `_LH_THEME_RESOLVED` carries the effective `wallpaper=`, `mode=` and `icons=` for
   registry themes as well as presets. flxp-desktop should read them there (when `name=` equals `_LH_THEME`) instead of the registry
-  section's `wallpaper` / `flxp_icons`; the themes.ini `wallpaper` keys are gone (THEMES.md "Wallpapers"). Until then lux keeps
+  section's `wallpaper` / `flxp_icons`; the themes.ini `wallpaper` keys are gone (docs/history/THEMES.md "Wallpapers"). Until then lux keeps
   `_FLXP_WALLPAPER` in step (above). Without lux running, a reader that wants the theme's wallpaper reads `data/wallpapers.ini`
   (`[NAME]` then the entry's aliases then `[default]`, `file` relative to `[default] root`).
 - **`[sidebar] stacking` in Display Properties** (redefined 2026-10-25). The key is shared and now says whether the sidebar is
@@ -273,7 +273,7 @@ preset) the value of KEY is the first set of:
    `composition = follow|on|off`, `animations = ...`, `icons = longhorn|xp|2k`, `frame = auto|xp|longhorn`);
 2. the preset's own key when NAME is a preset: `[Shell] taskbar`, `[Shell] start`, `[Composition] composition`,
    `[Composition] animations`, `[Desktop] icons`, `[Explorer] frame` (new: `[Shell] taskbar/start`, `[Explorer] frame`);
-3. the registry entry (the preset's base): `taskbar`, `start`, `animations`, `flxp_icons`, `flxp_frame` (THEMES.md
+3. the registry entry (the preset's base): `taskbar`, `start`, `animations`, `flxp_icons`, `flxp_frame` (docs/history/THEMES.md
    "Per-theme shell settings"); `composition` has no registry default here;
 4. the global key as before: `[taskbar] kind`, `[start] menu`, `[theme] composition`, `[theme] animations`, `[desktop] icons`,
    `[explorer] frame` - the fallback for themes that set nothing (lux keeps working with it);

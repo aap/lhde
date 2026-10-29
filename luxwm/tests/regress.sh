@@ -76,7 +76,7 @@ if [ -z "$styles" ] || [ -z "$(ls "$styles" 2>/dev/null)" ]; then
 	echo "skip  luxwm regress: no visual styles in $LHDE_USER_DATA/styles (tools/lhde-import)"; exit 0
 fi
 [ -x "$ft" ] || { echo "regress: build $ft first (make)" >&2; exit 2; }
-# the session's fonts (themes.ini `fonts =`, THEMES.md): the 4074 Fonts directory, so "Segoe UI 9" is Segoe UI 0.7 as in luxwm
+# the session's fonts (themes.ini `fonts =`, docs/history/THEMES.md): the 4074 Fonts directory, so "Segoe UI 9" is Segoe UI 0.7 as in luxwm
 export FRAMETEST_FONTS=${FRAMETEST_FONTS-$(lhde_find fonts/4074)}
 rm -rf "$out"; mkdir -p "$out"
 

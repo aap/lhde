@@ -20,6 +20,7 @@ pack     = 5112-aero         ; the 5112 Start pill, bar and task buttons, for ta
 [Explorer]
 chrome   = longhorn
 navbar   = vision
+navbar_preset = small
 
 [Desktop]
 wallpaper = 5112/Longhorn    ; the grass blades

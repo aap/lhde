@@ -1,4 +1,4 @@
-# liblhde, the desktop-wide library (docs/THEME-FORMAT.md section 10.3): lhde's data directories (<lhde/data.h>), the theme
+# liblhde, the desktop-wide library (docs/history/THEME-FORMAT-status.md section 10.3): lhde's data directories (<lhde/data.h>), the theme
 # resolver (<lhde/theme.h>) and the settings store (<lhde/settings.h>). Plain C, no X; style probing through libwuxtheme.
 # Included by the top-level Makefile, before luxnav.mk (libluxnav carries data.o).
 #   build/lib/liblhde.a, build/lib/liblhde.so.1 (+ .so), build/lib/pkgconfig/lhde.pc

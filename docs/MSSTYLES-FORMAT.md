@@ -307,7 +307,7 @@ Unknown types must be skipped using the record length (the header makes every re
   4051 SDK header against the Jade 4074 schema: identical for all classes **except** `MENU` (renumbered), plus additions
   (`STYLUSHOT` states = 5/6/..., `REBAR` parts 6..8, `TOOLBAR` 7, `LISTVIEW` 6..8, `PROGRESS` 5..6, `EDIT` 3, `LISTITEM` state 6 `HOTSELECTED`) and one removal (`CAPTION` state `DISABLED`=3).
   Examples that matter for frames: `FRAMESTATES` ACTIVE=1 INACTIVE=2; caption buttons NORMAL=1 HOT=2 PUSHED=3 DISABLED=4
-  (+5 STYLUSHOT); with 8-image strips `index = (frame state-1)*4 + state` as in `CLASSIC-DECO-NOTES.md` sec. 2. Caption
+  (+5 STYLUSHOT); with 8-image strips `index = (frame state-1)*4 + state` as in `docs/history/CLASSIC-DECO-NOTES.md` sec. 2. Caption
   button strips in 4074 can have `IMAGECOUNT = 10`.
 * Longhorn-only classes (parts from STBL, 4074 Jade):
   * `CompositedWindow` (`COMPOSITEDWINDOWPARTS`): 1 GENERIC3DMESH, 2 LGFRAME, 3 LGFRAMEEXPLORER, 4 LGFRAMESHADOW, 5
@@ -366,7 +366,7 @@ Strips: a part's image holds `IMAGECOUNT` sub-images stacked per `IMAGELAYOUT` (
 `IMAGEFILE1..5` + `MINDPI1..5`/`MINSIZE1..5` are the alternative resolutions (`IMAGESELECTTYPE` NONE/SIZE/DPI).
 `SIZINGMARGINS` (l,r,t,b) cut the nine-grid; `SIZINGTYPE` TRUESIZE/STRETCH/TILE; `CONTENTMARGINS`, `CAPTIONMARGINS`,
 `TRANSPARENT`, `TRANSPARENTCOLOR` (3809, default 255 0 255), `BGTYPE`, `GLYPHTYPE`/`GLYPHIMAGEFILE`/`GLYPHTRANSPARENT`,
-`UNIFORMSIZING`, `BORDERONLY` keep their XP meanings; drawing rules: `docs/CLASSIC-DECO-NOTES.md`.
+`UNIFORMSIZING`, `BORDERONLY` keep their XP meanings; drawing rules: `docs/history/CLASSIC-DECO-NOTES.md`.
 
 ### 6.2 Alpha conventions (measured over all Longhorn bitmaps)
 

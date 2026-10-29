@@ -1,5 +1,5 @@
 ; Windows XP icons and toolbar art, read by resource id from lhde-import's resources/xp (the Server 2003 SP1 x64
-; DLLs: XP's resources; docs/flxp-NOTES.md "XP and 2000 art by resource id"). The recipe format (flxp/shell/icons.h):
+; DLLs: XP's resources; docs/history/flxp-NOTES.md "XP and 2000 art by resource id"). The recipe format (flxp/shell/icons.h):
 ; [theme] resources = resources/BUILD is the base of every relative source; pe:DLL#ID is an icon (RT_GROUP_ICON) or,
 ; in [toolbar], a bitmap (RT_BITMAP); a relative path starting with resources/ names another build's file.
 ; The ids are XP's (Longhorn 4074 keeps them).

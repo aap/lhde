@@ -98,7 +98,7 @@ luxwm; the lab's). Escape or q quits.
 ## Theme changes
 
 The session theme is the root property `_LH_THEME` (UTF8_STRING), a name in the registry whose path is in `_LH_THEMES_INI`
-(`data/themes.ini`; format, names and the full rules in `docs/THEMES.md`). A theme switch is Windows' `WM_THEMECHANGED`, and
+(`data/themes.ini`; format, names and the full rules in `docs/history/THEMES.md`). A theme switch is Windows' `WM_THEMECHANGED`, and
 a client treats a PropertyNotify on the root for `_LH_THEME`, `_LHWM_COMPOSITED` or `_LHWM_FRAME_METRICS` as one: look the
 name up in the registry and reload the visual style (`msstyles`, `color`, `size`), re-read `_LHWM_COMPOSITED`, and repaint
 the header transparent or opaque. Keep `_LHWM_EXTEND_FRAME` and `_LHWM_FRAME_FLAGS` set in both states (since 2026-10-24: while
@@ -254,7 +254,7 @@ differs from or adds to the text above:
   edge only works in the border rows above the client (all of them since the second round, below, plus a client-started top
   resize). Still experimental: nothing from flxp has used it yet.
 - XP visual styles: `tools/msstyles2theme.py` reads XP (PACKTHEM_VERSION 3) and Longhorn-compiled (4) `.msstyles` directly;
-  the registry has `luna`, `luna-olive`, `luna-silver` (`THEMES.md`). The `msstyles` key points at Longhorn 4051's Luna
+  the registry has `luna`, `luna-olive`, `luna-silver` (`docs/history/THEMES.md`). The `msstyles` key points at Longhorn 4051's Luna
   (version 4); `flxp_msstyles` at a real XP Luna (version 3) for flxp's uxtheme.
 
 ### Fog default changed (2026-10-24)
