@@ -26,7 +26,7 @@ luxshell: build/bin/luxshell build/luxshell/tests/trayicon
 # make check-luxshell: it builds, and every Lua file at least compiles (luac -p when there is one)
 check-luxshell: build/bin/luxshell
 	@if command -v luac5.4 >/dev/null 2>&1; then L=luac5.4; elif command -v luac >/dev/null 2>&1; then L=luac; else L=; fi; \
-	if [ -n "$$L" ]; then $$L -p $(LUXSHELL_LUA) data/packs/*/shell.lua data/packs/startpanels.lua && echo "ok    luxshell (built, Lua parses: $$L -p)"; \
+	if [ -n "$$L" ]; then $$L -p $(LUXSHELL_LUA) data/packs/*/shell.lua && echo "ok    luxshell (built, Lua parses: $$L -p)"; \
 	else echo "ok    luxshell (built; no luac to check the Lua)"; fi
 
 install-luxshell: build/bin/luxshell

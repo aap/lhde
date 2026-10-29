@@ -471,7 +471,7 @@ luxwm reads the `.msstyles` itself through the shared visual-style library (`~/s
 fallback for an luxwm built without the library, and the place for tuning keys. A registry entry whose `msstyles` names any v3 (XP) or
 v4 (Longhorn-compiled) style gets classic frames without running `tools/msstyles2theme.py` (`[luna-xp]` in `../themes.ini`: the real XP
 `luna.msstyles`, copied from the Wine prefix to `resources/msstyles/luna-xp.msstyles`, no directory at all; likewise `[royale]`, `[zune]`,
-`[noir]`, `[embedded]`).
+`[embedded]`).
 
 **Which style.** `theme_load` takes a theme spec: a directory, `DIR|STYLE.msstyles|COLOR|SIZE`, or `|STYLE.msstyles|COLOR|SIZE` (no
 directory: msstyles mode, every tuning key at its default). The style is the spec's, else the directory's own theme.ini `msstyles` /
@@ -556,11 +556,10 @@ theme directories as before (checked: builds and links without `-luxtheme`, 128 
   (FreeType mono vs GDI glyphs). Exactly the 4051-copy numbers. luna-xp and luna-blue differ from each other only in 36 (active) / 27 (inactive)
   corner pixels of the buttons (+-1 level: XP stores straight alpha and premultiplies on load, the 4051 copy is stored premultiplied). The HomeStead and
   Metallic schemes of the same file load the same way.
-- XP styles from `XP_Themes.zip` (2026-10-25; `docs/history/THEMES.md` "Microsoft's later XP styles"): `[royale]`, `[zune]`, `[noir]` (scheme
-  Metallic), `[embedded]` have no directory and load like `[luna-xp]` (whose style is now the copy `resources/msstyles/luna-xp.msstyles`).
+- XP styles from `XP_Themes.zip` (2026-10-25; `docs/history/THEMES.md` "Microsoft's later XP styles"): `[royale]`, `[zune]`, `[embedded]` have no directory and load like `[luna-xp]` (whose style is now the copy `resources/msstyles/luna-xp.msstyles`).
   `compare_xp_styles.png`: frametest renders (active, inactive, maximised) of all of them plus Royale Noir's NormalColor scheme (= Royale),
   and the Luna caption next to the XP SP3 screenshot; no reference screenshots of the other four exist here. All four open through the
-  library (v3), margins 4/4/30/4, borders identical to `ut-dump --render`; on the lab (`:4`) `_LH_THEME = royale` / `noir` / `zune` /
+  library (v3), margins 4/4/30/4, borders identical to `ut-dump --render`; on the lab (`:4`) `_LH_THEME = royale` / `zune` /
   `embedded` switch live (`_LHWM_THEME = |.../resources/msstyles/royale.msstyles|NormalColor|NormalSize`). The theme directories'
   `theme.ini` now name `resources/msstyles/*` and `resources/fonts/4074` and `tests/regress.sh` uses `resources/fonts/4074`: still 144
   of 144 identical (lib and dir source).

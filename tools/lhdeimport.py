@@ -1114,48 +1114,6 @@ def ut_sections(ut, style, color, prefixes):
     return secs
 
 
-def r_packs_startpanel(data, target, args):
-    """packs/<build>/startpanel-<name>/: the StartPanel / StartMenu:: classes of a style (one PNG per part/state, the
-    bitmaps un-premultiplied; startpanel.ini with the decoded values), as luxshell's menu.lua reads them"""
-    name, style = args[0], args[1]
-    color = args[2] if len(args) > 2 else None
-    ut = tool('ut-dump')
-    if not ut:
-        raise RuntimeError('needs ut-dump (make)')
-    rel = style_rel(data, style)
-    path = os.path.join(data, rel)
-    pe = PE(path)
-    out = os.path.join(data, 'packs', target, 'startpanel-' + name)
-    os.makedirs(out, exist_ok=True)
-    ini = ['; StartPanel / StartMenu classes of styles/%s.msstyles%s (lhde-import, ut-dump; FONT = face, lfHeight, weight, italic)' % (style, ' colour ' + color if color else '')]
-    n = 0
-    for sec, kvs in ut_sections(ut, path, color, ('StartPanel', 'StartMenu::')):
-        ini.append('\n[%s]' % sec)
-        kv = dict(kvs)
-        tcol = None
-        if kv.get('TRANSPARENT') == 'TRUE':
-            tcol = tuple(int(x) for x in re.split(r'[ ,]+', kv.get('TRANSPARENTCOLOR', '255, 0, 255'))[:3])
-        for k, v in kvs:
-            if k == 'FONT':
-                f = [x.strip() for x in v.split(',')]
-                weight = 700 if any(x.lower() == 'bold' for x in f[2:]) else 400
-                v = '%s, %s, %d, %d' % (f[0], f[1] if len(f) > 1 else '-12', weight, int(any(x.lower() == 'italic' for x in f[2:])))
-            elif k.startswith('IMAGEFILE') and v.startswith('#'):
-                bid = int(v[1:].split()[0])
-                part = sec.replace('StartPanel.', '').replace('StartPanel', 'STARTPANEL').replace('StartMenu::', 'MENU_').replace('.', '_')
-                part = re.sub(r'\((\w+)\)', r'_\1', part)
-                d = pe.get(2, bid)
-                if d:
-                    dib_image(d, tcolor=tcol).save(os.path.join(out, part + '.png'))
-                    n += 1
-                v = '%s.png ; bitmap#%d' % (part, bid)
-            elif re.match(r'^-?\d+(, -?\d+)+$', v):
-                v = v.replace(', ', ' ')
-            ini.append('  %s = %s' % (k, v))
-    open(os.path.join(out, 'startpanel.ini'), 'w').write('\n'.join(ini) + '\n')
-    return [rel], n
-
-
 def r_packs_aero5112(data, target, args):
     """packs/5112/imageres: the Vista 5112 taskbar art of aero.msstyles 5112 under the Aero imageres ids it replaces (was
     luxshell/shellpack-aero5112.sh): the Start pill (bitmap#502, 3 states) with the flag (explorer.exe icon 7103) and "Start"
@@ -1213,7 +1171,7 @@ def r_packs_aero5112(data, target, args):
 RECIPES = {
     ('frames', 'composited'): r_frames_composited, ('frames', 'vision'): r_frames_vision, ('frames', 'classic'): r_frames_classic,
     ('frames', 'udwm'): r_frames_udwm, ('frames', 'dwmwindow'): r_frames_dwmwindow,
-    ('packs', 'imageres'): r_packs_imageres, ('packs', 'shell32'): r_packs_shell32, ('packs', 'startpanel'): r_packs_startpanel,
+    ('packs', 'imageres'): r_packs_imageres, ('packs', 'shell32'): r_packs_shell32,
     ('packs', 'aero5112'): r_packs_aero5112,
 }
 

@@ -24,7 +24,7 @@
 #   liblhde/liblhde.mk    liblhde (lhde/data.h, lhde/theme.h, lhde/settings.h): the data directories, the theme resolver,
 #                         the settings store -> build/lib/liblhde.{a,so.1}, lhde.pc, build/bin/lhde-theme
 #   data/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme, sources/*.ini,
-#                         frames/*/*.ini, packs/*/shell.lua, packs/startpanels.lua), PKGLIBDIR/session + BINDIR/lhde-session,
+#                         frames/*/*.ini, packs/*/shell.lua), PKGLIBDIR/session + BINDIR/lhde-session,
 #                         PKGLIBDIR/tools + BINDIR/lhde-import, lhde-pack, lhde-schemes
 #
 # Every object is build/obj/<source path>.o (build/pic/... for the shared
@@ -112,9 +112,8 @@ install-data:
 	install -m 644 data/sources/*.ini $(DESTDIR)$(DATADIR)/sources/
 	for d in data/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
 	for d in data/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done
-	install -m 644 data/packs/startpanels.lua $(DESTDIR)$(DATADIR)/packs/
 	{ echo '# lhde: the files make install put into $(DATADIR) (program files; docs/LAYOUT.md)'; \
-	  cd data && ls themes/*.theme navbar/*.ini icons/*.theme sources/*.ini frames/*/*.ini packs/*/*.lua packs/startpanels.lua; \
+	  cd data && ls themes/*.theme navbar/*.ini icons/*.theme sources/*.ini frames/*/*.ini packs/*/*.lua; \
 	  cd ../flxp && ls res/icons/*.theme res/icons/*.ico res/icons/*.bmp; } > $(DESTDIR)$(DATADIR)/.lhde-install
 	rm -rf $(DESTDIR)$(DATADIR)/session $(DESTDIR)$(DATADIR)/tools $(DESTDIR)$(DATADIR)/luxshell
 	install -m 755 session/lhde-session $(DESTDIR)$(BINDIR)/

@@ -74,7 +74,7 @@ S.migrate()
 -- wallpaper" off) and the legacy [override:NAME] sections applied by the resolver. v.wallpaper_src says where the wallpaper came from.
 local function effective(e)
   local v = {}
-  for _, k in ipairs{ "msstyles", "color", "size", "frame", "frame_classic", "shell", "fonts", "startpanel" } do v[k] = e and e[k] or "" end
+  for _, k in ipairs{ "msstyles", "color", "size", "frame", "frame_classic", "shell", "fonts" } do v[k] = e and e[k] or "" end
   v.wallpaper, v.mode = e and e.wallpaper or "", e and e.mode or "fill"
   v.wallpaper_src = e and e.why and e.why["Desktop.wallpaper"] or "?"
   v.icons = e and e.icons or ""
@@ -128,19 +128,6 @@ local function apply_fonts(e)
   return changed
 end
 apply_fonts(theme_entry)
--- themes.ini `startpanel` (docs/history/THEMES.md): a start panel other than the pack's own, e.g. the Luna themes use the Slate taskbar pack
--- with Luna's StartPanel (assets/startpanel-luna-<scheme>); its metrics and menu colours come from themes/startpanels.lua
-local pack_own = {}
-local function apply_startpanel(e)
-  for _, k in ipairs{ "startpanel", "startmenu", "menu" } do if pack_own[k] == nil then pack_own[k] = T[k] or false end T[k] = pack_own[k] or nil end
-  local name = e and e.startpanel
-  if not name or name == "" then return end
-  local ok, all = pcall(dofile, lh.data_find("packs/startpanels.lua") or "packs/startpanels.lua")
-  local sp = ok and type(all) == "table" and all[name]
-  if not sp then io.stderr:write("luxshell: startpanel " .. name .. " is not in packs/startpanels.lua\n") return end
-  for k, v in pairs(sp) do T[k] = v end
-end
-apply_startpanel(theme_entry)
 ------------------------------------------------------------------ shell settings (SHELL-DESIGN 6.4; settings.ini, SETTINGS.md; defaults written on first run)
 --   [taskbar] kind = avalon|classic|none (M8: classic = flxp-taskbar, started from [commands] taskbar; LHSHELL_TASKBAR overrides it
 --   for one run), autohide = 0|1, rows = 1..3 (Taskbar\RowCount, 2.4.2; the top-edge drag), classic_start_menu = flxp|flxp-classic|
@@ -169,7 +156,7 @@ fold_sidebar_layer()
 for _, d in ipairs{ { "theme", "composition", "follow" }, { "desktop", "mode", "fill" }, { "desktop", "desktop_black", "0" },
                     { "taskbar", "kind", "avalon" }, { "taskbar", "autohide", "0" }, { "taskbar", "rows", "1" },
                     { "sidebar", "width", "150" }, { "sidebar", "with_classic", "0" }, { "sidebar", "stacking", "top" },
-                    { "clock", "layout", "default" }, { "start", "menu", "flxp" }, { "shell", "max_fade_ms", "0" } } do
+                    { "clock", "layout", "default" }, { "shell", "max_fade_ms", "0" } } do
   if not S.has(d[1], d[2]) then S.set(d[1], d[2], d[3]) end
 end
 local SB_MIN, SB_MAX = 100, 600         -- _ValidateSize(v, 100, 150, 600) (2.4.2, L53528)
@@ -209,8 +196,6 @@ local function theme_composition(e)
   local c = S.theme_value(e, "composition"); if c ~= "on" and c ~= "off" then c = "follow" end
   return c
 end
-local function start_pref() return S.theme_value(theme_entry, "start") == "lux" and "lux" or "flxp" end
-lh.start_pref = start_pref
 cfg.taskbar = theme_taskbar(theme_entry)
 cfg.composition = theme_composition(theme_entry)
 local function tb_on() return cfg.taskbar == "avalon" end
@@ -545,7 +530,23 @@ lua("flyout.lua")(ctx)
 lua("toast.lua")(ctx)
 ctx.apps = lua("apps.lua")          -- desktop entries, icons, MFU (start menu, 6.3)
 lua("menu.lua")(ctx)                -- popup menus: All Programs cascade, taskbar context menu
-lua("startmenu.lua")(ctx)
+-- The Start button and Super go to the start-menu provider, flxp-startmenu (flxp's XP start panel; started below), which owns
+-- _LH_STARTMENU_S<screen>: _LHSHELL_START to its owner window, format 32, l[0] = flags (bit 0: toggle), l[1..4] = anchor x, y, w, h
+-- in root coordinates (w or h 0: none). luxwm's Super broadcast has a timestamp in l[0] and no rect: "toggle, no anchor". There
+-- is no start menu of our own (Longhorn's Avalon shell never had one); without a provider nothing opens.
+local function our_anchor() if not lh.start_anchor then return nil end local x, y, w, h = lh.start_anchor(); if not x then return nil end return { x = x, y = y, w = w, h = h } end
+local function forward_start(flags, a)
+  local sel = lh.startmenu_selection or "_LH_STARTMENU_S0"
+  local o = lh.selection_owner(sel)
+  if not o then io.stderr:write("luxshell: start menu: nothing owns " .. sel .. " (flxp-startmenu is not running)\n") return end
+  lh.send_message(o, "_LHSHELL_START", flags, a and a.x or 0, a and a.y or 0, a and a.w or 0, a and a.h or 0)
+  lh._emit("start-forwarded", flags)   -- the Start button's pressed look while the provider's menu is open
+end
+lh.on("start-click", function() forward_start(1, our_anchor()) end)
+lh.on("start-key", function(l0, x, y, w, h)
+  local has = (w or 0) > 0 and (h or 0) > 0
+  forward_start(has and ((l0 or 0) & 0xff) or 1, has and { x = x, y = y, w = w, h = h } or our_anchor())
+end)
 lua("settings.lua")(ctx)            -- settings flyout ("Control Panel"), run / search box
 
 ------------------------------------------------------------------ tiles
@@ -683,7 +684,7 @@ place_taskbar = function()
   tb.surface:icon_offset(0, y - ny)
   if lh.yield_soon then lh.yield_soon(0) end   -- M4 layout: the sidebar follows the taskbar's strut
 end
-local function ui_open() return (lh.startmenu and lh.startmenu.open) or (lh.menu and lh.menu.is_open()) or lh.flyout_tile ~= nil end
+local function ui_open() return (lh.menu and lh.menu.is_open()) or lh.flyout_tile ~= nil end
 local function pointer_in_taskbar()
   local px, py = lh.pointer(); local x, y, w, h = tb_shown()
   return px >= x and px < x + w and py >= y and py < screen_h
@@ -701,15 +702,15 @@ end
 local function autohide_check() if cfg.autohide then slide_to(focus_within() and 100 or 0) end end
 lh.timer(function() if cfg.autohide and tb_on() and tb.pct > 0 then autohide_check() end end, 100, true)   -- shown: poll focus-within
 tb.surface.on_enter = function() if cfg.autohide and tb_on() then autohide_check() end end            -- hidden: the sliver re-shows it
--- The Start button shows StartButton.FakePressed (1181, the "checked" state) while a start menu is open: ours (the "startmenu"
--- event), or a provider's (CLIENT-PROTOCOL "Requests to the wux side"): the provider sets root _LH_STARTMENU_OPEN = 1 while its
+-- The Start button shows StartButton.FakePressed (1181, the "checked" state) while the provider's start menu is open
+-- (CLIENT-PROTOCOL "Requests to the wux side"): the provider sets root _LH_STARTMENU_OPEN = 1 while its
 -- menu is mapped (0 or deleted when closed). A provider that does not set it (the property never changed since the forward):
 -- pressed from the forward (Start button or Super) until the first toplevel mapped within 1.5 s of it (its popup) unmaps, or
 -- until the next forward (a click on the button while it shows pressed closes the provider's menu), or 1.5 s without a map.
 local fwd       -- { t = ms, win = the popup } while a forward to a provider without the property is assumed open
 local function start_pressed()
   local p = lh.root_prop("_LH_STARTMENU_OPEN")
-  return (lh.startmenu and lh.startmenu.open) or p == 1 or (fwd ~= nil and p == nil) or false
+  return p == 1 or (fwd ~= nil and p == nil) or false
 end
 local function update_start()
   if not tb.start then return end
@@ -717,7 +718,6 @@ local function update_start()
   if tb.start.checked ~= on then tb.start.checked = on; tb.start:set{ checked = on, state = on and "checked" or "normal" } end
 end
 lh.update_start_button = update_start
-lh.on("startmenu", function() autohide_check(); update_start() end)
 lh.on("startmenu-open", function() fwd = nil; update_start() end)   -- the provider speaks the protocol: the property decides
 lh.on("start-forwarded", function()
   if fwd or lh.root_prop("_LH_STARTMENU_OPEN") == 1 then fwd = nil   -- shown pressed: this forward closes the provider's menu
@@ -916,7 +916,6 @@ local function sidebar_menu_items()
 end
 -- x, y: the click (root coordinates); the menu flips left/up where it does not fit (TrackPopupMenu, as lh4074-091929.png)
 local function sidebar_menu(x, y)
-  if lh.startmenu and lh.startmenu.open then lh.startmenu.hide() end
   lh.close_flyout()
   lh.menu.open(sidebar_menu_items(), x, y, { style = "avalon", grab = true, flip = true })
 end
@@ -950,7 +949,6 @@ local function tile_menu(t, x, y)
   if not t.pinned then
     table.insert(items, { text = "&Remove " .. friendly(t) .. " Tile", disabled = mode ~= "full", action = function() set_tile_shown(t.id, false) end })
   end
-  if lh.startmenu and lh.startmenu.open then lh.startmenu.hide() end
   lh.close_flyout()
   lh.menu.open(items, x, y, { style = "avalon", grab = true, flip = true })
 end
@@ -980,8 +978,7 @@ function lh.shell_get(k)
   if k == "autohide" then return cfg.autohide elseif k == "sidebar" then return mode elseif k == "wallpaper" then return S.get("desktop", "wallpaper") ~= "none"
   elseif k == "taskbar" then return cfg.taskbar
   elseif k == "sidebar_with_classic" then return cfg.with_classic
-  elseif k == "sidebar_stacking" then return cfg.sb_bottom and "bottom" or "top"
-  elseif k == "start_menu" then return start_pref() end
+  elseif k == "sidebar_stacking" then return cfg.sb_bottom and "bottom" or "top" end
 end
 function lh.shell_set(k, v)
   if k == "autohide" then
@@ -997,10 +994,6 @@ function lh.shell_set(k, v)
     if v then S.unset("desktop", "wallpaper") else S.set("desktop", "wallpaper", "none") end   -- per user; the resolver applies it
     theme_entry = S.resolve(theme_name) or theme_entry
     set_wallpaper(theme_entry); publish_resolved(theme_entry)
-  elseif k == "start_menu" then
-    local sel = S.set_theme_value(theme_entry, "start", v == "lux" and "lux" or "flxp")   -- a theme key: the current layer
-    if sel then lh.select_theme(sel, true) end
-    lh.start_provider_check()
   end
 end
 
@@ -1061,7 +1054,6 @@ local function taskbar_menu(px, py)
   local showing = (tonumber(lh.root_prop("_NET_SHOWING_DESKTOP") or 0) or 0) ~= 0
   local nwin = #arrangeable()
   local tm = task_manager()
-  if lh.startmenu and lh.startmenu.open then lh.startmenu.hide() end
   lh.close_flyout()
   lh.menu.open({
     { text = mode == "minimized" and "&Restore bar" or "&Minimize bar", disabled = sb_hidden(), action = function()
@@ -1113,23 +1105,18 @@ end
 -- The classic taskbar: [commands] taskbar (default flxp-taskbar; $LHSHELL_TASKBAR_CMD), run with our DISPLAY and session bus
 -- (inherited) and its log in $XDG_RUNTIME_DIR. It follows _LH_THEME by itself (flxp's WM_THEMECHANGED; no --theme). It may take
 -- the tray over from us (FLXP_TRAY_TAKEOVER=1: our notifications tile then hides, tiles/notifications.lua). Start menu:
--- [taskbar] classic_start_menu = flxp (FLXP_START_MENU=panel: XP's start panel of flxp-taskbar; it owns _LH_STARTMENU_S<screen>,
--- so startmenu.lua forwards Super to it, and its own Start button opens it directly) | flxp-classic (flxp's classic popup menu,
--- FLXP_START_MENU=classic) | lhshell (FLXP_START_MENU=lhshell FLXP_START_KEY=0: its Start button sends _LHSHELL_START with its
--- rect to the root and our StartPanel answers). Default: from [start] menu (flxp -> flxp, lux -> lhshell).
+-- [taskbar] classic_start_menu = flxp (default; FLXP_START_MENU=panel: XP's start panel of flxp-taskbar; it owns
+-- _LH_STARTMENU_S<screen>, so we forward Super to it, and its own Start button opens it directly) | flxp-classic (flxp's classic
+-- popup menu, FLXP_START_MENU=classic).
 local classic = {}
 local function classic_command()
   local c = S.get("commands", "taskbar") or os.getenv("LHSHELL_TASKBAR_CMD")
   return (c and c ~= "") and c or lh.prog("flxp-taskbar")
 end
 local function classic_name() return (classic_command():gsub("'", ""):match("^%s*(%S+)") or "flxp-taskbar"):match("([^/]+)$") end
-local function classic_menu()
-  local v = S.get("taskbar", "classic_start_menu")
-  if v == "lhshell" or v == "flxp-classic" or v == "flxp" then return v end
-  if v == "own" then return "flxp" end
-  return start_pref() == "lux" and "lhshell" or "flxp"
-end
--- flxp-taskbar processes of this display, the bar or the menu-only provider (/proc/PID/cmdline has --start-menu-only)
+local function classic_menu() return S.get("taskbar", "classic_start_menu") == "flxp-classic" and "flxp-classic" or "flxp" end
+-- flxp-taskbar processes of this display: the bar, or one run by hand as the menu-only provider (/proc/PID/cmdline has
+-- --start-menu-only; the provider we start is flxp-startmenu, a name of its own)
 local function menu_only(pid)
   local f = io.open("/proc/" .. pid .. "/cmdline"); local c = f and f:read("a") or ""; if f then f:close() end
   for a in c:gmatch("[^%z]+") do if a == "--start-menu-only" then return true end end
@@ -1159,10 +1146,8 @@ local function classic_start()
   -- hand the tray over before it starts (a takeover races: icons answering its MANAGER while we still hand them back were lost
   -- by flxp-taskbar's ReparentNotify handling); our tile stays hidden while it starts and claims again if nobody took the tray
   if lh.tray_yield then lh.tray_yield(10000) end
-  local env = { FLXP_TRAY_TAKEOVER = "1" }
   local menu = classic_menu()
-  if menu == "lhshell" then env.FLXP_START_MENU, env.FLXP_START_KEY = "lhshell", "0"
-  else env.FLXP_START_MENU, env.FLXP_START_KEY = (menu == "flxp-classic" and "classic" or "panel"), "1" end
+  local env = { FLXP_TRAY_TAKEOVER = "1", FLXP_START_MENU = (menu == "flxp-classic" and "classic" or "panel"), FLXP_START_KEY = "1" }
   local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/lhshell-taskbar" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
   classic.pid = lh.spawn_pid(classic_command() .. " >" .. S.quote(log) .. " 2>&1 </dev/null", env); classic.name, classic.menu = name, menu
   io.stderr:write(string.format("luxshell: taskbar: started %s (pid %s, start menu %s, log %s)\n", classic_command(), tostring(classic.pid), classic_menu(), log))
@@ -1173,28 +1158,30 @@ local function classic_stop()
   if pid and pid_is(pid, name) then io.stderr:write("luxshell: taskbar: stopping " .. name .. " " .. pid .. "\n"); lh.kill(pid) end
 end
 
--- [start] menu = flxp (default) without the classic bar (taskbar avalon or none): flxp's start panel through
--- `flxp-taskbar --start-menu-only` (no bar, tray or struts; it owns _LH_STARTMENU_S<screen>, startmenu.lua forwards our Start
--- button and Super to it with the button's rect). Started, adopted (one already running on this display), restarted when it
--- dies (at most 5 times a minute, then our StartPanel stays the fallback until the settings change), stopped on a switch to
--- the classic bar, to [start] menu = lux, and on exit; only ever its own pid, checked against /proc (name, DISPLAY).
+-- Without the classic bar (taskbar avalon or none) the start menu is flxp-startmenu (flxp-taskbar's start panel without the bar,
+-- tray or struts; it owns _LH_STARTMENU_S<screen>, we forward our Start button and Super to it with the button's rect). Started,
+-- adopted (one already running on this display, or a flxp-taskbar --start-menu-only run by hand), restarted when it dies (at
+-- most 5 times a minute, then nothing opens until the settings change), stopped on a switch to the classic bar (the provider
+-- then) and on exit; only ever its own pid, checked against /proc (name, DISPLAY).
+local PROVIDER = "flxp-startmenu"
 local provider = { starts = {} }
-local function provider_wanted() return start_pref() == "flxp" and cfg.taskbar ~= "classic" end
-local function provider_running() return provider.pid and pid_is(provider.pid, provider.name or classic_name()) end
+local function provider_wanted() return cfg.taskbar ~= "classic" end
+local function provider_running() return provider.pid and pid_is(provider.pid, provider.name or PROVIDER) end
 local function provider_stop()
-  local pid, name = provider.pid, provider.name or classic_name(); provider.pid = nil
-  if pid and pid_is(pid, name) then io.stderr:write("lux: start menu: stopping " .. name .. " --start-menu-only " .. pid .. "\n"); lh.kill(pid) end
+  local pid, name = provider.pid, provider.name or PROVIDER; provider.pid = nil
+  if pid and pid_is(pid, name) then io.stderr:write("lux: start menu: stopping " .. name .. " " .. pid .. "\n"); lh.kill(pid) end
 end
 local function provider_start()
   if provider_running() or provider.pending then return end
-  local name = classic_name()
-  local running = flxp_pids(true, name)
-  if #running > 0 then provider.pid, provider.name = running[1], name; io.stderr:write("lux: start menu: " .. name .. " --start-menu-only already runs (" .. running[1] .. ")\n") return end
+  local name = PROVIDER
+  local running = display_pids(PROVIDER)
+  if #running == 0 then running = flxp_pids(true, classic_name()); if #running > 0 then name = classic_name() end end
+  if #running > 0 then provider.pid, provider.name = running[1], name; io.stderr:write("lux: start menu: " .. name .. " already runs (" .. running[1] .. ")\n") return end
   local now = lh.now(); local recent = {}
   for _, t in ipairs(provider.starts) do if now - t < 60000 then table.insert(recent, t) end end
   provider.starts = recent
   if #recent >= 5 then
-    if not provider.gave_up then provider.gave_up = true; io.stderr:write("lux: start menu: " .. name .. " --start-menu-only died 5 times in a minute; our start menu stays\n") end
+    if not provider.gave_up then provider.gave_up = true; io.stderr:write("lux: start menu: " .. name .. " died 5 times in a minute; no start menu until the settings change\n") end
     return
   end
   provider.pending = true
@@ -1203,9 +1190,9 @@ local function provider_start()
     if not provider_wanted() or provider_running() then return end
     table.insert(provider.starts, lh.now())
     local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/lux-startmenu" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
-    provider.pid = lh.spawn_pid(classic_command() .. " --start-menu-only >" .. S.quote(log) .. " 2>&1 </dev/null", { FLXP_START_MENU = "panel", FLXP_START_KEY = "1" })
-    provider.name = name
-    io.stderr:write(string.format("lux: start menu: started %s --start-menu-only (pid %s, log %s)\n", classic_command(), tostring(provider.pid), log))
+    provider.pid = lh.spawn_pid(lh.prog(PROVIDER) .. " >" .. S.quote(log) .. " 2>&1 </dev/null", { FLXP_START_MENU = "panel", FLXP_START_KEY = "1" })
+    provider.name = PROVIDER
+    io.stderr:write(string.format("lux: start menu: started %s (pid %s, log %s)\n", lh.prog(PROVIDER), tostring(provider.pid), log))
   end)
 end
 function lh.start_provider_check()
@@ -1259,7 +1246,7 @@ local function apply_taskbar(kind)
   local old = cfg.taskbar; cfg.taskbar = kind
   if old == "classic" then classic_stop() end
   if kind == "classic" then provider_stop() end
-  lh.close_flyout(); if lh.startmenu then lh.startmenu.hide() end
+  lh.close_flyout()
   tb.placed = nil; tb.wide = mode == "minimized"
   build_tb_tiles(); place_taskbar(); rebuild_tasks()
   if tb_on() then tb.surface:show(); tb.surface:raise() end
@@ -1322,9 +1309,9 @@ function lh.tray_yield(ms)
   lh.timer(tray_check, ms + 50)
 end
 
--- Start-menu provider (SHELL-DESIGN "Start menu ownership, revised"): a provider owns _LH_STARTMENU_S<screen>; startmenu.lua
--- forwards the Start button and Super to it. We own _LHSHELL_S<screen> while running, so a provider knows lhshell forwards
--- lhwm's root Super message and must not answer that broadcast itself.
+-- Start-menu provider (SHELL-DESIGN "Start menu ownership, revised"): the provider owns _LH_STARTMENU_S<screen>; we forward the
+-- Start button and Super to it (above). We own _LHSHELL_S<screen> while running, so a provider knows luxshell forwards luxwm's
+-- root Super message and must not answer that broadcast itself.
 lh.startmenu_selection = "_LH_STARTMENU_S" .. (screen_no or 0)
 lh.own_selection("_LHSHELL_S" .. (screen_no or 0))
 lh.watch_selection(lh.startmenu_selection)
@@ -1395,7 +1382,6 @@ local function apply_theme(e, root_set)
   theme_name, theme_entry = e.name, e
   local swapped = e.shell and e.shell ~= pack_dir and load_pack(e.shell)
   if swapped then pack_own = {} end
-  apply_startpanel(e)
   local fonts_changed = apply_fonts(e)
   if swapped or fonts_changed then rebuild_shell() else lh._emit("pack") end   -- "pack": the start menu and the menus drop their cached look
   set_wallpaper(e)
@@ -1484,7 +1470,7 @@ function lh.theme_name() return theme_name, theme_entry end
 --   xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND logoff
 -- Pack reload (live editing, USAGE.md "Live-editing a theme"): _LHSHELL_COMMAND "reload", or _LH_THEME set again to the name it
 -- already has (x11/theme-reload.sh sends the first). The registry entry is resolved again (themes.ini edits count), the pack's
--- shell.lua is read again even when the directory is the same, the theme's start panel (themes/startpanels.lua) and fonts are
+-- shell.lua is read again even when the directory is the same, the theme's fonts are
 -- applied again, changed PNGs leave the image cache (lh.image_flush: mtime/size), and the bars, tiles (tiles/*.lua are read
 -- again by build_tiles), flyout chrome, start menu and menus are rebuilt in place (rebuild_shell: same windows, no restart).
 -- Wallpaper (wallpapers.ini), composition and taskbar kind follow the theme's entry as on a switch. A pack that fails to load
@@ -1500,7 +1486,7 @@ local function reload_pack_now(why)
   pack_own = {}
   local flushed = lh.image_flush()
   if e then theme_entry = e end
-  apply_startpanel(theme_entry); apply_fonts(theme_entry)
+  apply_fonts(theme_entry)
   lh.close_flyout(); if lh.menu.is_open() then lh.menu.close() end
   rebuild_shell()
   if theme_entry then

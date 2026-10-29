@@ -33,7 +33,6 @@
 /* Shell: the Longhorn extras; "where it comes from" texts are value id + 20 */
 #define IDC_AP_FRAME    1201
 #define IDC_AP_TASKBAR  1202
-#define IDC_AP_START    1203
 #define IDC_AP_COMP     1204
 #define IDC_AP_ANIM     1205
 #define IDC_AP_NAVBAR   1209
@@ -41,7 +40,6 @@
 #define IDC_AP_FRAMES   1211
 #define IDC_AP_FRAME_SRC   1221
 #define IDC_AP_TASKBAR_SRC 1222
-#define IDC_AP_START_SRC   1223
 #define IDC_AP_COMP_SRC    1224
 #define IDC_AP_ANIM_SRC    1225
 #define IDC_AP_NAVBAR_SRC  1229

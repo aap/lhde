@@ -452,11 +452,11 @@ void paint_start(HWND hwnd, HDC hdc)
     if (owned) DeleteObject(f);
 }
 
-std::string start_menu_mode() { return setting("start_menu", "panel"); }   // panel, classic (own), lhshell
+std::string start_menu_mode() { return setting("start_menu", "panel"); }   // panel, classic (own)
 
-// Our menu is the display's start menu (start_menu = panel/classic): own _LH_STARTMENU_S<screen> so that lhshell
-// forwards its Avalon Start button and the Super key to us; start_menu = lhshell gives it up
-void update_menu_provider() { xwm::provide_start_menu(start_menu_mode() != "lhshell"); }
+// Our menu is the display's start menu: own _LH_STARTMENU_S<screen> so that luxshell forwards its Avalon Start button and
+// the Super key to us
+void update_menu_provider() { xwm::provide_start_menu(true); }
 
 // anchor: a Start button elsewhere (lhshell's Avalon one, from _LHSHELL_START) or null for ours
 void open_start_menu(const RECT* anchor = nullptr)
@@ -474,14 +474,9 @@ void open_start_menu(const RECT* anchor = nullptr)
         anchor = &corner;
     }
     std::string mode = start_menu_mode();
-    if (mode == "lhshell") {
-        // lhshell's StartPanel, anchored at our button (SHELL-DESIGN M8: _LHSHELL_START with the anchor rect)
-        xwm::send_root_message("_LHSHELL_START", 0, r.left, r.top, r.right - r.left, r.bottom - r.top);
-    } else {
-        // both publish _LH_STARTMENU_OPEN while they are up (xwm::set_start_menu_open)
-        if (mode == "classic" || mode == "own") startmenu::show(anchor ? *anchor : r, anchor != nullptr);
-        else startpanel::show(anchor ? *anchor : r, anchor != nullptr);
-    }
+    // both publish _LH_STARTMENU_OPEN while they are up (xwm::set_start_menu_open)
+    if (mode == "classic" || mode == "own") startmenu::show(anchor ? *anchor : r, anchor != nullptr);
+    else startpanel::show(anchor ? *anchor : r, anchor != nullptr);
     start_down = false;
     start_hot = false;
     InvalidateRect(g.start, nullptr, FALSE);
@@ -599,7 +594,6 @@ void start_request(const xwm::StartRequest& q)
     static uint32_t done;
     if (q.serial == done) return;
     done = q.serial;
-    if (start_menu_mode() == "lhshell") return;
     if (q.from_root && setting("start_key", "1") != "1") return;
     if (start_down) {                       // open: a toggle closes it, a plain "open" leaves it
         if (q.toggle) { startpanel::close(); startmenu::close(); }
@@ -746,6 +740,8 @@ int main(int argc, char** argv)
 {
     int quit_ms = 0;
     std::string edge;
+    // flxp-startmenu (a symlink to us): the start menu alone, luxshell's start-menu provider next to its Avalon taskbar
+    if (const char* sl = strrchr(argv[0], '/'); std::string(sl ? sl + 1 : argv[0]) == "flxp-startmenu") setenv("FLXP_START_MENU_ONLY", "1", 1);
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         auto value = [&]() -> const char* {
@@ -774,7 +770,7 @@ int main(int argc, char** argv)
     if (edge.empty()) edge = setting("taskbar_edge", "bottom");
     g.edge = edge == "top" ? EdgeTop : edge == "left" ? EdgeLeft : edge == "right" ? EdgeRight : EdgeBottom;
     tray_on = setting("tray", "1") != "0";
-    // only the start menu (next to lhshell's Avalon taskbar): no bar, no struts, no tray, no task buttons
+    // only the start menu (flxp-startmenu, next to luxshell's Avalon taskbar): no bar, no struts, no tray, no task buttons
     g.menu_only = setting("start_menu_only", "0") == "1";
     // settings.ini [taskbar] kind (start-up only): none, or avalon while lux draws its bar -> only the menu
     std::string kind = shell::setting("start_menu_only").empty() ? setting("taskbar_kind") : "";

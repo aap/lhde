@@ -63,7 +63,7 @@ luxwm, luxwmc, luxshell, lhde-theme, lhde-session, lhde-import, lhde-pack, lhde-
 lhwm, lhwmc, lhshell), `lib/` (`libwuxtheme`, `libluxnav`, `liblhde` `.so.1` + `.so`, `liblhde.a`, `pkgconfig/`),
 `lib/lhde/` (`PKGLIBDIR`: the code that is not a binary: `luxshell/` the Lua, `session/` lhde-session's helpers and lab.sh,
 `tools/` lhde-import's Python), `share/lhde/` (`DATADIR`: our shipped text, `themes/ navbar/ icons/ sources/ frames/*/theme.ini
-packs/*/shell.lua packs/startpanels.lua`, flxp's `res/icons`, and `.lhde-install`, the list of what it put there), `include/`,
+packs/*/shell.lua`, flxp's `res/icons`, and `.lhde-install`, the list of what it put there), `include/`,
 the man pages luxwm.1 and luxwmc.1 (`MANDIR`), `share/applications/flxp.desktop`, the portal backend's `flxp.portal` (in
 `PORTALDIR`, default `$PREFIX/share/xdg-desktop-portal/portals`; xdg-desktop-portal reads its own datadir, so set
 `PORTALDIR=/usr/share/xdg-desktop-portal/portals` for a system install) and its D-Bus service file (`DBUSSERVICEDIR`, default

@@ -26,13 +26,4 @@ return {
   pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 6.4)
   -- popup menus: the 4074 Jade [sysmetrics] FLATMENUS colours (MENU, MENUTEXT, MENUHILIGHT, MENUBAR, GRAYTEXT)
   menu = { bg = "#f4f4f4", text = "#00025c", hot = "#c5e7f6", hot_text = "#000000", border = "#929497", gray = "#b0b1b3" },
-  -- start menu (6.3): the Jade StartPanel class (packs/4074/startpanel-jade, shellpack.sh); metrics measured on 4074-dwm.png:
-  -- 380 px wide, menu y 428..993 on 1024 (body 526 + log off row 40), left column 190 (PROGLIST), places from x 190 (190 wide),
-  -- program tiles 40 px (32 px icon at +2, text at +41), places 36 px (24 px icon at +5, text at +33), separators 8 / 4 px,
-  -- All Programs row 34 px (text at x 48), outer frame 1 px black + 1 px #6b6b6b; no USERPANE part in Jade (no user pane).
-  startpanel = "4074/startpanel-jade",
-  startmenu = { font = "Segoe UI,Tahoma 12px", width = 380, left_w = 190, body_min = 526, prog_tile = 40, places_h = 36, sep_left = 8, sep_right = 4,
-                more_h = 34, logoff_h = 40, frame = { "#000000", "#6b6b6b" }, logoff_buttons = { "logoff", "standby" },
-                hot_bg = "#c5e7f6", hot_text = "#000000", places_bold_color = "#323232",
-                prog_dy = -2, places_dy = -1, more_text_dy = 0 },
 }

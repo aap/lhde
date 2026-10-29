@@ -1,7 +1,7 @@
 # flxp, the XP-style explorer and shell (included by the top-level Makefile).
 #   shell/      the shell model: namespace, icons, associations, settings, file ops (native)
 #   explorer/   the explorer (flxp) and the browsing widget the others share
-#   desktop/    flxp-desktop       taskbar/   flxp-taskbar (start menu, start panel, tray)
+#   desktop/    flxp-desktop       taskbar/   flxp-taskbar (start menu, start panel, tray; as flxp-startmenu the panel alone)
 #   filedlg/    flxp-filedialog, flxp-portal (xdg-desktop-portal FileChooser backend)
 #   settings/   flxp-settings (Display Properties)
 #   rc/         flxp's own dialog templates (.rc, compiled to .res with mingw windres)
@@ -84,8 +84,11 @@ build/bin/flxp-settings: $(SETOBJS) $(FILEDLGLIB) $(O)/flxp/desktop/wallpaper.o 
 	$(CXX) -o $@ $(SETOBJS) $(FILEDLGLIB) $(O)/flxp/desktop/wallpaper.o $(EXPLSHARED) $(W32LINK) $(LDLIBS) $(shell pkg-config --libs libpng libjpeg) -no-pie
 
 FLXP_PROGRAMS = flxp flxp-desktop flxp-taskbar flxp-settings flxp-filedialog flxp-portal
-PROGRAMS = $(addprefix build/bin/,$(FLXP_PROGRAMS)) $(UTDUMP)
-flxp: $(addprefix build/bin/,$(FLXP_PROGRAMS))
+PROGRAMS = $(addprefix build/bin/,$(FLXP_PROGRAMS)) build/bin/flxp-startmenu $(UTDUMP)
+flxp: $(addprefix build/bin/,$(FLXP_PROGRAMS)) build/bin/flxp-startmenu
+# flxp-startmenu: flxp-taskbar's start panel without the bar (luxshell's start-menu provider), the same binary by another name
+build/bin/flxp-startmenu: build/bin/flxp-taskbar
+	ln -sfn flxp-taskbar $@
 
 # ---- install ------------------------------------------------------------------------------
 # bin/flxp and its helpers, the run-time data in $(DATADIR) (res/icons), the
@@ -95,12 +98,13 @@ flxp: $(addprefix build/bin/,$(FLXP_PROGRAMS))
 install-flxp: flxp
 	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(DATADIR)/res/icons $(DESTDIR)$(APPDIR) $(DESTDIR)$(PORTALDIR) $(DESTDIR)$(DBUSSERVICEDIR)
 	install -m 755 $(addprefix build/bin/,$(FLXP_PROGRAMS)) $(DESTDIR)$(BINDIR)/
+	ln -sfn flxp-taskbar $(DESTDIR)$(BINDIR)/flxp-startmenu
 	install -m 644 flxp/res/icons/*.theme flxp/res/icons/*.ico flxp/res/icons/*.bmp $(DESTDIR)$(DATADIR)/res/icons/
 	sed 's|@BINDIR@|$(BINDIR)|g; s|@DATADIR@|$(DATADIR)|g' flxp/res/flxp.desktop.in > $(DESTDIR)$(APPDIR)/flxp.desktop
 	install -m 644 flxp/res/portal/flxp.portal $(DESTDIR)$(PORTALDIR)/flxp.portal
 	sed 's|@BINDIR@|$(BINDIR)|g' flxp/res/portal/org.freedesktop.impl.portal.desktop.flxp.service.in > $(DESTDIR)$(DBUSSERVICEDIR)/org.freedesktop.impl.portal.desktop.flxp.service
 uninstall-flxp:
-	rm -f $(addprefix $(DESTDIR)$(BINDIR)/,$(FLXP_PROGRAMS)) $(DESTDIR)$(APPDIR)/flxp.desktop
+	rm -f $(addprefix $(DESTDIR)$(BINDIR)/,$(FLXP_PROGRAMS)) $(DESTDIR)$(BINDIR)/flxp-startmenu $(DESTDIR)$(APPDIR)/flxp.desktop
 	rm -f $(DESTDIR)$(PORTALDIR)/flxp.portal $(DESTDIR)$(DBUSSERVICEDIR)/org.freedesktop.impl.portal.desktop.flxp.service
 	rm -rf $(DESTDIR)$(DATADIR)/res
 	-rmdir $(DESTDIR)$(DATADIR)

@@ -50,12 +50,10 @@ static void one(const char *name, const char *title, const char *file, int group
     else if (fc[0]) add(b, "frame = %s\n", fc);
     add(b, "frame_classic = %s\n", fc[0] ? fc : "style");
     if (val(t, "path.pack")[0]) add(b, "shell = %s\n", val(t, "path.pack"));
-    if (val(t, "Shell.startpanel")[0]) add(b, "startpanel = %s\n", val(t, "Shell.startpanel"));
     const char *comp = val(t, "Glass.composition");
     add(b, "composition = %s\n", !strcasecmp(comp, "off") || !fr[0] ? "off" : "auto");
     if (val(t, "path.fonts")[0]) add(b, "fonts = %s\n", val(t, "path.fonts"));
     add(b, "taskbar = %s\n", val(t, "Shell.taskbar"));
-    add(b, "start = %s\n", val(t, "Shell.start"));
     if (!none(val(t, "Glass.animations"))) add(b, "animations = %s\n", val(t, "Glass.animations"));
     const char *ic = val(t, "Desktop.icons");
     add(b, "flxp_icons = %s\n", !strncmp(ic, "longhorn", 8) ? "longhorn" : !strcmp(ic, "2k") ? "2k" : !strcmp(ic, "wine") ? "wine" : "xp");

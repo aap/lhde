@@ -43,7 +43,7 @@ happens when `lhde/settings.ini` exists; a report goes to `lhde/migration.log`):
    `[Shell] shell` -> `pack` (old pack names mapped), `[Desktop] icons longhorn` -> `longhorn4074`, `[Explorer] frame` -> `chrome`;
    the base through the aliases (`aero-patch` -> `aero4074`).
 2. `settings.ini` is copied with its comments; `[theme] name` follows aliases and renamed presets; each `[override:NAME]` becomes
-   `NAME-modified.theme` (keys mapped: taskbar -> Shell.taskbar, start -> Shell.start, icons -> Desktop.icons, frame ->
+   `NAME-modified.theme` (keys mapped: taskbar -> Shell.taskbar, icons -> Desktop.icons, frame ->
    Explorer.chrome, composition -> Glass.composition (follow = auto), animations, wallpaper, mode; keys equal to the theme's own
    are dropped, no file when nothing is left) and `[theme] name` moves to it when it was the selected theme; `[override]` (all
    themes) goes into the selected theme's modified copy; the global fallbacks `[theme] composition`, `[theme] animations`,
@@ -87,7 +87,7 @@ the theme registry (`data/themes.ini`, docs/history/THEMES.md) and the live root
                desktop_black = 0           ; lux: 1 = maximised mode also blacks out the desktop (M5a)
   [shell]      max_fade_ms = 0             ; lux: the bars' black layers in maximised mode, 0 = instant, else a fade (ms)
   [taskbar]    kind = avalon               ; avalon | classic | none ; autohide = 0 ; rows = 1
-               classic_start_menu = flxp   ; lux: flxp | flxp-classic | lhshell (default from [start] menu)
+               classic_start_menu = flxp   ; flxp | flxp-classic
   [sidebar]    mode = full                 ; full | minimized | pinned ; width = 150 ; with_classic = 0 ; yield_bottom = auto
                stacking = top              ; lux: top (above the windows, strut, full height) | bottom (under the windows like the desktop, no strut, ends at the full-width taskbar); Win+S toggles
   [clock]      pinned = 1 ; pinned_pack = aero ; layout = default
@@ -195,7 +195,7 @@ root property, on every theme change and whenever a key that feeds it changes:
 - **flxp_msstyles everywhere.** The registry's styles now live in `resources/msstyles/` under build-specific names
   (`jade4074.msstyles`), which `loadable_msstyles` cannot map to an XP backport by name; every Longhorn-format entry therefore sets
   `flxp_msstyles` (relative to the registry, `../resources/xp-backport/...`).
-- **Styles to test in flxp:** `royale`, `zune`, `noir` (`color = Metallic`; the file's NormalColor is plain Royale), `embedded`
+- **Styles to test in flxp:** `royale`, `zune`, `embedded`
   and `luna-xp`: all v3, so explorer, flxp-taskbar and the start panel load them directly (the lab showed flxp-taskbar with Royale,
   Noir, Zune and Embedded bars). Their `Shell/<scheme>/ShellStyle.dll` (task pane) is in `resources/xp-themes/<Style>/Shell/`.
   Library gaps: `plex4015.msstyles` (4015, early v4) loads with truncated class names (`indow` for `Window`), and `aero5048`'s

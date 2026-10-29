@@ -80,7 +80,7 @@ int main()
         "[Explorer]\nchrome = xp\nnavbar = none\n[Desktop]\nwallpaper = xp/Bliss\nmode = stretch\ncolor = 0 78 152\nicons = xp\n");
     put("data/themes/aero5112.theme",
         "[Theme]\nname = Basic (5112)\nbuild = 5112\n[VisualStyle]\nstyle = aero5112\n[Explorer]\nnavbar = vision\nnavbar_preset = big\n"
-        "[Shell]\nstart = lux\n[Desktop]\nwallpaper = none\n");
+        "[Desktop]\nwallpaper = none\n");
     for (const char* f : { "styles/slate4051.msstyles", "styles/luna.msstyles", "styles/luna-xp.msstyles", "styles/slate4074-xp/slate.msstyles",
                            "styles/aero5112.msstyles", "resources/4051/shell32.dll", "resources/4074/shell32.dll", "fonts/4074/tahoma.ttf",
                            "fonts/5112/segoeui.ttf", "wallpapers/4051/Bliss.jpg", "wallpapers/xp/Bliss.jpg", "wallpapers/xp/Bliss.bmp",
@@ -126,7 +126,7 @@ int main()
     set_session_theme(t);
     CHECK_EQ(theme_setting("header_engine"), "lhnav");
     CHECK_EQ(theme_setting("header_preset"), "big");
-    CHECK_EQ(theme_setting("start_menu", "panel"), "lhshell");
+    CHECK_EQ(theme_setting("start_menu", "panel"), "panel");          // one start menu: flxp's panel
     CHECK_EQ(theme_setting("longhorn_system32"), "");                 // resources/5112 not imported
     CHECK_EQ(theme_wallpaper(t, wp) ? "picture" : "none", "none");
     CHECK_EQ(t.value("path.navbar"), D + "/navbar/vision.ini");

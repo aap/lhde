@@ -15,7 +15,6 @@ composition    = off
 
 [Shell]
 taskbar  = classic
-startpanel = luna-olive       ; luxshell's start menu with taskbar = avalon (packs/startpanels.lua)
 
 [Explorer]
 chrome   = xp

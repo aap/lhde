@@ -89,9 +89,7 @@ def from_workspace(ws, W, force, copyres):
             if f.endswith('.png'):
                 L.copy_file(os.path.join(src, f), os.path.join(G, 'frames', n, f), force, rep)
     A = os.path.join(X, 'lhshell', 'assets')
-    for o, n in (('imageres', '4074/imageres'), ('shell32', '4074/shell32'), ('startpanel-jade', '4074/startpanel-jade'),
-                 ('startpanel-slate', '4074/startpanel-slate'), ('imageres-4051', '4051/imageres'), ('startpanel-luna-blue', '4051/startpanel-luna-blue'),
-                 ('startpanel-luna-olive', '4051/startpanel-luna-olive'), ('startpanel-luna-silver', '4051/startpanel-luna-silver'), ('aero5112', '5112/imageres')):
+    for o, n in (('imageres', '4074/imageres'), ('shell32', '4074/shell32'), ('imageres-4051', '4051/imageres'), ('aero5112', '5112/imageres')):
         src = os.path.join(A, o)
         if not os.path.isdir(src):
             continue

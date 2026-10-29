@@ -26,7 +26,7 @@ $PREFIX/share/lhde/                  shipped data, our text only (DATADIR)
   icons/NAME.theme                     icon recipes (pe:shell32.dll#ID from resources/<build>)
   sources/ID.ini                       what lhde-pack takes from each Windows build, the recipes lhde-import runs
   frames/SET/theme.ini (+ nav.ini)     frame-set tuning; the pixels are generated, below
-  packs/PACK/shell.lua                 luxshell's packs; packs/startpanels.lua
+  packs/PACK/shell.lua                 luxshell's packs
   res/icons/                           flxp's own (Wine's) icons
   .lhde-install                        the list of the files above (lhde-import --migrate tells them from yours)
 $PREFIX/lib/lhde/                    code that is not a binary (PKGLIBDIR)
@@ -46,7 +46,7 @@ WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_D
                                        schemes/ (lhde-schemes), wallpapers/ resources/ fonts/ (copied by hand, the workspace)
   generated/                           everything derived; deleting it is always safe (lhde-import --regenerate)
     frames/SET/                          PNGs + manifest.ini (recipe, inputs with sha256); theme.ini of a set we do not ship
-    packs/<build>/                       imageres/ID.png, shell32/SIZE/ID.png, startpanel-NAME/, manifest-*.ini
+    packs/<build>/                       imageres/ID.png, shell32/SIZE/ID.png, manifest-*.ini
     schemes/NAME.scheme                  from a source's HIVEDEF.INF
   index/                               relative symlinks under the names programs ask for (lhde-import --reindex):
     styles/NAME.msstyles, styles/NAME/     -> ../../<source>/themes/<Style>/... or ../../local/themes/...
@@ -90,7 +90,7 @@ and packs mixing shipped `theme.ini`/`shell.lua` with generated PNGs (often twic
 `lhde-windows/<b>/{system32,fonts,wallpapers}` (names that are no source, e.g. `demo`, `mock`: `local/`); each
 `styles/NAME.msstyles` (+ `styles/NAME/Shell`) to the place its source's `[styles]` names (`4074/themes/Jade/jade.msstyles`),
 the others to `local/themes`; the schemes to `local/schemes` (the old layout kept no HIVEDEF.INF to remake them); frame and
-pack PNGs, `startpanel.ini` and manifests -> `generated/` without the `cache/` level (where a PNG was there twice, the one
+pack PNGs and manifests -> `generated/` without the `cache/` level (where a PNG was there twice, the one
 beside `theme.ini`, which the programs used, is kept); shipped text stays when the directory is the install's own (it has
 `.lhde-install`), else is deleted as a stale copy, and a text file we do not ship (your own theme) goes to `~/.config/lhde`;
 `luxshell/ session/ tools/` are deleted (now in `$PREFIX/lib/lhde`); then `<b>/source.ini` (the shipped sources/ID.ini) and

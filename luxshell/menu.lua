@@ -5,7 +5,7 @@
 --                                       action = fn, checked = bool, radio = bool, separator = true, disabled = bool }, ... }
 --                                       text may carry a Win32-style mnemonic: "&Remove" draws R underlined and the R key
 --                                       activates the item ("&&" is a literal &); without one, typing jumps by first letter
---                                       opts = { style = "start" | "context" | "avalon", grab = bool (context menus take the
+--                                       opts = { style = "context" | "avalon", grab = bool (context menus take the
 --                                       pointer and keyboard themselves), up = bool (x,y is the bottom-left corner),
 --                                       flip = bool (TrackPopupMenu: open left of / above x,y when it does not fit to the
 --                                       right / below, instead of sliding along the edge), on_close = fn }
@@ -18,44 +18,9 @@
 --   lh.menu.key(name, text)           keyboard for the deepest level (Up/Down/Left/Right/Return/Escape, letters jump);
 --                                     true when handled, "close" when Left/Escape closed the root level
 --   lh.menu.owns(win)                 whether an X window id is one of the menu surfaces
---   lh.startpanel()                   the pack's StartPanel data: { dir, sec(name), color(sec, key), margins(sec, key), font(sec, key) }
 return function(ctx)
   local T, S = ctx.T, lh.session
   local screen_w, screen_h = ctx.screen_w, ctx.screen_h
-
-  ------------------------------------------------------------------ StartPanel data (assets/startpanel-<theme>/startpanel.ini, shellpack.sh)
-  local sp_cache = {}
-  function lh.startpanel()
-    local dir = T.startpanel or "4074/startpanel-jade"
-    if sp_cache[dir] then return sp_cache[dir] end
-    local secs = {}
-    for _, s in ipairs(S.parse_ini(lh.data_find("packs/" .. dir .. "/startpanel.ini") or "") or {}) do secs[s._name] = s end
-    local P = { dir = dir }
-    function P.sec(name) return secs[name] or {} end
-    function P.has(name) return secs[name] ~= nil end
-    function P.image(name) local f = P.sec(name).IMAGEFILE; return f and (dir .. "/" .. f) or nil end
-    function P.color(name, key, def)
-      local v = P.sec(name)[key]; if not v then return def end
-      local r, g, b = v:match("(%d+)%s+(%d+)%s+(%d+)"); return r and string.format("#%02x%02x%02x", r, g, b) or def
-    end
-    function P.margins(name, key)   -- uxtheme MARGINS: left right top bottom
-      local v = P.sec(name)[key or "SIZINGMARGINS"]; if not v then return { 0, 0, 0, 0 } end
-      local t = {}; for n in v:gmatch("%-?%d+") do table.insert(t, tonumber(n)) end; return t
-    end
-    function P.grid(name) local m = P.margins(name); return { m[3], m[2], m[4], m[1] } end   -- our ninegrid order: top right bottom left
-    function P.font(name, key, def)   -- "face, lfHeight, weight, italic" → pango description in px
-      local v = P.sec(name)[key or "FONT"]; if not v then return def end
-      local face, h = v:match("^%s*(.-)%s*,%s*(%-?%d+)"); if not face then return def end
-      local bold = face:match(" Bold$") or (tonumber(v:match("^.-,%s*%-?%d+%s*,%s*(%d+)") or 0) >= 700); face = face:gsub(" Bold$", "")
-      -- substitutes for faces not installed here (Segoe UI → Tahoma, as the rest of the start menu; the Franklin Gothic of
-      -- the user panes → ITC Franklin Gothic Std Medium from ~/.fonts), so the cascade and the panel use the same family
-      local subst = { ["Franklin Gothic Medium"] = "ITC Franklin Gothic Std Medium" }
-      face = subst[face] or (face == "Tahoma" and face or face .. ",Tahoma")
-      return string.format("%s%s %dpx", face, bold and " Bold" or "", math.abs(tonumber(h)))
-    end
-    sp_cache[dir] = P; return P
-  end
-  lh.on("pack", function() sp_cache = {} end)
 
   ------------------------------------------------------------------ levels
   local M = { levels = {} }
@@ -75,24 +40,7 @@ return function(ctx)
 
   local function style(name)
     local st = { name = name }
-    if name == "start" then
-      local P = lh.startpanel()
-      st.bg = P.image("StartMenu::Toolbar"); st.bg_grid = P.grid("StartMenu::Toolbar")
-      st.hot = P.image("StartMenu::Toolbar.BUTTON"); st.hot_grid = P.grid("StartMenu::Toolbar.BUTTON")
-      st.sep = P.image("StartMenu::MenuBand.SEPERATOR")
-      local m = T.menu or {}
-      st.text = P.color("StartMenu::Toolbar", "TEXTCOLOR", m.text or "#000000")
-      st.hot_text = P.color("StartMenu::Toolbar(HOT)", "TEXTCOLOR") or P.color("StartMenu::MenuBand(HOT)", "TEXTCOLOR") or st.text
-      -- the hot item: the BUTTON part's HOT strip (Jade: light blue plate; Luna: blue); where that strip is empty (Slate's
-      -- 8x6 BUTTON is transparent in all three states) the toolbar falls back to the flat-menu highlight (MENUHILIGHT,
-      -- T.menu.hot) with HIGHLIGHTTEXT, as the XP MenuBand does without a themed button
-      if not st.hot or lh.image_alpha(st.hot, 3, 1) == 0 then
-        st.hot = nil; st.hotfill = m.hot or "#316ac5"; st.hot_text = m.hot_text or "#ffffff"; st.hot_stroke = m.hot_border
-      end
-      -- the menu font: StartMenu::Toolbar FONT (Jade Segoe UI 9, Slate/Luna Tahoma 8), else the start menu's
-      st.font = P.font("StartMenu::Toolbar", "FONT", (T.startmenu and T.startmenu.font) or T.font)
-      st.item_h = T.startmenu and T.startmenu.cascade_item_h or 22; st.gutter = 32; st.pad = 2
-    else
+    do
       local m = T.menu or {}
       st.fill = m.bg or "#f4f4f4"; st.border = m.border or "#929497"; st.hotfill = m.hot or "#c5e7f6"
       st.text = m.text or "#00025c"; st.hot_text = m.hot_text or "#000000"; st.gray = m.gray or "#b0b1b3"
@@ -271,7 +219,6 @@ return function(ctx)
     -- the open levels and the start menu once the new window's fade-in is over
     lh.timer(function()
       for _, l in ipairs(M.levels) do l.surface:damage() end
-      if lh.startmenu and lh.startmenu.open then lh.startmenu.surface:damage() end
     end, 180)
     return L
   end

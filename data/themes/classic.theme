@@ -18,7 +18,6 @@ animations     = none
 
 [Shell]
 taskbar  = classic
-start    = flxp
 sidebar  = none
 
 [Explorer]

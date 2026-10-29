@@ -141,21 +141,6 @@ static void frames_detail(struct row *r, const char *name, const char *dir, cons
                               "makes this set)");
 }
 
-/* the pack's shell.lua `startpanel = "DIR"` */
-static int pack_startpanel(const char *packdir, char *out, size_t n)
-{
-    char p[PATH_MAX + 16]; snprintf(p, sizeof p, "%s/shell.lua", packdir);
-    FILE *f = fopen(p, "r"); if (!f) return 0;
-    char line[1024]; int ok = 0;
-    while (!ok && fgets(line, sizeof line, f)) {
-        char *s = strstr(line, "startpanel"); if (!s) continue;
-        char *q = strchr(s, '"'); if (!q || !strchr(s, '=') || strchr(s, '=') > q) continue;
-        char *e = strchr(q + 1, '"'); if (!e) continue;
-        snprintf(out, n, "%.*s", (int)(e - q - 1), q + 1); ok = 1;
-    }
-    fclose(f);
-    return ok;
-}
 
 /* the icon recipe's DLLs: every pe:NAME# of [icons] */
 struct dlls { char names[512]; };
@@ -270,20 +255,10 @@ int lhde_explain(const char *name)
             }
         }
     }
-    /* the start menu */
-    const char *st = G("Shell.start");
-    r = row("start menu", st);
-    if (!status(r, t, "Shell.start")) {
-        if (!strcasecmp(st, "lux")) {
-            char sp[256] = "", how[300] = "";
-            const char *ov = lhde_theme_get(t, "Shell.startpanel");
-            if (ov && ov[0] && !none(ov)) { char o[PATH_MAX]; snprintf(how, sizeof how, "Shell.startpanel %s (packs/startpanels.lua %s)", ov, lhde_data_find("packs/startpanels.lua", o, sizeof o) ? "" : "missing"); }
-            else if (G("path.pack")[0] && pack_startpanel(G("path.pack"), sp, sizeof sp)) snprintf(how, sizeof how, "the pack's startpanel = %s", sp);
-            more(r, "luxshell's start menu (startmenu.lua)%s%s", how[0] ? ", panel: " : "", how);
-            if (sp[0]) { char rel[400], p[PATH_MAX]; snprintf(rel, sizeof rel, "packs/%s/startpanel.ini", sp);
-                if (lhde_data_find(rel, p, sizeof p)) file(r, p); else { snprintf(r->status, sizeof r->status, "missing"); more(r, "%s not imported (lhde-import)", rel); } }
-        } else more(r, "flxp-taskbar's start panel, drawn from the visual style's StartPanel parts%s", classic ? " (classic: the 2000-style menu)" : "");
-    }
+    /* the start menu: flxp's start panel (flxp-startmenu next to the Avalon taskbar, flxp-taskbar's own with the classic bar) */
+    r = row("start menu", "flxp");
+    snprintf(r->status, sizeof r->status, "ok");
+    more(r, "flxp's start panel, drawn from the visual style's StartPanel parts%s", classic ? " (classic: the 2000-style menu)" : "");
     /* the navigation bar */
     char ns[200]; snprintf(ns, sizeof ns, "%s%s%s", G("Explorer.navbar"), strcmp(G("Explorer.navbar_preset"), "auto") ? " " : "", strcmp(G("Explorer.navbar_preset"), "auto") ? G("Explorer.navbar_preset") : "");
     r = row("navbar", ns);
@@ -428,8 +403,6 @@ int lhde_explain_files(const char *name)
     const char *pk = G("Shell.pack");
     if (!none(pk)) {
         char b[16] = ""; size_t i = 0; while (pk[i] >= '0' && pk[i] <= '9' && i < sizeof b - 1) { b[i] = pk[i]; i++; } b[i] = 0;
-        char sp[256] = ""; const char *ov = lhde_theme_get(t, "Shell.startpanel");
-        if (ov && ov[0] && !none(ov)) snprintf(sp, sizeof sp, "%s", ov); else if (G("path.pack")[0]) pack_startpanel(G("path.pack"), sp, sizeof sp);
         snprintf(rel, sizeof rel, "packs/%s", b);
         if (b[0] && lhde_data_find(rel, p, sizeof p)) {
             char pd[PATH_MAX]; snprintf(pd, sizeof pd, "%s", p);
@@ -438,10 +411,7 @@ int lhde_explain_files(const char *name)
                 char mp[PATH_MAX + 300]; snprintf(mp, sizeof mp, "%s/%s", pd, e->d_name);
                 lhde_ini *m = lhde_ini_load(mp); char kind[64] = "", args[200] = "";
                 if (m) { lhde_ini_get(m, "recipe", "kind", kind, sizeof kind); lhde_ini_get(m, "recipe", "args", args, sizeof args); lhde_ini_free(m); }
-                if (!strcmp(kind, "startpanel")) {   /* only the start panel this theme shows (args: NAME STYLE ...) */
-                    char nm[256] = ""; sscanf(args, "%255s", nm);
-                    if (!sp[0] || strcmp(nm, sp)) continue;
-                }
+                if (!strcmp(kind, "startpanel")) continue;   /* an old import's start panels: nothing draws them any more */
                 emit_manifest(mp);
             }
             if (d) closedir(d);

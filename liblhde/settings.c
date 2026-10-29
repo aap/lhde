@@ -96,7 +96,6 @@ static const char *map_override(const char *k, const char *v, char *key, size_t 
 {
     out[0] = 0;
     if (!strcasecmp(k, "taskbar")) { snprintf(key, nk, "Shell.taskbar"); snprintf(out, no, "%s", v); }
-    else if (!strcasecmp(k, "start")) { snprintf(key, nk, "Shell.start"); snprintf(out, no, "%s", !strcasecmp(v, "lhshell") ? "lux" : v); }
     else if (!strcasecmp(k, "icons")) { snprintf(key, nk, "Desktop.icons"); snprintf(out, no, "%s", !strcasecmp(v, "longhorn") ? "longhorn4074" : v); }
     else if (!strcasecmp(k, "frame")) { if (!strcasecmp(v, "auto") || !v[0]) return NULL; snprintf(key, nk, "Explorer.chrome"); snprintf(out, no, "%s", v); }
     else if (!strcasecmp(k, "composition")) { snprintf(key, nk, "Glass.composition"); snprintf(out, no, "%s", !strcasecmp(v, "follow") ? "auto" : v); }
@@ -290,9 +289,7 @@ static int migrate_preset(struct rep *r, const char *src, const char *udir, char
         lhde_ini_set(n, "Glass", "composition", !strcmp(v, "0") ? "off" : v);
     if (lhde_ini_get(o, "Composition", "animations", v, sizeof v) && v[0]) lhde_ini_set(n, "Glass", "animations", v);
     if (lhde_ini_get(o, "Shell", "shell", v, sizeof v) && v[0]) lhde_ini_set(n, "Shell", "pack", component_of(v, "packs", c, sizeof c) ? pack_alias(c) : pack_alias(v));
-    if (lhde_ini_get(o, "Shell", "startpanel", v, sizeof v) && v[0]) lhde_ini_set(n, "Shell", "startpanel", v);
     if (lhde_ini_get(o, "Shell", "taskbar", v, sizeof v) && v[0]) lhde_ini_set(n, "Shell", "taskbar", v);
-    if (lhde_ini_get(o, "Shell", "start", v, sizeof v) && v[0]) lhde_ini_set(n, "Shell", "start", !strcmp(v, "lhshell") ? "lux" : v);
     if (lhde_ini_get(o, "Explorer", "frame", v, sizeof v) && v[0] && strcmp(v, "auto")) lhde_ini_set(n, "Explorer", "chrome", v);
     if (lhde_ini_get(o, "Desktop", "wallpaper", v, sizeof v) && v[0]) {
         char abs[PATH_MAX];
@@ -416,7 +413,7 @@ static int migrate_settings(int force, struct rep *r)
     }
     /* 4. the global fallbacks of per-theme keys: the theme decides now */
     static const char *const gone[][3] = { { "theme", "composition", "the theme's Glass.composition" }, { "theme", "animations", "the theme's Glass.animations" },
-        { "taskbar", "kind", "the theme's Shell.taskbar" }, { "start", "menu", "the theme's Shell.start" }, { "desktop", "icons", "the theme's Desktop.icons" },
+        { "taskbar", "kind", "the theme's Shell.taskbar" }, { "start", "menu", "there is one start menu, flxp's" }, { "desktop", "icons", "the theme's Desktop.icons" },
         { "explorer", "frame", "the theme's Explorer.chrome" }, { NULL, NULL, NULL } };
     for (int i = 0; gone[i][0]; i++) {
         if (!lhde_ini_get(dst, gone[i][0], gone[i][1], v, sizeof v)) continue;

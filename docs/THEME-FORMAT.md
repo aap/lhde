@@ -64,7 +64,6 @@ animations     = 4074plus       ; 4074plus | 4074 | 5048 | invented | none
 
 [Shell]
 taskbar  = avalon               ; avalon (luxshell) | classic (flxp-taskbar) | none
-start    = flxp                 ; flxp | lux: who answers the Start button and Super
 pack     = 4074-aero            ; packs/, for taskbar = avalon
 sidebar  = full                 ; full | minimized | pinned | none
 
@@ -156,7 +155,7 @@ it was resolved at); a client resolves itself when the property is missing or st
 | v4 with CompositedWindow, 4074 | longhorn | 4074 | as above | `4074-slate` or `4074-aero` by family (slate -> slate, jade/aero -> aero) | the frame set named like the style, else none | longhorn4074 |
 | v4 with DWMWindow/uDWM (5048, 5112) | longhorn | vision (aap: Vista falls back to luxnav with the patched aero resources) | classic | - | the frame set named like the style | longhorn4074 |
 | classic | xp | none | classic | - | none | xp |
-`start` defaults to `flxp`, `composition` to `auto`, `animations` to the build's own, fonts and resources
+`composition` defaults to `auto`, `animations` to the build's own, fonts and resources
 to the build.
 
 ## 6. Fallbacks (never fail, look plainer, report it)

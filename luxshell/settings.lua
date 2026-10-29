@@ -2,7 +2,7 @@
 -- run / search box, both in the generic flyout chrome (flyout.lua: 1175 frame, Options row, white body like powerflyout.xaml).
 --   lh.settings_flyout([x])  two columns: the theme list (the shipped theme files, then the user's; the selected one with unsaved
 --                            changes, the current layer, reads "NAME (Modified)" as in Windows; Save as...), composition
---                            (follow / on / off), taskbar (avalon / classic / none, M8) and its autohide, start menu (flxp / lux),
+--                            (follow / on / off), taskbar (avalon / classic / none, M8) and its autohide, (lux),
 --                            sidebar mode, wallpaper
 --   lh.save_preset_box()     name box for "Save as...": the current theme with its current layer under a name of its own
 --                            (~/.config/lhde/themes/NAME.theme, liblhde lhde_theme_save_as) and selects it
@@ -73,8 +73,8 @@ return function(ctx)
       line()
       option("action", "Save as...", false, function() lh.close_flyout(); lh.save_preset_box() end)
       col = right
-      -- the compositor rule (runtime.lua lh.compositor): follow the theme's `composition`, or always on / off. Composition, taskbar
-      -- and start menu are theme keys: a change goes into the current layer (settings.ini [current], THEME-FORMAT.md sections 3
+      -- the compositor rule (runtime.lua lh.compositor): follow the theme's `composition`, or always on / off. Composition and
+      -- taskbar are theme keys: a change goes into the current layer (settings.ini [current], THEME-FORMAT.md sections 3
       -- and 14; no theme file is written) and the theme is applied again
       heading("Composition")
       for _, m in ipairs{ { "follow", "Follow the theme" }, { "on", "Always on" }, { "off", "Always off" } } do
@@ -86,11 +86,6 @@ return function(ctx)
         option("radio", m[2], lh.shell_get("taskbar") == m[1], function() lh.shell_set("taskbar", m[1]); later() end)
       end
       option("check", "Auto-hide the taskbar", lh.shell_get("autohide"), function() lh.shell_set("autohide", not lh.shell_get("autohide")); refresh() end)
-      line(); heading("Start menu")
-      -- [start] menu: flxp's start panel (flxp-taskbar is the provider; --start-menu-only next to the Avalon taskbar) or ours
-      for _, m in ipairs{ { "flxp", "Start panel (flxp)" }, { "lux", "Longhorn start menu (lux)" } } do
-        option("radio", m[2], lh.shell_get("start_menu") == m[1], function() lh.shell_set("start_menu", m[1]); later() end)
-      end
       line(); heading("Sidebar")
       for _, m in ipairs{ { "full", "Full" }, { "minimized", "Minimized (in the taskbar)" }, { "pinned", "Pinned tiles only" } } do
         option("radio", m[2], lh.shell_get("sidebar") == m[1], function() lh.shell_set("sidebar", m[1]); refresh() end)

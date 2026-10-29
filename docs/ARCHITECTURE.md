@@ -12,7 +12,7 @@ Windows files (docs/LAYOUT.md).
 | --- | --- | --- |
 | `wux/` | `libwux.a` (static, linked whole) | the win32 UI layer: `gdi/` (DCs, bitmaps, fonts over FreeType), `sys/` (X11 windows, input, clipboard, DnD), `win/` (the window and message machinery), `w32/` (the win32 shim: kernel, user, registry, resources), `vendor/wine/` (comctl32, user32, uxtheme, comdlg32 from Wine, LGPL, with patches), `rc/` (Wine's resources) |
 | `wuxtheme/` | `libwuxtheme.{a,so}`, `ut-dump` | the uxtheme renderer: reads and draws `.msstyles` (v3 XP and v4 Longhorn/Vista) through a plain C API `ut_*` (`<wuxtheme/ut.h>`), window-system independent; used by flxp through Wine's uxtheme and directly by luxwm, luxnav, luxshell and liblhde's style probe |
-| `flxp/` | `flxp`, `flxp-desktop`, `flxp-taskbar`, `flxp-settings`, `flxp-filedialog`, `flxp-portal` | the Explorer (`explorer/`: the browser, the faithful 4051/4074 headers, task pane, views), the shell layer (`shell/`: namespace, file operations, icons, thumbnails, the liblhde adapter), the desktop (wallpaper and icons), the classic taskbar with XP's start panel and the classic start menu, Display Properties, the Open/Save dialog and its xdg-desktop-portal backend |
+| `flxp/` | `flxp`, `flxp-desktop`, `flxp-taskbar` (as `flxp-startmenu`: the start panel alone), `flxp-settings`, `flxp-filedialog`, `flxp-portal` | the Explorer (`explorer/`: the browser, the faithful 4051/4074 headers, task pane, views), the shell layer (`shell/`: namespace, file operations, icons, thumbnails, the liblhde adapter), the desktop (wallpaper and icons), the classic taskbar with XP's start panel and the classic start menu, Display Properties, the Open/Save dialog and its xdg-desktop-portal backend |
 | `luxnav/` | `libluxnav.{a,so}` (`lhnav_*`) | the Longhorn navigation bar as the concept art had it (the "vision" header): layout, painting, hit testing; art from the style through wuxtheme; linked into flxp and `examples/navdemo` |
 | `luxwm/` | `luxwm`, `luxwmc` | the window manager: non-reparenting, EWMH, frames in three modes (DWM glass from the style's CompositedWindow streams or a generated frame set; non-composited msstyles frames through wuxtheme; Windows Classic from a scheme's colours and metrics), the XP window menu, animations, the extended-frame protocol for the Explorer's tall caption (docs/CLIENT-PROTOCOL.md), a frame regression (`tests/regress.sh`) |
 | `luxshell/` | `luxshell` (C core + Lua) | the Avalon reinterpretation: taskbar, sidebar, tiles (clock, notifications, power), tray, toasts, context menus, settings flyout and a Lua start menu; C scene nodes with the behaviour in `*.lua`; packs (`data/packs/*/shell.lua`) name the imageres art it draws |
@@ -31,8 +31,8 @@ frame regression against a local baseline.
 `lhde-session start [THEME]` (a real X server on `:1`, `--nested` in Xephyr, `--attach` to a running server) runs, in this
 order: the settings and layout migrations if needed, the root wallpaper once, **luxwm** in a restart loop, **picom** when the
 theme's frames want a compositor, **luxshell** (or nothing, for `taskbar = classic`, where luxshell itself starts
-`flxp-taskbar`), **flxp-desktop**, and `flxp-taskbar --start-menu-only` as the start-menu provider when the Avalon taskbar is up
-and the theme says `start = flxp`. `session/lab.sh` does the same on an Xvfb display with the build-tree binaries, for
+`flxp-taskbar`), **flxp-desktop**, and `flxp-startmenu` (flxp-taskbar's start panel without the bar) as the start-menu provider
+when the Avalon taskbar is up. `session/lab.sh` does the same on an Xvfb display with the build-tree binaries, for
 screenshots and scripted tests (`lab.sh start; lab.sh shell; lab.sh theme NAME; lab.sh shot FILE`).
 
 Everything a program needs is looked up by a relative name through liblhde (docs/LAYOUT.md "The three trees"):
@@ -64,8 +64,10 @@ files are moved there once by liblhde's migration, which every program runs at s
 
 ## Where things are duplicated, on purpose or not yet resolved
 
-- **Start menu**: flxp has XP's start panel and the classic popup menu (Wine controls); luxshell has a Lua start panel and a
-  provider protocol that forwards to flxp's. Every shipped theme uses flxp's.
+- **Start menu**: one, flxp's XP start panel (or its classic popup menu, flxp.ini `start_menu = classic`). luxshell's Avalon
+  Start button and the Super key are forwarded to whoever owns `_LH_STARTMENU_S<n>`: flxp-taskbar with the classic bar,
+  `flxp-startmenu` next to the Avalon bar (luxshell starts it). Longhorn's Avalon shell never had a start menu of its own, so
+  there is none to reproduce.
 - **Navigation header**: flxp's own `explorer/header.cpp` draws the faithful 4051 and 4074 headers; luxnav draws the concept-art
   "vision" header and is meant to take over 5048 and 5112. Which one a theme gets is `Explorer.navbar`.
 - **Frame painting**: luxwm paints glass and msstyles frames through wuxtheme and has its own Windows Classic painter; Wine's

@@ -92,7 +92,7 @@ user's own copies, in two stages:
    raw (377 MB stored once), 57 MB compressed; **essentials** for the 14 shipped themes 169 MB raw (164 MB stored once), 36 MB
    compressed, in 5 builds (4051 4074 5048 5112 xp) and the 2k icon DLLs. About 20 s from the ISOs, 10 s `--from-pack` (the
    tarball's xz is most of it).
-   Themes that need a file no medium has (`aero4074`, `aerovision`: `aero-patch.msstyles`; `noir`) report it missing in
+   Themes that need a file no medium has (`aero4074`, `aerovision`: `aero-patch.msstyles`) report it missing in
    `lhde-theme explain` with either profile: those styles go in with `lhde-import --style` (below).
 2. **`lhde-import`** (every user): the pack into the Windows tree (`$LHDE_WINDOWS`, else `~/.local/share/lhde-windows`;
    docs/LAYOUT.md "The three trees"):
@@ -166,9 +166,9 @@ starts without one. Your own variants of a theme (presets) are described under "
 | `jade4074-classic` | Jade msstyles frames | Aero | never (`composition = off`) |
 | `slate4074` | Slate 4074 msstyles frames | Slate (4074 look: 30 px bar, nearest-neighbour scaling) | never |
 | `slate4051` | Slate 4051 msstyles frames | Slate 4051 (29 px bar, bilinear scaling, 4051 images, clock tile in the list) | never |
-| `luna` (aliases `luna-blue`, `luna4051`), `luna-olive`, `luna-silver` | Windows XP Luna msstyles frames from 4051's copy (blue, olive green, silver) | Slate bars, Luna start menu | never |
-| `luna-xp` | XP SP3's own Luna, drawn live from the style | Slate bars, Luna start menu | never |
-| `royale`, `zune`, `noir`, `embedded` | Microsoft's later XP styles (Media Center 2005, Zune, Royale Noir, Embedded), drawn live from the style | flxp's classic taskbar in the style's look (Slate pack as stand-in) | never |
+| `luna` (aliases `luna-blue`, `luna4051`), `luna-olive`, `luna-silver` | Windows XP Luna msstyles frames from 4051's copy (blue, olive green, silver) | Slate bars, flxp's start panel in Luna's look | never |
+| `luna-xp` | XP SP3's own Luna, drawn live from the style | Slate bars, flxp's start panel in Luna's look | never |
+| `royale`, `zune`, `embedded` | Microsoft's later XP styles (Media Center 2005, Zune, Embedded), drawn live from the style | flxp's classic taskbar in the style's look (Slate pack as stand-in) | never |
 | `aero5048` | 5048's uDWM bitmaps | Aero | glass with picom |
 
 The old luxwm theme directory names still work everywhere a name is taken (`aliases` in themes.ini): `aero`, `aero4074`, `jade`,
@@ -324,18 +324,12 @@ button states. Nothing here touches your fvwm session except picom, which you st
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell M6, `SHELL-DESIGN.md` 6.3/6.4)
 
-**Start menu.** (By default the menu is now flxp's start panel, see "Start menu: flxp's start panel everywhere" below; what follows is lux's own, `[start] menu = lux` or the fallback.) Click the start button or press Super alone (luxwm grabs the bare Super key and, when it is released with no
-other key or click in between, sends the root client message `_LHSHELL_START`; the Mod4 bindings keep working, unbound
-Super+key combinations are swallowed while Super is held; `Super_L none` in `~/.config/lhde/keys` turns it off). It is the
-XP start panel in the theme's msstyles `StartPanel` look (Jade for aero4074/jade4074, Slate with the user pane for the
-Slate themes): pinned programs (bold, "Internet"/"E-mail" with the program as subtitle for the default browser and mail
-client), the most used programs, "All Programs" (a cascade by freedesktop category, 16 px icons from your icon theme),
-places (Documents, Pictures, Music, Computer in the file manager; Control Panel = the settings flyout; Search; Run...) and
-Log Off / Stand by (Slate: Shut down). Those ask first in a small flyout with **Log Off, Stand by, Turn Off** (the clicked one
-preselected; Enter confirms, Esc or a click elsewhere cancels). Keys: arrows move (Left/Right across the columns), Tab
-switches column, typing jumps to the next item with that initial, Return opens, Right/Return on All Programs opens the
-cascade (then Up/Down/Right/Left/Return), Esc or Super closes. A click outside closes it; the start button shows its pressed
-image while it is open. Launch counts are kept in `~/.local/state/lhde/luxshell-mfu.ini` (`LHSHELL_MFU` for another file).
+**Start menu.** The Start button and the Super key (luxwm sends the root client message `_LHSHELL_START` when Super is pressed
+and released alone; the Mod4 bindings keep working, unbound Super+key combinations are swallowed while Super is held; `Super_L
+none` in `~/.config/lhde/keys` turns it off) open flxp's XP start panel, drawn from the visual style's StartPanel parts: with the
+Avalon taskbar luxshell runs `flxp-startmenu` (flxp-taskbar's panel without the bar) and forwards both to it, with the classic
+bar flxp-taskbar answers itself. See "Start menu: flxp's start panel everywhere" below. Longhorn's Avalon shell never had a start
+menu of its own, so luxshell draws none.
 
 **Context menus** (2026-10-26; Longhorn 4074's Avalon menus, sources in `SHELL-DESIGN.md` "Context menus"). All three are drawn
 in the 4074 Avalon menu look (white, 1 px grey frame with a drop shadow, 19 px rows, the theme's highlight: Slate's tan
@@ -456,11 +450,8 @@ classic bar has no way to it): `xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL
 - Clock: luxshell publishes the root property `_LHSHELL_CLOCK_VISIBLE` = 1 while a clock tile of its own is on screen, 0
   otherwise (sidebar minimized, clock tile closed); flxp-taskbar hides its clock while it is 1.
 - Start menu: see "Start menu: flxp's start panel everywhere" below; in `classic` the classic Start button and Super open
-  flxp-taskbar's XP start panel (it is the start-menu provider), with `[start] menu = lux` lux's menu above the classic bar.
+  flxp-taskbar's XP start panel (it is the start-menu provider).
 `LHSHELL_TASKBAR=avalon|classic|none` overrides the setting for one luxshell run (not saved).
-
-**Luna start menu.** The three Luna themes keep the Slate taskbar and sidebar but get Windows XP's own start panel (user pane,
-two columns, All Programs, Log Off / Turn Off Computer) in the scheme's colours, and XP's flat-menu colours for the menus.
 
 ## Live-editing a theme (`theme-reload.sh`, `theme-watch.sh`)
 
@@ -553,16 +544,14 @@ value equal to what the theme gives anyway removes the key (and an emptied secti
 (log `lux: settings: taskbar for theme NAME: = KIND` / `back to the theme's KIND`). *Save as preset...* also writes the theme's
 taskbar / start menu into the preset when they differ from the base's.
 
-**Start menu: flxp's start panel everywhere.** `[start] menu = flxp` (default): flxp-taskbar's XP start panel is the start
-menu in every taskbar mode. With the Avalon taskbar or none, lux runs `flxp-taskbar --start-menu-only` (`[commands] taskbar`
-plus that flag; no bar, tray or struts; log `$XDG_RUNTIME_DIR/lux-startmenu<display>.log`): it owns `_LH_STARTMENU_S0` and lux
-forwards the Avalon Start button and Super to it (the panel opens above the Start button; Super or a click outside closes it).
-lux adopts one that already runs on the display, restarts it when it dies (at most 5 times a minute), stops it when you
-switch to the classic bar (which is the provider then) or to `menu = lux`, and on exit, always by its own pid checked against
-the display. While none runs (starting, gave up) lux's own menu answers. `[start] menu = lux`: lux's StartPanel everywhere,
-also behind the classic bar's Start button (unless `[taskbar] classic_start_menu` says otherwise). Switch it in the settings
-flyout (*Start menu*). flxp's panel has a Control Panel cascade whose *Display Properties...* starts flxp-settings; lux's
-settings flyout is reachable from a terminal with `xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND settings`.
+**Start menu: flxp's start panel everywhere.** flxp-taskbar's XP start panel is the start menu in every taskbar mode. With the
+Avalon taskbar or none, lux runs `flxp-startmenu` (the same program without the bar, tray or struts; log
+`$XDG_RUNTIME_DIR/lux-startmenu<display>.log`): it owns `_LH_STARTMENU_S0` and lux forwards the Avalon Start button and Super to
+it (the panel opens above the Start button; Super or a click outside closes it). lux adopts one that already runs on the display
+(also a `flxp-taskbar --start-menu-only` run by hand), restarts it when it dies (at most 5 times a minute, then nothing opens
+until the settings change), stops it when you switch to the classic bar (which is the provider then) and on exit, always by its
+own pid checked against the display. flxp's panel has a Control Panel cascade whose *Display Properties...* starts
+flxp-settings; lux's settings flyout is reachable from a terminal with `xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND settings`.
 The Avalon Start button shows its pressed image while flxp's panel is open: the provider sets the root property
 `_LH_STARTMENU_OPEN` (1 open, 0 or deleted closed; `docs/CLIENT-PROTOCOL.md`); with a flxp-taskbar that does not set it yet lux
 keeps the button pressed from the click (or Super) until the panel's window unmaps, or until the next click on the button.
@@ -579,7 +568,7 @@ keeps the button pressed from the click (or Super) until the panel's window unma
 | `[desktop]` | `desktop_black` * | `0` (default, M5b): a maximised window darkens only its own frame (luxwm) and the bars' black layers; `1`: the whole desktop also turns black (M5a) |
 | `[shell]` | `max_fade_ms` * | `0` (default): the bars' black layers switch at once when a window is maximised or restored; a number: the old fade in ms (4074: 400) |
 | `[taskbar]` | `kind` * | `avalon` (default), `classic` (flxp-taskbar instead, started/stopped by lux) or `none`; the fallback for themes with neither `[override:NAME] taskbar` nor a themes.ini `taskbar` |
-| `[taskbar]` | `classic_start_menu` | whose menu the classic bar's Start button opens: `flxp` (its XP start panel), `flxp-classic` (its classic popup menu) or `luxshell` (lux's menu). Default from `[start] menu`: `flxp` -> `flxp`, `lux` -> `luxshell` |
+| `[taskbar]` | `classic_start_menu` | whose menu the classic bar's Start button opens: `flxp` (its XP start panel, default) or `flxp-classic` (its classic popup menu). Was: from `[start] menu`: `flxp` -> `flxp`, `lux` -> `luxshell` |
 | `[taskbar]` | `autohide` * | `0` (default) or `1` |
 | `[taskbar]` | `rows` * | 1 (default), 2 or 3: the top-edge drag writes it |
 | `[sidebar]` | `mode` * | `full` (default), `minimized`, `pinned` |

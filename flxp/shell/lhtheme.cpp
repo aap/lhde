@@ -224,7 +224,6 @@ std::string theme_setting(const std::string& key, const std::string& fallback)
     }
     if (key == "taskbar_kind") return or_fallback(t.value("Shell.taskbar"));
     if (key == "start_menu") {
-        if (t.value("Shell.start") == "lux") return "lhshell";
         std::string v = setting(key);               // the user's style: panel | classic
         return v.empty() || v == "lhshell" ? fallback : v;
     }

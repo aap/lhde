@@ -25,11 +25,4 @@ return {
   pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 6.4)
   -- popup menus: the 4074 Slate [sysmetrics] FLATMENUS colours (MENU, MENUTEXT, MENUHILIGHT, GRAYTEXT)
   menu = { bg = "#ffffff", text = "#373738", hot = "#edb078", hot_text = "#000000", border = "#969696", gray = "#969696" },
-  -- start menu (6.3): the Slate StartPanel class (packs/4074/startpanel-slate); measured on lh4074-181541.png (1152x864):
-  -- 380 px wide, y 288..835: user pane 64 (USERPANE + USERPICTURE frame, name in Franklin Gothic Medium 14 with a 2,2
-  -- shadow), body 441, log off row 42; same columns and tiles as Jade with 30 px places rows (Tahoma 8).
-  startpanel = "4074/startpanel-slate",
-  startmenu = { font = "Tahoma 11px", width = 380, left_w = 190, body_min = 441, prog_tile = 40, places_h = 30, sep_left = 8, sep_right = 4,
-                more_h = 34, logoff_h = 42, userpane_h = 64, frame = { "#5f6769" }, logoff_buttons = { "logoff", "shutdown" },
-                hot_bg = "#edb078", hot_text = "#000000", user_font = "ITC Franklin Gothic Std Medium 19px" },
 }

@@ -1742,7 +1742,7 @@ INT_PTR CALLBACK appearance_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
 struct ShellKey { const char* key; int id; };
 const ShellKey kShell[] = {
     { "Explorer.chrome", IDC_AP_FRAME }, { "Explorer.navbar", IDC_AP_NAVBAR }, { "Explorer.navbar_preset", IDC_AP_PRESET },
-    { "Shell.taskbar", IDC_AP_TASKBAR }, { "Shell.start", IDC_AP_START }, { "Glass.frames", IDC_AP_FRAMES },
+    { "Shell.taskbar", IDC_AP_TASKBAR }, { "Glass.frames", IDC_AP_FRAMES },
     { "Glass.composition", IDC_AP_COMP }, { "Glass.animations", IDC_AP_ANIM } };
 std::map<int, std::vector<Item>> shell_items;
 const std::vector<Item> kSbModes = { { "Full", "full" }, { "Minimized", "minimized" }, { "Pinned", "pinned" }, { "None", "none" } };
@@ -1758,7 +1758,6 @@ std::vector<Item> items_for(int id)
         if (value("Explorer.navbar") == "vision") return items({ { "Automatic", "auto" }, { "Small", "small" }, { "Big", "big" } });
         return items({ { "Automatic", "auto" }, { "Small", "small" }, { "Medium", "medium" }, { "Large", "large" }, { "Extra large", "xlarge" } });
     case IDC_AP_TASKBAR: return items({ { "Avalon (luxshell)", "avalon" }, { "Classic (flxp-taskbar)", "classic" }, { "None", "none" } });
-    case IDC_AP_START: return items({ { "flxp start panel", "flxp" }, { "luxshell start menu", "lux" } });
     case IDC_AP_FRAMES: {
         std::vector<Item> out = { { "None (the style's own frames)", "none" } };
         for (const std::string& d : shell::lhde_subdirs("frames")) {

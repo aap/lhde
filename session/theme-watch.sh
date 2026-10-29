@@ -11,8 +11,8 @@ RELOAD="$LHDE_SESSION_DIR/theme-reload.sh"
 LUA=${LHDE_TOP:+$LHDE_TOP/luxshell}; LUA=${LUA:-$LHDE_LIB/luxshell}
 UTHEMES=${XDG_CONFIG_HOME:-$HOME/.config}/lhde/themes; mkdir -p "$UTHEMES"
 mapfile -t DIRS < <(lhde_data_dirs; echo "$LUA"; echo "$UTHEMES")
-PAT='(/themes/[^/]+\.theme|/[^/]+\.theme|/navbar/[^/]+\.ini|/frames/[^/]+/(theme|nav)\.ini|/packs/[^/]+/shell\.lua|/packs/startpanels\.lua|/tiles/[^/]+\.lua)$'
-files() { for d in "${DIRS[@]}"; do ls -d "$d"/themes/*.theme "$d"/*.theme "$d"/navbar/*.ini "$d"/frames/*/theme.ini "$d"/frames/*/nav.ini "$d"/packs/*/shell.lua "$d"/packs/startpanels.lua "$d"/tiles/*.lua; done 2>/dev/null; }
+PAT='(/themes/[^/]+\.theme|/[^/]+\.theme|/navbar/[^/]+\.ini|/frames/[^/]+/(theme|nav)\.ini|/packs/[^/]+/shell\.lua|/tiles/[^/]+\.lua)$'
+files() { for d in "${DIRS[@]}"; do ls -d "$d"/themes/*.theme "$d"/*.theme "$d"/navbar/*.ini "$d"/frames/*/theme.ini "$d"/frames/*/nav.ini "$d"/packs/*/shell.lua "$d"/tiles/*.lua; done 2>/dev/null; }
 reload() { echo "theme-watch: $1 changed"; "$RELOAD" "$D"; }
 echo "theme-watch: $(files | wc -l) files on display $D (${DIRS[*]})"
 if command -v inotifywait >/dev/null 2>&1; then

@@ -6,7 +6,7 @@
 --   S.resolve(name)            the theme NAME resolved (an alias gives its theme): an entry { name, title, file, user (its file is
 --                              the user's), v (the record: v["Glass.frames"], ...), why (where each key came from), record (the
 --                              _LH_THEME_RESOLVED text without serial), and the fields runtime.lua uses: shell (the pack's
---                              directory), startpanel, fonts, msstyles, color, size, frame, frame_classic, composition (the frame
+--                              directory), fonts, msstyles, color, size, frame, frame_classic, composition (the frame
 --                              mode: auto when the theme has a glass frame set, else off), wallpaper, mode, icons, modified (the
 --                              current layer has keys: Windows' "NAME (Modified)"), display (the title shown: "TITLE (Modified)")
 --                              }; nil, err
@@ -117,7 +117,7 @@ function S.resolve(name)
   local e = { name = r.name, file = r.file, v = v, why = r.why, record = r.record, title = v["Theme.name"] or r.name,
     user = r.file ~= "" and r.file:sub(1, #udir + 1) == udir .. "/",
     base = nz(v["Theme.base"]) or r.name,
-    shell = nz(v["path.pack"]), startpanel = nz(v["Shell.startpanel"]), fonts = v["path.fonts"] or "",
+    shell = nz(v["path.pack"]), fonts = v["path.fonts"] or "",
     msstyles = v["path.style"] or "", color = v["VisualStyle.color"] or "", size = v["VisualStyle.size"] or "",
     frame = v["path.frames"] or "", frame_classic = v["path.frames_classic"] or "",
     composition = (nz(v["path.frames"]) and v["Glass.composition"] ~= "off") and "auto" or "off",
@@ -137,7 +137,7 @@ function S.pack_dir(v)
   return lh.data_resolve_dir(v, "shell.lua")
 end
 -- the theme keys the flyout and runtime.lua use, by their old names
-S.theme_keys = { taskbar = "Shell.taskbar", start = "Shell.start", icons = "Desktop.icons", composition = "Glass.composition",
+S.theme_keys = { taskbar = "Shell.taskbar", icons = "Desktop.icons", composition = "Glass.composition",
   animations = "Glass.animations", sidebar = "Shell.sidebar", wallpaper = "Desktop.wallpaper" }
 local srcname = function(why)
   why = why or ""
@@ -148,7 +148,6 @@ function S.theme_value(e, key)
   local k = S.theme_keys[key]; if not (k and e and e.v) then return nil, nil end
   local v = e.v[k]
   if key == "composition" and (v == "auto" or v == nil) then v = "follow" end
-  if key == "start" and v == "lhshell" then v = "lux" end
   return v, srcname(e.why and e.why[k])
 end
 function S.theme_default(e, key) return S.theme_value(e, key) end

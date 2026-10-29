@@ -2,7 +2,7 @@
 
    Program files (make install; never edited by the user):
      $PREFIX/share/lhde/   shipped data, text only: themes/NAME.theme, navbar/NAME.ini, icons/NAME.theme, sources/ID.ini,
-                           frames/<set>/theme.ini (+ nav.ini), packs/<pack>/shell.lua, packs/startpanels.lua, res/icons (flxp)
+                           frames/<set>/theme.ini (+ nav.ini), packs/<pack>/shell.lua, res/icons (flxp)
      $PREFIX/lib/lhde/     code: luxshell/ (the Lua), session/ (lhde-session's helpers), tools/ (lhde-import's Python)
    Windows files (lhde-import; $LHDE_WINDOWS, default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows):
      <source>/             the raw files of one build, as in the resource pack: system32/ themes/ fonts/ wallpapers/ source.ini
