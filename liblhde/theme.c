@@ -540,12 +540,12 @@ static void apply_scheme(lhde_theme *t)
     lhde_ini_free(ini);
 }
 
-/* settings.ini on top of the files (legacy layers): flxp's [override:NAME] / [override], and [desktop] wallpaper */
-static void apply_settings(lhde_theme *t, const char *name)
+/* settings.ini on top of the files: the per-user [desktop] wallpaper = none (luxshell's "Show the wallpaper" off; every theme) */
+static void apply_settings(lhde_theme *t)
 {
-    char k[128], v[1024], why[600];
-    for (int i = 0; lhde__legacy_override(name, i, k, sizeof k, v, sizeof v, why, sizeof why); i++)
-        put(t, k, v, LHDE_FROM_SETTINGS, why);
+    char w[64];
+    if (lhde_settings_get("desktop", "wallpaper", w, sizeof w) && !strcmp(w, "none"))
+        put(t, "Desktop.wallpaper", "none", LHDE_FROM_SETTINGS, "settings: [desktop] wallpaper = none (per user: the wallpaper switched off)");
 }
 
 /* the style a theme ends up with: its own, else (section 6 / decision 2) luna -> luna4051, luna4074; else none (classic) */
@@ -664,7 +664,7 @@ static lhde_theme *resolve_ex(const char *name, int flags, const char *const *kv
     }
     put(t, "chain", chain, LHDE_FROM_DERIVED, "the base chain");
     tindex_free(&x);
-    apply_settings(t, canon);
+    apply_settings(t);
     /* the current layer: the stored one of this theme, or the caller's */
     {
         struct lhde__layer stored = { NULL, 0, 0 };

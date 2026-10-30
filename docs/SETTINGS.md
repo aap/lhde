@@ -61,6 +61,11 @@ happens when `lhde/settings.ini` exists; a report goes to `lhde/migration.log`):
    one still holding backups (`*.pre-lhde`, `*.pre-settings`) is left and named. A file that reappears in an old place (an older
    program) is moved by the next run unless the new one exists. Run by `lhde-session start`, luxshell and luxwm at startup, and
    the flxp programs when they first read their settings; the report is appended to `lhde/migration.log`.
+6. Every run, idempotent: legacy sections in `lhde/settings.ini` itself (left by a program from before the theme files) are
+   converted as in 2.: `[override:NAME]` -> `NAME-modified.theme`, `[override]` -> the selected theme's modified copy, and a
+   `[desktop] wallpaper = PATH` (+ `mode`; the old Set as Desktop Background for every theme) -> the selected theme's current
+   layer (`[current] Desktop.wallpaper / Desktop.mode`). The resolver applies none of them; of settings.ini's own keys it
+   applies only `[desktop] wallpaper = none`.
 
 Result on a copy of aap's config (2026-10-28): the four presets (Aero lotus, MyAero, MyLuna, MySlate4051) became
 `aero-lotus`, `myaero`, `myluna`, `myslate4051`; `[override:aero4074] icons = xp` -> `aero4074-modified.theme` (Desktop.icons =

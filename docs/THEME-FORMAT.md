@@ -134,6 +134,9 @@ the desktop colour (COLOR_BACKGROUND) under the wallpaper; `Desktop.color` when 
   `lhde_current_keys`, `lhde_current_clear`, `lhde_current_theme`, `lhde_theme_select`, `lhde_theme_save_as`,
   `lhde_theme_delete`, `lhde_theme_resolve_flags(NAME, LHDE_RESOLVE_FILES)` (the files only), `lhde_theme_resolve_with`
   (a preview of a layer not stored), `lhde_theme_resolve_current`.
+- The one per-user key the resolver applies, below the current layer: `settings.ini [desktop] wallpaper = none` (luxshell's
+  "Show the wallpaper" off) switches the picture off in every theme (source `settings`). No other settings.ini key is a theme
+  key; the old `[override:NAME]` sections are converted into theme files by the migration (docs/SETTINGS.md), not applied.
 - Migration: existing `NAME-modified.theme` files stay what they are, ordinary user themes (their `base = NAME` and `name =
   TITLE (modified)`); nothing converts them. Delete them in Display Properties, or keep them under a better name with Save As.
 - `lhde_theme_set_key` (the earlier model: the first change writes `NAME-modified.theme` with `base = NAME`, only the changed
@@ -142,7 +145,7 @@ the desktop colour (COLOR_BACKGROUND) under the wallpaper; `Desktop.color` when 
 
 ## 4. The resolver (liblhde, `<lhde/theme.h>`)
 `lhde_theme_resolve(name)` returns one flat record `section.key = value` with inheritance, defaults and
-fallbacks applied, and for every key where it came from (file, base, default, fallback + reason).
+fallbacks applied, and for every key where it came from (file, base, current, settings, scheme, default, fallback + reason).
 luxwm and flxp link it, luxshell through a Lua binding. The root property `_LH_THEME_RESOLVED` carries
 that record as `section.key=value` lines plus `theme=NAME` and `serial=` (the `_LH_SETTINGS_SERIAL`
 it was resolved at); a client resolves itself when the property is missing or stale.

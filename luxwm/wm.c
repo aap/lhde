@@ -975,7 +975,7 @@ handle_client_message(XEvent *e)
     } else if (cme->message_type == lh_settings_atom && lh_settings_atom != None) {   /* ../SETTINGS.md "Change notification" */
         LOGP("_LH_SETTINGS_CHANGED serial %ld", cme->data.l[0]);
         lhde_settings_reload();
-        theme_recheck("_LH_SETTINGS_CHANGED");   /* a theme file or a legacy [override:NAME] may have changed */
+        theme_recheck("_LH_SETTINGS_CHANGED");   /* a theme file or the current layer may have changed */
         settings_load(false);
     } else if (cme->message_type == net_berry[BerryClientEvent]) {
         LOGN("Received event from berryc");

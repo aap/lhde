@@ -3,7 +3,7 @@
    Covers: inheritance and its sources, absent vs none, the defaults of each style kind (v3, v4 CompositedWindow 4074, v4
    Sidebar 4051, v4 DWM 5048/5112, classic), bare styles as themes, aliases, the fallbacks (frames, pack -> classic taskbar,
    wallpaper, style luna -> luna4051, icons, base not found), cycles and the depth limit, lhde_theme_set_key
-   (NAME-modified.theme), serialization, the settings store (comments kept), the legacy [override:NAME] layer and the
+   (NAME-modified.theme), serialization, the settings store (comments kept), the conversion of the legacy [override:NAME] sections and the
    migration from ~/.config/longhorn + ~/.config/lhshell. */
 #define _GNU_SOURCE
 #include "lhde/data.h"
@@ -331,15 +331,37 @@ int main(void)
     EQ(slurp("config/lhde/settings.ini"), "; my comment\n[theme]\nname = aero   ; the theme\n\n[mine]\nx = 1\n\n[sidebar]\nwidth = 181\n");
     CHECK(lhde_settings_set("mine", "x", NULL) == 1);
     EQ(slurp("config/lhde/settings.ini"), "; my comment\n[theme]\nname = aero   ; the theme\n\n[sidebar]\nwidth = 181\n");
-    /* the legacy layer: flxp's [override:NAME] (also under an alias) */
+    /* flxp's legacy [override:NAME] (also under an alias) and [desktop] wallpaper = PATH: not applied live; the migration
+       (every run) turns them into NAME-modified.theme and the selected theme's current layer */
     lhde_settings_set("override:jade-old", "taskbar", "none");
-    lhde_settings_set("override:jade", "icons", "longhorn");
+    lhde_settings_set("override:jade", "icons", "xp");
+    lhde_settings_set("desktop", "wallpaper", "/pics/w.jpg");
+    lhde_settings_set("desktop", "mode", "fit");
     t = R("jade");
-    EQ(G(t, "Shell.taskbar"), "none"); CHECK(lhde_theme_source(t, "Shell.taskbar") == LHDE_FROM_SETTINGS);
-    EQ(G(t, "Desktop.icons"), "longhorn4074"); HAS(W(t, "Desktop.icons"), "[override:jade]");
+    CHECK(strcmp(G(t, "Shell.taskbar"), "none") != 0); CHECK(lhde_theme_source(t, "Shell.taskbar") != LHDE_FROM_SETTINGS);
+    CHECK(strcmp(G(t, "Desktop.icons"), "xp") != 0);
     lhde_theme_free(t);
+    t = R("aero"); CHECK(strcmp(G(t, "Desktop.wallpaper"), "/pics/w.jpg") != 0); lhde_theme_free(t);
+    {
+        static char lrep[8192];
+        CHECK(lhde_settings_migrate(0, lrep, sizeof lrep) > 0);
+        HAS(lrep, "[override:jade-old]"); HAS(lrep, "-> [current] of ");
+        char *ls = slurp("config/lhde/settings.ini");
+        CHECK(!strstr(ls, "override")); HAS(ls, "name = aero");
+        HAS(ls, "Desktop.wallpaper = /pics/w.jpg\nDesktop.mode = fit");
+        char *lj = slurp("config/lhde/themes/jade-modified.theme");
+        HAS(lj, "base = jade"); HAS(lj, "taskbar = none"); HAS(lj, "icons = xp");
+        t = R("jade-modified"); EQ(G(t, "Shell.taskbar"), "none"); EQ(G(t, "Desktop.icons"), "xp"); lhde_theme_free(t);
+        t = R("aero"); EQ(G(t, "Desktop.mode"), "fit"); CHECK(lhde_theme_source(t, "Desktop.mode") == LHDE_FROM_CURRENT);   /* (the picture itself is missing: a fallback) */
+        lhde_theme_free(t);
+        CHECK(lhde_settings_migrate(0, lrep, sizeof lrep) == 0);   /* idempotent */
+        lhde_settings_set("current", "theme", NULL); lhde_settings_set("current", "Desktop.wallpaper", NULL); lhde_settings_set("current", "Desktop.mode", NULL);
+        snprintf(p, sizeof p, "%s/config/lhde/themes/jade-modified.theme", T); unlink(p);
+    }
+    /* the per-user [desktop] wallpaper = none is applied (luxshell's "Show the wallpaper" off) */
     lhde_settings_set("desktop", "wallpaper", "none");
-    t = R("aero"); EQ(G(t, "Desktop.wallpaper"), "none"); EQ(G(t, "path.wallpaper"), ""); lhde_theme_free(t);
+    t = R("aero"); EQ(G(t, "Desktop.wallpaper"), "none"); EQ(G(t, "path.wallpaper"), ""); CHECK(lhde_theme_source(t, "Desktop.wallpaper") == LHDE_FROM_SETTINGS);
+    lhde_theme_free(t);
 
     /* ---- the migration ---- */
     snprintf(p, sizeof p, "%s/config/lhde", T);

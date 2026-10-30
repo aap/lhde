@@ -76,6 +76,9 @@ void lhde_settings_reload(void);
        (lux's old rules), the runtime state (tile order) stays
      - then longhorn/settings.ini is kept as settings.ini.pre-lhde
    That part runs once: nothing happens when lhde/settings.ini exists (force = 1: again, keeping what lhde/ has).
+   Every time, lhde/settings.ini's own legacy sections are converted the same way ([override:NAME], [override]; nothing
+   applies them live) and a [desktop] wallpaper = PATH (+ mode) becomes the selected theme's current layer ([current]
+   Desktop.wallpaper / Desktop.mode); [desktop] wallpaper = none stays (the per-user switch the resolver applies).
    Then, every time (idempotent, a few stats when there is nothing to do), the files that were scattered over other
    directories move to the two of lhde (above): flxp/flxp.ini -> lhde/flxp.ini (the keys that duplicated theme keys and the
    path overrides the resolver makes redundant are removed and reported), flxp/views and flxp/desktop-positions ->

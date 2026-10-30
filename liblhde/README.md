@@ -4,9 +4,9 @@ What every lhde component shares, prefix `lhde_`, plain C, no X (style probing t
 
 | header | file | what |
 | --- | --- | --- |
-| `<lhde/data.h>` | `data.c` | the three trees and the one lookup over them (docs/LAYOUT.md "The three trees"): `~/.config/lhde`, the Windows tree's `index/` (`$LHDE_WINDOWS`, default `~/.local/share/lhde-windows`; `$LHDE_DATA` a flat directory instead), an old-layout `~/.local/share/lhde` until migrated, the install's `share/lhde`, `$XDG_DATA_DIRS/lhde`, the tree's `data/`; lookup by kind (`lhde_data_find_kind`), which tree a file lies in (`lhde_data_origin`), the code directory (`<prefix>/lib/lhde`) |
+| `<lhde/data.h>` | `data.c` | the three trees and the one lookup over them (docs/LAYOUT.md "The three trees"): `~/.config/lhde`, the Windows tree's `index/` (`$LHDE_WINDOWS`, default `~/.local/share/lhde-windows`; `$LHDE_DATA` a flat directory instead), the install's `share/lhde`, `$XDG_DATA_DIRS/lhde`, the tree's `data/`; lookup by kind (`lhde_data_find_kind`), which tree a file lies in (`lhde_data_origin`), the code directory (`<prefix>/lib/lhde`) |
 | `<lhde/theme.h>` | `theme.c`, `style.c`, `current.c` | theme files and the resolver (base chains, absent vs `none`, defaults from the style, fallbacks, where every key came from), bare styles as themes, the current layer (`settings.ini [current]`, the unsaved changes: `lhde_current_*`, `lhde_theme_select`, `lhde_theme_save_as`, `lhde_theme_delete`), classic schemes (`styles/NAME.scheme`), the style and scheme lists, `lhde_theme_set_key` (`NAME-modified.theme`, the earlier model), the style probe |
-| `<lhde/settings.h>` | `ini.c`, `settings.c` | line-keeping ini documents; the settings store `~/.config/lhde/settings.ini`; the one-time migration from `~/.config/longhorn` + `~/.config/lhshell` |
+| `<lhde/settings.h>` | `ini.c`, `settings.c` | line-keeping ini documents; the settings store `~/.config/lhde/settings.ini`; the migration from `~/.config/longhorn` + `~/.config/lhshell` (once) and of legacy `[override:NAME]` sections into theme files (every run) |
 | `<lhde/data.h>` (compat part) | `compat.c` | the generated old-format `themes.ini` + `wallpapers.ini` for flxp until it reads theme files (`_LH_THEMES_INI`) |
 
 Build: `build/lib/liblhde.a`, `build/lib/liblhde.so.1`, `build/lib/pkgconfig/lhde.pc` (`make liblhde`); `make install`

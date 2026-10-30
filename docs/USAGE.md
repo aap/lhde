@@ -180,7 +180,8 @@ The old luxwm theme directory names still work everywhere a name is taken (`alia
 `data/wallpapers.ini` (one `[NAME]` section with `file` and `mode`, plus `[default]`), not in themes.ini: the 4074 themes get the
 4074 leaves, slate4074 Stonehenge, slate4051 4051's wheat field, aero-patch the 4093 tree, aero5048 5048's glass facade, the Luna
 and XP styles Bliss and XP stock pictures. Your own choice still wins: settings.ini `[desktop] wallpaper` (Display Properties'
-Desktop tab), a preset's `[Desktop] wallpaper`, or `[override:NAME] wallpaper` for one theme (docs/history/THEMES.md "Wallpapers").
+Desktop tab and Set as Desktop Background write it into the current layer, `settings.ini [current]`), your own theme file's
+`[Desktop] wallpaper`, or `[desktop] wallpaper = none` for no picture in any theme (docs/THEME-FORMAT.md section 3).
 
 **4051 vs 4074 Slate.** Builds after ~4060 look like 4074: their Avalon bars scale images nearest-neighbour, so the start
 button (imageres 1156, 74x23, drawn 79x29) has the blocky flag; 4051 scaled bilinear (the smooth flag). `slate4051` has its own
@@ -234,8 +235,9 @@ or without its layer. `LHSHELL_DESKTOP=0` (or off/no/false) works for any luxshe
 A theme switch restarts nothing: frames, bars and clients change in place.
 
 Startup wallpaper: `lhde-session` sets the root background once, before anything else paints, with `lhwall.sh` (sourced here and by
-`lhde-session desktop on`): `settings.ini [override:THEME] wallpaper`, a preset's own `[Desktop]` keys, `settings.ini [desktop]
-wallpaper` and `mode` if set, else the wallpaper of the session theme (`wallpapers.ini`, a preset resolves to its base), mapped to `feh --bg-fill|max|center|tile|scale`; `none` is a
+`lhde-session desktop on`): the session theme's resolved `Desktop.wallpaper` and `Desktop.mode` (`lhde-theme resolve THEME
+--get`: the current layer, the theme file and its base chain, the build's default; `settings.ini [desktop] wallpaper = none`
+applied), mapped to `feh --bg-fill|max|center|tile|scale`; `none` is a
 plain root (`xsetroot -solid '#3a6ea5'`); `LHSHELL_WALLPAPER=0` forces `none`. flxp-desktop reads settings.ini itself (the session no
 longer exports an `FLXP_WALLPAPER` default, which would have overridden it) and gets the theme's wallpaper from lux through the root
 property `_FLXP_WALLPAPER` (SETTINGS.md "Resolved theme": the registry has no `wallpaper` keys now), and lux never runs feh/xsetroot while another program
@@ -411,9 +413,8 @@ your choice holds for the pack you made it in.
 jade4074-classic) stops the picom of this display (only a process named `picom` whose environment has the same `DISPLAY`), and
 switching to an `auto` theme (aero4074, jade4074) starts one if no compositor runs. luxwm already follows the compositor (glass
 frames with it, the theme's classic frames without), so the whole desktop changes look together. The settings flyout's
-*Composition* group overrides this: *Always on* / *Always off*; *Follow the theme* is the default. The switch is per theme like
-the taskbar (`[override:NAME] composition`, a preset's `[Composition] composition`, else `[theme] composition`; see "Per-theme
-taskbar, start menu, composition" below). Since 2026-10-25 the rule is applied **at startup too**, also for *Follow*: 1.5 s after
+*Composition* group overrides this: *Always on* / *Always off*; *Follow the theme* is the default. The switch is the theme key
+`Glass.composition` like the taskbar (see "Per-theme taskbar, composition" below). Since 2026-10-25 the rule is applied **at startup too**, also for *Follow*: 1.5 s after
 lux starts it stops the picom of its display when the theme says off (a session starting on luna or slate4074 no longer keeps
 glass) and starts one for a glass theme when none runs (log `lux: compositor at startup: ...`). `lhde-session` (and so
 `lhde-session`) already decides with the same rule whether to start picom at all (`lhcomp_wanted` in `lhwall.sh`), so a
@@ -425,13 +426,12 @@ glx`; on the Xvfb lab, which needs xrender, start luxshell with
 `LHSHELL_PICOM_CMD="picom --config /u/aap/fun/longhorn/session/picom-glass.conf --backend xrender --blur-method gaussian --blur-size 5 --blur-deviation 1.2"`.
 picom's output goes to `$XDG_RUNTIME_DIR/lhshell-picom<display>.log`.
 
-**Classic taskbar instead of the Avalon one** (SHELL-DESIGN "M8 luxshell side"). The taskbar kind, per theme (below: `[override:NAME]
-taskbar`, the preset's, the theme's `taskbar` in themes.ini, else `[taskbar] kind`), picks the
+**Classic taskbar instead of the Avalon one** (SHELL-DESIGN "M8 luxshell side"). The taskbar kind, the theme key `Shell.taskbar` (below), picks the
 bottom bar: `avalon` (default, luxshell's taskbar), `classic` (flxp's XP-style `flxp-taskbar`, which luxshell starts and stops)
 or `none`. Switch live from the settings flyout (*Taskbar*: Longhorn (Avalon) taskbar / Classic taskbar (flxp) / No taskbar) or
 from a terminal with `lhde-session taskbar avalon|classic|classic+sidebar|none` (the root command `_LHSHELL_COMMAND` =
 `taskbar KIND`, plus `sidebar-with-classic 0|1` for `classic` / `classic+sidebar`, to the running luxshell, which saves it for the
-current theme; with no lux on the display the script writes `[override:THEME] taskbar` itself). The settings flyout can also be opened from a terminal (the
+current theme's current layer; with no lux on the display the script sets the theme key itself, `lhde-theme set-key`). The settings flyout can also be opened from a terminal (the
 classic bar has no way to it): `xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND settings`. In `classic`:
 - luxshell has no taskbar surface, no taskbar strut and no `_NET_WM_ICON_GEOMETRY` (flxp-taskbar sets its own); it runs
   `[commands] taskbar` (default `flxp-taskbar`, from PATH; `$LHSHELL_TASKBAR_CMD`) with its own DISPLAY and D-Bus session, log in
@@ -514,8 +514,7 @@ and compositor rule from it, writes `[theme] name = NAME`, publishes the resolve
 preset names themselves, registry first, then `themes/NAME.theme`; luxwm's frames come from the base entry plus the preset's
 `[VisualStyle]`, `[Frames]`, `[Fonts]` and `[Composition] composition` (`off` = the classic frame), its animations from
 `[Composition] animations`; log line `luxwm: theme NAME: preset (base BASE) from ...`). Which value wins:
-the preset's own key, then settings.ini (`[desktop] wallpaper / mode`), then the registry entry (icons, animations, taskbar, start
-menu and composition: the per-theme chain below, where `[override:NAME]` comes first and the registry before the global key);
+the current layer (`settings.ini [current]`), then the theme file and its base chain, then the style's defaults;
 `[desktop] wallpaper = none` (the flyout's "Show the wallpaper" off) always wins. A name that is neither a theme nor a preset
 is ignored by everybody (the current theme stays; luxwm and lux log it).
 
@@ -528,22 +527,14 @@ settings.ini, sets `_LH_THEME` for a theme change and sends one `_LH_SETTINGS_CH
 lux + picom (`lhshell/compare_settings_sync.png`): Jade, composition off, animations invented, classic taskbar, a saved
 preset `test1` (`_LH_THEME = test1`, luxwm on the base's frames, lux on the base's pack, no rewrite), and back.
 
-**Per-theme taskbar, start menu, composition (`[override:NAME]`, 2026-10-25).** The taskbar kind, the start menu, the
-compositor switch, the icon set and the animations belong to the theme (SETTINGS.md "Per-theme settings"): Display Properties'
-Appearance tab stores them per theme, into `[override:NAME]` (keys `taskbar`, `start`, `composition`, `icons`, `animations`,
-`frame`) for a registry theme or into the preset itself, and lux reads them the same way. For the current theme NAME the value
-is the first of: `settings.ini [override:NAME] KEY`; the preset's own key (`[Shell] taskbar` / `start`, `[Composition]
-composition` / `animations`, `[Desktop] icons`); the theme's themes.ini key (`taskbar`, `start`, `flxp_icons`, `animations`; the
-Luna themes say `taskbar = classic`, `start = flxp`, the Longhorn ones `taskbar = avalon`, `start = lux`); the global key
-(`[taskbar] kind`, `[start] menu`, `[theme] composition`, `[desktop] icons`, `[theme] animations`); the default (avalon, flxp,
-follow, xp, 4074plus). So `[override:aero4074] taskbar = classic` gives aero4074 the classic bar while jade4074 keeps the Avalon
-one, and since every registry theme has a `taskbar`, the global `[taskbar] kind` only matters for a theme without one. lux
-applies the chain at startup, on every theme change and on `_LH_SETTINGS_CHANGED` (log `luxshell: taskbar A -> B`; a classic
-bar started with the other start menu is restarted). lux's settings flyout (and `_LHSHELL_COMMAND taskbar KIND`) writes exactly
-like the dialog: the value for the current theme only, into `[override:NAME]` (a preset: its own `[Shell] taskbar` etc.), and a
-value equal to what the theme gives anyway removes the key (and an emptied section); it does not write the global keys any more
-(log `lux: settings: taskbar for theme NAME: = KIND` / `back to the theme's KIND`). *Save as preset...* also writes the theme's
-taskbar / start menu into the preset when they differ from the base's.
+**Per-theme taskbar, composition.** The taskbar kind, the compositor switch, the icon set and the animations are theme keys
+(`Shell.taskbar`, `Glass.composition`, `Desktop.icons`, `Glass.animations`; docs/THEME-FORMAT.md): a theme file says them, its
+base chain or the style's defaults fill them in. Display Properties' Appearance tab and lux's settings flyout (and
+`_LHSHELL_COMMAND taskbar KIND`) change them for the current theme only, into its current layer (`settings.ini [current]`,
+"NAME (Modified)"); a value equal to what the theme gives anyway is dropped; Save As keeps it in a theme file of your own. So
+aero4074 can have the classic bar while jade4074 keeps the Avalon one. lux applies the record at startup, on every theme change
+and on `_LH_SETTINGS_CHANGED` (log `luxshell: taskbar A -> B`). The `[override:NAME]` sections of an older settings.ini are
+turned into `NAME-modified.theme` by the migration (docs/SETTINGS.md "Migration"); nothing reads them live.
 
 **Start menu: flxp's start panel everywhere.** flxp-taskbar's XP start panel is the start menu in every taskbar mode. With the
 Avalon taskbar or none, lux runs `flxp-startmenu` (the same program without the bar, tray or struts; log
