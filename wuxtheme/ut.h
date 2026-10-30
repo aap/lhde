@@ -107,7 +107,8 @@ int ut_draw_background(ut_theme *t, const char *cls, int part, int state,
                        uint32_t *pixels, int width, int height, int stride,
                        const ut_rect *rect, const ut_rect *clip);
 /* DrawThemeText (UTF-8, DT_* flags of winuser.h, e.g. 0x25 = DT_CENTER |
- * DT_VCENTER | DT_SINGLELINE). Fonts come from fontconfig and ut_add_font_dir. */
+ * DT_VCENTER | DT_SINGLELINE). Fonts come from fontconfig and ut_add_font_dir (a directory or one font file, searched before
+ * the system's). */
 int ut_draw_text(ut_theme *t, const char *cls, int part, int state,
                  uint32_t *pixels, int width, int height, int stride,
                  const char *text, unsigned flags, const ut_rect *rect);
@@ -142,6 +143,43 @@ int ut_get_text_metrics(ut_theme *t, const char *cls, int part, int state,
 int ut_draw_text_mask(ut_theme *t, const char *cls, int part, int state, const ut_font *f,
                       uint8_t *mask, int width, int height, int stride,
                       const char *text, unsigned flags, const ut_rect *rect);
+
+/* ---- Windows Classic drawing: user32's DrawEdge, DrawFrameControl and DrawCaption into a premultiplied ARGB buffer, with a
+ * caller-given table of the 31 system colours (0xRRGGBB by COLOR_* index: scrollbar, background, activecaption,
+ * inactivecaption, menu, window, windowframe, menutext, windowtext, captiontext, activeborder, inactiveborder, appworkspace,
+ * highlight, highlighttext, btnface, btnshadow, graytext, btntext, inactivecaptiontext, btnhighlight, 3ddkshadow, 3dlight,
+ * infotext, infobk, alternatebtnface, hotlight, gradientactivecaption, gradientinactivecaption, menuhilight, menubar; lhde's
+ * Colors.* order), or NULL for the process's own. The window manager's frames, flxp's own classic windows and Display
+ * Properties' sample are drawn by this one implementation. The constants are winuser.h's. 1 on success. ---- */
+#define UT_SYSCOLORS 31
+enum { UT_BDR_RAISEDOUTER = 1, UT_BDR_SUNKENOUTER = 2, UT_BDR_RAISEDINNER = 4, UT_BDR_SUNKENINNER = 8,
+       UT_EDGE_RAISED = 5, UT_EDGE_SUNKEN = 10, UT_EDGE_ETCHED = 6, UT_EDGE_BUMP = 9 };
+enum { UT_BF_LEFT = 1, UT_BF_TOP = 2, UT_BF_RIGHT = 4, UT_BF_BOTTOM = 8, UT_BF_RECT = 15, UT_BF_MIDDLE = 0x800, UT_BF_SOFT = 0x1000,
+       UT_BF_ADJUST = 0x2000, UT_BF_FLAT = 0x4000, UT_BF_MONO = 0x8000 };
+enum { UT_DFC_CAPTION = 1, UT_DFC_MENU = 2, UT_DFC_SCROLL = 3, UT_DFC_BUTTON = 4 };
+enum { UT_DFCS_CAPTIONCLOSE = 0, UT_DFCS_CAPTIONMIN = 1, UT_DFCS_CAPTIONMAX = 2, UT_DFCS_CAPTIONRESTORE = 3, UT_DFCS_CAPTIONHELP = 4,
+       UT_DFCS_BUTTONPUSH = 0x10, UT_DFCS_INACTIVE = 0x100, UT_DFCS_PUSHED = 0x200, UT_DFCS_CHECKED = 0x400, UT_DFCS_FLAT = 0x4000,
+       UT_DFCS_MONO = 0x8000 };
+enum { UT_DC_ACTIVE = 1, UT_DC_SMALLCAP = 2, UT_DC_ICON = 4, UT_DC_TEXT = 8, UT_DC_INBUTTON = 0x10, UT_DC_GRADIENT = 0x20 };
+/* DrawEdge: edge = UT_EDGE_* / UT_BDR_*, flags = UT_BF_*; UT_BF_ADJUST shrinks rect to the inside */
+int ut_draw_edge(uint32_t *pixels, int width, int height, int stride, ut_rect *rect, unsigned edge, unsigned flags,
+                 const uint32_t *colors);
+/* DrawFrameControl: type UT_DFC_*, state UT_DFCS_* (a caption button: the push button in btnface with its Marlett glyph in
+ * btntext; pushed: sunken, the glyph one pixel down and right) */
+int ut_draw_frame_control(uint32_t *pixels, int width, int height, int stride, const ut_rect *rect, unsigned type, unsigned state,
+                          const uint32_t *colors);
+/* DrawCaptionTemp: the caption bar in rect. UT_DC_ACTIVE: the active colours (else inactive); UT_DC_GRADIENT: GradientFill
+ * from the caption colour to its gradient colour, as GDI computes it; UT_DC_ICON: a slot as wide as the bar is high at the
+ * left in the solid caption colour, holding icon (premultiplied ARGB icon_w x icon_h, drawn 1:1, centred one pixel right of the
+ * slot's centre; NULL: the slot only, the caller draws its own); UT_DC_TEXT: title (UTF-8) in font and the caption text colour,
+ * CXEDGE from the left of the text area, vertically centred as DrawText does it, "..." when it does not fit. */
+int ut_draw_caption(uint32_t *pixels, int width, int height, int stride, const ut_rect *rect, unsigned flags, const char *title,
+                    const uint32_t *icon, int icon_w, int icon_h, const ut_font *font, const uint32_t *colors);
+/* GradientFill(GRADIENT_FILL_RECT_H) as GDI computes it: c0 (0xRRGGBB) at rect's left edge to c1 at its right */
+int ut_gradient_fill_h(uint32_t *pixels, int width, int height, int stride, const ut_rect *rect, uint32_t c0, uint32_t c1);
+/* the text renderer's "Smooth edges of screen fonts" for every draw call of this process: 0 off, 1 standard (grayscale where the
+ * font's gasp table allows it: Tahoma 8 stays crisp), 2 ClearType (drawn as standard for now). Default 1. */
+void ut_set_font_smoothing(int mode);
 
 #ifdef UT_WITH_CAIRO
 /* cairo: the part is rendered at rect's size (device pixels = user units) and

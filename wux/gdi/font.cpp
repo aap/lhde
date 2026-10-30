@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/stat.h>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -70,7 +71,9 @@ void add_font_dir(const char* dir)
         FcConfigParseAndLoadFromMemory(app_config, (const FcChar8*)
             "<fontconfig><cachedir prefix=\"xdg\">fontconfig</cachedir></fontconfig>", FcFalse);
     }
-    if (FcConfigAppFontAddDir(app_config, (const FcChar8*)dir))
+    struct stat st;   // a directory, or one font file (luxwm's Marlett without the rest of its directory)
+    bool file = stat(dir, &st) == 0 && S_ISREG(st.st_mode);
+    if (file ? FcConfigAppFontAddFile(app_config, (const FcChar8*)dir) : FcConfigAppFontAddDir(app_config, (const FcChar8*)dir))
         font_dirs.push_back(dir);
 }
 
@@ -300,7 +303,8 @@ Font* create_font(const FontDesc& d)
     FT_Face face;
     if (FT_New_Face(library, file.c_str(), index, &face)) return nullptr;
     if (!FT_IS_SCALABLE(face)) { FT_Done_Face(face); return nullptr; }
-    if (!face->charmap) FT_Select_Charmap(face, FT_ENCODING_UNICODE);
+    // Unicode, else the symbol cmap (Marlett has only that; FreeType selects none for it)
+    if (!face->charmap && FT_Select_Charmap(face, FT_ENCODING_UNICODE)) FT_Select_Charmap(face, FT_ENCODING_MS_SYMBOL);
 
     Font* f = new Font;
     f->face = face;
@@ -492,6 +496,16 @@ static bool render_glyph(Font* f, FT_UInt index, bool mono, Glyph& g)
     return true;
 }
 
+// get_glyph_index: a symbol font (Marlett, Wingdings: only a (3,0) cmap) has its characters at U+F000 + the byte, as GDI
+// maps them; try that first and the code itself after (fonts with a broken symbol cmap)
+static FT_UInt glyph_index(FT_Face face, uint32_t cp)
+{
+    if (face->charmap && face->charmap->encoding == FT_ENCODING_MS_SYMBOL && cp < 0x100) {
+        if (FT_UInt i = FT_Get_Char_Index(face, cp + 0xf000)) return i;
+    }
+    return FT_Get_Char_Index(face, cp);
+}
+
 static const Glyph* get_glyph(const Font* cf, uint32_t cp)
 {
     Font* f = (Font*)cf;   // the cache is not part of the font's logical state
@@ -502,7 +516,7 @@ static const Glyph* get_glyph(const Font* cf, uint32_t cp)
 
     Glyph g{};
     // cache_glyph_bitmap: the glyph, else .notdef, else space
-    FT_UInt indices[3] = { FT_Get_Char_Index(f->face, cp), 0, FT_Get_Char_Index(f->face, ' ') };
+    FT_UInt indices[3] = { glyph_index(f->face, cp), 0, glyph_index(f->face, ' ') };
     bool ok = false;
     for (int i = 0; i < 3 && !ok; i++) ok = render_glyph(f, indices[i], mono, g);
     if (!ok) g = Glyph{};

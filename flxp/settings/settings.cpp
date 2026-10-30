@@ -596,7 +596,7 @@ template<class F> void with_dc(Pixels& p, F fn)
     if (b && bits) {
         memcpy(bits, p.px.data(), p.px.size() * 4);
         HGDIOBJ old = SelectObject(dc, b);
-        fn(dc);
+        fn(dc, (uint32_t*)bits);
 
         memcpy(p.px.data(), bits, p.px.size() * 4);
         SelectObject(dc, old);
@@ -623,15 +623,29 @@ void gline(HDC dc, int x0, int y0, int x1, int y1, COLORREF c)
     DeleteObject(pen);
 }
 
-// DrawEdge's EDGE_RAISED / EDGE_SUNKEN with the look's colours
-void gedge(HDC dc, int l, int t, int r, int b, const shell::SessionTheme& st, bool raised)
+// The classic look's 31 system colours (lhde's Colors.* order = COLOR_* order) for libwuxtheme's classic drawing helpers, which
+// draw the frame, the caption and its buttons exactly as luxwm draws a Windows Classic frame (one implementation, ut.h)
+struct LookColors { uint32_t c[UT_SYSCOLORS]; };
+LookColors look_colors(const shell::SessionTheme& st)
 {
-    COLORREF light = look_color(st, "3dlight"), hi = look_color(st, "btnhighlight"), sh = look_color(st, "btnshadow"), dk = look_color(st, "3ddkshadow");
-    COLORREF otl = raised ? light : sh, obr = raised ? dk : hi, itl = raised ? hi : dk, ibr = raised ? sh : light;
-    gline(dc, l, b - 1, l, t, otl); gline(dc, l, t, r - 1, t, otl);
-    gline(dc, r - 1, t, r - 1, b - 1, obr); gline(dc, l, b - 1, r, b - 1, obr);
-    gline(dc, l + 1, b - 2, l + 1, t + 1, itl); gline(dc, l + 1, t + 1, r - 2, t + 1, itl);
-    gline(dc, r - 2, t + 1, r - 2, b - 2, ibr); gline(dc, l + 1, b - 2, r - 1, b - 2, ibr);
+    static const char* const names[UT_SYSCOLORS] = {
+        "scrollbar", "background", "activecaption", "inactivecaption", "menu", "window", "windowframe", "menutext", "windowtext",
+        "captiontext", "activeborder", "inactiveborder", "appworkspace", "highlight", "highlighttext", "btnface", "btnshadow",
+        "graytext", "btntext", "inactivecaptiontext", "btnhighlight", "3ddkshadow", "3dlight", "infotext", "infobk",
+        "alternatebtnface", "hotlight", "gradientactivecaption", "gradientinactivecaption", "menuhilight", "menubar" };
+    LookColors lc;
+    for (int i = 0; i < UT_SYSCOLORS; i++) { COLORREF r = look_color(st, names[i]); lc.c[i] = GetRValue(r) << 16 | GetGValue(r) << 8 | GetBValue(r); }
+    return lc;
+}
+
+// a pixel buffer the preview draws in (the DIB's bits while with_dc runs)
+struct Px { uint32_t* px; int w, h; int stride() const { return w * 4; } };
+
+// DrawEdge EDGE_RAISED / EDGE_SUNKEN (BF_RECT) with the look's colours
+void gedge(const Px& P, int l, int t, int r, int b, const LookColors& lc, bool raised)
+{
+    ut_rect rc = { l, t, r, b };
+    ut_draw_edge(P.px, P.w, P.h, P.stride(), &rc, raised ? UT_EDGE_RAISED : UT_EDGE_SUNKEN, UT_BF_RECT, lc.c);
 }
 
 void gtext(HDC dc, const std::string& s, int l, int t, int r, int b, COLORREF c, const FontSpec& f, UINT flags)
@@ -647,46 +661,52 @@ void gtext(HDC dc, const std::string& s, int l, int t, int r, int b, COLORREF c,
     DeleteObject(font);
 }
 
-// a caption button: raised, btnface, with its glyph (0 minimize, 1 maximize, 2 close)
-void gcapbutton(HDC dc, int l, int t, int r, int b, int kind, const shell::SessionTheme& st)
+// a caption button (DrawFrameControl DFC_CAPTION): kind 0 minimize, 1 maximize, 2 close
+void gcapbutton(const Px& P, int l, int t, int r, int b, int kind, const LookColors& lc)
 {
-    gfill(dc, l, t, r, b, look_color(st, "btnface"));
-    gedge(dc, l, t, r, b, st, true);
-    COLORREF c = look_color(st, "btntext");
-    int w = r - l, h = b - t, cx = l + w / 2, cy = t + h / 2, s = (std::max)(2, (std::min)(w, h) / 4);
-    if (kind == 0) { gfill(dc, cx - s, cy + s - 1, cx + s, cy + s + 1, c); }
-    else if (kind == 1) { gfill(dc, cx - s - 1, cy - s - 1, cx + s + 1, cy - s + 1, c); gline(dc, cx - s - 1, cy - s, cx - s - 1, cy + s + 1, c);
-                          gline(dc, cx + s, cy - s, cx + s, cy + s + 1, c); gline(dc, cx - s - 1, cy + s, cx + s + 1, cy + s, c); }
-    else { for (int d = 0; d < 2; d++) { gline(dc, cx - s + d, cy - s, cx + s + d, cy + s, c); gline(dc, cx + s - 1 + d, cy - s, cx - s - 1 + d, cy + s, c); } }
+    ut_rect rc = { l, t, r, b };
+    ut_draw_frame_control(P.px, P.w, P.h, P.stride(), &rc, UT_DFC_CAPTION,
+                          kind == 0 ? UT_DFCS_CAPTIONMIN : kind == 1 ? UT_DFCS_CAPTIONMAX : UT_DFCS_CAPTIONCLOSE, lc.c);
 }
 
-// a classic window frame + caption in l,t,r,b; returns the client's top
-int gwindow(HDC dc, int l, int t, int r, int b, const std::string& title, bool active, const shell::SessionTheme& st, bool small = false)
+// a classic window frame + caption in l,t,r,b, laid out as user32 does (luxwm's classic frame: cnBorders = 3 + borderwidth,
+// caption captionheight + 1, buttons (captionwidth - 2) x (captionheight - 4), close 2 px from the right, CXEDGE, max and min
+// touching); returns the client's top
+int gwindow(const Px& P, int l, int t, int r, int b, const std::string& title, bool active, const shell::SessionTheme& st, bool small = false)
 {
+    LookColors lc = look_colors(st);
     int bw = (std::max)(1, look_int(st, "borderwidth"));
-    gfill(dc, l, t, r, b, look_color(st, active ? "activeborder" : "inactiveborder"));
-    gedge(dc, l, t, r, b, st, true);
-    int in = 2 + bw;   // edge + the border's own width (Windows adds one pixel of btnface: kept in the border colour)
+    ut_rect fr = { l, t, r, b };
+    ut_draw_edge(P.px, P.w, P.h, P.stride(), &fr, UT_EDGE_RAISED, UT_BF_RECT | UT_BF_ADJUST, lc.c);
+    auto ring = [&](uint32_t c, int k) {   // DrawFrame: k px in colour c, the rectangle shrinks
+        uint32_t v = 0xff000000u | c;
+        for (int y = fr.top; y < fr.bottom; y++) for (int x = fr.left; x < fr.right; x++)
+            if (y < fr.top + k || y >= fr.bottom - k || x < fr.left + k || x >= fr.right - k) if (x >= 0 && y >= 0 && x < P.w && y < P.h) P.px[(size_t)y * P.w + x] = v;
+        fr.left += k; fr.top += k; fr.right -= k; fr.bottom -= k;
+    };
+    ring(lc.c[active ? 10 : 11], bw);   // activeborder / inactiveborder
+    ring(lc.c[15], 1);                  // btnface
     int ch = (std::max)(8, look_int(st, small ? "smcaptionheight" : "captionheight"));
     int cw = (std::max)(8, look_int(st, small ? "smcaptionwidth" : "captionwidth"));
-    int ct = t + in, cb = ct + ch;
-    COLORREF c1 = look_color(st, active ? "activecaption" : "inactivecaption"), c2 = look_color(st, active ? "gradientactivecaption" : "gradientinactivecaption");
-    int cl = l + in, cr = r - in;
-    for (int x = cl; x < cr; x++) {
-        int k = cr - cl > 1 ? (x - cl) * 255 / (cr - cl - 1) : 0;
-        COLORREF c = RGB((GetRValue(c1) * (255 - k) + GetRValue(c2) * k) / 255, (GetGValue(c1) * (255 - k) + GetGValue(c2) * k) / 255,
-                         (GetBValue(c1) * (255 - k) + GetBValue(c2) * k) / 255);
-        gline(dc, x, ct, x, cb, c);
-    }
+    int ct = fr.top, cb = ct + ch, cl = fr.left, cr = fr.right;
+    bool gradient = lc.c[active ? 2 : 3] != lc.c[active ? 27 : 28];
+    // the bar's background under the buttons (the gradient's end colour), the separator line
+    { uint32_t v = 0xff000000u | lc.c[gradient ? (active ? 27 : 28) : (active ? 2 : 3)];
+      for (int y = ct; y < cb && y < P.h; y++) for (int x = cl; x < cr && x < P.w; x++) P.px[(size_t)y * P.w + x] = v;
+      if (cb < P.h) for (int x = cl; x < cr && x < P.w; x++) P.px[(size_t)cb * P.w + x] = 0xff000000u | lc.c[15]; }
     int bh = ch - 4, bwid = cw - 2, by = ct + 2;
     int x = cr - 2 - bwid;
-    gcapbutton(dc, x, by, x + bwid, by + bh, 2, st);
+    gcapbutton(P, x, by, x + bwid, by + bh, 2, lc);
     if (!small) {
-        x -= 2 + bwid; gcapbutton(dc, x, by, x + bwid, by + bh, 1, st);
-        x -= bwid; gcapbutton(dc, x, by, x + bwid, by + bh, 0, st);
+        x -= 2 + bwid; gcapbutton(P, x, by, x + bwid, by + bh, 1, lc);
+        x -= bwid; gcapbutton(P, x, by, x + bwid, by + bh, 0, lc);
     }
-    gtext(dc, title, cl + 3, ct, x - 2, cb, look_color(st, active ? "captiontext" : "inactivecaptiontext"),
-          parse_font(look_metric(st, small ? "smcaptionfont" : "captionfont")), DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+    FontSpec fs = parse_font(look_metric(st, small ? "smcaptionfont" : "captionfont"));
+    ut_font f; memset(&f, 0, sizeof f);
+    snprintf(f.face, sizeof f.face, "%s", fs.face.c_str()); f.height = fs.height; f.weight = fs.bold ? 700 : 400; f.italic = fs.italic;
+    ut_rect cap = { cl, ct, x - 2, cb };
+    ut_draw_caption(P.px, P.w, P.h, P.stride(), &cap, (active ? UT_DC_ACTIVE : 0) | (gradient ? UT_DC_GRADIENT : 0) | UT_DC_TEXT,
+                    title.c_str(), nullptr, 0, 0, &f, lc.c);
     return cb + 1;
 }
 
@@ -694,18 +714,19 @@ int gwindow(HDC dc, int l, int t, int r, int b, const std::string& title, bool a
 // message box; over the desktop colour (background = true) or the pixels already there
 void classic_sample(const shell::SessionTheme& st, Pixels& p, bool background)
 {
-    with_dc(p, [&](HDC dc) {
+    with_dc(p, [&](HDC dc, uint32_t* bits) {
+        Px P{ bits, p.w, p.h }; LookColors lc = look_colors(st);
         int PW = p.w, PH = p.h;
         if (background) gfill(dc, 0, 0, PW, PH, look_color(st, "background"));
-        int bw = 2 + (std::max)(1, look_int(st, "borderwidth"));
+        int bw = 3 + (std::max)(1, look_int(st, "borderwidth"));   // cnBorders: the edge, the sizing border, the btnface ring
         // the inactive window
         int il = PW / 24, it = PH / 24, ir = PW - PW / 6, ib = PH * 3 / 5;
-        int ict = gwindow(dc, il, it, ir, ib, "Inactive Window", false, st);
+        int ict = gwindow(P, il, it, ir, ib, "Inactive Window", false, st);
         gfill(dc, il + bw, ict, ir - bw, ib - bw, look_color(st, "window"));
         // the active window
         int ch = look_int(st, "captionheight");
         int al = il + PW / 20, at = it + ch + 8, ar = PW - PW / 24, ab = PH - PH / 20;
-        int act = gwindow(dc, al, at, ar, ab, "Active Window", true, st);
+        int act = gwindow(P, al, at, ar, ab, "Active Window", true, st);
         int mh = (std::max)(8, look_int(st, "menuheight"));
         int ml = al + bw, mr = ar - bw;
         gfill(dc, ml, act, mr, act + mh, look_color(st, "menu"));
@@ -728,7 +749,7 @@ void classic_sample(const shell::SessionTheme& st, Pixels& p, bool background)
         // the client: window colour, sunken, window text, a scroll bar
         int cl = ml, ct = act + mh + 1, cr = mr, cb = ab - bw;
         gfill(dc, cl, ct, cr, cb, look_color(st, "btnface"));
-        gedge(dc, cl, ct, cr, cb, st, false);
+        gedge(P, cl, ct, cr, cb, lc, false);
         gfill(dc, cl + 2, ct + 2, cr - 2, cb - 2, look_color(st, "window"));
         int sw = (std::max)(8, look_int(st, "scrollwidth"));
         int sx = cr - 2 - sw;
@@ -736,7 +757,7 @@ void classic_sample(const shell::SessionTheme& st, Pixels& p, bool background)
         for (int k = 0; k < 2; k++) {
             int y0 = k ? cb - 2 - sw : ct + 2;
             gfill(dc, sx, y0, sx + sw, y0 + sw, look_color(st, "btnface"));
-            gedge(dc, sx, y0, sx + sw, y0 + sw, st, true);
+            gedge(P, sx, y0, sx + sw, y0 + sw, lc, true);
             int mx = sx + sw / 2, my = y0 + sw / 2, s = sw / 5;
             for (int d = 0; d <= s; d++) gline(dc, mx - d, k ? my - s / 2 + (s - d) : my - s / 2 + d, mx + d + 1, k ? my - s / 2 + (s - d) : my - s / 2 + d, look_color(st, "btntext"));
         }
@@ -747,7 +768,7 @@ void classic_sample(const shell::SessionTheme& st, Pixels& p, bool background)
         int mbw = PW * 2 / 5, mbh = (std::max)(PH / 3, ch + 2 * bw + 1 + 20 + obh + 8);
         int mbl = PW / 2 - mbw / 3, mbt = (std::max)(ct + 24, cb - mbh - 6), mbr = mbl + mbw, mbb = mbt + mbh;
         if (mbb > PH - 2) { mbb = PH - 2; mbt = mbb - mbh; }
-        int mct = gwindow(dc, mbl, mbt, mbr, mbb, "Message Box", true, st);
+        int mct = gwindow(P, mbl, mbt, mbr, mbb, "Message Box", true, st);
         gfill(dc, mbl + bw, mct, mbr - bw, mbb - bw, look_color(st, "btnface"));
         gtext(dc, "Message Text", mbl + bw + 6, mct + 2, mbr - bw - 4, mct + 18, look_color(st, "windowtext"), msg, DT_SINGLELINE | DT_VCENTER);
         int obw = (std::min)(50, mbw / 3), obx = (mbl + mbr - obw) / 2, oby = mbb - bw - obh - 4;
@@ -757,7 +778,7 @@ void classic_sample(const shell::SessionTheme& st, Pixels& p, bool background)
             gline(dc, obx - 1, oby - 1, obx - 1, oby + obh, look_color(st, "windowframe"));
             gline(dc, obx + obw, oby - 1, obx + obw, oby + obh, look_color(st, "windowframe"));
             gfill(dc, obx, oby, obx + obw, oby + obh, look_color(st, "btnface"));
-            gedge(dc, obx, oby, obx + obw, oby + obh, st, true);
+            gedge(P, obx, oby, obx + obw, oby + obh, lc, true);
             gtext(dc, "OK", obx, oby, obx + obw, oby + obh, look_color(st, "btntext"), msg, DT_SINGLELINE | DT_VCENTER | DT_CENTER);
         }
     });

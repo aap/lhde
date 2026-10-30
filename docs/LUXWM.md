@@ -606,7 +606,7 @@ missing as `<theme>.classic/` (lib source only, the usual 8 renders x png+txt): 
 (32 new files). Regression after this round (lib source): 201 identical (169 + the 32 new) and the 11 known stale aero5112 files; frame.c
 only gained the registry/preset `style` value and the `style` fields, every existing render is byte-identical; `--compare-sources`: 0 differ.
 
-## Windows Classic frames (`style = classic`, 2026-10-28)
+## Windows Classic frames (`style = classic`)
 
 docs/THEME-FORMAT.md sections 2a and 14: with `VisualStyle.style = classic` (Display Properties' "Windows Classic style", or
 `lhde-theme layer-set VisualStyle.style classic`) there is no visual style; the look is Windows' classic one from the record's
@@ -623,29 +623,38 @@ window menu's icon cell, `_LHWM_FRAME_METRICS` (text colours `captiontext` / `in
 
 `classic_paint` is user32's non-client painting (Windows 2000 / XP `xxxDrawCaptionBar`, `DrawEdge`, `DrawFrame`,
 `DrawFrameControl(DFC_CAPTION)`, `xxxDrawCaptionTemp`, GDI's `GradientFill`), for a sizable overlapped window with
-`WS_EX_WINDOWEDGE`:
-- frame: `DrawEdge(EDGE_RAISED)` (outer `3dlight` / `3ddkshadow`, inner `btnhighlight` / `btnshadow`; right and bottom are drawn
-  first, so they own the corners), then the sizing border, `borderwidth` px of `activeborder` / `inactiveborder`, then 1 px
-  `btnface`: cnBorders = 3 + `borderwidth` on every side (the msstyles formula). Maximised: the borders lie off-screen.
+`WS_EX_WINDOWEDGE`. It does not draw the pieces itself: it paints into an ARGB image of the frame's size with libwuxtheme's classic
+helpers (`<wuxtheme/ut.h>`: `ut_draw_edge`, `ut_draw_frame_control`, `ut_draw_caption`, which run Wine's user32 `DrawEdge` /
+`DrawFrameControl` and wux's GDI with the frame's colour table installed as the system colours) and composites it; Display
+Properties' classic sample (flxp/settings) draws its windows with the same helpers and the same geometry, so there is one
+implementation of the classic art. luxwm keeps the geometry (cnBorders, the button rectangles, maximised), the hit test, the shape
+and the caption icon (cairo):
+- frame: `ut_draw_edge(EDGE_RAISED, BF_RECT | BF_ADJUST)` (outer `3dlight` / `3ddkshadow`, inner `btnhighlight` / `btnshadow`;
+  right and bottom are drawn first, so they own the corners), then the sizing border, `borderwidth` px of `activeborder` /
+  `inactiveborder`, then 1 px `btnface` (DrawFrame: plain fills): cnBorders = 3 + `borderwidth` on every side (the msstyles
+  formula). Maximised: the borders lie off-screen.
 - caption: `captionheight` rows (SM_CYSIZE), then a 1 px `btnface` separator (SM_CYCAPTION = `captionheight` + 1). Buttons
   (`captionwidth` - 2) x (`captionheight` - 4), 2 px below the caption top; close 2 px from the right, 2 px gap, max and min
-  touching (min/max/close, restore while maximised); `DrawPushButton` with `BF_SOFT` (raised: `btnhighlight`, `3dlight` /
-  `3ddkshadow`, `btnshadow`; pushed: `EDGE_SUNKEN`, `3ddkshadow`, `btnshadow` / `btnhighlight`, `3dlight`, the glyph 1 px down
-  and right), face `btnface`, glyph `btntext`. Classic caption buttons have no hot state (`hover` is ignored).
-- glyphs: Marlett's `r` `0` `1` `2` at cell height e = min(w, h) of the button's inside (`lfHeight` = e, the cell centred), drawn as
-  bitmaps (no font needed; frame.c `cl_glyph`): bit-exact with 4051/XP at e = 10 (the 16 x 14 button: X 8 x 7 at (1,1), box 9 x 9
-  with a 2-row top, bar 6 x 2, restore two 6 x 6 boxes 2 right / 3 down); larger sizes follow Marlett's proportions (strokes
-  max(2, (e + 4) / 8)).
-- caption fill (`DrawCaptionTemp`): the whole bar first in `gradientactivecaption` (the brush around the buttons), then the icon
-  slot (a `captionheight` square, solid `activecaption`; the SM_CXSMICON = (`captionwidth` - 2) & ~1 icon 1 px right of centre),
-  then the text area (icon slot .. min button - 2) as `GradientFill(GRADIENT_FILL_RECT_H)` from `activecaption` to
-  `gradientactivecaption` (GDI's 8.24 fixed point, truncated; solid when the two colours are equal); inactive:
-  `inactivecaption` / `gradientinactivecaption` / `inactivecaptiontext`.
-- text: `captionfont` (`Tahoma, -11, bold` = "Tahoma Bold 11px"; points: -MulDiv(pt, 96, 72)), 2 px into the text area, the
-  baseline tmAscent below (top + bottom - tmHeight) / 2, `DT_END_ELLIPSIS` with "...". It is drawn with cairo's FreeType backend
-  and hinted advances (`cl_text`), as GDI places TrueType glyphs: pango's HarfBuzz advances put "Computer"'s `m` a pixel short.
-  A title with characters the matched face lacks goes through pango (font fallback). `Fonts.smoothing = cleartype`: subpixel
-  antialiasing, otherwise none (standard smoothing leaves Tahoma 8 bi-level).
+  touching (min/max/close, restore while maximised); `ut_draw_frame_control(DFC_CAPTION)`: `DrawPushButton` with `BF_SOFT`
+  (raised: `btnhighlight`, `3dlight` / `3ddkshadow`, `btnshadow`; pushed: `EDGE_SUNKEN`, `3ddkshadow`, `btnshadow` /
+  `btnhighlight`, `3dlight`), face `btnface`, glyph `btntext`. Classic caption buttons have no hot state (`hover` is ignored).
+- glyphs: Marlett's `r` `0` `1` `2` (wux's GDI maps a symbol font's characters to U+F000 + the byte, as Windows does) at a cell of
+  e = min(w, h) of the button's inside (within the 2 px push-button edge), centred there, `lfHeight` -e (Marlett's cell is its
+  em); pushed: 1 px down and right (uitools.c.patch: Wine sized the glyph from the whole button, 2 px too big). At e = 10 (the
+  16 x 14 button) that is the X 8 x 7, the box 9 x 9 with a 2-row top, the bar 6 x 2 of 4051/XP. The face is the first imported
+  `fonts/<build>/marlett.ttf` (`cl_marlett`, registered as a single file with `ut_add_font_dir`, so a theme whose fonts lack it,
+  classic's `xp`, still has it), else fontconfig's.
+- caption fill: the whole bar first in `gradientactivecaption` (the brush around the buttons), then `ut_draw_caption` over the
+  icon slot and text area: the slot (a `captionheight` square, solid `activecaption`; luxwm draws the SM_CXSMICON =
+  (`captionwidth` - 2) & ~1 icon in it, 1 px right of centre), then the text area (icon slot .. min button - 2) as
+  `GradientFill(GRADIENT_FILL_RECT_H)` from `activecaption` to `gradientactivecaption` (GDI's 8.24 fixed point, truncated, now
+  wux's own GradientFill; solid when the two colours are equal); inactive: `inactivecaption` / `gradientinactivecaption` /
+  `inactivecaptiontext`.
+- text: `captionfont` (`Tahoma, -11, bold`; points: -MulDiv(pt, 96, 72)) as a LOGFONT (`cl_face`, `cl_px`, `cl_bold`,
+  `cl_italic`), drawn by `DrawText` (`DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS`) 2 px into the text area: GDI's hinted
+  TrueType advances and vertical centring, "..." when it does not fit. `Fonts.smoothing` (`cl_smooth`, `ut_set_font_smoothing`):
+  `off` bi-level, `standard` grey where the font's gasp table allows it (Tahoma stays bi-level at 11 px and is smoothed at 19 and
+  24 px, as XP's "Standard" does), `cleartype` drawn as standard. wux's font lookup has no per-glyph fallback.
 - the window menu (menu.c) takes `menu`, `menutext`, `graytext`, `highlight`, `highlighttext`, `btnface`, `btnshadow`,
   `btnhighlight`, `3ddkshadow`, `3dlight` and `menufont`.
 
@@ -653,19 +662,15 @@ Measured against Longhorn 4051's Windows Classic (`~/fun/longhorn/screenshots/lh
 109,33, 800 wide, Windows Standard): edge rows 33/34, band 35/36, caption 37-54 (18), separator 55; buttons 16 x 14 at y 39, close
 x 887-902, max 869-884, min 853-868; icon slot 113-130, gradient 131-850 (`activecaption` 10 36 106 to 166 202 240), text at
 x 133, baseline 50. `frametest '|classic|' out.png 800 300 Computer 1 0 none ICON` against the screenshot's rows 33-55 (all 800
-columns, the icon slot left out, the system Tahoma Bold): 0 of 18400 pixels differ. The default icon (no client icon): the first of
+columns, the icon slot left out, `FRAMETEST_FONTS` = the imported 4074 fonts): 0 of 18400 pixels differ, the Marlett glyphs
+included. The default icon (no client icon): the first of
 `packs/xp/shell32/16/3.png`, `packs/4074/shell32/16/3.png`, `packs/2k/shell32/16/3.png` that exists (and its 32 px size).
 
 `tests/regress.sh` renders `classic/` (the spec `|classic|`: the built-in Windows Standard, no data needed), `classic.xl/` (Extra
 Large Fonts metrics: 24/24, Tahoma -19 bold) and `classic.hc/` (High Contrast Black's colours, borderwidth 6, 31/31, Tahoma -24 bold),
-the usual 8 renders x png+txt each: 48 new baseline entries, the 212 existing ones identical. Lab (`:3`, no compositor, slate4074 with
-the layer `VisualStyle.style = classic`): xterm, flxp and flxp-settings with the schemes Windows Standard (none), Brick, Rainy Day,
-High Contrast Black; active / inactive, maximised, the window menu, a pushed restore button. flxp-settings' sample windows (Wine's
-user32 in wux) and the luxwm frame around it agree in edge, band, caption height and colours (the sample is a fixed-frame window:
-3 px border).
-
-When wuxtheme exports user32's helpers (docs/history/THEME-FORMAT-status.md section 15: `ut_draw_edge`, `ut_draw_frame_control`, `ut_draw_caption`),
-`classic_paint` can call them instead of its own copies; the geometry and the text placement stay luxwm's.
+the usual 8 renders x png+txt each. Display Properties' classic sample (the Appearance tab with "Windows Classic style") draws its
+inactive, active and message-box windows with the same helpers and the same construction (edge, `borderwidth` ring, `btnface` ring,
+caption, buttons); only its window sizes are its own.
 
 ## Maximised mode, the desktop layer, running without a compositor (M5a, `SHELL-DESIGN.md`)
 

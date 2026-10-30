@@ -47,6 +47,12 @@ static Brush* brushes[NUM_SYS_COLORS];
 static Pen* pens[NUM_SYS_COLORS];
 static Brush* brush_55aa;
 static bool inited;
+// A caller-given table in place of the process's own (wuxtheme's classic drawing helpers: luxwm's frames in a scheme's
+// colours, Display Properties' preview of another scheme): GetSysColor, GetSysColorBrush and SYSCOLOR_GetPen answer from it
+// while it is set. The brushes and pens for it are made once and recoloured per table.
+static const COLORREF* over_tab;
+static Brush* over_brushes[NUM_SYS_COLORS];
+static Pen* over_pens[NUM_SYS_COLORS];
 
 static void fill_55aa()
 {
@@ -98,6 +104,27 @@ void init_syscolor()
     refresh_objects();
 }
 
+static void set_override(const COLORREF* tab)
+{
+    init_syscolor();
+    over_tab = tab;
+    if (!tab) return;
+    if (!over_brushes[0]) {
+        for (int i = 0; i < NUM_SYS_COLORS; i++) {
+            Brush* b = new Brush();
+            b->type = T_BRUSH; b->stock = true; b->lb.lbStyle = BS_SOLID; b->lb.lbHatch = 0; b->pattern = nullptr;
+            over_brushes[i] = b;
+            Pen* p = new Pen();
+            p->type = T_PEN; p->stock = true; p->lp.lopnStyle = PS_SOLID; p->lp.lopnWidth.x = 1; p->lp.lopnWidth.y = 0;
+            over_pens[i] = p;
+        }
+    }
+    for (int i = 0; i < NUM_SYS_COLORS; i++) {
+        over_brushes[i]->lb.lbColor = tab[i] & 0x00ffffff;
+        over_pens[i]->lp.lopnColor = tab[i] & 0x00ffffff;
+    }
+}
+
 void reset_syscolors()
 {
     init_syscolor();
@@ -130,15 +157,18 @@ DWORD WINAPI GetSysColor(INT index)
 {
     init_syscolor();
     if (index < 0 || index >= NUM_SYS_COLORS) return 0;
-    return colors[index];
+    return over_tab ? over_tab[index] & 0x00ffffff : colors[index];
 }
 
 HBRUSH WINAPI GetSysColorBrush(INT index)
 {
     init_syscolor();
     if (index < 0 || index >= NUM_SYS_COLORS) return nullptr;
-    return (HBRUSH)brushes[index];
+    return (HBRUSH)(over_tab ? over_brushes[index] : brushes[index]);
 }
+
+// the override table (NUM_SYS_COLORS COLORREFs, COLOR_* order), NULL = the process's own again
+void SYSCOLOR_SetOverride(const COLORREF* tab) { set_override(tab); }
 
 extern "C" void COMCTL32_RefreshSysColors(void) __attribute__((weak));
 
@@ -163,7 +193,7 @@ HPEN SYSCOLOR_GetPen(INT index)
 {
     init_syscolor();
     if (index < 0 || index >= NUM_SYS_COLORS) return nullptr;
-    return (HPEN)pens[index];
+    return (HPEN)(over_tab ? over_pens[index] : pens[index]);
 }
 
 HBRUSH SYSCOLOR_Get55AABrush(void)

@@ -33,6 +33,8 @@ struct ut_theme {
     std::string color, size;
 };
 
+extern "C" void SYSCOLOR_SetOverride(const COLORREF* tab);   // wux/w32/syscolor.cpp: a caller-given system colour table
+
 namespace {
 
 std::recursive_mutex g_lock;
@@ -753,6 +755,163 @@ int ut_draw_text_mask(ut_theme* t, const char* cls, int part, int state, const u
         }
     }
     return 1;
+}
+
+} // extern "C"
+
+// ---- Windows Classic drawing with a caller-given system colour table (ut.h) ----------------------------------------------
+namespace {
+
+// the table installed in the shim for the duration of one call (COLORREF is 0x00BBGGRR; the API speaks 0xRRGGBB)
+struct ColorOverride {
+    COLORREF tab[UT_SYSCOLORS];
+    bool on;
+    explicit ColorOverride(const uint32_t* c) : on(c != nullptr)
+    {
+        if (!on) return;
+        for (int i = 0; i < UT_SYSCOLORS; i++) tab[i] = RGB(c[i] >> 16 & 255, c[i] >> 8 & 255, c[i] & 255);
+        SYSCOLOR_SetOverride(tab);
+    }
+    ~ColorOverride() { if (on) SYSCOLOR_SetOverride(nullptr); }
+};
+
+bool buffer_ok(const uint32_t* pixels, int width, int height, int stride)
+{
+    return pixels && width > 0 && height > 0 && stride >= width * 4 && !(stride & 3);
+}
+
+// every pixel of rect (clipped to the buffer) opaque: GDI's fills leave the alpha byte as the colour's (0)
+void opaque_rect(uint32_t* pixels, int width, int height, int stride, const RECT& r)
+{
+    int l = r.left < 0 ? 0 : r.left, t = r.top < 0 ? 0 : r.top, rr = r.right > width ? width : r.right, b = r.bottom > height ? height : r.bottom;
+    for (int y = t; y < b; y++) {
+        uint32_t* row = pixels + (size_t)y * (stride / 4);
+        for (int x = l; x < rr; x++) row[x] |= 0xff000000u;
+    }
+}
+
+void fill_rect(HDC dc, const RECT& r, COLORREF c)
+{
+    HBRUSH b = CreateSolidBrush(c);
+    FillRect(dc, &r, b);
+    DeleteObject(b);
+}
+
+void gradient_h(HDC dc, const RECT& r, COLORREF c0, COLORREF c1)
+{
+    TRIVERTEX v[2] = { { r.left, r.top, (COLOR16)(GetRValue(c0) << 8), (COLOR16)(GetGValue(c0) << 8), (COLOR16)(GetBValue(c0) << 8), 0 },
+                       { r.right, r.bottom, (COLOR16)(GetRValue(c1) << 8), (COLOR16)(GetGValue(c1) << 8), (COLOR16)(GetBValue(c1) << 8), 0 } };
+    GRADIENT_RECT g = { 0, 1 };
+    GradientFill(dc, v, 2, &g, 1, GRADIENT_FILL_RECT_H);
+}
+
+} // namespace
+
+extern "C" {
+
+int ut_draw_edge(uint32_t* pixels, int width, int height, int stride, ut_rect* rect, unsigned edge, unsigned flags, const uint32_t* colors)
+{
+    Lock l;
+    if (!buffer_ok(pixels, width, height, stride) || !rect) return 0;
+    ColorOverride co(colors);
+    TargetDC dc(pixels, width, height, stride);
+    RECT r = rect_of(rect), whole = r;
+    BOOL ok = DrawEdge(dc.hdc(), &r, edge, flags);
+    // the bands DrawEdge painted are opaque: the outer and inner lines (BF_MIDDLE: the inside too)
+    if (flags & UT_BF_MIDDLE) opaque_rect(pixels, width, height, stride, whole);
+    else {
+        int w = ((edge & (UT_BDR_RAISEDOUTER | UT_BDR_SUNKENOUTER)) ? 1 : 0) + ((edge & (UT_BDR_RAISEDINNER | UT_BDR_SUNKENINNER)) ? 1 : 0);
+        if (flags & UT_BF_TOP) opaque_rect(pixels, width, height, stride, RECT{ whole.left, whole.top, whole.right, whole.top + w });
+        if (flags & UT_BF_BOTTOM) opaque_rect(pixels, width, height, stride, RECT{ whole.left, whole.bottom - w, whole.right, whole.bottom });
+        if (flags & UT_BF_LEFT) opaque_rect(pixels, width, height, stride, RECT{ whole.left, whole.top, whole.left + w, whole.bottom });
+        if (flags & UT_BF_RIGHT) opaque_rect(pixels, width, height, stride, RECT{ whole.right - w, whole.top, whole.right, whole.bottom });
+    }
+    if (flags & UT_BF_ADJUST) { rect->left = r.left; rect->top = r.top; rect->right = r.right; rect->bottom = r.bottom; }
+    return ok ? 1 : 0;
+}
+
+int ut_draw_frame_control(uint32_t* pixels, int width, int height, int stride, const ut_rect* rect, unsigned type, unsigned state, const uint32_t* colors)
+{
+    Lock l;
+    if (!buffer_ok(pixels, width, height, stride) || !rect) return 0;
+    ColorOverride co(colors);
+    TargetDC dc(pixels, width, height, stride);
+    RECT r = rect_of(rect);
+    BOOL ok = DrawFrameControl(dc.hdc(), &r, type, state);
+    if (ok && (type == UT_DFC_CAPTION || type == UT_DFC_BUTTON || type == UT_DFC_SCROLL)) opaque_rect(pixels, width, height, stride, rect_of(rect));
+    return ok ? 1 : 0;
+}
+
+int ut_gradient_fill_h(uint32_t* pixels, int width, int height, int stride, const ut_rect* rect, uint32_t c0, uint32_t c1)
+{
+    Lock l;
+    if (!buffer_ok(pixels, width, height, stride) || !rect) return 0;
+    TargetDC dc(pixels, width, height, stride);
+    RECT r = rect_of(rect);
+    if (r.right <= r.left || r.bottom <= r.top) return 1;
+    gradient_h(dc.hdc(), r, RGB(c0 >> 16 & 255, c0 >> 8 & 255, c0 & 255), RGB(c1 >> 16 & 255, c1 >> 8 & 255, c1 & 255));
+    opaque_rect(pixels, width, height, stride, r);
+    return 1;
+}
+
+int ut_draw_caption(uint32_t* pixels, int width, int height, int stride, const ut_rect* rect, unsigned flags, const char* title,
+                    const uint32_t* icon, int icon_w, int icon_h, const ut_font* font, const uint32_t* colors)
+{
+    Lock l;
+    if (!buffer_ok(pixels, width, height, stride) || !rect) return 0;
+    ColorOverride co(colors);
+    TargetDC dc(pixels, width, height, stride);
+    RECT r = rect_of(rect);
+    if (r.right <= r.left || r.bottom <= r.top) return 1;
+    bool active = (flags & UT_DC_ACTIVE) != 0;
+    COLORREF cap = GetSysColor(active ? COLOR_ACTIVECAPTION : COLOR_INACTIVECAPTION);
+    COLORREF grad = GetSysColor(active ? COLOR_GRADIENTACTIVECAPTION : COLOR_GRADIENTINACTIVECAPTION);
+    int L = r.left, ch = r.bottom - r.top;
+    if (flags & UT_DC_ICON) {   // xxxDrawCaptionTemp: the icon slot is the caption's height wide, filled with the solid colour
+        int slot = ch < r.right - L ? ch : r.right - L;
+        RECT s = { L, r.top, L + slot, r.bottom };
+        fill_rect(dc.hdc(), s, cap);
+        opaque_rect(pixels, width, height, stride, s);
+        if (icon && icon_w > 0 && icon_h > 0) {   // premultiplied over, 1:1, one pixel right of the slot's centre (SM_CXSMICON's place)
+            int ix = L + 1 + (slot - icon_w) / 2, iy = r.top + (slot - icon_h) / 2;
+            for (int y = 0; y < icon_h; y++) {
+                int dy = iy + y; if (dy < s.top || dy >= s.bottom || dy < 0 || dy >= height) continue;
+                uint32_t* row = pixels + (size_t)dy * (stride / 4);
+                for (int x = 0; x < icon_w; x++) {
+                    int dx = ix + x; if (dx < s.left || dx >= s.right || dx < 0 || dx >= width) continue;
+                    uint32_t sp = icon[(size_t)y * icon_w + x], a = sp >> 24; if (!a) continue;
+                    if (a == 255) { row[dx] = sp; continue; }
+                    uint32_t d = row[dx], ia = 255 - a, o = 0;
+                    for (int sh = 0; sh < 32; sh += 8) o |= ((((sp >> sh) & 255) + (((d >> sh) & 255) * ia + 127) / 255) & 255) << sh;
+                    row[dx] = o | 0xff000000u;
+                }
+            }
+        }
+        L += slot;
+    }
+    if (L < r.right) {
+        RECT t = { L, r.top, r.right, r.bottom };
+        if ((flags & UT_DC_GRADIENT) && cap != grad) gradient_h(dc.hdc(), t, cap, grad); else fill_rect(dc.hdc(), t, cap);
+        opaque_rect(pixels, width, height, stride, t);
+    }
+    if ((flags & UT_DC_TEXT) && title && *title && font && L + 2 < r.right) {
+        HFONT f = font_of(font);
+        HGDIOBJ old = SelectObject(dc.hdc(), f);
+        SetBkMode(dc.hdc(), TRANSPARENT);
+        SetTextColor(dc.hdc(), GetSysColor(active ? COLOR_CAPTIONTEXT : COLOR_INACTIVECAPTIONTEXT));
+        RECT tr = { L + 2, r.top, r.right, r.bottom };   // ExtTextOut at left + CXEDGE; DrawText's DT_END_ELLIPSIS when too long
+        std::u16string w = u16(title);
+        DrawTextW(dc.hdc(), W(w), -1, &tr, DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | DT_NOPREFIX | DT_LEFT);
+        SelectObject(dc.hdc(), old);
+        DeleteObject(f);
+    }
+    return 1;
+}
+
+void ut_set_font_smoothing(int mode)
+{
+    Lock l;
+    gdi::set_font_smoothing(mode < 0 ? 0 : mode > 2 ? 2 : mode);
 }
 
 } // extern "C"

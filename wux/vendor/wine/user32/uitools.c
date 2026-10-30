@@ -911,12 +911,15 @@ static BOOL UITOOLS95_DrawFrameButton(HDC hdc, LPRECT rc, UINT uState)
 
 static BOOL UITOOLS95_DrawFrameCaption(HDC dc, LPRECT r, UINT uFlags)
 {
-    RECT myr;
-    int SmallDiam = UITOOLS_MakeSquareRect(r, &myr)-2;
+    /* lhde: Windows sizes the Marlett glyph from the button's inside (within the 2 px push-button edge): a cell of
+       min(width, height) square, centred there (Wine took the whole button's square less 2, two pixels too big for XP's
+       16 x 14 caption button) */
+    int iw = r->right - r->left - 4, ih = r->bottom - r->top - 4;
+    int SmallDiam = iw < ih ? iw : ih;
     HFONT hfsave, hf;
     int colorIdx = uFlags & DFCS_INACTIVE ? COLOR_BTNSHADOW : COLOR_BTNTEXT;
-    int xc = (myr.left+myr.right)/2;
-    int yc = (myr.top+myr.bottom)/2;
+    int xc = r->left + 2 + (iw - SmallDiam)/2 + SmallDiam/2;
+    int yc = r->top + 2 + (ih - SmallDiam)/2 + SmallDiam/2;
     WCHAR str[] = {0, 0};
     UINT alignsave;
     int bksave;
@@ -946,6 +949,8 @@ static BOOL UITOOLS95_DrawFrameCaption(HDC dc, LPRECT r, UINT uFlags)
     hfsave = SelectObject(dc, hf);
     GetTextExtentPoint32W(dc, str, 1, &size);
 
+    /* lhde: a pushed caption button draws its glyph one pixel down and right, as Windows does */
+    if(uFlags & DFCS_PUSHED) { xc++; yc++; }
     if(uFlags & DFCS_INACTIVE)
     {
         SetTextColor(dc, GetSysColor(COLOR_BTNHIGHLIGHT));

@@ -886,12 +886,21 @@ BOOL WINAPI TransparentBlt(HDC hdst, INT xd, INT yd, INT wd, INT hd, HDC hsrc, I
     return GdiTransparentBlt(hdst, xd, yd, wd, hd, hsrc, xs, ys, ws, hs, key);
 }
 
+// GRADIENT_FILL_RECT as GDI computes it: per channel 8.24 fixed point, start + pos * (((end - start) << 24) / len), truncated
+// (a 4051 caption gradient matches this to the bit; luxwm's classic frames were measured against it)
+static inline uint32_t gradient_channel(int c0, int c1, int64_t pos, int64_t len)
+{
+    int64_t d = (((int64_t)c1 - c0) << 24) / len, v = ((int64_t)c0 << 24) + d * pos;
+    int c = (int)(v >> 24);
+    return (uint32_t)(c < 0 ? 0 : c > 255 ? 255 : c);
+}
 static inline uint32_t gradient_8888(const TRIVERTEX* v, int64_t pos, int64_t len)
 {
-    uint32_t r = (uint32_t)((v[0].Red * (len - pos) + v[1].Red * pos) / len / 256);
-    uint32_t g = (uint32_t)((v[0].Green * (len - pos) + v[1].Green * pos) / len / 256);
-    uint32_t b = (uint32_t)((v[0].Blue * (len - pos) + v[1].Blue * pos) / len / 256);
-    uint32_t a = (uint32_t)((v[0].Alpha * (len - pos) + v[1].Alpha * pos) / len / 256);
+    if (len <= 0) len = 1;
+    uint32_t r = gradient_channel(v[0].Red >> 8, v[1].Red >> 8, pos, len);
+    uint32_t g = gradient_channel(v[0].Green >> 8, v[1].Green >> 8, pos, len);
+    uint32_t b = gradient_channel(v[0].Blue >> 8, v[1].Blue >> 8, pos, len);
+    uint32_t a = gradient_channel(v[0].Alpha >> 8, v[1].Alpha >> 8, pos, len);
     return a << 24 | r << 16 | g << 8 | b;
 }
 

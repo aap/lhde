@@ -45,7 +45,7 @@ void text_out(DC* dc, Point pos, const Font* f, const char* utf8, int32_t len, C
 // text_out afterwards. Works on opaque and alpha-tracking surfaces.
 void glow_text(DC* dc, Point pos, const Font* f, const char* utf8, int32_t len, Color glow, int32_t radius = 3);
 
-void add_font_dir(const char* dir);       // searched before the system fonts
+void add_font_dir(const char* dir);       // searched before the system fonts (a directory or one font file)
 // "Smooth edges of screen fonts" (Display Properties > Appearance > Effects):
 // SPI_SETFONTSMOOTHING / SPI_SETFONTSMOOTHINGTYPE. Standard = grayscale where
 // the font's gasp table allows gray at the ppem (Tahoma 8 stays mono);

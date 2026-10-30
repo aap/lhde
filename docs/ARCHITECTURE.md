@@ -70,9 +70,12 @@ files are moved there once by liblhde's migration, which every program runs at s
   there is none to reproduce.
 - **Navigation header**: flxp's own `explorer/header.cpp` draws the faithful 4051 and 4074 headers; luxnav draws the concept-art
   "vision" header and is meant to take over 5048 and 5112. Which one a theme gets is `Explorer.navbar`.
-- **Frame painting**: luxwm paints glass and msstyles frames through wuxtheme and has its own Windows Classic painter; Wine's
-  user32 in wux draws the same classic non-client art for flxp's own windows. The plan is for wuxtheme to export the three
-  classic drawing helpers so there is one implementation.
+- **Frame painting**: the Windows Classic art has one implementation, Wine's user32 in wux (`DrawEdge`, `DrawFrameControl` with
+  Marlett, the caption fill and GDI text), which flxp's own windows use directly and wuxtheme exports with a caller's colour
+  table (`ut_draw_edge`, `ut_draw_frame_control`, `ut_draw_caption`) for luxwm's classic frames and Display Properties' classic
+  sample. What stays split: the classic frame's geometry (cnBorders, the button rectangles) is written twice, luxwm's `frame.c`
+  and the sample in `flxp/settings`, kept equal by hand; and luxwm's glass and msstyles frames are its own compositions of the
+  style's parts (drawn through wuxtheme, laid out by `frame.c` after uxtheme's nctheme rules), not uxtheme's non-client code.
 - **Theme resolution**: one implementation, liblhde; flxp's `shell/lhtheme.cpp` only maps the record onto flxp's older keys.
 
 ## Where to look first

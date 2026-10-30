@@ -2,6 +2,7 @@
 #include "frame.h"
 #include <lhde/data.h>
 #include "frame_ut.h"
+#include <wuxtheme/ut.h>   /* the classic (user32) drawing: ut_draw_edge, ut_draw_frame_control, ut_draw_caption */
 #include <cairo/cairo-xlib.h>
 #include <cairo/cairo-ft.h>
 #include <pango/pangocairo.h>
@@ -15,6 +16,7 @@
 #include <X11/Xutil.h>
 #include <fontconfig/fontconfig.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <unistd.h>
 #include <math.h>
 
@@ -346,26 +348,57 @@ static int cl_has(const char *s, const char *w) {   /* case-insensitive strstr (
     for (size_t n = strlen(w); *s; s++) if (!strncasecmp(s, w, n)) return 1;
     return 0;
 }
-static int cl_font(const char *v, char *out, size_t n) {
+static int cl_font_lf(const char *v, char *out, size_t n, char *face_out, size_t nf, int *px_out, int *bold_out, int *italic_out);
+static int cl_font(const char *v, char *out, size_t n) { return cl_font_lf(v, out, n, NULL, 0, NULL, NULL, NULL); }
+/* the same, with the LOGFONT fields (face, pixel height, bold, italic) when asked for */
+static int cl_font_lf(const char *v, char *out, size_t n, char *face_out, size_t nf, int *px_out, int *bold_out, int *italic_out) {
     char face[64] = ""; int size = 0; const char *c = strchr(v, ',');
     if (!c) return 0;
     snprintf(face, sizeof face, "%.*s", (int)(c - v) < 63 ? (int)(c - v) : 63, v);
     size_t l = strlen(face); while (l && face[l - 1] == ' ') face[--l] = 0;
     const char *f = face; while (*f == ' ') f++;
     if (!*f || sscanf(c + 1, "%d", &size) != 1 || !size) return 0;
-    int px = size < 0 ? -size : (size * 96 + 36) / 72;
-    snprintf(out, n, "%s%s%s %dpx", f, cl_has(c, "bold") ? " Bold" : "", cl_has(c, "italic") ? " Italic" : "", px);
+    int px = size < 0 ? -size : (size * 96 + 36) / 72, bold = cl_has(c, "bold"), italic = cl_has(c, "italic");
+    snprintf(out, n, "%s%s%s %dpx", f, bold ? " Bold" : "", italic ? " Italic" : "", px);
+    if (face_out) snprintf(face_out, nf, "%s", f);
+    if (px_out) *px_out = px;
+    if (bold_out) *bold_out = bold;
+    if (italic_out) *italic_out = italic;
     return 1;
 }
 
 /* spec: KEY=VALUE pairs separated by ';' (wm.c lh_theme_apply writes them from the record): the Colors.* names (activecaption =
    "R G B"), the Metrics.* names (borderwidth, captionwidth, captionheight, captionfont, menufont), smoothing (Fonts.smoothing:
    standard | cleartype | off), gradient (0: SPI_SETGRADIENTCAPTIONS off), icons (default icons, space separated) */
+/* the caption buttons' glyphs are Marlett's (DrawFrameControl): the first imported fonts/<build>/marlett.ttf, registered as a
+   single file with libwuxtheme's text, so a theme whose own fonts lack it (classic's are xp: Tahoma, Trebuchet) still has it and
+   no other face of that directory joins the theme's; without one, fontconfig's Marlett (Wine's) if the system has it */
+static void cl_marlett(void) {
+    static int done; if (done) return; done = 1;
+    const char *dirs[16]; int n = lhde_data_dirs(dirs, 16);
+    for (int i = 0; i < n; i++) {
+        char fd[4096]; snprintf(fd, sizeof fd, "%s/fonts", dirs[i]);
+        DIR *d = opendir(fd); if (!d) continue;
+        struct dirent *e; char found[4700] = "";
+        while (!*found && (e = readdir(d))) {
+            if (e->d_name[0] == '.') continue;
+            char sub[4400]; snprintf(sub, sizeof sub, "%s/%s", fd, e->d_name);
+            DIR *b = opendir(sub); if (!b) continue;
+            struct dirent *f;
+            while ((f = readdir(b))) if (!strcasecmp(f->d_name, "marlett.ttf")) { snprintf(found, sizeof found, "%s/%s", sub, f->d_name); break; }
+            closedir(b);
+        }
+        closedir(d);
+        if (*found) { fut_add_font_dir(found); return; }
+    }
+}
+
 static int classic_load(struct theme *t, const char *spec) {
     t->mode = THEME_MSSTYLES; t->classic = 1; t->cl_gradient = 1;
     memcpy(t->cl, cl_standard, sizeof t->cl);
     t->ms_border = 1; t->ms_cap_h = 18; t->cl_capw = 18;
     strcpy(t->ms_font, "Tahoma Bold 11px"); strcpy(t->cl_menufont, "Tahoma 11px");
+    strcpy(t->cl_face, "Tahoma"); t->cl_px = 11; t->cl_bold = 1; t->cl_italic = 0; t->cl_smooth = 1;
     t->ms_font_aa = CAIRO_ANTIALIAS_NONE; t->ms_hint = CAIRO_HINT_STYLE_FULL;
     char icons[600] = "packs/xp/shell32/16/3.png packs/4074/shell32/16/3.png packs/2k/shell32/16/3.png";
     char buf[2200]; snprintf(buf, sizeof buf, "%s", spec);
@@ -378,9 +411,12 @@ static int classic_load(struct theme *t, const char *spec) {
         if (!strcasecmp(k, "borderwidth")) { t->ms_border = atoi(v); if (t->ms_border < 1) t->ms_border = 1; if (t->ms_border > 50) t->ms_border = 50; }
         else if (!strcasecmp(k, "captionheight")) { t->ms_cap_h = atoi(v); if (t->ms_cap_h < 8) t->ms_cap_h = 8; if (t->ms_cap_h > 100) t->ms_cap_h = 100; }
         else if (!strcasecmp(k, "captionwidth")) { t->cl_capw = atoi(v); if (t->cl_capw < 8) t->cl_capw = 8; if (t->cl_capw > 100) t->cl_capw = 100; }
-        else if (!strcasecmp(k, "captionfont")) cl_font(v, t->ms_font, sizeof t->ms_font);
+        else if (!strcasecmp(k, "captionfont")) cl_font_lf(v, t->ms_font, sizeof t->ms_font, t->cl_face, sizeof t->cl_face, &t->cl_px, &t->cl_bold, &t->cl_italic);
         else if (!strcasecmp(k, "menufont")) cl_font(v, t->cl_menufont, sizeof t->cl_menufont);
-        else if (!strcasecmp(k, "smoothing")) t->ms_font_aa = !strcasecmp(v, "cleartype") ? CAIRO_ANTIALIAS_SUBPIXEL : CAIRO_ANTIALIAS_NONE;
+        else if (!strcasecmp(k, "smoothing")) {
+            t->ms_font_aa = !strcasecmp(v, "cleartype") ? CAIRO_ANTIALIAS_SUBPIXEL : CAIRO_ANTIALIAS_NONE;
+            t->cl_smooth = !strcasecmp(v, "cleartype") ? 2 : !strcasecmp(v, "off") || !strcasecmp(v, "none") ? 0 : 1;
+        }
         else if (!strcasecmp(k, "gradient")) t->cl_gradient = atoi(v) != 0;
         else if (!strcasecmp(k, "icons")) snprintf(icons, sizeof icons, "%s", v);
     }
@@ -405,98 +441,22 @@ static int classic_load(struct theme *t, const char *spec) {
                 if (cairo_surface_status(ic) == CAIRO_STATUS_SUCCESS) t->defic[t->ndefic++] = ic; else cairo_surface_destroy(ic); } }
     }
     fonts_apply(NULL);
+    cl_marlett();
     return 1;
 }
 
-static void cl_fill(cairo_t *cr, unsigned c, int x, int y, int w, int h) {
-    if (w <= 0 || h <= 0) return;
-    cairo_set_source_rgb(cr, (c >> 16 & 255) / 255.0, (c >> 8 & 255) / 255.0, (c & 255) / 255.0);
-    cairo_rectangle(cr, x, y, w, h); cairo_fill(cr);
-}
-/* user32 DrawEdge without BF_DIAGONAL / BF_FLAT, BF_RECT | BF_ADJUST: each border right, bottom, left, top (the bottom/right
-   sides win the corners), outer then inner; raised: 1, sunken: 0; soft: BF_SOFT (push buttons) */
-static void cl_edge(cairo_t *cr, const struct theme *t, int *x, int *y, int *w, int *h, int raised, int soft) {
-    const unsigned *C = t->cl;
-    for (int inner = 0; inner < 2; inner++) {
-        unsigned tl, br;
-        if (raised && !inner) { tl = soft ? C[CL_BTNHIGHLIGHT] : C[CL_3DLIGHT]; br = C[CL_3DDKSHADOW]; }        /* BDR_RAISEDOUTER */
-        else if (raised) { tl = soft ? C[CL_3DLIGHT] : C[CL_BTNHIGHLIGHT]; br = C[CL_BTNSHADOW]; }                /* BDR_RAISEDINNER */
-        else if (!inner) { tl = soft ? C[CL_3DDKSHADOW] : C[CL_BTNSHADOW]; br = C[CL_BTNHIGHLIGHT]; }             /* BDR_SUNKENOUTER */
-        else { tl = soft ? C[CL_BTNSHADOW] : C[CL_3DDKSHADOW]; br = C[CL_3DLIGHT]; }                              /* BDR_SUNKENINNER */
-        int l = *x, tp = *y, r = *x + *w, b = *y + *h;
-        r--; cl_fill(cr, br, r, tp, 1, b - tp);
-        b--; cl_fill(cr, br, l, b, r - l, 1);
-        cl_fill(cr, tl, l, tp, 1, b - tp); l++;
-        cl_fill(cr, tl, l, tp, r - l, 1); tp++;
-        *x = l; *y = tp; *w = r - l; *h = b - tp;
-    }
+/* a solid fill in the premultiplied ARGB image the classic frame is drawn in (user32: FillRect with a system brush) */
+static void px_fill(uint32_t *px, int S4, int W, int H, unsigned c, int x, int y, int w, int h) {
+    int x1 = x + w < W ? x + w : W, y1 = y + h < H ? y + h : H;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    for (int j = y; j < y1; j++) for (int i = x; i < x1; i++) px[(size_t)j * S4 + i] = 0xff000000u | c;
 }
 /* DrawFrame: a k px ring in colour c inside (x, y, w, h), which shrinks by it */
-static void cl_ring(cairo_t *cr, unsigned c, int *x, int *y, int *w, int *h, int k) {
-    cl_fill(cr, c, *x, *y, *w, k); cl_fill(cr, c, *x, *y + *h - k, *w, k);
-    cl_fill(cr, c, *x, *y + k, k, *h - 2 * k); cl_fill(cr, c, *x + *w - k, *y + k, k, *h - 2 * k);
+static void px_ring(uint32_t *px, int S4, int W, int H, unsigned c, int *x, int *y, int *w, int *h, int k) {
+    px_fill(px, S4, W, H, c, *x, *y, *w, k); px_fill(px, S4, W, H, c, *x, *y + *h - k, *w, k);
+    px_fill(px, S4, W, H, c, *x, *y + k, k, *h - 2 * k); px_fill(px, S4, W, H, c, *x + *w - k, *y + k, k, *h - 2 * k);
     *x += k; *y += k; *w -= 2 * k; *h -= 2 * k;
-}
-/* GradientFill(GRADIENT_FILL_RECT_H) as GDI computes it: per channel 8.24 fixed point, start + i * ((c1 - c0) << 24) / w,
-   truncated (the 4051 caption matches it to the bit) */
-static void cl_gradient(cairo_t *cr, unsigned c0, unsigned c1, int x, int y, int w, int h) {
-    if (w <= 0 || h <= 0) return;
-    cairo_surface_t *s = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w, 1);
-    cairo_surface_flush(s);
-    uint32_t *px = (uint32_t *)cairo_image_surface_get_data(s);
-    for (int k = 0; k < 3; k++) {
-        int sh = 16 - 8 * k; int64_t a = (int64_t)(c0 >> sh & 255), d = (((int64_t)(c1 >> sh & 255) - a) * ((int64_t)1 << 24)) / w;
-        for (int i = 0; i < w; i++) {
-            int64_t v = (a << 24) + d * i; int c = (int)(v >> 24);
-            if (!k) px[i] = 0xff000000u;
-            px[i] |= (uint32_t)(c < 0 ? 0 : c > 255 ? 255 : c) << sh;
-        }
-    }
-    cairo_surface_mark_dirty(s);
-    cairo_save(cr); cairo_rectangle(cr, x, y, w, h); cairo_clip(cr);
-    cairo_pattern_t *p = cairo_pattern_create_for_surface(s); cairo_pattern_set_extend(p, CAIRO_EXTEND_REPEAT);
-    cairo_matrix_t m; cairo_matrix_init_translate(&m, -x, -y); cairo_pattern_set_matrix(p, &m);
-    cairo_set_source(cr, p); cairo_paint(cr); cairo_pattern_destroy(p); cairo_restore(cr);
-    cairo_surface_destroy(s);
-}
-/* the Marlett caption glyphs (DrawFrameControl DFC_CAPTION: 'r' close, '0' minimise, '1' maximise, '2' restore) as bitmaps of the
-   shapes GDI rasterises at cell height e = min(cx, cy) of the button's inside, the cell centred in it (4051 / XP: e = 10 in a
-   16 x 14 button, bit-exact there; other sizes follow Marlett's proportions as FreeType renders it): strokes k = max(2, (e + 4) / 8)
-   thick; close an X of (2e + 1) / 3 rows; maximise a box (2e + 8) / 3 square with a k-row top; minimise a bar e / 2 + 1 wide on
-   the box's bottom row, one in from its left; restore two boxes (e + 2) / 2 square, the back one (e + 2) / 6 right, the front one
-   (e - 1) / 4 + 1 down, its face hiding the back one (Marlett's '2' is drawn with the front box's inside opaque) */
-static void cl_box(cairo_t *cr, unsigned c, int x, int y, int s, int k) {
-    cl_fill(cr, c, x, y, s, k); cl_fill(cr, c, x, y + s - 1, s, 1); cl_fill(cr, c, x, y, 1, s); cl_fill(cr, c, x + s - 1, y, 1, s);
-}
-static void cl_glyph(cairo_t *cr, unsigned c, unsigned face, int which, int x, int y, int e) {
-    int k = (e + 4) / 8 < 2 ? 2 : (e + 4) / 8, B = (2 * e + 8) / 3 < e ? (2 * e + 8) / 3 : e, bx = x + (e - B) / 2, by = y + (e - B) / 2;
-    switch (which) {
-    case BTN_CLOSE: {
-        int H = (2 * e + 1) / 3, W = H + (k % 2 == 0); if (W > e) W = e;
-        int x0 = x + (e - W) / 2, y0 = y + (e - H) / 2;
-        for (int i = 0; i < H; i++) {
-            int d = i < H - 1 - i ? i : H - 1 - i, l = H > 1 ? (d * (W - k) + (H - 1) / 2) / (H - 1) : 0;
-            cl_fill(cr, c, x0 + l, y0 + i, k, 1); cl_fill(cr, c, x0 + W - k - l, y0 + i, k, 1);
-        }
-        break; }
-    case BTN_MIN: cl_fill(cr, c, bx + 1, by + B - k, e / 2 + 1, k); break;
-    case BTN_MAX: cl_box(cr, c, bx, by, B, k); break;
-    case BTN_RESTORE: {
-        int sz = (e + 2) / 2, dx = (e + 2) / 6, dy = (e - 1) / 4 + 1;
-        cl_box(cr, c, bx + dx, by, sz, k);
-        cl_fill(cr, face, bx, by + dy, sz, sz);
-        cl_box(cr, c, bx, by + dy, sz, k);
-        break; }
-    }
-}
-/* DrawFrameControl(DFC_CAPTION): DrawPushButton (EDGE_RAISED or, pushed, EDGE_SUNKEN, BF_SOFT, the face COLOR_3DFACE), then
-   the glyph in COLOR_BTNTEXT (pushed: one pixel down and right) */
-static void cl_button(cairo_t *cr, const struct theme *t, int which, int pushed, int x, int y, int w, int h) {
-    int ix = x, iy = y, iw = w, ih = h;
-    cl_edge(cr, t, &ix, &iy, &iw, &ih, !pushed, 1);
-    cl_fill(cr, t->cl[CL_BTNFACE], ix, iy, iw, ih);
-    int e = iw < ih ? iw : ih; if (e < 4) return;
-    cl_glyph(cr, t->cl[CL_BTNTEXT], t->cl[CL_BTNFACE], which, ix + (iw - e) / 2 + (pushed ? 1 : 0), iy + (ih - e) / 2 + (pushed ? 1 : 0), e);
 }
 
 /* caption buttons: close 2 px from the caption's right, then CXEDGE, max and min touching; (captionwidth - 2) x (captionheight - 4),
@@ -509,59 +469,11 @@ static void cl_btn_rect(const struct theme *t, int w, int slot, int maximized, i
 /* SM_CXSMICON = (SM_CXSIZE - SM_CXEDGE) & ~1 */
 static int cl_smicon(const struct theme *t) { int s = (t->cl_capw - 2) & ~1; return s < 8 ? 8 : s; }
 
-/* the caption text as GDI's ExtTextOut places it: TrueType hinted advances (cairo's FreeType backend with hint metrics, as the 4051
-   caption shows: pango positions glyphs by HarfBuzz's unhinted advances, a pixel off in "Computer"), DT_END_ELLIPSIS with "..." when
-   it does not fit in maxw. 0 (nothing drawn) when the face fontconfig matches lacks a character: the caller lays it out with pango
-   (font fallback) */
-static int cl_text(cairo_t *cr, const struct theme *t, const char *text, int x, int base, int maxw) {
-    static char key[128]; static cairo_font_face_t *face; static FcCharSet *cs; static double px;
-    if (!face || strcmp(key, t->ms_font)) {
-        if (face) { cairo_font_face_destroy(face); face = NULL; }
-        if (cs) { FcCharSetDestroy(cs); cs = NULL; }
-        snprintf(key, sizeof key, "%s", t->ms_font);
-        PangoFontDescription *fd = pango_font_description_from_string(t->ms_font);
-        px = pango_font_description_get_size(fd) / (double)PANGO_SCALE;
-        if (!pango_font_description_get_size_is_absolute(fd)) px = px * 96 / 72;
-        FcPattern *p = FcPatternCreate(), *m; FcResult r;
-        if (pango_font_description_get_family(fd)) FcPatternAddString(p, FC_FAMILY, (const FcChar8 *)pango_font_description_get_family(fd));
-        FcPatternAddInteger(p, FC_WEIGHT, pango_font_description_get_weight(fd) >= PANGO_WEIGHT_BOLD ? FC_WEIGHT_BOLD : FC_WEIGHT_REGULAR);
-        FcPatternAddInteger(p, FC_SLANT, pango_font_description_get_style(fd) != PANGO_STYLE_NORMAL ? FC_SLANT_ITALIC : FC_SLANT_ROMAN);
-        FcPatternAddDouble(p, FC_PIXEL_SIZE, px);
-        FcConfigSubstitute(NULL, p, FcMatchPattern); FcDefaultSubstitute(p);
-        if ((m = FcFontMatch(NULL, p, &r))) {
-            FcCharSet *c; if (FcPatternGetCharSet(m, FC_CHARSET, 0, &c) == FcResultMatch) cs = FcCharSetCopy(c);
-            face = cairo_ft_font_face_create_for_pattern(m); FcPatternDestroy(m);
-        }
-        FcPatternDestroy(p); pango_font_description_free(fd);
-    }
-    if (!face || !cs) return 0;
-    for (const unsigned char *q = (const unsigned char *)text; *q; ) {   /* every character in the face (UTF-8) */
-        unsigned u = *q++; int k = u >= 0xf0 ? 3 : u >= 0xe0 ? 2 : u >= 0xc0 ? 1 : 0;
-        if (k) u &= 0x3f >> k;
-        while (k-- > 0 && (*q & 0xc0) == 0x80) u = u << 6 | (*q++ & 0x3f);
-        if (u >= 0x20 && !FcCharSetHasChar(cs, u)) return 0;
-    }
-    cairo_save(cr);
-    cairo_set_font_face(cr, face); cairo_set_font_size(cr, px);
-    cairo_font_options_t *fo = cairo_font_options_create(); cairo_font_options_set_antialias(fo, t->ms_font_aa);
-    cairo_font_options_set_subpixel_order(fo, CAIRO_SUBPIXEL_ORDER_RGB); cairo_font_options_set_hint_style(fo, CAIRO_HINT_STYLE_FULL);
-    cairo_font_options_set_hint_metrics(fo, CAIRO_HINT_METRICS_ON); cairo_set_font_options(cr, fo); cairo_font_options_destroy(fo);
-    cairo_text_extents_t te; cairo_text_extents(cr, text, &te);
-    char buf[1100]; snprintf(buf, 1024, "%s", text);
-    if (te.x_advance > maxw) {   /* DrawTextEx DT_END_ELLIPSIS: drop characters until the rest plus "..." fits */
-        size_t n = strlen(buf);
-        while (n > 0) {
-            do n--; while (n > 0 && ((unsigned char)buf[n] & 0xc0) == 0x80);
-            char tmp[1100]; snprintf(tmp, sizeof tmp, "%.*s...", (int)n, buf);
-            cairo_text_extents(cr, tmp, &te);
-            if (te.x_advance <= maxw || !n) { snprintf(buf, sizeof buf, "%s", tmp); break; }
-        }
-    }
-    cairo_move_to(cr, x, base); cairo_show_text(cr, buf);
-    cairo_restore(cr);
-    return 1;
-}
-
+/* Windows Classic: user32's non-client painting from the record's Colors.* and Metrics.*, drawn by libwuxtheme's classic helpers
+   (ut_draw_edge, ut_draw_frame_control, ut_draw_caption: Wine's DrawEdge / DrawFrameControl with its Marlett glyphs / the
+   DrawCaptionTemp fill and GDI text, with this frame's colour table), so the window manager's frame, flxp's own classic windows
+   and Display Properties' sample come from one implementation. luxwm keeps the geometry (cnBorders, the button rectangles,
+   maximised), the hit test and the shape. The frame is painted into an image of its size and composited; the icon stays cairo's. */
 static void classic_paint(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover,
                           int pressed, int maximized, const struct frame_ext *ext) {
     (void)hover;
@@ -572,69 +484,62 @@ static void classic_paint(cairo_t *cr, const struct theme *t, int w, int h, cons
     if (ext && (ext->flags & FRAME_NO_TITLE)) title = NULL;
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE); cairo_set_source_rgba(cr, 0, 0, 0, 0); cairo_paint(cr);
     cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-    /* the frame: window edge, sizing border, the 1 px COLOR_3DFACE border */
-    int x = ox, y = oy, fw = W, fh = H;
-    cl_edge(cr, t, &x, &y, &fw, &fh, 1, 0);
-    cl_ring(cr, focused ? C[CL_ACTIVEBORDER] : C[CL_INACTIVEBORDER], &x, &y, &fw, &fh, t->ms_border);
-    cl_ring(cr, C[CL_BTNFACE], &x, &y, &fw, &fh, 1);
+    if (W <= 0 || H <= 0) return;
+    cairo_surface_t *img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, W, H);
+    cairo_surface_flush(img);
+    uint32_t *px = (uint32_t *)cairo_image_surface_get_data(img); int stride = cairo_image_surface_get_stride(img), S4 = stride / 4;
+    memset(px, 0, (size_t)stride * H);
+    /* the frame: window edge (DrawEdge EDGE_RAISED), the sizing border, the 1 px COLOR_3DFACE border; image coordinates */
+    ut_rect fr = { 0, 0, W, H };
+    ut_draw_edge(px, W, H, stride, &fr, UT_EDGE_RAISED, UT_BF_RECT | UT_BF_ADJUST, C);
+    int x = fr.left, y = fr.top, fw = fr.right - fr.left, fh = fr.bottom - fr.top;
+    px_ring(px, S4, W, H, focused ? C[CL_ACTIVEBORDER] : C[CL_INACTIVEBORDER], &x, &y, &fw, &fh, t->ms_border);
+    px_ring(px, S4, W, H, C[CL_BTNFACE], &x, &y, &fw, &fh, 1);
     /* the caption bar (x, y, fw, ch) and the separator below it; a header extension (ext->t) continues the bar's background */
     int ch = t->ms_cap_h;
     unsigned cap = focused ? C[CL_ACTIVECAPTION] : C[CL_INACTIVECAPTION];
     unsigned grad = focused ? C[CL_GRADIENTACTIVECAPTION] : C[CL_GRADIENTINACTIVECAPTION];
     unsigned brush = t->cl_gradient ? grad : cap;
-    cl_fill(cr, brush, x, y, fw, ch);
-    cl_fill(cr, C[CL_BTNFACE], x, y + ch, fw, 1);
-    if (et > 0) cl_fill(cr, brush, x, y + ch, fw, et);
-    /* buttons */
+    px_fill(px, S4, W, H, brush, x, y, fw, ch);
+    px_fill(px, S4, W, H, C[CL_BTNFACE], x, y + ch, fw, 1);
+    if (et > 0) px_fill(px, S4, W, H, brush, x, y + ch, fw, et);
+    /* buttons (DrawFrameControl DFC_CAPTION) */
     int leftmost = x + fw;
     for (int slot = 0; slot < 3; slot++) {
         int bx, by, bw, bh; cl_btn_rect(t, w, slot, maximized, &bx, &by, &bw, &bh);
+        bx -= ox; by -= oy;
         if (bw < 4 || bh < 4 || bx < x) break;
         int which = slot == 0 ? BTN_CLOSE : slot == 2 ? BTN_MIN : maximized ? BTN_RESTORE : BTN_MAX;
-        cl_button(cr, t, which, pressed == ms_slot_hit(slot), bx, by, bw, bh);
+        unsigned st = which == BTN_CLOSE ? UT_DFCS_CAPTIONCLOSE : which == BTN_MIN ? UT_DFCS_CAPTIONMIN : which == BTN_MAX ? UT_DFCS_CAPTIONMAX : UT_DFCS_CAPTIONRESTORE;
+        if (pressed == ms_slot_hit(slot)) st |= UT_DFCS_PUSHED;
+        ut_rect br = { bx, by, bx + bw, by + bh };
+        ut_draw_frame_control(px, W, H, stride, &br, UT_DFC_CAPTION, st, C);
         leftmost = bx;
     }
-    /* xxxDrawCaptionTemp over (x .. leftmost - CXEDGE): icon slot, then the text area */
+    /* xxxDrawCaptionTemp over (x .. leftmost - CXEDGE): the icon slot (filled here, the icon drawn below), the gradient, the text */
     int L = x, R = leftmost - 2;
-    if (R <= L) return;
-    if (icon) {
-        int sm = cl_smicon(t), slot = ch;
-        cl_fill(cr, cap, L, y, slot < R - L ? slot : R - L, ch);
+    if (R > L) {
+        ut_font f; memset(&f, 0, sizeof f);
+        snprintf(f.face, sizeof f.face, "%s", t->cl_face); f.height = -t->cl_px; f.weight = t->cl_bold ? 700 : 400; f.italic = t->cl_italic;
+        ut_set_font_smoothing(t->cl_smooth);   /* GDI's: standard keeps Tahoma 8 bi-level (its gasp) and smooths larger sizes */
+        unsigned fl = (focused ? UT_DC_ACTIVE : 0) | (t->cl_gradient ? UT_DC_GRADIENT : 0) | (icon ? UT_DC_ICON : 0) | (title && *title ? UT_DC_TEXT : 0);
+        ut_rect cr_ = { L, y, R, y + ch };
+        ut_draw_caption(px, W, H, stride, &cr_, fl, title, NULL, 0, 0, &f, C);
+    }
+    cairo_surface_mark_dirty(img);
+    cairo_set_source_surface(cr, img, ox, oy); cairo_paint(cr);
+    cairo_surface_destroy(img);
+    /* the icon: SM_CXSMICON, one pixel right of the slot's centre, in cairo (the frame's own default icons are cairo surfaces) */
+    if (icon && R > L) {
+        int sm = cl_smicon(t), slot = ch < R - L ? ch : R - L, cx = L + ox, cy = y + oy;
         double iw = cairo_image_surface_get_width(icon), ih = cairo_image_surface_get_height(icon), sc = sm / (iw > ih ? iw : ih);
         if (iw <= sm + 4 && ih <= sm + 4 && (iw > sm || ih > sm)) sc = 1;
-        int ix = L + 1 + (slot - sm) / 2, iy = y + (slot - sm) / 2;
-        cairo_save(cr); cairo_rectangle(cr, L, y, slot < R - L ? slot : R - L, ch); cairo_clip(cr);
+        int ix = cx + 1 + (ch - sm) / 2, iy = cy + (ch - sm) / 2;
+        cairo_save(cr); cairo_rectangle(cr, cx, cy, slot, ch); cairo_clip(cr);
         cairo_translate(cr, ix + floor((sm - iw * sc) / 2), iy + floor((sm - ih * sc) / 2)); cairo_scale(cr, sc, sc);
         cairo_set_source_surface(cr, icon, 0, 0); cairo_pattern_set_filter(cairo_get_source(cr), sc == 1 ? CAIRO_FILTER_NEAREST : CAIRO_FILTER_BEST);
         cairo_paint(cr); cairo_restore(cr);
-        L += slot;
     }
-    if (R <= L) return;
-    if (t->cl_gradient && cap != grad) cl_gradient(cr, cap, grad, L, y, R - L, ch);
-    else cl_fill(cr, cap, L, y, R - L, ch);
-    if (!title || !*title) return;
-    PangoLayout *lay = pango_cairo_create_layout(cr); PangoFontDescription *fd = pango_font_description_from_string(t->ms_font);
-    cairo_font_options_t *fo = cairo_font_options_create(); cairo_font_options_set_antialias(fo, t->ms_font_aa);
-    cairo_font_options_set_subpixel_order(fo, CAIRO_SUBPIXEL_ORDER_RGB); cairo_font_options_set_hint_style(fo, CAIRO_HINT_STYLE_FULL);
-    cairo_font_options_set_hint_metrics(fo, CAIRO_HINT_METRICS_ON);
-    pango_cairo_context_set_font_options(pango_layout_get_context(lay), fo); cairo_font_options_destroy(fo); pango_layout_context_changed(lay);
-    pango_layout_set_font_description(lay, fd); pango_layout_set_text(lay, title, -1);
-    int tl = L + 2;   /* ExtTextOut at left + CXEDGE; DrawTextEx (too long) with iLeftMargin = CXEDGE and DT_END_ELLIPSIS */
-    pango_layout_set_width(lay, (R - tl > 0 ? R - tl : 0) * PANGO_SCALE); pango_layout_set_ellipsize(lay, PANGO_ELLIPSIZE_END);
-    /* tmHeight = the unhinted ascent + descent, rounded; the baseline tmAscent below (top + bottom - tmHeight) / 2 */
-    PangoContext *mctx = pango_font_map_create_context(pango_cairo_font_map_get_default());
-    cairo_font_options_t *mfo = cairo_font_options_create(); cairo_font_options_set_hint_metrics(mfo, CAIRO_HINT_METRICS_OFF);
-    pango_cairo_context_set_font_options(mctx, mfo); cairo_font_options_destroy(mfo);
-    PangoFontMetrics *fm = pango_context_get_metrics(mctx, fd, NULL);
-    int asc = (pango_font_metrics_get_ascent(fm) + PANGO_SCALE / 2) / PANGO_SCALE, desc = (pango_font_metrics_get_descent(fm) + PANGO_SCALE / 2) / PANGO_SCALE;
-    pango_font_metrics_unref(fm); g_object_unref(mctx);
-    int base = y + (ch - (asc + desc)) / 2 + asc, top = base - pango_layout_get_baseline(lay) / PANGO_SCALE;
-    const double *tc = focused ? t->text_a : t->text_i;
-    cairo_save(cr); cairo_rectangle(cr, L, y, R - L, ch); cairo_clip(cr);
-    cairo_set_source_rgb(cr, tc[0], tc[1], tc[2]);
-    if (!cl_text(cr, t, title, tl, base, R - tl)) { cairo_move_to(cr, tl, top); pango_cairo_show_layout(cr, lay); }
-    cairo_restore(cr);
-    pango_font_description_free(fd); g_object_unref(lay);
 }
 
 static unsigned theme_gen_next;   /* theme_load count: identifies a loaded theme for the crossfade cache */
