@@ -16,12 +16,11 @@
    wallpapers/4074/Bliss.jpg; lhde_data_kind_rel) searched in these directories, first match wins (lhde_data_dirs):
      1. user        ~/.config/lhde
      2. windows     $LHDE_WINDOWS/index; with $LHDE_DATA set (tests, scratch): that one flat directory instead
-     3. old layout  ${XDG_DATA_HOME:-~/.local/share}/lhde while it still holds Windows files (before lhde-import --migrate)
-     4. shipped     <exe>/../share/lhde (the program's own prefix), then $XDG_DATA_DIRS/lhde (default /usr/local/share:/usr/share)
-     5. source tree <top>/data when the program runs from a build tree (<top>/build/...; LHDE_TREE=0 leaves it out: tests)
+     3. shipped     <exe>/../share/lhde (the program's own prefix), then $XDG_DATA_DIRS/lhde (default /usr/local/share:/usr/share)
+     4. source tree <top>/data when the program runs from a build tree (<top>/build/...; LHDE_TREE=0 leaves it out: tests)
    A frame set or pack is split: its text (theme.ini, shell.lua) is shipped, its pixels are generated; lhde_data_find_in finds a
    file of the same relative directory in any tree. A lookup of DIR/NAME that misses also tries DIR/cache/NAME (the caches of
-   the old layout and of a $LHDE_DATA directory). Paths come back as found (through index/); lhde_data_origin tells which tree
+   a $LHDE_DATA directory). Paths come back as found (through index/); lhde_data_origin tells which tree
    a file really lies in. */
 #ifndef LHDE_DATA_H
 #define LHDE_DATA_H
@@ -36,9 +35,9 @@ extern "C" {
 /* the data directories in search order (absolute, existing, without duplicates); returns how many */
 int lhde_data_dirs(const char **dirs, int max);
 /* the trees */
-enum lhde_tree_kind { LHDE_TREE_USER, LHDE_TREE_WINDOWS, LHDE_TREE_FLAT, LHDE_TREE_OLD, LHDE_TREE_SHIPPED, LHDE_TREE_SOURCE,
+enum lhde_tree_kind { LHDE_TREE_USER, LHDE_TREE_WINDOWS, LHDE_TREE_FLAT, LHDE_TREE_SHIPPED, LHDE_TREE_SOURCE,
                       LHDE_TREE_CODE };
-/* the tree of lhde_data_dirs' i-th directory (-1 past the end), and a kind's name: user, windows, data, old layout, shipped,
+/* the tree of lhde_data_dirs' i-th directory (-1 past the end), and a kind's name: user, windows, data, shipped,
    source tree, program ($PREFIX/lib/lhde), "elsewhere" for -1 */
 int lhde_data_dir_kind(int i);
 const char *lhde_tree_name(int kind);
@@ -46,7 +45,8 @@ const char *lhde_tree_name(int kind);
 const char *lhde_data_user(void);
 /* the Windows tree itself: $LHDE_WINDOWS (default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows), or $LHDE_DATA */
 const char *lhde_windows_dir(void);
-/* the old-layout directory when it is searched (3. above), else NULL */
+/* an unmigrated old-layout directory (${XDG_DATA_HOME:-~/.local/share}/lhde still holding Windows files, before
+   lhde-import --migrate): never searched, only reported; NULL when there is none or $LHDE_WINDOWS / $LHDE_DATA is set */
 const char *lhde_old_dir(void);
 /* which tree PATH really lies in (symlinks resolved; enum lhde_tree_kind, -1 elsewhere); rel = the path below that tree's
    top (for the Windows tree: below $LHDE_WINDOWS, e.g. 4074/system32/imageres.dll), else the resolved path */

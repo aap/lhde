@@ -82,8 +82,11 @@ session() {
 	D=$DISPLAY STATE=$(statedir "$DISPLAY"); mkdir -p "$STATE"
 	# the one-time move of ~/.config/longhorn and ~/.config/lhshell to ~/.config/lhde (docs/SETTINGS.md "Migration")
 	"$LHDE_THEME_TOOL" migrate > "$STATE/migration.log" 2>&1
-	# the one-time move of an old-layout ~/.local/share/lhde into the three trees (docs/LAYOUT.md; does nothing once done)
-	if [ -n "$(lhde_bin lhde-import)" ] && [ -z "$LHDE_DATA$LHDE_WINDOWS" ] && [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/lhde/styles" ]; then
+	# the one-time move of an old-layout ~/.local/share/lhde into the three trees (docs/LAYOUT.md; does nothing once done):
+	# nothing searches that directory any more, so this is how its files reach the programs (liblhde data.c is_old_layout)
+	old=${XDG_DATA_HOME:-$HOME/.local/share}/lhde
+	if [ -n "$(lhde_bin lhde-import)" ] && [ -z "$LHDE_DATA$LHDE_WINDOWS" ] &&
+	   { [ -d "$old/styles" ] || [ -d "$old/resources" ] || [ -d "$old/fonts" ] || [ -d "$old/wallpapers" ]; }; then
 		"$(lhde_bin lhde-import)" --migrate --auto > "$STATE/layout-migration.log" 2>&1
 	fi
 	# no THEME given: the one saved last (settings.ini [theme] name, SETTINGS.md), else aero4074

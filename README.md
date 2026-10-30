@@ -112,7 +112,7 @@ The art comes from the user's own Windows files, imported once (docs/USAGE.md "G
 
 Every program looks a file up by its relative name (`styles/jade4074.msstyles`, `frames/jade4074/close.png`,
 `resources/4074`) in this order: `~/.config/lhde`, the Windows tree's `index/` (`$LHDE_DATA`, a flat directory, instead:
-tests), an old-layout `~/.local/share/lhde` until it is migrated, the install's `share/lhde`, `$XDG_DATA_DIRS/lhde`, the
+tests), the install's `share/lhde`, `$XDG_DATA_DIRS/lhde`, the
 source tree's `data/` (liblhde/data.c, lhde/data.h; scripts through `lhde-theme find`). **When something looks wrong:**
 `lhde-theme explain [THEME]` prints every visible component of the theme, the file it comes from, its tree and whether it
 fell back; `lhde-theme dirs` shows the trees with their sizes.

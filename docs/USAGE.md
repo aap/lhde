@@ -31,7 +31,8 @@ the shell pack (+ the imageres it was cut from), the start menu, the navigation 
 Typical answers: a wrong frame -> the `frames` rows (which set, its `theme.ini`, its PNGs and the recipe that made them; glass
 sets of the 4042-4093 styles are read live from the `.msstyles`); a wrong taskbar or start orb -> `shell pack` (the pack's
 `shell.lua`, its images in `generated/packs/<build>` and the imageres they came from); a wrong icon -> `icons` (the recipe and
-the DLL). Before `lhde-import --migrate` the tree is `[old layout]` (`~/.local/share/lhde`, everything mixed).
+the DLL). An old-layout `~/.local/share/lhde` (everything mixed) is not searched; `lhde-theme dirs` reports it as unmigrated
+until `lhde-import --migrate` (which lhde-session runs at start) has moved it.
 
 Three ways to run luxwm, pick by how much you want to see and touch:
 

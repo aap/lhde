@@ -404,7 +404,7 @@ int main(void)
     HAS(slurp("run/lhde/nodisplay/themes.ini"), "flxp_frame = longhorn");
     HAS(slurp("run/lhde/nodisplay/wallpapers.ini"), "[jade]\nfile = ");
 
-    /* ---- the three trees (docs/LAYOUT.md): the Windows tree's index, the user's files first, the old layout ---- */
+    /* ---- the three trees (docs/LAYOUT.md): the Windows tree's index, the user's files first, an old layout reported ---- */
     {
         char W[PATH_MAX + 32], q[PATH_MAX * 2], o[PATH_MAX], rel[PATH_MAX], flat[PATH_MAX];
         snprintf(W, sizeof W, "%s/xdg/lhde-windows", T);
@@ -449,13 +449,14 @@ int main(void)
         CHECK(lhde_data_find_in(fd, "close.png", o, sizeof o) != NULL);
         CHECK(lhde_data_origin(o, rel, sizeof rel) == LHDE_TREE_WINDOWS); EQ(rel, "generated/frames/jade4074w/close.png");
         CHECK(lhde_data_origin(fd, rel, sizeof rel) == LHDE_TREE_SHIPPED); EQ(rel, "frames/jade4074w");
-        /* not migrated: the old ~/.local/share/lhde with Windows files is searched after the Windows tree */
+        /* not migrated: an old ~/.local/share/lhde with Windows files is reported, never searched */
         put("xdg/lhde/styles/old4051.msstyles", "x");
         lhde_data_reset();
         CHECK(lhde_old_dir() != NULL);
-        CHECK(lhde_data_find("styles/old4051.msstyles", o, sizeof o) != NULL);
-        CHECK(lhde_data_origin(o, rel, sizeof rel) == LHDE_TREE_OLD);
-        /* $LHDE_WINDOWS set: no old layout */
+        CHECK(lhde_data_find("styles/old4051.msstyles", o, sizeof o) == NULL);
+        nd = lhde_data_dirs(d, LHDE_DATA_MAX);
+        CHECK(nd == 3);
+        /* $LHDE_WINDOWS set: not even reported */
         setenv("LHDE_WINDOWS", W, 1); lhde_data_reset();
         CHECK(lhde_old_dir() == NULL && lhde_data_find("styles/old4051.msstyles", o, sizeof o) == NULL);
         unsetenv("LHDE_WINDOWS"); setenv("LHDE_DATA", flat, 1); setenv("XDG_DATA_DIRS", "/nonexistent", 1); lhde_data_reset();

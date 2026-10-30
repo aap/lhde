@@ -512,10 +512,9 @@ int lhde_dirs_report(void)
     const char *wd = lhde_windows_dir();
     tree_line(getenv("LHDE_DATA") && *getenv("LHDE_DATA") ? "LHDE_DATA" : "windows", wd, NULL);
     if (isdir(wd)) entries(wd, "    ");
-    if (lhde_old_dir()) {
-        tree_line("old layout", lhde_old_dir(), NULL);
-        printf("    the old layout: Windows files mixed with program files; `lhde-import --migrate -n` shows the move, --migrate does it\n");
-    }
+    if (lhde_old_dir())
+        printf("  unmigrated %s: Windows files of the old layout, not searched; `lhde-import --migrate` moves them (-n shows the move)\n",
+               tilde(lhde_old_dir(), t, sizeof t));
     printf("User files (docs/SETTINGS.md \"Files\"):\n");
     tree_line("config", lhde_config_dir(buf, sizeof buf), "what you chose: settings.ini, themes/, flxp.ini, keys, overridden shipped files");
     if (isdir(buf)) entries(buf, "    ");
