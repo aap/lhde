@@ -1,10 +1,12 @@
 --- a/dlls/comctl32/listview.c (wine-10.0)
 +++ b/vendor/wine/comctl32/listview.c
-@@ -174,8 +174,20 @@
+@@ -174,8 +174,22 @@
    LPARAM lParam;
    INT iIndent;
    ITEM_ID *id;
 +  INT iGroupId;   /* flxp: group view */
++  UINT tileCols[4];   /* flxp: tile view: the subitems shown under the name (LVM_SETTILEINFO) */
++  UINT nTileCols;
  } ITEM_INFO;
  
 +/* flxp: group view (LVM_ENABLEGROUPVIEW) in the icon views: a header row
@@ -21,7 +23,7 @@
  struct tagITEM_ID
  {
    UINT id;   /* item id */
-@@ -289,6 +301,7 @@
+@@ -289,6 +303,7 @@
  
    /* focus drawing */
    BOOL bFocus;              /* control has focus */
@@ -29,11 +31,18 @@
    INT nFocusedItem;
    RECT rcFocus;             /* focus bounds */
  
-@@ -297,6 +310,12 @@
+@@ -297,6 +312,19 @@
    COLORREF clrBk;
    COLORREF clrText;
    COLORREF clrTextBk;
 +  COLORREF clrOutline;          /* flxp: LVS_EX_BORDERSELECT outline (LVM_SETOUTLINECOLOR) */
++
++  /* flxp: the tile view (LV_VIEW_TILE): the icon view's layout (cells of
++     iconSpacing, the normal image list) with the image at the left and the
++     name and up to nTileLines more lines (the item's tile columns, grey) to
++     its right; uView stays LV_VIEW_ICON, LVM_GETVIEW answers LV_VIEW_TILE */
++  BOOL bTile;
++  INT nTileLines;
 +
 +  /* flxp: group view */
 +  BOOL groupView;
@@ -42,7 +51,28 @@
    HBITMAP hBkBitmap;
  
    /* font */
-@@ -1035,6 +1054,9 @@
+@@ -374,6 +402,12 @@
+ #define ICON_LR_PADDING              16
+ #define ICON_LR_HALF                 (ICON_LR_PADDING/2)
+ 
++/* flxp: tile view: the image's left edge and the text's gap after it in the
++   cell, the selection 2 px inside the cell (4051's 214x52 in a 218x56 tile) */
++#define TILE_ICON_LEFT               4
++#define TILE_TEXT_GAP                5
++#define TILE_INSET                   2
++
+ /* default label width for items in list and small icon display modes */
+ #define DEFAULT_LABEL_WIDTH 40
+ /* maximum select rectangle width for empty text item in LV_VIEW_DETAILS */
+@@ -446,6 +480,7 @@
+ static INT LISTVIEW_HitTest(const LISTVIEW_INFO *, LPLVHITTESTINFO, BOOL, BOOL);
+ static BOOL LISTVIEW_EndEditLabelT(LISTVIEW_INFO *, BOOL, BOOL);
+ static BOOL LISTVIEW_Scroll(LISTVIEW_INFO *, INT, INT);
++static SUBITEM_INFO* LISTVIEW_GetSubItemPtr(HDPA, INT);
+ 
+ /******** Text handling functions *************************************/
+ 
+@@ -1035,6 +1070,9 @@
      lpnmlvcd->nmcd.dwItemSpec = lplvItem->iItem + 1;
      lpnmlvcd->iSubItem = lplvItem->iSubItem;
      if (lplvItem->state & LVIS_SELECTED) lpnmlvcd->nmcd.uItemState |= CDIS_SELECTED;
@@ -52,7 +82,7 @@
      if (lplvItem->state & LVIS_FOCUSED) lpnmlvcd->nmcd.uItemState |= CDIS_FOCUS;
      if (lplvItem->iItem == infoPtr->nHotItem) lpnmlvcd->nmcd.uItemState |= CDIS_HOT;
      lpnmlvcd->nmcd.lItemlParam = lplvItem->lParam;
-@@ -1054,6 +1076,31 @@
+@@ -1054,19 +1092,82 @@
      return result;
  }
  
@@ -81,11 +111,43 @@
 +    return theme && IsThemePartDefined(theme, LVP_LISTITEM, 0);
 +}
 +
++/* flxp: the sorted column's shade in Details (LVM_SETSELECTEDCOLUMN; XP lvrept.c
++   GetSortColor(10, the background): white becomes #F7F7F7, as 4074's and XP's
++   Name column); not in group view. FALSE when the column is not shaded. */
++static BOOL LISTVIEW_SortedColumnColor(const LISTVIEW_INFO *infoPtr, INT nSubItem, COLORREF *clr)
++{
++    COLORREF bk = infoPtr->clrBk;
++    BYTE c[3];
++    BOOL desaturate;
++    int i;
++
++    if (infoPtr->uView != LV_VIEW_DETAILS || infoPtr->groupView || bk == CLR_NONE ||
++        infoPtr->selected_column < 0 || infoPtr->selected_column >= DPA_GetPtrCount(infoPtr->hdpaColumns) ||
++        (nSubItem >= 0 && nSubItem != infoPtr->selected_column)) return FALSE;
++    if (bk == CLR_DEFAULT) bk = comctl32_color.clrWindow;
++    if (bk == 0) { *clr = RGB(128, 128, 128); return TRUE; }
++    c[0] = GetRValue(bk); c[1] = GetGValue(bk); c[2] = GetBValue(bk);
++    desaturate = c[0] > 0xf0 && c[1] > 0xf0 && c[2] > 0xf0;
++    for (i = 0; i < 3; i++)
++    {
++        if (c[i] + (10 * 10 * c[i]) / 1000 > 0xff) c[i] = desaturate ? c[i] - c[i] / 30 : 0xff;
++        else c[i] += (10 * 10 * c[i]) / 1000;
++    }
++    *clr = RGB(c[0], c[1], c[2]);
++    return TRUE;
++}
++
  static void prepaint_setup (const LISTVIEW_INFO *infoPtr, HDC hdc, const NMLVCUSTOMDRAW *cd, BOOL SubItem)
  {
-     COLORREF backcolor, textcolor;
-@@ -1062,11 +1109,19 @@
+-    COLORREF backcolor, textcolor;
++    COLORREF backcolor, textcolor, sorted;
+ 
+     backcolor = cd->clrTextBk;
      textcolor = cd->clrText;
++    /* flxp: the sorted column's text on its shade */
++    if ((backcolor == CLR_DEFAULT || backcolor == infoPtr->clrBk || backcolor == comctl32_color.clrWindow) &&
++        LISTVIEW_SortedColumnColor(infoPtr, cd->iSubItem, &sorted))
++        backcolor = sorted;
  
      /* apparently, for selected items, we have to override the returned values */
 +    /* flxp: not when the theme draws the item (its text keeps its colour) */
@@ -105,7 +167,15 @@
              {
                  backcolor = comctl32_color.clrHighlight;
                  textcolor = comctl32_color.clrHighlightText;
-@@ -1709,6 +1764,9 @@
+@@ -1599,6 +1700,7 @@
+    it used to reset view state to match current window style */
+ static inline void map_style_view(LISTVIEW_INFO *infoPtr)
+ {
++    infoPtr->bTile = FALSE;   /* flxp: a view from the style is never tiles */
+     switch (infoPtr->dwStyle & LVS_TYPEMASK)
+     {
+     case LVS_ICON:
+@@ -1709,6 +1811,9 @@
  /* used to handle collapse main item column case */
  static inline BOOL LISTVIEW_DrawFocusRect(const LISTVIEW_INFO *infoPtr, HDC hdc)
  {
@@ -115,7 +185,113 @@
      return (infoPtr->rcFocus.left < infoPtr->rcFocus.right) ?
              DrawFocusRect(hdc, &infoPtr->rcFocus) : FALSE;
  }
-@@ -2492,6 +2550,9 @@
+@@ -2045,7 +2150,9 @@
+ 	if (LISTVIEW_GetViewRect(infoPtr, &rcView)) horzInfo.nMax = rcView.right - rcView.left;
+     }
+ 
+-    if (LISTVIEW_IsHeaderEnabled(infoPtr))
++    /* flxp: the header above the icon views (LVS_EX_HEADERINALLVIEWS) does not
++       widen them: their extent is the items' */
++    if (LISTVIEW_IsHeaderEnabled(infoPtr) && infoPtr->uView == LV_VIEW_DETAILS)
+     {
+ 	if (DPA_GetPtrCount(infoPtr->hdpaColumns))
+ 	{
+@@ -2325,6 +2432,39 @@
+  * RETURN:
+  *   None.
+  */
++/* flxp: the tile view (LISTVIEW_INFO.bTile) */
++static inline BOOL is_tile(const LISTVIEW_INFO *infoPtr)
++{
++    return infoPtr->bTile && infoPtr->uView == LV_VIEW_ICON;
++}
++
++/* flxp: LVS_EX_HIDELABELS (Vista; 4051's Hide File Names): the icon view without labels */
++static inline BOOL hide_labels(const LISTVIEW_INFO *infoPtr)
++{
++    return infoPtr->uView == LV_VIEW_ICON && !infoPtr->bTile && (infoPtr->dwLvExStyle & LVS_EX_HIDELABELS);
++}
++
++/* flxp: a tile's lines under the name: the texts of the item's tile columns
++   that are not empty, at most nTileLines (4051: the first two non-empty) */
++static INT LISTVIEW_TileLines(const LISTVIEW_INFO *infoPtr, INT nItem, LPCWSTR *lines, INT max)
++{
++    HDPA hdpaSubItems;
++    ITEM_INFO *item;
++    UINT i;
++    INT n = 0;
++
++    if ((infoPtr->dwStyle & LVS_OWNERDATA) || nItem < 0 || nItem >= infoPtr->nItemCount) return 0;
++    hdpaSubItems = DPA_GetPtr(infoPtr->hdpaItems, nItem);
++    if (!hdpaSubItems) return 0;
++    item = DPA_GetPtr(hdpaSubItems, 0);
++    for (i = 0; i < item->nTileCols && n < infoPtr->nTileLines && n < max; i++)
++    {
++        SUBITEM_INFO *sub = LISTVIEW_GetSubItemPtr(hdpaSubItems, item->tileCols[i]);
++        if (sub && is_text(sub->hdr.pszText) && sub->hdr.pszText[0]) lines[n++] = sub->hdr.pszText;
++    }
++    return n;
++}
++
+ static void LISTVIEW_GetItemMetrics(const LISTVIEW_INFO *infoPtr, const LVITEMW *lpLVItem,
+ 				    LPRECT lprcBox, LPRECT lprcSelectBox,
+ 				    LPRECT lprcIcon, LPRECT lprcStateIcon, LPRECT lprcLabel)
+@@ -2341,7 +2481,7 @@
+     if (infoPtr->uView == LV_VIEW_ICON && (lprcBox || lprcLabel))
+     {
+ 	assert((lpLVItem->mask & LVIF_STATE) && (lpLVItem->stateMask & LVIS_FOCUSED));
+-	if (lpLVItem->state & LVIS_FOCUSED) oversizedBox = doLabel = TRUE;
++	if ((lpLVItem->state & LVIS_FOCUSED) && !is_tile(infoPtr) && !hide_labels(infoPtr)) oversizedBox = doLabel = TRUE;
+     }
+     if (lprcSelectBox) doSelectBox = TRUE;
+     if (lprcLabel) doLabel = TRUE;
+@@ -2380,7 +2520,14 @@
+ 	if (infoPtr->himlState && lpLVItem->iSubItem == 0)
+ 	    state_width = infoPtr->iconStateSize.cx;
+ 
+-	if (infoPtr->uView == LV_VIEW_ICON)
++	if (is_tile(infoPtr))
++	{
++	    Icon.left   = Box.left + TILE_ICON_LEFT + state_width;
++	    Icon.top    = Box.top + (infoPtr->nItemHeight - infoPtr->iconSize.cy) / 2;
++	    Icon.right  = Icon.left + infoPtr->iconSize.cx;
++	    Icon.bottom = Icon.top + infoPtr->iconSize.cy;
++	}
++	else if (infoPtr->uView == LV_VIEW_ICON)
+ 	{
+ 	    Icon.left   = Box.left + state_width;
+ 	    if (infoPtr->himlNormal)
+@@ -2451,6 +2598,7 @@
+ 	   labelSize.cy = infoPtr->nItemHeight;
+ 	   goto calc_label;
+ 	}
++	if (is_tile(infoPtr) || hide_labels(infoPtr)) goto calc_label;   /* flxp */
+ 	
+ 	/* we need the text in non owner draw mode */
+ 	assert(lpLVItem->mask & LVIF_TEXT);
+@@ -2487,16 +2635,38 @@
+ 	}
+ 
+ calc_label:
+-	if (infoPtr->uView == LV_VIEW_ICON)
++	if (is_tile(infoPtr))
++	{
++	    /* flxp: the name and the tile lines, centred vertically right of the image */
++	    LPCWSTR lines[8];
++	    INT h = (1 + LISTVIEW_TileLines(infoPtr, lpLVItem->iItem, lines, 8)) * infoPtr->ntmHeight;
++	    Label.left = Icon.right + TILE_TEXT_GAP;
++	    Label.right = max(Label.left, Box.right - TILE_INSET - 2);
++	    Label.top = Box.top + (infoPtr->nItemHeight - h) / 2;
++	    Label.bottom = Label.top + h;
++	}
++	else if (hide_labels(infoPtr))
++	{
++	    Label.left = Icon.left;
++	    Label.right = Icon.right;
++	    Label.top = Label.bottom = Icon.bottom;
++	}
++	else if (infoPtr->uView == LV_VIEW_ICON)
+ 	{
  	    Label.left = Box.left + (infoPtr->nItemWidth - labelSize.cx) / 2;
  	    Label.top  = Box.top + ICON_TOP_PADDING_HITABLE +
  		         infoPtr->iconSize.cy + ICON_BOTTOM_PADDING;
@@ -125,7 +301,27 @@
  	    Label.right = Label.left + labelSize.cx;
  	    Label.bottom = Label.top + infoPtr->nItemHeight;
  	    if (!oversizedBox && labelSize.cy > infoPtr->ntmHeight)
-@@ -2775,6 +2836,254 @@
+ 	    {
+ 		labelSize.cy = min(Box.bottom - Label.top, labelSize.cy);
++		/* flxp: comctl32's label is two lines at most unless focused (XP
++		   lvicon.c CLIP_HEIGHT; 4051/4074's "Downloaded Program Files") */
++		labelSize.cy = min(labelSize.cy, 2 * infoPtr->ntmHeight);
+ 		labelSize.cy /= infoPtr->ntmHeight;
+ 		labelSize.cy = max(labelSize.cy, 1);
+ 		labelSize.cy *= infoPtr->ntmHeight;
+@@ -2539,6 +2709,11 @@
+ 	    else
+ 	        SelectBox.right = min(Label.left + MAX_EMPTYTEXT_SELECT_WIDTH, Label.right);
+ 	}
++	else if (is_tile(infoPtr))
++	{
++	    SelectBox = Box;
++	    InflateRect(&SelectBox, -TILE_INSET, -TILE_INSET);
++	}
+ 	else
+ 	{
+ 	    UnionRect(&SelectBox, &Icon, &Label);
+@@ -2775,6 +2950,318 @@
   *   SUCCESS : TRUE
   *   FAILURE : FALSE
   */
@@ -137,9 +333,31 @@
 +        (infoPtr->uView == LV_VIEW_ICON || infoPtr->uView == LV_VIEW_SMALLICON);
 +}
 +
-+/* the header row: the title (the list's font) with room above and below */
++/* flxp: the theme's group header (4051/4074 Explorer::ListView GROUPHEADER, its
++   EXPANDBUTTON and COLLAPSEBUTTON) unless the window asks for the concept's
++   drawn header (the property "flxp_concept_groups": the Longhorn file dialog);
++   *h: the header image's height */
++static HTHEME group_theme(const LISTVIEW_INFO *infoPtr, INT *h)
++{
++    HTHEME theme = GetWindowTheme(infoPtr->hwndSelf);
++    SIZE sz = { 0, 0 };
++
++    if (!theme || GetPropW(infoPtr->hwndSelf, L"flxp_concept_groups") || !IsThemePartDefined(theme, LVP_GROUPHEADER, 0)) return NULL;
++    if (h)
++    {
++        GetThemePartSize(theme, NULL, LVP_GROUPHEADER, LVGH_OPEN, NULL, TS_TRUE, &sz);
++        *h = sz.cy > 0 ? sz.cy : 21;
++    }
++    return theme;
++}
++
++/* the header row: the title (the list's font) with room above and below; themed:
++   the header image 4 px down with 6 px under it (4074: a group of one 56 px tile
++   row every 92 px) */
 +static inline INT group_header_height(const LISTVIEW_INFO *infoPtr)
 +{
++    INT h;
++    if (group_theme(infoPtr, &h)) return h + 10;
 +    return infoPtr->ntmHeight + 16;
 +}
 +
@@ -250,9 +468,21 @@
 +    HPEN pen, oldPen;
 +    HBRUSH brush, oldBrush;
 +
++    INT imgh;
++    HTHEME theme = group_theme(infoPtr, &imgh);
++    HFONT themeFont = NULL, oldFont = NULL;
++    COLORREF heading = RGB(86, 93, 95);
++
 +    LISTVIEW_GetOrigin(infoPtr, &Origin);
 +    if (GetClipBox(hdc, &rcClip) == ERROR) rcClip = infoPtr->rcList;
 +    SetBkMode(hdc, TRANSPARENT);
++    if (theme)
++    {
++        LOGFONTW lf;
++        if (SUCCEEDED(GetThemeFont(theme, hdc, LVP_GROUPHEADER, 0, 210 /* TMT_FONT */, &lf))) themeFont = CreateFontIndirectW(&lf);
++        if (themeFont) oldFont = SelectObject(hdc, themeFont);
++        GetThemeColor(theme, LVP_GROUPHEADER, 0, 3825 /* TMT_HEADING1TEXTCOLOR */, &heading);
++    }
 +    for (i = 0; i < DPA_GetPtrCount(infoPtr->hdpaGroups); i++)
 +    {
 +        LV_GROUP_INFO *g = DPA_GetPtr(infoPtr->hdpaGroups, i);
@@ -267,6 +497,34 @@
 +        r.bottom = r.top + hdr;
 +        if (!IntersectRect(&tmp, &r, &rcClip)) continue;
 +        len = g->header ? lstrlenW(g->header) : 0;
++        if (theme)
++        {
++            /* flxp: 4051/4074 (lh4074-224845): the header image 8 px in from both sides,
++               the title in HEADING1TEXTCOLOR 7 px in, the collapse (expanded) or expand
++               button at the right end */
++            RECT box = { r.left + 8, r.top + 4, r.right - 8, r.top + 4 + imgh };
++            BOOL collapsed = (g->state & LVGS_COLLAPSED) != 0;
++            SIZE bs = { 0, 0 };
++            /* the buttons' part numbers: Vista's 8 and 9 (after GROUPHEADERLINE, 7); the
++               Longhorn styles have no header line, their buttons are 7 and 8 */
++            BOOL vista = IsThemePartDefined(theme, LVP_COLLAPSEBUTTON, 0);
++            INT part = collapsed ? (vista ? LVP_EXPANDBUTTON : 7) : (vista ? LVP_COLLAPSEBUTTON : 8);
++            DrawThemeBackground(theme, hdc, LVP_GROUPHEADER, LVGH_OPEN, &box, NULL);
++            if ((g->state & LVGS_COLLAPSIBLE) && IsThemePartDefined(theme, part, 0))
++            {
++                RECT b;
++                GetThemePartSize(theme, NULL, part, 1, NULL, TS_TRUE, &bs);
++                b.right = box.right - 4; b.left = b.right - bs.cx;
++                b.top = box.top + (imgh - bs.cy) / 2; b.bottom = b.top + bs.cy;
++                DrawThemeBackground(theme, hdc, part, 1, &b, NULL);
++            }
++            tr = box;
++            tr.left += 7;
++            tr.right -= bs.cx + 8;
++            SetTextColor(hdc, heading);
++            if (len) DrawTextW(hdc, g->header, len, &tr, DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
++            continue;
++        }
 +        tr = r;
 +        tr.left += 8;
 +        tr.right -= 44;
@@ -304,6 +562,8 @@
 +            DeleteObject(brush);
 +        }
 +    }
++    if (oldFont) SelectObject(hdc, oldFont);
++    if (themeFont) DeleteObject(themeFont);
 +}
 +
 +static LRESULT LISTVIEW_InsertGroup(LISTVIEW_INFO *infoPtr, INT index, const LVGROUP *lvg)
@@ -380,7 +640,7 @@
  static BOOL LISTVIEW_Arrange(LISTVIEW_INFO *infoPtr, INT nAlignCode)
  {
      void (*next_pos)(LISTVIEW_INFO *, LPPOINT);
-@@ -2782,6 +3091,13 @@
+@@ -2782,6 +3269,13 @@
      INT i;
  
      if (infoPtr->uView != LV_VIEW_ICON && infoPtr->uView != LV_VIEW_SMALLICON) return FALSE;
@@ -394,7 +654,7 @@
    
      TRACE("nAlignCode=%d\n", nAlignCode);
  
-@@ -4147,6 +4463,28 @@
+@@ -4147,6 +4641,28 @@
          }
      }
  
@@ -423,7 +683,7 @@
      /* see if we are supposed to be tracking mouse hovering */
      if (LISTVIEW_IsHotTracking(infoPtr)) {
          TRACKMOUSEEVENT trackinfo;
-@@ -4254,6 +4592,18 @@
+@@ -4254,6 +4770,18 @@
      item.lParam = 0;
      if (!isNew && !LISTVIEW_GetItemW(infoPtr, &item)) return FALSE;
  
@@ -442,7 +702,58 @@
      TRACE("oldState=%x, newState=%x\n", item.state, lpLVItem->state);
      /* determine what fields will change */    
      if ((lpLVItem->mask & LVIF_STATE) && ((item.state ^ lpLVItem->state) & stateMask & ~infoPtr->uCallbackMask))
-@@ -4623,6 +4973,8 @@
+@@ -4412,7 +4940,8 @@
+     if (infoPtr->dwStyle & LVS_OWNERDATA) return FALSE;
+     
+     /* set subitem only if column is present */
+-    if (lpLVItem->iSubItem >= DPA_GetPtrCount(infoPtr->hdpaColumns)) return FALSE;
++    /* flxp: or any up to 31: text only the tile view shows (LVM_SETTILEINFO) */
++    if (lpLVItem->iSubItem >= DPA_GetPtrCount(infoPtr->hdpaColumns) && lpLVItem->iSubItem >= 32) return FALSE;
+    
+     /* First do some sanity checks */
+     /* The LVIF_STATE flag is valid for subitems, but does not appear to be
+@@ -4516,7 +5045,7 @@
+ 	/* this little optimization eliminates some nasty flicker */
+ 	if ( infoPtr->uView == LV_VIEW_DETAILS && !(infoPtr->dwStyle & LVS_OWNERDRAWFIXED) &&
+ 	     !(infoPtr->dwLvExStyle & LVS_EX_FULLROWSELECT) &&
+-             lpLVItem->iSubItem > 0 && lpLVItem->iSubItem <= DPA_GetPtrCount(infoPtr->hdpaColumns) )
++             lpLVItem->iSubItem > 0 && lpLVItem->iSubItem < DPA_GetPtrCount(infoPtr->hdpaColumns) )   /* flxp: < (tile subitems) */
+ 	    LISTVIEW_InvalidateSubItem(infoPtr, lpLVItem->iItem, lpLVItem->iSubItem);
+ 	else
+         {
+@@ -4604,12 +5133,31 @@
+  */
+ static BOOL LISTVIEW_FillBkgnd(const LISTVIEW_INFO *infoPtr, HDC hdc, const RECT *lprcBox)
+ {
++    COLORREF sorted;
++
+     if (infoPtr->hBkBrush)
+     {
+         TRACE("(hdc=%p, lprcBox=%s, hBkBrush=%p)\n", hdc, wine_dbgstr_rect(lprcBox), infoPtr->hBkBrush);
+ 
+         FillRect(hdc, lprcBox, infoPtr->hBkBrush);
+     }
++    /* flxp: the sorted column shaded down to the bottom (XP listview.c, the erase) */
++    if (infoPtr->hBkBrush && LISTVIEW_SortedColumnColor(infoPtr, -1, &sorted))
++    {
++        RECT col, r;
++        POINT origin;
++        HBRUSH br;
++
++        LISTVIEW_GetHeaderRect(infoPtr, infoPtr->selected_column, &col);
++        LISTVIEW_GetOrigin(infoPtr, &origin);
++        col.left += origin.x; col.right += origin.x;
++        col.top = lprcBox->top; col.bottom = lprcBox->bottom;
++        if (IntersectRect(&r, &col, lprcBox) && (br = CreateSolidBrush(sorted)))
++        {
++            FillRect(hdc, &r, br);
++            DeleteObject(br);
++        }
++    }
+ 
+     LISTVIEW_DrawBackgroundBitmap(infoPtr, hdc, lprcBox);
+     return TRUE;
+@@ -4623,6 +5171,8 @@
      HIMAGELIST himl;
      UINT format;
      RECT *focus;
@@ -451,7 +762,7 @@
  
      /* now check if we need to update the focus rectangle */
      focus = infoPtr->bFocus && (item->state & LVIS_FOCUSED) ? &infoPtr->rcFocus : 0;
-@@ -4662,7 +5014,55 @@
+@@ -4662,7 +5212,60 @@
      else
          background = &rcSelect;
  
@@ -464,7 +775,12 @@
 +             LISTVIEW_ThemedItemState(infoPtr, nmlvcd->nmcd.uItemState, item->state) : 0;
 +    if (themed && item->iSubItem == 0)
 +    {
-+        if (infoPtr->uView == LV_VIEW_ICON)
++        if (is_tile(infoPtr))
++        {
++            rcTheme = rcBox;
++            InflateRect(&rcTheme, -TILE_INSET, -TILE_INSET);
++        }
++        else if (infoPtr->uView == LV_VIEW_ICON)
 +            UnionRect(&rcTheme, &rcBox, &rcLabel);
 +        else if (infoPtr->uView == LV_VIEW_DETAILS && (infoPtr->dwLvExStyle & LVS_EX_FULLROWSELECT))
 +        {
@@ -508,7 +824,7 @@
          ExtTextOutW(nmlvcd->nmcd.hdc, background->left, background->top, ETO_OPAQUE, background, NULL, 0, NULL);
  
      if (item->state & LVIS_FOCUSED)
-@@ -4693,6 +5093,11 @@
+@@ -4693,6 +5296,11 @@
          }
          else
              infoPtr->rcFocus = rcLabel;
@@ -520,7 +836,7 @@
      }
  
      /* state icons */
-@@ -4714,15 +5119,51 @@
+@@ -4714,20 +5322,84 @@
  
          TRACE("iImage=%d\n", item->iImage);
  
@@ -574,7 +890,40 @@
      }
  
      /* Don't bother painting item being edited */
-@@ -4752,6 +5193,15 @@
+     if (infoPtr->hwndEdit && item->iItem == infoPtr->nEditLabelItem && item->iSubItem == 0) return;
+ 
++    /* flxp: no labels (Hide File Names) */
++    if (hide_labels(infoPtr)) return;
++
++    /* flxp: a tile: the name on the first line, the tile lines grey under it
++       (#808080 in 4051 and 4074; the highlight text colour on a classic selection) */
++    if (is_tile(infoPtr))
++    {
++        LPCWSTR lines[8];
++        INT n = LISTVIEW_TileLines(infoPtr, item->iItem, lines, 8), k;
++        UINT fmt = DT_TOP | DT_LEFT | DT_NOPREFIX | DT_SINGLELINE | DT_END_ELLIPSIS;
++        HDC hdc = nmlvcd->nmcd.hdc;
++        COLORREF old = GetTextColor(hdc);
++        BOOL classic_sel = !themed && (item->state & LVIS_SELECTED) &&
++                           (infoPtr->bFocus || (infoPtr->dwStyle & LVS_SHOWSELALWAYS));
++        RECT r = rcLabel;
++
++        r.bottom = r.top + infoPtr->ntmHeight;
++        DrawTextW(hdc, item->pszText, -1, &r, fmt);
++        if (!classic_sel) SetTextColor(hdc, RGB(128, 128, 128));
++        for (k = 0; k < n; k++)
++        {
++            OffsetRect(&r, 0, infoPtr->ntmHeight);
++            DrawTextW(hdc, lines[k], -1, &r, fmt);
++        }
++        SetTextColor(hdc, old);
++        return;
++    }
++
+     /* figure out the text drawing flags */
+     format = (infoPtr->uView == LV_VIEW_ICON ? (focus ? LV_FL_DT_FLAGS : LV_ML_DT_FLAGS) : LV_SL_DT_FLAGS);
+     if (infoPtr->uView == LV_VIEW_ICON)
+@@ -4752,6 +5424,15 @@
      if (infoPtr->uView == LV_VIEW_DETAILS && infoPtr->dwLvExStyle & LVS_EX_GRIDLINES)
          rcLabel.bottom--;
  
@@ -590,7 +939,7 @@
      DrawTextW(nmlvcd->nmcd.hdc, item->pszText, -1, &rcLabel, format);
  }
  
-@@ -4785,7 +5235,7 @@
+@@ -4785,7 +5466,7 @@
      /* get information needed for drawing the item */
      lvItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM | LVIF_STATE;
      if (infoPtr->uView == LV_VIEW_DETAILS) lvItem.mask |= LVIF_INDENT;
@@ -599,7 +948,7 @@
      lvItem.iItem = nItem;
      lvItem.iSubItem = 0;
      lvItem.state = 0;
-@@ -5252,6 +5702,9 @@
+@@ -5252,6 +5933,9 @@
      cdmode = notify_customdraw(infoPtr, CDDS_PREPAINT, &nmlvcd);
      if (cdmode & CDRF_SKIPDEFAULT) goto enddraw;
  
@@ -609,7 +958,16 @@
      /* nothing to draw */
      if(infoPtr->nItemCount == 0) goto enddraw;
  
-@@ -6208,6 +6661,14 @@
+@@ -6171,6 +6855,8 @@
+     ReleaseDC(infoPtr->hwndSelf, hdc);
+ 
+     sz.cy = rect.bottom - rect.top + 2;
++    /* flxp: a tile's name is its first line; without labels the box goes under the image */
++    if (is_tile(infoPtr) || hide_labels(infoPtr)) sz.cy = infoPtr->ntmHeight + 2;
+     rect.left -= 2;
+     rect.top  -= 1;
+     TRACE("moving edit (%ld,%ld)-(%ld,%ld)\n", rect.left, rect.top, sz.cx, sz.cy);
+@@ -6208,6 +6894,14 @@
      rcItem.left = LVIR_BOUNDS;
      if (!LISTVIEW_GetItemRect(infoPtr, nItem, &rcItem)) return FALSE;
  
@@ -624,7 +982,7 @@
      if (bPartial && IntersectRect(&rcTemp, &infoPtr->rcList, &rcItem)) return TRUE;
      
      if (rcItem.left < infoPtr->rcList.left || rcItem.right > infoPtr->rcList.right)
-@@ -6781,6 +7242,9 @@
+@@ -6781,6 +7475,9 @@
      else
  	pItemHdr = &lpItem->hdr;
  
@@ -634,7 +992,7 @@
      /* Do we need to query the state from the app? */
      if ((lpLVItem->mask & LVIF_STATE) && infoPtr->uCallbackMask && (!lpLVItem->iSubItem || is_subitem_invalid))
      {
-@@ -7800,6 +8264,7 @@
+@@ -7800,6 +8497,7 @@
      if (!is_assignable_item(lpLVItem, infoPtr->dwStyle)) return -1;
  
      if (!(lpItem = Alloc(sizeof(*lpItem)))) return -1;
@@ -642,7 +1000,7 @@
      
      /* insert item in listview control data structure */
      if ( !(hdpaSubItems = DPA_Create(8)) ) goto fail;
-@@ -7921,6 +8386,7 @@
+@@ -7921,6 +8619,7 @@
  
  	LISTVIEW_MoveIconTo(infoPtr, nItem, &pt, TRUE);
      }
@@ -650,7 +1008,17 @@
  
      /* now is the invalidation fun */
      LISTVIEW_ScrollOnInsert(infoPtr, nItem, 1);
-@@ -9018,6 +9484,16 @@
+@@ -8698,6 +9397,9 @@
+             LISTVIEW_SetBkColor(infoPtr, CLR_NONE);
+     }
+ 
++    if((infoPtr->dwLvExStyle ^ old_ex_style) & LVS_EX_HIDELABELS)   /* flxp */
++        LISTVIEW_UpdateItemSize(infoPtr);
++
+     if((infoPtr->dwLvExStyle ^ old_ex_style) & LVS_EX_HEADERINALLVIEWS)
+     {
+         if (infoPtr->dwLvExStyle & LVS_EX_HEADERINALLVIEWS)
+@@ -9018,6 +9720,16 @@
      if (!pt || nItem < 0 || nItem >= infoPtr->nItemCount ||
  	!(infoPtr->uView == LV_VIEW_ICON || infoPtr->uView == LV_VIEW_SMALLICON)) return FALSE;
  
@@ -667,7 +1035,30 @@
      Pt = *pt;
      LISTVIEW_GetOrigin(infoPtr, &Origin);
  
-@@ -9563,6 +10039,7 @@
+@@ -9278,17 +9990,15 @@
+ static INT LISTVIEW_SetView(LISTVIEW_INFO *infoPtr, DWORD nView)
+ {
+   HIMAGELIST himl;
+-
+-  if (infoPtr->uView == nView) return 1;
++  /* flxp: the tile view is the icon view's layout (bTile) */
++  BOOL tile = nView == LV_VIEW_TILE;
+ 
+   if ((INT)nView < 0 || nView > LV_VIEW_MAX) return -1;
+-  if (nView == LV_VIEW_TILE)
+-  {
+-      FIXME("View LV_VIEW_TILE unimplemented\n");
+-      return -1;
+-  }
++  if (tile) nView = LV_VIEW_ICON;
++  if (infoPtr->uView == nView && infoPtr->bTile == tile) return 1;
+ 
+   infoPtr->uView = nView;
++  infoPtr->bTile = tile;
+ 
+   SendMessageW(infoPtr->hwndEdit, WM_KILLFOCUS, 0, 0);
+   ShowWindow(infoPtr->hwndHeader, SW_HIDE);
+@@ -9563,6 +10273,7 @@
    SetWindowLongPtrW(hwnd, 0, (DWORD_PTR)infoPtr);
  
    infoPtr->hwndSelf = hwnd;
@@ -675,7 +1066,7 @@
    infoPtr->dwStyle = lpcs->style;    /* Note: may be changed in WM_CREATE */
    map_style_view(infoPtr);
    /* determine the type of structures to use */
-@@ -9573,6 +10050,7 @@
+@@ -9573,6 +10284,7 @@
    infoPtr->clrBk = CLR_NONE;
    infoPtr->clrText = CLR_DEFAULT;
    infoPtr->clrTextBk = CLR_DEFAULT;
@@ -683,7 +1074,7 @@
    LISTVIEW_SetBkColor(infoPtr, comctl32_color.clrWindow);
  
    /* set default values */
-@@ -9609,6 +10087,7 @@
+@@ -9609,6 +10321,7 @@
    if (!(infoPtr->hdpaItemIds = DPA_Create(10))) goto fail;
    if (!(infoPtr->hdpaPosX  = DPA_Create(10))) goto fail;
    if (!(infoPtr->hdpaPosY  = DPA_Create(10))) goto fail;
@@ -691,7 +1082,7 @@
    if (!(infoPtr->hdpaColumns = DPA_Create(10))) goto fail;
  
    return DefWindowProcW(hwnd, WM_NCCREATE, wParam, (LPARAM)lpcs);
-@@ -10055,6 +10534,13 @@
+@@ -10055,6 +10768,13 @@
  
    TRACE("(nVirtualKey=%d, lKeyData=%ld)\n", nVirtualKey, lKeyData);
  
@@ -705,7 +1096,7 @@
    /* send LVN_KEYDOWN notification */
    nmKeyDown.wVKey = nVirtualKey;
    nmKeyDown.flags = 0;
-@@ -10309,6 +10795,24 @@
+@@ -10309,6 +11029,24 @@
    infoPtr->bMarqueeSelect = FALSE;
    infoPtr->bScrolling = FALSE;
  
@@ -730,7 +1121,7 @@
    lvHitTestInfo.pt.x = x;
    lvHitTestInfo.pt.y = y;
  
-@@ -10495,6 +10999,10 @@
+@@ -10495,6 +11233,10 @@
    DPA_Destroy(infoPtr->hdpaItemIds);
    DPA_Destroy(infoPtr->hdpaPosX);
    DPA_Destroy(infoPtr->hdpaPosY);
@@ -741,7 +1132,7 @@
    /* columns */
    for (i = 0; i < DPA_GetPtrCount(infoPtr->hdpaColumns); i++)
        Free(DPA_GetPtr(infoPtr->hdpaColumns, i));
-@@ -10790,6 +11298,14 @@
+@@ -10790,6 +11532,14 @@
  	    LISTVIEW_Arrange(infoPtr, LVA_DEFAULT);
  	LISTVIEW_UpdateScroll(infoPtr);
      }
@@ -756,7 +1147,7 @@
  
      if (infoPtr->hwndHeader)  UpdateWindow(infoPtr->hwndHeader);
  
-@@ -11448,7 +11964,17 @@
+@@ -11448,7 +12198,17 @@
    case LVM_EDITLABELW:
      return (LRESULT)LISTVIEW_EditLabelT(infoPtr, (INT)wParam,
                                          uMsg == LVM_EDITLABELW);
@@ -775,7 +1166,7 @@
  
    case LVM_ENSUREVISIBLE:
      return LISTVIEW_EnsureVisible(infoPtr, (INT)wParam, (BOOL)lParam);
-@@ -11558,7 +12084,8 @@
+@@ -11558,7 +12318,8 @@
      LISTVIEW_GetOrigin(infoPtr, (LPPOINT)lParam);
      return TRUE;
  
@@ -785,7 +1176,47 @@
  
    case LVM_GETSELECTEDCOLUMN:
      return infoPtr->selected_column;
-@@ -11618,7 +12145,8 @@
+@@ -11583,9 +12344,28 @@
+   case LVM_GETTEXTCOLOR:
+     return infoPtr->clrText;
+ 
+-  /* case LVM_GETTILEINFO: */
++  case LVM_GETTILEINFO:   /* flxp */
++  {
++      LVTILEINFO *ti = (LVTILEINFO *)lParam;
++      ITEM_INFO *it;
++      UINT i;
++      if (!ti || (infoPtr->dwStyle & LVS_OWNERDATA) || ti->iItem < 0 || ti->iItem >= infoPtr->nItemCount) return FALSE;
++      it = DPA_GetPtr(DPA_GetPtr(infoPtr->hdpaItems, ti->iItem), 0);
++      for (i = 0; i < it->nTileCols && i < ti->cColumns; i++) if (ti->puColumns) ti->puColumns[i] = it->tileCols[i];
++      ti->cColumns = it->nTileCols;
++      return TRUE;
++  }
+ 
+-  /* case LVM_GETTILEVIEWINFO: */
++  case LVM_GETTILEVIEWINFO:   /* flxp */
++  {
++      LVTILEVIEWINFO *tvi = (LVTILEVIEWINFO *)lParam;
++      if (!tvi) return FALSE;
++      tvi->dwMask = LVTVIM_TILESIZE | LVTVIM_COLUMNS;
++      tvi->dwFlags = LVTVIF_FIXEDSIZE;
++      tvi->sizeTile = infoPtr->iconSpacing;
++      tvi->cLines = infoPtr->nTileLines;
++      return TRUE;
++  }
+ 
+   case LVM_GETTOOLTIPS:
+     if( !infoPtr->hwndToolTip )
+@@ -11599,7 +12379,7 @@
+     return (infoPtr->notifyFormat == NFR_UNICODE);
+ 
+   case LVM_GETVIEW:
+-    return infoPtr->uView;
++    return is_tile(infoPtr) ? LV_VIEW_TILE : infoPtr->uView;   /* flxp */
+ 
+   case LVM_GETVIEWRECT:
+     return LISTVIEW_GetViewRect(infoPtr, (LPRECT)lParam);
+@@ -11618,7 +12398,8 @@
      return LISTVIEW_InsertColumnT(infoPtr, (INT)wParam, (LPLVCOLUMNW)lParam,
                                    uMsg == LVM_INSERTCOLUMNW);
  
@@ -795,7 +1226,7 @@
  
    /* case LVM_INSERTGROUPSORTED: */
  
-@@ -11628,7 +12156,33 @@
+@@ -11628,7 +12409,33 @@
  
    /* case LVM_INSERTMARKHITTEST: */
  
@@ -830,7 +1261,7 @@
  
    case LVM_ISITEMVISIBLE:
      return LISTVIEW_IsItemVisible(infoPtr, (INT)wParam);
-@@ -11734,7 +12288,12 @@
+@@ -11734,7 +12541,12 @@
      return LISTVIEW_SetItemTextT(infoPtr, (INT)wParam, (LPLVITEMW)lParam,
                                   uMsg == LVM_SETITEMTEXTW);
  
@@ -844,7 +1275,39 @@
  
    case LVM_SETSELECTEDCOLUMN:
      infoPtr->selected_column = (INT)wParam;
-@@ -11817,6 +12376,17 @@
+@@ -11749,9 +12561,29 @@
+   case LVM_SETTEXTCOLOR:
+     return LISTVIEW_SetTextColor(infoPtr, (COLORREF)lParam);
+ 
+-  /* case LVM_SETTILEINFO: */
++  case LVM_SETTILEINFO:   /* flxp: the subitems a tile shows under its name */
++  {
++      const LVTILEINFO *ti = (const LVTILEINFO *)lParam;
++      ITEM_INFO *it;
++      UINT i;
++      if (!ti || (infoPtr->dwStyle & LVS_OWNERDATA) || ti->iItem < 0 || ti->iItem >= infoPtr->nItemCount) return FALSE;
++      it = DPA_GetPtr(DPA_GetPtr(infoPtr->hdpaItems, ti->iItem), 0);
++      it->nTileCols = min(ti->cColumns, sizeof(it->tileCols) / sizeof(it->tileCols[0]));
++      for (i = 0; i < it->nTileCols; i++) it->tileCols[i] = ti->puColumns ? ti->puColumns[i] : 0;
++      if (is_tile(infoPtr)) LISTVIEW_InvalidateItem(infoPtr, ti->iItem);
++      return TRUE;
++  }
+ 
+-  /* case LVM_SETTILEVIEWINFO: */
++  case LVM_SETTILEVIEWINFO:   /* flxp: the lines under the name; a fixed tile size is the icon spacing */
++  {
++      const LVTILEVIEWINFO *tvi = (const LVTILEVIEWINFO *)lParam;
++      if (!tvi) return FALSE;
++      if (tvi->dwMask & LVTVIM_COLUMNS) infoPtr->nTileLines = max(0, min(tvi->cLines, 8));
++      if ((tvi->dwMask & LVTVIM_TILESIZE) && (tvi->dwFlags & LVTVIF_FIXEDSIZE) == LVTVIF_FIXEDSIZE)
++          LISTVIEW_SetIconSpacing(infoPtr, tvi->sizeTile.cx, tvi->sizeTile.cy);
++      LISTVIEW_InvalidateList(infoPtr);
++      return TRUE;
++  }
+ 
+   /* case LVM_SETTILEWIDTH: */
+ 
+@@ -11817,6 +12649,17 @@
    case WM_KEYDOWN:
      return LISTVIEW_KeyDown(infoPtr, (INT)wParam, (LONG)lParam);
  
@@ -862,7 +1325,7 @@
    case WM_KILLFOCUS:
      return LISTVIEW_KillFocus(infoPtr);
  
-@@ -11835,6 +12405,15 @@
+@@ -11835,6 +12678,15 @@
    case WM_MOUSEHOVER:
      return LISTVIEW_MouseHover(infoPtr, (SHORT)LOWORD(lParam), (SHORT)HIWORD(lParam));
  

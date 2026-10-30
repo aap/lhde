@@ -26,6 +26,16 @@ std::string md5_hex(const std::string& data);
 // A file this can make a thumbnail of (by name or by its first bytes).
 bool can_thumbnail(const std::string& path);
 
+// Whether the Longhorn views show thumbnails in a folder: flxp.ini thumbnails = 1 | 0
+// (default 1) and, on a network mount (reading every picture over the network is
+// slow), thumbnails_network = 0 | 1 (default 0).
+bool enabled_for(const std::string& folder);
+// A path on a network filesystem: NFS, SMB/CIFS, 9p, AFS, Ceph, Coda, or a FUSE mount
+// of sshfs, rclone, curlftpfs, gvfs, davfs2, s3fs and the like.
+bool on_network(const std::string& path);
+// A picture's width and height from its header (PNG, JPEG, GIF, BMP, WebP), without decoding it
+bool picture_size(const std::string& path, int* w, int* h);
+
 // The thumbnail at cache size: a current cached one, else a new one that is
 // also saved. Null when the file cannot be decoded. Thread-safe.
 gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size);

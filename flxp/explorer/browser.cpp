@@ -5,12 +5,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <algorithm>
 #include <math.h>
 #include "shell/namespace.h"
 #include "shell/config.h"
 #include "shell/lhtheme.h"
 #include "shell/dirwatch.h"
+#include "shell/thumbs.h"
 #include "sys/sys.h"
 #include "header.h"
 #include "places.h"
@@ -157,6 +159,7 @@ namespace views {
 
 static const struct { const char* name; int view; } k_names[] = {
     { "thumbnails", VIEW_THUMBNAILS }, { "icons", LVS_ICON }, { "smallicons", LVS_SMALLICON }, { "list", LVS_LIST }, { "details", LVS_REPORT },
+    { "tiles", VIEW_TILES },
     { "smallicons+thumbnails", LVS_SMALLICON | VIEW_THUMBS_FLAG }, { "list+thumbnails", LVS_LIST | VIEW_THUMBS_FLAG },
     { "details+thumbnails", LVS_REPORT | VIEW_THUMBS_FLAG },
 };
@@ -166,33 +169,46 @@ static struct stat g_stamp;                  // the file as last read (other win
 
 static bool enabled() { return shell::setting("remember_views", "1") != "0"; }
 
-// "icons@64" (the zoom: the Longhorn hosts), "details+thumbnails", ...; -1 if not a view
+// "icons@64" (the size: the Longhorn hosts), "tiles@48", "icons@96+nonames",
+// "details+thumbnails" (the earlier toggle), ...; -1 if not a view
 int parse(const std::string& text)
 {
     std::string name = text;
-    int zoom = 0;
+    int zoom = 0, flags = 0;
     size_t at = name.find('@');
-    if (at != std::string::npos) { zoom = atoi(name.c_str() + at + 1); name.resize(at); }
+    if (at != std::string::npos) {
+        zoom = atoi(name.c_str() + at + 1);
+        size_t plus = name.find('+', at);
+        name = name.substr(0, at) + (plus != std::string::npos ? name.substr(plus) : std::string());
+    }
+    const std::string nn = "+nonames";
+    if (name.size() > nn.size() && name.compare(name.size() - nn.size(), nn.size(), nn) == 0) {
+        name.resize(name.size() - nn.size());
+        flags = VIEW_NONAMES_FLAG;
+    }
     if (zoom < 0 || zoom > 256) zoom = 0;
-    for (const auto& n : k_names) if (name == n.name) return n.view | zoom << ZOOM_SHIFT;
+    for (const auto& n : k_names) if (name == n.name) return n.view | flags | zoom << ZOOM_SHIFT;
     return -1;
 }
 
 std::string name_of(int view)
 {
     int zoom = view >> ZOOM_SHIFT;
+    bool nonames = (view & VIEW_NONAMES_FLAG) != 0;
     for (const auto& n : k_names)
-        if (n.view == (view & ZOOM_VIEW)) return n.name + (zoom ? "@" + std::to_string(zoom) : std::string());
+        if (n.view == (view & ZOOM_VIEW & ~VIEW_NONAMES_FLAG))
+            return n.name + (zoom ? "@" + std::to_string(zoom) : std::string()) + (nonames ? "+nonames" : "");
     return "";
 }
 
 // The view of a folder never shown (XP's global default, g_dfs): default_view
 // (the XP frame) or default_view_longhorn in flxp.ini, set by Folder Options'
 // Apply to All Folders; empty = flxp's own: Details in the XP frame (XP's
-// Icons/Tiles are not ours), Icons at 48 px with thumbnails in the Longhorn
-// hosts (the user's "default should be icon view with thumbnails")
+// Icons/Tiles are not ours), Icons at 48 px (4074's Medium Icons; thumbnails
+// show by the thumbnails setting) in the Longhorn hosts (the user's "default
+// should be icon view with thumbnails")
 static const char* default_key(bool zoomable) { return zoomable ? "default_view_longhorn" : "default_view"; }
-int builtin_default(bool zoomable) { return zoomable ? (int)VIEW_THUMBNAILS | 48 << ZOOM_SHIFT : (int)LVS_REPORT; }
+int builtin_default(bool zoomable) { return zoomable ? (int)LVS_ICON | 48 << ZOOM_SHIFT : (int)LVS_REPORT; }
 int default_view(bool zoomable)
 {
     int v = parse(shell::setting(default_key(zoomable)));
@@ -359,11 +375,15 @@ static void make_groups(Browser& b, std::vector<int>& group_of)
         return lower(x) < lower(y);
     });
     order.erase(std::unique(order.begin(), order.end()), order.end());
+    // the Longhorn explorer's headers count their items ("File Folder (2)", lh4074-224845)
+    bool counts = b.zoomable && !GetPropW(b.list, L"flxp_concept_groups");
     for (size_t g = 0; g < order.size(); g++) {
         LVGROUP lg = {};
         lg.cbSize = sizeof lg;
         lg.mask = LVGF_HEADER | LVGF_GROUPID | LVGF_STATE;
-        std::u16string t = W(order[g]);
+        std::string text = order[g];
+        if (counts) text += " (" + std::to_string(std::count(titles.begin(), titles.end(), order[g])) + ")";
+        std::u16string t = W(text);
         lg.pszHeader = (LPWSTR)t.c_str();
         lg.iGroupId = (int)g;
         lg.stateMask = LVGS_COLLAPSIBLE | LVGS_COLLAPSED;
@@ -375,6 +395,8 @@ static void make_groups(Browser& b, std::vector<int>& group_of)
     for (size_t i = 0; i < b.items.size(); i++)
         group_of[i] = (int)(std::find(order.begin(), order.end(), titles[i]) - order.begin());
 }
+
+static void put_tile_lines(Browser& b, size_t i);
 
 // list item i from b.items[i] (lParam i): inserted, or set again (a change on disk)
 static void put_item(Browser& b, size_t i, int group, bool insert)
@@ -399,6 +421,7 @@ static void put_item(Browser& b, size_t i, int group, bool insert)
     sub.iSubItem = 1; sub.pszText = (LPWSTR)size.c_str(); SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
     sub.iSubItem = 2; sub.pszText = (LPWSTR)type.c_str(); SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
     sub.iSubItem = 3; sub.pszText = (LPWSTR)date.c_str(); SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
+    if (b.zoomable && b.tiles) put_tile_lines(b, i);
 }
 
 void fill_list(Browser& b)
@@ -658,9 +681,11 @@ bool navigate(Browser& b, const std::string& path, bool record)
     if (changed && b.folder && b.remember_views) views::leaving(b.folder->path(), view_code(b));
     std::string from = b.folder ? b.folder->path() : "";
     b.folder = f;
-    if (changed && b.remember_views) {
-        int v = views::lookup(f->path(), b.zoomable);
-        if (v >= 0 && v != view_code(b)) set_view(b, v, true);
+    if (changed) {
+        int v = b.remember_views ? views::lookup(f->path(), b.zoomable) : -1;
+        // the Longhorn views every time: whether thumbnails show depends on the folder (a network mount)
+        if (b.zoomable) set_view(b, v >= 0 ? v : view_code(b), true);
+        else if (v >= 0 && v != view_code(b)) set_view(b, v, true);
     }
     if (b.select_parent && changed && !from.empty()) b.select_after_refresh = from;   // going up selects the folder we came from
     refresh(b);
@@ -716,26 +741,19 @@ void history_menu(Browser& b, HWND owner, bool back, int x, int y)
     }
 }
 
-// the view as the menus see it: LVS_* or VIEW_THUMBNAILS
-int menu_view(const Browser& b) { return thumbview::active() ? (int)VIEW_THUMBNAILS : b.view; }
+// the view as the menus see it: LVS_* or VIEW_THUMBNAILS (XP); LVS_REPORT, VIEW_TILES
+// or LVS_ICON (the Longhorn hosts)
+int menu_view(const Browser& b)
+{
+    if (b.zoomable) return b.view == LVS_REPORT ? (int)LVS_REPORT : b.tiles ? (int)VIEW_TILES : (int)LVS_ICON;
+    return thumbview::active() ? (int)VIEW_THUMBNAILS : b.view;
+}
 
 int view_code(const Browser& b)
 {
-    int zoom = b.zoomable && b.zoom ? b.zoom << ZOOM_SHIFT : 0;
-    if (b.thumbs && b.view == LVS_ICON) return VIEW_THUMBNAILS | zoom;
-    return b.view | (b.thumbs && b.thumbs_toggle ? (int)VIEW_THUMBS_FLAG : 0) | zoom;
-}
-
-void set_thumbnails(Browser& b, bool on)
-{
-    if (b.zoomable) {   // a toggle for the way the items are drawn, in every view (4051)
-        b.thumbs = on;
-        set_view(b, b.view | (on ? (int)VIEW_THUMBS_FLAG : 0));
-        return;
-    }
-    if (on) { set_view(b, VIEW_THUMBNAILS); return; }
-    b.thumbs = false;
-    set_view(b, b.view);
+    if (b.zoomable) return menu_view(b) | (b.hide_names ? (int)VIEW_NONAMES_FLAG : 0) | (b.zoom > 0 ? b.zoom << ZOOM_SHIFT : 0);
+    if (b.thumbs && b.view == LVS_ICON) return VIEW_THUMBNAILS;
+    return b.view;
 }
 
 // ---- zoom (the Longhorn hosts) ----------------------------------------------------
@@ -769,7 +787,7 @@ std::vector<int> zoom_levels()
 
 int icon_px(const Browser& b)
 {
-    if (b.zoomable && b.zoom) return b.zoom;
+    if (b.zoomable) return b.zoom > 0 ? b.zoom : current_view(b).size;
     if (b.thumbs) return thumbview::default_size();
     int cx = 32, cy = 32;
     if (b.large) ImageList_GetIconSize(b.large, &cx, &cy);
@@ -788,57 +806,290 @@ static void restore_icons(Browser& b)
     }
 }
 
-// What the items show: thumbnails (XP's Thumbnails view: in Icons only; the
-// Longhorn hosts' toggle: in every view - at the zoom in Icons, 16 px in the
-// others) or the icons (the Longhorn hosts: at the zoom in Icons). True when
-// the list was filled again.
+// ---- the Longhorn views (shell/viewmodel.h) ---------------------------------------------
+
+using shell::viewmodel::View;
+using shell::viewmodel::Mode;
+
+static shell::viewmodel::Memory g_memory;
+static bool g_memory_loaded;
+static std::vector<void (*)(Browser&)> g_view_listeners;
+
+void add_view_listener(void (*fn)(Browser&)) { g_view_listeners.push_back(fn); }
+
+static std::string memory_path() { return shell::state_file("flxp-view-sizes"); }
+
+shell::viewmodel::Memory& view_memory()
+{
+    if (!g_memory_loaded) {
+        g_memory_loaded = true;
+        std::string text;
+        if (shell::read_file(memory_path(), text)) g_memory.load(text);
+    }
+    return g_memory;
+}
+
+// a view was shown: its stop keeps the size (written when that changed something)
+static void remember_shown(const View& v)
+{
+    shell::viewmodel::Memory& m = view_memory();
+    std::string before = m.save();
+    m.shown(v);
+    std::string after = m.save();
+    if (after != before) shell::write_file_atomic(memory_path(), after + "\n");
+}
+
+// A view code (the views file, Folder Options, the menus) as a View; a size the view
+// cannot have (none, or the earlier codes' Icons size on Details) is the one it remembers
+static View view_of_code(int code)
+{
+    int size = (code >> ZOOM_SHIFT) & 0x1ff;
+    int v = code & ZOOM_VIEW;
+    View out;
+    out.hide_names = (v & VIEW_NONAMES_FLAG) != 0;
+    bool old_toggle = (v & VIEW_THUMBS_FLAG) != 0;
+    v &= ~(VIEW_NONAMES_FLAG | VIEW_THUMBS_FLAG);
+    out.mode = v == LVS_REPORT || v == LVS_LIST ? Mode::Details : v == VIEW_TILES ? Mode::Tiles : Mode::Icons;
+    if (v == LVS_SMALLICON && !size) size = 16;
+    if (v == LVS_LIST || (old_toggle && out.mode == Mode::Details) ||
+        size < shell::viewmodel::min_size(out.mode) || size > shell::viewmodel::max_size(out.mode))
+        size = view_memory().recall(out.mode).size;
+    out.size = size;
+    return out;
+}
+
+
+View current_view(const Browser& b)
+{
+    View v;
+    v.mode = b.view == LVS_REPORT ? Mode::Details : b.tiles ? Mode::Tiles : Mode::Icons;
+    v.size = b.zoom > 0 ? b.zoom : view_memory().recall(v.mode).size;
+    v.hide_names = b.hide_names;
+    return shell::viewmodel::clamped(v);
+}
+
+static int line_height(HWND list)
+{
+    HDC dc = GetDC(list);
+    HFONT f = (HFONT)SendMessageW(list, WM_GETFONT, 0, 0);
+    HFONT old = f ? (HFONT)SelectObject(dc, f) : nullptr;
+    TEXTMETRICW tm = {};
+    GetTextMetricsW(dc, &tm);
+    if (old) SelectObject(dc, old);
+    ReleaseDC(list, dc);
+    return tm.tmHeight > 0 ? (int)tm.tmHeight : 13;
+}
+
+// A tile's lines under the name, as 4051/4074's TileInfo lists them (REGINST): "Label: value",
+// the first two that are not empty: a folder its Type; a picture Dimensions, Type, Size; a
+// drive Percent Full, Free Space; any other file Type, Size, Date Modified
+enum { TILE_SUBITEM = 8, TILE_LINES = 3 };   // the subitems that hold them (listview.c: beyond the columns)
+static std::vector<std::string> tile_lines(const Item& it)
+{
+    std::vector<std::string> out;
+    if (it.flags & shell::IsDrive) {
+        struct statvfs st;
+        if (!it.path.empty() && it.path[0] == '/' && statvfs(it.path.c_str(), &st) == 0 && st.f_blocks) {
+            uint64_t total = (uint64_t)st.f_blocks * st.f_frsize, avail = (uint64_t)st.f_bavail * st.f_frsize;
+            uint64_t used = total - (uint64_t)st.f_bfree * st.f_frsize;
+            out.push_back("Percent Full: " + std::to_string((int)(used * 100 / total)) + "%");
+            out.push_back("Free Space: " + shell::format_size(avail));
+        }
+        if (!it.type.empty()) out.push_back("Type: " + it.type);
+        return out;
+    }
+    if (it.is_folder()) {
+        if (!it.type.empty()) out.push_back("Type: " + it.type);
+        return out;
+    }
+    int w = 0, h = 0;
+    if (shell::thumbs::can_thumbnail(it.path) && shell::thumbs::picture_size(it.path, &w, &h))
+        out.push_back("Dimensions: " + std::to_string(w) + " x " + std::to_string(h));
+    if (!it.type.empty()) out.push_back("Type: " + it.type);
+    if (!(it.flags & shell::IsVirtual)) out.push_back("Size: " + shell::format_size(it.size));
+    if (it.mtime) out.push_back("Date Modified: " + shell::format_date(it.mtime));
+    return out;
+}
+
+static void put_tile_lines(Browser& b, size_t i)
+{
+    std::vector<std::string> lines = tile_lines(b.items[i]);
+    UINT cols[TILE_LINES];
+    UINT n = 0;
+    for (int k = 0; k < TILE_LINES; k++) {
+        std::u16string t = k < (int)lines.size() ? W(lines[(size_t)k]) : std::u16string();
+        LVITEMW sub = {};
+        sub.mask = LVIF_TEXT; sub.iItem = (int)i; sub.iSubItem = TILE_SUBITEM + k; sub.pszText = (LPWSTR)t.c_str();
+        SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
+        cols[n++] = (UINT)(TILE_SUBITEM + k);
+    }
+    LVTILEINFO ti = {};
+    ti.cbSize = sizeof ti; ti.iItem = (int)i; ti.cColumns = n; ti.puColumns = cols;
+    SendMessageW(b.list, LVM_SETTILEINFO, 0, (LPARAM)&ti);
+}
+
+// The list as a View asks: its view, the images at the view's size (thumbview's when
+// thumbnails show in the folder, else the theme's icons at that size), the spacing,
+// the tile lines, Hide File Names
+static void lh_set(Browser& b, View v, bool navigating)
+{
+    v = shell::viewmodel::clamped(v);
+    bool details = v.mode == Mode::Details, tiles = v.mode == Mode::Tiles;
+    bool thumbs = shell::thumbs::enabled_for(b.folder ? b.folder->path() : "");
+    bool was_grouped = !b.group_titles.empty();
+    bool was_tiles = b.tiles && b.view == LVS_ICON;
+    int px = v.size;
+    b.view = details ? LVS_REPORT : LVS_ICON;
+    b.tiles = tiles;
+    b.hide_names = v.hide_names;
+    b.zoom = px;
+    b.thumbs = thumbs;
+    remember_shown(v);
+    if (!navigating && b.folder && b.remember_views) views::store(b.folder->path(), view_code(b));
+
+    // the list's view: Details, or the icon layout as tiles or icons (with or without labels)
+    DWORD style = (DWORD)GetWindowLongW(b.list, GWL_STYLE);
+    DWORD want = (style & ~LVS_TYPEMASK) | (DWORD)(details ? LVS_REPORT : LVS_ICON);
+    if (want != style) SetWindowLongW(b.list, GWL_STYLE, (LONG)want);
+    SendMessageW(b.list, LVM_SETVIEW, tiles ? LV_VIEW_TILE : details ? LV_VIEW_DETAILS : LV_VIEW_ICON, 0);
+    // the column header above every view (LVS_EX_HEADERINALLVIEWS: 4051/4074's sort and filter row);
+    // Details selects whole rows (4051's LISTITEM underlay per row, lh4051-194831)
+    SendMessageW(b.list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_HIDELABELS | LVS_EX_BORDERSELECT | LVS_EX_HEADERINALLVIEWS | LVS_EX_FULLROWSELECT,
+                 (v.mode == Mode::Icons && v.hide_names ? LVS_EX_HIDELABELS : 0) | LVS_EX_HEADERINALLVIEWS | (details ? LVS_EX_FULLROWSELECT : 0));
+
+    // the images at px: Details in the small slot, Tiles and Icons in the normal one
+    bool refill = false;
+    if (thumbs) {
+        if (thumbview::active() && !thumbview::longhorn()) thumbview::leave(b.large, b.small);
+        thumbview::set_longhorn(true);
+        refill = thumbview::enter_at(px, details, b.large, b.small);
+        SendMessageW(b.list, LVM_SETIMAGELIST, details ? LVSIL_NORMAL : LVSIL_SMALL, (LPARAM)(details ? b.large : b.small));
+    } else {
+        if (thumbview::active()) { thumbview::leave(b.large, b.small); if (!navigating) restore_icons(b); }
+        HIMAGELIST icons = b.icons_at(px);
+        SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)(details ? icons : b.small));
+        SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)(details ? b.large : icons));
+    }
+
+    // the cells (measured: 4051/4074 tiles 218 x 56 at 48 px, 186 x 26 at 16 px; 4074's
+    // icons 77 x 69 at 16 px, 116 x 148 at about 72, 139 x 163 at about 90, 277 high at
+    // about 175: the height grows by 1.3 per pixel of image; 4051 hidden names 110 x 105 at 96)
+    int lh = line_height(b.list);
+    if (tiles) {
+        int lines = px >= 48 ? 2 : 0;   // 4051 _SetTileViewInfo: cLines 0 below 48 px, 2 from 48
+        LVTILEVIEWINFO tvi = {};
+        tvi.cbSize = sizeof tvi; tvi.dwMask = LVTVIM_COLUMNS; tvi.cLines = lines;
+        SendMessageW(b.list, LVM_SETTILEVIEWINFO, 0, (LPARAM)&tvi);
+        int h = (std::max)(26, (std::max)(px + 8, (1 + lines) * lh + 8));
+        SendMessageW(b.list, LVM_SETICONSPACING, 0, MAKELPARAM(px + 170, h));
+        if (!was_tiles && !navigating && !refill) for (size_t i = 0; i < b.items.size(); i++) put_tile_lines(b, i);
+    } else if (!details) {
+        if (v.hide_names) SendMessageW(b.list, LVM_SETICONSPACING, 0, MAKELPARAM(px + 14, px + 9));
+        else SendMessageW(b.list, LVM_SETICONSPACING, 0, MAKELPARAM((std::max)(77, px + 46), px + 27 + 2 * lh + 3 * (px - 16) / 10));
+    }
+
+    if (refill || (!navigating && b.grouped && was_grouped != group_view_applies(b))) fill_list(b);
+    if (!details) SendMessageW(b.list, LVM_ARRANGE, LVA_DEFAULT, 0);
+    InvalidateRect(b.list, nullptr, TRUE);
+    b.view_changed();
+    for (auto fn : g_view_listeners) fn(b);
+}
+
+void show_view(Browser& b, const View& v)
+{
+    if (!b.zoomable) return;
+    lh_set(b, v, false);
+}
+
+void thumbnails_changed(Browser& b)
+{
+    if (!b.zoomable) return;
+    bool on = shell::thumbs::enabled_for(b.folder ? b.folder->path() : "");
+    if (on != b.thumbs) lh_set(b, current_view(b), false);
+}
+
+bool view_command(Browser& b, int vc)
+{
+    if (!b.zoomable) return false;
+    shell::viewmodel::Memory& m = view_memory();
+    View cur = current_view(b), v = cur;
+    switch (vc) {
+    case VC_DETAILS: v = m.recall(Mode::Details); break;
+    case VC_TILES: v = m.recall(Mode::Tiles); break;
+    case VC_ICONS: v = m.recall(Mode::Icons); break;
+    case VC_LARGE: v = m.at(shell::viewmodel::STOP_LARGE); break;
+    case VC_MEDIUM: v = m.at(shell::viewmodel::STOP_MEDIUM); break;
+    case VC_SMALL: v = m.at(shell::viewmodel::STOP_SMALL); break;
+    case VC_CYCLE: v = m.next(cur); break;
+    case VC_HIDENAMES:
+        if (cur.mode != Mode::Icons) return true;   // (4051: Icons only)
+        v.hide_names = !cur.hide_names;
+        show_view(b, v);
+        return true;
+    case VC_THUMBNAILS:
+        shell::write_setting("thumbnails", shell::setting("thumbnails", "1") == "0" ? "1" : "0");
+        thumbnails_changed(b);
+        return true;
+    case VC_DEFAULT:
+        set_view(b, views::default_view(true));
+        if (b.folder) views::forget(b.folder->path());   // (after set_view, which stores)
+        return true;
+    default: return false;
+    }
+    v.hide_names = cur.hide_names;   // the folder's choice stays with it (shown in Icons only)
+    show_view(b, v);
+    return true;
+}
+
+// ---- XP's views -------------------------------------------------------------------------
+
+// XP's Thumbnails view in Icons (thumbview's squares); true when the list was filled again
 static bool apply_images(Browser& b, bool navigating)
 {
-    bool thumbs = b.thumbs && (b.view == LVS_ICON || b.zoomable);
-    bool refilled = false;
-    HIMAGELIST large = b.zoomable ? b.icons_at(icon_px(b)) : b.large;
-    if (thumbs) {
-        bool small_slot = b.view != LVS_ICON;
-        bool was = thumbview::active();
-        bool changed = b.zoomable ? thumbview::enter_at(small_slot ? 16 : icon_px(b), small_slot, large, b.small)
-                                  : (!was ? (thumbview::enter(), true) : false);
-        if (changed && !navigating) { fill_list(b); refilled = true; }   // refilled: Wine keeps the old scroll extent otherwise
-        return refilled;
+    if (b.thumbs && b.view == LVS_ICON) {
+        if (thumbview::active()) return false;
+        thumbview::enter();
+        if (navigating) return false;
+        fill_list(b);   // refilled: Wine keeps the old scroll extent otherwise
+        return true;
     }
-    if (!b.zoomable) {   // back from a zoomed Longhorn frame (a frame switch): the large icons
-        if (!thumbview::active() && (HIMAGELIST)SendMessageW(b.list, LVM_GETIMAGELIST, LVSIL_NORMAL, 0) != b.large) {
-            SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)b.large);
-            SendMessageW(b.list, LVM_SETICONSPACING, 0, (LPARAM)-1);
-        }
-    } else {
-        int px = icon_px(b);
-        HIMAGELIST cur = (HIMAGELIST)SendMessageW(b.list, LVM_GETIMAGELIST, LVSIL_NORMAL, 0);
-        if (cur != large) {
-            SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)large);
-            // XP's 75 px cells up to the large icons, then the icon and 43 more
-            if (large == b.large) SendMessageW(b.list, LVM_SETICONSPACING, 0, (LPARAM)-1);
-            else SendMessageW(b.list, LVM_SETICONSPACING, 0, MAKELPARAM(px <= 32 ? 75 : px + 43, px + 43));
-        }
+    if (!thumbview::active() && (HIMAGELIST)SendMessageW(b.list, LVM_GETIMAGELIST, LVSIL_NORMAL, 0) != b.large) {
+        SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)b.large);
+        SendMessageW(b.list, LVM_SETICONSPACING, 0, (LPARAM)-1);
     }
     return false;
 }
 
+// back from the Longhorn views (a frame switch): the list as XP's views expect it
+static void leave_longhorn(Browser& b, bool navigating)
+{
+    if (thumbview::active() && thumbview::longhorn()) {
+        thumbview::leave(b.large, b.small);
+        if (!navigating) restore_icons(b);
+    }
+    thumbview::set_longhorn(false);
+    b.tiles = b.hide_names = false;
+    b.zoom = 0;
+    if (SendMessageW(b.list, LVM_GETEXTENDEDLISTVIEWSTYLE, 0, 0) & LVS_EX_HEADERINALLVIEWS)   // (the Longhorn views had them)
+        SendMessageW(b.list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_HIDELABELS | LVS_EX_HEADERINALLVIEWS | LVS_EX_FULLROWSELECT, 0);
+    if ((HIMAGELIST)SendMessageW(b.list, LVM_GETIMAGELIST, LVSIL_SMALL, 0) != b.small && !thumbview::active())
+        SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)b.small);
+}
+
 void set_view(Browser& b, int view, bool navigating)
 {
-    // the view, its zoom and whether thumbnails show in it
-    int zoom = (view >> ZOOM_SHIFT) & 0x1ff;
-    view &= ZOOM_VIEW;
-    bool th;
-    if (view == VIEW_THUMBNAILS) { th = true; view = LVS_ICON; }
-    else if (view & VIEW_THUMBS_FLAG) { th = true; view &= ~VIEW_THUMBS_FLAG; }
-    else th = b.thumbs_toggle && !navigating ? b.thumbs : false;   // a remembered plain view: off
-    if (navigating || zoom) b.zoom = zoom;                         // a remembered view brings its zoom (none: the default)
+    if (b.zoomable) { lh_set(b, view_of_code(view), navigating); return; }
+    leave_longhorn(b, navigating);
+    view &= ZOOM_VIEW & ~VIEW_NONAMES_FLAG;   // (the views file is shared with the Longhorn frame)
+    if (view == VIEW_TILES) view = LVS_ICON;
+    bool th = view == VIEW_THUMBNAILS;
+    view = th ? (int)LVS_ICON : view & ~VIEW_THUMBS_FLAG;
     b.thumbs = th;
     bool was_grouped = !b.group_titles.empty();
-    if (!(th && (view == LVS_ICON || b.zoomable)) && thumbview::active()) {
+    if (!th && thumbview::active()) {
         // the items' images are indices into the thumbnail list: give them their
         // icons back before the small/large lists show them (else wrong icons until F5)
-        thumbview::leave(b.zoomable ? b.icons_at(icon_px(b)) : b.large, b.small);
+        thumbview::leave(b.large, b.small);
         if (!navigating) restore_icons(b);
     }
     b.view = view;
@@ -846,59 +1097,82 @@ void set_view(Browser& b, int view, bool navigating)
     DWORD style = (DWORD)GetWindowLongW(b.list, GWL_STYLE);
     style = (style & ~LVS_TYPEMASK) | (DWORD)view;
     SetWindowLongW(b.list, GWL_STYLE, (LONG)style);
+    SendMessageW(b.list, LVM_SETVIEW, (WPARAM)(view == LVS_REPORT ? LV_VIEW_DETAILS : view == LVS_LIST ? LV_VIEW_LIST :
+                                               view == LVS_SMALLICON ? LV_VIEW_SMALLICON : LV_VIEW_ICON), 0);   // (out of tiles)
     bool refilled = apply_images(b, navigating);
     if (!refilled && !navigating && b.grouped && was_grouped != group_view_applies(b)) fill_list(b);   // groups come or go with the view
     if (view != LVS_REPORT) SendMessageW(b.list, LVM_ARRANGE, LVA_DEFAULT, 0);
     InvalidateRect(b.list, nullptr, TRUE);
     b.view_changed();
+    for (auto fn : g_view_listeners) fn(b);
+}
+
+void set_thumbnails(Browser& b, bool on)
+{
+    if (b.zoomable) {   // the thumbnails setting (every view, every folder)
+        if (on != (shell::setting("thumbnails", "1") != "0")) view_command(b, VC_THUMBNAILS);
+        return;
+    }
+    if (on) { set_view(b, VIEW_THUMBNAILS); return; }
+    b.thumbs = false;
+    set_view(b, b.view);
 }
 
 bool view_key(Browser& b, int key)
 {
+    if (b.zoomable) {
+        static const int stops[] = { VC_DEFAULT, VC_DETAILS, VC_TILES, VC_LARGE, VC_MEDIUM, VC_SMALL };
+        if (key < '0' || key > '5') return false;
+        return view_command(b, stops[key - '0']);
+    }
     switch (key) {
     case '0':
-        set_view(b, views::default_view(b.zoomable));
+        set_view(b, views::default_view(false));
         if (b.folder) views::forget(b.folder->path());   // (after set_view, which stores)
         return true;
     case '1': set_view(b, LVS_REPORT); return true;
-    case '2': set_view(b, b.zoomable ? (int)LVS_ICON | 48 << ZOOM_SHIFT : (int)LVS_ICON); return true;
-    case '3': set_view(b, b.zoomable ? (int)VIEW_THUMBNAILS | thumbview::default_size() << ZOOM_SHIFT : (int)VIEW_THUMBNAILS); return true;
+    case '2': set_view(b, LVS_ICON); return true;
+    case '3': set_view(b, VIEW_THUMBNAILS); return true;
     }
     return false;
 }
 
+// the zoom: the size of the view shown (4051's magnifier slider is the Icons view's, from
+// Details or Tiles it goes to Icons at px)
 void set_zoom(Browser& b, int px)
 {
     if (!b.zoomable) return;
-    if (px == icon_px(b) && b.view == LVS_ICON) return;
-    b.zoom = px;
-    // the zoom is the icon views': from List or Details it goes to Icons (Vista)
-    set_view(b, LVS_ICON | (b.thumbs ? (int)VIEW_THUMBS_FLAG : 0) | px << ZOOM_SHIFT);
+    View v = current_view(b);
+    if (v.mode == Mode::Icons && v.size == px) return;
+    v.mode = Mode::Icons;
+    v.size = px;
+    show_view(b, v);
 }
 
 void zoom_menu(const Browser& b, HMENU m, int first)
 {
     while (GetMenuItemCount(m) > 0) DeleteMenu(m, 0, MF_BYPOSITION);
-    std::vector<int> z = zoom_levels();
-    int cur = icon_px(b);
+    View v = b.zoomable ? current_view(b) : View();
+    std::vector<int> z = shell::viewmodel::levels(v.mode);
     UINT gray = b.zoomable ? 0 : MF_GRAYED;
-    AppendMenuW(m, MF_STRING | gray | (b.view == LVS_ICON && cur >= z.back() ? MF_GRAYED : 0), (UINT)first, L"Zoom &In\tCtrl++");
-    AppendMenuW(m, MF_STRING | gray | (b.view == LVS_ICON && cur <= z.front() ? MF_GRAYED : 0), (UINT)first + 1, L"Zoom &Out\tCtrl+-");
+    AppendMenuW(m, MF_STRING | gray | (v.size >= z.back() ? MF_GRAYED : 0), (UINT)first, L"Zoom &In\tCtrl++");
+    AppendMenuW(m, MF_STRING | gray | (v.size <= z.front() ? MF_GRAYED : 0), (UINT)first + 1, L"Zoom &Out\tCtrl+-");
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     for (size_t i = 0; i < z.size(); i++) {
         std::string t = std::to_string(z[i]) + " x " + std::to_string(z[i]);
         AppendMenuW(m, MF_STRING | gray, (UINT)(first + 2 + (int)i), WS(t));
-        if (b.view == LVS_ICON && z[i] == cur) CheckMenuRadioItem(m, (UINT)(first + 2), (UINT)(first + 1 + (int)z.size()), (UINT)(first + 2 + (int)i), MF_BYCOMMAND);
+        if (b.zoomable && z[i] == v.size) CheckMenuRadioItem(m, (UINT)(first + 2), (UINT)(first + 1 + (int)z.size()), (UINT)(first + 2 + (int)i), MF_BYCOMMAND);
     }
 }
 
 bool zoom_command(Browser& b, int id, int first)
 {
-    std::vector<int> z = zoom_levels();
-    if (id < first || id >= first + 2 + (int)z.size()) return false;
+    View v = b.zoomable ? current_view(b) : View();
+    std::vector<int> z = shell::viewmodel::levels(v.mode);
+    if (id < first || id >= first + 2 + ZOOM_MENU_IDS - 2) return false;
     if (id == first) zoom_step(b, 1);
     else if (id == first + 1) zoom_step(b, -1);
-    else set_zoom(b, z[(size_t)(id - first - 2)]);
+    else if (b.zoomable && id - first - 2 < (int)z.size()) { v.size = z[(size_t)(id - first - 2)]; show_view(b, v); }
     return true;
 }
 
@@ -978,16 +1252,12 @@ void zoom_popup(Browser& b, HWND owner, int x, int y)
     if (IsWindow(b.list)) SetFocus(b.list);
 }
 
+// Ctrl+wheel, Ctrl+plus/minus: the view shown a level bigger or smaller, inside its range
 void zoom_step(Browser& b, int dir)
 {
-    int cur = icon_px(b);
-    if (b.view != LVS_ICON) { set_zoom(b, cur); return; }   // first step: the Icons view at the size now
-    int next = cur;
-    for (int v : zoom_levels()) {
-        if (dir > 0 && v > cur) { next = v; break; }
-        if (dir < 0 && v < cur) next = v;
-    }
-    if (next != cur) set_zoom(b, next);
+    if (!b.zoomable) return;
+    View v = current_view(b), n = shell::viewmodel::step(v, dir);
+    if (n != v) show_view(b, n);
 }
 
 void set_grouped(Browser& b, bool on)

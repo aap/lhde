@@ -28,11 +28,13 @@ void properties(HWND owner, const std::string& path, const std::string& display_
                 HICON icon, HIMAGELIST small, int app_image);
 
 // Folder Options (Tools menu): XP's General and View pages reduced to flxp's settings.
-// View codes as browser::view_code (LVS_*, VIEW_THUMBNAILS, VIEW_THUMBS_FLAG, the zoom
-// above ZOOM_SHIFT). The buttons act at once through the callbacks (as XP's do, after a
-// question); OK and Apply call applied() with the page values in the struct.
+// View codes as browser::view_code (LVS_*, VIEW_THUMBNAILS; the Longhorn frame's
+// LVS_REPORT, VIEW_TILES, LVS_ICON with the size above ZOOM_SHIFT). The buttons act at
+// once through the callbacks (as XP's do, after a question); OK and Apply call
+// applied() with the page values in the struct.
 struct FolderOptions {
-    bool longhorn = false;             // the Longhorn frame: icon size and the thumbnails toggle
+    bool longhorn = false;             // the Longhorn frame: its views, the size, the thumbnails setting
+    bool thumbnails = true;            // the Longhorn frame: flxp.ini thumbnails
     int default_view = 0;              // in: the default now; out: as chosen
     int builtin_default = 0;           // Restore Defaults
     int current_view = 0;              // the folder's (Apply to All Folders)

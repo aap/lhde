@@ -316,16 +316,25 @@ int thumbs_toggle = -1;
 
 // The view items are adjacent in every menu that has them, but Thumbnails'
 // id is not next to the others: the radio group goes by position. With the
-// toggle Thumbnails is a check item outside the group.
+// toggle Thumbnails is a check item outside the group, and so is Hide File Names.
 void check_view_items(HMENU m, int view)
 {
     bool toggle = thumbs_toggle >= 0;
+    view &= ZOOM_VIEW;
+    bool nonames = (view & VIEW_NONAMES_FLAG) != 0;
+    view &= ~VIEW_NONAMES_FLAG;
     if (toggle && view == VIEW_THUMBNAILS) view = LVS_ICON;
     view &= ~VIEW_THUMBS_FLAG;
-    UINT want = view == VIEW_THUMBNAILS ? ID_VIEW_THUMBNAILS : view == LVS_ICON ? ID_VIEW_ICONS : view == LVS_SMALLICON ? ID_VIEW_SMALLICONS : view == LVS_LIST ? ID_VIEW_LIST : ID_VIEW_DETAILS;
+    UINT want = view == VIEW_THUMBNAILS ? ID_VIEW_THUMBNAILS : view == VIEW_TILES ? ID_VIEW_TILES : view == LVS_ICON ? ID_VIEW_ICONS :
+                view == LVS_SMALLICON ? ID_VIEW_SMALLICONS : view == LVS_LIST ? ID_VIEW_LIST : ID_VIEW_DETAILS;
     int first = -1, last = -1, at = -1, n = GetMenuItemCount(m);
     for (int i = 0; i < n; i++) {
         UINT id = GetMenuItemID(m, i);
+        if (id == ID_VIEW_HIDENAMES) {   // the Longhorn views: Icons only
+            CheckMenuItem(m, (UINT)i, MF_BYPOSITION | (nonames ? MF_CHECKED : MF_UNCHECKED));
+            EnableMenuItem(m, (UINT)i, MF_BYPOSITION | (view == LVS_ICON ? MF_ENABLED : MF_GRAYED));
+            continue;
+        }
         if (id == ID_VIEW_THUMBNAILS) {
             // a plain check item with the toggle (no radio bullet), XP's radio item without
             MENUITEMINFOW mi = {}; mi.cbSize = sizeof mi; mi.fMask = MIIM_FTYPE | MIIM_STATE;
@@ -337,7 +346,8 @@ void check_view_items(HMENU m, int view)
                 continue;
             }
         }
-        if (id != ID_VIEW_THUMBNAILS && id != ID_VIEW_ICONS && id != ID_VIEW_SMALLICONS && id != ID_VIEW_LIST && id != ID_VIEW_DETAILS) continue;
+        if (id != ID_VIEW_THUMBNAILS && id != ID_VIEW_ICONS && id != ID_VIEW_SMALLICONS && id != ID_VIEW_LIST && id != ID_VIEW_DETAILS &&
+            id != ID_VIEW_TILES) continue;
         if (first < 0) first = i;
         last = i;
         if (id == want) at = i;
@@ -349,14 +359,20 @@ HMENU view_submenu(int view, bool thumbnails)
 {
     HMENU m = CreatePopupMenu();
     bool toggle = thumbnails && thumbs_toggle >= 0;
-    if (thumbnails && !toggle) AppendMenuW(m, MF_STRING, ID_VIEW_THUMBNAILS, L"T&humbnails");
+    if (toggle) {     // the Longhorn views (4074's View menu: Details, Tiles, Icons, Hide File Names)
+        AppendMenuW(m, MF_STRING, ID_VIEW_DETAILS, L"&Details");
+        AppendMenuW(m, MF_STRING, ID_VIEW_TILES, L"Tile&s");
+        AppendMenuW(m, MF_STRING, ID_VIEW_ICONS, L"Ico&ns");
+        AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(m, MF_STRING, ID_VIEW_HIDENAMES, L"Hide Fi&le Names");
+        AppendMenuW(m, MF_STRING, ID_VIEW_THUMBNAILS, L"Sho&w Thumbnails");   // the thumbnails setting
+        check_view_items(m, view);
+        return m;
+    }
+    if (thumbnails) AppendMenuW(m, MF_STRING, ID_VIEW_THUMBNAILS, L"T&humbnails");
     AppendMenuW(m, MF_STRING, ID_VIEW_ICONS, L"Ico&ns");
     AppendMenuW(m, MF_STRING, ID_VIEW_LIST, L"&List");
     AppendMenuW(m, MF_STRING, ID_VIEW_DETAILS, L"&Details");
-    if (toggle) {     // 4051's Views drop-down: Preview, a check after the views (lh4051-194532.png)
-        AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(m, MF_STRING, ID_VIEW_THUMBNAILS, L"T&humbnails");
-    }
     check_view_items(m, view);
     return m;
 }

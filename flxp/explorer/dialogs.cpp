@@ -453,22 +453,20 @@ namespace folderopts {
 FolderOptions* o;
 HWND general, view;                    // the pages (General refreshed after Apply/Reset All)
 
-struct ViewName { int view; const char* name; bool xp_only; };
+struct ViewName { int view; const char* name; bool xp, lh; };
 static const ViewName k_views[] = {
-    { VIEW_THUMBNAILS, "Thumbnails", true }, { LVS_ICON, "Icons", false }, { LVS_SMALLICON, "Small Icons", false },
-    { LVS_LIST, "List", false }, { LVS_REPORT, "Details", false },
+    { VIEW_THUMBNAILS, "Thumbnails", true, false }, { LVS_REPORT, "Details", false, true }, { VIEW_TILES, "Tiles", false, true },
+    { LVS_ICON, "Icons", true, true }, { LVS_SMALLICON, "Small Icons", true, false },
+    { LVS_LIST, "List", true, false }, { LVS_REPORT, "Details", true, false },
 };
 
 // the controls from a view code
 static void show_view(HWND dlg, int v)
 {
     int zoom = (v >> ZOOM_SHIFT) & 0x1ff;
-    v &= ZOOM_VIEW;
-    bool thumbs = false;
-    if (o->longhorn) {
-        if (v == VIEW_THUMBNAILS) { v = LVS_ICON; thumbs = true; }
-        if (v & VIEW_THUMBS_FLAG) { v &= ~VIEW_THUMBS_FLAG; thumbs = true; }
-    } else v &= ~VIEW_THUMBS_FLAG;
+    v &= ZOOM_VIEW & ~(VIEW_THUMBS_FLAG | VIEW_NONAMES_FLAG);
+    if (o->longhorn && (v == VIEW_THUMBNAILS || v == LVS_SMALLICON)) v = LVS_ICON;
+    if (o->longhorn && v == LVS_LIST) v = LVS_REPORT;
     HWND cb = GetDlgItem(dlg, IDC_FO_VIEW);
     int n = (int)SendMessageW(cb, CB_GETCOUNT, 0, 0);
     for (int i = 0; i < n; i++)
@@ -478,7 +476,6 @@ static void show_view(HWND dlg, int v)
     for (int i = 0; i < nz; i++)
         if ((int)SendMessageW(zc, CB_GETITEMDATA, (WPARAM)i, 0) == zoom) best = i;
     SendMessageW(zc, CB_SETCURSEL, (WPARAM)best, 0);
-    CheckDlgButton(dlg, IDC_FO_THUMBS, thumbs ? BST_CHECKED : BST_UNCHECKED);
 }
 
 // and back
@@ -491,14 +488,15 @@ static int chosen_view(HWND dlg)
     HWND zc = GetDlgItem(dlg, IDC_FO_ZOOM);
     int zi = (int)SendMessageW(zc, CB_GETCURSEL, 0, 0);
     int zoom = zi >= 0 ? (int)SendMessageW(zc, CB_GETITEMDATA, (WPARAM)zi, 0) : 0;
-    bool thumbs = IsDlgButtonChecked(dlg, IDC_FO_THUMBS) == BST_CHECKED;
-    if (thumbs) v = v == LVS_ICON ? (int)VIEW_THUMBNAILS : v | VIEW_THUMBS_FLAG;
-    return v | zoom << ZOOM_SHIFT;
+    return v | zoom << ZOOM_SHIFT;   // (a size the view cannot have: the one it remembers)
 }
 
 static void take(HWND, bool from_general)
 {
-    if (from_general && general) o->default_view = chosen_view(general);
+    if (from_general && general) {
+        o->default_view = chosen_view(general);
+        if (o->longhorn) o->thumbnails = IsDlgButtonChecked(general, IDC_FO_THUMBS) == BST_CHECKED;
+    }
     if (view) {
         o->remember = IsDlgButtonChecked(view, IDC_FO_REMEMBER) == BST_CHECKED;
         o->hidden = IsDlgButtonChecked(view, IDC_FO_HIDDEN) == BST_CHECKED;
@@ -512,7 +510,7 @@ static INT_PTR CALLBACK general_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         general = dlg;
         HWND cb = GetDlgItem(dlg, IDC_FO_VIEW);
         for (const ViewName& v : k_views) {
-            if (v.xp_only && o->longhorn) continue;   // the Longhorn frame: thumbnails are a toggle, below
+            if (o->longhorn ? !v.lh : !v.xp) continue;   // the frame's views (the Longhorn frame: thumbnails a setting, below)
             int i = (int)SendMessageW(cb, CB_ADDSTRING, 0, (LPARAM)WS(v.name));
             SendMessageW(cb, CB_SETITEMDATA, (WPARAM)i, (LPARAM)v.view);
         }
@@ -522,6 +520,7 @@ static INT_PTR CALLBACK general_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
             SendMessageW(zc, CB_SETITEMDATA, (WPARAM)i, (LPARAM)z);
         }
         for (int id : { IDC_FO_ZOOML, IDC_FO_ZOOM, IDC_FO_THUMBS }) EnableWindow(GetDlgItem(dlg, id), o->longhorn);
+        CheckDlgButton(dlg, IDC_FO_THUMBS, o->longhorn && o->thumbnails ? BST_CHECKED : BST_UNCHECKED);
         show_view(dlg, o->default_view);
         return TRUE;
     }

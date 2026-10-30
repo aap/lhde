@@ -3,7 +3,7 @@
 # save with the overwrite prompt (No, then Yes), folder mode, a typed
 # wildcard, a typed folder, cancel; Longhorn only: Hide Explorer (remembered
 # across runs), Show in Groups from the list's menu (remembered), the
-# view keys (Ctrl+0..3) remembered with the view.
+# view keys (Ctrl+0..5) remembered with the view and its size.
 # Needs Xvfb and xdotool. Usage: tests/headless/filedlg.sh [:DISPLAY]
 D=${1:-:73}
 T=$(mktemp -d)
@@ -88,17 +88,21 @@ check "groups off remembered" "filedlg_groups = 0" "$(grep '^filedlg_groups' $HO
 run longhorn click3:650,300 v g sleep Escape -- --open > /dev/null
 check "groups on again" "filedlg_groups = 1" "$(grep '^filedlg_groups' $HOME/.config/lhde/flxp.ini)"
 check "size remembered" "yes" "$(grep -q '^filedlg_size = [0-9]*x[0-9]*' $HOME/.config/lhde/flxp.ini && echo yes)"
-# The view keys (browser::view_key): Ctrl+3 big icons with thumbnails, Ctrl+1
-# Details keeping the thumbnails toggle, Ctrl+2 Icons at 48 px, Ctrl+0 the
-# default view (Longhorn: Icons at 48 px with thumbnails); remembered in filedlg_view
+# The view keys (browser::view_key, 4074's slider stops): Ctrl+3 Large Icons at
+# 128 px, Ctrl+1 Details at 16, Ctrl+2 Tiles at 48, Ctrl+plus a step bigger in
+# the view shown, Ctrl+5 Small Icons, Ctrl+0 the default view (Icons at 48 px);
+# remembered in filedlg_view, the sizes each view had in flxp-view-sizes
 run longhorn ctrl+3 sleep Escape -- --open > /dev/null
-check "ctrl+3 thumbnails" "filedlg_view = thumbnails@96" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
+check "ctrl+3 large icons" "filedlg_view = icons@128" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
 run longhorn ctrl+1 sleep Escape -- --open > /dev/null
-check "toggle kept in details" "filedlg_view = details+thumbnails@96" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
-run longhorn ctrl+2 sleep Escape -- --open > /dev/null
-check "ctrl+2 icons" "filedlg_view = thumbnails@48" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
+check "ctrl+1 details" "filedlg_view = details@16" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
+run longhorn ctrl+2 ctrl+plus sleep Escape -- --open > /dev/null
+check "ctrl+2 tiles, a step bigger" "filedlg_view = tiles@64" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
+run longhorn ctrl+5 ctrl+2 sleep Escape -- --open > /dev/null
+check "tiles remember their size" "filedlg_view = tiles@64" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
+check "sizes remembered" "details=16 tiles=64 large=128 medium=48 small=16 icons=small" "$(cat $HOME/.local/state/lhde/flxp-view-sizes)"
 run longhorn ctrl+4 ctrl+0 sleep Escape -- --open > /dev/null
-check "ctrl+0 default view" "filedlg_view = thumbnails@48" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
+check "ctrl+0 default view" "filedlg_view = icons@48" "$(grep '^filedlg_view' $HOME/.config/lhde/flxp.ini)"
 
 kill $XP 2>/dev/null
 rm -rf $T
