@@ -58,8 +58,21 @@ static void wake_init();
 static void xdnd_init();
 static void set_xdnd_aware(::Window xw);
 
+// The X connection is gone (the server ended, or the client was killed): end the process at once. Xlib's default handler
+// calls exit(), which runs the static destructors on whichever thread noticed while the others still run; a program with a
+// thread of its own (flxp-taskbar's X worker, a std::thread at namespace scope) was then aborted by std::terminate, and two
+// threads noticing together raced in exit(). Process-wide: it covers every connection the program opens, not only this one.
+static int on_io_error(Display* d)
+{
+    const char* name = d ? DisplayString(d) : nullptr;
+    fprintf(stderr, "X connection to %s broken (explicit kill or server shutdown).\n", name && *name ? name : "the display");
+    fflush(nullptr);
+    _exit(1);
+}
+
 bool init()
 {
+    XSetIOErrorHandler(on_io_error);
     dpy = XOpenDisplay(nullptr);
     if (!dpy) { fprintf(stderr, "sys: cannot open display\n"); return false; }
     screen = DefaultScreen(dpy);
