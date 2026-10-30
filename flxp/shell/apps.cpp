@@ -528,7 +528,7 @@ bool open_terminal(const std::string& dir, std::string* err)
 {
     std::string cmd = terminal_command();
     std::string prog = cmd.substr(0, cmd.find_first_of(" \t"));
-    if (!in_path(prog)) { if (err) *err = "The terminal program \"" + prog + "\" was not found. Set FLXP_TERMINAL or terminal= in " + config_home() + "/flxp/flxp.ini."; return false; }
+    if (!in_path(prog)) { if (err) *err = "The terminal program \"" + prog + "\" was not found. Set FLXP_TERMINAL or terminal= in " + settings_path() + "."; return false; }
     return spawn({ "/bin/sh", "-c", with_dir(terminal_command(), dir) }, dir, err);
 }
 

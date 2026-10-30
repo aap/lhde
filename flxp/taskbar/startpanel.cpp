@@ -122,7 +122,7 @@ std::string user_dir(const char* key, const char* fallback)
 
 // ---- most frequently used: "COUNT ID" lines in $XDG_DATA_HOME/flxp/mfu ---------------
 
-std::string mfu_path() { return shell::data_home() + "/flxp/mfu"; }
+std::string mfu_path() { return shell::state_file("flxp-mfu"); }   // the start panel's launch counts: state (docs/SETTINGS.md "Files")
 
 std::vector<std::pair<int, std::string>> load_mfu()
 {

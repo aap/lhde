@@ -24,7 +24,7 @@ int frame_theme_source = FRAME_SRC_AUTO;
 int frame_uxtheme_available(void) { return fut_available(); }
 
 static cairo_surface_t *load_png(const char *dir, const char *name) {
-    /* the frame set's text (theme.ini) and its pixels may lie in different data directories (lhde_data.h): the file beside
+    /* the frame set's text (theme.ini) and its pixels may lie in different data directories (lhde/data.h): the file beside
        theme.ini, else the same frames/NAME/ in the user's imported data */
     char p[4200]; lhde_data_find_in(dir, name, p, sizeof p);
     cairo_surface_t *s = cairo_image_surface_create_from_png(p);

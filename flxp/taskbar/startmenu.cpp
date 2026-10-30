@@ -28,7 +28,7 @@ namespace {
 
 enum : UINT {
     CMD_DOCUMENTS = 1, CMD_COMPUTER, CMD_DISPLAY, CMD_RUN, CMD_LOGOFF, CMD_SHUTDOWN,
-    CMD_THEME = 100,            // + index into the registry's sections
+    CMD_THEME = 100,            // + index into the theme list (liblhde)
     CMD_APP = 1000,             // + index into the application list
 };
 
@@ -189,12 +189,7 @@ bool run_shell(const std::string& cmd)
 
 // ---- Run --------------------------------------------------------------------------------
 
-std::string history_file()
-{
-    const char* x = getenv("XDG_CONFIG_HOME");
-    std::string d = x && *x ? x : home() + "/.config";
-    return d + "/flxp/run-history";
-}
+std::string history_file() { return shell::state_file("flxp-run-history"); }   // what the Run box remembers: state, not a setting
 
 std::vector<std::string> load_history()
 {

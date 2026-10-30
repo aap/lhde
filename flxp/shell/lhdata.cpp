@@ -10,7 +10,7 @@
 #include "config.h"
 #include "lhtheme.h"
 extern "C" {
-#include "lhde_data.h"
+#include "lhde/data.h"
 }
 
 namespace shell {

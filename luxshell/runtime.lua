@@ -33,9 +33,9 @@ local function N(t) return lh.node(t) end
 local screen_w, screen_h, screen_no = lh.screen()
 
 ------------------------------------------------------------------ theme (SHELL-DESIGN 6.1): session theme name → registry → pack
--- The session theme is the root property _LH_THEME, a name in the registry ../themes.ini (_LH_THEMES_INI); its `shell` key
--- names the pack. At startup: _LH_THEME if someone (lhwm, a script) set it, else the persisted theme from state.ini, which
--- is then published; LHSHELL_THEME (a pack directory) only when neither names a registry entry. A change of _LH_THEME
+-- The session theme is the root property _LH_THEME, a theme name liblhde resolves (docs/THEME-FORMAT.md); its Shell.pack
+-- names the pack. At startup: _LH_THEME if someone (luxwm, a script) set it, else settings.ini [theme] name, which is then
+-- published; LHSHELL_THEME (a pack directory) only when neither names a theme. A change of _LH_THEME
 -- swaps the pack live (rebuild_shell below), sets the wallpaper and persists the name.
 local function lua(f) return dofile(lh.lua_dir .. "/" .. f) end   -- luxshell's own Lua (lh.lua_dir: the tree's luxshell/ or <prefix>/lib/lhde/luxshell)
 -- lhde's own programs beside us first (build/bin of the tree, <prefix>/bin), then PATH: lh.prog("flxp-taskbar")
@@ -71,7 +71,7 @@ end
 S.migrate()
 -- the effective values of a resolved theme (S.resolve: liblhde's record, docs/THEME-FORMAT.md): the theme files, their base
 -- chain, the style's defaults and the fallbacks, with settings.ini's per-user [desktop] wallpaper = none (the flyout's "Show the
--- wallpaper" off) and the legacy [override:NAME] sections applied by the resolver. v.wallpaper_src says where the wallpaper came from.
+-- wallpaper" off) and the current layer applied by the resolver. v.wallpaper_src says where the wallpaper came from.
 local function effective(e)
   local v = {}
   for _, k in ipairs{ "msstyles", "color", "size", "frame", "frame_classic", "shell", "fonts" } do v[k] = e and e[k] or "" end
@@ -105,7 +105,6 @@ local function set_theme_prop(v) theme_echo[v] = (theme_echo[v] or 0) + 1; lh.se
 -- startup: the root wins (SETTINGS.md "Conflicts"): _LH_THEME holds the selected name; else settings.ini [theme] name. liblhde
 -- resolves it (a theme file, an alias, a bare style); an alias goes back on the root as the theme's name.
 local theme_name, theme_entry
-S.registry_path()   -- the compatibility registry for flxp, published when nobody has
 do
   local root, file = lh.root_prop("_LH_THEME"), S.get("theme", "name")
   local want = root or file
@@ -185,7 +184,7 @@ local function taskbar_kind(v)
   return nil
 end
 -- taskbar kind, start menu and the compositor switch are per theme (SETTINGS.md "Per-theme settings" / "Per-theme overrides"):
--- S.theme_value(theme_entry, ...) = [override:NAME] > the preset's own key > the registry entry > the global key > default; they
+-- S.theme_value(theme_entry, ...) = the resolved record's key (the current layer, the theme file, its base chain, the default); they
 -- are applied at startup, on every theme change and on _LH_SETTINGS_CHANGED. LHSHELL_TASKBAR / LHSHELL_COMPOSITION (on|off|follow;
 -- xinitrc.lab sets it from LAB_PICOM=0/1) force one for this run.
 local taskbar_env = taskbar_kind(os.getenv("LHSHELL_TASKBAR"))
@@ -1326,7 +1325,7 @@ end
 -- On a theme change lhshell applies the registry's `composition`: off → stop the picom of this display (only processes named
 -- picom whose environment has our DISPLAY; nothing else is touched), auto → start one when no compositor owns
 -- _NET_WM_CM_S<screen>. lhwm already follows the compositor's presence (glass ⇄ frame_classic, _LHWM_COMPOSITED), so this is
--- the whole chain. The switch (per theme: [override:NAME] composition > the preset's > settings.ini [theme] composition) is
+-- the whole chain. The switch (per theme: the resolved Glass.composition, auto = follow) is
 -- follow (the theme's `composition` decides) | on | off; it is applied at startup (1.5 s in: stops the picom xinitrc.lab may
 -- have started for a classic theme, starts one for a glass theme when none runs), on every theme change and when it changes.
 -- Command: settings.ini [commands] picom, else $LHSHELL_PICOM_CMD, else picom --config <x11>/picom-glass.conf --backend glx.
@@ -1385,14 +1384,13 @@ local function apply_theme(e, root_set)
   local fonts_changed = apply_fonts(e)
   if swapped or fonts_changed then rebuild_shell() else lh._emit("pack") end   -- "pack": the start menu and the menus drop their cached look
   set_wallpaper(e)
-  cfg.composition = theme_composition(e)                 -- the theme's own switch ([override:NAME] composition, ...)
+  cfg.composition = theme_composition(e)                 -- the theme's own switch (Glass.composition)
   apply_composition(e)
-  local k = theme_taskbar(e); if k ~= cfg.taskbar then apply_taskbar(k) end   -- and its taskbar ([override:NAME] taskbar, ...)
+  local k = theme_taskbar(e); if k ~= cfg.taskbar then apply_taskbar(k) end   -- and its taskbar (Shell.taskbar)
   lh.start_provider_check()                              -- and its start menu
   S.select(e.name)                                       -- [theme] name; another theme's current layer is dropped (liblhde)
   publish_resolved(e)
   if root_set ~= e.name then set_theme_prop(e.name) end
-  S.registry_path()   -- the compatibility registry follows the theme files
   io.stderr:write(string.format("luxshell: theme %s%s: pack %s%s, %d ms\n", e.name, e.user and (" (the user's, base " .. e.base .. ")") or "", pack_dir, swapped and " (rebuilt)" or "", lh.now() - t0))
 end
 -- lh.select_theme(name, force): the settings flyout, Save As, settings.ini changed by another writer; force: the selected theme
@@ -1421,11 +1419,11 @@ local function reload_settings()
   S.reload()
   local n = S.get("theme", "name")
   if n and n ~= theme_name then lh.select_theme(n)
-  else   -- the same theme: its files, its current layer ([current]) or a legacy [override:NAME] may have changed
+  else   -- the same theme: its files, or its current layer ([current]) may have changed
     local e = theme_name and S.resolve(theme_name)
     if e and theme_entry and e.record ~= theme_entry.record then apply_theme(e, theme_name) end
   end
-  -- per theme (S.theme_value): [override:NAME] > the preset > the registry > the global key; applied, not written back
+  -- per theme (S.theme_value): the resolved record's keys; applied, not written back
   local c = theme_composition(theme_entry)
   if c ~= cfg.composition then cfg.composition = c; apply_composition(theme_entry) end
   local k = theme_taskbar(theme_entry)

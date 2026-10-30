@@ -16,12 +16,11 @@
    wallpapers/4074/Bliss.jpg; lhde_data_kind_rel) searched in these directories, first match wins (lhde_data_dirs):
      1. user        ~/.config/lhde
      2. windows     $LHDE_WINDOWS/index; with $LHDE_DATA set (tests, scratch): that one flat directory instead
-     3. old layout  ${XDG_DATA_HOME:-~/.local/share}/lhde while it still holds Windows files (before lhde-import --migrate)
-     4. shipped     <exe>/../share/lhde (the program's own prefix), then $XDG_DATA_DIRS/lhde (default /usr/local/share:/usr/share)
-     5. source tree <top>/data when the program runs from a build tree (<top>/build/...; LHDE_TREE=0 leaves it out: tests)
+     3. shipped     <exe>/../share/lhde (the program's own prefix), then $XDG_DATA_DIRS/lhde (default /usr/local/share:/usr/share)
+     4. source tree <top>/data when the program runs from a build tree (<top>/build/...; LHDE_TREE=0 leaves it out: tests)
    A frame set or pack is split: its text (theme.ini, shell.lua) is shipped, its pixels are generated; lhde_data_find_in finds a
    file of the same relative directory in any tree. A lookup of DIR/NAME that misses also tries DIR/cache/NAME (the caches of
-   the old layout and of a $LHDE_DATA directory). Paths come back as found (through index/); lhde_data_origin tells which tree
+   a $LHDE_DATA directory). Paths come back as found (through index/); lhde_data_origin tells which tree
    a file really lies in. */
 #ifndef LHDE_DATA_H
 #define LHDE_DATA_H
@@ -36,9 +35,9 @@ extern "C" {
 /* the data directories in search order (absolute, existing, without duplicates); returns how many */
 int lhde_data_dirs(const char **dirs, int max);
 /* the trees */
-enum lhde_tree_kind { LHDE_TREE_USER, LHDE_TREE_WINDOWS, LHDE_TREE_FLAT, LHDE_TREE_OLD, LHDE_TREE_SHIPPED, LHDE_TREE_SOURCE,
+enum lhde_tree_kind { LHDE_TREE_USER, LHDE_TREE_WINDOWS, LHDE_TREE_FLAT, LHDE_TREE_SHIPPED, LHDE_TREE_SOURCE,
                       LHDE_TREE_CODE };
-/* the tree of lhde_data_dirs' i-th directory (-1 past the end), and a kind's name: user, windows, data, old layout, shipped,
+/* the tree of lhde_data_dirs' i-th directory (-1 past the end), and a kind's name: user, windows, data, shipped,
    source tree, program ($PREFIX/lib/lhde), "elsewhere" for -1 */
 int lhde_data_dir_kind(int i);
 const char *lhde_tree_name(int kind);
@@ -46,7 +45,8 @@ const char *lhde_tree_name(int kind);
 const char *lhde_data_user(void);
 /* the Windows tree itself: $LHDE_WINDOWS (default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows), or $LHDE_DATA */
 const char *lhde_windows_dir(void);
-/* the old-layout directory when it is searched (3. above), else NULL */
+/* an unmigrated old-layout directory (${XDG_DATA_HOME:-~/.local/share}/lhde still holding Windows files, before
+   lhde-import --migrate): never searched, only reported; NULL when there is none or $LHDE_WINDOWS / $LHDE_DATA is set */
 const char *lhde_old_dir(void);
 /* which tree PATH really lies in (symlinks resolved; enum lhde_tree_kind, -1 elsewhere); rel = the path below that tree's
    top (for the Windows tree: below $LHDE_WINDOWS, e.g. 4074/system32/imageres.dll), else the resolved path */
@@ -80,19 +80,6 @@ const char *lhde_code_dir(char *out, size_t n);
 const char *lhde_tree(void);
 /* forget the cached directory list (after $LHDE_DATA, $LHDE_WINDOWS, $XDG_DATA_HOME or $XDG_CONFIG_HOME changed: tests) */
 void lhde_data_reset(void);
-
-/* ---- the compatibility registry (docs/history/THEME-FORMAT-status.md section 11; liblhde/compat.c) ----
-   Until flxp reads theme files itself, liblhde writes an old-format themes.ini (one section per theme: shipped theme files,
-   the user's, bare styles; every path absolute) and wallpapers.ini from the resolved themes into
-   $XDG_RUNTIME_DIR/lhde/<display>/ (else /tmp/lhde-<uid>/<display>/); luxwm and luxshell publish its path as _LH_THEMES_INI.
-   Its first line is "; lhde: generated ..."; it is rewritten when a theme file, the styles or settings.ini changed. */
-/* the generated registry's path (written or refreshed now); NULL when it cannot be written */
-const char *lhde_compat_registry(char *out, size_t n);
-/* the registry a program should read: $LH_THEMES_INI, else the generated one (lhde_compat_registry); NULL when none */
-const char *lhde_registry_source(char *out, size_t n);
-/* a registry path someone published: the generated registry is refreshed in place (and returned), any other existing file is
-   returned as it is. NULL when src does not exist. (Before liblhde: the resolved copy of data/themes.ini.) */
-const char *lhde_registry_resolved(const char *src, char *out, size_t n);
 
 #ifdef __cplusplus
 }

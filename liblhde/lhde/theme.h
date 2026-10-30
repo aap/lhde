@@ -8,7 +8,7 @@
    lhde_theme_resolve(NAME) returns one flat record: every key as SECTION.KEY = VALUE (Glass.frames = jade4074) with base
    chains, defaults from the style and fallbacks applied, and for every key where it came from:
      file      the theme's own file                      base      a theme in its base chain (which, and its file)
-     settings  settings.ini's legacy [override:NAME] / [override] (flxp's Display Properties before the switch)
+     settings  settings.ini's per-user [desktop] wallpaper = none (the wallpaper switched off, for every theme)
      default   section 5: derived from the visual style (ut_format, CompositedWindow / DWMWindow, the build)
      fallback  section 6: what was asked for is not imported (or not usable); the reason is part of the source text
    Absent keys inherit, then take the default; the value `none` switches a component off and is never replaced by a default.
@@ -49,7 +49,7 @@ void lhde_theme_free(lhde_theme *t);
 /* a value ("Glass.frames"; sections case-insensitive); NULL when the record has no such key */
 const char *lhde_theme_get(const lhde_theme *t, const char *key);
 /* where it came from, as text: "file /path/x.theme", "base jade4074 (/path/jade4074.theme)", "default: v4 style with
-   CompositedWindow, build 4074", "fallback: frames aero5048 not imported (none)", "settings: [override:aero5048]"; NULL like get */
+   CompositedWindow, build 4074", "fallback: frames aero5048 not imported (none)", "settings: [desktop] wallpaper = none (...)"; NULL like get */
 const char *lhde_theme_why(const lhde_theme *t, const char *key);
 enum lhde_source lhde_theme_source(const lhde_theme *t, const char *key);
 /* iterate: i from 0; 0 when past the end */

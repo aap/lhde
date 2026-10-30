@@ -90,8 +90,8 @@ int lhde_settings_set(const char *sec, const char *key, const char *value)
     return r ? -1 : changed;
 }
 
-/* ---------------------------------------------------------------- legacy layers ([override:NAME], [override]) */
-/* flxp's per-theme keys (docs/SETTINGS.md "Per-theme settings") -> theme keys, values in the new vocabulary; NULL = dropped */
+/* ---------------------------------------------------------------- the legacy [override:NAME] / [override] keys */
+/* (the migration turns them into theme files; nothing applies them live) flxp's per-theme keys (docs/SETTINGS.md "Per-theme settings") -> theme keys, values in the new vocabulary; NULL = dropped */
 static const char *map_override(const char *k, const char *v, char *key, size_t nk, char *out, size_t no)
 {
     out[0] = 0;
@@ -104,61 +104,6 @@ static const char *map_override(const char *k, const char *v, char *key, size_t 
     else if (!strcasecmp(k, "mode")) { snprintf(key, nk, "Desktop.mode"); snprintf(out, no, "%s", v); }
     else return NULL;
     return out[0] ? out : NULL;
-}
-
-struct ov { char key[64], val[1024], why[300]; };
-struct ovctx { struct ov *o; int n, max; const char *sec; };
-static void ov_key(const char *k, const char *v, void *ud)
-{
-    struct ovctx *c = ud;
-    char key[64], val[1024];
-    if (!map_override(k, v, key, sizeof key, val, sizeof val)) return;
-    for (int i = 0; i < c->n; i++) if (!strcasecmp(c->o[i].key, key)) return;   /* an earlier layer has it */
-    if (c->n >= c->max) return;
-    struct ov *o = &c->o[c->n++];
-    snprintf(o->key, sizeof o->key, "%s", key); snprintf(o->val, sizeof o->val, "%s", val);
-    snprintf(o->why, sizeof o->why, "settings: [%s] %s (legacy, flxp's Display Properties)", c->sec, k);
-}
-/* [override:NAME], [override:ALIAS] for each of the theme's aliases, then [override] */
-int lhde__legacy_override(const char *name, int i, char *key, size_t nk, char *val, size_t nv, char *why, size_t nw)
-{
-    static struct ov o[32]; static int n;
-    if (i == 0) {
-        n = 0;
-        lhde_ini *s = settings();
-        struct ovctx c = { o, 0, 32, NULL };
-        char sec[300]; snprintf(sec, sizeof sec, "override:%s", name);
-        c.sec = sec; lhde_ini_keys(s, sec, ov_key, &c);
-        char canon[256], file[PATH_MAX], al[512] = "";
-        if (lhde_theme_lookup(name, canon, sizeof canon, file, sizeof file) == 1) {
-            lhde_ini *f = lhde_ini_load(file); lhde_ini_get(f, "Theme", "aliases", al, sizeof al); lhde_ini_free(f);
-        }
-        char sec2[300];
-        for (char *save = NULL, *t = strtok_r(al, " \t,", &save); t; t = strtok_r(NULL, " \t,", &save)) {
-            snprintf(sec2, sizeof sec2, "override:%s", t); c.sec = sec2; lhde_ini_keys(s, sec2, ov_key, &c);
-        }
-        c.sec = "override"; lhde_ini_keys(s, "override", ov_key, &c);
-        /* [desktop] wallpaper = none: the user switched the wallpaper off (luxshell's "Show the wallpaper") */
-        char w[1024];
-        if (lhde_ini_get(s, "desktop", "wallpaper", w, sizeof w) && w[0] && c.n < 32) {
-            int have = 0; for (int k = 0; k < c.n; k++) if (!strcmp(o[k].key, "Desktop.wallpaper")) have = 1;
-            if (!have) {
-                struct ov *x = &o[c.n++];
-                snprintf(x->key, sizeof x->key, "Desktop.wallpaper"); snprintf(x->val, sizeof x->val, "%s", w);
-                snprintf(x->why, sizeof x->why, "settings: [desktop] wallpaper (per user%s)", strcmp(w, "none") ? "; legacy: Set as Desktop Background" : ": the wallpaper switched off");
-                char m[64];
-                if (strcmp(w, "none") && lhde_ini_get(s, "desktop", "mode", m, sizeof m) && m[0] && c.n < 32) {
-                    struct ov *y = &o[c.n++];
-                    snprintf(y->key, sizeof y->key, "Desktop.mode"); snprintf(y->val, sizeof y->val, "%s", m);
-                    snprintf(y->why, sizeof y->why, "settings: [desktop] mode (with [desktop] wallpaper)");
-                }
-            }
-        }
-        n = c.n;
-    }
-    if (i < 0 || i >= n) return 0;
-    snprintf(key, nk, "%s", o[i].key); snprintf(val, nv, "%s", o[i].val); snprintf(why, nw, "%s", o[i].why);
-    return 1;
 }
 
 /* ---------------------------------------------------------------- the migration */
@@ -338,6 +283,63 @@ static void st_key(const char *k, const char *v, void *ud)
     }
 }
 
+/* settings.ini's legacy per-theme layers, which nothing applies live any more: [override:NAME] -> NAME-modified.theme (and
+   [theme] name follows when NAME was selected), [override] (all themes) -> the selected theme's modified copy, [desktop]
+   wallpaper = PATH (+ mode; the old "Set as Desktop Background", for every theme) -> the selected theme's current layer.
+   [desktop] wallpaper = none stays: the per-user switch the resolver applies. Returns the number of changes. */
+static int convert_legacy(struct rep *r, lhde_ini *dst, const char *udir, char *selected, size_t nsel)
+{
+    int count = 0;
+    char v[1024];
+    struct secs ss; ss.n = 0;
+    lhde_ini_sections(dst, sec_add, &ss);
+    static char keys[32][64], vals[32][1024];
+    for (int i = 0; i < ss.n; i++) {
+        if (strncasecmp(ss.names[i], "override:", 9)) continue;
+        const char *old = ss.names[i] + 9;
+        char canon[256]; new_name(old, canon, sizeof canon);
+        struct kv c = { keys, vals, 0, 32, ss.names[i] };
+        lhde_ini_keys(dst, ss.names[i], kv_add, &c);
+        char tname[300]; snprintf(tname, sizeof tname, "%s-modified", canon);
+        char origin[400]; snprintf(origin, sizeof origin, "settings.ini [%s]", ss.names[i]);
+        int stored = c.n ? write_modified(r, udir, tname, canon, NULL, keys, vals, c.n, origin) : 0;
+        if (!stored) say(r, "  %s: nothing that differs from %s, no theme file", origin, canon);
+        lhde_ini_remove_section(dst, ss.names[i]); count++;
+        if (stored && !strcmp(selected, canon)) { lhde_ini_set(dst, "theme", "name", tname); say(r, "  [theme] name = %s -> %s", canon, tname); snprintf(selected, nsel, "%s", tname); }
+    }
+    if (lhde_ini_has_section(dst, "override")) {
+        struct kv c = { keys, vals, 0, 32, "override" };
+        lhde_ini_keys(dst, "override", kv_add, &c);
+        if (c.n && selected[0]) {
+            size_t sl = strlen(selected);
+            char tname[300]; if (sl > 9 && !strcmp(selected + sl - 9, "-modified")) snprintf(tname, sizeof tname, "%s", selected); else snprintf(tname, sizeof tname, "%s-modified", selected);
+            char base[256]; snprintf(base, sizeof base, "%s", selected); if (!strcmp(tname, selected)) { char *m = strstr(base, "-modified"); if (m) *m = 0; }
+            if (write_modified(r, udir, tname, base, NULL, keys, vals, c.n, "settings.ini [override] (all themes; now the selected theme's)") && strcmp(selected, tname)) {
+                lhde_ini_set(dst, "theme", "name", tname); snprintf(selected, nsel, "%s", tname); }
+        }
+        lhde_ini_remove_section(dst, "override"); count++;
+        say(r, "  [override] removed (no all-themes layer any more; other themes keep their own values)");
+    }
+    if (lhde_ini_get(dst, "desktop", "wallpaper", v, sizeof v) && v[0] && strcmp(v, "none")) {
+        char m[64] = "", owner[256] = "", have[1024], canon[256] = "", file[PATH_MAX];
+        lhde_ini_get(dst, "desktop", "mode", m, sizeof m);
+        if (selected[0] && lhde_theme_lookup(selected, canon, sizeof canon, file, sizeof file) <= 0) snprintf(canon, sizeof canon, "%s", selected);
+        selected = canon;   /* the current layer belongs to the canonical name */
+        lhde_ini_get(dst, "current", "theme", owner, sizeof owner);
+        if (!selected[0]) say(r, "  [desktop] wallpaper = %s removed: no theme is selected to carry it", v);
+        else if (owner[0] && strcmp(owner, selected)) say(r, "  [desktop] wallpaper = %s removed: the current layer belongs to %s, not %s", v, owner, selected);
+        else if (lhde_ini_get(dst, "current", "Desktop.wallpaper", have, sizeof have)) say(r, "  [desktop] wallpaper = %s removed: the current layer has %s", v, have);
+        else {
+            lhde_ini_set(dst, "current", "theme", selected);
+            lhde_ini_set(dst, "current", "Desktop.wallpaper", v);
+            if (m[0] && !lhde_ini_get(dst, "current", "Desktop.mode", have, sizeof have)) lhde_ini_set(dst, "current", "Desktop.mode", m);
+            say(r, "  [desktop] wallpaper = %s%s%s -> [current] of %s (Desktop.wallpaper%s)", v, m[0] ? ", mode = " : "", m, selected, m[0] ? ", Desktop.mode" : "");
+        }
+        lhde_ini_set(dst, "desktop", "wallpaper", NULL); lhde_ini_set(dst, "desktop", "mode", NULL); count++;
+    }
+    return count;
+}
+
 static int migrate_settings(int force, struct rep *r)
 {
     char ch[PATH_MAX], newp[PATH_MAX], cdir[PATH_MAX], udir[PATH_MAX], oldp[PATH_MAX + 64], olddir[PATH_MAX + 64], state[PATH_MAX + 64];
@@ -381,36 +383,8 @@ static int migrate_settings(int force, struct rep *r)
         if (strcmp(nv, v)) { lhde_ini_set(dst, "theme", "name", nv); say(r, "  [theme] name = %s -> %s", v, nv); count++; }
         snprintf(selected, sizeof selected, "%s", nv);
     }
-    /* 3. [override:NAME] -> NAME-modified.theme; [override] (all themes) -> the selected theme's */
-    struct secs ss; ss.n = 0;
-    lhde_ini_sections(dst, sec_add, &ss);
-    static char keys[32][64], vals[32][1024];
-    for (int i = 0; i < ss.n; i++) {
-        if (strncasecmp(ss.names[i], "override:", 9)) continue;
-        const char *old = ss.names[i] + 9;
-        char canon[256]; new_name(old, canon, sizeof canon);
-        struct kv c = { keys, vals, 0, 32, ss.names[i] };
-        lhde_ini_keys(dst, ss.names[i], kv_add, &c);
-        char tname[300]; snprintf(tname, sizeof tname, "%s-modified", canon);
-        char origin[400]; snprintf(origin, sizeof origin, "settings.ini [%s]", ss.names[i]);
-        int stored = c.n ? write_modified(r, udir, tname, canon, NULL, keys, vals, c.n, origin) : 0;
-        if (!stored) say(r, "  %s: nothing that differs from %s, no theme file", origin, canon);
-        lhde_ini_remove_section(dst, ss.names[i]); count++;
-        if (stored && !strcmp(selected, canon)) { lhde_ini_set(dst, "theme", "name", tname); say(r, "  [theme] name = %s -> %s", canon, tname); snprintf(selected, sizeof selected, "%s", tname); }
-    }
-    if (lhde_ini_has_section(dst, "override")) {
-        struct kv c = { keys, vals, 0, 32, "override" };
-        lhde_ini_keys(dst, "override", kv_add, &c);
-        if (c.n && selected[0]) {
-            size_t sl = strlen(selected);
-            char tname[300]; if (sl > 9 && !strcmp(selected + sl - 9, "-modified")) snprintf(tname, sizeof tname, "%s", selected); else snprintf(tname, sizeof tname, "%s-modified", selected);
-            char base[256]; snprintf(base, sizeof base, "%s", selected); if (!strcmp(tname, selected)) { char *m = strstr(base, "-modified"); if (m) *m = 0; }
-            if (write_modified(r, udir, tname, base, NULL, keys, vals, c.n, "settings.ini [override] (all themes; now the selected theme's)") && strcmp(selected, tname)) {
-                lhde_ini_set(dst, "theme", "name", tname); snprintf(selected, sizeof selected, "%s", tname); }
-        }
-        lhde_ini_remove_section(dst, "override"); count++;
-        say(r, "  [override] removed (no all-themes layer any more; other themes keep their own values)");
-    }
+    /* 3. [override:NAME] -> NAME-modified.theme; [override] (all themes) -> the selected theme's; [desktop] wallpaper */
+    count += convert_legacy(r, dst, udir, selected, sizeof selected);
     /* 4. the global fallbacks of per-theme keys: the theme decides now */
     static const char *const gone[][3] = { { "theme", "composition", "the theme's Glass.composition" }, { "theme", "animations", "the theme's Glass.animations" },
         { "taskbar", "kind", "the theme's Shell.taskbar" }, { "start", "menu", "there is one start menu, flxp's" }, { "desktop", "icons", "the theme's Desktop.icons" },
@@ -483,6 +457,31 @@ static int migrate_settings(int force, struct rep *r)
     return count ? count : 1;
 }
 
+/* ---- every run: legacy layers in lhde's own settings.ini (written there by a program from before the switch, or left by a
+   settings.ini that was migrated before they stopped being applied live) ---- */
+static int migrate_legacy(struct rep *r)
+{
+    char newp[PATH_MAX], udir[PATH_MAX], v[1024];
+    lhde_settings_path(newp, sizeof newp);
+    if (!lhde__exists(newp)) return 0;
+    lhde_ini *ini = lhde_ini_load(newp);
+    if (!ini) return 0;
+    struct secs ss; ss.n = 0; lhde_ini_sections(ini, sec_add, &ss);
+    int any = lhde_ini_get(ini, "desktop", "wallpaper", v, sizeof v) && v[0] && strcmp(v, "none");
+    for (int i = 0; i < ss.n && !any; i++) if (!strncasecmp(ss.names[i], "override", 8) && (!ss.names[i][8] || ss.names[i][8] == ':')) any = 1;
+    if (!any) { lhde_ini_free(ini); return 0; }
+    lhde_theme_user_dir(udir, sizeof udir);
+    if (lhde__mkdirs(udir)) { say(r, "cannot create %s: %s", udir, strerror(errno)); lhde_ini_free(ini); return -1; }
+    say(r, "lhde: %s: legacy per-theme sections -> theme files", newp);
+    char selected[256] = "";
+    lhde_ini_get(ini, "theme", "name", selected, sizeof selected);
+    int n = convert_legacy(r, ini, udir, selected, sizeof selected);
+    if (lhde_ini_save(ini, newp)) { say(r, "cannot write %s: %s", newp, strerror(errno)); lhde_ini_free(ini); return -1; }
+    lhde_ini_free(ini);
+    lhde_settings_reload();
+    return n;
+}
+
 /* ---- the files that were scattered over ~/.config/{flxp,lhshell,lhwm,longhorn}: into lhde's config and state directories ---- */
 static int move_file(const char *src, const char *dst)
 {
@@ -540,6 +539,11 @@ static int migrate_files(struct rep *r)
     snprintf(src, sizeof src, "%s/flxp/views", ch); snprintf(dst, sizeof dst, "%s/flxp-views", sdir); move_one(r, src, dst, &count);
     snprintf(src, sizeof src, "%s/flxp/desktop-positions", ch); snprintf(dst, sizeof dst, "%s/flxp-desktop-positions", sdir); move_one(r, src, dst, &count);
     snprintf(src, sizeof src, "%s/lhshell/state.ini", ch); snprintf(dst, sizeof dst, "%s/luxshell-state.ini", sdir); move_one(r, src, dst, &count);
+    { char dh[PATH_MAX]; const char *x = getenv("XDG_DATA_HOME"), *hm = getenv("HOME");   /* flxp's start panel kept two files under ~/.local/share/flxp */
+      if (x && *x == '/') snprintf(dh, sizeof dh, "%s", x); else snprintf(dh, sizeof dh, "%s/.local/share", hm ? hm : ".");
+      snprintf(src, sizeof src, "%s/flxp/mfu", dh); snprintf(dst, sizeof dst, "%s/flxp-mfu", sdir); move_one(r, src, dst, &count);
+      snprintf(src, sizeof src, "%s/flxp/run-history", ch); snprintf(dst, sizeof dst, "%s/flxp-run-history", sdir); move_one(r, src, dst, &count);
+      snprintf(src, sizeof src, "%s/flxp", dh); if (lhde__is_dir(src) && rmdir(src) == 0) say(r, "  %s (empty) removed", src); }
     snprintf(src, sizeof src, "%s/lhshell/mfu.ini", ch); snprintf(dst, sizeof dst, "%s/luxshell-mfu.ini", sdir); move_one(r, src, dst, &count);
     snprintf(src, sizeof src, "%s/lhwm/keys", ch); snprintf(dst, sizeof dst, "%s/keys", cdir); move_one(r, src, dst, &count);
     snprintf(src, sizeof src, "%s/longhorn/settings.ini", ch);
@@ -559,6 +563,9 @@ int lhde_settings_migrate(int force, char *report, size_t n)
     if (report && n) report[0] = 0;
     int a = migrate_settings(force, &r);
     if (a < 0) return -1;
+    int l = migrate_legacy(&r);
+    if (l < 0) return -1;
+    a += l;
     int b = migrate_files(&r);
     if (b < 0) return -1;
     if (report && report[0]) {   /* the report is kept beside the settings, appended */

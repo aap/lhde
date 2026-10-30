@@ -111,7 +111,7 @@ static void parse_box(lua_State *L, int idx, double *l, double *t, double *r, do
     if (n == 1) { *l = *t = *r = *b = v[0]; } else { *l = v[0]; *t = v[1]; *r = v[2]; *b = v[3]; }
 }
 /* a pack image: "@icon:..." (registered icons), an absolute path, or a path under packs/ in lhde's data directories
-   (4074/imageres/1179.png: lhde-import's pack pixels, lhde_data.h) */
+   (4074/imageres/1179.png: lhde-import's pack pixels, lhde/data.h) */
 static cairo_surface_t *img_from_lua(lua_State *L, int idx) {
     const char *p = lua_tostring(L, idx); if (!p) return NULL;
     if (p[0] == '@') return image_get(p);           /* registered icons */
@@ -493,7 +493,7 @@ static int l_maxmode(lua_State *L) {
 static int l_screen(lua_State *L) { lua_pushinteger(L, scr_w); lua_pushinteger(L, scr_h); lua_pushinteger(L, screen); return 3; }   /* width, height, X screen number */
 /* lh.root_prop(name): a root property as a string (8-bit types: STRING, UTF8_STRING) or an integer (the first 32-bit item:
    CARDINAL, PIXMAP, WINDOW, ...); nil when missing. lh.set_root_prop(name, string | nil): UTF8_STRING, nil deletes it.
-   The theme setting (_LH_THEME, _LH_THEMES_INI) and _LHSHELL_COMMAND go through these (SHELL-DESIGN 6.1/6.2). */
+   The theme setting (_LH_THEME, _LH_THEME_RESOLVED) and _LHSHELL_COMMAND go through these (SHELL-DESIGN 6.1/6.2). */
 static int l_root_prop(lua_State *L) {
     Atom a = XInternAtom(dpy, luaL_checkstring(L, 1), False), ty; int fmt; unsigned long n, after; unsigned char *d = NULL;
     if (XGetWindowProperty(dpy, root, a, 0, 4096, False, AnyPropertyType, &ty, &fmt, &n, &after, &d) != Success || !d || !n) { if (d) XFree(d); lua_pushnil(L); return 1; }
@@ -509,7 +509,7 @@ static int l_set_root_prop(lua_State *L) {
 /* lhde's data directories (liblhde, lhde/data.h): lh.data_find(rel) -> the first dir/rel that exists, or nil;
    lh.data_resolve(value) -> a registry value as a path; lh.data_resolve_dir(value, marker) -> the directory of value that has
    marker (frames/x + theme.ini, packs/x + shell.lua); lh.data_dirs() -> the list; lh.data_user() -> the user's data directory;
-   lh.component_dir(name) -> luxshell/ or session/ (tree or <prefix>/lib/lhde), or nil; lh.registry_source() / lh.registry_resolved(src) */
+   lh.component_dir(name) -> luxshell/ or session/ (tree or <prefix>/lib/lhde), or nil */
 static int l_data_find(lua_State *L) { char b[4200]; if (lhde_data_find(luaL_checkstring(L, 1), b, sizeof b)) lua_pushstring(L, b); else lua_pushnil(L); return 1; }
 static int l_data_resolve(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_data_resolve(luaL_checkstring(L, 1), b, sizeof b)); return 1; }
 static int l_data_resolve_dir(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_data_resolve_dir(luaL_checkstring(L, 1), luaL_checkstring(L, 2), b, sizeof b)); return 1; }
@@ -517,8 +517,6 @@ static int l_data_dirs(lua_State *L) { const char *d[LHDE_DATA_MAX]; int n = lhd
     for (int i = 0; i < n; i++) { lua_pushstring(L, d[i]); lua_rawseti(L, -2, i + 1); } return 1; }
 static int l_data_user(lua_State *L) { lua_pushstring(L, lhde_data_user()); return 1; }
 static int l_component_dir(lua_State *L) { char b[4200]; if (lhde_component_dir(luaL_checkstring(L, 1), b, sizeof b)) lua_pushstring(L, b); else lua_pushnil(L); return 1; }
-static int l_registry_source(lua_State *L) { char b[4200]; if (lhde_registry_source(b, sizeof b)) lua_pushstring(L, b); else lua_pushnil(L); return 1; }
-static int l_registry_resolved(lua_State *L) { char b[4200]; if (lhde_registry_resolved(luaL_checkstring(L, 1), b, sizeof b)) lua_pushstring(L, b); else lua_pushnil(L); return 1; }
 /* liblhde's theme resolver and settings store (docs/THEME-FORMAT.md, docs/SETTINGS.md):
      lh.theme_resolve(name) -> { name =, file =, v = { ["Glass.frames"] = ..., ... }, why = { ... }, record = TEXT (no serial) },
                                or nil, error
@@ -534,7 +532,7 @@ static int l_registry_resolved(lua_State *L) { char b[4200]; if (lhde_registry_r
      theme's layer dropped), false when not, nil on an error; lh.theme_save_as(file, title) -> true, or nil, error
      lh.settings_get(sec, key) -> value ("" when empty) or nil when absent; lh.settings_set(sec, key, value | nil) -> true when the
      file changed; lh.settings_path(); lh.config_file(NAME), lh.state_file(NAME) -> path; lh.settings_reload();
-     lh.settings_migrate() -> count, report; lh.compat_registry() -> path */
+     lh.settings_migrate() -> count, report */
 static int l_theme_resolve(lua_State *L) {
     char err[600]; lhde_theme *t = lhde_theme_resolve(luaL_checkstring(L, 1), err, sizeof err);
     if (!t) { lua_pushnil(L); lua_pushstring(L, err); return 2; }
@@ -619,7 +617,6 @@ static int l_settings_migrate(lua_State *L) {
     static char rep[65536]; int n = lhde_settings_migrate(0, rep, sizeof rep);
     lua_pushinteger(L, n); lua_pushstring(L, rep); return 2;
 }
-static int l_compat_registry(lua_State *L) { char b[4200]; if (lhde_compat_registry(b, sizeof b)) lua_pushstring(L, b); else lua_pushnil(L); return 1; }
 static int l_realpath(lua_State *L) { char buf[4096]; if (realpath(luaL_checkstring(L, 1), buf)) lua_pushstring(L, buf); else lua_pushnil(L); return 1; }
 /* lh.list_dir(path): file names in a directory (no . and ..), nil when it cannot be read; lh.mtime(path): modification time
    in seconds or nil (desktop-entry and icon caches of the start menu) */
@@ -932,11 +929,11 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"set_root_cardinal", l_set_root_cardinal}, {"struts", l_struts}, {"spawn_pid", l_spawn_pid}, {"notification_closed", l_notification_closed}, {"notification_action", l_notification_action},
     {"spawn", l_spawn}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"realpath", l_realpath}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"quit", l_quit}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"mtime", l_mtime},
     {"data_find", l_data_find}, {"data_resolve", l_data_resolve}, {"data_resolve_dir", l_data_resolve_dir}, {"data_dirs", l_data_dirs}, {"data_user", l_data_user},
-    {"component_dir", l_component_dir}, {"registry_source", l_registry_source}, {"registry_resolved", l_registry_resolved},
+    {"component_dir", l_component_dir},
     {"theme_resolve", l_theme_resolve}, {"theme_record", l_theme_record}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},
     {"theme_set_key", l_theme_set_key}, {"theme_user_dir", l_theme_user_dir}, {"current_set_key", l_current_set_key},
     {"current_keys", l_current_keys}, {"current_theme", l_current_theme}, {"theme_select", l_theme_select}, {"theme_save_as", l_theme_save_as}, {"settings_get", l_settings_get}, {"settings_set", l_settings_set},
-    {"settings_path", l_settings_path}, {"config_file", l_config_file}, {"state_file", l_state_file}, {"settings_reload", l_settings_reload}, {"settings_migrate", l_settings_migrate}, {"compat_registry", l_compat_registry},
+    {"settings_path", l_settings_path}, {"config_file", l_config_file}, {"state_file", l_state_file}, {"settings_reload", l_settings_reload}, {"settings_migrate", l_settings_migrate},
     {"cm_owner", l_cm_owner}, {"kill", l_kill}, {"image_alpha", l_image_alpha}, {"fonts", l_fonts}, {"image_filter", l_image_filter}, {"image_flush", l_image_flush}, {"wm_moveresize", l_wm_moveresize}, {NULL, NULL} };
 static const luaL_Reg nodemeth[] = { {"add", l_node_add}, {"remove", l_node_remove}, {"clear", l_node_clear}, {"set", l_node_set}, {"bounds", l_node_bounds}, {"measure", l_node_measure}, {"desired", l_node_desired}, {NULL, NULL} };
 static const luaL_Reg surfmeth[] = { {"root", l_surface_root}, {"show", l_surface_show}, {"hide", l_surface_hide}, {"move", l_surface_move}, {"raise", l_surface_raise}, {"lower", l_surface_lower}, {"set_layer", l_surface_layer}, {"stackpos", l_surface_stackpos}, {"damage", l_surface_damage}, {"id", l_surface_id},

@@ -342,9 +342,12 @@ static void make_fonts()
 
 enum { HEAD_H = 25, PAD_X = 12, PAD_Y = 10, ROW_GAP = 4, SECTION_GAP = 15 };
 // the groups look: the Filter box at (8, 8) as 4074's (lh4074-180309.png),
-// group rows 22 px with the expander at 8 and the title at 22, entries 20 px
-// with the icon at 22 and the name at 42 (Media Player concept), 8 px between groups
-enum { GR_X = 8, GR_BOX_Y = 8, GR_BOX_H = 21, GR_FIRST = GR_BOX_Y + GR_BOX_H + 10, GR_HEAD = 22, GR_ROW = 20, GR_INDENT = 22, GR_GAP = 8 };
+// group rows 22 px with the expander box at 6..14 and the title 5 px after it
+// (XP's Folders tree: the 9 px glyph centred in the 19 px indent, the icon at 19,
+// so 5 clear columns between them), entries 20 px with the icon at 22 and the
+// name at 42 (Media Player concept), 8 px between groups
+enum { GR_X = 8, GR_BOX_Y = 8, GR_BOX_H = 21, GR_FIRST = GR_BOX_Y + GR_BOX_H + 10, GR_HEAD = 22, GR_ROW = 20, GR_INDENT = 22, GR_GAP = 8,
+       GR_BOX_GAP = 5 };
 
 
 static int text_height(HDC dc, const std::string& s, int width, UINT extra)
@@ -601,7 +604,7 @@ static void draw_group_header(HDC dc, const Group& g, int gi, int dy)
     SetBkMode(dc, TRANSPARENT);
     SetTextColor(dc, hot ? g_look.title_hot : g_look.title);
     std::u16string t = W(g.title);
-    RECT tr = { GR_INDENT - 6, r.top, r.right, r.bottom };
+    RECT tr = { bx + 9 + GR_BOX_GAP, r.top, r.right, r.bottom };
     DrawTextW(dc, (LPCWSTR)t.c_str(), -1, &tr, DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
     SelectObject(dc, of);
 }

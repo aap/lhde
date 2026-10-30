@@ -31,11 +31,11 @@ std::string settings_path();                  // $XDG_CONFIG_HOME/lhde/flxp.ini
 // it cannot be written.
 bool write_setting(const std::string& key, const std::string& value);
 
-// Run-time data (res/icons, ...) is looked up, relative path appended, in:
-// $FLXP_DATA, the compiled-in FLXP_DATADIR ($(PREFIX)/share/lhde),
-// <exe>/../share/lhde (a moved install), <exe>/../../flxp and
-// <exe>/../../../flxp (an uninstalled build: build/bin, build/tests[/w32]),
-// <exe>/../share/flxp (flxp's old data directory). "" if none has it.
+// flxp's program data (res/icons) is looked up, relative path appended, in:
+// the compiled-in FLXP_DATADIR ($(PREFIX)/share/lhde), <exe>/../share/lhde
+// (a moved install), <exe>/../../flxp and <exe>/../../../flxp (an uninstalled
+// build: build/bin, build/tests[/w32]). "" if none has it. Everything else
+// (styles, resources, wallpapers, themes) comes through liblhde (lhdata.h).
 std::string data_path(const std::string& rel);
 std::vector<std::string> data_search_dirs();
 std::string exe_dir();                        // dirname(/proc/self/exe)

@@ -122,26 +122,13 @@ What `luxshell` (the taskbar/sidebar) relies on, all in `wm.c`:
   `_LHWM_RESTORE_GEOMETRY` (written on maximise).
 - `ConfigureNotify` of root children no longer re-queries the monitors (only the root's own); a `ConfigureRequest`
   from a hidden window keeps it off screen (size only).
-- Session theme (M6, `SHELL-DESIGN.md` 6.1, `docs/history/THEMES.md`): root `_LH_THEME` (UTF8_STRING) is a theme name in the registry
-  `../themes.ini`, whose absolute path is root `_LH_THEMES_INI`. luxwm follows it (below, "Maximised mode": runtime theme
-  switching); at startup the root's value wins over `-t`/`LHWM_THEME`, which luxwm publishes only when `_LH_THEME` is missing.
-  luxwm publishes `_LH_THEMES_INI` when missing (`LH_THEMES_INI`, else `../themes.ini` from the binary's directory, the theme
-  directory's grandparent, or the working directory). An alias written to `_LH_THEME` is replaced by the registry name.
-  **Presets** (2026-10-25, `SETTINGS.md` "Preset names on `_LH_THEME`"): a name that is neither a section nor an alias is
-  looked up as a user preset, `$XDG_CONFIG_HOME/longhorn/themes/NAME.theme` (default `~/.config/longhorn/themes/`), at startup
-  (also for `-t`/`LHWM_THEME`) and on every change. `theme_preset_lookup` (frame.c) takes the `[Theme] base` registry entry and
-  merges the preset's `[VisualStyle] msstyles/color/size`, `[Frames] frame/frame_classic`, `[Fonts] fonts` and `[Composition]
-  composition` (`off` = always the classic frame, as the registry's `composition = off`) over it; paths are absolute, `~/...` or
-  relative to the preset file. When the root's `_LH_THEME_RESOLVED` (lux) has `name=` NAME, its unescaped key=value view is used
-  instead of the file (base + the same keys). The result is applied exactly like a registry entry (frame spec
-  `frame|msstyles|color|size`, `frame_classic`, fonts, the composition-off rule) and `_LHWM_THEME` publishes the derived spec as
-  before; `_LH_THEME` keeps the preset's name (never rewritten to the base). A change of `_LH_THEME_RESOLVED` while a preset of
-  that name is selected applies it again (nothing happens when the spec is the same). The preset's own `[Composition]
-  animations` wins over settings.ini's `[theme] animations` while it is selected ("Animations"). Log: `luxwm: theme NAME:
-  preset (base BASE) from SOURCE: frame ..., style ..., classic ...[, composition off]`; an unknown name: `luxwm: _LH_THEME NAME
-  is neither in themes.ini nor a preset; keeping CURRENT` (nothing changes). `tests/regress.sh`: 144 identical.
-  frame.c only gained the registry reader; `tests/frametest` output is byte-identical before/after (aero, jade and the three
-  classic themes: strip, normal, unfocused, maximised, extended).
+- Session theme: root `_LH_THEME` (UTF8_STRING) is a theme name liblhde resolves (docs/THEME-FORMAT.md: the user's and the
+  shipped theme files, aliases, bare styles; the current layer). luxwm resolves it itself (`lh_theme_apply`: the frame set,
+  the classic frames, the style, the fonts, the composition-off rule, the animations) and follows a change live (below,
+  "Maximised mode": runtime theme switching; `_LH_SETTINGS_CHANGED` and a republished `_LH_THEME_RESOLVED` apply the record
+  again when it differs). At startup the root's value wins over `-t`/`LHWM_THEME`, which luxwm publishes only when
+  `_LH_THEME` is missing; an alias written to `_LH_THEME` is replaced by the theme's name; a name that is no theme is logged
+  (`luxwm: _LH_THEME NAME is no theme; keeping CURRENT`) and nothing changes.
 - Start menu key (M6, `SHELL-DESIGN.md` 6.3): the key action `start` (defaults `Super_L start`, `Super_R start`, added to a
   user keys file that binds neither Super key) grabs the bare Super key; when it is released with no other key or button press
   in between, luxwm sends the client message `_LHSHELL_START` to the root (SubstructureNotify|SubstructureRedirect, data[0] =
@@ -206,7 +193,7 @@ What `luxshell` (the taskbar/sidebar) relies on, all in `wm.c`:
   minimised windows stay unmapped with WM_STATE Iconic (berry used to set every client Withdrawn on exit, so a restarted
   luxwm lost the minimised ones; now they are adopted minimised again). Deleted from the root: `_NET_SUPPORTED`,
   `_NET_SHOWING_DESKTOP`, `_NET_SUPPORTING_WM_CHECK`, `_NET_WORKAREA`, `_LHWM_THEME`, `_LHWM_COMPOSITED`, `_LHWM_FRAME_METRICS`,
-  `_LHWM_MAXIMIZED_MODE` and berry's status properties; kept: `_LH_THEME`, `_LH_THEMES_INI` (the session's) and
+  `_LHWM_MAXIMIZED_MODE` and berry's status properties; kept: `_LH_THEME` (the session's) and
   `_NET_CLIENT_LIST`, `_NET_CLIENT_LIST_STACKING`, `_NET_ACTIVE_WINDOW` (a restarted luxwm restores order and focus from
   them). Exit status 0, "luxwm: clean exit" on stderr. Tested on the lab: three clients stay viewable at their positions, a
   minimised xterm keeps WM_STATE Iconic and comes back minimised after `lab.sh restart-wm`.

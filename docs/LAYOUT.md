@@ -67,14 +67,14 @@ USER FILES                           yours; lhde writes only what you change in 
   luxshell-mfu.ini                     launch counts behind the start menu's frequently-used list
   flxp-views, flxp-desktop-positions   the view remembered per folder, the desktop icons' positions
   flxp-view-sizes                      the size each of the Explorer's Longhorn views had last
+  flxp-mfu, flxp-run-history           the start panel's launch counts, the Run box's history
 ```
 
 **Lookup.** A program asks for a file by kind and name, i.e. by its relative name (`styles/jade4074.msstyles`,
 `frames/jade4074/close.png`, `resources/4074`, `wallpapers/4074/Bliss.jpg`), and liblhde (`liblhde/data.c`, `<lhde/data.h>`)
 answers from the first of: 1. `~/.config/lhde`; 2. `~/.local/share/lhde-windows/index` (or `$LHDE_DATA`, a flat directory:
-tests, scratch imports); 3. an old-layout `~/.local/share/lhde` still holding Windows files (until it is migrated);
-4. `$PREFIX/share/lhde` of the running program, then `$XDG_DATA_DIRS/lhde`; 5. the source tree's `data/` when the program runs
-from a build tree. Code is found by `lhde_component_dir`: `<tree>/luxshell` or `<prefix>/lib/lhde/luxshell`. Scripts use the
+tests, scratch imports); 3. `$PREFIX/share/lhde` of the running program, then `$XDG_DATA_DIRS/lhde`; 4. the source tree's
+`data/` when the program runs from a build tree. Code is found by `lhde_component_dir`: `<tree>/luxshell` or `<prefix>/lib/lhde/luxshell`. Scripts use the
 same lookup through `lhde-theme find REL` / `find KIND NAME` / `dirs --list` (session/lhde-paths.sh); lhde-import is the only
 writer of the Windows tree and the only code that knows its inside (`tools/lhdetree.py`). A frame set or pack is split by
 design: its text is shipped, its pixels are generated; `lhde_data_find_in` joins them.
@@ -96,6 +96,7 @@ beside `theme.ini`, which the programs used, is kept); shipped text stays when t
 `.lhde-install`), else is deleted as a stale copy, and a text file we do not ship (your own theme) goes to `~/.config/lhde`;
 `luxshell/ session/ tools/` are deleted (now in `$PREFIX/lib/lhde`); then `<b>/source.ini` (the shipped sources/ID.ini) and
 `index/`. It is idempotent (a second run finds nothing to do) and lhde-session runs it once by itself at start
-(`$XDG_RUNTIME_DIR/lhde-session:N/layout-migration.log`). An unmigrated directory keeps working meanwhile (tree 3 above).
+(`$XDG_RUNTIME_DIR/lhde-session:N/layout-migration.log`). An unmigrated directory is not searched: its files reach the
+programs only once moved, and `lhde-theme dirs` names it with the command to run until then.
 Switching an existing setup: `make install PREFIX=~/.local`, then `lhde-import --migrate -n`, then `lhde-import --migrate`.
 

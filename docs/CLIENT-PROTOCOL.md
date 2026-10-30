@@ -48,7 +48,7 @@ Root properties the client reads (set by luxwm, PropertyNotify on the root when 
 | `_LHWM_THEME` | STRING | Path of the active frame theme (M5a). Derived from the session theme `_LH_THEME` since M6 (see "Theme changes"); read-only for clients. |
 | `_LHWM_FRAME_METRICS` | CARDINAL[19] | `caption_h border_l border_r border_b text_rgb glow_rgb inactive_text_rgb reserved max_caption_h max_border_l max_border_r max_border_b border_t max_border_t max_text_rgb max_inactive_text_rgb max_glow_rgb reserved deco_h` so a client can lay out its header to match the theme (fonts come from the theme.ini: read it if needed). Fields 0..3 are the normal (not maximised) frame margins, 8..11 the maximised ones, 12/13 the top border kept above a `CLIENT_CAPTION` client (normal/maximised); colours `0xRRGGBB`; `glow_rgb` is the DWM TextGlow colour, or the msstyles caption text-shadow colour (0 without one). Field 18 `deco_h` (2026-10-27, "Vision header" below): the rows at the frame's top that are the frame's own decoration (Aero vision: 15, the caption buttons), else `caption_h`. Fields 8..13 since 2026-10-24 ("Second round"), 14..17 since 2026-10-25 (maximised caption colours, below), 18 since 2026-10-27; before, the property had 8 (then 14, then 18) items, so read up to 19 and treat missing ones as absent. |
 
-luxwm deletes them on a clean exit (`luxwmc quit`); `_LH_THEME` and `_LH_THEMES_INI` stay (they are the session's, not luxwm's). A client treats a missing `_LHWM_COMPOSITED` as 0 (another WM, or luxwm not running).
+luxwm deletes them on a clean exit (`luxwmc quit`); `_LH_THEME` stays (it is the session's, not luxwm's). A client treats a missing `_LHWM_COMPOSITED` as 0 (another WM, or luxwm not running).
 
 ## What luxwm does for an extended frame
 
@@ -97,10 +97,12 @@ luxwm; the lab's). Escape or q quits.
 
 ## Theme changes
 
-The session theme is the root property `_LH_THEME` (UTF8_STRING), a name in the registry whose path is in `_LH_THEMES_INI`
-(`data/themes.ini`; format, names and the full rules in `docs/history/THEMES.md`). A theme switch is Windows' `WM_THEMECHANGED`, and
-a client treats a PropertyNotify on the root for `_LH_THEME`, `_LHWM_COMPOSITED` or `_LHWM_FRAME_METRICS` as one: look the
-name up in the registry and reload the visual style (`msstyles`, `color`, `size`), re-read `_LHWM_COMPOSITED`, and repaint
+The session theme is the root property `_LH_THEME` (UTF8_STRING), a theme name; its resolved record is `_LH_THEME_RESOLVED`
+(docs/THEME-FORMAT.md section 4: `theme=NAME`, `serial=`, then `section.key=value` lines), current when its `theme=` is that
+name and its `serial=` the root's `_LH_SETTINGS_SERIAL`; otherwise the client resolves the name itself with liblhde
+(`lhde_theme_resolve`, `<lhde/theme.h>`; `lhde_theme_parse` reads the record). A theme switch is Windows' `WM_THEMECHANGED`, and
+a client treats a PropertyNotify on the root for `_LH_THEME`, `_LH_THEME_RESOLVED`, `_LHWM_COMPOSITED` or `_LHWM_FRAME_METRICS`
+as one: take the record and reload the visual style (`path.style`, `VisualStyle.color`, `VisualStyle.size`), re-read `_LHWM_COMPOSITED`, and repaint
 the header transparent or opaque. Keep `_LHWM_EXTEND_FRAME` and `_LHWM_FRAME_FLAGS` set in both states (since 2026-10-24: while
 it is 0 they ask for `_LHWM_HEADER_PIXMAP`); deleting them while it is 0, as this section said before, still gives an ordinary
 framed window with title and icon. luxwm rewrites `_LHWM_COMPOSITED` and `_LHWM_FRAME_METRICS` on every `_LH_THEME` change even when the

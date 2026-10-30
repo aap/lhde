@@ -1,8 +1,8 @@
 /* liblhde: the settings store (docs/SETTINGS.md) and the ini files it is made of.
 
-   One file per user, ${XDG_CONFIG_HOME:-~/.config}/lhde/settings.ini ($LHDE_SETTINGS overrides the path; the x11-era
-   $LH_SETTINGS too): the current theme's name ([theme] name) and the per-user keys that are not part of a theme (sidebar
-   stacking and width, autohide, rows, the clock, [commands], ...). Every writer keeps the comments, the order and the keys it
+   One file per user, ${XDG_CONFIG_HOME:-~/.config}/lhde/settings.ini ($LHDE_SETTINGS overrides the path): the current theme's
+   name ([theme] name) and the per-user keys that are not part of a theme (sidebar stacking and width, autohide, rows, the
+   clock, [commands], ...). Every writer keeps the comments, the order and the keys it
    does not know (read, modify, write back the whole file, atomically, through a symlink). After a write the X clients send
    _LH_SETTINGS_CHANGED with the serial in _LH_SETTINGS_SERIAL (docs/SETTINGS.md "Change notification"); that part stays in
    the clients, liblhde has no X.
@@ -50,7 +50,7 @@ const char *lhde_settings_path(char *out, size_t n);
 const char *lhde_config_dir(char *out, size_t n);       /* ${XDG_CONFIG_HOME:-~/.config}/lhde */
 /* The user's two directories (docs/SETTINGS.md "Files"). What the user chose: ${XDG_CONFIG_HOME:-~/.config}/lhde (settings.ini,
    themes/, flxp.ini, keys, any shipped file overridden under its own name). What a program remembers on its own:
-   ${XDG_STATE_HOME:-~/.local/state}/lhde (luxshell-state.ini, luxshell-mfu.ini, flxp-views, flxp-desktop-positions). The two
+   ${XDG_STATE_HOME:-~/.local/state}/lhde (luxshell-state.ini, luxshell-mfu.ini, flxp-views, flxp-desktop-positions, flxp-mfu, flxp-run-history). The two
    calls below give the path of a named file in them and create the directory when it is missing. */
 const char *lhde_state_dir(char *out, size_t n);        /* ${XDG_STATE_HOME:-~/.local/state}/lhde */
 const char *lhde_config_file(const char *name, char *out, size_t n);
@@ -76,6 +76,9 @@ void lhde_settings_reload(void);
        (lux's old rules), the runtime state (tile order) stays
      - then longhorn/settings.ini is kept as settings.ini.pre-lhde
    That part runs once: nothing happens when lhde/settings.ini exists (force = 1: again, keeping what lhde/ has).
+   Every time, lhde/settings.ini's own legacy sections are converted the same way ([override:NAME], [override]; nothing
+   applies them live) and a [desktop] wallpaper = PATH (+ mode) becomes the selected theme's current layer ([current]
+   Desktop.wallpaper / Desktop.mode); [desktop] wallpaper = none stays (the per-user switch the resolver applies).
    Then, every time (idempotent, a few stats when there is nothing to do), the files that were scattered over other
    directories move to the two of lhde (above): flxp/flxp.ini -> lhde/flxp.ini (the keys that duplicated theme keys and the
    path overrides the resolver makes redundant are removed and reported), flxp/views and flxp/desktop-positions ->

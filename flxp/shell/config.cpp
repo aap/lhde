@@ -180,20 +180,18 @@ std::string exe_dir()
 #define FLXP_DATADIR "/usr/local/share/lhde"
 #endif
 
-// The data directory (res/icons, themes): $FLXP_DATA, the installed one
-// (lhde's $PREFIX/share/lhde), an installed tree moved elsewhere, the source
-// tree's flxp/ for an uninstalled build, then flxp's old share/flxp.
+// flxp's own program data (res/icons): the installed one (lhde's
+// $PREFIX/share/lhde), an installed tree moved elsewhere, the source tree's
+// flxp/ for an uninstalled build. Everything else comes through liblhde (lhdata.h).
 std::vector<std::string> data_search_dirs()
 {
     std::vector<std::string> out;
-    if (const char* d = getenv("FLXP_DATA")) if (*d) out.push_back(d);
     out.push_back(FLXP_DATADIR);
     std::string e = exe_dir();
     if (!e.empty()) {
         out.push_back(e + "/../share/lhde");     // an installed tree moved elsewhere
         out.push_back(e + "/../../flxp");        // the source tree: build/bin/flxp, build/tests/assoctest
         out.push_back(e + "/../../../flxp");     // build/tests/w32/<test>
-        out.push_back(e + "/../share/flxp");     // flxp's data directory before lhde
     }
     return out;
 }

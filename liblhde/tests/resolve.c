@@ -3,7 +3,7 @@
    Covers: inheritance and its sources, absent vs none, the defaults of each style kind (v3, v4 CompositedWindow 4074, v4
    Sidebar 4051, v4 DWM 5048/5112, classic), bare styles as themes, aliases, the fallbacks (frames, pack -> classic taskbar,
    wallpaper, style luna -> luna4051, icons, base not found), cycles and the depth limit, lhde_theme_set_key
-   (NAME-modified.theme), serialization, the settings store (comments kept), the legacy [override:NAME] layer and the
+   (NAME-modified.theme), serialization, the settings store (comments kept), the conversion of the legacy [override:NAME] sections and the
    migration from ~/.config/longhorn + ~/.config/lhshell. */
 #define _GNU_SOURCE
 #include "lhde/data.h"
@@ -94,7 +94,7 @@ int main(void)
     snprintf(p, sizeof p, "%s/run", T); setenv("XDG_RUNTIME_DIR", p, 1);
     snprintf(p, sizeof p, "%s/state", T); setenv("XDG_STATE_HOME", p, 1);
     setenv("HOME", T, 1); setenv("XDG_DATA_DIRS", "/nonexistent", 1); setenv("LHDE_TREE", "0", 1);
-    unsetenv("LHDE_SETTINGS"); unsetenv("LH_THEMES_INI"); unsetenv("DISPLAY");
+    unsetenv("LHDE_SETTINGS"); unsetenv("DISPLAY");
     lhde_data_reset();
     lhde_style_set_probe(probe);
 
@@ -331,15 +331,37 @@ int main(void)
     EQ(slurp("config/lhde/settings.ini"), "; my comment\n[theme]\nname = aero   ; the theme\n\n[mine]\nx = 1\n\n[sidebar]\nwidth = 181\n");
     CHECK(lhde_settings_set("mine", "x", NULL) == 1);
     EQ(slurp("config/lhde/settings.ini"), "; my comment\n[theme]\nname = aero   ; the theme\n\n[sidebar]\nwidth = 181\n");
-    /* the legacy layer: flxp's [override:NAME] (also under an alias) */
+    /* flxp's legacy [override:NAME] (also under an alias) and [desktop] wallpaper = PATH: not applied live; the migration
+       (every run) turns them into NAME-modified.theme and the selected theme's current layer */
     lhde_settings_set("override:jade-old", "taskbar", "none");
-    lhde_settings_set("override:jade", "icons", "longhorn");
+    lhde_settings_set("override:jade", "icons", "xp");
+    lhde_settings_set("desktop", "wallpaper", "/pics/w.jpg");
+    lhde_settings_set("desktop", "mode", "fit");
     t = R("jade");
-    EQ(G(t, "Shell.taskbar"), "none"); CHECK(lhde_theme_source(t, "Shell.taskbar") == LHDE_FROM_SETTINGS);
-    EQ(G(t, "Desktop.icons"), "longhorn4074"); HAS(W(t, "Desktop.icons"), "[override:jade]");
+    CHECK(strcmp(G(t, "Shell.taskbar"), "none") != 0); CHECK(lhde_theme_source(t, "Shell.taskbar") != LHDE_FROM_SETTINGS);
+    CHECK(strcmp(G(t, "Desktop.icons"), "xp") != 0);
     lhde_theme_free(t);
+    t = R("aero"); CHECK(strcmp(G(t, "Desktop.wallpaper"), "/pics/w.jpg") != 0); lhde_theme_free(t);
+    {
+        static char lrep[8192];
+        CHECK(lhde_settings_migrate(0, lrep, sizeof lrep) > 0);
+        HAS(lrep, "[override:jade-old]"); HAS(lrep, "-> [current] of ");
+        char *ls = slurp("config/lhde/settings.ini");
+        CHECK(!strstr(ls, "override")); HAS(ls, "name = aero");
+        HAS(ls, "Desktop.wallpaper = /pics/w.jpg\nDesktop.mode = fit");
+        char *lj = slurp("config/lhde/themes/jade-modified.theme");
+        HAS(lj, "base = jade"); HAS(lj, "taskbar = none"); HAS(lj, "icons = xp");
+        t = R("jade-modified"); EQ(G(t, "Shell.taskbar"), "none"); EQ(G(t, "Desktop.icons"), "xp"); lhde_theme_free(t);
+        t = R("aero"); EQ(G(t, "Desktop.mode"), "fit"); CHECK(lhde_theme_source(t, "Desktop.mode") == LHDE_FROM_CURRENT);   /* (the picture itself is missing: a fallback) */
+        lhde_theme_free(t);
+        CHECK(lhde_settings_migrate(0, lrep, sizeof lrep) == 0);   /* idempotent */
+        lhde_settings_set("current", "theme", NULL); lhde_settings_set("current", "Desktop.wallpaper", NULL); lhde_settings_set("current", "Desktop.mode", NULL);
+        snprintf(p, sizeof p, "%s/config/lhde/themes/jade-modified.theme", T); unlink(p);
+    }
+    /* the per-user [desktop] wallpaper = none is applied (luxshell's "Show the wallpaper" off) */
     lhde_settings_set("desktop", "wallpaper", "none");
-    t = R("aero"); EQ(G(t, "Desktop.wallpaper"), "none"); EQ(G(t, "path.wallpaper"), ""); lhde_theme_free(t);
+    t = R("aero"); EQ(G(t, "Desktop.wallpaper"), "none"); EQ(G(t, "path.wallpaper"), ""); CHECK(lhde_theme_source(t, "Desktop.wallpaper") == LHDE_FROM_SETTINGS);
+    lhde_theme_free(t);
 
     /* ---- the migration ---- */
     snprintf(p, sizeof p, "%s/config/lhde", T);
@@ -397,14 +419,7 @@ int main(void)
     { char b[PATH_MAX]; snprintf(p, sizeof p, "%s/state/lhde/x.ini", T); EQ(lhde_state_file("x.ini", b, sizeof b), p);
       snprintf(p, sizeof p, "%s/config/lhde/x.ini", T); EQ(lhde_config_file("x.ini", b, sizeof b), p); }
 
-    /* ---- the compatibility registry ---- */
-    char reg[PATH_MAX];
-    CHECK(lhde_compat_registry(reg, sizeof reg) != NULL);
-    HAS(slurp("run/lhde/nodisplay/themes.ini"), "[jade]\ntitle = Jade (4074)\naliases = jade-old jadeclassic\n");
-    HAS(slurp("run/lhde/nodisplay/themes.ini"), "flxp_frame = longhorn");
-    HAS(slurp("run/lhde/nodisplay/wallpapers.ini"), "[jade]\nfile = ");
-
-    /* ---- the three trees (docs/LAYOUT.md): the Windows tree's index, the user's files first, the old layout ---- */
+    /* ---- the three trees (docs/LAYOUT.md): the Windows tree's index, the user's files first, an old layout reported ---- */
     {
         char W[PATH_MAX + 32], q[PATH_MAX * 2], o[PATH_MAX], rel[PATH_MAX], flat[PATH_MAX];
         snprintf(W, sizeof W, "%s/xdg/lhde-windows", T);
@@ -449,13 +464,14 @@ int main(void)
         CHECK(lhde_data_find_in(fd, "close.png", o, sizeof o) != NULL);
         CHECK(lhde_data_origin(o, rel, sizeof rel) == LHDE_TREE_WINDOWS); EQ(rel, "generated/frames/jade4074w/close.png");
         CHECK(lhde_data_origin(fd, rel, sizeof rel) == LHDE_TREE_SHIPPED); EQ(rel, "frames/jade4074w");
-        /* not migrated: the old ~/.local/share/lhde with Windows files is searched after the Windows tree */
+        /* not migrated: an old ~/.local/share/lhde with Windows files is reported, never searched */
         put("xdg/lhde/styles/old4051.msstyles", "x");
         lhde_data_reset();
         CHECK(lhde_old_dir() != NULL);
-        CHECK(lhde_data_find("styles/old4051.msstyles", o, sizeof o) != NULL);
-        CHECK(lhde_data_origin(o, rel, sizeof rel) == LHDE_TREE_OLD);
-        /* $LHDE_WINDOWS set: no old layout */
+        CHECK(lhde_data_find("styles/old4051.msstyles", o, sizeof o) == NULL);
+        nd = lhde_data_dirs(d, LHDE_DATA_MAX);
+        CHECK(nd == 3);
+        /* $LHDE_WINDOWS set: not even reported */
         setenv("LHDE_WINDOWS", W, 1); lhde_data_reset();
         CHECK(lhde_old_dir() == NULL && lhde_data_find("styles/old4051.msstyles", o, sizeof o) == NULL);
         unsetenv("LHDE_WINDOWS"); setenv("LHDE_DATA", flat, 1); setenv("XDG_DATA_DIRS", "/nonexistent", 1); lhde_data_reset();

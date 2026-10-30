@@ -23,7 +23,8 @@ This section replaces the paths below; the dated sections after it are history (
   `FLXP_<KEY>` for one run), `keys` (luxwm's key bindings), and any shipped file overridden under its own name. What a program
   remembers on its own lives in `~/.local/state/lhde/` (`$XDG_STATE_HOME/lhde`): `luxshell-state.ini` (the tile order),
   `luxshell-mfu.ini` (launch counts), `flxp-views` (the view remembered per folder), `flxp-view-sizes` (the size each of the
-  Explorer's views had last), `flxp-desktop-positions` (icon positions).
+  Explorer's views had last), `flxp-desktop-positions` (icon positions), `flxp-mfu` and `flxp-run-history` (the start
+  panel's launch counts and the Run box's history).
   Losing the state directory costs nothing but convenience. liblhde gives the paths (`lhde_config_file`, `lhde_state_file`;
   luxshell `lh.config_file`, `lh.state_file`; flxp `shell::settings_path`, `shell::state_file`) and `lhde-theme dirs` lists both.
   No lhde program reads `~/.config/flxp`, `~/.config/lhshell`, `~/.config/lhwm` or `~/.config/longhorn` any more.
@@ -57,11 +58,16 @@ happens when `lhde/settings.ini` exists; a report goes to `lhde/migration.log`):
    two directories above: `flxp/flxp.ini` -> `lhde/flxp.ini`, where the keys that duplicated theme keys (`icons`, `frame`,
    `taskbar_kind`, `wallpaper`, `wallpaper_mode`, `themes_ini`), `nt5src` and the path overrides the imported Windows tree makes
    redundant (`font_path`, `longhorn_system32`, `longhorn_wim`, `explorer_resources`, `theme_path`) are removed and reported;
-   `flxp/views`, `flxp/desktop-positions`, `lhshell/state.ini`, `lhshell/mfu.ini` -> the state directory; `lhwm/keys` ->
+   `flxp/views`, `flxp/desktop-positions`, `~/.local/share/flxp/{mfu,run-history}`, `lhshell/state.ini`, `lhshell/mfu.ini` -> the state directory; `lhwm/keys` ->
    `lhde/keys`; a `longhorn/settings.ini` symlink left by an earlier migration is removed; an emptied old directory is removed,
    one still holding backups (`*.pre-lhde`, `*.pre-settings`) is left and named. A file that reappears in an old place (an older
    program) is moved by the next run unless the new one exists. Run by `lhde-session start`, luxshell and luxwm at startup, and
    the flxp programs when they first read their settings; the report is appended to `lhde/migration.log`.
+6. Every run, idempotent: legacy sections in `lhde/settings.ini` itself (left by a program from before the theme files) are
+   converted as in 2.: `[override:NAME]` -> `NAME-modified.theme`, `[override]` -> the selected theme's modified copy, and a
+   `[desktop] wallpaper = PATH` (+ `mode`; the old Set as Desktop Background for every theme) -> the selected theme's current
+   layer (`[current] Desktop.wallpaper / Desktop.mode`). The resolver applies none of them; of settings.ini's own keys it
+   applies only `[desktop] wallpaper = none`.
 
 Result on a copy of aap's config (2026-10-28): the four presets (Aero lotus, MyAero, MyLuna, MySlate4051) became
 `aero-lotus`, `myaero`, `myluna`, `myslate4051`; `[override:aero4074] icons = xp` -> `aero4074-modified.theme` (Desktop.icons =

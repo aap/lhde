@@ -49,12 +49,13 @@ static void add_dir(const char *d, int kind)
 {
     char r[PATH_MAX];
     if (ndirs >= LHDE_DATA_MAX || !is_dir(d) || !realpath(d, r)) return;
-    for (int i = 0; i < ndirs; i++) if (!strcmp(roots[i].path, r)) return;   /* the first kind wins (~/.local/share/lhde: old or shipped) */
+    for (int i = 0; i < ndirs; i++) if (!strcmp(roots[i].path, r)) return;   /* the first kind wins */
     snprintf(roots[ndirs].path, PATH_MAX, "%s", r);
     roots[ndirs++].kind = kind;
 }
 
-/* an old-layout data directory (before the three trees): Windows files beside the program files */
+/* an old-layout data directory (before the three trees): Windows files beside the program files; never searched, only
+   reported (lhde-theme dirs) until lhde-import --migrate moves it */
 static int is_old_layout(const char *d)
 {
     static const char *const k[] = { "styles", "resources", "fonts", "wallpapers", NULL };
@@ -86,20 +87,21 @@ static void init(void)
         if (w && *w) snprintf(win_dir, sizeof win_dir, "%s", w); else snprintf(win_dir, sizeof win_dir, "%s/lhde-windows", share);
         snprintf(user_dir, sizeof user_dir, "%s/index", win_dir);
         add_dir(user_dir, LHDE_TREE_WINDOWS);
-        /* 3. not migrated yet: the old ~/.local/share/lhde that held everything (lhde-import --migrate empties it) */
+        /* not migrated yet: an old ~/.local/share/lhde that held everything is noted, not searched (lhde-session runs
+           lhde-import --migrate, which empties it) */
         if (!(w && *w)) {
             char o[PATH_MAX + 8]; snprintf(o, sizeof o, "%s/lhde", share);
-            if (is_old_layout(o)) { snprintf(old_dir, sizeof old_dir, "%s", o); add_dir(o, LHDE_TREE_OLD); }
+            if (is_old_layout(o)) snprintf(old_dir, sizeof old_dir, "%s", o);
         }
     }
-    /* 4. the shipped data: <exe>/../share/lhde (the program's own prefix), then $XDG_DATA_DIRS/lhde */
+    /* 3. the shipped data: <exe>/../share/lhde (the program's own prefix), then $XDG_DATA_DIRS/lhde */
     if (exe_dir[0] && !tree_dir[0]) { char p[PATH_MAX + 32]; snprintf(p, sizeof p, "%s/../share/lhde", exe_dir); add_dir(p, LHDE_TREE_SHIPPED); }
     const char *xd = getenv("XDG_DATA_DIRS");
     char list[4096]; snprintf(list, sizeof list, "%s", xd && *xd ? xd : "/usr/local/share:/usr/share");
     for (char *save = NULL, *t = strtok_r(list, ":", &save); t; t = strtok_r(NULL, ":", &save)) {
         char p[PATH_MAX + 16]; snprintf(p, sizeof p, "%s/lhde", t); add_dir(p, LHDE_TREE_SHIPPED);
     }
-    /* 5. the source tree's data/ (an uninstalled build); LHDE_TREE=0 leaves it out (tests on fake files) */
+    /* 4. the source tree's data/ (an uninstalled build); LHDE_TREE=0 leaves it out (tests on fake files) */
     const char *nt = getenv("LHDE_TREE");
     if (tree_dir[0] && !(nt && !strcmp(nt, "0"))) { char p[PATH_MAX + 16]; snprintf(p, sizeof p, "%s/data", tree_dir); add_dir(p, LHDE_TREE_SOURCE); }
 }
@@ -122,7 +124,6 @@ const char *lhde_tree_name(int kind)
     case LHDE_TREE_USER: return "user";
     case LHDE_TREE_WINDOWS: return "windows";
     case LHDE_TREE_FLAT: return "data";
-    case LHDE_TREE_OLD: return "old layout";
     case LHDE_TREE_SHIPPED: return "shipped";
     case LHDE_TREE_SOURCE: return "source tree";
     case LHDE_TREE_CODE: return "program";
@@ -135,7 +136,7 @@ const char *lhde_windows_dir(void) { init(); return win_dir; }
 const char *lhde_old_dir(void) { init(); return old_dir[0] ? old_dir : NULL; }
 const char *lhde_tree(void) { init(); return tree_dir[0] ? tree_dir : NULL; }
 
-/* DIR/REL, else DIR/<REL's directory>/cache/<REL's last component> (the caches of the old layout and of a $LHDE_DATA) */
+/* DIR/REL, else DIR/<REL's directory>/cache/<REL's last component> (the caches of a $LHDE_DATA) */
 static int exists_or_cache(const char *dir, const char *rel, char *out, size_t n)
 {
     snprintf(out, n, "%s/%s", dir, rel);
