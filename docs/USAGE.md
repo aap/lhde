@@ -341,10 +341,10 @@ in the 4074 Avalon menu look (white, 1 px grey frame with a drop shadow, 19 px r
   under it). *Minimize bar* (the sidebar into the taskbar; *Restore bar* when minimized), *Properties* (the settings flyout,
   next to the sidebar), then lux's own *Lock the Sidebar* (`[sidebar] locked = 1`: the width sizer no longer drags) and
   *Stacking* ▸ *Top (above the windows)* / *Bottom (part of the desktop)* (the same as Super+s); then 4074's parts list: every
-  module 4074 had, checked when it is in the sidebar. Ours are *Classic Tray* (the notification area tile), *Power (Transient)*
-  and *Clock*: clicking one adds or removes that tile (remembered in `~/.local/state/lhde/luxshell-state.ini [sidebar] tiles`); the others
-  (Basket, Contacts, News Feed, Notification History, People nearby, Quick Launch, Search, Slide Show, Sync, Web Host Tile) are
-  greyed: not implemented. The parts list works in the `full` mode (greyed in `pinned`).
+  module 4074 had, checked when it is in the sidebar. Ours are *Classic Tray* (the notification area tile), *Notification
+  History*, *Quick Launch*, *Power (Transient)* and *Clock*: clicking one adds or removes that tile (remembered in
+  `~/.local/state/lhde/luxshell-state.ini [sidebar] tiles`); the others (Basket, Contacts, News Feed, People nearby, Search,
+  Slide Show, Sync, Web Host Tile) are greyed: not implemented. The parts list works in the `full` mode (greyed in `pinned`).
 - **Tile menu**: right-click a tile; a tile without a flyout (the tray tile) also opens it with a click on its arrow at the
   top right. First the tile's own items (clock: *Clock layout* ▸, *Pinned to the bottom (4074)*), then 4074's: *Auto Size*
   (checked and greyed: our tiles always size to their content), *Move Up* / *Move Down* (greyed at the ends of the list and for
@@ -407,7 +407,20 @@ same choices in a flyout. *Clock layout* picks one of the 4074 views: Analog and
 (a month grid). *Pinned to the bottom (4074)* switches between 4074's pinned clock at the bottom of the bar (80 px face) and
 4051's clock as an ordinary tile in the list (96 px face, larger time line); unpinned, *Move Up* / *Move Down* place it (and
 any other tile) in the list, which is remembered. Each pack has its default (pinned in the 4074 packs, a tile in `slate4051`);
-your choice holds for the pack you made it in.
+your choice holds for the pack you made it in. Unpinned, the face follows the bar width as in 4051 (the tile's width less 32,
+up to the native 260 px) and the tile grows and shrinks with it; pinned, it stays 80 px at any width. The face is 4074's
+layered clock (face, hands, hub and glass images from imageres.dll on their original pivots); the second hand ticks once a
+second. It follows the theme's visual style: the light grey set under Slate (and Luna, Classic and the other non-Longhorn
+styles), the dark-blue set that 4074 drew with the DWM under Jade and Aero (jade4074, aero4074, aerovision, the 5048/5112
+Aero and Basic themes), and under a Plex style the light set of the Plex builds (4042's art when it is imported, else the same
+4074 images). A pack can override it with the key `clock_face = "light"`, `"dwm"` or `"plex"`.
+
+**Calendar flyout.** A click on the clock opens 4074's clock flyout: the clock at full size with the digital time under it,
+and the month calendar with that month's photo, today on a tan box, the days of the neighbouring months in grey and the week
+starting on the locale's first weekday. Point at the calendar and the ◀ ▶ buttons fade in; they step a month (another
+year shows in the title). It opens at the clock and covers the bar's bottom, as in 4074, and closes on Escape, a click outside
+it, or another click on the clock; it always opens on today's month. The tile's time line and the weekday and month names
+follow `LC_TIME` (24-hour time where the locale has it); the flyout's large time is 4074's fixed `h:mm AM/PM`.
 
 **Compositor rule.** The compositor follows the theme: switching to a theme with `composition = off` (Slate, Luna,
 jade4074-classic) stops the picom of this display (only a process named `picom` whose environment has the same `DISPLAY`), and
@@ -616,6 +629,22 @@ luxshell, on the same display (most also want the same session bus): any XEmbed 
 DISPLAY=:3 build/luxshell/tests/trayicon '#3399ff' &` (an ARGB circle; click cycles its colour; a second argument makes it exit
 after that many seconds). Apps that only speak StatusNotifierItem (D-Bus, KDE/Ayatana style, no XEmbed fallback) do not show
 up. Stop luxshell with a plain `kill` (SIGTERM): it hands the icons back unmapped, and the apps re-dock when luxshell returns.
+
+**Notification History tile** (on by default in the 4074 packs, as in 4074): every notification luxshell receives (except those
+with the `transient` hint) is kept, newest 100, in `~/.local/state/lhde/luxshell-notifications` and survives a restart. The tile
+is 4074's time line: the newest eight as speech bubbles along the bar, the newest at the right edge, older ones further left,
+close ones piled in stacks of up to four; yellow = not seen yet, grey = seen (its toast was clicked or closed by you, or the
+history flyout was opened). Point at a bubble for its time and text, click it to see the toast again. A click elsewhere on the
+tile opens the flyout: the full list by day, newest first (time, bubble, title in orange, text), a click on a row shows the toast
+again, the wheel scrolls, and *Delete All Notifications* at the bottom (also in the tile's and the flyout's right-click menu)
+empties the history. An app that withdraws its notification (`CloseNotification`) takes it out of the history too. Minimized,
+the bar shows the bell with the number of unseen notifications in the taskbar; click it for the flyout.
+
+**Quick Launch tile** (default in the 4074 and 4051 packs): the `.desktop` files of `~/.config/lhde/quicklaunch/` (or the
+directory in `settings.ini [quicklaunch] dir`) as 16 px icons in rows of five, in file-name order; click to start, point for the
+name. On the first start luxshell creates the folder with copies of your browser, mail client, flxp and a terminal; add, remove
+or rename files there (the tile follows within seconds; *Open Quick Launch folder* in the tile menu opens it). Minimized, the
+icons sit in the taskbar.
 
 **Power tile** reads `/sys/class/power_supply/BAT0` and `AC/online` every 30 s; click it for the details flyout.
 `LHSHELL_POWER_SUPPLY=/some/dir` (with `BAT0/{status,capacity,...}` and `AC/online` files) fakes a battery for screenshots.

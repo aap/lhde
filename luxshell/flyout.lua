@@ -7,7 +7,8 @@
 -- A tile opts in with `flyout = function(self) return content_node, width, height end` (width/height optional: measured).
 -- Any other owner (the start menu's settings, run and session flyouts, M6) works the same and may add
 -- `place = function(self, fw, fh) return x, y end` (default: left of the tile) and `on_key = function(self, name, text)`
--- (the flyout then grabs the keyboard; Escape always closes).
+-- (the flyout then grabs the keyboard; Escape always closes) and `stay_open = true` (no grab at all: an outside click leaves it
+-- open and only the tile closes it).
 return function(ctx)
   local R, T, sb = ctx.R, ctx.T, ctx.sb
   local fl = { surface = lh.surface{ name = "lhshell-flyout", popup = true, type = "popup_menu", x = 0, y = 0, w = 10, h = 10 } }
@@ -32,7 +33,7 @@ return function(ctx)
   end
   chrome()
   lh.on("pack", function() lh.close_flyout(); chrome() end)
-  fl.surface.on_outside = function() lh.close_flyout() end
+  fl.surface.on_outside = function() if not (fl.tile and fl.tile.stay_open) then lh.close_flyout() end end
   fl.surface.on_key = function(_, name, text, state, pressed)
     if not pressed or not fl.tile then return end
     if name == "Escape" then lh.close_flyout() return end
@@ -60,7 +61,8 @@ return function(ctx)
       y = math.max(0, math.min(ty, ctx.screen_h - fh))
     end
     fl.surface:move(x, y, fw, fh); fl.surface:show(); fl.surface:raise()
-    local ok, kb = fl.surface:grab(tile.on_key ~= nil)
+    local ok, kb = true, true
+    if not tile.stay_open then ok, kb = fl.surface:grab(tile.on_key ~= nil) end
     if tile.on_key and not kb then   -- the keyboard may still be held by whoever opened us (lhwm's Super grab, a menu): retry
       local tries = 0
       local function retry() tries = tries + 1; if fl.tile ~= tile then return end local _, k = fl.surface:grab(true); if not k and tries < 20 then lh.timer(retry, 50) end end
@@ -71,7 +73,7 @@ return function(ctx)
   function lh.toggle_flyout(tile) if fl.tile == tile then lh.close_flyout() else lh.open_flyout(tile) end end
   -- a press on another lhshell surface (owner events of the grab go there) also closes it, except on the tile itself
   lh.on("surface-press", function(x, y, button, win)
-    if fl.tile and win ~= fl.surface:id() and not (win == sb.surface:id() and fl.tile.node and (function()
+    if fl.tile and not fl.tile.stay_open and win ~= fl.surface:id() and not (win == sb.surface:id() and fl.tile.node and (function()
         local nx, ny, nw, nh = fl.tile.node:bounds(); return x >= nx and x < nx + nw and y >= ny and y < ny + nh end)()) then lh.close_flyout() end
   end)
   lh.flyout = fl

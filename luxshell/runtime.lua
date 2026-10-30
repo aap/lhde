@@ -118,6 +118,9 @@ do
     S.set("theme", "name", theme_name)                                       -- the first writer brings the file in line
   elseif want then io.stderr:write("lux: theme " .. want .. ": " .. tostring(err) .. " (lhde-theme list)\n") end
 end
+-- the selected theme's name and resolved entry (settings flyout; the clock tile reads the visual style); defined before the
+-- first build_tiles
+function lh.theme_name() return theme_name, theme_entry end
 if not (theme_entry and theme_entry.shell and load_pack(theme_entry.shell)) then load_pack(S.pack_dir(os.getenv("LHSHELL_THEME") or "4074-aero")) end
 -- themes.ini `fonts` (docs/history/THEMES.md "Fonts"): the theme's font directories as fontconfig application fonts, so the packs' "Segoe UI 9"
 -- is 4074's Segoe UI 0.7 (lhshell.c lh.fonts; the set is replaced on every theme switch). Returns true when the set changed.
@@ -528,6 +531,9 @@ local ctx = { R = R, T = T, sb = sb, tb = tb, screen_w = screen_w, screen_h = sc
 lua("flyout.lua")(ctx)
 lua("toast.lua")(ctx)
 ctx.apps = lua("apps.lua")          -- desktop entries, icons, MFU (start menu, 6.3)
+lh.apps = ctx.apps                  -- the same for the tiles (tiles/quicklaunch.lua)
+lua("tooltip.lua")(ctx)             -- lh.tooltip(node, text)
+lua("notifylog.lua")(ctx)           -- lh.notifylog: the notification history (tiles/notifyhistory.lua)
 lua("menu.lua")(ctx)                -- popup menus: All Programs cascade, taskbar context menu
 -- The Start button and Super go to the start-menu provider, flxp-startmenu (flxp's XP start panel; started below), which owns
 -- _LH_STARTMENU_S<screen>: _LHSHELL_START to its owner window, format 32, l[0] = flags (bit 0: toggle), l[1..4] = anchor x, y, w, h
@@ -607,7 +613,7 @@ local function build_tb_tiles()
   for _, t in ipairs(tb.tile_list) do if t.dispose then pcall(t.dispose, t) end end
   tb.tile_list = {}; tb.tbhost:clear()
   if mode ~= "minimized" or not tb.wide or not tb_on() then publish_clock() return end
-  for _, name in ipairs(pinned_names()) do
+  for _, name in ipairs(T.taskbar_tiles or pinned_names()) do   -- pack key taskbar_tiles: 4074 Sidebar\TaskbarTiles
     local def = load_tile(name)
     if def and def.taskbar then def.id = name; def.tb = tb; def:taskbar(tb.tbhost); table.insert(tb.tile_list, def) end
   end
@@ -858,13 +864,13 @@ end
 -- Mnemonics are ours (the 4074 Avalon menus draw none); "&" marks them (menu.lua).
 -- The 4074 module list as the screenshot shows it; `id` = the tiles/<id>.lua that implements it, the others are greyed.
 local PARTS = {
-  { "Basket" }, { "Classic Tray", id = "notifications" }, { "Contacts" }, { "News Feed" }, { "Notification History" },
-  { "People nearby" }, { "Quick Launch" }, { "Search" }, { "Slide Show" }, { "Sync" },
+  { "Basket" }, { "Classic Tray", id = "notifications" }, { "Contacts" }, { "News Feed" }, { "Notification History", id = "notifyhistory" },
+  { "People nearby" }, { "Quick Launch", id = "quicklaunch" }, { "Search" }, { "Slide Show" }, { "Sync" },
 }
 local TRANSIENT = { { "Power (Transient)", id = "power" }, { "Web Host Tile (Transient)" } }
-local FRIENDLY = { notifications = "Classic Tray", power = "Power", clock = "Clock" }   -- the modules' Friendly Name
+local FRIENDLY = { notifications = "Classic Tray", power = "Power", clock = "Clock", quicklaunch = "Quick Launch", notifyhistory = "Notification History" }   -- the modules' Friendly Name
 local function friendly(t) return FRIENDLY[t.id] or t.name or t.id end
-local KNOWN_ORDER = { "notifications", "power", "clock" }
+local KNOWN_ORDER = { "notifyhistory", "quicklaunch", "notifications", "power", "clock" }   -- 4074 SidebarTiles order
 local function tile_shown(id) for _, n in ipairs(tile_names()) do if n == id then return true end end return false end
 -- add (at its place in the pack's order, else before the next known tile) or remove a tile from the list; persisted
 local function set_tile_shown(id, on)
@@ -1463,7 +1469,6 @@ lh.on("settings-changed", function(serial, hint)
   if reload_timer then return end
   reload_timer = lh.timer(function() reload_timer = nil; reload_settings() end, 50)   -- one reload per burst
 end)
-function lh.theme_name() return theme_name, theme_entry end
 -- session commands from outside (6.2; the start menu calls lh.session.run directly):
 --   xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND logoff
 -- Pack reload (live editing, USAGE.md "Live-editing a theme"): _LHSHELL_COMMAND "reload", or _LH_THEME set again to the name it

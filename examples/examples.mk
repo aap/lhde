@@ -2,10 +2,11 @@
 #   extendframe  luxwm's extended glass frame client (docs/CLIENT-PROTOCOL.md): an Explorer-style 60 px glass header
 #   navdemo      luxnav's reference client (docs/NAVBAR.md): a small file browser with the vision header
 #   glassdemo    an ARGB client that is its own glass frame (the frame set aero-patch's plate from the data directories)
+#   aurorademo   Longhorn's preview-pane and desktop aurora, played from examples/aurora_data.h (made by aurora_data.py)
 # Not installed: run them from build/examples.
 
 EXAMPLES_PKGS = x11 xext cairo cairo-xlib pangocairo
-EXAMPLES      = $(addprefix build/examples/,extendframe navdemo glassdemo)
+EXAMPLES      = $(addprefix build/examples/,extendframe navdemo glassdemo aurorademo)
 
 build/examples/extendframe: examples/extendframe.c $(LHDEA) $(UTSO)
 	@mkdir -p $(dir $@)
@@ -18,6 +19,9 @@ build/examples/navdemo: examples/navdemo.c luxnav/lhnav.h $(LUXNAVA) $(LHDEA) $(
 build/examples/glassdemo: examples/glassdemo.c $(O)/liblhde/data.o
 	@mkdir -p $(dir $@)
 	$(CC) -std=gnu11 -O2 -g -Wall -Iliblhde $(shell pkg-config --cflags cairo-xlib x11) -o $@ $< $(O)/liblhde/data.o $(shell pkg-config --libs cairo-xlib x11) -lm
+build/examples/aurorademo: examples/aurorademo.c examples/aurora_data.h
+	@mkdir -p $(dir $@)
+	$(CC) -std=gnu11 -O2 -g -Wall -Wextra -pthread $(shell pkg-config --cflags cairo-xlib x11) -o $@ $< $(shell pkg-config --libs cairo-xlib x11) -lm
 
 examples: $(EXAMPLES)
 .PHONY: examples

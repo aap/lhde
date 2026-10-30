@@ -23,6 +23,7 @@ P.imageres = "4051/imageres"
 P.taskbar = { height = 29, bg_grid = {7, 0, 2, 0}, bg_filter = "nearest" }
 P.start_dy = 0; P.taskbar_dy = 0                 -- 4051: the pill sits on the bar's top row (835); slate's taskbar_dy = 1 put it one row low
 P.start = { w = 83, h = 29 }                -- StartButton 83x29, Border(0,0,4,0): 1156 drawn 79x29 (bilinear), at the bar's top row
-P.tiles = { "notifications", "clock" }
+P.tiles = { "quicklaunch", "notifications", "clock" }   -- 4051 Administrator: Quick Launch, Clock (+ our tray tile)
+P.taskbar_tiles = nil                      -- 4051: no TaskbarTiles list (the tray showed one icon per tile)
 P.clock_pinned = false                     -- [clock] pinned default for this pack: the 4051 tile-in-the-list clock
 return P

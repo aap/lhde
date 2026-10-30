@@ -21,8 +21,11 @@ return {
   -- visible over the background: it turns 1000's dark column 0 into the grey/white edge of the references (112/161/148/...)
   sidebar = { width = 150, bg_grid = {0, 0, 0, 0}, sizer = { w = 6, image = 1108 } },
   tile_bg = 1000,                                         -- Slate repaints 1000 under each tile
-  tiles = { "notifications", "power", "clock" },     -- M4b: tray tile, power tile (lh4074-181415.png order: tray/QL above power), pinned clock
+  -- 4074 Administrator SidebarTiles: Search, Notification History, Quick Launch, Classic Tray (+ the transient Power, the pinned
+  -- Clock): lh4074-193747.png top to bottom (no Search tile in lux yet)
+  tiles = { "notifyhistory", "quicklaunch", "notifications", "power", "clock" },
   pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 6.4)
+  taskbar_tiles = { "notifyhistory", "quicklaunch", "notifications", "clock" },   -- minimized: 4074 TaskbarTiles (all five)
   -- popup menus: the 4074 Slate [sysmetrics] FLATMENUS colours (MENU, MENUTEXT, MENUHILIGHT, GRAYTEXT)
   menu = { bg = "#ffffff", text = "#373738", hot = "#edb078", hot_text = "#000000", border = "#969696", gray = "#969696" },
 }

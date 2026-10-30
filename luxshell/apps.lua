@@ -4,6 +4,7 @@
 --   A.entries()            { id = entry }, entry = { id, name, generic, comment, exec, icon, terminal, categories = {..}, path }
 --   A.list()               visible entries sorted by name
 --   A.get(id)              one entry (id = "xterm.desktop") or nil
+--   A.parse(path, id)      one desktop file -> entry (Type=Application only) or nil
 --   A.launch(e)            run it (field codes dropped, Terminal=true → xterm -e), count the launch in mfu.ini
 --   A.mfu(n, skip)         the n most launched entries (skip = { id = true } for the pinned ones)
 --   A.icon(name, size)     a PNG path for an icon name or path at about size px, or nil
@@ -54,6 +55,7 @@ local function parse_desktop(path, id)
   if e.type ~= "Application" or not e.name or not e.exec then return nil end
   return e
 end
+A.parse = parse_desktop   -- (path, id) -> entry or nil: one .desktop file (the Quick Launch tile's folder)
 local cache, cache_key
 local function scan_dir(dir, prefix, out)
   for _, name in ipairs(lh.list_dir(dir) or {}) do

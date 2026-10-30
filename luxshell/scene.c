@@ -206,7 +206,9 @@ static void paint_node(cairo_t *cr, struct node *n) {
                 src = n->scaled; w0 = sw; h0 = sh;
             }
             cairo_save(cr); cairo_translate(cr, ix, iy); if (n->flip_h) { cairo_translate(cr, iw, 0); cairo_scale(cr, -1, 1); } cairo_scale(cr, iw / w0, ih / h0);
-            cairo_set_source_surface(cr, src, 0, 0); cairo_pattern_set_filter(cairo_get_source(cr), src == n->img && iw == w0 && ih == h0 ? CAIRO_FILTER_NEAREST : CAIRO_FILTER_BILINEAR);
+            /* nearest only for a 1:1 copy; a rotated layer (the clock hands under a transform node) is always filtered */
+            cairo_matrix_t m; cairo_get_matrix(cr, &m); bool axis = m.xy == 0 && m.yx == 0;
+            cairo_set_source_surface(cr, src, 0, 0); cairo_pattern_set_filter(cairo_get_source(cr), axis && src == n->img && iw == w0 && ih == h0 ? CAIRO_FILTER_NEAREST : CAIRO_FILTER_BILINEAR);
             if (n->opacity < 1 && n->nkids == 0) cairo_paint_with_alpha(cr, n->opacity); else cairo_paint(cr); cairo_restore(cr); } break;
         case N_TEXT: text_paint(cr, n); break;
         case N_TRAY: if (scene_custom_paint) scene_custom_paint(n, cr); break;

@@ -54,9 +54,14 @@ static void surface_paint(struct surface *s) {
     long long t0 = debug ? now_ms() : 0;
     scene_layout(s->root, 0, 0, s->w, s->h);
     tray_place(s); icon_geometry_update(s);
+    /* double-buffered: the frame is built in an offscreen group (a server-side pixmap, starting transparent) and goes to the
+       window in one SOURCE composite. Painting straight into the window (a clear, then some 40 layers) let the compositor show
+       half-drawn frames on every repaint: a hover repaints the whole bar, so the clock face flickered while the mouse moved */
     cairo_t *cr = cairo_create(s->xs);
-    cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE); cairo_set_source_rgba(cr, 0, 0, 0, 0); cairo_paint(cr); cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-    scene_paint(s->root, cr); cairo_destroy(cr); cairo_surface_flush(s->xs); XFlush(dpy); s->dirty = false;
+    cairo_push_group_with_content(cr, CAIRO_CONTENT_COLOR_ALPHA);
+    scene_paint(s->root, cr);
+    cairo_pop_group_to_source(cr); cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE); cairo_paint(cr);
+    cairo_destroy(cr); cairo_surface_flush(s->xs); XFlush(dpy); s->dirty = false;
     if (debug) { XSync(dpy, False); fprintf(stderr, "luxshell: [%lld] painted 0x%lx %dx%d in %lld ms\n", now_ms(), s->win, s->w, s->h, now_ms() - t0); }
 }
 void surface_damage(struct surface *s) { s->dirty = true; }

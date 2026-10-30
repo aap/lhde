@@ -22,7 +22,7 @@ This section replaces the paths below; the dated sections after it are history (
   `settings.ini`, `themes/`, `flxp.ini` (flxp's own preferences: views, dialog sizes, the terminal, ... any key also as
   `FLXP_<KEY>` for one run), `keys` (luxwm's key bindings), and any shipped file overridden under its own name. What a program
   remembers on its own lives in `~/.local/state/lhde/` (`$XDG_STATE_HOME/lhde`): `luxshell-state.ini` (the tile order),
-  `luxshell-mfu.ini` (launch counts), `flxp-views` (the view remembered per folder), `flxp-desktop-positions` (icon positions),
+  `luxshell-mfu.ini` (launch counts), `luxshell-notifications` (the notification history), `flxp-views` (the view remembered per folder), `flxp-desktop-positions` (icon positions),
   `flxp-mfu` and `flxp-run-history` (the start panel's launch counts and the Run box's history).
   Losing the state directory costs nothing but convenience. liblhde gives the paths (`lhde_config_file`, `lhde_state_file`;
   luxshell `lh.config_file`, `lh.state_file`; flxp `shell::settings_path`, `shell::state_file`) and `lhde-theme dirs` lists both.
@@ -97,6 +97,7 @@ the theme registry (`data/themes.ini`, docs/history/THEMES.md) and the live root
   [sidebar]    mode = full                 ; full | minimized | pinned ; width = 150 ; with_classic = 0 ; yield_bottom = auto
                stacking = top              ; lux: top (above the windows, strut, full height) | bottom (under the windows like the desktop, no strut, ends at the full-width taskbar); Win+S toggles
   [clock]      pinned = 1 ; pinned_pack = aero ; layout = default
+  [quicklaunch] dir = ~/some/dir         ; lux: the Quick Launch tile's folder of .desktop files (default ~/.config/lhde/quicklaunch/)
   [start]      mfu_count = 6 ; userpane = 1 ; lux
   [start]      pinned = a.desktop;b.desktop ; menu = flxp   ; flxp | lux (provider when both exist)
   [commands]   logoff = ... ; standby = ... ; shutdown = ... ; restart = ... ; lock = ... ; picom = ... ; taskbar = ... ; run = ...
