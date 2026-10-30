@@ -20,6 +20,7 @@
 #include <vector>
 #include "shell/namespace.h"
 #include "shell/dirwatch.h"
+#include "shell/viewmodel.h"
 #include "w32/w32.h"
 #include "commands.h"
 extern "C" {
@@ -88,17 +89,17 @@ struct Browser {
     bool select_parent = false;                      // going up selects the folder we came from (the file dialog, XP)
     bool record_same = true;                         // navigate() to the folder shown still records history (the explorer)
     bool grouped = false;                            // group view by type in the icon views (LVM_ENABLEGROUPVIEW)
-    // Thumbnails: XP's view (false: choosing another view ends it) or, in the
-    // Longhorn hosts (4051's View > Preview, lh4051-194700.png), a toggle that
-    // shows thumbnails in the Icons view whatever view is chosen after it
-    bool thumbs_toggle = false;
+    // Thumbnails: XP's view (false: choosing another view ends it); in the
+    // Longhorn hosts thumbnails show in every view unless the thumbnails setting
+    // (shell/thumbs.h enabled_for) is off for the folder
     bool thumbs = false;
-    // The Longhorn hosts (4051, Vista): zoom levels for the icon views and the
-    // thumbnails toggle in every view (Details/List: 16 px squares); zoom = the
-    // Icons view's icon size, 0 = the default (the large icons; with thumbnails
-    // thumbnail_size). Remembered per folder with the view.
+    // The Longhorn hosts (4074's model, shell/viewmodel.h): Details (view
+    // LVS_REPORT), Tiles (LVS_ICON in LV_VIEW_TILE) and Icons (LVS_ICON), each
+    // at an image size, zoom; Hide File Names in Icons. Remembered per folder.
     bool zoomable = false;
     int zoom = 0;
+    bool tiles = false;
+    bool hide_names = false;
     // following the folder on disk (inotify, browser.cpp follow/update); off: F5 only
     bool follow_disk = true;
     std::unique_ptr<shell::DirWatch> dirwatch;
@@ -144,32 +145,51 @@ void go_forward(Browser& b);
 void go_up(Browser& b);
 void history_menu(Browser& b, HWND owner, bool back, int x, int y);   // the last ten places, nearest first
 
-int menu_view(const Browser& b);       // LVS_* or VIEW_THUMBNAILS
-// what is remembered for the folder: menu_view, or LVS_* | VIEW_THUMBS_FLAG for
-// another view with the toggle on
+int menu_view(const Browser& b);       // LVS_* or VIEW_THUMBNAILS (XP); LVS_REPORT, VIEW_TILES, LVS_ICON (Longhorn)
+// what is remembered for the folder: menu_view, in the Longhorn hosts with
+// VIEW_NONAMES_FLAG and the size above ZOOM_SHIFT
 int view_code(const Browser& b);
-// the toggle (thumbs_toggle hosts): on from another view goes to Icons as well
+// XP: the Thumbnails view on, or off (the view before it); the Longhorn hosts: the thumbnails setting
 void set_thumbnails(Browser& b, bool on);
-// view: LVS_* or VIEW_THUMBNAILS (Icons with thumbnails), or with
-// VIEW_THUMBS_FLAG (navigating: a remembered view_code). navigating: the folder's remembered view,
-// applied before refresh() fills the list (no refill or icon restore here, and
-// nothing stored).
+// view: a view code (LVS_*, VIEW_THUMBNAILS; the Longhorn hosts' VIEW_TILES,
+// VIEW_NONAMES_FLAG, the size above ZOOM_SHIFT, none: the one the view remembers;
+// earlier codes are read as the nearest view). navigating: the folder's remembered
+// view, applied before refresh() fills the list (no refill or icon restore here,
+// and nothing stored).
 void set_view(Browser& b, int view, bool navigating = false);
 void set_grouped(Browser& b, bool on);   // group view by type (icon views)
 // the zoom (zoomable hosts): 4051's slider, 0..100 -> floor(16 * 16^(pos/100)) px;
-// the levels (Ctrl+wheel, View > Zoom) are its ticks every 10: 16 21 27 36 48 64 84 111 147 194 256
+// its ticks every 10 are the levels: 16 21 27 36 48 64 84 111 147 194 256
 int zoom_at(int pos);
 int zoom_pos(int px);
 std::vector<int> zoom_levels();
-int icon_px(const Browser& b);          // the Icons view's size now
-void set_zoom(Browser& b, int px);      // from List/Details: to Icons at px
-void zoom_step(Browser& b, int dir);    // +1 bigger, -1 smaller (Ctrl+wheel, Ctrl+plus/minus)
+int icon_px(const Browser& b);          // the image size of the view now
+void set_zoom(Browser& b, int px);      // Icons at px (4051's magnifier slider is the Icons view's)
+void zoom_step(Browser& b, int dir);    // the view shown a level bigger (+1) or smaller, in its range (Ctrl+wheel, Ctrl+plus/minus)
 enum { ZOOM_MENU_IDS = 13 };
-// View > Zoom: Zoom In, Zoom Out, the levels (radio), ids first..; zoom_command: true if id was one
+// View > Zoom: Zoom In, Zoom Out, the view's levels (radio), ids first..; zoom_command: true if id was one
 void zoom_menu(const Browser& b, HMENU m, int first);
 void zoom_popup(Browser& b, HWND owner, int x, int y);   // the magnifier's slider under (x, y) (screen), modal
 bool zoom_command(Browser& b, int id, int first);
 bool group_view_applies(const Browser& b);   // the view can show groups (icon views)
+
+// ---- the Longhorn views (zoomable hosts; shell/viewmodel.h) ----------------------------
+// The controls (4074's view button and slider, the menus, the keys) choose Views here;
+// what the list then is - its view, images, spacing, tile lines - is set_view's business.
+shell::viewmodel::View current_view(const Browser& b);
+void show_view(Browser& b, const shell::viewmodel::View& v);   // a control chose v (remembered for the folder)
+shell::viewmodel::Memory& view_memory();                       // what each view remembers ($XDG_STATE_HOME/lhde/flxp-view-sizes)
+enum ViewCommand {
+    VC_DETAILS, VC_TILES, VC_ICONS,          // the three views as remembered (Icons: the icon stop used last)
+    VC_LARGE, VC_MEDIUM, VC_SMALL,           // the icon stops (Ctrl+3..5)
+    VC_HIDENAMES, VC_THUMBNAILS,             // Hide File Names (Icons), the thumbnails setting
+    VC_CYCLE, VC_DEFAULT,                    // the View button; Ctrl+0
+};
+bool view_command(Browser& b, int vc);       // false: not a zoomable host
+// Re-reads the thumbnails setting (another program changed flxp.ini): the images again
+void thumbnails_changed(Browser& b);
+// the change listeners of the view controls (4074's view button): called after every set_view
+void add_view_listener(void (*fn)(Browser&));
 
 std::vector<Item> selection(const Browser& b);
 int list_index(const Browser& b, const std::string& path);
@@ -196,9 +216,9 @@ int default_view(bool zoomable);
 int builtin_default(bool zoomable);
 void set_default(bool zoomable, int view);
 }
-// the view keys (both hosts): Ctrl+0 the default view (the folder's own forgotten),
-// Ctrl+1 Details, Ctrl+2 Icons (48 px in the Longhorn hosts), Ctrl+3 big icons with
-// thumbnails (thumbnail_size; XP: the Thumbnails view); true if key was one
+// the view keys: Ctrl+0 the default view (the folder's own forgotten); the Longhorn
+// hosts Ctrl+1..5 the slider's stops (Details, Tiles, Large, Medium, Small Icons, each as
+// remembered); XP Ctrl+1 Details, Ctrl+2 Icons, Ctrl+3 Thumbnails; true if key was one
 bool view_key(Browser& b, int key);
 
 }

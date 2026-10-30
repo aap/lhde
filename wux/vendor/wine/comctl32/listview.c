@@ -2632,6 +2632,9 @@ calc_label:
 	    if (!oversizedBox && labelSize.cy > infoPtr->ntmHeight)
 	    {
 		labelSize.cy = min(Box.bottom - Label.top, labelSize.cy);
+		/* flxp: comctl32's label is two lines at most unless focused (XP
+		   lvicon.c CLIP_HEIGHT; 4051/4074's "Downloaded Program Files") */
+		labelSize.cy = min(labelSize.cy, 2 * infoPtr->ntmHeight);
 		labelSize.cy /= infoPtr->ntmHeight;
 		labelSize.cy = max(labelSize.cy, 1);
 		labelSize.cy *= infoPtr->ntmHeight;

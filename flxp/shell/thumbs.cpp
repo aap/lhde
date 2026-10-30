@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
+#include <limits.h>
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
@@ -18,6 +20,99 @@
 
 namespace shell {
 namespace thumbs {
+
+// ---- where thumbnails are made -----------------------------------------------------
+
+bool on_network(const std::string& path)
+{
+    struct statfs fs;
+    if (path.empty() || path[0] != '/' || statfs(path.c_str(), &fs) != 0) return false;
+    switch ((unsigned long)fs.f_type) {
+    case 0x6969:        // NFS
+    case 0x517b:        // SMB
+    case 0xff534d42:    // CIFS
+    case 0xfe534d42:    // SMB2
+    case 0x01021997:    // 9p
+    case 0x5346414f:    // AFS
+    case 0x00c36400:    // Ceph
+    case 0x73757245:    // Coda
+    case 0x564c:        // NCP
+        return true;
+    case 0x65735546:    // FUSE: what is behind it (fuseblk, ntfs-3g, is local)
+        break;
+    default:
+        return false;
+    }
+    char real[PATH_MAX];
+    std::string p = realpath(path.c_str(), real) ? real : path;
+    std::string data, best_type;
+    size_t best = 0;
+    if (!read_file("/proc/self/mountinfo", data)) return false;
+    size_t at = 0;
+    while (at < data.size()) {   // "id parent maj:min root mountpoint opts ... - fstype source superopts"
+        size_t nl = data.find('\n', at);
+        std::string line = data.substr(at, nl == std::string::npos ? std::string::npos : nl - at);
+        at = nl == std::string::npos ? data.size() : nl + 1;
+        size_t f = 0;
+        std::string mnt;
+        for (int i = 0; i < 5 && f != std::string::npos; i++) {
+            size_t sp = line.find(' ', f);
+            if (i == 4) mnt = line.substr(f, sp == std::string::npos ? std::string::npos : sp - f);
+            f = sp == std::string::npos ? sp : sp + 1;
+        }
+        size_t dash = line.find(" - ");
+        if (mnt.empty() || dash == std::string::npos) continue;
+        std::string type = line.substr(dash + 3, line.find(' ', dash + 3) - dash - 3);
+        bool under = p == mnt || (p.compare(0, mnt.size(), mnt) == 0 && (mnt == "/" || p[mnt.size()] == '/'));
+        if (under && mnt.size() >= best) { best = mnt.size(); best_type = type; }
+    }
+    static const char* remote[] = { "fuse.sshfs", "fuse.rclone", "fuse.curlftpfs", "fuse.gvfsd-fuse", "fuse.davfs",
+                                    "fuse.s3fs", "fuse.gcsfuse", "fuse.smbnetfs", "fuse.goofys", "fuse.httpdirfs" };
+    for (const char* r : remote) if (best_type == r) return true;
+    return false;
+}
+
+bool picture_size(const std::string& path, int* w, int* h)
+{
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f) return false;
+    unsigned char b[32];
+    size_t n = fread(b, 1, sizeof b, f);
+    bool ok = false;
+    auto be16 = [](const unsigned char* p) { return p[0] << 8 | p[1]; };
+    auto be32 = [](const unsigned char* p) { return (int)((unsigned)p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3]); };
+    auto le16 = [](const unsigned char* p) { return p[0] | p[1] << 8; };
+    auto le32 = [](const unsigned char* p) { return (int)((unsigned)p[0] | p[1] << 8 | p[2] << 16 | (unsigned)p[3] << 24); };
+    if (n >= 24 && !memcmp(b, "\x89PNG", 4)) { *w = be32(b + 16); *h = be32(b + 20); ok = true; }
+    else if (n >= 10 && (!memcmp(b, "GIF87a", 6) || !memcmp(b, "GIF89a", 6))) { *w = le16(b + 6); *h = le16(b + 8); ok = true; }
+    else if (n >= 26 && b[0] == 'B' && b[1] == 'M') { *w = le32(b + 18); int y = le32(b + 22); *h = y < 0 ? -y : y; ok = true; }
+    else if (n >= 30 && !memcmp(b, "RIFF", 4) && !memcmp(b + 8, "WEBPVP8", 7)) {
+        if (b[15] == ' ') { *w = le16(b + 26) & 0x3fff; *h = le16(b + 28) & 0x3fff; ok = true; }
+        else if (b[15] == 'L') { unsigned v = (unsigned)le32(b + 21); *w = (int)(v & 0x3fff) + 1; *h = (int)((v >> 14) & 0x3fff) + 1; ok = true; }
+        else if (b[15] == 'X') { *w = (b[24] | b[25] << 8 | b[26] << 16) + 1; *h = (b[27] | b[28] << 8 | b[29] << 16) + 1; ok = true; }
+    } else if (n >= 4 && b[0] == 0xff && b[1] == 0xd8) {   // JPEG: the frame header (SOFn)
+        long at = 2;
+        unsigned char m[9];
+        while (fseek(f, at, SEEK_SET) == 0 && fread(m, 1, 4, f) == 4 && m[0] == 0xff) {
+            int marker = m[1], len = be16(m + 2);
+            if (marker >= 0xc0 && marker <= 0xcf && marker != 0xc4 && marker != 0xc8 && marker != 0xcc) {
+                if (fread(m, 1, 5, f) == 5) { *h = be16(m + 1); *w = be16(m + 3); ok = true; }
+                break;
+            }
+            if (len < 2) break;
+            at += 2 + len;
+        }
+    }
+    fclose(f);
+    return ok && *w > 0 && *h > 0;
+}
+
+bool enabled_for(const std::string& folder)
+{
+    if (setting("thumbnails", "1") == "0") return false;
+    if (setting("thumbnails_network", "0") != "0") return true;
+    return !on_network(folder);
+}
 
 // ---- MD5 (RFC 1321) ---------------------------------------------------------------
 
@@ -233,6 +328,13 @@ static std::vector<gdi::Bitmap*> folder_minis(const std::string& dir, int mini)
         closedir(d);
     }
     std::sort(names.begin(), names.end());
+    // the folder's own picture first (XP and 4074: folder.jpg, folder.gif; flxp: also .png)
+    auto own = [](const std::string& n) {
+        std::string l = n;
+        for (char& c : l) if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+        return l == "folder.jpg" || l == "folder.gif" || l == "folder.png";
+    };
+    std::stable_partition(names.begin(), names.end(), own);
     for (size_t i = 0; i < names.size() && i < 8 && out.size() < 4; i++) {
         std::string p = dir + "/" + names[i];
         if (gdi::Bitmap* b = fitted(get(p, 0, 128), mini)) out.push_back(b);

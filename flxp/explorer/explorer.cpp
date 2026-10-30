@@ -567,17 +567,49 @@ void Explorer::filled() { update_status(); }
 
 namespace lhtool { static void changed(); }
 
-// the view as the menus see it: LVS_* or VIEW_THUMBNAILS
-static int menu_view() { return browser::menu_view(g); }
+// the view as the menus see it: LVS_* or VIEW_THUMBNAILS (XP), the view code (Longhorn: Tiles, Hide File Names)
+static int menu_view() { return browser::view_code(g); }
 
 static void set_view(int view, bool navigating = false) { browser::set_view(g, view, navigating); }
 
-// the Longhorn frame's Thumbnails toggle (browser.h), XP's Thumbnails view otherwise
+// the Longhorn frame's views (browser.h: Details, Tiles, Icons; thumbnails a setting), XP's otherwise
 static void sync_thumbs_mode()
 {
-    g.thumbs_toggle = g.longhorn;
     g.zoomable = g.longhorn;
-    verbs::thumbs_toggle = g.longhorn ? (g.thumbs ? 1 : 0) : -1;
+    verbs::thumbs_toggle = g.longhorn ? (shell::setting("thumbnails", "1") != "0" ? 1 : 0) : -1;
+}
+
+// The View menu's views, made again each time it opens (the frame can change): XP's
+// Thumbnails, Icons, Small Icons, List, Details; the Longhorn frame's Details, Tiles,
+// Icons, Hide File Names and Show Thumbnails; then Default View
+static void view_items(HMENU view)
+{
+    static const UINT ids[] = { ID_VIEW_THUMBNAILS, ID_VIEW_ICONS, ID_VIEW_SMALLICONS, ID_VIEW_LIST, ID_VIEW_DETAILS, ID_VIEW_TILES,
+                                ID_VIEW_HIDENAMES, ID_VIEW_LARGEICONS, ID_VIEW_MEDIUMICONS, ID_VIEW_DEFAULT };
+    int at = -1;
+    for (int i = GetMenuItemCount(view) - 1; i >= 0; i--) {
+        UINT id = GetMenuItemID(view, i);
+        if (std::find(std::begin(ids), std::end(ids), id) == std::end(ids)) continue;
+        DeleteMenu(view, (UINT)i, MF_BYPOSITION);
+        at = i;
+    }
+    if (at < 0) return;
+    auto add = [&](UINT id, const wchar_t* text) { InsertMenuW(view, (UINT)at++, MF_BYPOSITION | MF_STRING, id, text); };
+    if (g.zoomable) {   // 4074's View menu: Details, Tiles, Icons ... Hide File Names
+        add(ID_VIEW_DETAILS, L"&Details\tCtrl+1");
+        add(ID_VIEW_TILES, L"Tile&s\tCtrl+2");
+        add(ID_VIEW_ICONS, L"Ico&ns");
+        add(ID_VIEW_HIDENAMES, L"Hide Fi&le Names");
+        add(ID_VIEW_THUMBNAILS, L"Sho&w Thumbnails");
+    } else {
+        add(ID_VIEW_THUMBNAILS, L"T&humbnails\tCtrl+3");
+        add(ID_VIEW_ICONS, L"Ico&ns\tCtrl+2");
+        add(ID_VIEW_SMALLICONS, L"S&mall Icons\tCtrl+5");
+        add(ID_VIEW_LIST, L"&List\tCtrl+4");
+        add(ID_VIEW_DETAILS, L"&Details\tCtrl+1");
+    }
+    add(ID_VIEW_DEFAULT, L"D&efault View\tCtrl+0");
+    verbs::check_view_items(view, menu_view());
 }
 
 void Explorer::view_changed()
@@ -702,7 +734,7 @@ static void go_up() { browser::go_up(g); }
 static void views_menu(int x, int y)
 {
     HMENU m = verbs::view_submenu(menu_view(), true);
-    TrackPopupMenu(m, TPM_LEFTALIGN | TPM_TOPALIGN, x, y, 0, g.frame, nullptr);
+    TrackPopupMenu(m, TPM_LEFTALIGN | TPM_TOPALIGN, x, y, 0, g.frame, nullptr);   // (WM_COMMAND: on_command)
     DestroyMenu(m);
 }
 
@@ -1707,6 +1739,7 @@ static void fo_applied(dialogs::FolderOptions& o)
     browser::views::set_default(g.zoomable, o.default_view == browser::views::builtin_default(g.zoomable) ? -1 : o.default_view);
     shell::write_setting("remember_views", o.remember ? "1" : "0");
     if (o.hidden != g.show_hidden) on_command(ID_VIEW_HIDDEN);   // (writes show_hidden, refreshes)
+    if (g.zoomable && o.thumbnails != (shell::setting("thumbnails", "1") != "0")) on_command(ID_VIEW_THUMBNAILS);
 }
 
 static void folder_options()
@@ -1721,6 +1754,7 @@ static void folder_options()
     for (int z : browser::zoom_levels()) o.zoom_levels.push_back(z);
     o.remember = shell::setting("remember_views", "1") != "0";
     o.hidden = g.show_hidden;
+    o.thumbnails = shell::setting("thumbnails", "1") != "0";
     o.apply_all = fo_apply_all;
     o.reset_all = fo_reset_all;
     o.applied = fo_applied;
@@ -1779,17 +1813,21 @@ static void on_command(int id)
         CheckMenuItem(GetSubMenu(g.menu, 2), ID_VIEW_STATUSBAR, MF_BYCOMMAND | (g.show_status ? MF_CHECKED : MF_UNCHECKED));
         layout();
         break;
-    case ID_VIEW_THUMBNAILS:      // Longhorn: a toggle (4051's Preview), Ctrl+1 too
-        if (g.longhorn) browser::set_thumbnails(g, !g.thumbs);
+    case ID_VIEW_THUMBNAILS:      // Longhorn: the thumbnails setting
+        if (g.zoomable) { browser::view_command(g, browser::VC_THUMBNAILS); sync_thumbs_mode(); }
         else set_view(VIEW_THUMBNAILS);
         break;
     case ID_VIEW_DEFAULT: browser::view_key(g, '0'); break;
     case ID_VIEW_BIGICONS: browser::view_key(g, '3'); break;
     case ID_TOOLS_FOLDEROPTIONS: folder_options(); break;
-    case ID_VIEW_ICONS: set_view(LVS_ICON); break;
-    case ID_VIEW_LIST: set_view(LVS_LIST); break;
-    case ID_VIEW_SMALLICONS: set_view(LVS_SMALLICON); break;
-    case ID_VIEW_DETAILS: set_view(LVS_REPORT); break;
+    case ID_VIEW_ICONS: if (!browser::view_command(g, browser::VC_ICONS)) set_view(LVS_ICON); break;
+    case ID_VIEW_LIST: if (!browser::view_command(g, browser::VC_DETAILS)) set_view(LVS_LIST); break;
+    case ID_VIEW_SMALLICONS: if (!browser::view_command(g, browser::VC_SMALL)) set_view(LVS_SMALLICON); break;
+    case ID_VIEW_DETAILS: if (!browser::view_command(g, browser::VC_DETAILS)) set_view(LVS_REPORT); break;
+    case ID_VIEW_TILES: browser::view_command(g, browser::VC_TILES); break;
+    case ID_VIEW_LARGEICONS: browser::view_command(g, browser::VC_LARGE); break;
+    case ID_VIEW_MEDIUMICONS: browser::view_command(g, browser::VC_MEDIUM); break;
+    case ID_VIEW_HIDENAMES: browser::view_command(g, browser::VC_HIDENAMES); break;
     case ID_SORT_NAME: case ID_SORT_SIZE: case ID_SORT_TYPE: case ID_SORT_DATE:
         g.sort = (shell::SortBy)(id - ID_SORT_NAME); g.ascending = true;
         CheckMenuRadioItem(g_arrange_menu, ID_SORT_NAME, ID_SORT_DATE, id, MF_BYCOMMAND);
@@ -1942,6 +1980,12 @@ static void set_frame_mode(bool lh)
     }
     places::set_longhorn(lh);
     sync_taskpane();
+    // the folder in the frame's views (XP's or the Longhorn ones), as navigating to it would
+    if (g.folder) {
+        int v = g.remember_views ? browser::views::lookup(g.folder->path(), g.zoomable) : -1;
+        set_view(v >= 0 ? v : browser::views::default_view(g.zoomable), true);
+        fill_list();
+    }
     layout();
     RedrawWindow(frame, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
 }
@@ -2011,6 +2055,7 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
                 if (GetSubMenu(view, i) == g_header_menu) EnableMenuItem(view, (UINT)i, MF_BYPOSITION | (g.header ? MF_ENABLED : MF_GRAYED));
                 else if (GetSubMenu(view, i) == g_zoom_menu) EnableMenuItem(view, (UINT)i, MF_BYPOSITION | (g.zoomable ? MF_ENABLED : MF_GRAYED));
             header::update_menu(g_header_menu, ID_VIEW_HEADER_FIRST);
+            view_items(view);
             EnableMenuItem(view, ID_SEARCH, MF_BYCOMMAND | (g.header ? MF_ENABLED : MF_GRAYED));        // the header's search box filters
             EnableMenuItem(view, ID_FILTER_CLEAR, MF_BYCOMMAND | (g.header && !g.filter.empty() ? MF_ENABLED : MF_GRAYED));
         }
@@ -2307,9 +2352,10 @@ int main(int argc, char** argv)
             continue;
         }
         if (msg.message == WM_KEYDOWN && msg.wParam >= '0' && msg.wParam <= '5' && (GetKeyState(VK_CONTROL) & 0x8000) && !(GetKeyState(VK_MENU) & 0x8000)) {
-            // Ctrl+0 default view, 1 Details, 2 Icons, 3 big icons with thumbnails (browser::view_key), 4 List, 5 Small Icons
+            // XP: Ctrl+0 default view, 1 Details, 2 Icons, 3 Thumbnails (browser::view_key), 4 List, 5 Small Icons;
+            // Longhorn: 0 default view, 1..5 the slider's stops (Details, Tiles, Large, Medium, Small Icons)
             static const int keys[] = { ID_VIEW_DEFAULT, ID_VIEW_DETAILS, ID_VIEW_ICONS, ID_VIEW_BIGICONS, ID_VIEW_LIST, ID_VIEW_SMALLICONS };
-            on_command(keys[msg.wParam - '0']);
+            if (!g.zoomable || !browser::view_key(g, (int)msg.wParam)) on_command(keys[msg.wParam - '0']);
             continue;
         }
         TranslateMessage(&msg);

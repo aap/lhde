@@ -322,6 +322,40 @@ Housekeeping: `session/lab.sh restart-wm` installs a fresh build (`make` in `lux
 `:1` without disturbing your `:0`; `session/lab.sh stop` tears the lab down. `./hovertest.sh` scripts the
 button states. Nothing here touches your fvwm session except picom, which you started yourself.
 
+## The Explorer's views (flxp)
+
+In the Longhorn frame (and the Longhorn file dialog) the Explorer's list has build 4074's three views, each at an image size:
+
+| view | sizes | layout |
+| --- | --- | --- |
+| Details | 16-32 px | the table; the size is the rows' image (17 px rows at 16) |
+| Tiles | 32-96 px | the image at the left, the name and, from 48 px, two grey "Label: value" lines right of it (a folder its Type; a picture Dimensions and Type; a drive Percent Full and Free Space; another file Type and Size); 218 x 56 at 48 px |
+| Icons | 16-256 px | the image above, the name below (two lines, then an ellipsis); Large 128-256, Medium 48-128, Small 16-48 |
+
+Choosing a view: View > Details, Tiles, Icons (also in the list's context menu and the header's Views drop-down); Ctrl+1 Details,
+Ctrl+2 Tiles, Ctrl+3, 4, 5 Large, Medium, Small Icons (4074's five slider stops, top to bottom), Ctrl+0 the default view; Ctrl+plus,
+Ctrl+minus, Ctrl+wheel and View > Zoom make the view shown a step bigger or smaller within its range (4051's levels 16 21 27 36 48 64
+84 111 147 194 256 and the range's ends). Each of the five stops remembers the size it was last shown at, and "Icons" is the icon
+stop used last, so going back to a view brings its size back; the sizes are kept for every window in
+`~/.local/state/lhde/flxp-view-sizes`. Every folder keeps its own view, size and Hide File Names in `flxp-views` beside it
+(`remember_views`, Tools > Folder Options); a folder never opened gets `default_view_longhorn` (Icons at 48 px unless Folder Options
+says otherwise).
+
+Hide File Names (View menu) shows Icons without names, in cells hugging the images; it belongs to the folder and to Icons: Details
+and Tiles always show the names, and the names stay hidden when the folder comes back to Icons.
+
+Thumbnails show in every view and are just bigger or smaller images: a picture in a photo frame that follows its aspect ratio (a soft
+shadow, a grey line, a mat graded from white to light grey; no frame below 32 px), any other file its own icon at the size, a
+folder 4074's photo standing in the open folder where the build has that art (shell32 #389/#390 of `longhorn_system32`; the
+folder's `folder.jpg` first, else its first picture), else the folder icon with up to four pictures on it. There is no square
+behind them; selection and hover are the theme's `Explorer::ListView` LISTITEM underlay (Slate tan, Jade blue), the classic
+highlight in styles without it. View > Show Thumbnails (and Folder Options) turn them off for every folder (`thumbnails = 0` in
+`flxp.ini`); on network mounts (NFS, SMB, sshfs and other FUSE network filesystems) they are off unless `thumbnails_network = 1`,
+since every picture would be read over the network. The thumbnails are cached in `~/.cache/thumbnails` (the freedesktop spec, shared
+with other programs).
+
+In the XP frame the Explorer keeps XP's views: Thumbnails (squares of `thumbnail_size`), Icons, Small Icons, List, Details, Ctrl+1..5.
+
 ## Start menu, taskbar autohide, sidebar modes (luxshell M6, `SHELL-DESIGN.md` 6.3/6.4)
 
 **Start menu.** The Start button and the Super key (luxwm sends the root client message `_LHSHELL_START` when Super is pressed

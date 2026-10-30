@@ -337,6 +337,7 @@ enum {
     ID_TOOLBAR = 0x4a0,      // XP reuses stc1 for it; a distinct id keeps GetDlgItem(stc1) unambiguous
     ID_BACK = 0xa001, ID_UP, ID_NEWFOLDER, ID_VIEWMENU,   // XP's IDC_BACK.. are private; same roles
     ID_VIEW_ICONS = 0xa101, ID_VIEW_LIST, ID_VIEW_DETAILS, ID_VIEW_THUMBS, ID_GROUPS, ID_VIEW_SMALL, ID_FORWARD, ID_CMDBAR, ID_PANE_ICONS,
+    ID_VIEW_TILES, ID_VIEW_HIDENAMES,   // the Longhorn look's (browser::ViewCommand)
     ID_ZOOM_FIRST = 0xa160,  // View > Zoom (browser::ZOOM_MENU_IDS)
     ID_BAR = 0xa120, ID_BARTB, ID_PANE, ID_HEADER_ID,
     ID_HEADER_FIRST = 0xa140,  // View > Header (header::MENU_IDS)
@@ -855,19 +856,34 @@ static void view_menu(Dlg& d)
     else if (cmd == ID_VIEW_DETAILS) set_view(d, LVS_REPORT);
 }
 
+// The Longhorn look's views (the explorer's: 4074's Details, Tiles, Icons, Hide File Names;
+// Show Thumbnails, the thumbnails setting), then a separator
+static void lh_view_items(Dlg& d, HMENU m)
+{
+    int code = browser::view_code(d);
+    UINT radio = d.view == LVS_REPORT ? ID_VIEW_DETAILS : d.tiles ? ID_VIEW_TILES : ID_VIEW_ICONS;
+    AppendMenuW(m, MF_STRING, ID_VIEW_DETAILS, L"&Details\tCtrl+1");
+    AppendMenuW(m, MF_STRING, ID_VIEW_TILES, L"Tile&s\tCtrl+2");
+    AppendMenuW(m, MF_STRING, ID_VIEW_ICONS, L"Ic&ons");
+    CheckMenuRadioItem(m, 0, 2, radio == ID_VIEW_DETAILS ? 0 : radio == ID_VIEW_TILES ? 1 : 2, MF_BYPOSITION);
+    AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(m, MF_STRING | ((code & VIEW_NONAMES_FLAG) ? MF_CHECKED : 0) | (radio == ID_VIEW_ICONS ? 0 : MF_GRAYED), ID_VIEW_HIDENAMES, L"Hide Fi&le Names");
+    AppendMenuW(m, MF_STRING | (shell::setting("thumbnails", "1") != "0" ? MF_CHECKED : 0), ID_VIEW_THUMBS, L"Sho&w Thumbnails");
+}
+
 // Right-click on the view background: View, Arrange Icons By, Refresh, New Folder (XP's defview background menu, trimmed).
 static void background_menu(Dlg& d, POINT pt)
 {
     HMENU view = CreatePopupMenu();
-    AppendMenuW(view, MF_STRING, ID_VIEW_ICONS, L"Ic&ons");
-    AppendMenuW(view, MF_STRING, ID_VIEW_LIST, L"&List");
-    AppendMenuW(view, MF_STRING, ID_VIEW_DETAILS, L"&Details");
-    CheckMenuRadioItem(view, ID_VIEW_ICONS, ID_VIEW_DETAILS,
-                       d.view == LVS_ICON || d.view == LVS_SMALLICON ? ID_VIEW_ICONS : d.view == LVS_LIST ? ID_VIEW_LIST : ID_VIEW_DETAILS, MF_BYCOMMAND);
     if (d.lh) {
-        AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(view, MF_STRING | (d.thumbs ? MF_CHECKED : 0), ID_VIEW_THUMBS, L"T&humbnails");   // the toggle
+        lh_view_items(d, view);
         AppendMenuW(view, MF_STRING | (d.grouped ? MF_CHECKED : 0) | (browser::group_view_applies(d) ? 0 : MF_GRAYED), ID_GROUPS, L"Show in &Groups");
+    } else {
+        AppendMenuW(view, MF_STRING, ID_VIEW_ICONS, L"Ic&ons");
+        AppendMenuW(view, MF_STRING, ID_VIEW_LIST, L"&List");
+        AppendMenuW(view, MF_STRING, ID_VIEW_DETAILS, L"&Details");
+        CheckMenuRadioItem(view, ID_VIEW_ICONS, ID_VIEW_DETAILS,
+                           d.view == LVS_ICON || d.view == LVS_SMALLICON ? ID_VIEW_ICONS : d.view == LVS_LIST ? ID_VIEW_LIST : ID_VIEW_DETAILS, MF_BYCOMMAND);
     }
     HMENU arrange = CreatePopupMenu();
     AppendMenuW(arrange, MF_STRING, ID_SORT_NAME, L"&Name");
@@ -1353,34 +1369,12 @@ bool longhorn_look(const Options& o)
     return browser::want_longhorn();
 }
 
-// filedlg_view: a browser::view_code ("list+thumbnails": the toggle on in another view)
-static int view_from_name_only(const std::string& name);
-static std::string view_name(int v)
-{
-    int zoom = v >> ZOOM_SHIFT;   // "icons@64"
-    v &= ZOOM_VIEW;
-    std::string th = (v & VIEW_THUMBS_FLAG) ? "+thumbnails" : "";
-    v &= ~VIEW_THUMBS_FLAG;
-    return (v == VIEW_THUMBNAILS ? "thumbnails" : v == LVS_ICON ? "icons" : v == LVS_SMALLICON ? "smallicons" : v == LVS_LIST ? "list" : "details") + th +
-           (zoom ? "@" + std::to_string(zoom) : std::string());
-}
-
+// filedlg_view: the view as the views file names it (browser::views: "icons@48", "tiles@64",
+// "details@16", "icons@96+nonames"; the earlier "thumbnails@96", "list+thumbnails" are read too)
 static int view_from_name(const std::string& name)
 {
-    std::string n = name;
-    int zoom = 0;
-    size_t at = n.find('@');
-    if (at != std::string::npos) { zoom = atoi(n.c_str() + at + 1); n.resize(at); if (zoom < 16 || zoom > 256) zoom = 0; }
-    return view_from_name_only(n) | zoom << ZOOM_SHIFT;
-}
-
-static int view_from_name_only(const std::string& name)
-{
-    std::string n = name;
-    int flag = 0;
-    if (n.size() > 11 && n.compare(n.size() - 11, 11, "+thumbnails") == 0) { n.resize(n.size() - 11); flag = VIEW_THUMBS_FLAG; }
-    if (n == "thumbnails") return VIEW_THUMBNAILS;
-    return flag | (n == "list" ? LVS_LIST : n == "details" ? LVS_REPORT : n == "smallicons" ? LVS_SMALLICON : LVS_ICON);
+    int v = browser::views::parse(name);
+    return v >= 0 ? v : (int)LVS_ICON;
 }
 
 // the list's folder for the details band and the places pane
@@ -1419,7 +1413,7 @@ static void lh_folder_shown(Dlg& d)
 
 static void lh_view_changed(Dlg& d)
 {
-    if (d.ready) shell::write_setting("filedlg_view", view_name(browser::view_code(d)));
+    if (d.ready) shell::write_setting("filedlg_view", browser::views::name_of(browser::view_code(d)));
 }
 
 // ---- header and places callbacks (the innermost dialog: g_cur) ----
@@ -1802,15 +1796,9 @@ static void lh_view_menu(Dlg& d, int x, int y)
 {
     HMENU m = CreatePopupMenu();
     int mv = browser::menu_view(d);
-    // the views, then Thumbnails as a toggle (4051's Views drop-down: Preview)
-    AppendMenuW(m, MF_STRING, ID_VIEW_ICONS, L"Ic&ons\tCtrl+2");
-    AppendMenuW(m, MF_STRING, ID_VIEW_LIST, L"&List\tCtrl+4");
-    AppendMenuW(m, MF_STRING, ID_VIEW_DETAILS, L"&Details\tCtrl+1");
+    // the views (4074's), Hide File Names, Show Thumbnails, groups
     (void)mv;
-    CheckMenuRadioItem(m, ID_VIEW_ICONS, ID_VIEW_DETAILS,
-                       d.view == LVS_ICON || d.view == LVS_SMALLICON ? ID_VIEW_ICONS : d.view == LVS_LIST ? ID_VIEW_LIST : ID_VIEW_DETAILS, MF_BYCOMMAND);
-    AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(m, MF_STRING | (d.thumbs ? MF_CHECKED : 0), ID_VIEW_THUMBS, L"T&humbnails");   // (Ctrl+3: big icons with thumbnails)
+    lh_view_items(d, m);
     AppendMenuW(m, MF_STRING | (d.grouped ? MF_CHECKED : 0) | (browser::group_view_applies(d) ? 0 : MF_GRAYED), ID_GROUPS, L"Show in &Groups");
     HMENU arrange = CreatePopupMenu();
     AppendMenuW(arrange, MF_STRING, ID_SORT_NAME, L"&Name");
@@ -1937,7 +1925,6 @@ static void lh_init(Dlg& d, HWND owner)
     SendMessageW(d.list, LVM_SETTEXTBKCOLOR, 0, (LPARAM)CLR_NONE);
     thumbview::init(d.list, dlg);
     d.grouped = fd_setting("filedlg_groups", "1") != "0";
-    d.thumbs_toggle = true;
     d.zoomable = true;
     {
         std::string folded = fd_setting("filedlg_folded_types", "");   // the list's groups folded last time
@@ -1951,8 +1938,7 @@ static void lh_init(Dlg& d, HWND owner)
     }
     int v = view_from_name(fd_setting("filedlg_view", "icons"));
     if (const char* e = getenv("FLXP_FILEDLG_VIEW")) v = view_from_name(e);
-    if (v != LVS_ICON) browser::set_view(d, v, true);
-    if (v == VIEW_THUMBNAILS) thumbview::enter();
+    browser::set_view(d, v, true);
 
     // size, before the list is filled (it scrolls to the focused item):
     // remembered (filedlg_size, the window's), else the concept's proportions
@@ -2325,10 +2311,12 @@ static void on_command(Dlg& d, int id, int code, HWND ctl)
             lh_view_menu(d, r.left, r.bottom);
         } else view_menu(d);
         return;
-    case ID_VIEW_THUMBS:     // the Longhorn look: a toggle
-        if (d.lh) browser::set_thumbnails(d, !d.thumbs);
+    case ID_VIEW_THUMBS:     // the Longhorn look: the thumbnails setting
+        if (d.lh) browser::view_command(d, browser::VC_THUMBNAILS);
         else set_view(d, VIEW_THUMBNAILS);
         return;
+    case ID_VIEW_TILES: browser::view_command(d, browser::VC_TILES); return;
+    case ID_VIEW_HIDENAMES: browser::view_command(d, browser::VC_HIDENAMES); return;
     case ID_VIEW_SMALL: set_view(d, LVS_SMALLICON); return;
     case ID_GROUPS:
         browser::set_grouped(d, !d.grouped);
@@ -2349,9 +2337,9 @@ static void on_command(Dlg& d, int id, int code, HWND ctl)
             if (!d.show_explorer) SetFocus(d.name_edit);
         }
         return;
-    case ID_VIEW_ICONS: set_view(d, LVS_ICON); return;
+    case ID_VIEW_ICONS: if (!(d.lh && browser::view_command(d, browser::VC_ICONS))) set_view(d, LVS_ICON); return;
     case ID_VIEW_LIST: set_view(d, LVS_LIST); return;
-    case ID_VIEW_DETAILS: set_view(d, LVS_REPORT); return;
+    case ID_VIEW_DETAILS: if (!(d.lh && browser::view_command(d, browser::VC_DETAILS))) set_view(d, LVS_REPORT); return;
     case ID_SORT_NAME: case ID_SORT_SIZE: case ID_SORT_TYPE: case ID_SORT_DATE:
         d.sort = (shell::SortBy)(id - ID_SORT_NAME); d.ascending = true; fill_list(d); return;
     case ID_REFRESH: fill_list(d); return;
@@ -2510,11 +2498,10 @@ static LRESULT CALLBACK msg_filter(int code, WPARAM wp, LPARAM lp)
                 browser::zoom_step(*d, m->wParam == VK_OEM_PLUS || m->wParam == VK_ADD ? 1 : -1);
                 return TRUE;
             }
-            if (ctrl && !alt && m->wParam >= '0' && m->wParam <= '4') {
-                // as the explorer's (browser::view_key): 0 the default view, 1 Details, 2 Icons,
-                // 3 big icons with thumbnails; 4 List
-                if (m->wParam == '4') SendMessageW(d->dlg, WM_COMMAND, (WPARAM)ID_VIEW_LIST, 0);
-                else browser::view_key(*d, (int)m->wParam);
+            if (ctrl && !alt && m->wParam >= '0' && m->wParam <= '5') {
+                // as the explorer's (browser::view_key): 0 the default view, 1..5 Details, Tiles,
+                // Large, Medium and Small Icons
+                browser::view_key(*d, (int)m->wParam);
                 return TRUE;
             }
         }

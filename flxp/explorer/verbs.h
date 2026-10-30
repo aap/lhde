@@ -53,11 +53,12 @@ void error_box(const std::string& text);
 void build_item_menu(HMENU m);
 enum { BG_VIEW = 1, BG_ARRANGE = 2, BG_THUMBNAILS = 4 };   // View submenu; Arrange Icons By, Refresh, Paste; View has Thumbnails
 void build_background_menu(HMENU m, unsigned flags, int view, int sort);
-HMENU view_submenu(int view, bool thumbnails = false);   // view: LVS_* or VIEW_THUMBNAILS
-void check_view_items(HMENU m, int view);                 // the radio mark among Thumbnails/Icons/List/Details
-// The Longhorn hosts' Thumbnails toggle (browser.h thumbs_toggle): -1 XP's
-// Thumbnails view (a radio item), else 0/1 the toggle's state: Thumbnails is a
-// check item after Icons/List/Details and the radio mark goes by `view` & ~thumbnails
+// view: a browser::view_code (LVS_*, VIEW_THUMBNAILS, VIEW_TILES, VIEW_NONAMES_FLAG; a zoom is ignored)
+HMENU view_submenu(int view, bool thumbnails = false);
+void check_view_items(HMENU m, int view);   // the radio mark among the views, the check items
+// -1: XP's views (Thumbnails a radio item among Icons/List/Details); else the Longhorn
+// hosts' (browser.h): Details/Tiles/Icons, Hide File Names, and Show Thumbnails a check
+// item for the thumbnails setting, 0/1 its state
 extern int thumbs_toggle;
 // runs a verb on g_ctx; false if id is not one (view commands, ID_EXPAND)
 bool run(int id);

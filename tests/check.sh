@@ -28,6 +28,9 @@ result "fileops_test ($(tail -n 1 "$T/fileops.log"))" $? "$T/fileops.log"
 # flxp's lookups in lhde's data directories (shell/lhdata.h) on a fake import
 build/tests/lhdatatest > "$T/lhdata.log" 2>&1
 result "lhdatatest ($(tail -n 1 "$T/lhdata.log"))" $? "$T/lhdata.log"
+# the Explorer's view model (shell/viewmodel.h): views, sizes, 4074's slider stops, memory
+build/tests/viewmodeltest > "$T/viewmodel.log" 2>&1
+result "viewmodeltest ($(tail -n 1 "$T/viewmodel.log"))" $? "$T/viewmodel.log"
 # libwuxtheme through its own API: every style the user imported
 styles=${LHDE_STYLES:-$(build/bin/lhde-theme find styles 2>/dev/null)}   # liblhde's lookup: the Windows tree's index/styles (docs/LAYOUT.md)
 n=0

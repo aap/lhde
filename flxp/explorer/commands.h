@@ -8,6 +8,9 @@ enum { VIEW_THUMBNAILS = 0x100 };
 // with another view: the Longhorn hosts' Thumbnails toggle is on (it shows in
 // the Icons view; browser::view_code, the views file's "details+thumbnails")
 enum { VIEW_THUMBS_FLAG = 0x200 };
+// the Longhorn hosts' Tiles view (an LVS_ICON list in LV_VIEW_TILE) and Hide File
+// Names in their Icons view (the views file's "tiles@48", "icons@96+nonames")
+enum { VIEW_TILES = 0x400, VIEW_NONAMES_FLAG = 0x800 };
 // view codes may carry the zoom (icon px) above ZOOM_SHIFT (browser::view_code)
 enum { ZOOM_SHIFT = 16, ZOOM_VIEW = 0xffff };
 
@@ -25,6 +28,10 @@ enum {
     ID_VIEW_PREVIEW,                  // 4051's View > Preview: the task band expanded (else compact)
     ID_VIEW_DEFAULT,                  // Ctrl+0: the default view (the folder's own forgotten)
     ID_VIEW_BIGICONS,                 // Ctrl+3: big icons with thumbnails (XP frame: the Thumbnails view)
+    ID_VIEW_TILES,                    // the Longhorn views (browser::ViewCommand): Tiles, Hide File Names,
+    ID_VIEW_HIDENAMES,                // the Large and Medium Icons stops (ID_VIEW_SMALLICONS: Small)
+    ID_VIEW_LARGEICONS,
+    ID_VIEW_MEDIUMICONS,
     ID_VIEW_HEADER_FIRST = 330,       // View > Header: header::MENU_IDS ids (sizes, elements)
     ID_VIEW_ZOOM_FIRST = 340,         // View > Zoom: browser::ZOOM_MENU_IDS ids (in, out, the levels)
     // (ID_VIEW_ZOOM_FIRST .. +12)
