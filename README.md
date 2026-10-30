@@ -68,7 +68,7 @@ the man pages luxwm.1 and luxwmc.1 (`MANDIR`), `share/applications/flxp.desktop`
 `PORTALDIR`, default `$PREFIX/share/xdg-desktop-portal/portals`; xdg-desktop-portal reads its own datadir, so set
 `PORTALDIR=/usr/share/xdg-desktop-portal/portals` for a system install) and its D-Bus service file (`DBUSSERVICEDIR`, default
 `$PREFIX/share/dbus-1/services`). Also settable: `BINDIR LIBDIR INCLUDEDIR DATADIR PKGLIBDIR APPDIR PKGCONFIGDIR`.
-`DATADIR` is compiled into flxp; `$PREFIX/share/flxp` (flxp's old one) is still read as a fallback, `FLXP_DATA` overrides.
+`DATADIR` is compiled into flxp (its `res/icons`; everything else it finds through liblhde).
 No Windows file and no user setting is ever installed: those are the two other trees below.
 
 ### luxnav (the explorer header's vision mode)

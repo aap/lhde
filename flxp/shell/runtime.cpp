@@ -253,9 +253,6 @@ std::vector<std::string> theme_dirs()
 {
     std::vector<std::string> dirs = split_path(setting("theme_path"));
     for (const std::string& d : lhde_dirs()) dirs.push_back(d + "/styles");   // lhde-import's styles/
-    dirs.push_back(data_home() + "/flxp/themes");
-    std::string d = data_path("themes");
-    if (!d.empty()) dirs.push_back(d);
     const char* wp = getenv("WINEPREFIX");
     dirs.push_back((wp && *wp ? std::string(wp) : home_dir() + "/.wine") + "/drive_c/windows/resources/themes");
     dirs.push_back(home_dir() + "/.themes");
