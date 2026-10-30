@@ -33,6 +33,7 @@
 #include "explorer/header.h"
 #include "explorer/places.h"
 #include "explorer/thumbview.h"
+#include "explorer/viewbutton.h"
 #include "explorer/lhbar.h"
 #include "explorer/uiicons.h"
 #include "explorer/verbs.h"
@@ -367,6 +368,7 @@ struct Dlg : browser::Browser {
     // the Longhorn look
     bool lh = false;
     HWND bar = nullptr, bar_tb = nullptr, pane = nullptr, hide = nullptr;
+    HWND viewstrip = nullptr;                // 4074's view button under the left pane (lh4074-180309)
     bool show_explorer = true;               // Save: Hide Explorer folds the browser away
     bool show_bar = true;                    // the 4074 command bar
     int pane_w = 155, bar_h = 0;
@@ -1720,8 +1722,13 @@ static void lh_layout(Dlg& d)
     }
     int body_bottom = H_ - bottom_h;
     if (d.pane) {
+        int pane_bottom = d.viewstrip ? body_bottom - viewbutton::STRIP_H : body_bottom;
         ShowWindow(d.pane, br ? SW_SHOWNA : SW_HIDE);
-        place(d.pane, 0, top, d.pane_w, body_bottom - top);
+        place(d.pane, 0, top, d.pane_w, pane_bottom - top);
+        if (d.viewstrip) {
+            ShowWindow(d.viewstrip, br ? SW_SHOWNA : SW_HIDE);
+            place(d.viewstrip, 0, pane_bottom, d.pane_w, viewbutton::STRIP_H);
+        }
     }
     ShowWindow(d.list, br ? SW_SHOWNA : SW_HIDE);
     int lx = d.pane ? d.pane_w + LH_SPLIT : 0;
@@ -1912,6 +1919,7 @@ static void lh_init(Dlg& d, HWND owner)
     d.pane = places::create(dlg, ID_PANE, pcb, po);
     SetWindowLongPtrW(d.pane, GWL_EXSTYLE, GetWindowLongPtrW(d.pane, GWL_EXSTYLE) | WS_EX_CONTROLPARENT);
     ShowWindow(d.pane, SW_SHOWNA);
+    d.viewstrip = viewbutton::create(dlg, d);
     d.pane_w = std::max(100, std::min(400, atoi(fd_setting("filedlg_pane_width", "155").c_str())));
 
     // the list: Icons grouped by type unless the user chose otherwise (filedlg_view, filedlg_groups)
@@ -2460,6 +2468,7 @@ static INT_PTR CALLBACK dlg_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
                 lh_save_state(*d);
                 header::destroy();   // the shared widget's statics are free for the next dialog
                 places::destroy();
+                if (d->viewstrip) { viewbutton::destroy(d->viewstrip); d->viewstrip = nullptr; }
             }
             thumbview::leave(d->large);
             thumbview::folder_changed();

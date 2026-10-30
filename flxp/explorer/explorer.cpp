@@ -28,6 +28,7 @@
 #include "header.h"
 #include "lhbar.h"
 #include "thumbview.h"
+#include "viewbutton.h"
 #include "places.h"
 #include "taskpane.h"
 #include "uiicons.h"
@@ -748,6 +749,8 @@ static void open_item(int i)
 
 // ---- layout -------------------------------------------------------------------
 
+static HWND g_viewstrip;   // 4074's view button under the left pane (the Longhorn frame; viewbutton.h)
+
 static void layout()
 {
     RECT rc; GetClientRect(g.frame, &rc);
@@ -785,8 +788,16 @@ static void layout()
         }
     }
     int x = 0;
+    // 4074's view button: a strip at the bottom of the left pane (the tree's or the places pane's)
+    HWND vb = g_viewstrip;
+    bool left = g.show_folders || places::window();
+    int pane_bottom = vb && left ? bottom - viewbutton::STRIP_H : bottom;
+    if (vb) {
+        if (left) SetWindowPos(vb, HWND_TOP, 0, pane_bottom, g.tree_width, viewbutton::STRIP_H, 0);
+        ShowWindow(vb, left ? SW_SHOW : SW_HIDE);
+    }
     if (g.show_folders) {
-        SetWindowPos(g.bandsite, nullptr, 0, top, g.tree_width, bottom - top, SWP_NOZORDER);
+        SetWindowPos(g.bandsite, nullptr, 0, top, g.tree_width, pane_bottom - top, SWP_NOZORDER);
         ShowWindow(g.bandsite, SW_SHOW);
         x = g.tree_width + 4;
     } else {
@@ -794,7 +805,7 @@ static void layout()
     }
     if (HWND pl = places::window()) {   // the places pane takes the tree's slot when it is off (XP: the task pane)
         if (!g.show_folders) {
-            SetWindowPos(pl, nullptr, 0, top, g.tree_width, bottom - top, SWP_NOZORDER);
+            SetWindowPos(pl, nullptr, 0, top, g.tree_width, pane_bottom - top, SWP_NOZORDER);
             ShowWindow(pl, SW_SHOW);
             x = g.tree_width + 4;
         } else ShowWindow(pl, SW_HIDE);
@@ -1175,6 +1186,7 @@ static void create_children(HWND frame)
         lhtool::create();
         EnableMenuItem(bars, ID_TB_LARGE, MF_BYCOMMAND | MF_GRAYED);
         EnableMenuItem(bars, ID_TB_SMALL, MF_BYCOMMAND | MF_GRAYED);
+        g_viewstrip = viewbutton::create(frame, g);   // 4074: the view button at the bottom of the left pane
     }
     if (getenv("FLXP_DEBUG")) {
         for (int i = 0; i < 2; i++) {
@@ -1960,6 +1972,7 @@ static void set_frame_mode(bool lh)
         SendMessageW(g.rebar, RB_SHOWBAND, (WPARAM)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_ADDRESS, 0), FALSE);
         ModifyMenuW(bars, 1, MF_BYPOSITION | MF_STRING | MF_UNCHECKED, ID_TB_ADDRESS, L"&Address Bar");
         lhtool::create();
+        if (!g_viewstrip) g_viewstrip = viewbutton::create(frame, g);
         EnableMenuItem(bars, ID_TB_LARGE, MF_BYCOMMAND | MF_GRAYED);
         EnableMenuItem(bars, ID_TB_SMALL, MF_BYCOMMAND | MF_GRAYED);
         header::set_history(!g.back.empty(), !g.forward.empty());
@@ -1967,6 +1980,8 @@ static void set_frame_mode(bool lh)
         sync_active();
     } else {
         lhtool::destroy();
+        viewbutton::destroy(g_viewstrip);
+        g_viewstrip = nullptr;
         header::destroy();
         g.header = nullptr;
         if (!g.filter.empty()) { g.filter.clear(); apply_filter(); }

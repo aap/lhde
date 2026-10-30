@@ -332,7 +332,14 @@ In the Longhorn frame (and the Longhorn file dialog) the Explorer's list has bui
 | Tiles | 32-96 px | the image at the left, the name and, from 48 px, two grey "Label: value" lines right of it (a folder its Type; a picture Dimensions and Type; a drive Percent Full and Free Space; another file Type and Size); 218 x 56 at 48 px |
 | Icons | 16-256 px | the image above, the name below (two lines, then an ellipsis); Large 128-256, Medium 48-128, Small 16-48 |
 
-Choosing a view: View > Details, Tiles, Icons (also in the list's context menu and the header's Views drop-down); Ctrl+1 Details,
+The view button at the bottom of the left pane (the Explorer's and the file dialog's) is 4074's: its left part shows the view's picture and goes to the next view
+(Details, Tiles, Icons, each at the size it had last); its arrows open the slider, a white popup with the five stops' pictures
+(Details, Tiles, Large, Medium, Small Icons) beside a vertical slider. Dragging the thumb (or Up/Down) sizes the view as it moves,
+growing downwards through Details and Tiles, then jumping to 256 px at Large Icons and shrinking downwards to 16 px at Small Icons;
+a click on a picture shows that stop at the size it had last and closes the popup; Escape, Enter or a click elsewhere closes it. The
+pictures are the 4074 pack's (`packs/4074/imageres`, imported by `lhde-import`); without it the control draws plain shapes.
+
+Choosing a view otherwise: View > Details, Tiles, Icons (also in the list's context menu and the header's Views drop-down); Ctrl+1 Details,
 Ctrl+2 Tiles, Ctrl+3, 4, 5 Large, Medium, Small Icons (4074's five slider stops, top to bottom), Ctrl+0 the default view; Ctrl+plus,
 Ctrl+minus, Ctrl+wheel and View > Zoom make the view shown a step bigger or smaller within its range (4051's levels 16 21 27 36 48 64
 84 111 147 194 256 and the range's ends). Each of the five stops remembers the size it was last shown at, and "Icons" is the icon

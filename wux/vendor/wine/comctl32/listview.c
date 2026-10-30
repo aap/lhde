@@ -2120,7 +2120,9 @@ static INT LISTVIEW_UpdateHScroll(LISTVIEW_INFO *infoPtr)
 	if (LISTVIEW_GetViewRect(infoPtr, &rcView)) horzInfo.nMax = rcView.right - rcView.left;
     }
 
-    if (LISTVIEW_IsHeaderEnabled(infoPtr))
+    /* flxp: the header above the icon views (LVS_EX_HEADERINALLVIEWS) does not
+       widen them: their extent is the items' */
+    if (LISTVIEW_IsHeaderEnabled(infoPtr) && infoPtr->uView == LV_VIEW_DETAILS)
     {
 	if (DPA_GetPtrCount(infoPtr->hdpaColumns))
 	{
