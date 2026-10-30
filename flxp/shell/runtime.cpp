@@ -113,6 +113,8 @@ static const char template_text[] =
     "# (auto: 0, every picture would be read over the network).\n"
     "thumbnails =\n"
     "thumbnails_network =\n"
+    "# The Longhorn views' Show in Groups (by type, Tiles and Icons): 1 or 0 (auto: 0).\n"
+    "groups =\n"
     "# The view of folders never opened (Tools > Folder Options), as the views file\n"
     "# names them: XP frame (default_view) details, icons, smallicons, list,\n"
     "# thumbnails; Longhorn (default_view_longhorn) details, tiles or icons with @px,\n"

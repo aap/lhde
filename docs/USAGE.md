@@ -348,6 +348,9 @@ stop used last, so going back to a view brings its size back; the sizes are kept
 (`remember_views`, Tools > Folder Options); a folder never opened gets `default_view_longhorn` (Icons at 48 px unless Folder Options
 says otherwise).
 
+View > Show in Groups (`groups = 1` in `flxp.ini`) groups Tiles and Icons by type, under the theme's group headers (4074's
+GROUPHEADER band with the title and its count, the collapse button at the right end; a click on a header folds the group).
+
 Hide File Names (View menu) shows Icons without names, in cells hugging the images; it belongs to the folder and to Icons: Details
 and Tiles always show the names, and the names stay hidden when the folder comes back to Icons.
 

@@ -1927,6 +1927,7 @@ static void lh_init(Dlg& d, HWND owner)
     if (!(o.multiple && o.mode == Mode::Open)) style |= LVS_SINGLESEL;
     static const int widths[4] = { 200, 80, 140, 130 };
     browser::create_list(d, dlg, ID_LIST, style, 0, widths, (HFONT)SendMessageW(dlg, WM_GETFONT, 0, 0));
+    SetPropW(d.list, L"flxp_concept_groups", (HANDLE)1);   // the concept's group headers, not the theme's (listview.c)
     SendMessageW(d.list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_LABELTIP, LVS_EX_LABELTIP);
     // the concept's warm near-white behind the files (thumbnails are composed on it too)
     SendMessageW(d.list, LVM_SETBKCOLOR, 0, (LPARAM)LIST_BK);

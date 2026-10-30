@@ -375,11 +375,15 @@ static void make_groups(Browser& b, std::vector<int>& group_of)
         return lower(x) < lower(y);
     });
     order.erase(std::unique(order.begin(), order.end()), order.end());
+    // the Longhorn explorer's headers count their items ("File Folder (2)", lh4074-224845)
+    bool counts = b.zoomable && !GetPropW(b.list, L"flxp_concept_groups");
     for (size_t g = 0; g < order.size(); g++) {
         LVGROUP lg = {};
         lg.cbSize = sizeof lg;
         lg.mask = LVGF_HEADER | LVGF_GROUPID | LVGF_STATE;
-        std::u16string t = W(order[g]);
+        std::string text = order[g];
+        if (counts) text += " (" + std::to_string(std::count(titles.begin(), titles.end(), order[g])) + ")";
+        std::u16string t = W(text);
         lg.pszHeader = (LPWSTR)t.c_str();
         lg.iGroupId = (int)g;
         lg.stateMask = LVGS_COLLAPSIBLE | LVGS_COLLAPSED;

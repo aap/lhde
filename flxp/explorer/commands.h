@@ -22,6 +22,7 @@ enum {
     ID_VIEW_STATUSBAR = 300, ID_VIEW_FOLDERS, ID_VIEW_ICONS, ID_VIEW_LIST, ID_VIEW_DETAILS,
     ID_SORT_NAME, ID_SORT_SIZE, ID_SORT_TYPE, ID_SORT_DATE, ID_VIEW_HIDDEN, ID_VIEW_REFRESH,
     ID_VIEW_THUMBNAILS,               // the explorer's Thumbnails view (not on the desktop)
+    ID_VIEW_GROUPS,                   // the Longhorn frame's Show in Groups (by type; flxp.ini groups)
     ID_VIEW_TASKPANE = 320,           // Longhorn: the task band under the command bar (taskpane.h)
     ID_VIEW_SMALLICONS,               // the explorer's View menu only (Ctrl+5; 2000's Small Icons)
     ID_VIEW_PLACES_ICONS,             // View > Explorer Bar > Icons in the Pane (places_icons, the groups look)

@@ -573,10 +573,12 @@ static int menu_view() { return browser::view_code(g); }
 
 static void set_view(int view, bool navigating = false) { browser::set_view(g, view, navigating); }
 
-// the Longhorn frame's views (browser.h: Details, Tiles, Icons; thumbnails a setting), XP's otherwise
+// the Longhorn frame's views (browser.h: Details, Tiles, Icons; thumbnails a setting; Show in
+// Groups, flxp.ini groups), XP's otherwise
 static void sync_thumbs_mode()
 {
     g.zoomable = g.longhorn;
+    g.grouped = g.longhorn && shell::setting("groups", "0") == "1";
     verbs::thumbs_toggle = g.longhorn ? (shell::setting("thumbnails", "1") != "0" ? 1 : 0) : -1;
 }
 
@@ -586,7 +588,7 @@ static void sync_thumbs_mode()
 static void view_items(HMENU view)
 {
     static const UINT ids[] = { ID_VIEW_THUMBNAILS, ID_VIEW_ICONS, ID_VIEW_SMALLICONS, ID_VIEW_LIST, ID_VIEW_DETAILS, ID_VIEW_TILES,
-                                ID_VIEW_HIDENAMES, ID_VIEW_LARGEICONS, ID_VIEW_MEDIUMICONS, ID_VIEW_DEFAULT };
+                                ID_VIEW_HIDENAMES, ID_VIEW_LARGEICONS, ID_VIEW_MEDIUMICONS, ID_VIEW_GROUPS, ID_VIEW_DEFAULT };
     int at = -1;
     for (int i = GetMenuItemCount(view) - 1; i >= 0; i--) {
         UINT id = GetMenuItemID(view, i);
@@ -602,6 +604,9 @@ static void view_items(HMENU view)
         add(ID_VIEW_ICONS, L"Ico&ns");
         add(ID_VIEW_HIDENAMES, L"Hide Fi&le Names");
         add(ID_VIEW_THUMBNAILS, L"Sho&w Thumbnails");
+        add(ID_VIEW_GROUPS, L"Show in &Groups");   // 4074's (by type here); Tiles and Icons
+        CheckMenuItem(view, ID_VIEW_GROUPS, MF_BYCOMMAND | (g.grouped ? MF_CHECKED : MF_UNCHECKED));
+        EnableMenuItem(view, ID_VIEW_GROUPS, MF_BYCOMMAND | (browser::group_view_applies(g) ? MF_ENABLED : MF_GRAYED));
     } else {
         add(ID_VIEW_THUMBNAILS, L"T&humbnails\tCtrl+3");
         add(ID_VIEW_ICONS, L"Ico&ns\tCtrl+2");
@@ -1840,6 +1845,10 @@ static void on_command(int id)
     case ID_VIEW_LARGEICONS: browser::view_command(g, browser::VC_LARGE); break;
     case ID_VIEW_MEDIUMICONS: browser::view_command(g, browser::VC_MEDIUM); break;
     case ID_VIEW_HIDENAMES: browser::view_command(g, browser::VC_HIDENAMES); break;
+    case ID_VIEW_GROUPS:
+        browser::set_grouped(g, !g.grouped);
+        shell::write_setting("groups", g.grouped ? "1" : "0");
+        break;
     case ID_SORT_NAME: case ID_SORT_SIZE: case ID_SORT_TYPE: case ID_SORT_DATE:
         g.sort = (shell::SortBy)(id - ID_SORT_NAME); g.ascending = true;
         CheckMenuRadioItem(g_arrange_menu, ID_SORT_NAME, ID_SORT_DATE, id, MF_BYCOMMAND);

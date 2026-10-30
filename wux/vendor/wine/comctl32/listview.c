@@ -2958,9 +2958,31 @@ static inline BOOL groups_active(const LISTVIEW_INFO *infoPtr)
         (infoPtr->uView == LV_VIEW_ICON || infoPtr->uView == LV_VIEW_SMALLICON);
 }
 
-/* the header row: the title (the list's font) with room above and below */
+/* flxp: the theme's group header (4051/4074 Explorer::ListView GROUPHEADER, its
+   EXPANDBUTTON and COLLAPSEBUTTON) unless the window asks for the concept's
+   drawn header (the property "flxp_concept_groups": the Longhorn file dialog);
+   *h: the header image's height */
+static HTHEME group_theme(const LISTVIEW_INFO *infoPtr, INT *h)
+{
+    HTHEME theme = GetWindowTheme(infoPtr->hwndSelf);
+    SIZE sz = { 0, 0 };
+
+    if (!theme || GetPropW(infoPtr->hwndSelf, L"flxp_concept_groups") || !IsThemePartDefined(theme, LVP_GROUPHEADER, 0)) return NULL;
+    if (h)
+    {
+        GetThemePartSize(theme, NULL, LVP_GROUPHEADER, LVGH_OPEN, NULL, TS_TRUE, &sz);
+        *h = sz.cy > 0 ? sz.cy : 21;
+    }
+    return theme;
+}
+
+/* the header row: the title (the list's font) with room above and below; themed:
+   the header image 4 px down with 6 px under it (4074: a group of one 56 px tile
+   row every 92 px) */
 static inline INT group_header_height(const LISTVIEW_INFO *infoPtr)
 {
+    INT h;
+    if (group_theme(infoPtr, &h)) return h + 10;
     return infoPtr->ntmHeight + 16;
 }
 
@@ -3071,9 +3093,21 @@ static void LISTVIEW_RefreshGroups(const LISTVIEW_INFO *infoPtr, HDC hdc)
     HPEN pen, oldPen;
     HBRUSH brush, oldBrush;
 
+    INT imgh;
+    HTHEME theme = group_theme(infoPtr, &imgh);
+    HFONT themeFont = NULL, oldFont = NULL;
+    COLORREF heading = RGB(86, 93, 95);
+
     LISTVIEW_GetOrigin(infoPtr, &Origin);
     if (GetClipBox(hdc, &rcClip) == ERROR) rcClip = infoPtr->rcList;
     SetBkMode(hdc, TRANSPARENT);
+    if (theme)
+    {
+        LOGFONTW lf;
+        if (SUCCEEDED(GetThemeFont(theme, hdc, LVP_GROUPHEADER, 0, 210 /* TMT_FONT */, &lf))) themeFont = CreateFontIndirectW(&lf);
+        if (themeFont) oldFont = SelectObject(hdc, themeFont);
+        GetThemeColor(theme, LVP_GROUPHEADER, 0, 3825 /* TMT_HEADING1TEXTCOLOR */, &heading);
+    }
     for (i = 0; i < DPA_GetPtrCount(infoPtr->hdpaGroups); i++)
     {
         LV_GROUP_INFO *g = DPA_GetPtr(infoPtr->hdpaGroups, i);
@@ -3088,6 +3122,34 @@ static void LISTVIEW_RefreshGroups(const LISTVIEW_INFO *infoPtr, HDC hdc)
         r.bottom = r.top + hdr;
         if (!IntersectRect(&tmp, &r, &rcClip)) continue;
         len = g->header ? lstrlenW(g->header) : 0;
+        if (theme)
+        {
+            /* flxp: 4051/4074 (lh4074-224845): the header image 8 px in from both sides,
+               the title in HEADING1TEXTCOLOR 7 px in, the collapse (expanded) or expand
+               button at the right end */
+            RECT box = { r.left + 8, r.top + 4, r.right - 8, r.top + 4 + imgh };
+            BOOL collapsed = (g->state & LVGS_COLLAPSED) != 0;
+            SIZE bs = { 0, 0 };
+            /* the buttons' part numbers: Vista's 8 and 9 (after GROUPHEADERLINE, 7); the
+               Longhorn styles have no header line, their buttons are 7 and 8 */
+            BOOL vista = IsThemePartDefined(theme, LVP_COLLAPSEBUTTON, 0);
+            INT part = collapsed ? (vista ? LVP_EXPANDBUTTON : 7) : (vista ? LVP_COLLAPSEBUTTON : 8);
+            DrawThemeBackground(theme, hdc, LVP_GROUPHEADER, LVGH_OPEN, &box, NULL);
+            if ((g->state & LVGS_COLLAPSIBLE) && IsThemePartDefined(theme, part, 0))
+            {
+                RECT b;
+                GetThemePartSize(theme, NULL, part, 1, NULL, TS_TRUE, &bs);
+                b.right = box.right - 4; b.left = b.right - bs.cx;
+                b.top = box.top + (imgh - bs.cy) / 2; b.bottom = b.top + bs.cy;
+                DrawThemeBackground(theme, hdc, part, 1, &b, NULL);
+            }
+            tr = box;
+            tr.left += 7;
+            tr.right -= bs.cx + 8;
+            SetTextColor(hdc, heading);
+            if (len) DrawTextW(hdc, g->header, len, &tr, DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
+            continue;
+        }
         tr = r;
         tr.left += 8;
         tr.right -= 44;
@@ -3125,6 +3187,8 @@ static void LISTVIEW_RefreshGroups(const LISTVIEW_INFO *infoPtr, HDC hdc)
             DeleteObject(brush);
         }
     }
+    if (oldFont) SelectObject(hdc, oldFont);
+    if (themeFont) DeleteObject(themeFont);
 }
 
 static LRESULT LISTVIEW_InsertGroup(LISTVIEW_INFO *infoPtr, INT index, const LVGROUP *lvg)
