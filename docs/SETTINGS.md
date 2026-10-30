@@ -22,7 +22,8 @@ This section replaces the paths below; the dated sections after it are history (
   `settings.ini`, `themes/`, `flxp.ini` (flxp's own preferences: views, dialog sizes, the terminal, ... any key also as
   `FLXP_<KEY>` for one run), `keys` (luxwm's key bindings), and any shipped file overridden under its own name. What a program
   remembers on its own lives in `~/.local/state/lhde/` (`$XDG_STATE_HOME/lhde`): `luxshell-state.ini` (the tile order),
-  `luxshell-mfu.ini` (launch counts), `flxp-views` (the view remembered per folder), `flxp-desktop-positions` (icon positions).
+  `luxshell-mfu.ini` (launch counts), `flxp-views` (the view remembered per folder), `flxp-desktop-positions` (icon positions),
+  `flxp-mfu` and `flxp-run-history` (the start panel's launch counts and the Run box's history).
   Losing the state directory costs nothing but convenience. liblhde gives the paths (`lhde_config_file`, `lhde_state_file`;
   luxshell `lh.config_file`, `lh.state_file`; flxp `shell::settings_path`, `shell::state_file`) and `lhde-theme dirs` lists both.
   No lhde program reads `~/.config/flxp`, `~/.config/lhshell`, `~/.config/lhwm` or `~/.config/longhorn` any more.
@@ -56,7 +57,7 @@ happens when `lhde/settings.ini` exists; a report goes to `lhde/migration.log`):
    two directories above: `flxp/flxp.ini` -> `lhde/flxp.ini`, where the keys that duplicated theme keys (`icons`, `frame`,
    `taskbar_kind`, `wallpaper`, `wallpaper_mode`, `themes_ini`), `nt5src` and the path overrides the imported Windows tree makes
    redundant (`font_path`, `longhorn_system32`, `longhorn_wim`, `explorer_resources`, `theme_path`) are removed and reported;
-   `flxp/views`, `flxp/desktop-positions`, `lhshell/state.ini`, `lhshell/mfu.ini` -> the state directory; `lhwm/keys` ->
+   `flxp/views`, `flxp/desktop-positions`, `~/.local/share/flxp/{mfu,run-history}`, `lhshell/state.ini`, `lhshell/mfu.ini` -> the state directory; `lhwm/keys` ->
    `lhde/keys`; a `longhorn/settings.ini` symlink left by an earlier migration is removed; an emptied old directory is removed,
    one still holding backups (`*.pre-lhde`, `*.pre-settings`) is left and named. A file that reappears in an old place (an older
    program) is moved by the next run unless the new one exists. Run by `lhde-session start`, luxshell and luxwm at startup, and

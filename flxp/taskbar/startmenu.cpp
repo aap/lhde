@@ -189,12 +189,7 @@ bool run_shell(const std::string& cmd)
 
 // ---- Run --------------------------------------------------------------------------------
 
-std::string history_file()
-{
-    const char* x = getenv("XDG_CONFIG_HOME");
-    std::string d = x && *x ? x : home() + "/.config";
-    return d + "/flxp/run-history";
-}
+std::string history_file() { return shell::state_file("flxp-run-history"); }   // what the Run box remembers: state, not a setting
 
 std::vector<std::string> load_history()
 {

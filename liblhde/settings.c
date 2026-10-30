@@ -539,6 +539,11 @@ static int migrate_files(struct rep *r)
     snprintf(src, sizeof src, "%s/flxp/views", ch); snprintf(dst, sizeof dst, "%s/flxp-views", sdir); move_one(r, src, dst, &count);
     snprintf(src, sizeof src, "%s/flxp/desktop-positions", ch); snprintf(dst, sizeof dst, "%s/flxp-desktop-positions", sdir); move_one(r, src, dst, &count);
     snprintf(src, sizeof src, "%s/lhshell/state.ini", ch); snprintf(dst, sizeof dst, "%s/luxshell-state.ini", sdir); move_one(r, src, dst, &count);
+    { char dh[PATH_MAX]; const char *x = getenv("XDG_DATA_HOME"), *hm = getenv("HOME");   /* flxp's start panel kept two files under ~/.local/share/flxp */
+      if (x && *x == '/') snprintf(dh, sizeof dh, "%s", x); else snprintf(dh, sizeof dh, "%s/.local/share", hm ? hm : ".");
+      snprintf(src, sizeof src, "%s/flxp/mfu", dh); snprintf(dst, sizeof dst, "%s/flxp-mfu", sdir); move_one(r, src, dst, &count);
+      snprintf(src, sizeof src, "%s/flxp/run-history", ch); snprintf(dst, sizeof dst, "%s/flxp-run-history", sdir); move_one(r, src, dst, &count);
+      snprintf(src, sizeof src, "%s/flxp", dh); if (lhde__is_dir(src) && rmdir(src) == 0) say(r, "  %s (empty) removed", src); }
     snprintf(src, sizeof src, "%s/lhshell/mfu.ini", ch); snprintf(dst, sizeof dst, "%s/luxshell-mfu.ini", sdir); move_one(r, src, dst, &count);
     snprintf(src, sizeof src, "%s/lhwm/keys", ch); snprintf(dst, sizeof dst, "%s/keys", cdir); move_one(r, src, dst, &count);
     snprintf(src, sizeof src, "%s/longhorn/settings.ini", ch);

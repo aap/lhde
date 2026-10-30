@@ -50,7 +50,7 @@ const char *lhde_settings_path(char *out, size_t n);
 const char *lhde_config_dir(char *out, size_t n);       /* ${XDG_CONFIG_HOME:-~/.config}/lhde */
 /* The user's two directories (docs/SETTINGS.md "Files"). What the user chose: ${XDG_CONFIG_HOME:-~/.config}/lhde (settings.ini,
    themes/, flxp.ini, keys, any shipped file overridden under its own name). What a program remembers on its own:
-   ${XDG_STATE_HOME:-~/.local/state}/lhde (luxshell-state.ini, luxshell-mfu.ini, flxp-views, flxp-desktop-positions). The two
+   ${XDG_STATE_HOME:-~/.local/state}/lhde (luxshell-state.ini, luxshell-mfu.ini, flxp-views, flxp-desktop-positions, flxp-mfu, flxp-run-history). The two
    calls below give the path of a named file in them and create the directory when it is missing. */
 const char *lhde_state_dir(char *out, size_t n);        /* ${XDG_STATE_HOME:-~/.local/state}/lhde */
 const char *lhde_config_file(const char *name, char *out, size_t n);

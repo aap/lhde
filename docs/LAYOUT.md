@@ -66,6 +66,7 @@ USER FILES                           yours; lhde writes only what you change in 
   luxshell-state.ini                   costs nothing but convenience. The tile order
   luxshell-mfu.ini                     launch counts behind the start menu's frequently-used list
   flxp-views, flxp-desktop-positions   the view remembered per folder, the desktop icons' positions
+  flxp-mfu, flxp-run-history           the start panel's launch counts, the Run box's history
 ```
 
 **Lookup.** A program asks for a file by kind and name, i.e. by its relative name (`styles/jade4074.msstyles`,
