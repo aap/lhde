@@ -111,8 +111,8 @@ static Atom cm_atom, lhwm_theme_atom, lhwm_maxmode_atom, lhwm_max_atom;
 static char theme_req_classic[1024];   /* the resolved frames_classic directory ("style" = the style's own decorations) */
 static bool theme_comp_off = false;    /* Glass.composition = off, or no glass frame set: always the classic frame */
 static bool theme_announce = false;    /* a switch was asked for: republish _LHWM_COMPOSITED and _LHWM_FRAME_METRICS even if unchanged */
-static char reg_ini[1024], lh_theme_cur[256];   /* the compatibility registry published (for flxp), the _LH_THEME name applied last */
-static Atom lh_theme_atom, lh_ini_atom;
+static char lh_theme_cur[256];   /* the _LH_THEME name applied last */
+static Atom lh_theme_atom;
 static Atom lhwm_reload_atom;          /* _LHWM_RELOAD: root ClientMessage or property, re-read the current theme (README "Live-editing a theme") */
 static int lh_theme_selfwrite;         /* _LH_THEME writes of lhwm's own (alias -> name) whose PropertyNotify is not a reload request */
 static bool theme_force;               /* theme_select: load and apply even when the spec is the one in use (reload) */
@@ -128,7 +128,6 @@ static void lh_resolved_property(void);
 static bool lh_theme_apply(const char *arg, char *canon, size_t n);
 static void lh_theme_property(void);
 static void theme_recheck(const char *why);
-static void registry_setup(const char *theme_arg);
 static bool root_string(Atom a, char *buf, size_t n);
 static char *root_string_alloc(Atom a);
 static const char *theme_opt = NULL;   /* -t THEME */
@@ -483,7 +482,7 @@ close_wm(void)
     XDeleteProperty(display, root, lhwm_metrics_atom);
     XDeleteProperty(display, root, net_atom[NetWMCheck]);   /* lhshell then falls back to its EWMH rules (maxmode) */
     XDeleteProperty(display, root, net_atom[NetWorkarea]);
-    /* kept on purpose: _LH_THEME and _LH_THEMES_INI (the session's setting, not lhwm's), and _NET_CLIENT_LIST,
+    /* kept on purpose: _LH_THEME (the session's setting, not lhwm's), and _NET_CLIENT_LIST,
        _NET_CLIENT_LIST_STACKING, _NET_ACTIVE_WINDOW, which a restarted lhwm uses to restore order and focus */
     fprintf(stderr, "luxwm: clean exit\n");
 
@@ -3053,11 +3052,10 @@ setup(void)
                                        XFixesSelectionWindowDestroyNotifyMask | XFixesSelectionClientCloseNotifyMask);
         else { xfixes_ev = -1; fprintf(stderr, "luxwm: no XFixes, compositor changes are not followed\n"); }
         compositor = XGetSelectionOwner(display, cm_atom) != None;
-        lh_theme_atom = XInternAtom(display, "_LH_THEME", False); lh_ini_atom = XInternAtom(display, "_LH_THEMES_INI", False);
+        lh_theme_atom = XInternAtom(display, "_LH_THEME", False);
         lh_resolved_atom = XInternAtom(display, "_LH_THEME_RESOLVED", False);
         lh_serial_atom = XInternAtom(display, "_LH_SETTINGS_SERIAL", False);
         utf8string = XInternAtom(display, "UTF8_STRING", False);
-        registry_setup(td);
         {   /* the session theme (_LH_THEME, published by whoever starts first) wins over -t / LHWM_THEME */
             char cur[256], canon[256];
             bool have = root_string(lh_theme_atom, cur, sizeof cur);
@@ -4213,34 +4211,6 @@ root_string_alloc(Atom a)
     return out;
 }
 
-/* the compatibility registry (liblhde: an old-format themes.ini generated from the theme files, docs/history/THEME-FORMAT-status.md section 11)
-   for programs that do not read theme files yet (flxp): published as _LH_THEMES_INI when nobody has; LH_THEMES_INI in the
-   environment is used as it is and not published. Refreshed on every theme switch and reload (theme files may have changed). */
-static void
-registry_setup(const char *theme_arg)
-{
-    char rp[PATH_MAX], gen[PATH_MAX];
-    (void)theme_arg;
-    const char *env = getenv("LH_THEMES_INI");
-    bool published = root_string(lh_ini_atom, rp, sizeof rp) && access(rp, R_OK) == 0;
-    reg_ini[0] = 0;
-    if (env && *env && access(env, R_OK) == 0) { snprintf(reg_ini, sizeof reg_ini, "%.1000s", env); return; }
-    if (published) { snprintf(reg_ini, sizeof reg_ini, "%.1000s", lhde_registry_resolved(rp, gen, sizeof gen) ? gen : rp); return; }
-    if (!lhde_compat_registry(gen, sizeof gen)) { fprintf(stderr, "luxwm: cannot write the compatibility registry (flxp follows no theme)\n"); return; }
-    snprintf(reg_ini, sizeof reg_ini, "%.1000s", gen);
-    fprintf(stderr, "luxwm: compatibility registry %s\n", reg_ini);
-    XChangeProperty(display, root, lh_ini_atom, utf8string, 8, PropModeReplace, (unsigned char *)reg_ini, strlen(reg_ini));
-}
-
-/* the generated registry again (a theme file may have changed) */
-static void
-registry_refresh(void)
-{
-    char res[PATH_MAX];
-    if (reg_ini[0]) lhde_registry_resolved(reg_ini, res, sizeof res);
-    else registry_setup(NULL);
-}
-
 /* _LH_SETTINGS_SERIAL, the serial a record is resolved at */
 static unsigned long
 settings_serial(void)
@@ -4350,7 +4320,6 @@ lh_theme_property(void)
     }
     snprintf(prev, sizeof prev, "%s", theme_req); snprintf(prev_c, sizeof prev_c, "%s", theme_req_classic);
     snprintf(prev_anim, sizeof prev_anim, "%s", theme_anim);
-    registry_refresh();
     if (!lh_theme_apply(want, canon, sizeof canon)) {
         fprintf(stderr, "luxwm: _LH_THEME %s is no theme; keeping %s\n", want, lh_theme_cur);
         return;
@@ -4382,7 +4351,6 @@ theme_recheck(const char *why)
     bool same = before && theme_record && !strcmp(before, theme_record);
     free(before);
     if (same) return;
-    registry_refresh();
     if (strcmp(theme_req, prev) || strcmp(theme_req_classic, prev_c) || theme_comp_off != prev_off) {
         fprintf(stderr, "luxwm: theme %s changed (%s)\n", lh_theme_cur, why);
         theme_announce = true;
@@ -4415,7 +4383,6 @@ theme_reload(const char *why)
     snprintf(prev, sizeof prev, "%s", theme_req); snprintf(prev_c, sizeof prev_c, "%s", theme_req_classic);
     if (lh_theme_cur[0]) {
         char canon[256];
-        registry_refresh();
         if (!lh_theme_apply(lh_theme_cur, canon, sizeof canon))
             fprintf(stderr, "luxwm: reload: %s is no theme any more; reloading %s as it was\n", lh_theme_cur, theme_req);
     }

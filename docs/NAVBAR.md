@@ -243,7 +243,7 @@ aap's nudges carry them; `tools_dx`/`tools_dy` move them further, the field keep
 | `newfolder` | XP's New Folder icon button | `"newfolder"`, else the same strips, cell 31 (VIEW_NEWFOLDER) | "New Folder", "New Folder (2)", ... selected in the listing |
 | `separator` | a 7 px cell with a vertical line (glass: white fading out at both ends, as flxp's divider; opaque: dark + light) | drawn | none (no hit) |
 Icon buttons' hot/pressed box: the breadcrumb toolbar's `SPLITBUTTON` HOT/PRESSED (as a hot segment). `icon_dir` (nav.ini, else
-navdemo passes the registry's `flxp_longhorn_system32`): `luxnav/lhnav_res.c` reads shell32.dll's RT_GROUP_ICON/RT_ICON (DIB or
+navdemo passes the session theme's `path.resources`): `luxnav/lhnav_res.c` reads shell32.dll's RT_GROUP_ICON/RT_ICON (DIB or
 PNG) and RT_BITMAP straight from the PE file (a small mmap'ed resource walker; no other new dependency).
 `tools = search_field` is the look before the toolbar: the offscreen render (`small`/`big` x short/long path x rest, not composited,
 back hot/pressed, address hot, search hot, search editing, crumb hot: 32 images) is byte-identical to the previous luxnav except the
@@ -395,8 +395,8 @@ better for 5048/5112: the small preset with `auto` (crisp unscaled Vista orbs, t
 the big preset is drawn for the aero patch's 54-row orbs and looks emptier with the 27/28-row band, so there `aero-patch` fills it
 better (sheets: `aero5048-auto-vs-aeropatch.png`, `aero5112-auto-vs-aeropatch.png` of the 2026-10-28 session).
 
-Clients: navdemo reads the frame set's `nav.ini` and, when the frame set has none and the registry says `flxp_header_engine =
-lhnav` (aero5048, aero5112), `navbar/vision.ini` (liblhde's `path.navbar`). flxp's header (`vision_wanted`) still reads the frame
+Clients: navdemo reads the frame set's `nav.ini` and, when the frame set has none and the theme's `Explorer.navbar` is `vision`
+(aero5048, aero5112), the theme's `path.navbar` (`navbar/vision.ini`). flxp's header (`vision_wanted`) still reads the frame
 set's `nav.ini` only, so under 5048/5112 it runs on lhnav's defaults (the small layout, `art_style` auto) until it does the same.
 
 ## Porting luxnav into flxp

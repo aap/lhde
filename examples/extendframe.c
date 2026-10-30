@@ -11,9 +11,10 @@
         _LHWM_HEADER_PIXMAP (the theme's caption band, continued down over the header) under the header content, or, when
         there is none (another WM), a gradient of our own; keep the extension set, it is what asks lhwm for the pixmap;
      5. caption behaviour in the header comes from _NET_WM_MOVERESIZE (drag) and _NET_WM_STATE (double-click maximise);
-     6. a PropertyNotify on the root for _LH_THEME, _LHWM_COMPOSITED or _LHWM_FRAME_METRICS is WM_THEMECHANGED: look the
-        theme up in the registry (_LH_THEMES_INI, docs/history/THEMES.md; a uxtheme client loads its msstyles), re-read
-        _LHWM_COMPOSITED and repaint (glass or the header pixmap); the extension stays set.
+     6. a PropertyNotify on the root for _LH_THEME, _LH_THEME_RESOLVED, _LHWM_COMPOSITED or _LHWM_FRAME_METRICS is
+        WM_THEMECHANGED: take the session theme's record (_LH_THEME_RESOLVED when it is current, else liblhde resolves
+        _LH_THEME itself; docs/THEME-FORMAT.md section 4; a uxtheme client loads its path.style), re-read _LHWM_COMPOSITED
+        and repaint (glass or the header pixmap); the extension stays set.
 
    -c (experimental, CLIENT-PROTOCOL.md "CLIENT_CAPTION"): the window also takes the caption rows. lhwm grows it up to the frame's
    top border and publishes _LHWM_CAPTION_RECT (the caption buttons, client coordinates); we leave that rectangle empty and cut it
@@ -29,7 +30,7 @@
    pixmap; without it they are only on lhwm's decoration window, so we cut _LHWM_CAPTION_RECT out of our bounding shape as well
    (not only the input shape) and they show through.
 
-   Build: make (Xlib + Xext + cairo + pangocairo). Run: DISPLAY=:3 ./extendframe [-c] [-n]. Escape or q quits. */
+   Build: make (Xlib + Xext + cairo + pangocairo, liblhde). Run: DISPLAY=:3 ./extendframe [-c] [-n]. Escape or q quits. */
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
@@ -38,6 +39,7 @@
 #include <X11/extensions/shape.h>
 #include <cairo/cairo-xlib.h>
 #include <pango/pangocairo.h>
+#include "lhde/theme.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,7 +56,7 @@
 static Display *dpy;
 static Window root, win;
 static Atom a_composited, a_theme, a_moveresize, a_state, a_max_v, a_max_h, a_delete;
-static Atom a_lh_theme, a_themes_ini, a_metrics, a_extend, a_flags, a_header_pixmap, a_caption_rect;
+static Atom a_lh_theme, a_lh_resolved, a_lh_serial, a_metrics, a_extend, a_flags, a_header_pixmap, a_caption_rect;
 static int client_caption;     /* -c */
 static int no_header_pixmap;   /* -n, toggled with the key n */
 static int maximized;          /* _NET_WM_STATE has MAXIMIZED_VERT and MAXIMIZED_HORZ */
@@ -63,7 +65,7 @@ static int bounding_hole;      /* -c with NO_HEADER_PIXMAP and no composition: l
 static long cap_rect[4];       /* _LHWM_CAPTION_RECT x y w h (client coordinates), all 0 while there is none */
 static int top_rows;           /* header rows in client pixels: HEADER, plus the caption zone with -c */
 static int x_error;            /* set by the error handler (a header pixmap freed under our feet) */
-static char theme_name[64], theme_msstyles[1024];   /* _LH_THEME and its registry msstyles (what a uxtheme client would load) */
+static char theme_name[64], theme_msstyles[1024];   /* _LH_THEME and its path.style (what a uxtheme client would load) */
 
 /* root CARDINAL _LHWM_COMPOSITED: 1 = lhwm draws glass and honours the extension. Missing (another WM, or lhwm not running) = 0. */
 static int read_composited(void) {
@@ -86,7 +88,7 @@ static unsigned long read_metric(int i, unsigned long dflt) {
     return v;
 }
 
-/* a root string property (_LH_THEME, _LH_THEMES_INI: UTF8_STRING) into buf */
+/* a root string property (_LH_THEME: UTF8_STRING) into buf */
 static void read_root_string(Atom a, char *buf, size_t n) {
     Atom type; int format; unsigned long cnt, after; unsigned char *data = NULL;
     buf[0] = 0;
@@ -96,24 +98,35 @@ static void read_root_string(Atom a, char *buf, size_t n) {
     }
 }
 
-/* the registry (docs/history/THEMES.md): plain ini, [name] sections with key = value; we only want msstyles. A real client takes msstyles,
-   color and size and reloads its visual style (flxp: the FLXP_THEME / _COLOR / _SIZE triple). Relative paths are relative to
-   the registry file. */
+/* the session theme (docs/THEME-FORMAT.md section 4): _LH_THEME names it; _LH_THEME_RESOLVED is its resolved record, current
+   when its theme= is that name and its serial= is the root's _LH_SETTINGS_SERIAL; else liblhde resolves the name itself. We only
+   want path.style (the .msstyles, "" for classic); a real client takes the style with VisualStyle.color / .size and reloads it
+   (flxp: shell/lhtheme.cpp). */
 static void read_theme(void) {
-    char ini[1024], line[1280], sec[64] = ""; FILE *f;
+    Atom type; int format; unsigned long cnt, after; unsigned char *data = NULL;
+    char *rec = NULL; unsigned long serial = 0, rs = 0;
     read_root_string(a_lh_theme, theme_name, sizeof theme_name);
-    read_root_string(a_themes_ini, ini, sizeof ini);
     theme_msstyles[0] = 0;
-    if (!theme_name[0] || !ini[0] || !(f = fopen(ini, "r"))) return;
-    while (fgets(line, sizeof line, f)) {
-        char key[64], val[1024];
-        if (sscanf(line, " [%63[^]]]", sec) == 1) continue;
-        if (strcmp(sec, theme_name) || sscanf(line, " %63[^= \t] = %1023[^;#\n]", key, val) != 2 || strcmp(key, "msstyles")) continue;
-        for (char *e = val + strlen(val); e > val && (e[-1] == ' ' || e[-1] == '\t'); ) *--e = 0;
-        if (val[0] == '/' || !strrchr(ini, '/')) snprintf(theme_msstyles, sizeof theme_msstyles, "%s", val);
-        else snprintf(theme_msstyles, sizeof theme_msstyles, "%.*s/%s", (int)(strrchr(ini, '/') - ini), ini, val);
+    if (!theme_name[0]) return;
+    if (XGetWindowProperty(dpy, root, a_lh_serial, 0, 1, False, XA_CARDINAL, &type, &format, &cnt, &after, &data) == Success && data) {
+        if (format == 32 && cnt == 1) serial = (unsigned long)*(long *)data;
+        XFree(data); data = NULL;
     }
-    fclose(f);
+    if (XGetWindowProperty(dpy, root, a_lh_resolved, 0, 1 << 20, False, AnyPropertyType, &type, &format, &cnt, &after, &data) == Success && data) {
+        if (format == 8 && (rec = malloc(cnt + 1))) { memcpy(rec, data, cnt); rec[cnt] = 0; }
+        XFree(data);
+    }
+    lhde_theme *t = NULL;
+    size_t nl = strlen(theme_name);
+    if (rec && !strncmp(rec, "theme=", 6) && !strncmp(rec + 6, theme_name, nl) && rec[6 + nl] == '\n') {
+        t = lhde_theme_parse(rec, &rs);
+        if (t && rs != serial) { lhde_theme_free(t); t = NULL; }   /* stale: resolve ourselves */
+    }
+    free(rec);
+    if (!t) t = lhde_theme_resolve(theme_name, NULL, 0);
+    const char *p = t ? lhde_theme_get(t, "path.style") : NULL;
+    snprintf(theme_msstyles, sizeof theme_msstyles, "%s", p ? p : "");
+    lhde_theme_free(t);
 }
 
 /* rule 2: the extension and the flags. Kept in both modes: composited, lhwm paints glass under the header; not composited it
@@ -275,7 +288,7 @@ static void paint(cairo_surface_t *xs, Visual *vis, int w, int h, int composited
     for (int i = 0; i < 4; i++) text_at(cr, "Segoe UI, Tahoma, Sans 9", lines[i], 16, HEADER + 14 + i * 20, 0);
     char th[1200]; const char *ms = strrchr(theme_msstyles, '/');
     snprintf(th, sizeof th, "Theme (_LH_THEME): %s%s%s%s", theme_name[0] ? theme_name : "(none)", ms ? ", msstyles " : "", ms ? ms + 1 : "",
-             theme_name[0] && !ms ? ", not in the registry" : "");
+             theme_name[0] && !ms ? ", no visual style (classic, or no such theme)" : "");
     text_at(cr, "Segoe UI, Tahoma, Sans 9", th, 16, HEADER + 14 + 4 * 20, 0);
     cairo_destroy(cr);
     cairo_surface_flush(xs); XFlush(dpy);
@@ -300,7 +313,8 @@ int main(int argc, char **argv) {
     a_moveresize = XInternAtom(dpy, "_NET_WM_MOVERESIZE", False); a_state = XInternAtom(dpy, "_NET_WM_STATE", False);
     a_max_v = XInternAtom(dpy, "_NET_WM_STATE_MAXIMIZED_VERT", False); a_max_h = XInternAtom(dpy, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
     a_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-    a_lh_theme = XInternAtom(dpy, "_LH_THEME", False); a_themes_ini = XInternAtom(dpy, "_LH_THEMES_INI", False);
+    a_lh_theme = XInternAtom(dpy, "_LH_THEME", False); a_lh_resolved = XInternAtom(dpy, "_LH_THEME_RESOLVED", False);
+    a_lh_serial = XInternAtom(dpy, "_LH_SETTINGS_SERIAL", False);
     a_metrics = XInternAtom(dpy, "_LHWM_FRAME_METRICS", False);
     a_extend = XInternAtom(dpy, "_LHWM_EXTEND_FRAME", False); a_flags = XInternAtom(dpy, "_LHWM_FRAME_FLAGS", False);
     a_header_pixmap = XInternAtom(dpy, "_LHWM_HEADER_PIXMAP", False); a_caption_rect = XInternAtom(dpy, "_LHWM_CAPTION_RECT", False);
@@ -352,9 +366,9 @@ int main(int argc, char **argv) {
             break;
         case PropertyNotify:   /* rule 6: WM_THEMECHANGED */
             if (e.xproperty.window == root && (e.xproperty.atom == a_composited || e.xproperty.atom == a_theme || e.xproperty.atom == a_lh_theme
-                                               || e.xproperty.atom == a_metrics)) {
+                                               || e.xproperty.atom == a_lh_resolved || e.xproperty.atom == a_metrics)) {
                 int now = argb && read_composited();
-                if (e.xproperty.atom == a_lh_theme) read_theme();   /* a uxtheme client reloads theme_msstyles here */
+                if (e.xproperty.atom == a_lh_theme || e.xproperty.atom == a_lh_resolved) read_theme();   /* a uxtheme client reloads theme_msstyles here */
                 if (client_caption && e.xproperty.atom == a_metrics) set_extension();   /* the caption rows follow the theme */
                 composited = now;
                 if (client_caption && bounding_hole != (no_header_pixmap && !composited)) { bounding_hole = !bounding_hole; read_caption_rect(w, h); }

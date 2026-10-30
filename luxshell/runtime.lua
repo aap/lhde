@@ -33,9 +33,9 @@ local function N(t) return lh.node(t) end
 local screen_w, screen_h, screen_no = lh.screen()
 
 ------------------------------------------------------------------ theme (SHELL-DESIGN 6.1): session theme name → registry → pack
--- The session theme is the root property _LH_THEME, a name in the registry ../themes.ini (_LH_THEMES_INI); its `shell` key
--- names the pack. At startup: _LH_THEME if someone (lhwm, a script) set it, else the persisted theme from state.ini, which
--- is then published; LHSHELL_THEME (a pack directory) only when neither names a registry entry. A change of _LH_THEME
+-- The session theme is the root property _LH_THEME, a theme name liblhde resolves (docs/THEME-FORMAT.md); its Shell.pack
+-- names the pack. At startup: _LH_THEME if someone (luxwm, a script) set it, else settings.ini [theme] name, which is then
+-- published; LHSHELL_THEME (a pack directory) only when neither names a theme. A change of _LH_THEME
 -- swaps the pack live (rebuild_shell below), sets the wallpaper and persists the name.
 local function lua(f) return dofile(lh.lua_dir .. "/" .. f) end   -- luxshell's own Lua (lh.lua_dir: the tree's luxshell/ or <prefix>/lib/lhde/luxshell)
 -- lhde's own programs beside us first (build/bin of the tree, <prefix>/bin), then PATH: lh.prog("flxp-taskbar")
@@ -105,7 +105,6 @@ local function set_theme_prop(v) theme_echo[v] = (theme_echo[v] or 0) + 1; lh.se
 -- startup: the root wins (SETTINGS.md "Conflicts"): _LH_THEME holds the selected name; else settings.ini [theme] name. liblhde
 -- resolves it (a theme file, an alias, a bare style); an alias goes back on the root as the theme's name.
 local theme_name, theme_entry
-S.registry_path()   -- the compatibility registry for flxp, published when nobody has
 do
   local root, file = lh.root_prop("_LH_THEME"), S.get("theme", "name")
   local want = root or file
@@ -1392,7 +1391,6 @@ local function apply_theme(e, root_set)
   S.select(e.name)                                       -- [theme] name; another theme's current layer is dropped (liblhde)
   publish_resolved(e)
   if root_set ~= e.name then set_theme_prop(e.name) end
-  S.registry_path()   -- the compatibility registry follows the theme files
   io.stderr:write(string.format("luxshell: theme %s%s: pack %s%s, %d ms\n", e.name, e.user and (" (the user's, base " .. e.base .. ")") or "", pack_dir, swapped and " (rebuilt)" or "", lh.now() - t0))
 end
 -- lh.select_theme(name, force): the settings flyout, Save As, settings.ini changed by another writer; force: the selected theme

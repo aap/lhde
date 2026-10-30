@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "lhde_data.h"
+#include "lhde/data.h"
 
 static void nine(cairo_t *cr, cairo_surface_t *img, double x, double y, double w, double h, double t, double r, double b, double l) {
     double iw = cairo_image_surface_get_width(img), ih = cairo_image_surface_get_height(img);

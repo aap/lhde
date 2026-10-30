@@ -37,17 +37,18 @@
      4. paint: everything transparent, then the header with lhnav (over glass: lhnav's text halo; not composited: lhwm's
         _LHWM_HEADER_PIXMAP under it and plain text), then the body opaque;
      5. caption behaviour through _NET_WM_MOVERESIZE (move 8, top resize 1) and _NET_WM_STATE (maximise toggle);
-     6. relayout and repaint on PropertyNotify: root _LH_THEME / _LHWM_COMPOSITED / _LHWM_FRAME_METRICS / _LHWM_THEME (theme
+     6. relayout and repaint on PropertyNotify: root _LH_THEME / _LH_THEME_RESOLVED / _LHWM_COMPOSITED / _LHWM_FRAME_METRICS / _LHWM_THEME (theme
         change or reload: reopen the visual style, re-read nav.ini), our _LHWM_CAPTION_RECT and _NET_WM_STATE (maximise), our
         _LHWM_HEADER_PIXMAP (a new opaque header background).
 
    Build: make navdemo (builds ../lhnav first). Run: DISPLAY=:3 ./navdemo [-r ROOT] [DIRECTORY]; -r: the breadcrumb starts at
-   ROOT (named by its last component) instead of "/" ("File System"). The toolbar's icons come from the registry's
-   flxp_longhorn_system32 (shell32.dll) unless nav.ini sets icon_dir. NAVDEMO_DEBUG=1 prints lhnav's final layout on every relayout:
+   ROOT (named by its last component) instead of "/" ("File System"). The toolbar's icons come from the session theme's
+   path.resources (shell32.dll) unless nav.ini sets icon_dir. NAVDEMO_DEBUG=1 prints lhnav's final layout on every relayout:
    every part's rect in client coordinates and the frame rows (y + border_t) that nav.ini's *_y keys use. */
 #define LHNAV_WITH_CAIRO
 #include "lhnav.h"
-#include "lhde_data.h"
+#include "lhde/data.h"
+#include "lhde/theme.h"
 #ifdef HAVE_UXTHEME
 #include <wuxtheme/ut.h>
 #endif
@@ -81,7 +82,7 @@
 static Display *dpy;
 static Window root, win;
 static Visual *vis;
-static Atom a_composited, a_theme, a_lh_theme, a_themes_ini, a_metrics, a_extend, a_flags, a_header_pixmap, a_caption_rect;
+static Atom a_composited, a_theme, a_lh_theme, a_lh_resolved, a_lh_serial, a_metrics, a_extend, a_flags, a_header_pixmap, a_caption_rect;
 static Atom a_moveresize, a_state, a_max_v, a_max_h, a_delete, a_name, a_utf8;
 static int W = 720, H = 480, composited, maximized, focused = 1, x_error;
 static long cap_rect[4];
@@ -100,7 +101,7 @@ static char **hist; static int nhist, hpos;          /* hist[hpos] is cwd */
 static char **ent; static int nent, *isdir;          /* sorted: directories first */
 static long long *ent_size; static time_t *ent_mtime;  /* for the Details view */
 static int view_mode;                                /* the `views` tool: 0 List, 1 Details */
-static char icon_dir_reg[512];                       /* the registry's flxp_longhorn_system32 (lhnav's icon_dir unless nav.ini sets one) */
+static char icon_dir_reg[512];                       /* the theme's path.resources (lhnav's icon_dir unless nav.ini sets one) */
 static int *vis_idx, nvis, sel = -1, scroll;         /* the entries matching the search text */
 static char address[PATH_MAX], search[256];          /* the two edit fields' text */
 static int editing;                                  /* 0 none, 1 address, 2 search */
@@ -135,39 +136,49 @@ static void start_moveresize(XButtonEvent *b, int dir) {
 }
 static int on_x_error(Display *d, XErrorEvent *e) { (void)d; (void)e; x_error = 1; return 0; }
 
-/* ---- theme (rule 6): the registry entry of _LH_THEME (msstyles, fonts) and the frame theme directory of _LHWM_THEME (nav.ini) ---- */
-static void registry_value(const char *ini, const char *name, const char *key, char *out, size_t n) {
-    char line[1400], sec[64] = ""; FILE *f = fopen(ini, "r"); out[0] = 0;
-    if (!f) return;
-    while (fgets(line, sizeof line, f)) {
-        char k[64], v[1200];
-        if (sscanf(line, " [%63[^]]]", sec) == 1) continue;
-        if (strcmp(sec, name) || sscanf(line, " %63[^= \t] = %1199[^\n]", k, v) != 2 || strcmp(k, key)) continue;
-        for (char *c = v + 1; *c; c++) if ((*c == ';' || *c == '#') && (c[-1] == ' ' || c[-1] == '\t')) { *c = 0; break; }
-        for (char *e = v + strlen(v); e > v && (e[-1] == ' ' || e[-1] == '\t'); ) *--e = 0;
-        snprintf(out, n, "%s", v);
+/* ---- theme (rule 6): the session theme's record (msstyles, fonts, resources, navbar) and the frame set of _LHWM_THEME (nav.ini) ---- */
+/* _LH_THEME names the theme; _LH_THEME_RESOLVED is its record (docs/THEME-FORMAT.md section 4), current when its theme= is that
+   name and its serial= the root's _LH_SETTINGS_SERIAL; else liblhde resolves the name itself */
+static lhde_theme *session_theme(const char *name) {
+    Atom type; int format; unsigned long cnt, after; unsigned char *data = NULL;
+    char *rec = NULL; unsigned long serial = 0, rs = 0;
+    if (XGetWindowProperty(dpy, root, a_lh_serial, 0, 1, False, XA_CARDINAL, &type, &format, &cnt, &after, &data) == Success && data) {
+        if (format == 32 && cnt == 1) serial = (unsigned long)*(long *)data;
+        XFree(data); data = NULL;
     }
-    fclose(f);
+    if (XGetWindowProperty(dpy, root, a_lh_resolved, 0, 1 << 20, False, AnyPropertyType, &type, &format, &cnt, &after, &data) == Success && data) {
+        if (format == 8 && (rec = malloc(cnt + 1))) { memcpy(rec, data, cnt); rec[cnt] = 0; }
+        XFree(data);
+    }
+    lhde_theme *t = NULL;
+    size_t nl = strlen(name);
+    if (rec && !strncmp(rec, "theme=", 6) && !strncmp(rec + 6, name, nl) && rec[6 + nl] == '\n') {
+        t = lhde_theme_parse(rec, &rs);
+        if (t && rs != serial) { lhde_theme_free(t); t = NULL; }   /* stale */
+    }
+    free(rec);
+    return t ? t : lhde_theme_resolve(name, NULL, 0);
 }
-/* a registry value: absolute in the resolved registry luxwm publishes, else relative to lhde's data directories (lhde_data.h) */
-static void rel_path(char *out, size_t n, const char *ini, const char *v) { (void)ini; lhde_data_resolve(v, out, n); }
+static const char *theme_value(const lhde_theme *t, const char *key) { const char *v = t ? lhde_theme_get(t, key) : NULL; return v ? v : ""; }
 static void load_theme(void) {
-    char name[64], ini[1024], ms[1200] = "", v[1200], frame[1200], engine[32] = "";
+    char name[256], ms[1200] = "", v[1200], frame[1200], navbar[1200] = "";
+    int vision = 0;
     read_string(root, a_lh_theme, name, sizeof name);
-    read_string(root, a_themes_ini, ini, sizeof ini);
-    if (name[0] && ini[0]) {
-        registry_value(ini, name, "msstyles", v, sizeof v);
-        if (v[0]) rel_path(ms, sizeof ms, ini, v);
-        registry_value(ini, name, "flxp_header_engine", engine, sizeof engine);   /* lhnav: the theme's navbar is vision */
-        registry_value(ini, name, "flxp_longhorn_system32", v, sizeof v);   /* shell32.dll for the toolbar's icons */
-        icon_dir_reg[0] = 0;
-        if (v[0]) rel_path(icon_dir_reg, sizeof icon_dir_reg, ini, v);
-        registry_value(ini, name, "fonts", v, sizeof v);   /* the build's Fonts directory: Segoe UI 0.7 */
-        for (char *save = NULL, *t = strtok_r(v, ";", &save); t; t = strtok_r(NULL, ";", &save)) {
-            while (*t == ' ') t++;
-            char p[1200]; rel_path(p, sizeof p, ini, t); lhnav_add_font_dir(p);
-            FcConfigAppFontAddDir(NULL, (const FcChar8 *)p); pango_cairo_font_map_set_default(NULL);   /* the body list's pango text */
+    icon_dir_reg[0] = 0;
+    lhde_theme *t = name[0] ? session_theme(name) : NULL;
+    if (t) {
+        snprintf(ms, sizeof ms, "%s", theme_value(t, "path.style"));
+        vision = !strcmp(theme_value(t, "Explorer.navbar"), "vision");   /* the theme's navbar is luxnav's */
+        snprintf(navbar, sizeof navbar, "%s", theme_value(t, "path.navbar"));
+        snprintf(icon_dir_reg, sizeof icon_dir_reg, "%s", theme_value(t, "path.resources"));   /* shell32.dll for the toolbar's icons */
+        snprintf(v, sizeof v, "%s", theme_value(t, "path.fonts"));   /* the build's Fonts directory: Segoe UI 0.7 */
+        for (char *save = NULL, *f = strtok_r(v, ";", &save); f; f = strtok_r(NULL, ";", &save)) {
+            while (*f == ' ') f++;
+            if (!*f) continue;
+            lhnav_add_font_dir(f);
+            FcConfigAppFontAddDir(NULL, (const FcChar8 *)f); pango_cairo_font_map_set_default(NULL);   /* the body list's pango text */
         }
+        lhde_theme_free(t);
     }
 #ifdef HAVE_UXTHEME
     void *old = style; style = ms[0] ? ut_open(ms, NULL, NULL) : NULL;
@@ -179,9 +190,8 @@ static void load_theme(void) {
     nav_path[0] = 0;
     if (frame[0] && !lhde_data_find_in(frame, "nav.ini", nav_path, sizeof nav_path)) nav_path[0] = 0;   /* beside theme.ini, or the
                                                                        frame set's copy in a data directory */
-    /* a frame set without one (aero5048, aero5112: their themes' navbar = vision): the navbar layout file, data/navbar/vision.ini
-       (liblhde's path.navbar; the registry only says flxp_header_engine = lhnav) */
-    if (!nav_path[0] && !strcmp(engine, "lhnav") && !lhde_data_find("navbar/vision.ini", nav_path, sizeof nav_path)) nav_path[0] = 0;
+    /* a frame set without one (aero5048, aero5112: their themes' navbar = vision): the theme's navbar layout file (path.navbar) */
+    if (!nav_path[0] && vision && navbar[0]) snprintf(nav_path, sizeof nav_path, "%s", navbar);
     if (nav_path[0]) {
         /* nav.ini's own choice; p overrides it until the file's `preset =` is edited */
         lhnav_metrics tmp; lhnav_metrics_default(&tmp); lhnav_metrics_load(&tmp, nav_path);
@@ -900,7 +910,8 @@ int main(int argc, char **argv) {
     if (!(dpy = XOpenDisplay(NULL))) { fprintf(stderr, "navdemo: cannot open display\n"); return 1; }
     int scr = DefaultScreen(dpy); root = RootWindow(dpy, scr);
     a_composited = XInternAtom(dpy, "_LHWM_COMPOSITED", False); a_theme = XInternAtom(dpy, "_LHWM_THEME", False);
-    a_lh_theme = XInternAtom(dpy, "_LH_THEME", False); a_themes_ini = XInternAtom(dpy, "_LH_THEMES_INI", False);
+    a_lh_theme = XInternAtom(dpy, "_LH_THEME", False); a_lh_resolved = XInternAtom(dpy, "_LH_THEME_RESOLVED", False);
+    a_lh_serial = XInternAtom(dpy, "_LH_SETTINGS_SERIAL", False);
     a_metrics = XInternAtom(dpy, "_LHWM_FRAME_METRICS", False); a_extend = XInternAtom(dpy, "_LHWM_EXTEND_FRAME", False);
     a_flags = XInternAtom(dpy, "_LHWM_FRAME_FLAGS", False); a_header_pixmap = XInternAtom(dpy, "_LHWM_HEADER_PIXMAP", False);
     a_caption_rect = XInternAtom(dpy, "_LHWM_CAPTION_RECT", False); a_moveresize = XInternAtom(dpy, "_NET_WM_MOVERESIZE", False);
@@ -958,10 +969,10 @@ int main(int argc, char **argv) {
             break;
         case PropertyNotify: {
             Atom at = e.xproperty.atom;
-            if (e.xproperty.window == root && (at == a_composited || at == a_theme || at == a_lh_theme || at == a_metrics)) {
+            if (e.xproperty.window == root && (at == a_composited || at == a_theme || at == a_lh_theme || at == a_lh_resolved || at == a_metrics)) {
                 /* WM_THEMECHANGED (and lhwm's theme reload): style, fonts, nav.ini, composition, metrics */
                 composited = argb && read_composited();
-                if (at == a_lh_theme || at == a_theme || at == a_metrics) load_theme();
+                if (at == a_lh_theme || at == a_lh_resolved || at == a_theme || at == a_metrics) load_theme();
                 relayout = 1;
             } else if (e.xproperty.window == win && (at == a_caption_rect || at == a_state)) {
                 maximized = read_maximized(); relayout = 1;   /* republished on every maximise/restore */

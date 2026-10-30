@@ -1,8 +1,8 @@
 /* liblhde: the settings store (docs/SETTINGS.md) and the ini files it is made of.
 
-   One file per user, ${XDG_CONFIG_HOME:-~/.config}/lhde/settings.ini ($LHDE_SETTINGS overrides the path; the x11-era
-   $LH_SETTINGS too): the current theme's name ([theme] name) and the per-user keys that are not part of a theme (sidebar
-   stacking and width, autohide, rows, the clock, [commands], ...). Every writer keeps the comments, the order and the keys it
+   One file per user, ${XDG_CONFIG_HOME:-~/.config}/lhde/settings.ini ($LHDE_SETTINGS overrides the path): the current theme's
+   name ([theme] name) and the per-user keys that are not part of a theme (sidebar stacking and width, autohide, rows, the
+   clock, [commands], ...). Every writer keeps the comments, the order and the keys it
    does not know (read, modify, write back the whole file, atomically, through a symlink). After a write the X clients send
    _LH_SETTINGS_CHANGED with the serial in _LH_SETTINGS_SERIAL (docs/SETTINGS.md "Change notification"); that part stays in
    the clients, liblhde has no X.

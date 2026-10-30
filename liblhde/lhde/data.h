@@ -81,19 +81,6 @@ const char *lhde_tree(void);
 /* forget the cached directory list (after $LHDE_DATA, $LHDE_WINDOWS, $XDG_DATA_HOME or $XDG_CONFIG_HOME changed: tests) */
 void lhde_data_reset(void);
 
-/* ---- the compatibility registry (docs/history/THEME-FORMAT-status.md section 11; liblhde/compat.c) ----
-   Until flxp reads theme files itself, liblhde writes an old-format themes.ini (one section per theme: shipped theme files,
-   the user's, bare styles; every path absolute) and wallpapers.ini from the resolved themes into
-   $XDG_RUNTIME_DIR/lhde/<display>/ (else /tmp/lhde-<uid>/<display>/); luxwm and luxshell publish its path as _LH_THEMES_INI.
-   Its first line is "; lhde: generated ..."; it is rewritten when a theme file, the styles or settings.ini changed. */
-/* the generated registry's path (written or refreshed now); NULL when it cannot be written */
-const char *lhde_compat_registry(char *out, size_t n);
-/* the registry a program should read: $LH_THEMES_INI, else the generated one (lhde_compat_registry); NULL when none */
-const char *lhde_registry_source(char *out, size_t n);
-/* a registry path someone published: the generated registry is refreshed in place (and returned), any other existing file is
-   returned as it is. NULL when src does not exist. (Before liblhde: the resolved copy of data/themes.ini.) */
-const char *lhde_registry_resolved(const char *src, char *out, size_t n);
-
 #ifdef __cplusplus
 }
 #endif

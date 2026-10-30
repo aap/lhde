@@ -94,7 +94,7 @@ int main(void)
     snprintf(p, sizeof p, "%s/run", T); setenv("XDG_RUNTIME_DIR", p, 1);
     snprintf(p, sizeof p, "%s/state", T); setenv("XDG_STATE_HOME", p, 1);
     setenv("HOME", T, 1); setenv("XDG_DATA_DIRS", "/nonexistent", 1); setenv("LHDE_TREE", "0", 1);
-    unsetenv("LHDE_SETTINGS"); unsetenv("LH_THEMES_INI"); unsetenv("DISPLAY");
+    unsetenv("LHDE_SETTINGS"); unsetenv("DISPLAY");
     lhde_data_reset();
     lhde_style_set_probe(probe);
 
@@ -418,13 +418,6 @@ int main(void)
     /* the path helpers */
     { char b[PATH_MAX]; snprintf(p, sizeof p, "%s/state/lhde/x.ini", T); EQ(lhde_state_file("x.ini", b, sizeof b), p);
       snprintf(p, sizeof p, "%s/config/lhde/x.ini", T); EQ(lhde_config_file("x.ini", b, sizeof b), p); }
-
-    /* ---- the compatibility registry ---- */
-    char reg[PATH_MAX];
-    CHECK(lhde_compat_registry(reg, sizeof reg) != NULL);
-    HAS(slurp("run/lhde/nodisplay/themes.ini"), "[jade]\ntitle = Jade (4074)\naliases = jade-old jadeclassic\n");
-    HAS(slurp("run/lhde/nodisplay/themes.ini"), "flxp_frame = longhorn");
-    HAS(slurp("run/lhde/nodisplay/wallpapers.ini"), "[jade]\nfile = ");
 
     /* ---- the three trees (docs/LAYOUT.md): the Windows tree's index, the user's files first, an old layout reported ---- */
     {

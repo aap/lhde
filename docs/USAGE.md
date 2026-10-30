@@ -146,7 +146,6 @@ lhde-theme set-key aero4074 Glass.composition off    -> aero4074-modified.theme 
 lhde-theme setting sidebar width 200    a per-user key; without VALUE: print it
 lhde-theme style jade4074               what liblhde reads from a style (kind, format, build, family, first scheme)
 lhde-theme migrate                      ~/.config/{longhorn,lhshell,flxp,lhwm} -> ~/.config/lhde + ~/.local/state/lhde (once)
-lhde-theme registry                     the compatibility themes.ini for flxp
 lhde-theme explain [THEME]              where every visible part comes from ("When something looks wrong" above)
 lhde-theme dirs [--list|--windows|--user]   the three trees and the search order; --list for scripts
 lhde-theme find REL | find KIND NAME    one data file (exit 1 when no tree has it); lhde-theme path VALUE: a theme value as a path
@@ -155,7 +154,8 @@ lhde-theme find REL | find KIND NAME    one data file (exit 1 when no tree has i
 ## Themes and switching them
 
 One setting for everything (`SHELL-DESIGN.md` 6.1, details for client authors in `docs/history/THEMES.md`): the root property
-`_LH_THEME` holds a theme *name* from the registry `themes.ini`. luxwm picks its frames from it, luxshell its taskbar/sidebar
+`_LH_THEME` holds a theme *name* (a theme file, an alias or a bare style; docs/THEME-FORMAT.md), its resolved record is
+`_LH_THEME_RESOLVED`. luxwm picks its frames from it, luxshell its taskbar/sidebar
 pack and the wallpaper, and clients (extendframe, flxp) their visual style and glass; all of them follow a change live, nothing
 restarts. lux remembers the last theme in `~/.config/lhde/settings.ini` (`[theme] name`, below) and publishes it when a session
 starts without one. Your own variants of a theme (presets) are described under "Settings and presets" below.
@@ -487,8 +487,8 @@ loads (a broken `theme.ini`) keeps the running one. luxwm's C code and `config.h
 
 ## Settings and presets (lux, SETTINGS.md)
 
-**Where.** lux keeps its settings in the desktop-wide `$XDG_CONFIG_HOME/longhorn/settings.ini` (default
-`~/.config/lhde/settings.ini`, `LH_SETTINGS` for another file), which luxwm and the flxp programs share (SETTINGS.md). lux
+**Where.** lux keeps its settings in the desktop-wide `$XDG_CONFIG_HOME/lhde/settings.ini` (default
+`~/.config/lhde/settings.ini`, `LHDE_SETTINGS` for another file), which luxwm and the flxp programs share (SETTINGS.md). lux
 writes every change back in place (other programs' keys, comments and order are kept) and then sends the root ClientMessage
 `_LH_SETTINGS_CHANGED`; when another program (flxp's Display Properties, a script) changes the file and sends that message, lux
 reads it again and applies what changed, live. A hand edit is picked up by sending it yourself, e.g.

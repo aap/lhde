@@ -4,7 +4,7 @@
 #include "lhnav.h"
 #include "lhnav_res.h"
 #include "lhnav_px.h"
-#include "lhde_data.h"
+#include "lhde/data.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,7 +103,7 @@ static void set_key(lhnav_metrics *m, const char *path, char *k, char *v)
     else if (!strcmp(k, "art_style")) snprintf(m->art_style, sizeof m->art_style, "%s", strcasecmp(v, "auto") ? v : "");
     else if (!strcmp(k, "art_dir") || !strcmp(k, "icon_dir")) {
         char *d = k[0] == 'a' ? m->art_dir : m->icon_dir; size_t dn = sizeof m->art_dir;
-        /* lhde: icon_dir is relative to the data directories (resources/4074, lhde_data.h); art_dir to the frame set (nav.ini's
+        /* lhde: icon_dir is relative to the data directories (resources/4074, lhde/data.h); art_dir to the frame set (nav.ini's
            directory, or the same frames/NAME/ in another data directory) */
         if (!*v) d[0] = 0;
         else if (v[0] == '/' || v[0] == '~' || k[0] == 'i') lhde_data_resolve(v, d, dn);

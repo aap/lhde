@@ -64,7 +64,7 @@ int main()
     setenv("XDG_RUNTIME_DIR", (T + "/run").c_str(), 1);
     setenv("XDG_DATA_DIRS", (T + "/none").c_str(), 1);
     setenv("LHDE_TREE", "0", 1);
-    unsetenv("DISPLAY"); unsetenv("LHDE_SETTINGS"); unsetenv("LH_THEMES_INI");
+    unsetenv("DISPLAY"); unsetenv("LHDE_SETTINGS");
     for (const char* k : { "FLXP_LONGHORN_SYSTEM32", "FLXP_FONT_PATH", "FLXP_WALLPAPER_DIRS", "FLXP_THEME", "FLXP_THEME_PATH",
                            "FLXP_ICONS", "FLXP_FRAME", "FLXP_HEADER_ENGINE", "FLXP_HEADER_PRESET", "FLXP_TASKBAR_KIND", "FLXP_START_MENU" })
         unsetenv(k);
