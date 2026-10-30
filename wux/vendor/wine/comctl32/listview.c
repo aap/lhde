@@ -175,6 +175,8 @@ typedef struct tagITEM_INFO
   INT iIndent;
   ITEM_ID *id;
   INT iGroupId;   /* flxp: group view */
+  UINT tileCols[4];   /* flxp: tile view: the subitems shown under the name (LVM_SETTILEINFO) */
+  UINT nTileCols;
 } ITEM_INFO;
 
 /* flxp: group view (LVM_ENABLEGROUPVIEW) in the icon views: a header row
@@ -312,6 +314,13 @@ typedef struct tagLISTVIEW_INFO
   COLORREF clrTextBk;
   COLORREF clrOutline;          /* flxp: LVS_EX_BORDERSELECT outline (LVM_SETOUTLINECOLOR) */
 
+  /* flxp: the tile view (LV_VIEW_TILE): the icon view's layout (cells of
+     iconSpacing, the normal image list) with the image at the left and the
+     name and up to nTileLines more lines (the item's tile columns, grey) to
+     its right; uView stays LV_VIEW_ICON, LVM_GETVIEW answers LV_VIEW_TILE */
+  BOOL bTile;
+  INT nTileLines;
+
   /* flxp: group view */
   BOOL groupView;
   BOOL groupsDirty;              /* arrange before the next paint */
@@ -393,6 +402,12 @@ typedef struct tagLISTVIEW_INFO
 #define ICON_LR_PADDING              16
 #define ICON_LR_HALF                 (ICON_LR_PADDING/2)
 
+/* flxp: tile view: the image's left edge and the text's gap after it in the
+   cell, the selection 2 px inside the cell (4051's 214x52 in a 218x56 tile) */
+#define TILE_ICON_LEFT               4
+#define TILE_TEXT_GAP                5
+#define TILE_INSET                   2
+
 /* default label width for items in list and small icon display modes */
 #define DEFAULT_LABEL_WIDTH 40
 /* maximum select rectangle width for empty text item in LV_VIEW_DETAILS */
@@ -465,6 +480,7 @@ static HIMAGELIST LISTVIEW_SetImageList(LISTVIEW_INFO *, INT, HIMAGELIST);
 static INT LISTVIEW_HitTest(const LISTVIEW_INFO *, LPLVHITTESTINFO, BOOL, BOOL);
 static BOOL LISTVIEW_EndEditLabelT(LISTVIEW_INFO *, BOOL, BOOL);
 static BOOL LISTVIEW_Scroll(LISTVIEW_INFO *, INT, INT);
+static SUBITEM_INFO* LISTVIEW_GetSubItemPtr(HDPA, INT);
 
 /******** Text handling functions *************************************/
 
@@ -1654,6 +1670,7 @@ static void toggle_checkbox_state(LISTVIEW_INFO *infoPtr, INT nItem)
    it used to reset view state to match current window style */
 static inline void map_style_view(LISTVIEW_INFO *infoPtr)
 {
+    infoPtr->bTile = FALSE;   /* flxp: a view from the style is never tiles */
     switch (infoPtr->dwStyle & LVS_TYPEMASK)
     {
     case LVS_ICON:
@@ -2383,6 +2400,39 @@ static void LISTVIEW_GetItemOrigin(const LISTVIEW_INFO *infoPtr, INT nItem, LPPO
  * RETURN:
  *   None.
  */
+/* flxp: the tile view (LISTVIEW_INFO.bTile) */
+static inline BOOL is_tile(const LISTVIEW_INFO *infoPtr)
+{
+    return infoPtr->bTile && infoPtr->uView == LV_VIEW_ICON;
+}
+
+/* flxp: LVS_EX_HIDELABELS (Vista; 4051's Hide File Names): the icon view without labels */
+static inline BOOL hide_labels(const LISTVIEW_INFO *infoPtr)
+{
+    return infoPtr->uView == LV_VIEW_ICON && !infoPtr->bTile && (infoPtr->dwLvExStyle & LVS_EX_HIDELABELS);
+}
+
+/* flxp: a tile's lines under the name: the texts of the item's tile columns
+   that are not empty, at most nTileLines (4051: the first two non-empty) */
+static INT LISTVIEW_TileLines(const LISTVIEW_INFO *infoPtr, INT nItem, LPCWSTR *lines, INT max)
+{
+    HDPA hdpaSubItems;
+    ITEM_INFO *item;
+    UINT i;
+    INT n = 0;
+
+    if ((infoPtr->dwStyle & LVS_OWNERDATA) || nItem < 0 || nItem >= infoPtr->nItemCount) return 0;
+    hdpaSubItems = DPA_GetPtr(infoPtr->hdpaItems, nItem);
+    if (!hdpaSubItems) return 0;
+    item = DPA_GetPtr(hdpaSubItems, 0);
+    for (i = 0; i < item->nTileCols && n < infoPtr->nTileLines && n < max; i++)
+    {
+        SUBITEM_INFO *sub = LISTVIEW_GetSubItemPtr(hdpaSubItems, item->tileCols[i]);
+        if (sub && is_text(sub->hdr.pszText) && sub->hdr.pszText[0]) lines[n++] = sub->hdr.pszText;
+    }
+    return n;
+}
+
 static void LISTVIEW_GetItemMetrics(const LISTVIEW_INFO *infoPtr, const LVITEMW *lpLVItem,
 				    LPRECT lprcBox, LPRECT lprcSelectBox,
 				    LPRECT lprcIcon, LPRECT lprcStateIcon, LPRECT lprcLabel)
@@ -2399,7 +2449,7 @@ static void LISTVIEW_GetItemMetrics(const LISTVIEW_INFO *infoPtr, const LVITEMW 
     if (infoPtr->uView == LV_VIEW_ICON && (lprcBox || lprcLabel))
     {
 	assert((lpLVItem->mask & LVIF_STATE) && (lpLVItem->stateMask & LVIS_FOCUSED));
-	if (lpLVItem->state & LVIS_FOCUSED) oversizedBox = doLabel = TRUE;
+	if ((lpLVItem->state & LVIS_FOCUSED) && !is_tile(infoPtr) && !hide_labels(infoPtr)) oversizedBox = doLabel = TRUE;
     }
     if (lprcSelectBox) doSelectBox = TRUE;
     if (lprcLabel) doLabel = TRUE;
@@ -2438,7 +2488,14 @@ static void LISTVIEW_GetItemMetrics(const LISTVIEW_INFO *infoPtr, const LVITEMW 
 	if (infoPtr->himlState && lpLVItem->iSubItem == 0)
 	    state_width = infoPtr->iconStateSize.cx;
 
-	if (infoPtr->uView == LV_VIEW_ICON)
+	if (is_tile(infoPtr))
+	{
+	    Icon.left   = Box.left + TILE_ICON_LEFT + state_width;
+	    Icon.top    = Box.top + (infoPtr->nItemHeight - infoPtr->iconSize.cy) / 2;
+	    Icon.right  = Icon.left + infoPtr->iconSize.cx;
+	    Icon.bottom = Icon.top + infoPtr->iconSize.cy;
+	}
+	else if (infoPtr->uView == LV_VIEW_ICON)
 	{
 	    Icon.left   = Box.left + state_width;
 	    if (infoPtr->himlNormal)
@@ -2509,6 +2566,7 @@ static void LISTVIEW_GetItemMetrics(const LISTVIEW_INFO *infoPtr, const LVITEMW 
 	   labelSize.cy = infoPtr->nItemHeight;
 	   goto calc_label;
 	}
+	if (is_tile(infoPtr) || hide_labels(infoPtr)) goto calc_label;   /* flxp */
 	
 	/* we need the text in non owner draw mode */
 	assert(lpLVItem->mask & LVIF_TEXT);
@@ -2545,7 +2603,23 @@ static void LISTVIEW_GetItemMetrics(const LISTVIEW_INFO *infoPtr, const LVITEMW 
 	}
 
 calc_label:
-	if (infoPtr->uView == LV_VIEW_ICON)
+	if (is_tile(infoPtr))
+	{
+	    /* flxp: the name and the tile lines, centred vertically right of the image */
+	    LPCWSTR lines[8];
+	    INT h = (1 + LISTVIEW_TileLines(infoPtr, lpLVItem->iItem, lines, 8)) * infoPtr->ntmHeight;
+	    Label.left = Icon.right + TILE_TEXT_GAP;
+	    Label.right = max(Label.left, Box.right - TILE_INSET - 2);
+	    Label.top = Box.top + (infoPtr->nItemHeight - h) / 2;
+	    Label.bottom = Label.top + h;
+	}
+	else if (hide_labels(infoPtr))
+	{
+	    Label.left = Icon.left;
+	    Label.right = Icon.right;
+	    Label.top = Label.bottom = Icon.bottom;
+	}
+	else if (infoPtr->uView == LV_VIEW_ICON)
 	{
 	    Label.left = Box.left + (infoPtr->nItemWidth - labelSize.cx) / 2;
 	    Label.top  = Box.top + ICON_TOP_PADDING_HITABLE +
@@ -2599,6 +2673,11 @@ calc_label:
 	        SelectBox.right = min(Label.left + labelSize.cx, Label.right);
 	    else
 	        SelectBox.right = min(Label.left + MAX_EMPTYTEXT_SELECT_WIDTH, Label.right);
+	}
+	else if (is_tile(infoPtr))
+	{
+	    SelectBox = Box;
+	    InflateRect(&SelectBox, -TILE_INSET, -TILE_INSET);
 	}
 	else
 	{
@@ -4762,7 +4841,8 @@ static BOOL set_sub_item(const LISTVIEW_INFO *infoPtr, const LVITEMW *lpLVItem, 
     if (infoPtr->dwStyle & LVS_OWNERDATA) return FALSE;
     
     /* set subitem only if column is present */
-    if (lpLVItem->iSubItem >= DPA_GetPtrCount(infoPtr->hdpaColumns)) return FALSE;
+    /* flxp: or any up to 31: text only the tile view shows (LVM_SETTILEINFO) */
+    if (lpLVItem->iSubItem >= DPA_GetPtrCount(infoPtr->hdpaColumns) && lpLVItem->iSubItem >= 32) return FALSE;
    
     /* First do some sanity checks */
     /* The LVIF_STATE flag is valid for subitems, but does not appear to be
@@ -4866,7 +4946,7 @@ static BOOL LISTVIEW_SetItemT(LISTVIEW_INFO *infoPtr, LVITEMW *lpLVItem, BOOL is
 	/* this little optimization eliminates some nasty flicker */
 	if ( infoPtr->uView == LV_VIEW_DETAILS && !(infoPtr->dwStyle & LVS_OWNERDRAWFIXED) &&
 	     !(infoPtr->dwLvExStyle & LVS_EX_FULLROWSELECT) &&
-             lpLVItem->iSubItem > 0 && lpLVItem->iSubItem <= DPA_GetPtrCount(infoPtr->hdpaColumns) )
+             lpLVItem->iSubItem > 0 && lpLVItem->iSubItem < DPA_GetPtrCount(infoPtr->hdpaColumns) )   /* flxp: < (tile subitems) */
 	    LISTVIEW_InvalidateSubItem(infoPtr, lpLVItem->iItem, lpLVItem->iSubItem);
 	else
         {
@@ -5022,7 +5102,12 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
              LISTVIEW_ThemedItemState(infoPtr, nmlvcd->nmcd.uItemState, item->state) : 0;
     if (themed && item->iSubItem == 0)
     {
-        if (infoPtr->uView == LV_VIEW_ICON)
+        if (is_tile(infoPtr))
+        {
+            rcTheme = rcBox;
+            InflateRect(&rcTheme, -TILE_INSET, -TILE_INSET);
+        }
+        else if (infoPtr->uView == LV_VIEW_ICON)
             UnionRect(&rcTheme, &rcBox, &rcLabel);
         else if (infoPtr->uView == LV_VIEW_DETAILS && (infoPtr->dwLvExStyle & LVS_EX_FULLROWSELECT))
         {
@@ -5168,6 +5253,34 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
 
     /* Don't bother painting item being edited */
     if (infoPtr->hwndEdit && item->iItem == infoPtr->nEditLabelItem && item->iSubItem == 0) return;
+
+    /* flxp: no labels (Hide File Names) */
+    if (hide_labels(infoPtr)) return;
+
+    /* flxp: a tile: the name on the first line, the tile lines grey under it
+       (the highlight text colour on a classic selection) */
+    if (is_tile(infoPtr))
+    {
+        LPCWSTR lines[8];
+        INT n = LISTVIEW_TileLines(infoPtr, item->iItem, lines, 8), k;
+        UINT fmt = DT_TOP | DT_LEFT | DT_NOPREFIX | DT_SINGLELINE | DT_END_ELLIPSIS;
+        HDC hdc = nmlvcd->nmcd.hdc;
+        COLORREF old = GetTextColor(hdc);
+        BOOL classic_sel = !themed && (item->state & LVIS_SELECTED) &&
+                           (infoPtr->bFocus || (infoPtr->dwStyle & LVS_SHOWSELALWAYS));
+        RECT r = rcLabel;
+
+        r.bottom = r.top + infoPtr->ntmHeight;
+        DrawTextW(hdc, item->pszText, -1, &r, fmt);
+        if (!classic_sel) SetTextColor(hdc, comctl32_color.clrGrayText);
+        for (k = 0; k < n; k++)
+        {
+            OffsetRect(&r, 0, infoPtr->ntmHeight);
+            DrawTextW(hdc, lines[k], -1, &r, fmt);
+        }
+        SetTextColor(hdc, old);
+        return;
+    }
 
     /* figure out the text drawing flags */
     format = (infoPtr->uView == LV_VIEW_ICON ? (focus ? LV_FL_DT_FLAGS : LV_ML_DT_FLAGS) : LV_SL_DT_FLAGS);
@@ -6624,6 +6737,8 @@ static HWND LISTVIEW_EditLabelT(LISTVIEW_INFO *infoPtr, INT nItem, BOOL isW)
     ReleaseDC(infoPtr->hwndSelf, hdc);
 
     sz.cy = rect.bottom - rect.top + 2;
+    /* flxp: a tile's name is its first line; without labels the box goes under the image */
+    if (is_tile(infoPtr) || hide_labels(infoPtr)) sz.cy = infoPtr->ntmHeight + 2;
     rect.left -= 2;
     rect.top  -= 1;
     TRACE("moving edit (%ld,%ld)-(%ld,%ld)\n", rect.left, rect.top, sz.cx, sz.cy);
@@ -9164,6 +9279,9 @@ static DWORD LISTVIEW_SetExtendedListViewStyle(LISTVIEW_INFO *infoPtr, DWORD mas
             LISTVIEW_SetBkColor(infoPtr, CLR_NONE);
     }
 
+    if((infoPtr->dwLvExStyle ^ old_ex_style) & LVS_EX_HIDELABELS)   /* flxp */
+        LISTVIEW_UpdateItemSize(infoPtr);
+
     if((infoPtr->dwLvExStyle ^ old_ex_style) & LVS_EX_HEADERINALLVIEWS)
     {
         if (infoPtr->dwLvExStyle & LVS_EX_HEADERINALLVIEWS)
@@ -9754,17 +9872,15 @@ static BOOL LISTVIEW_SetUnicodeFormat( LISTVIEW_INFO *infoPtr, BOOL unicode)
 static INT LISTVIEW_SetView(LISTVIEW_INFO *infoPtr, DWORD nView)
 {
   HIMAGELIST himl;
-
-  if (infoPtr->uView == nView) return 1;
+  /* flxp: the tile view is the icon view's layout (bTile) */
+  BOOL tile = nView == LV_VIEW_TILE;
 
   if ((INT)nView < 0 || nView > LV_VIEW_MAX) return -1;
-  if (nView == LV_VIEW_TILE)
-  {
-      FIXME("View LV_VIEW_TILE unimplemented\n");
-      return -1;
-  }
+  if (tile) nView = LV_VIEW_ICON;
+  if (infoPtr->uView == nView && infoPtr->bTile == tile) return 1;
 
   infoPtr->uView = nView;
+  infoPtr->bTile = tile;
 
   SendMessageW(infoPtr->hwndEdit, WM_KILLFOCUS, 0, 0);
   ShowWindow(infoPtr->hwndHeader, SW_HIDE);
@@ -12110,9 +12226,28 @@ LISTVIEW_WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
   case LVM_GETTEXTCOLOR:
     return infoPtr->clrText;
 
-  /* case LVM_GETTILEINFO: */
+  case LVM_GETTILEINFO:   /* flxp */
+  {
+      LVTILEINFO *ti = (LVTILEINFO *)lParam;
+      ITEM_INFO *it;
+      UINT i;
+      if (!ti || (infoPtr->dwStyle & LVS_OWNERDATA) || ti->iItem < 0 || ti->iItem >= infoPtr->nItemCount) return FALSE;
+      it = DPA_GetPtr(DPA_GetPtr(infoPtr->hdpaItems, ti->iItem), 0);
+      for (i = 0; i < it->nTileCols && i < ti->cColumns; i++) if (ti->puColumns) ti->puColumns[i] = it->tileCols[i];
+      ti->cColumns = it->nTileCols;
+      return TRUE;
+  }
 
-  /* case LVM_GETTILEVIEWINFO: */
+  case LVM_GETTILEVIEWINFO:   /* flxp */
+  {
+      LVTILEVIEWINFO *tvi = (LVTILEVIEWINFO *)lParam;
+      if (!tvi) return FALSE;
+      tvi->dwMask = LVTVIM_TILESIZE | LVTVIM_COLUMNS;
+      tvi->dwFlags = LVTVIF_FIXEDSIZE;
+      tvi->sizeTile = infoPtr->iconSpacing;
+      tvi->cLines = infoPtr->nTileLines;
+      return TRUE;
+  }
 
   case LVM_GETTOOLTIPS:
     if( !infoPtr->hwndToolTip )
@@ -12126,7 +12261,7 @@ LISTVIEW_WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     return (infoPtr->notifyFormat == NFR_UNICODE);
 
   case LVM_GETVIEW:
-    return infoPtr->uView;
+    return is_tile(infoPtr) ? LV_VIEW_TILE : infoPtr->uView;   /* flxp */
 
   case LVM_GETVIEWRECT:
     return LISTVIEW_GetViewRect(infoPtr, (LPRECT)lParam);
@@ -12308,9 +12443,29 @@ LISTVIEW_WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
   case LVM_SETTEXTCOLOR:
     return LISTVIEW_SetTextColor(infoPtr, (COLORREF)lParam);
 
-  /* case LVM_SETTILEINFO: */
+  case LVM_SETTILEINFO:   /* flxp: the subitems a tile shows under its name */
+  {
+      const LVTILEINFO *ti = (const LVTILEINFO *)lParam;
+      ITEM_INFO *it;
+      UINT i;
+      if (!ti || (infoPtr->dwStyle & LVS_OWNERDATA) || ti->iItem < 0 || ti->iItem >= infoPtr->nItemCount) return FALSE;
+      it = DPA_GetPtr(DPA_GetPtr(infoPtr->hdpaItems, ti->iItem), 0);
+      it->nTileCols = min(ti->cColumns, sizeof(it->tileCols) / sizeof(it->tileCols[0]));
+      for (i = 0; i < it->nTileCols; i++) it->tileCols[i] = ti->puColumns ? ti->puColumns[i] : 0;
+      if (is_tile(infoPtr)) LISTVIEW_InvalidateItem(infoPtr, ti->iItem);
+      return TRUE;
+  }
 
-  /* case LVM_SETTILEVIEWINFO: */
+  case LVM_SETTILEVIEWINFO:   /* flxp: the lines under the name; a fixed tile size is the icon spacing */
+  {
+      const LVTILEVIEWINFO *tvi = (const LVTILEVIEWINFO *)lParam;
+      if (!tvi) return FALSE;
+      if (tvi->dwMask & LVTVIM_COLUMNS) infoPtr->nTileLines = max(0, min(tvi->cLines, 8));
+      if ((tvi->dwMask & LVTVIM_TILESIZE) && (tvi->dwFlags & LVTVIF_FIXEDSIZE) == LVTVIF_FIXEDSIZE)
+          LISTVIEW_SetIconSpacing(infoPtr, tvi->sizeTile.cx, tvi->sizeTile.cy);
+      LISTVIEW_InvalidateList(infoPtr);
+      return TRUE;
+  }
 
   /* case LVM_SETTILEWIDTH: */
 
