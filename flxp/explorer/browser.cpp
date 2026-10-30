@@ -948,9 +948,10 @@ static void lh_set(Browser& b, View v, bool navigating)
     DWORD want = (style & ~LVS_TYPEMASK) | (DWORD)(details ? LVS_REPORT : LVS_ICON);
     if (want != style) SetWindowLongW(b.list, GWL_STYLE, (LONG)want);
     SendMessageW(b.list, LVM_SETVIEW, tiles ? LV_VIEW_TILE : details ? LV_VIEW_DETAILS : LV_VIEW_ICON, 0);
-    // the column header above every view (LVS_EX_HEADERINALLVIEWS: 4051/4074's sort and filter row)
-    SendMessageW(b.list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_HIDELABELS | LVS_EX_BORDERSELECT | LVS_EX_HEADERINALLVIEWS,
-                 (v.mode == Mode::Icons && v.hide_names ? LVS_EX_HIDELABELS : 0) | LVS_EX_HEADERINALLVIEWS);
+    // the column header above every view (LVS_EX_HEADERINALLVIEWS: 4051/4074's sort and filter row);
+    // Details selects whole rows (4051's LISTITEM underlay per row, lh4051-194831)
+    SendMessageW(b.list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_HIDELABELS | LVS_EX_BORDERSELECT | LVS_EX_HEADERINALLVIEWS | LVS_EX_FULLROWSELECT,
+                 (v.mode == Mode::Icons && v.hide_names ? LVS_EX_HIDELABELS : 0) | LVS_EX_HEADERINALLVIEWS | (details ? LVS_EX_FULLROWSELECT : 0));
 
     // the images at px: Details in the small slot, Tiles and Icons in the normal one
     bool refill = false;
@@ -967,7 +968,8 @@ static void lh_set(Browser& b, View v, bool navigating)
     }
 
     // the cells (measured: 4051/4074 tiles 218 x 56 at 48 px, 186 x 26 at 16 px; 4074's
-    // small icons 77 x 69 at 16 px; 4051 hidden names 110 x 105 at 96 px)
+    // icons 77 x 69 at 16 px, 116 x 148 at about 72, 139 x 163 at about 90, 277 high at
+    // about 175: the height grows by 1.3 per pixel of image; 4051 hidden names 110 x 105 at 96)
     int lh = line_height(b.list);
     if (tiles) {
         int lines = px >= 48 ? 2 : 0;   // 4051 _SetTileViewInfo: cLines 0 below 48 px, 2 from 48
@@ -979,7 +981,7 @@ static void lh_set(Browser& b, View v, bool navigating)
         if (!was_tiles && !navigating && !refill) for (size_t i = 0; i < b.items.size(); i++) put_tile_lines(b, i);
     } else if (!details) {
         if (v.hide_names) SendMessageW(b.list, LVM_SETICONSPACING, 0, MAKELPARAM(px + 14, px + 9));
-        else SendMessageW(b.list, LVM_SETICONSPACING, 0, MAKELPARAM((std::max)(77, px + 46), px + 27 + 2 * lh));
+        else SendMessageW(b.list, LVM_SETICONSPACING, 0, MAKELPARAM((std::max)(77, px + 46), px + 27 + 2 * lh + 3 * (px - 16) / 10));
     }
 
     if (refill || (!navigating && b.grouped && was_grouped != group_view_applies(b))) fill_list(b);
@@ -1064,7 +1066,8 @@ static void leave_longhorn(Browser& b, bool navigating)
     thumbview::set_longhorn(false);
     b.tiles = b.hide_names = false;
     b.zoom = 0;
-    SendMessageW(b.list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_HIDELABELS | LVS_EX_HEADERINALLVIEWS, 0);
+    if (SendMessageW(b.list, LVM_GETEXTENDEDLISTVIEWSTYLE, 0, 0) & LVS_EX_HEADERINALLVIEWS)   // (the Longhorn views had them)
+        SendMessageW(b.list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_HIDELABELS | LVS_EX_HEADERINALLVIEWS | LVS_EX_FULLROWSELECT, 0);
     if ((HIMAGELIST)SendMessageW(b.list, LVM_GETIMAGELIST, LVSIL_SMALL, 0) != b.small && !thumbview::active())
         SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)b.small);
 }

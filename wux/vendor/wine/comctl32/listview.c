@@ -1117,12 +1117,42 @@ static BOOL LISTVIEW_HasThemedItems(const LISTVIEW_INFO *infoPtr)
     return theme && IsThemePartDefined(theme, LVP_LISTITEM, 0);
 }
 
+/* flxp: the sorted column's shade in Details (LVM_SETSELECTEDCOLUMN; XP lvrept.c
+   GetSortColor(10, the background): white becomes #F7F7F7, as 4074's and XP's
+   Name column); not in group view. FALSE when the column is not shaded. */
+static BOOL LISTVIEW_SortedColumnColor(const LISTVIEW_INFO *infoPtr, INT nSubItem, COLORREF *clr)
+{
+    COLORREF bk = infoPtr->clrBk;
+    BYTE c[3];
+    BOOL desaturate;
+    int i;
+
+    if (infoPtr->uView != LV_VIEW_DETAILS || infoPtr->groupView || bk == CLR_NONE ||
+        infoPtr->selected_column < 0 || infoPtr->selected_column >= DPA_GetPtrCount(infoPtr->hdpaColumns) ||
+        (nSubItem >= 0 && nSubItem != infoPtr->selected_column)) return FALSE;
+    if (bk == CLR_DEFAULT) bk = comctl32_color.clrWindow;
+    if (bk == 0) { *clr = RGB(128, 128, 128); return TRUE; }
+    c[0] = GetRValue(bk); c[1] = GetGValue(bk); c[2] = GetBValue(bk);
+    desaturate = c[0] > 0xf0 && c[1] > 0xf0 && c[2] > 0xf0;
+    for (i = 0; i < 3; i++)
+    {
+        if (c[i] + (10 * 10 * c[i]) / 1000 > 0xff) c[i] = desaturate ? c[i] - c[i] / 30 : 0xff;
+        else c[i] += (10 * 10 * c[i]) / 1000;
+    }
+    *clr = RGB(c[0], c[1], c[2]);
+    return TRUE;
+}
+
 static void prepaint_setup (const LISTVIEW_INFO *infoPtr, HDC hdc, const NMLVCUSTOMDRAW *cd, BOOL SubItem)
 {
-    COLORREF backcolor, textcolor;
+    COLORREF backcolor, textcolor, sorted;
 
     backcolor = cd->clrTextBk;
     textcolor = cd->clrText;
+    /* flxp: the sorted column's text on its shade */
+    if ((backcolor == CLR_DEFAULT || backcolor == infoPtr->clrBk || backcolor == comctl32_color.clrWindow) &&
+        LISTVIEW_SortedColumnColor(infoPtr, cd->iSubItem, &sorted))
+        backcolor = sorted;
 
     /* apparently, for selected items, we have to override the returned values */
     /* flxp: not when the theme draws the item (its text keeps its colour) */
@@ -5039,11 +5069,30 @@ static void LISTVIEW_DrawBackgroundBitmap(const LISTVIEW_INFO *infoPtr, HDC hdc,
  */
 static BOOL LISTVIEW_FillBkgnd(const LISTVIEW_INFO *infoPtr, HDC hdc, const RECT *lprcBox)
 {
+    COLORREF sorted;
+
     if (infoPtr->hBkBrush)
     {
         TRACE("(hdc=%p, lprcBox=%s, hBkBrush=%p)\n", hdc, wine_dbgstr_rect(lprcBox), infoPtr->hBkBrush);
 
         FillRect(hdc, lprcBox, infoPtr->hBkBrush);
+    }
+    /* flxp: the sorted column shaded down to the bottom (XP listview.c, the erase) */
+    if (infoPtr->hBkBrush && LISTVIEW_SortedColumnColor(infoPtr, -1, &sorted))
+    {
+        RECT col, r;
+        POINT origin;
+        HBRUSH br;
+
+        LISTVIEW_GetHeaderRect(infoPtr, infoPtr->selected_column, &col);
+        LISTVIEW_GetOrigin(infoPtr, &origin);
+        col.left += origin.x; col.right += origin.x;
+        col.top = lprcBox->top; col.bottom = lprcBox->bottom;
+        if (IntersectRect(&r, &col, lprcBox) && (br = CreateSolidBrush(sorted)))
+        {
+            FillRect(hdc, &r, br);
+            DeleteObject(br);
+        }
     }
 
     LISTVIEW_DrawBackgroundBitmap(infoPtr, hdc, lprcBox);
@@ -5263,7 +5312,7 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
     if (hide_labels(infoPtr)) return;
 
     /* flxp: a tile: the name on the first line, the tile lines grey under it
-       (the highlight text colour on a classic selection) */
+       (#808080 in 4051 and 4074; the highlight text colour on a classic selection) */
     if (is_tile(infoPtr))
     {
         LPCWSTR lines[8];
@@ -5277,7 +5326,7 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
 
         r.bottom = r.top + infoPtr->ntmHeight;
         DrawTextW(hdc, item->pszText, -1, &r, fmt);
-        if (!classic_sel) SetTextColor(hdc, comctl32_color.clrGrayText);
+        if (!classic_sel) SetTextColor(hdc, RGB(128, 128, 128));
         for (k = 0; k < n; k++)
         {
             OffsetRect(&r, 0, infoPtr->ntmHeight);
