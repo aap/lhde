@@ -460,7 +460,9 @@ with one key when you want to look at it.
   all clients) and reserves **no strut**, so windows dragged over it cover it and maximised windows take the full width
   (`_NET_WORKAREA` 1280x770 on the lab, the taskbar's strut only). The Avalon taskbar runs the full width over it, above it in the
   stack, and the sidebar ends at the taskbar's top (the 4015/M4 look; it follows autohide). Pinned: the block sits above the
-  full-width taskbar, under the windows, no strut. Minimized: as always (no sidebar, the tiles in the taskbar).
+  full-width taskbar, under the windows, no strut. Minimized: as always (no sidebar, the tiles in the taskbar). Since the
+  sidebar's clock can be covered by windows, the taskbar shows the time at its right end as well (the clock tile's taskbar
+  view, as 4074's taskbar shows it when the sidebar has no clock on screen).
 - `top` (default, "Sidebar on top of windows"): the sidebar is above the windows (`_NET_WM_STATE_ABOVE`, like the taskbar),
   runs the full height and is above the taskbar at the corner, which is shortened by its width (4074); its strut keeps maximised
   windows clear (full 1099x770 with a 181 px sidebar, pinned 1280x662).

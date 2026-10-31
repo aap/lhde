@@ -612,8 +612,11 @@ lh.publish_clock = publish_clock
 local function build_tb_tiles()
   for _, t in ipairs(tb.tile_list) do if t.dispose then pcall(t.dispose, t) end end
   tb.tile_list = {}; tb.tbhost:clear()
-  if mode ~= "minimized" or not tb.wide or not tb_on() then publish_clock() return end
-  for _, name in ipairs(T.taskbar_tiles or pinned_names()) do   -- pack key taskbar_tiles: 4074 Sidebar\TaskbarTiles
+  -- the sidebar stacked under the windows: its clock may be covered, so the taskbar shows the time at its right end, as 4074's
+  -- taskbar does with no clock of the sidebar's to show (the clock's taskbar view alone; minimized: all the pinned tiles)
+  local names = (mode == "minimized" and tb.wide) and (T.taskbar_tiles or pinned_names()) or (cfg.sb_bottom and { "clock" }) or nil
+  if not names or not tb_on() then tb.surface:damage(); publish_clock() return end
+  for _, name in ipairs(names) do   -- pack key taskbar_tiles: 4074 Sidebar\TaskbarTiles
     local def = load_tile(name)
     if def and def.taskbar then def.id = name; def.tb = tb; def:taskbar(tb.tbhost); table.insert(tb.tile_list, def) end
   end
@@ -1236,7 +1239,7 @@ function lh.set_sidebar_stacking(v)
   if sb.anim then lh.cancel(sb.anim); sb.anim = nil end
   sb.yield = sb_yield()
   local function sidebar() build_sidebar(); build_tiles(); after_tiles(); place_sidebar() end
-  local function taskbar() place_taskbar(); rebuild_tasks() end
+  local function taskbar() build_tb_tiles(); place_taskbar(); rebuild_tasks() end
   if on then taskbar(); sidebar() else sidebar(); taskbar() end
   sb.surface:set_layer(sb_layer())
   if mode ~= "minimized" and not sb_hidden() then sb_stack() end   -- top: raised over the taskbar at the corner; bottom: lowered

@@ -5,7 +5,6 @@
 		* context menu
 		* drag to reorder
 		* center buttons mode for plex and concepts
-	* should show time in taskbar when sidebar is stacked below (sidebar clock may be hidden)
 
 * sidebar
 	* mouse hover over tiles
