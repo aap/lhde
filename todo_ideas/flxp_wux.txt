@@ -34,3 +34,4 @@ not *entirely* sure about the font for all themes though
 ## misc
 
 * flxp portal save dialog seems to get stuck on an "Open" button label when changing directories
+* tests/headless/filedlg.sh is flaky under load (make check with a lab running): a different check fails each run (xp multi, longhorn filter index, the view keys), alone it passes; its xdotool waits need to wait for the dialog, not sleep
