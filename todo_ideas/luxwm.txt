@@ -1,6 +1,6 @@
 # Luxwm things
 
-## resizing
+## resizing (NEXT, aap: the maximization items)
 * maximize vertically when resize-dragging window border to edge of maximize-area
 * maximize when move-dragging window to top edge,
 	maximize to left/right half when dragging to left/half edge

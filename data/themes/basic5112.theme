@@ -20,7 +20,7 @@ pack     = 5112-aero         ; the 5112 Start pill, bar and task buttons, for ta
 [Explorer]
 chrome   = longhorn
 navbar   = vision
-navbar_preset = small
+navbar_preset = concept     ; a named luxnav preset (data/navbar/vision.ini); the Vista era has no header sizes
 taskpane = bottom            ; the task band under the list, close to Vista's details pane (a choice, not 5048's/5112's)
 
 [Desktop]

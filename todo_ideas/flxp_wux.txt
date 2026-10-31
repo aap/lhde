@@ -2,7 +2,7 @@
 
 ## visuals
 
-* currently two ways to draw context menus?
+* NEXT (aap): the context menus: currently two ways to draw context menus?
 luxwm has something for the window menu that looks different from the other wux menus.
 in some respects it looks better because of how the font and (jade/aero) highlights are drawn,
 not *entirely* sure about the font for all themes though
@@ -14,6 +14,13 @@ not *entirely* sure about the font for all themes though
 * flicker on resize (a lead, not confirmed): wux windows use the default ForgetGravity, so the X server drops a window's
 	contents on every resize, and a glass (ARGB) window's transparent background shows before wux repaints; try NorthWest
 	gravity (and a background of None) and watch a resize under picom
+
+* the start panel looks very wrong with most themes, including Windows Classic: XP's panel under the classic theme is drawn
+	with the system colours (screenshots WinXP-193211.png, WinXP-193221.png in the research workspace: the gradient user band,
+	white left column, light grey right column, raised edges, classic All Programs cascade); check the ReactOS styles too
+
+* 5048 and 5112 use the `concept` luxnav preset for now (set in their themes); presets of their own in data/navbar/vision.ini
+	when they diverge; Display Properties still offers Small/Big/Concept for them although the Vista era has no header sizes
 
 ## flxp behavior
 

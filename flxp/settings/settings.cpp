@@ -1795,7 +1795,7 @@ std::vector<Item> items_for(int id)
     case IDC_AP_FRAME: return items({ { "Automatic (Longhorn when luxwm runs)", "auto" }, { "Windows XP", "xp" }, { "Longhorn header", "longhorn" } });
     case IDC_AP_NAVBAR: return items({ { "Longhorn 4074", "4074" }, { "Longhorn 4051", "4051" }, { "Vision (luxnav)", "vision" }, { "None (XP toolbars)", "none" } });
     case IDC_AP_PRESET:
-        if (value("Explorer.navbar") == "vision") return items({ { "Automatic", "auto" }, { "Small", "small" }, { "Big", "big" } });
+        if (value("Explorer.navbar") == "vision") return items({ { "Automatic", "auto" }, { "Small", "small" }, { "Big", "big" }, { "Concept", "concept" } });
         return items({ { "Automatic", "auto" }, { "Small", "small" }, { "Medium", "medium" }, { "Large", "large" }, { "Extra large", "xlarge" } });
     case IDC_AP_TASKBAR: return items({ { "Avalon (luxshell)", "avalon" }, { "Classic (flxp-taskbar)", "classic" }, { "None", "none" } });
     case IDC_AP_FRAMES: {
