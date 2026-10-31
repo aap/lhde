@@ -11,7 +11,7 @@
  
  WINE_DEFAULT_DEBUG_CHANNEL(menu);
  WINE_DECLARE_DEBUG_CHANNEL(accel);
-@@ -814,6 +818,25 @@
+@@ -814,6 +818,38 @@
  }
  
  
@@ -33,11 +33,24 @@
 +    if (look->theme) CloseThemeData( look->theme );
 +    UXMENU_FreeLook( look );
 +}
++/* flxp: the plate under one item (the frame's pixels there: background, the style's borders and gutter), so an item drawn
++ * again alone (MENU_SelectItem: the old item unselected, the new one selected) loses its old highlight, and an alpha
++ * highlight is not drawn over itself; a menu with its own background brush (MIM_BACKGROUND) gets that brush */
++static void menu_plate( HWND hwnd, const POPUPMENU *menu, HDC hdc, const UXMENU_LOOK *look, const RECT *item )
++{
++    RECT rc;
++    int saved = SaveDC( hdc );
++    GetClientRect( hwnd, &rc );
++    IntersectClipRect( hdc, item->left, item->top, item->right, item->bottom );
++    if (menu->hbrBack) FillRect( hdc, item, menu->hbrBack );
++    else UXMENU_DrawFrame( look, hdc, &rc );
++    RestoreDC( hdc, saved );
++}
 +
  /***********************************************************************
   *           MENU_GetBitmapItemSize
   *
-@@ -1005,6 +1028,18 @@
+@@ -1005,6 +1041,18 @@
      /* handle fontsize > bitmap_height */
      top = (h>bm.bmHeight) ? rect->top+(h-bm.bmHeight)/2 : rect->top;
      left=rect->left;
@@ -56,7 +69,7 @@
      rop=((lpitem->fState & MF_HILITE) && !IS_MAGIC_BITMAP(hbmToDraw)) ? NOTSRCCOPY : SRCCOPY;
      if ((lpitem->fState & MF_HILITE) && lpitem->hbmpItem)
          SetBkColor(hdc, GetSysColor(COLOR_HIGHLIGHT));
-@@ -1019,7 +1054,7 @@
+@@ -1019,7 +1067,7 @@
   * Calculate the size of the menu item and store it in lpitem->rect.
   */
  static void MENU_CalcItemSize( HDC hdc, MENUITEM *lpitem, HWND hwndOwner,
@@ -65,7 +78,7 @@
  {
      WCHAR *p;
      UINT check_bitmap_width = GetSystemMetrics( SM_CXMENUCHECK );
-@@ -1073,12 +1108,39 @@
+@@ -1073,12 +1121,39 @@
  
      if (lpitem->fType & MF_SEPARATOR)
      {
@@ -105,7 +118,7 @@
      itemheight = 0;
      lpitem->xTab = 0;
  
-@@ -1185,6 +1247,8 @@
+@@ -1185,6 +1260,8 @@
      start = 0;
  
      lppop->textOffset = 0;
@@ -114,7 +127,7 @@
  
      while (start < lppop->nItems)
      {
-@@ -1204,7 +1268,7 @@
+@@ -1204,7 +1281,7 @@
                  if (i != start) break;
              }
  
@@ -123,7 +136,7 @@
  	    lppop->items_rect.right = max( lppop->items_rect.right, lpitem->rect.right );
  	    orgY = lpitem->rect.bottom;
  	    if (IS_STRING_ITEM(lpitem->fType) && lpitem->xTab)
-@@ -1235,6 +1299,7 @@
+@@ -1235,6 +1312,7 @@
      if( !textandbmp) lppop->textOffset = 0;
  
      lppop->nTotalHeight = lppop->items_rect.bottom;
@@ -131,7 +144,7 @@
  
      /* space for the border */
      OffsetRect(&lppop->items_rect, MENU_MARGIN, MENU_MARGIN);
-@@ -1302,7 +1367,7 @@
+@@ -1302,7 +1380,7 @@
  
  	    TRACE("calling MENU_CalcItemSize org=(%d, %d)\n", orgX, orgY );
  	    debug_print_menuitem ("  item: ", lpitem, "");
@@ -140,7 +153,7 @@
  
  	    if (lpitem->rect.right > lppop->items_rect.right)
  	    {
-@@ -1521,12 +1586,84 @@
+@@ -1521,12 +1599,85 @@
          /* Draw the popup-menu arrow */
          SetBkColor( hdc, old_bk );
          SetTextColor( hdc, old_text );
@@ -185,6 +198,7 @@
 +            else if (lpitem->fState & MF_CHECKED)
 +                f |= UXMENU_CHECKED | ((lpitem->fType & MFT_RADIOCHECK) ? UXMENU_RADIO : 0);
 +        }
++        menu_plate( hwnd, menu, hdc, &look, &rect );
 +        UXMENU_DrawItem( &look, hdc, &rect, f, 0, NULL, 0, NULL, -1 );
 +        if (!(f & UXMENU_SEPARATOR))
 +        {
@@ -226,7 +240,7 @@
      if (menuBar && (lpitem->fType & MF_SEPARATOR)) goto done;
  
      if (lpitem->fState & MF_HILITE)
-@@ -1804,7 +1941,14 @@
+@@ -1804,7 +1955,14 @@
  	    BOOL flat_menu = FALSE;
  
  	    SystemParametersInfoW (SPI_GETFLATMENU, 0, &flat_menu, 0);
@@ -242,7 +256,7 @@
  		FrameRect(hdc, &rect, GetSysColorBrush(COLOR_BTNSHADOW));
  	    else
  		DrawEdge (hdc, &rect, EDGE_RAISED, BF_RECT);
-@@ -3110,6 +3254,11 @@
+@@ -3110,6 +3268,11 @@
              }
          }
  
@@ -254,7 +268,7 @@
  	/* check if EndMenu() tried to cancel us, by posting this message */
          if(msg.message == WM_CANCELMODE)
  	{
-@@ -3156,6 +3305,9 @@
+@@ -3156,6 +3319,9 @@
  		    /* Else, end menu tracking */
  		    fRemove = MENU_ButtonDown( &mt, msg.message, hmenu, wFlags );
  		    fEndMenu = !fRemove;

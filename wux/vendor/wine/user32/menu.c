@@ -836,6 +836,19 @@ static void menu_look_done( UXMENU_LOOK *look )
     if (look->theme) CloseThemeData( look->theme );
     UXMENU_FreeLook( look );
 }
+/* flxp: the plate under one item (the frame's pixels there: background, the style's borders and gutter), so an item drawn
+ * again alone (MENU_SelectItem: the old item unselected, the new one selected) loses its old highlight, and an alpha
+ * highlight is not drawn over itself; a menu with its own background brush (MIM_BACKGROUND) gets that brush */
+static void menu_plate( HWND hwnd, const POPUPMENU *menu, HDC hdc, const UXMENU_LOOK *look, const RECT *item )
+{
+    RECT rc;
+    int saved = SaveDC( hdc );
+    GetClientRect( hwnd, &rc );
+    IntersectClipRect( hdc, item->left, item->top, item->right, item->bottom );
+    if (menu->hbrBack) FillRect( hdc, item, menu->hbrBack );
+    else UXMENU_DrawFrame( look, hdc, &rc );
+    RestoreDC( hdc, saved );
+}
 
 /***********************************************************************
  *           MENU_GetBitmapItemSize
@@ -1626,6 +1639,7 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
             else if (lpitem->fState & MF_CHECKED)
                 f |= UXMENU_CHECKED | ((lpitem->fType & MFT_RADIOCHECK) ? UXMENU_RADIO : 0);
         }
+        menu_plate( hwnd, menu, hdc, &look, &rect );
         UXMENU_DrawItem( &look, hdc, &rect, f, 0, NULL, 0, NULL, -1 );
         if (!(f & UXMENU_SEPARATOR))
         {
