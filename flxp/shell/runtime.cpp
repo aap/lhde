@@ -82,7 +82,7 @@ static const char template_text[] =
     "menubar_gradient =\n"
     "menubar_text =\n"
     "menubar_msstyles =\n"
-    "# The longhorn header (View > Header; 4074's Toolbar Size and Toolbars):\n"
+    "# The longhorn header (View > Toolbars; 4074's Toolbar Size and Toolbars):\n"
     "# small (36 rows under the caption, which keeps the title), medium (4051's\n"
     "# 54-row navigation bar), large, xlarge (32 / 49 more rows); auto: medium (the\n"
     "# theme's Explorer.navbar_preset, else medium; the file dialog:\n"

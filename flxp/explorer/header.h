@@ -43,7 +43,7 @@ void enable_tool(int id, bool on);
 bool tool_rect(int id, RECT* screen);
 
 // 4074's Toolbar Size and Toolbars (its system menu, lh4074-1952*.png), as
-// settings (flxp.ini, View > Header): <prefix>header_size = small | medium |
+// settings (flxp.ini, View > Toolbars): <prefix>header_size = small | medium |
 // large | xlarge, and <prefix>header_buttons / _title / _breadcrumb / _search /
 // _favorites = 1 | 0. Small: one row under the frame's caption (which keeps the
 // title) with the small Back/Forward buttons, the breadcrumb, the small
@@ -61,9 +61,11 @@ bool draws_title();                 // the header shows the title (else the fram
 void set_size(Size s);              // stored; the host refits (browser::header_refit)
 void set_shown(Element e, bool on); // stored; Title also wants a refit (the caption's flags)
 enum { MENU_IDS = 9 };
-// View > Header: the sizes (radio) and the elements (checks), ids first..first+MENU_IDS-1
-void append_menu(HMENU parent, UINT first, bool enabled = true);
-void update_menu(HMENU header_menu, UINT first);
+// View > Toolbars under this header, ids first..first+MENU_IDS-1: the elements
+// (checks, 4074's Toolbars) and last the Toolbar Size submenu (radio, 4074's
+// Small / Medium / Large / Extra-Large), appended to the host's Toolbars popup
+void append_menu(HMENU toolbars, UINT first);
+void update_menu(HMENU toolbars, UINT first);
 bool menu_command(UINT id, UINT first);      // true when id was one of them (then refit)
 
 // The header's height in client rows: on glass 4074's 76 px from the frame's

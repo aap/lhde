@@ -342,7 +342,7 @@ enum {
     ID_VIEW_TILES, ID_VIEW_HIDENAMES,   // the Longhorn look's (browser::ViewCommand)
     ID_ZOOM_FIRST = 0xa160,  // View > Zoom (browser::ZOOM_MENU_IDS)
     ID_BAR = 0xa120, ID_BARTB, ID_PANE, ID_HEADER_ID,
-    ID_HEADER_FIRST = 0xa140,  // View > Header (header::MENU_IDS)
+    ID_HEADER_FIRST = 0xa140,  // View > Toolbars (header::MENU_IDS)
     ID_SORT_NAME = 0xa110, ID_SORT_SIZE, ID_SORT_TYPE, ID_SORT_DATE, ID_REFRESH, ID_HIDDEN,
     ID_PLACE_BASE = 0xa200,  // XP IDC_PLACESBAR_BASE
     ID_LIST = 0xa300,
@@ -1825,7 +1825,11 @@ static void lh_view_menu(Dlg& d, int x, int y)
     browser::zoom_menu(d, zoom, ID_ZOOM_FIRST);
     AppendMenuW(m, MF_POPUP, (UINT_PTR)zoom, L"&Zoom");
     AppendMenuW(m, MF_STRING | (places::icons() ? MF_CHECKED : 0), ID_PANE_ICONS, L"I&cons in the Pane");
-    if (d.header) header::append_menu(m, ID_HEADER_FIRST);
+    if (d.header) {   // the header's elements and 4074's Toolbar Size (explorer: the same under View > Toolbars)
+        HMENU bars = CreatePopupMenu();
+        header::append_menu(bars, ID_HEADER_FIRST);
+        AppendMenuW(m, MF_POPUP, (UINT_PTR)bars, L"&Toolbars");
+    }
     AppendMenuW(m, MF_STRING | (d.show_hidden ? MF_CHECKED : 0), ID_HIDDEN, L"Show &Hidden Files\tCtrl+H");
     AppendMenuW(m, MF_STRING, ID_REFRESH, L"R&efresh\tF5");
     if (d.bar_tb) SendMessageW(d.bar_tb, TB_PRESSBUTTON, ID_VIEWMENU, MAKELONG(TRUE, 0));
@@ -2300,7 +2304,7 @@ static LRESULT on_notify(Dlg& d, NMHDR* nm)
 
 static void on_command(Dlg& d, int id, int code, HWND ctl)
 {
-    if (d.header && header::menu_command((UINT)id, ID_HEADER_FIRST)) {   // View > Header
+    if (d.header && header::menu_command((UINT)id, ID_HEADER_FIRST)) {   // View > Toolbars
         browser::header_refit(d.dlg, lh_layout_cur);
         InvalidateRect(d.dlg, nullptr, TRUE);
         return;

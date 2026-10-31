@@ -456,11 +456,20 @@ a song's artist and album, which XP's tiles show, are not read: those files show
 context menu, the Views drop-down, Folder Options' default view and the XP-look file dialog's View Menu (Tiles, Icons, List,
 Details) list it; a folder shown in Tiles keeps it (`tiles` in `flxp-views`, which the Longhorn frame reads as its Tiles).
 
-**Toolbar icon size.** View > Toolbars > Icon Options > Large Icons / Small Icons is XP's "Icon options" of the Customize Toolbar
-dialog (the dialog itself is not there yet): the Standard Buttons toolbar changes at once between the 24 px and the 16 px strip,
-the labels staying on the right of Back, Search and Folders as XP's default "Selective text on right", and the choice is kept
-(`toolbar_icons = large|small` in `flxp.ini`; other open windows take it when they start). The Longhorn frame's toolbar has one
-size, so the item is greyed there.
+**Toolbar size.** The size of what sits above the folder is in one place, the last entry of View > Toolbars, and that entry shows
+only what the window's chrome has, in the words of its era:
+
+- the XP frame: **Icon Options** > Large Icons / Small Icons, the "Icon options" of XP's Customize Toolbar dialog without the dialog
+  (which is not there yet). The Standard Buttons toolbar changes at once between the 24 px and the 16 px strip, the labels staying
+  on the right of Back, Search and Folders as XP's default "Selective text on right" (`toolbar_icons = large|small` in `flxp.ini`;
+  other open windows take it when they start).
+- the Longhorn frame: the header's elements as checks (Back/Forward Buttons, Title, Address (Breadcrumb), Search, Favorites: 4074's
+  system-menu Toolbars), then **Toolbar Size** > Small / Medium / Large / Extra-Large (4074's system-menu Toolbar Size,
+  lh4074-1952*.png). The header refits at once (`header_size`, `header_buttons`, `header_title`, ... in `flxp.ini`; without a
+  `header_size` of its own the theme's `Explorer.navbar_preset`, which Display Properties' Shell tab sets). The Longhorn frame's
+  toolbar has one icon size, so Icon Options is not shown there.
+- the Longhorn file dialog: View > Toolbars, the same elements and Toolbar Size, kept apart from the Explorer's
+  (`filedlg_header_size`, small unless set; the elements fall back to the Explorer's).
 
 ## The Explorer's details and task band (flxp)
 

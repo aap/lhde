@@ -33,7 +33,7 @@ enum {
     ID_VIEW_HIDENAMES,                // the Large and Medium Icons stops (ID_VIEW_SMALLICONS: Small)
     ID_VIEW_LARGEICONS,
     ID_VIEW_MEDIUMICONS,
-    ID_VIEW_HEADER_FIRST = 330,       // View > Header: header::MENU_IDS ids (sizes, elements)
+    ID_VIEW_HEADER_FIRST = 330,       // View > Toolbars: header::MENU_IDS ids (sizes, elements)
     ID_VIEW_ZOOM_FIRST = 340,         // View > Zoom: browser::ZOOM_MENU_IDS ids (in, out, the levels)
     // (ID_VIEW_ZOOM_FIRST .. +12)
     ID_HELP_ABOUT = 400, ID_TB_LARGE = 410, ID_TB_SMALL, ID_TB_ADDRESS,

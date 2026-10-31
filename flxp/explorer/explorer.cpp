@@ -139,8 +139,8 @@ static bool apply_toolbar_images()
     return true;
 }
 
-static HMENU g_xbar_menu, g_arrange_menu, g_header_menu, g_zoom_menu;   // View's submenus
-static HMENU g_icon_menu;   // View > Toolbars > Icon Options
+static HMENU g_xbar_menu, g_arrange_menu, g_bars_menu, g_zoom_menu;   // View's submenus
+static HMENU g_icon_menu;   // View > Toolbars > Icon Options (the XP frame's)
 
 static void set_toolbar_size(bool large)
 {
@@ -894,7 +894,7 @@ static HMENU build_menu()
     AppendMenuW(g_icon_menu, MF_STRING, ID_TB_LARGE, L"&Large Icons");
     AppendMenuW(g_icon_menu, MF_STRING, ID_TB_SMALL, L"&Small Icons");
     CheckMenuRadioItem(g_icon_menu, ID_TB_LARGE, ID_TB_SMALL, g.large_toolbar ? ID_TB_LARGE : ID_TB_SMALL, MF_BYCOMMAND);
-    AppendMenuW(bars, MF_POPUP, (UINT_PTR)g_icon_menu, L"&Icon Options");
+    g_bars_menu = bars;   // the size part is the frame's (fill_bars_menu)
     AppendMenuW(view, MF_POPUP, (UINT_PTR)bars, L"&Toolbars");
     AppendMenuW(view, MF_STRING | (g.show_status ? MF_CHECKED : 0), ID_VIEW_STATUSBAR, L"Status &Bar");
     AppendMenuW(view, MF_STRING | MF_GRAYED, ID_VIEW_TASKPANE, L"Task Ba&nd");
@@ -903,8 +903,6 @@ static HMENU build_menu()
     AppendMenuW(xbar, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(xbar, MF_STRING | MF_GRAYED, ID_VIEW_PLACES_ICONS, L"&Icons in the Pane");   // the Longhorn frame's groups look
     AppendMenuW(view, MF_POPUP, (UINT_PTR)xbar, L"&Explorer Bar");
-    header::append_menu(view, ID_VIEW_HEADER_FIRST, false);     // the Longhorn frame's (enabled there)
-    g_header_menu = GetSubMenu(view, GetMenuItemCount(view) - 1);
     g_xbar_menu = xbar; g_arrange_menu = arrange;
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(view, MF_STRING, ID_VIEW_THUMBNAILS, L"T&humbnails\tCtrl+3");
@@ -1262,7 +1260,6 @@ static void create_children(HWND frame)
         ModifyMenuW(bars, 1, MF_BYPOSITION | MF_STRING | MF_UNCHECKED, ID_TB_ADDRESS, L"&Address Bar");
         // 4051: the menu band and a small toolbar share one coloured row
         lhtool::create();
-        EnableMenuItem(bars, 3, MF_BYPOSITION | MF_GRAYED);   // Icon Options (the Longhorn frame's toolbar has one size)
         g_viewstrip = viewbutton::create(frame, g);   // 4074: the view button at the bottom of the left pane
     }
     if (getenv("FLXP_DEBUG")) {
@@ -1857,7 +1854,7 @@ static void folder_options()
 
 static void on_command(int id)
 {
-    if (header::menu_command((UINT)id, ID_VIEW_HEADER_FIRST)) {   // View > Header
+    if (header::menu_command((UINT)id, ID_VIEW_HEADER_FIRST)) {   // View > Toolbars
         if (g.header) header_refit(g.frame);
         return;
     }
@@ -2062,7 +2059,6 @@ static void set_frame_mode(bool lh)
         ModifyMenuW(bars, 1, MF_BYPOSITION | MF_STRING | MF_UNCHECKED, ID_TB_ADDRESS, L"&Address Bar");
         lhtool::create();
         if (!g_viewstrip) g_viewstrip = viewbutton::create(frame, g);
-        EnableMenuItem(bars, 3, MF_BYPOSITION | MF_GRAYED);   // Icon Options (the Longhorn frame's toolbar has one size)
         header::set_history(!g.back.empty(), !g.forward.empty());
         if (g.folder) header::set_folder(g.folder);
         sync_active();
@@ -2077,7 +2073,6 @@ static void set_frame_mode(bool lh)
         SendMessageW(g.rebar, RB_SHOWBAND, (WPARAM)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_TOOLBAR, 0), TRUE);
         SendMessageW(g.rebar, RB_SHOWBAND, (WPARAM)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_ADDRESS, 0), TRUE);
         ModifyMenuW(bars, 1, MF_BYPOSITION | MF_STRING | MF_CHECKED | MF_GRAYED, 0, L"&Address Bar");
-        EnableMenuItem(bars, 3, MF_BYPOSITION | MF_ENABLED);   // Icon Options (the Longhorn frame's toolbar has one size)
         brand::create(g.rebar);
     }
     places::set_longhorn(lh);
@@ -2090,6 +2085,22 @@ static void set_frame_mode(bool lh)
     }
     layout();
     RedrawWindow(frame, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+}
+
+// View > Toolbars: Standard Buttons, Address Bar, a separator, then what sizes
+// the frame's toolbar has, as that era named it, and nothing that does not
+// apply: XP's Icon Options (Large Icons / Small Icons, toolbar_icons) or the
+// Longhorn header's elements and 4074's Toolbar Size (header_size)
+static void fill_bars_menu()
+{
+    HMENU bars = g_bars_menu;
+    if (!bars) return;
+    while (GetMenuItemCount(bars) > 3) {
+        if (GetSubMenu(bars, 3) == g_icon_menu) RemoveMenu(bars, 3, MF_BYPOSITION);   // kept for the XP frame
+        else DeleteMenu(bars, 3, MF_BYPOSITION);
+    }
+    if (g.header) header::append_menu(bars, ID_VIEW_HEADER_FIRST);
+    else AppendMenuW(bars, MF_POPUP, (UINT_PTR)g_icon_menu, L"&Icon Options");
 }
 
 static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
@@ -2154,12 +2165,12 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         else if ((HMENU)wp == g.file_menu) init_file_menu((HMENU)wp);
         else if ((HMENU)wp == g.edit_menu) init_edit_menu((HMENU)wp);
         else if ((HMENU)wp == g_zoom_menu) browser::zoom_menu(g, g_zoom_menu, ID_VIEW_ZOOM_FIRST);
+        else if ((HMENU)wp == g_bars_menu) fill_bars_menu();
         else if ((HMENU)wp == GetSubMenu(g.menu, 2)) {
             HMENU view = (HMENU)wp;
             for (int i = 0; i < GetMenuItemCount(view); i++)
-                if (GetSubMenu(view, i) == g_header_menu) EnableMenuItem(view, (UINT)i, MF_BYPOSITION | (g.header ? MF_ENABLED : MF_GRAYED));
-                else if (GetSubMenu(view, i) == g_zoom_menu) EnableMenuItem(view, (UINT)i, MF_BYPOSITION | (g.zoomable ? MF_ENABLED : MF_GRAYED));
-            header::update_menu(g_header_menu, ID_VIEW_HEADER_FIRST);
+                if (GetSubMenu(view, i) == g_zoom_menu) EnableMenuItem(view, (UINT)i, MF_BYPOSITION | (g.zoomable ? MF_ENABLED : MF_GRAYED));
+            fill_bars_menu();
             view_items(view);
             EnableMenuItem(view, ID_SEARCH, MF_BYCOMMAND | (g.header ? MF_ENABLED : MF_GRAYED));        // the header's search box filters
             EnableMenuItem(view, ID_FILTER_CLEAR, MF_BYCOMMAND | (g.header && !g.filter.empty() ? MF_ENABLED : MF_GRAYED));

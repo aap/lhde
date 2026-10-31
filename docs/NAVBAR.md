@@ -434,7 +434,7 @@ layout, then `AlphaBlend` over the background; no cairo or pango comes with it):
   `paint_bottom`'s last row), luxwm's `_LHWM_HEADER_PIXMAP`, the Slate gradient (`choose_mode`, `paint_pixmap`);
 - the 4051 command bar (`lhbar.cpp`), a rebar band below the header: unchanged;
 - settings and menus: `header_size`, the element toggles (`header_buttons/_title/_breadcrumb/_search/_favorites` become the preset
-  choice, `lhnav_set_title(NULL)` and the `tools` list built from them), `header_button_images`, View > Header;
+  choice, `lhnav_set_title(NULL)` and the `tools` list built from them), `header_button_images`, View > Toolbars;
 - luxwm protocol work (`DwmExtendFrameIntoClientArea`, CLIENT_CAPTION, `_LHWM_FRAME_METRICS` -> `lhnav_metrics` border_t, deco_h,
   caption rect) and the theme reload (`theme_changed` -> `lhnav_set_style`/`lhnav_set_metrics`).
 

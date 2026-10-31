@@ -85,7 +85,7 @@ bool g_tracking, g_quiet;
 int g_divider;
 
 // 4074's Toolbar Size and Toolbars (the system menu of lh4074-1952*.png), our
-// View > Header: the size and which elements show (header.h). Read from
+// View > Toolbars: the size and which elements show (header.h). Read from
 // <prefix>header_size / <prefix>header_<element> (the file dialog: filedlg_).
 int g_hsize = SIZE_MEDIUM;
 bool g_show[ELEMENTS] = { true, true, true, true, true };
@@ -2082,7 +2082,7 @@ std::vector<std::string> tool_items(const char* spec)
 }
 
 // nav.ini's toolbar for this header: the host's glyph buttons (the dialog's New
-// Folder and Views) first, the elements switched off in View > Header left out
+// Folder and Views) first, the elements switched off in View > Toolbars left out
 std::string vision_tools(const char* spec)
 {
     std::string out;
@@ -2974,7 +2974,7 @@ void caption_changed()
     layout();
 }
 
-// ---- size and elements (View > Header) ----------------------------------------------
+// ---- size and elements (View > Toolbars) ----------------------------------------------
 
 void configure(const std::string& prefix, const std::string& default_size)
 {
@@ -3002,26 +3002,29 @@ void set_shown(Element e, bool on)
     if (g_wnd) { layout(); InvalidateRect(g_wnd, nullptr, TRUE); }
 }
 
-void append_menu(HMENU parent, UINT first, bool enabled)
+void append_menu(HMENU toolbars, UINT first)
 {
+    static const wchar_t* const sizes[4] = { L"&Small", L"&Medium", L"&Large", L"E&xtra-Large" };
+    static const wchar_t* const elements[ELEMENTS] = { L"&Back/Forward Buttons", L"&Title", L"A&ddress (Breadcrumb)", L"Sea&rch", L"&Favorites" };
+    for (int i = 0; i < ELEMENTS; i++) AppendMenuW(toolbars, MF_STRING, first + 4 + (UINT)i, elements[i]);
+    AppendMenuW(toolbars, MF_SEPARATOR, 0, nullptr);
     HMENU m = CreatePopupMenu();
-    static const wchar_t* const sizes[4] = { L"&Small", L"&Medium", L"&Large", L"E&xtra Large" };
-    static const wchar_t* const elements[ELEMENTS] = { L"&Back/Forward Buttons", L"&Title", L"&Address (Breadcrumb)", L"Sea&rch", L"&Favorites" };
     for (int i = 0; i < 4; i++) AppendMenuW(m, MF_STRING, first + (UINT)i, sizes[i]);
-    AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
-    for (int i = 0; i < ELEMENTS; i++) AppendMenuW(m, MF_STRING, first + 4 + (UINT)i, elements[i]);
-    AppendMenuW(parent, MF_POPUP | (enabled ? 0 : MF_GRAYED), (UINT_PTR)m, L"&Header");
-    update_menu(m, first);
+    AppendMenuW(toolbars, MF_POPUP, (UINT_PTR)m, L"Toolbar Si&ze");
+    update_menu(toolbars, first);
 }
 
-void update_menu(HMENU m, UINT first)
+void update_menu(HMENU toolbars, UINT first)
 {
-    if (!m) return;
+    if (!toolbars) return;
     if (!g_settings_read) read_settings();
-    CheckMenuRadioItem(m, first, first + 3, first + (UINT)g_hsize, MF_BYCOMMAND);
-    for (int i = 0; i < ELEMENTS; i++) CheckMenuItem(m, first + 4 + (UINT)i, MF_BYCOMMAND | (g_show[i] ? MF_CHECKED : MF_UNCHECKED));
+    HMENU m = nullptr;   // Toolbar Size
+    for (int i = GetMenuItemCount(toolbars) - 1; i >= 0 && !m; i--)
+        if (HMENU sub = GetSubMenu(toolbars, i)) if (GetMenuState(sub, first, MF_BYCOMMAND) != (UINT)-1) m = sub;
+    if (m) CheckMenuRadioItem(m, first, first + 3, first + (UINT)g_hsize, MF_BYCOMMAND);
+    for (int i = 0; i < ELEMENTS; i++) CheckMenuItem(toolbars, first + 4 + (UINT)i, MF_BYCOMMAND | (g_show[i] ? MF_CHECKED : MF_UNCHECKED));
     // the title shows in the frame's caption at the small size
-    EnableMenuItem(m, first + 4 + SHOW_TITLE, MF_BYCOMMAND | (g_hsize == SIZE_SMALL ? MF_GRAYED : MF_ENABLED));
+    EnableMenuItem(toolbars, first + 4 + SHOW_TITLE, MF_BYCOMMAND | (g_hsize == SIZE_SMALL ? MF_GRAYED : MF_ENABLED));
 }
 
 bool menu_command(UINT id, UINT first)
