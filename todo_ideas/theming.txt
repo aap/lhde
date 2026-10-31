@@ -19,8 +19,7 @@ imported is the free baseline. Left:
 * The ReactOS styles' start panel user pane is a blank white band (no StartPanel UserPane art?); check against ReactOS.
 * Cursors: an X cursor theme in XP's shapes (free ones exist); ReactOS's are user32.dll resources.
 * Sounds, wallpaper: a generated classic wallpaper (the teal), none for sounds.
-* A `make check` run and a lab screenshot with LHDE_WINDOWS pointing at an empty directory, kept green: the free baseline is a
-  test configuration, not a hope.
+* make check-free tests only-ReactOS; an empty Windows tree (nothing imported at all) is not a test configuration yet.
 
 aap: Makefile targets that install a clean Windows tree of (a) just the free stuff, (b) the small Windows pack, (c) free + all
 of Windows; (b) and (c) refer to files we do not supply, under generic names (lhde_winthemes.zip, lhde_wintheme_full.zip or

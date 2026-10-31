@@ -6,6 +6,8 @@
 #   luxwm/tests/regress.sh [--source dir|lib] [OUTDIR]     render into OUTDIR (default build/luxwm/regress/out) and compare;
 #                                                          no baseline yet: write it (exit 0)
 #   luxwm/tests/regress.sh --rebaseline [OUTDIR]           render and replace the baseline (after an intended change)
+#   luxwm/tests/regress.sh --classic-only [OUTDIR]         only the Windows Classic renders (classic/ classic.xl/ classic.hc/), which
+#                                                          need no visual style: the free baseline (tests/check-free.sh)
 #   luxwm/tests/regress.sh --baseline-from-x11 X11DIR      the baseline from the x11 lab's own build: runs X11DIR/lhwm/tests/regress.sh
 #                                                          (it compiles its frametest from X11DIR's frame.c into a scratch dir and
 #                                                          renders X11DIR/lhwm/themes; X11DIR is not written) and takes the
@@ -31,12 +33,13 @@ set -e
 here=$(cd "$(dirname "$0")" && pwd)
 top=$(cd "$here/../.." && pwd)
 LHDE_SELF_DIR=$top/session; . "$top/session/lhde-paths.sh"; lhde_setup_paths
-mode=compare source=lib x11=
+mode=compare source=lib x11= classic_only=
 while :; do
 	case "$1" in
 	--rebaseline) mode=rebaseline; shift ;;
 	--baseline-from-x11) mode=x11; x11=$2; shift 2 ;;
 	--source) source=$2; shift 2 ;;
+	--classic-only) classic_only=1; shift ;;
 	*) break ;;
 	esac
 done
@@ -72,7 +75,7 @@ if [ $mode = x11 ]; then
 fi
 
 styles=$(lhde_find styles)
-if [ -z "$styles" ] || [ -z "$(ls "$styles" 2>/dev/null)" ]; then
+if [ -z "$classic_only" ] && { [ -z "$styles" ] || [ -z "$(ls "$styles" 2>/dev/null)" ]; }; then
 	echo "skip  luxwm regress: no visual styles in $LHDE_USER_DATA/styles (tools/lhde-import)"; exit 0
 fi
 [ -x "$ft" ] || { echo "regress: build $ft first (make)" >&2; exit 2; }
@@ -110,13 +113,14 @@ ini() { sed -n "s/^$2 *= *//p" "$1" | head -1; }
 export FRAMETEST_SOURCE=$source
 n=0
 for td in "$top"/data/frames/*/; do
+	[ -n "$classic_only" ] && break
 	set_=$(basename "$td"); d=$out/$set_
 	if [ "$source" = dir ] && [ -z "$(ls "$(lhde_find "frames/$set_")"/*.png 2>/dev/null)" ]; then continue; fi
 	mkdir -p "$d"
 	v=; grep -q '^header_mode *= *crop' "$td/theme.ini" 2>/dev/null && v=vision
 	render_one "${td%/}" "$d" $v; n=$((n + 1))
 done
-if [ "$source" = lib ]; then
+if [ "$source" = lib ] && [ -z "$classic_only" ]; then
 	for set_ in $(classic_own); do
 		td=$top/data/frames/$set_; d=$out/$set_.classic
 		st=$(ini "$td/theme.ini" msstyles); [ -n "$st" ] || continue
@@ -134,20 +138,20 @@ for c in "classic|" "classic.xl|captionwidth=24;captionheight=24;captionfont=Tah
 	"classic.hc|$hc;borderwidth=6;captionwidth=31;captionheight=31;captionfont=Tahoma, -24, bold"; do
 	d=$out/${c%%|*}; mkdir -p "$d"; render_one "|classic|${c#*|}" "$d"; n=$((n + 1))
 done
-checksums "$out" > "$R/out.sha256"
+checksums "$out" > "$out.sha256"
 if [ $mode = rebaseline ] || [ ! -f "$base" ]; then
-	cp "$R/out.sha256" "$base"
+	cp "$out.sha256" "$base"
 	echo "ok    luxwm regress: baseline written, $(wc -l < "$base") renders of $n frame sets (source $source, data $LHDE_USER_DATA) -> $base"
 	exit 0
 fi
 same=0 diff=0 miss=0 new=0
 while read -r sum f; do
-	got=$(awk -v f="$f" '$2 == f { print $1 }' "$R/out.sha256")
+	got=$(awk -v f="$f" '$2 == f { print $1 }' "$out.sha256")
 	if [ -z "$got" ]; then echo "MISSING $f"; miss=$((miss + 1))
 	elif [ "$got" = "$sum" ]; then same=$((same + 1))
 	else echo "CHANGED $f"; diff=$((diff + 1)); fi
 done < "$base"
-while read -r sum f; do grep -q "  $f\$" "$base" || { echo "NEW     $f"; new=$((new + 1)); }; done < "$R/out.sha256"
+while read -r sum f; do grep -q "  $f\$" "$base" || { echo "NEW     $f"; new=$((new + 1)); }; done < "$out.sha256"
 if [ $diff -eq 0 ] && [ $miss -eq 0 ]; then
 	echo "ok    luxwm regress: $same renders identical to the baseline$( [ $new -gt 0 ] && echo ", $new new") (source $source, out $out)"
 else

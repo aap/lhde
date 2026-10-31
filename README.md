@@ -89,6 +89,11 @@ Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac 
 regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a
 baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the first run;
 `--baseline-from-x11 DIR` takes it from the x11 lab's build); skipped without imported styles.
+Last the free baseline (`make check-free`, `tests/check-free.sh`): ReactOS's boot CD (`LHDE_REACTOS_ISO`, else
+`~/lib/windows_isos/ReactOS-*.iso`; skipped without one) imported once into `build/free/windows`, and with that tree
+alone every shipped theme must resolve (`lhde-theme explain`, `explain --files`), classic and the ReactOS themes with
+nothing missing but what ReactOS stands in for, and luxwm's classic frames render against a baseline of their own
+(`build/luxwm/regress/baseline-free.sha256`; ReactOS's Tahoma and Marlett, so they differ from the normal run's).
 
 ## The three trees, lhde-import and lhde-theme explain
 

@@ -173,7 +173,7 @@ fontconfig's. luxwm registers the first imported `marlett.ttf` of a Windows buil
 none. Each substitution is in the resolved record's "came from" (`path.resources` and `path.fonts` keep the
 setting and say "fallback: ..." in their why); `lhde-theme explain` shows `missing -> fallback SOURCE`.
 
-With only the reactos source imported (the free baseline): `classic` and the four ReactOS
+With only the reactos source imported (the free baseline, a test configuration: `make check-free`): `classic` and the four ReactOS
 themes (`lunar`, `modern`, `mizu`, `lautus`) resolve fully; every other theme resolves to Windows Classic with
 ReactOS's icons, fonts and resources. Microsoft-only by nature, with no free stand-in: the Luna, Longhorn and
 Vista visual styles and everything made from them (the frame sets, the glass, luxshell's packs and imageres
