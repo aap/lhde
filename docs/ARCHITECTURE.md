@@ -78,11 +78,11 @@ files are moved there once by liblhde's migration, which every program runs at s
 - **Popup menus**: the themed popup menu has one painter, wuxtheme's (`wuxtheme/menu.cpp`: XP's popup in the style's colours and
   menu font, the Longhorn/Vista Menu parts where the style has them), which Wine's user32 menus in wux call for every popup (flxp's
   context menus, menu band, the start menu's Programs cascades: owner-drawn items marked `UXMENU_MNS_BAND`, which the painter gives
-  4074's menu band look under a Longhorn style, `UXMENU_SetBand`, and the owner only its icons and text) and luxwm's window menu
-  reaches through `ut_menu_layout` / `ut_menu_draw`; luxwm
-  keeps only the geometry on screen, the shadow and the input. XP's drop shadow is the painter's too (`ut_menu_shadow_alpha`):
-  luxwm draws it in its menu window, wux in a window of its own under each popup menu (docs/CLIENT-PROTOCOL.md "Drop shadows"). luxshell's Lua menus (`luxshell/menu.lua`) are a different thing on
-  purpose: the Avalon ContextMenu of the 4074 sidebar and taskbar, drawn from the shell pack's colours.
+  4074's menu band look under a Longhorn style, `UXMENU_SetBand`, and the owner only its icons and text), and luxwm's window menu
+  and luxshell's context menus (the sidebar, tiles, Avalon taskbar and Start button: `luxshell/menupaint.c`, `lh.menu_render`)
+  reach through `ut_menu_layout` / `ut_menu_draw`; luxwm and luxshell's `menu.lua` keep only the geometry on screen, the shadow
+  and the input. XP's drop shadow is the painter's too (`ut_menu_shadow_alpha`): luxwm and luxshell draw it in their menu
+  images, wux in a window of its own under each popup menu (docs/CLIENT-PROTOCOL.md "Drop shadows").
 - **Theme resolution**: one implementation, liblhde; flxp's `shell/lhtheme.cpp` only maps the record onto flxp's older keys.
 
 ## Where to look first

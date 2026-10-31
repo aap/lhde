@@ -1477,13 +1477,20 @@ taskbar menu was captured; their items come from the IL (`res/4074/il/desktop.il
   "Tile Horizontally" (enabled when there are windows).
 
 **lux** (`runtime.lua` "sidebar and tile context menus", `menu.lua`):
-- `menu.lua` style `"avalon"` measured on `lh4074-091929.png`: 1 px frame (`T.menu.border`) plus a 1 px drop shadow, 1 px
-  inner padding, 19 px rows with an 18 px highlight (`T.menu.hot`, top row 30 % and bottom row 40 % lighter, as #F2C49A /
-  #EDB078 / #F4CEAB there), text 17 px from the frame, 7 px separators with a 1 px `#BEBEBE` line, ✔ check marks, width text +
-  29 px (152 px for that list in Tahoma 8: equal to the reference). `opts.flip`: TrackPopupMenu placement (the menu opens to
-  the left of / above the point where it would not fit; the screenshot's menu is flipped that way). Mnemonics: `&` in item
-  text, drawn underlined through Pango markup (text node `markup = true`, `scene.c`); the key activates a unique mnemonic or
-  cycles through duplicates; other letters jump by initial; Home/End added. 4074 drew no underlines (a deviation asked for).
+- `menu.lua` draws every menu with wuxtheme's popup menu painter (`lh.menu_render`, `menupaint.c`: `ut_menu_layout` /
+  `ut_menu_draw`, the pixels of flxp's menus and luxwm's window menu) in the session theme: the style's Menu class where it
+  has one (Aero / Jade POPUPITEM band, separators, check marks, cascade arrows), its [SysMetrics] colours, FLATMENUS and
+  MENUFONT; Windows Classic from the scheme's Colors.* and Metrics.menufont; text smoothing from `[fonts] smoothing`, else the
+  theme's `Fonts.smoothing`; XP's 4 px drop shadow (luxwm's 4074 Slate measurement; without a compositor the screen under it,
+  darkened). The menu is one image node with a hoverable node over each item's rectangle from the painter's layout. This is
+  not 4074's Avalon ContextMenu, chosen so (menus look the same everywhere): `lh4074-091929.png` has a white plate, a 1 px
+  #919191 frame and a 1 px shadow, 19 px rows with an 18 px MENUHILIGHT bar whose top row is 30 % and bottom row 40 % lighter,
+  text 17 px from the frame, 7 px separators with a 1 px #BEBEBE line; the painter under Slate gives the style's #F5F5F5 plate,
+  a #4E5358 frame, a flat 19 px #EFC38C bar inset 3 px, text 22 px in, the 4 px shadow, and the same 19 px rows.
+  `opts.flip`: TrackPopupMenu placement (the menu opens to the left of / above the point where it would not fit; the
+  screenshot's menu is flipped that way). Mnemonics: `&` in item text, underlined by the painter once the keyboard is used
+  (XP's keyboard cues; opened from the keyboard: at once); the key activates a unique mnemonic or cycles through duplicates;
+  other letters jump by initial; Home/End added. 4074 drew no underlines.
 - Sidebar menu: right click on the sidebar outside the tiles, or a click on the Options glyph (under it, right-aligned). Items:
   4074's two base items; lux's group *Lock the Sidebar* (`[sidebar] locked`, the 4051 `CShellSidebar::SetLockBar` idea: the
   sizer stops dragging) and *Stacking* ▸ Top / Bottom; the 4074 parts list in the screenshot's order, where *Classic Tray* =
