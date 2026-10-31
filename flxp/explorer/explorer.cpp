@@ -1409,7 +1409,7 @@ static void track(HMENU m, POINT pt)
     int cmd = TrackPopupMenu(m, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, pt.x, pt.y, 0, g.frame, nullptr);
     DestroyMenu(m);
     if (cmd <= 0) return;
-    if ((cmd >= ID_VIEW_STATUSBAR && cmd <= ID_VIEW_THUMBNAILS)) on_command(cmd);
+    if (cmd >= ID_VIEW_STATUSBAR && cmd <= ID_VIEW_MEDIUMICONS) on_command(cmd);   // (the View submenu's views)
     else verb(cmd);
 }
 
