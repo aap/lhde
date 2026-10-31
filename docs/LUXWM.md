@@ -138,7 +138,7 @@ What `luxshell` (the taskbar/sidebar) relies on, all in `wm.c`:
   `shell run`, `Mod4+s` = `shell sidebar-stacking toggle` (lux's sidebar under the windows ⇄ on top, instantly). A user keys file
   keeps its own bindings; `Mod4+d`, `Mod4+r` and `Mod4+s` are added to it only where that key is unbound there. Actions:
   `showdesktop`, `sysmenu` (the window menu, default Alt+Space, added to a user keys file where unbound: "The window menu"), `shell CMD` (sets the root property `_LHSHELL_COMMAND` = CMD, UTF8_STRING; luxshell's runtime.lua accepts `run` =
-  lux's own Run box, `sidebar-stacking toggle|top|bottom`, `taskbar KIND`, `sidebar-with-classic 0|1`, `settings`). Every `exec` child does `chdir($HOME)` first (luxwm itself runs in its own directory).
+  lux's own Run box, `sidebar-stacking toggle|top|bottom`, `taskbar KIND`, `sidebar-with-classic 0|1`, `settings`, `desktop N|next|prev` = switch the virtual desktop, N 0-based, through the EWMH `_NET_CURRENT_DESKTOP` request). Every `exec` child does `chdir($HOME)` first (luxwm itself runs in its own directory).
   **Show desktop** (2026-10-27: Windows' Win+D) = EWMH `_NET_SHOWING_DESKTOP` (in `_NET_SUPPORTED`, root CARDINAL, 0 at start,
   deleted on quit). On (the key, or a `_NET_SHOWING_DESKTOP` client message with data[0] = 1 from a pager or taskbar): the visible
   windows of the current desktop are really minimised (iconic, task buttons stay; bottom first, so the focus is not handed down the

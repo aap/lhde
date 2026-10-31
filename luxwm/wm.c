@@ -1060,7 +1060,8 @@ handle_client_message(XEvent *e)
         if (c) client_close(c);
 
     } else if (cme->message_type == net_atom[NetCurrentDesktop]) {
-        switch_ws(cme->data.l[0]);
+        if (cme->data.l[0] >= 0 && cme->data.l[0] < WORKSPACE_NUMBER)   /* a pager's or lhshell's request (lh.set_desktop) */
+            switch_ws(cme->data.l[0]);
     } else if (cme->message_type == net_atom[NetRestackWindow]) {
         client_restack(get_client_from_window(cme->window), cme->window, (Window)cme->data.l[1], cme->data.l[2], cme->data.l[0]);
     } else if (cme->message_type == net_atom[NetShowingDesktop]) {

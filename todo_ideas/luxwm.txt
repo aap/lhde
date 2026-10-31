@@ -11,8 +11,6 @@
 
 looks like Ctrl-n switches desktops. this is very nice
 
-* if not yet the case, need to be able to do this externally (especially luxshell for a sidebar tile)
-* taskbar should only show windows on current desktop
 * move windows between desks
 	* Ctrl-n switching while in alt-space M move mode should do the right thing (currently nothing happens)
 	* "move to desk" submenu in window menu
