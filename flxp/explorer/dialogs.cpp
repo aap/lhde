@@ -1,8 +1,10 @@
 // The explorer's dialogs; templates in rc/explorer.rc (embedded below).
 #include "res/res.h"   // before the win32 headers: their macros clash with its names
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <algorithm>
 #include "dialogs.h"
 #include "resource.h"
 #include "shell/apps.h"
@@ -612,6 +614,176 @@ void folder_options(HWND owner, FolderOptions& o)
     psh.ppsp = pages;
     PropertySheetW(&psh);
     folderopts::o = nullptr;
+}
+
+// ---- Choose Details ----------------------------------------------------------------------
+
+namespace choosedetails {
+
+std::vector<DetailColumn>* cols;
+bool g_filling;
+
+// LVS_EX_CHECKBOXES: the state image 2 is checked, 1 not (ListView_SetCheckState)
+static void set_check(HWND lv, int i, bool on)
+{
+    LVITEMW st = {}; st.stateMask = LVIS_STATEIMAGEMASK; st.state = INDEXTOSTATEIMAGEMASK(on ? 2 : 1);
+    SendMessageW(lv, LVM_SETITEMSTATE, (WPARAM)i, (LPARAM)&st);
+}
+static bool get_check(HWND lv, int i) { return ((SendMessageW(lv, LVM_GETITEMSTATE, (WPARAM)i, LVIS_STATEIMAGEMASK) >> 12) - 1) == 1; }
+
+static int current(HWND dlg) { return (int)SendDlgItemMessageW(dlg, IDC_CDT_LIST, LVM_GETNEXTITEM, (WPARAM)-1, LVNI_SELECTED); }
+
+static void fill(HWND dlg, int select)
+{
+    HWND lv = GetDlgItem(dlg, IDC_CDT_LIST);
+    g_filling = true;
+    SendMessageW(lv, LVM_DELETEALLITEMS, 0, 0);
+    for (size_t i = 0; i < cols->size(); i++) {
+        std::u16string t = W((*cols)[i].label);
+        LVITEMW it = {};
+        it.mask = LVIF_TEXT; it.iItem = (int)i; it.pszText = (LPWSTR)t.c_str();
+        SendMessageW(lv, LVM_INSERTITEMW, 0, (LPARAM)&it);
+        set_check(lv, (int)i, (*cols)[i].shown);
+    }
+    if (select >= 0 && select < (int)cols->size()) {
+        LVITEMW st = {}; st.stateMask = LVIS_SELECTED | LVIS_FOCUSED; st.state = st.stateMask;
+        SendMessageW(lv, LVM_SETITEMSTATE, (WPARAM)select, (LPARAM)&st);
+        SendMessageW(lv, LVM_ENSUREVISIBLE, (WPARAM)select, FALSE);
+    }
+    g_filling = false;
+}
+
+static void sync(HWND dlg)
+{
+    int i = current(dlg);
+    bool sel = i >= 0;
+    // Name stays first and shown (XP's is greyed)
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_UP), i > 1);
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_DOWN), i > 0 && i + 1 < (int)cols->size());
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_SHOW), i > 0 && !(*cols)[(size_t)i].shown);
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_HIDE), i > 0 && (*cols)[(size_t)i].shown);
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_WIDTH), sel);
+    g_filling = true;
+    set_text(dlg, IDC_CDT_WIDTH, sel ? std::to_string((*cols)[(size_t)i].width) : "");
+    g_filling = false;
+}
+
+static void show(HWND dlg, int i, bool on)
+{
+    if (i <= 0 || i >= (int)cols->size()) return;
+    (*cols)[(size_t)i].shown = on;
+    g_filling = true;
+    set_check(GetDlgItem(dlg, IDC_CDT_LIST), i, on);
+    g_filling = false;
+    sync(dlg);
+}
+
+static INT_PTR CALLBACK proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
+{
+    switch (msg) {
+    case WM_INITDIALOG: {
+        HWND lv = GetDlgItem(dlg, IDC_CDT_LIST);
+        SendMessageW(lv, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT, LVS_EX_CHECKBOXES | LVS_EX_FULLROWSELECT);
+        RECT rc; GetClientRect(lv, &rc);
+        LVCOLUMNW c = {};
+        c.mask = LVCF_WIDTH; c.cx = rc.right - rc.left - GetSystemMetrics(SM_CXVSCROLL);
+        SendMessageW(lv, LVM_INSERTCOLUMNW, 0, (LPARAM)&c);
+        fill(dlg, 0);
+        sync(dlg);
+        return TRUE;
+    }
+    case WM_NOTIFY: {
+        NMHDR* nm = (NMHDR*)lp;
+        if (nm->idFrom != IDC_CDT_LIST || nm->code != LVN_ITEMCHANGED || g_filling) return FALSE;
+        NMLISTVIEW* lv = (NMLISTVIEW*)nm;
+        if ((lv->uChanged & LVIF_STATE) && ((lv->uNewState ^ lv->uOldState) & LVIS_STATEIMAGEMASK) && lv->iItem >= 0) {
+            bool on = get_check(nm->hwndFrom, lv->iItem);
+            if (lv->iItem == 0 && !on) { g_filling = true; set_check(nm->hwndFrom, 0, TRUE); g_filling = false; }
+            else if ((size_t)lv->iItem < cols->size()) (*cols)[(size_t)lv->iItem].shown = on;
+        }
+        sync(dlg);
+        return FALSE;
+    }
+    case WM_COMMAND: {
+        int i = current(dlg);
+        switch (LOWORD(wp)) {
+        case IDC_CDT_UP:
+            if (i > 1) { std::swap((*cols)[(size_t)i], (*cols)[(size_t)i - 1]); fill(dlg, i - 1); sync(dlg); }
+            return TRUE;
+        case IDC_CDT_DOWN:
+            if (i > 0 && i + 1 < (int)cols->size()) { std::swap((*cols)[(size_t)i], (*cols)[(size_t)i + 1]); fill(dlg, i + 1); sync(dlg); }
+            return TRUE;
+        case IDC_CDT_SHOW: show(dlg, i, true); return TRUE;
+        case IDC_CDT_HIDE: show(dlg, i, false); return TRUE;
+        case IDC_CDT_WIDTH:
+            if (HIWORD(wp) == EN_CHANGE && !g_filling && i >= 0) {
+                int w = atoi(get_text((HWND)lp).c_str());
+                if (w > 0 && w < 4000) (*cols)[(size_t)i].width = w;
+            }
+            return TRUE;
+        case IDOK: EndDialog(dlg, IDOK); return TRUE;
+        case IDCANCEL: EndDialog(dlg, IDCANCEL); return TRUE;
+        }
+        return FALSE;
+    }
+    }
+    return FALSE;
+}
+
+} // namespace choosedetails
+
+bool choose_details(HWND owner, std::vector<DetailColumn>& cols)
+{
+    std::vector<DetailColumn> work = cols;
+    choosedetails::cols = &work;
+    INT_PTR r = DialogBoxParamW(module(), MAKEINTRESOURCEW(IDD_CHOOSEDETAILS), owner, choosedetails::proc, 0);
+    choosedetails::cols = nullptr;
+    if (r != IDOK) return false;
+    cols = work;
+    return true;
+}
+
+// ---- a line of text (Edit Description..., Add Tag...) ------------------------------------
+
+namespace asktext {
+
+const TextAsk* a;
+std::string* out;
+
+static INT_PTR CALLBACK proc(HWND dlg, UINT msg, WPARAM wp, LPARAM)
+{
+    switch (msg) {
+    case WM_INITDIALOG: {
+        SetWindowTextW(dlg, WS(a->title));
+        if (a->icon) SendDlgItemMessageW(dlg, IDC_TX_ICON, STM_SETICON, (WPARAM)a->icon, 0);
+        set_text(dlg, IDC_TX_PROMPT, a->prompt);
+        set_text(dlg, IDC_TX_NOTE, a->note);
+        HWND box = GetDlgItem(dlg, IDC_TX_TEXT);
+        for (const std::string& t : a->suggestions) SendMessageW(box, CB_ADDSTRING, 0, (LPARAM)WS(t));
+        SetWindowTextW(box, WS(a->initial));
+        SetFocus(box);
+        if (a->dropdown) SendMessageW(box, CB_SETEDITSEL, 0, MAKELPARAM(0, -1));
+        else SendMessageW(box, EM_SETSEL, 0, -1);
+        return FALSE;
+    }
+    case WM_COMMAND:
+        if (LOWORD(wp) == IDOK) { *out = get_text(GetDlgItem(dlg, IDC_TX_TEXT)); EndDialog(dlg, IDOK); return TRUE; }
+        if (LOWORD(wp) == IDCANCEL) { EndDialog(dlg, IDCANCEL); return TRUE; }
+        return FALSE;
+    }
+    return FALSE;
+}
+
+} // namespace asktext
+
+bool ask_text(HWND owner, const TextAsk& a, std::string* text)
+{
+    asktext::a = &a;
+    asktext::out = text;
+    INT_PTR r = DialogBoxParamW(module(), MAKEINTRESOURCEW(a.dropdown ? IDD_ADDTAG : IDD_EDITTEXT), owner, asktext::proc, 0);
+    asktext::a = nullptr;
+    asktext::out = nullptr;
+    return r == IDOK;
 }
 
 } // namespace dialogs

@@ -49,4 +49,21 @@ struct FolderOptions {
 };
 void folder_options(HWND owner, FolderOptions& o);
 
+// XP's Choose Details: the columns in their order, each shown or not and its width;
+// the user checks, moves and sizes them; true on OK (cols changed then). The first
+// one (Name) stays shown and first.
+struct DetailColumn { int id; std::string label; bool shown; int width; };
+bool choose_details(HWND owner, std::vector<DetailColumn>& cols);
+
+// A line of text for items (Edit Description..., Add Tag...): the prompt over the box,
+// a note under it; suggestions make the box a drop-down offering them (Add Tag: the
+// folder's tags). True on OK with *text what was typed (it may be empty).
+struct TextAsk {
+    std::string title, prompt, note, initial;
+    std::vector<std::string> suggestions;
+    bool dropdown = false;
+    HICON icon = nullptr;
+};
+bool ask_text(HWND owner, const TextAsk& a, std::string* text);
+
 } // namespace dialogs

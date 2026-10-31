@@ -12,7 +12,6 @@ Future: synchronize local metadata catalog with local and remote filesystems
 For existing xattr tooling see ~/src/luxfs [note: perhaps move into lhde? or separate repo...]
 
 Initial features for flxp:
-* description, tags columns selectable for details view
 * full metadata on detail-preview and mouse hover
 * edit with options in context menu:
 	* Edit Description

@@ -107,6 +107,13 @@ struct Browser {
     bool follow_armed = false;                       // the coalescing timer runs
     std::map<std::string, bool> collapsed;           // groups folded by the user, by title
     std::vector<std::string> group_titles;           // the list's groups as last filled (by id)
+    // the Details columns, by SortBy value (Name first, always), and their widths by id;
+    // choose_columns: the header's right-click menu and Choose Details (the explorer),
+    // remembered in $XDG_STATE_HOME/lhde/flxp-columns
+    std::vector<int> columns = { 0, 1, 2, 3 };
+    std::map<int, int> column_widths;
+    bool choose_columns = false;
+    bool infotips = false;                           // XP's infotip over an item (details::infotip)
 
     // hooks
     virtual std::shared_ptr<shell::Folder> resolve(const std::string& path) { return shell::folder_for(path); }
@@ -127,7 +134,27 @@ struct Browser {
 // widths. SetWindowTheme "Explorer" (Longhorn/Vista styles: themed selection).
 HWND create_list(Browser& b, HWND parent, int id, DWORD style, DWORD exstyle, const int widths[4], HFONT font);
 
-void attach_list(Browser& b);          // a list the host made itself: the widget's own handling (Ctrl+wheel zoom)
+void attach_list(Browser& b);          // a list the host made itself: the widget's own handling (Ctrl+wheel zoom, the infotip, the header's menu)
+
+// ---- the Details columns -------------------------------------------------------------
+// Name, Size, Type, Date Modified (derived) and Description, Tags, Comment (the stored
+// properties of shell/details.h, read from the files only while one of them is shown or
+// sorted by); ids are shell::SortBy values. XP's View > Choose Details and the header's
+// right-click menu (a check per column, then More...) choose them.
+struct Column { int id; const char* label; int width; int fmt; };
+const std::vector<Column>& all_columns();
+const Column* column(int id);
+int column_index(const Browser& b, int id);   // the list's column showing id (-1: not shown)
+int column_id(const Browser& b, int index);   // the id the list's column index shows (Name for none)
+// Name first; the list refilled; remembered (choose_columns). take: the widths the user
+// dragged the columns to are kept first (false: b.column_widths as they are)
+void set_columns(Browser& b, const std::vector<int>& ids, bool take = true);
+void load_columns(Browser& b);                // the remembered set and widths, applied
+void save_columns(Browser& b);                // the set and the widths now
+bool wants_stored(const Browser& b);          // a stored column shown or sorted by
+void column_menu(Browser& b, HWND owner, int x, int y);   // the header's menu at screen (x, y)
+void choose_details(Browser& b, HWND owner);  // XP's Choose Details dialog
+void sort_by_column(Browser& b, int index);   // a header click: that column, again the other way round
 void fill_list(Browser& b);            // the list from b.items (sorted), the selection after refresh
 void sort_feedback(Browser& b);        // the header's sort arrow and the tinted column
 void apply_filter(Browser& b);         // b.items from b.all_items, then fill_list

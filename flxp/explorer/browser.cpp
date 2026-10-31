@@ -10,6 +10,7 @@
 #include <math.h>
 #include "shell/namespace.h"
 #include "shell/config.h"
+#include "shell/details.h"
 #include "shell/lhtheme.h"
 #include "shell/dirwatch.h"
 #include "shell/thumbs.h"
@@ -29,6 +30,7 @@ extern "C" {
 #undef small      // rpcndr.h (through dwmapi.h)
 }
 #include "browser.h"
+#include "dialogs.h"
 
 namespace browser {
 
@@ -307,10 +309,74 @@ std::string lower(const std::string& s)
     return out;
 }
 
-// Ctrl+wheel over the list: the zoom (the Longhorn hosts), as Vista's
+// ---- XP's infotip -------------------------------------------------------------------
+// comctl32's own (LVS_EX_INFOTIP, LVN_GETINFOTIP) is not in Wine's list view: a tooltip
+// whose tool is the item under the pointer (its bounds), a new tool per item so the
+// next one shows after the delay again; the text from shell/details (infotip)
+
+static HWND g_tip;
+static int g_tip_item = -1;
+static HWND g_tip_list;
+static std::u16string g_tip_text;
+
+static void tip_clear()
+{
+    if (!g_tip || g_tip_item < 0) { g_tip_item = -1; return; }
+    TTTOOLINFOW ti = {}; ti.cbSize = sizeof ti; ti.hwnd = g_tip_list; ti.uId = 1;
+    SendMessageW(g_tip, TTM_DELTOOLW, 0, (LPARAM)&ti);
+    g_tip_item = -1;
+}
+
+static void tip_track(Browser& b, int x, int y)
+{
+    LVHITTESTINFO hti = {}; hti.pt = POINT{ x, y };
+    int i = (int)SendMessageW(b.list, LVM_HITTEST, 0, (LPARAM)&hti);
+    if (!(hti.flags & LVHT_ONITEM) || SendMessageW(b.list, LVM_GETEDITCONTROL, 0, 0)) i = -1;
+    if (i == g_tip_item && b.list == g_tip_list) return;
+    tip_clear();
+    if (i < 0 || (size_t)i >= b.items.size()) return;
+    if (!g_tip) {
+        g_tip = CreateWindowExW(WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr, WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
+                                CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, b.list, nullptr, nullptr, nullptr);
+        if (!g_tip) return;
+        SendMessageW(g_tip, TTM_SETMAXTIPWIDTH, 0, 400);   // the lines as they are ("\n" breaks)
+    }
+    std::string t = shell::details::infotip(b.items[(size_t)i]);
+    if (t.empty()) return;
+    RECT r = {}; r.left = b.view == LVS_REPORT ? LVIR_LABEL : LVIR_SELECTBOUNDS;
+    if (!SendMessageW(b.list, LVM_GETITEMRECT, (WPARAM)i, (LPARAM)&r)) return;
+    if (b.view == LVS_REPORT) {   // the row's Name column (XP: the tip is the name's)
+        RECT ic = {}; ic.left = LVIR_ICON;
+        SendMessageW(b.list, LVM_GETITEMRECT, (WPARAM)i, (LPARAM)&ic);
+        r.left = ic.left;
+    }
+    g_tip_text = W(t);
+    TTTOOLINFOW ti = {};
+    ti.cbSize = sizeof ti; ti.hwnd = b.list; ti.uId = 1; ti.rect = r; ti.lpszText = (LPWSTR)g_tip_text.c_str();
+    SendMessageW(g_tip, TTM_ADDTOOLW, 0, (LPARAM)&ti);
+    g_tip_item = i;
+    g_tip_list = b.list;
+}
+
+// Ctrl+wheel over the list: the zoom (the Longhorn hosts), as Vista's; the infotip; the header's menu
 static LRESULT CALLBACK list_subclass(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR ref)
 {
     Browser& b = *(Browser*)ref;
+    if (b.infotips) {
+        if (msg == WM_MOUSEMOVE) tip_track(b, (SHORT)LOWORD(lp), (SHORT)HIWORD(lp));
+        if (msg == WM_MOUSELEAVE || msg == WM_KEYDOWN || msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_MOUSEWHEEL ||
+            msg == WM_VSCROLL || msg == WM_HSCROLL || msg == WM_DESTROY || (msg == LVM_DELETEALLITEMS))
+            tip_clear();
+        if (g_tip && (msg == WM_MOUSEMOVE || msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_LBUTTONUP || msg == WM_RBUTTONUP)) {
+            MSG m = {}; m.hwnd = h; m.message = msg; m.wParam = wp; m.lParam = lp;
+            SendMessageW(g_tip, TTM_RELAYEVENT, 0, (LPARAM)&m);
+        }
+        if (msg == WM_MOUSEMOVE) { TRACKMOUSEEVENT t = { sizeof t, TME_LEAVE, h, 0 }; TrackMouseEvent(&t); }
+    }
+    if (msg == WM_CONTEXTMENU && b.choose_columns && (HWND)wp == (HWND)SendMessageW(h, LVM_GETHEADER, 0, 0)) {
+        column_menu(b, GetParent(h), (SHORT)LOWORD(lp), (SHORT)HIWORD(lp));
+        return 0;
+    }
     if (msg == WM_MOUSEWHEEL && ((GET_KEYSTATE_WPARAM(wp) & MK_CONTROL) || (GetKeyState(VK_CONTROL) & 0x8000)) && b.zoomable) {
         static int acc;
         acc += GET_WHEEL_DELTA_WPARAM(wp);
@@ -334,16 +400,188 @@ HWND create_list(Browser& b, HWND parent, int id, DWORD style, DWORD exstyle, co
     SetWindowTheme(b.list, L"Explorer", nullptr);
     SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)b.small);
     SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)b.large);
-    static const struct { const wchar_t* name; int fmt; } cols[] = {
-        { L"Name", LVCFMT_LEFT }, { L"Size", LVCFMT_RIGHT }, { L"Type", LVCFMT_LEFT }, { L"Date Modified", LVCFMT_LEFT },
-    };
-    for (int i = 0; i < 4; i++) {
-        LVCOLUMNW c = {};
-        c.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT | LVCF_SUBITEM;
-        c.pszText = (LPWSTR)cols[i].name; c.cx = widths[i]; c.fmt = cols[i].fmt; c.iSubItem = i;
-        SendMessageW(b.list, LVM_INSERTCOLUMNW, (WPARAM)i, (LPARAM)&c);
-    }
+    for (int i = 0; i < 4; i++) if (!b.column_widths.count(i)) b.column_widths[i] = widths[i];
+    set_columns(b, b.columns);
     return b.list;
+}
+
+// ---- the Details columns -----------------------------------------------------------------
+
+const std::vector<Column>& all_columns()
+{
+    // XP's details defaults (measured): 180, 96, 120, 120; the stored ones as XP's Comments (150)
+    static const std::vector<Column> c = {
+        { (int)shell::SortBy::Name, "Name", 180, LVCFMT_LEFT },
+        { (int)shell::SortBy::Size, "Size", 96, LVCFMT_RIGHT },
+        { (int)shell::SortBy::Type, "Type", 120, LVCFMT_LEFT },
+        { (int)shell::SortBy::Date, "Date Modified", 120, LVCFMT_LEFT },
+        { (int)shell::SortBy::Description, "Description", 180, LVCFMT_LEFT },
+        { (int)shell::SortBy::Tags, "Tags", 120, LVCFMT_LEFT },
+        { (int)shell::SortBy::Comment, "Comment", 150, LVCFMT_LEFT },
+    };
+    return c;
+}
+
+const Column* column(int id)
+{
+    for (const Column& c : all_columns()) if (c.id == id) return &c;
+    return nullptr;
+}
+
+int column_index(const Browser& b, int id)
+{
+    for (size_t i = 0; i < b.columns.size(); i++) if (b.columns[i] == id) return (int)i;
+    return -1;
+}
+
+int column_id(const Browser& b, int index) { return index >= 0 && (size_t)index < b.columns.size() ? b.columns[(size_t)index] : 0; }
+
+bool wants_stored(const Browser& b)
+{
+    if (shell::details::column_property(b.sort)) return true;
+    for (int id : b.columns) if (shell::details::column_property((shell::SortBy)id)) return true;
+    return false;
+}
+
+// the stored properties of the items, when a column needs them (else none: what is not
+// shown is not read)
+static void read_stored(const Browser& b, std::vector<Item>& items)
+{
+    bool want = wants_stored(b);
+    for (Item& it : items) {
+        if (want && b.folder && b.folder->is_filesystem()) shell::details::read_stored(it);
+        else it.xattrs.clear();
+    }
+}
+
+// the widths the user gave the columns shown
+static void take_widths(Browser& b)
+{
+    if (!b.list) return;
+    HWND hdr = (HWND)SendMessageW(b.list, LVM_GETHEADER, 0, 0);
+    int n = hdr ? (int)SendMessageW(hdr, HDM_GETITEMCOUNT, 0, 0) : 0;
+    for (int i = 0; i < n && (size_t)i < b.columns.size(); i++) {
+        int w = (int)SendMessageW(b.list, LVM_GETCOLUMNWIDTH, (WPARAM)i, 0);
+        if (w > 0) b.column_widths[b.columns[(size_t)i]] = w;
+    }
+}
+
+void set_columns(Browser& b, const std::vector<int>& want, bool take)
+{
+    std::vector<int> ids = { 0 };
+    for (int id : want) if (id != 0 && column(id) && std::find(ids.begin(), ids.end(), id) == ids.end()) ids.push_back(id);
+    if (!b.list) { b.columns = ids; return; }
+    HWND hdr = (HWND)SendMessageW(b.list, LVM_GETHEADER, 0, 0);
+    int n = hdr ? (int)SendMessageW(hdr, HDM_GETITEMCOUNT, 0, 0) : 0;
+    if (n > 0 && take) take_widths(b);
+    bool had_stored = wants_stored(b);
+    // the sorted column goes with its column (back to Name)
+    if (std::find(ids.begin(), ids.end(), (int)b.sort) == ids.end()) { b.sort = shell::SortBy::Name; b.ascending = true; }
+    b.columns = ids;
+    SendMessageW(b.list, WM_SETREDRAW, FALSE, 0);
+    for (int i = n - 1; i >= 0; i--) SendMessageW(b.list, LVM_DELETECOLUMN, (WPARAM)i, 0);
+    for (size_t i = 0; i < ids.size(); i++) {
+        const Column* c = column(ids[i]);
+        std::u16string t = W(c->label);
+        LVCOLUMNW lc = {};
+        lc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT | LVCF_SUBITEM;
+        lc.pszText = (LPWSTR)t.c_str(); lc.fmt = c->fmt; lc.iSubItem = (int)i;
+        lc.cx = b.column_widths.count(c->id) ? b.column_widths[c->id] : c->width;
+        SendMessageW(b.list, LVM_INSERTCOLUMNW, (WPARAM)i, (LPARAM)&lc);
+    }
+    SendMessageW(b.list, WM_SETREDRAW, TRUE, 0);
+    if (n > 0) {
+        if (wants_stored(b) && !had_stored) { read_stored(b, b.all_items); read_stored(b, b.items); }
+        fill_list(b);
+        if (b.choose_columns) save_columns(b);
+    }
+}
+
+static std::string columns_path() { return shell::state_file("flxp-columns"); }
+
+// "name:180 size:96 type:120 modified:120 tags:120": the columns in order, each with its width
+void load_columns(Browser& b)
+{
+    std::string text;
+    shell::read_file(columns_path(), text);
+    std::vector<int> ids;
+    size_t i = 0;
+    while (i < text.size()) {
+        size_t e = text.find_first_of(" \t\n", i);
+        if (e == std::string::npos) e = text.size();
+        std::string w = text.substr(i, e - i);
+        i = e + 1;
+        size_t colon = w.find(':');
+        int id = shell::details::column_of(w.substr(0, colon));
+        if (id < 0) continue;
+        ids.push_back(id);
+        int px = colon == std::string::npos ? 0 : atoi(w.c_str() + colon + 1);
+        if (px > 0 && px < 4000) b.column_widths[id] = px;
+    }
+    set_columns(b, ids.empty() ? b.columns : ids);
+}
+
+void save_columns(Browser& b)
+{
+    take_widths(b);
+    static const char* const NAMES[] = { "name", "size", "type", "modified", "description", "tags", "comment" };
+    std::string text;
+    for (int id : b.columns) {
+        if (id < 0 || id > 6) continue;
+        text += (text.empty() ? "" : " ") + std::string(NAMES[id]);
+        if (b.column_widths.count(id)) text += ":" + std::to_string(b.column_widths[id]);
+    }
+    shell::write_file_atomic(columns_path(), text + "\n");
+}
+
+enum { COLMENU_FIRST = 1, COLMENU_MORE = 100 };
+
+void column_menu(Browser& b, HWND owner, int x, int y)
+{
+    HMENU m = CreatePopupMenu();
+    for (const Column& c : all_columns()) {
+        UINT f = MF_STRING | (column_index(b, c.id) >= 0 ? MF_CHECKED : 0) | (c.id == 0 ? MF_GRAYED : 0);
+        AppendMenuW(m, f, (UINT_PTR)(COLMENU_FIRST + c.id), WS(c.label));
+    }
+    AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(m, MF_STRING, COLMENU_MORE, L"&More...");
+    int cmd = TrackPopupMenu(m, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, x, y, 0, owner, nullptr);
+    DestroyMenu(m);
+    if (cmd == COLMENU_MORE) { choose_details(b, owner); return; }
+    int id = cmd - COLMENU_FIRST;
+    if (cmd <= 0 || id <= 0 || !column(id)) return;
+    std::vector<int> ids = b.columns;
+    auto at = std::find(ids.begin(), ids.end(), id);
+    if (at != ids.end()) ids.erase(at); else ids.push_back(id);
+    set_columns(b, ids);
+}
+
+void choose_details(Browser& b, HWND owner)
+{
+    take_widths(b);
+    // XP's dialog lists the columns shown first, in their order, then the others
+    std::vector<dialogs::DetailColumn> cols;
+    for (int id : b.columns) {
+        const Column* c = column(id);
+        cols.push_back(dialogs::DetailColumn{ id, c->label, true, b.column_widths.count(id) ? b.column_widths[id] : c->width });
+    }
+    for (const Column& c : all_columns())
+        if (column_index(b, c.id) < 0) cols.push_back(dialogs::DetailColumn{ c.id, c.label, false, b.column_widths.count(c.id) ? b.column_widths[c.id] : c.width });
+    if (!dialogs::choose_details(owner, cols)) return;
+    std::vector<int> ids;
+    for (const dialogs::DetailColumn& c : cols) {
+        if (c.width > 0) b.column_widths[c.id] = c.width;
+        if (c.shown) ids.push_back(c.id);
+    }
+    set_columns(b, ids, false);   // the dialog's widths, not the list's
+}
+
+void sort_by_column(Browser& b, int index)
+{
+    shell::SortBy by = (shell::SortBy)column_id(b, index);
+    if (by == b.sort) b.ascending = !b.ascending; else { b.sort = by; b.ascending = true; }
+    if (wants_stored(b)) { read_stored(b, b.all_items); read_stored(b, b.items); }
+    fill_list(b);
 }
 
 bool group_view_applies(const Browser& b) { return b.view == LVS_ICON || b.view == LVS_SMALLICON; }
@@ -413,14 +651,19 @@ static void put_item(Browser& b, size_t i, int group, bool insert)
     if (cut || !insert) { lvi.mask |= LVIF_STATE; lvi.stateMask = LVIS_CUT; lvi.state = cut ? LVIS_CUT : 0; }
     if (group >= 0) { lvi.mask |= LVIF_GROUPID; lvi.iGroupId = group; }
     SendMessageW(b.list, insert ? LVM_INSERTITEMW : LVM_SETITEMW, 0, (LPARAM)&lvi);
-    std::u16string size = b.size_shown(it) ? W(shell::format_size(it.size)) : std::u16string();
-    std::u16string type = W(it.type);
-    std::u16string date = it.mtime ? W(shell::format_date(it.mtime)) : std::u16string();
-    LVITEMW sub = {};
-    sub.mask = LVIF_TEXT; sub.iItem = (int)i;
-    sub.iSubItem = 1; sub.pszText = (LPWSTR)size.c_str(); SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
-    sub.iSubItem = 2; sub.pszText = (LPWSTR)type.c_str(); SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
-    sub.iSubItem = 3; sub.pszText = (LPWSTR)date.c_str(); SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
+    for (size_t k = 1; k < b.columns.size(); k++) {
+        std::string text;
+        int id = b.columns[k];
+        if (id == (int)shell::SortBy::Size) text = b.size_shown(it) ? shell::format_size(it.size) : "";
+        else if (id == (int)shell::SortBy::Type) text = it.type;
+        else if (id == (int)shell::SortBy::Date) text = it.mtime ? shell::format_date(it.mtime) : "";
+        else if (const shell::details::Property* p = shell::details::column_property((shell::SortBy)id))
+            text = p->type == shell::details::ValueType::List ? shell::details::tag_list(it.stored(p->xattr)) : it.stored(p->xattr);
+        std::u16string t = W(text);
+        LVITEMW sub = {};
+        sub.mask = LVIF_TEXT; sub.iItem = (int)i; sub.iSubItem = (int)k; sub.pszText = (LPWSTR)t.c_str();
+        SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
+    }
     if (b.tiles) put_tile_lines(b, i);
 }
 
@@ -460,7 +703,7 @@ void sort_feedback(Browser& b)
 {
     HWND hdr = (HWND)SendMessageW(b.list, LVM_GETHEADER, 0, 0);
     if (!hdr) return;
-    int col = (int)b.sort;
+    int col = column_index(b, (int)b.sort);
     int n = (int)SendMessageW(hdr, HDM_GETITEMCOUNT, 0, 0);
     for (int i = 0; i < n; i++) {
         HDITEMW hi = {}; hi.mask = HDI_FORMAT;
@@ -496,6 +739,7 @@ void refresh(Browser& b)
     if (!b.folder) return;
     b.all_items.clear();
     b.folder->enumerate(b.all_items, b.show_hidden);
+    read_stored(b, b.all_items);
     apply_filter(b);
     follow(b);
     b.shown();
@@ -510,7 +754,8 @@ static std::map<HWND, Browser*> g_following;   // list -> its browser (the timer
 
 static bool same_item(const Item& x, const Item& y)
 {
-    return x.name == y.name && x.size == y.size && x.mtime == y.mtime && x.type == y.type && x.icon == y.icon && x.flags == y.flags;
+    return x.name == y.name && x.size == y.size && x.mtime == y.mtime && x.type == y.type && x.icon == y.icon && x.flags == y.flags &&
+           x.xattrs == y.xattrs;
 }
 
 static void CALLBACK follow_timer(HWND h, UINT, UINT_PTR, DWORD)
@@ -587,6 +832,7 @@ void update(Browser& b)
     if (!b.folder || !b.list) return;
     std::vector<Item> all;
     if (!b.folder->enumerate(all, b.show_hidden) && all.empty()) return;
+    read_stored(b, all);
     std::vector<Item> items;
     for (const Item& it : all)
         if (b.visible(it) && (b.filter.empty() || lower(it.name).find(b.filter) != std::string::npos)) items.push_back(it);

@@ -920,6 +920,7 @@ static HMENU build_menu()
     AppendMenuW(arrange, MF_STRING, ID_SORT_TYPE, L"&Type");
     AppendMenuW(arrange, MF_STRING, ID_SORT_DATE, L"&Modified");
     AppendMenuW(view, MF_POPUP, (UINT_PTR)arrange, L"Arrange &Icons by");
+    AppendMenuW(view, MF_STRING, ID_VIEW_CHOOSEDETAILS, L"Choose De&tails...");
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(view, MF_STRING, ID_SEARCH, L"&Filter by Name...");   // (the 4051 bar's magnifier is the zoom)
     AppendMenuW(view, MF_STRING, ID_FILTER_CLEAR, L"&Clear Filter");
@@ -1300,18 +1301,13 @@ static void create_children(HWND frame)
     SendMessageW(g.list, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)g.small);
     SendMessageW(g.list, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)g.large);
     SendMessageW(g.list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_HEADERDRAGDROP | LVS_EX_LABELTIP, LVS_EX_HEADERDRAGDROP | LVS_EX_LABELTIP);
-    static const struct { const wchar_t* name; int width; int fmt; } cols[] = {
-        // XP's details defaults (measured): 180, 96, 120, 120
-        { L"Name", 180, LVCFMT_LEFT }, { L"Size", 96, LVCFMT_RIGHT }, { L"Type", 120, LVCFMT_LEFT }, { L"Date Modified", 120, LVCFMT_LEFT },
-    };
     thumbview::init(g.list, frame);
+    // the columns as chosen last (XP's details defaults: Name, Size, Type, Date Modified,
+    // browser::all_columns), the header's menu and Choose Details, the infotip
+    g.choose_columns = true;
+    g.infotips = true;
     browser::attach_list(g);
-    for (int i = 0; i < 4; i++) {
-        LVCOLUMNW c = {};
-        c.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT | LVCF_SUBITEM;
-        c.pszText = (LPWSTR)cols[i].name; c.cx = cols[i].width; c.fmt = cols[i].fmt; c.iSubItem = i;
-        SendMessageW(g.list, LVM_INSERTCOLUMNW, (WPARAM)i, (LPARAM)&c);
-    }
+    browser::load_columns(g);
 
     // status bar
     g.status = CreateWindowExW(0, STATUSCLASSNAMEW, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | SBARS_SIZEGRIP,
@@ -1693,11 +1689,11 @@ static LRESULT on_notify(NMHDR* nm)
             return TRUE;
         }
         case LVN_COLUMNCLICK: {
-            NMLISTVIEW* lv = (NMLISTVIEW*)nm;
-            shell::SortBy by = lv->iSubItem == 1 ? shell::SortBy::Size : lv->iSubItem == 2 ? shell::SortBy::Type : lv->iSubItem == 3 ? shell::SortBy::Date : shell::SortBy::Name;
-            if (by == g.sort) g.ascending = !g.ascending; else { g.sort = by; g.ascending = true; }
-            CheckMenuRadioItem(g_arrange_menu, ID_SORT_NAME, ID_SORT_DATE, ID_SORT_NAME + lv->iSubItem, MF_BYCOMMAND);
-            fill_list();
+            browser::sort_by_column(g, ((NMLISTVIEW*)nm)->iSubItem);
+            // Arrange Icons by has the derived four (a stored column's sort checks none)
+            for (int id = ID_SORT_NAME; id <= ID_SORT_DATE; id++)
+                CheckMenuItem(g_arrange_menu, (UINT)id, MF_BYCOMMAND | (id - ID_SORT_NAME == (int)g.sort ? MF_CHECKED : MF_UNCHECKED));
+            if ((int)g.sort <= 3) CheckMenuRadioItem(g_arrange_menu, ID_SORT_NAME, ID_SORT_DATE, ID_SORT_NAME + (int)g.sort, MF_BYCOMMAND);
             return 0;
         }
         }
@@ -1935,6 +1931,7 @@ static void on_command(int id)
         refresh();
         break;
     case ID_VIEW_REFRESH: refresh(); break;
+    case ID_VIEW_CHOOSEDETAILS: browser::choose_details(g, g.frame); break;
     case ID_TB_LARGE: set_toolbar_size(true); shell::write_setting("toolbar_icons", "large"); break;
     case ID_TB_ADDRESS: {
         HMENU bars = GetSubMenu(GetSubMenu(g.menu, 2), 0);
@@ -2263,6 +2260,7 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         if (wp == VK_RIGHT) { go_forward(); return 0; }
         break;
     case WM_DESTROY:
+        if (g.list) browser::save_columns(g);   // (the widths dragged to)
         PostQuitMessage(0);
         return 0;
     }

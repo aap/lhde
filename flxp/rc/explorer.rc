@@ -63,6 +63,54 @@ BEGIN
     PUSHBUTTON      "Cancel", IDCANCEL, 243, 169, 50, 14
 END
 
+/* XP's Choose Details (shell32 DLG_COLUMN_SETTINGS: the columns with check boxes, Move
+ * Up/Down, Show/Hide and the selected column's width); the layout is ours, in XP's style */
+IDD_CHOOSEDETAILS DIALOGEX 0, 0, 253, 214
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Choose Details"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "Select the details you want to display for the files in this folder.", -1, 7, 7, 239, 16
+    LTEXT           "&Details:", -1, 7, 26, 60, 8
+    CONTROL         "", IDC_CDT_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOCOLUMNHEADER | WS_BORDER | WS_TABSTOP, 7, 37, 175, 132
+    PUSHBUTTON      "Move &Up", IDC_CDT_UP, 189, 37, 57, 14
+    PUSHBUTTON      "Move Do&wn", IDC_CDT_DOWN, 189, 55, 57, 14
+    PUSHBUTTON      "&Show", IDC_CDT_SHOW, 189, 73, 57, 14
+    PUSHBUTTON      "&Hide", IDC_CDT_HIDE, 189, 91, 57, 14
+    LTEXT           "&Width of selected column (in pixels):", -1, 7, 177, 130, 8
+    EDITTEXT        IDC_CDT_WIDTH, 140, 175, 30, 12, ES_NUMBER | ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK", IDOK, 142, 193, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 196, 193, 50, 14
+END
+
+/* Edit Description...: one line kept with the file (user.lux.desc) */
+IDD_EDITTEXT DIALOGEX 0, 0, 262, 78
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION ""
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            "", IDC_TX_ICON, 7, 7, 21, 20
+    LTEXT           "", IDC_TX_PROMPT, 41, 7, 214, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    EDITTEXT        IDC_TX_TEXT, 41, 19, 214, 12, ES_AUTOHSCROLL
+    LTEXT           "", IDC_TX_NOTE, 41, 36, 214, 16, SS_NOPREFIX
+    DEFPUSHBUTTON   "OK", IDOK, 151, 57, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 205, 57, 50, 14
+END
+
+/* Add Tag...: tags for the selection, the folder's tags offered in the drop-down */
+IDD_ADDTAG DIALOGEX 0, 0, 262, 78
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION ""
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            "", IDC_TX_ICON, 7, 7, 21, 20
+    LTEXT           "", IDC_TX_PROMPT, 41, 7, 214, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    COMBOBOX        IDC_TX_TEXT, 41, 19, 214, 90, CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_TX_NOTE, 41, 36, 214, 16, SS_NOPREFIX
+    DEFPUSHBUTTON   "OK", IDOK, 151, 57, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 205, 57, 50, 14
+END
+
 IDD_PROPERTIES DIALOGEX 0, 0, 227, 215
 STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
 CAPTION "General"

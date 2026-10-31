@@ -8,6 +8,9 @@
 #define IDD_PROPERTIES      104
 #define IDD_FO_GENERAL      105
 #define IDD_FO_VIEW         106
+#define IDD_CHOOSEDETAILS   107
+#define IDD_EDITTEXT        108
+#define IDD_ADDTAG          109
 
 #define IDC_OW_ICON         1001
 #define IDC_OW_FILE         1002
@@ -55,6 +58,18 @@
 #define IDC_FO_REMEMBER     1508
 #define IDC_FO_HIDDEN       1509
 #define IDC_FO_FULLPATH     1510
+
+// Choose Details (XP's View > Choose Details), Edit Description and Add Tag
+#define IDC_CDT_LIST        1701
+#define IDC_CDT_UP          1702
+#define IDC_CDT_DOWN        1703
+#define IDC_CDT_SHOW        1704
+#define IDC_CDT_HIDE        1705
+#define IDC_CDT_WIDTH       1706
+#define IDC_TX_ICON         1711
+#define IDC_TX_PROMPT       1712
+#define IDC_TX_TEXT         1713
+#define IDC_TX_NOTE         1714
 
 // file operations (fileopui.cpp): XP's shell32 DLG_REPLACE_FILE, DLG_REPLACE_FOLDER,
 // DLG_MOVE_FILE, DLG_MOVECOPYPROGRESS and a message box for the errors
