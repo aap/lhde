@@ -4,7 +4,7 @@ data/sources/<source>.ini (docs/USAGE.md "Getting the Windows resources", docs/L
 turns a pack into lhde's Windows tree (~/.local/share/lhde-windows); nobody needs the ISOs after that.
 
 usage: lhde-pack [--profile essentials|museum] [--themes A,B,C] [--isos DIR]... [--sources ID,ID] [--all] [--from-pack PACK]
-                 [--out DIR] [--name NAME] [--no-tar] [--zip] [--tmp DIR] [--medium ID=PATH]... [--no-annotate] [--list]
+                 [--from-tree [DIR]] [--local DIR | --no-local] [--out DIR] [--name NAME] [--no-tar] [--zip] [--tmp DIR] [--medium ID=PATH]... [--no-annotate] [--list]
   --profile P     essentials (the default): only the files the themes need, from the resolver itself (see --themes);
                   museum: every file of every source (today's complete pack, for archaeology and for making essentials later)
   --themes A,B,C  the themes essentials is made for (default: the shipped ones, data/themes/*.theme without .todo). For each,
@@ -15,6 +15,14 @@ usage: lhde-pack [--profile essentials|museum] [--themes A,B,C] [--isos DIR]... 
   --from-pack P   take the files from the pack P (a directory or .tar.zst/.tar.xz, normally a museum pack) instead of the
                   ISOs: nothing is read from any medium, the pack is only re-profiled (also: museum from a museum pack = a copy
                   with the duplicates linked)
+  --from-tree [DIR]  take the files from a Windows tree (default $LHDE_WINDOWS, else ~/.local/share/lhde-windows): its
+                  <source>/ directories are a museum pack already (the in-image paths are not recorded there: the MANIFEST
+                  says tree:<path>); then profiled like --from-pack. The way to pack the tree a desktop runs on
+  --local DIR     the files dropped in by hand that the pack carries as local/ (default: the Windows tree's local/ when there
+                  is one; with --from-pack only when the pack has no local/ of its own): styles imported with lhde-import
+                  --style (the Aero reconstruction aero-patch.msstyles that aero4074 and aerovision use), schemes,
+                  resources, fonts, wallpapers, icons. museum takes all of it, essentials what the themes name
+  --no-local      no local/ in the pack
   --isos DIR      where the ISOs are (several allowed; default $LHDE_ISOS, a :-list, else .); each source
                   names its ISO file (iso = ...)
   --sources A,B   only these sources (default: every source with default = yes whose ISO is found; --all: also the others,
@@ -35,7 +43,8 @@ Identical files (same sha256, within and across sources) are stored once: the fi
 links to it (relative symlinks where hard links fail), and the tarball holds the bytes once (tar, without --hard-dereference).
 lhde-import --pack copies every path as a normal file. The MANIFEST stays the authority: one line per path, all of them.
 Pack layout: NAME/<source>/{system32,themes,fonts,wallpapers}/..., NAME/<source>/source.ini (the rules it was made with, and
-the recipes lhde-import runs), NAME/MANIFEST (sha256, size, pack path, source, medium:in-image path). Adding a file or a source
+the recipes lhde-import runs), NAME/local/{themes,schemes,resources,fonts,wallpapers,icons}/... (the tree's local/, source
+`local` in the MANIFEST), NAME/MANIFEST (sha256, size, pack path, source, medium:in-image path). Adding a file or a source
 is editing or adding an ini in data/sources/.
 """
 import os
@@ -52,7 +61,7 @@ import lhdetree as T
 def main():
     a = sys.argv[1:]
     isos, want, out, name, tar, tmpd, media, listing, allsrc = [], None, '.', None, True, None, {}, False, False
-    profile, themes, frompack = 'essentials', None, None
+    profile, themes, frompack, fromtree, local, nolocal = 'essentials', None, None, None, None, False
     while a:
         o = a.pop(0)
         if o == '--isos': isos.append(a.pop(0))
@@ -67,6 +76,9 @@ def main():
         elif o == '--profile': profile = a.pop(0)
         elif o == '--themes': themes = [x for x in a.pop(0).replace(' ', ',').split(',') if x]
         elif o == '--from-pack': frompack = a.pop(0)
+        elif o == '--from-tree': fromtree = a.pop(0) if a and not a[0].startswith('--') else T.windows_dir()
+        elif o == '--local': local = a.pop(0)
+        elif o == '--no-local': nolocal = True
         elif o == '--list': listing = True
         elif o == '--no-annotate': T.set_annotate(False)
         elif o in ('-h', '--help'): print(__doc__); return 0
@@ -75,6 +87,16 @@ def main():
         L.die('--profile is essentials or museum')
     if themes and profile == 'museum':
         L.die('--themes belongs to --profile essentials')
+    if frompack and fromtree:
+        L.die('--from-pack or --from-tree, not both')
+    if local and not os.path.isdir(local):
+        L.die('--local %s is no directory' % local)
+    explicit = bool(local)
+    if not local and not nolocal:   # the Windows tree's local/ (the one --from-tree reads, else the user's)
+        d = os.path.join(os.path.realpath(fromtree or T.windows_dir()), 'local')
+        local = d if os.path.isdir(d) else None
+    if nolocal:
+        local = None
     if not isos:
         isos = [x for x in os.environ.get('LHDE_ISOS', '.').split(':') if x]
     sources = L.load_sources()
@@ -109,16 +131,16 @@ def main():
     pack = os.path.join(os.path.realpath(out), name)
     tmp = tempfile.mkdtemp(prefix='.lhde-pack-', dir=tmpd or os.path.realpath(out))
     try:
-        if profile == 'essentials' or frompack:
-            return from_museum(profile, themes, frompack, sel, want, isos, medium, pack, tmp, tar)
-        return pack_media(sel, medium, isos, pack, tmp, tar, 'museum', None)
+        if profile == 'essentials' or frompack or fromtree:
+            return from_museum(profile, themes, frompack, fromtree, local, explicit, sel, want, isos, medium, pack, tmp, tar)
+        return pack_media(sel, medium, isos, pack, tmp, tar, 'museum', None, local)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def pack_media(sel, medium, isos, pack, tmp, tar, profile, themes):
-    """the museum pack: every file of the selected sources, from their media; the pack directory is kept if it exists (this
-    run's sources replace their old lines in the MANIFEST)"""
+def pack_media(sel, medium, isos, pack, tmp, tar, profile, themes, local):
+    """the museum pack: every file of the selected sources, from their media, and local/ (all of it); the pack directory is
+    kept if it exists (this run's sources replace their old lines in the MANIFEST)"""
     os.makedirs(pack, exist_ok=True)
     T.xput(pack, {T.A_AUTHOR: 'lhde-pack', T.A_DESC: 'lhde resource pack: raw Windows files by source (lhde-import --pack)', T.A_TAGS: 'pack'})
     lines = []
@@ -136,11 +158,13 @@ def pack_media(sel, medium, isos, pack, tmp, tar, profile, themes):
             L.log('%s: failed: %s' % (s.id, e))
         shutil.rmtree(tmp, ignore_errors=True)
         os.makedirs(tmp, exist_ok=True)
+    if local:
+        lines += L.pack_local(local, pack)
     # the MANIFEST: this run's sources replace their old lines
     mf = os.path.join(pack, 'MANIFEST')
     keep = []
     if os.path.exists(mf):
-        done = set(s.id for s in sel)
+        done = set(s.id for s in sel) | ({'local'} if local else set())
         keep = [l.rstrip('\n') for l in open(mf) if not l.startswith('#') and l.split('\t')[3] not in done]
         os.unlink(mf)
     finish(pack, keep + lines, tar, profile, themes)
@@ -169,9 +193,21 @@ def finish(pack, lines, tar, profile, themes):
 ZIP = {'on': False}   # --zip
 
 
-def from_museum(profile, themes, frompack, sel, want, isos, medium, pack, tmp, tar):
-    """essentials (or a re-linked museum) pack out of a museum pack: --from-pack, else one made from the media on the way"""
-    if frompack:
+def from_museum(profile, themes, frompack, fromtree, local, explicit, sel, want, isos, medium, pack, tmp, tar):
+    """essentials (or a re-linked museum) pack out of a museum pack: --from-pack, --from-tree (the Windows tree seen as one),
+    else one made from the media on the way. local/: the tree's (or --local's); a pack's own local/ stays unless --local names
+    another"""
+    if fromtree:
+        W = os.path.realpath(fromtree)
+        if not os.path.isdir(W):
+            L.die('--from-tree %s is no directory' % W)
+        M = os.path.join(tmp, 'tree')
+        L.log('the Windows tree %s as the museum pack (in %s)' % (W, M))
+        lines = L.tree_pack(W, M)
+        if local:
+            lines += L.pack_local(local, M)
+        L.write_pack(M, lines, False, L.manifest_head('museum'))
+    elif frompack:
         M = L.unpack(frompack, tmp)
         if not os.path.exists(os.path.join(M, 'MANIFEST')):
             L.die('%s is no resource pack (no MANIFEST)' % frompack)
@@ -180,10 +216,19 @@ def from_museum(profile, themes, frompack, sel, want, isos, medium, pack, tmp, t
         L.log('essentials from the media: the museum pack first (in %s), then the files the themes need' % M)
         work = os.path.join(tmp, 'work')
         os.makedirs(work)
-        pack_media(sel, medium, isos, M, work, False, 'museum', None)
+        pack_media(sel, medium, isos, M, work, False, 'museum', None, local)
     lines_in = [l.rstrip('\n') for l in open(os.path.join(M, 'MANIFEST')) if l.strip() and not l.startswith('#')]
+    if frompack and local and (explicit or not os.path.isdir(os.path.join(M, 'local'))):
+        # the pack (read only) seen through an overlay: its sources as symlinks, local/ copied from the tree (or --local)
+        O = os.path.join(tmp, 'overlay')
+        os.makedirs(O)
+        for d in os.listdir(M):
+            if d not in ('local', 'MANIFEST'):
+                os.symlink(os.path.join(os.path.realpath(M), d), os.path.join(O, d))
+        lines_in = [l for l in lines_in if l.split('\t')[3] != 'local'] + L.pack_local(local, O)
+        M = O
     if want:
-        lines_in = [l for l in lines_in if l.split('\t')[3] in want]
+        lines_in = [l for l in lines_in if l.split('\t')[3] in want or l.split('\t')[3] == 'local']
     if profile == 'museum':
         need = set(l.split('\t')[2] for l in lines_in)
     else:

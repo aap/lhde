@@ -753,6 +753,57 @@ def theme_files(M, themes, tmp):
     return need
 
 
+def pack_local(local, pack):
+    """the Windows tree's local/ (styles dropped in by hand with lhde-import --style, such as the Aero reconstruction
+    aero-patch.msstyles; schemes, resources, fonts, wallpapers, icons copied there by hand) into pack/local/, every file with
+    its relative path; returns the MANIFEST lines (source `local`, in-image path local:<path>). Not deduplicated against the
+    sources here: finish() links identical files."""
+    import lhdetree
+    dst = os.path.join(pack, 'local')
+    shutil.rmtree(dst, ignore_errors=True)
+    lines = []
+    for r, ds, fs in os.walk(local):
+        ds.sort()
+        for f in sorted(fs):
+            src = os.path.join(r, f)
+            if not os.path.isfile(src):
+                continue
+            rel = os.path.relpath(src, local)
+            q = os.path.join(dst, rel)
+            os.makedirs(os.path.dirname(q), exist_ok=True)
+            shutil.copyfile(src, q)
+            lhdetree.copy_xattrs(src, q)
+            lines.append('%s\t%d\t%s\tlocal\tlocal:%s' % (sha256(q), os.path.getsize(q), 'local/' + rel, rel))
+    log('local: %d files from %s' % (len(lines), local))
+    return lines
+
+
+def tree_pack(W, M):
+    """a Windows tree W seen as a museum pack in M (lhde-pack --from-tree): each source with its source.ini as a symlink to
+    W/<source>, MANIFEST lines from the files there (in-image path tree:<path>; the tree keeps no record of the image paths);
+    local/ is the caller's (pack_local). Returns the lines."""
+    import lhdetree
+    os.makedirs(M, exist_ok=True)
+    lines = []
+    for sid in lhdetree.sources_in(W):
+        root = os.path.join(W, sid)
+        if not os.path.isfile(os.path.join(root, 'source.ini')):
+            continue
+        os.symlink(root, os.path.join(M, sid))
+        n = 0
+        for r, ds, fs in os.walk(root):
+            ds.sort()
+            for f in sorted(fs):
+                q = os.path.join(r, f)
+                if f == 'source.ini' and r == root or not os.path.isfile(q):
+                    continue
+                rel = os.path.relpath(q, W)
+                lines.append('%s\t%d\t%s\t%s\ttree:%s' % (sha256(q), os.path.getsize(q), rel, sid, rel))
+                n += 1
+        log('%s: %d files from %s' % (sid, n, root))
+    return lines
+
+
 def profile_pack(M, pack, themes, tmp, lines_in, need=None):
     """a new pack of the files THEMES need, taken from the museum pack M (xattrs, source.ini and the source directories'
     annotations kept; a source nothing needs is left out); returns its MANIFEST lines (those of M for the files taken)"""
@@ -776,7 +827,8 @@ def profile_pack(M, pack, themes, tmp, lines_in, need=None):
         srcs.add(sid)
         lines.append(by.get(rel) or '%s\t%d\t%s\t%s\t%s' % (sha256(q), os.path.getsize(q), rel, sid, 'pack:' + rel))
     for sid in sorted(srcs):
-        shutil.copyfile(os.path.join(M, sid, 'source.ini'), os.path.join(pack, sid, 'source.ini'))
+        if sid != 'local':   # local/ has no rules
+            shutil.copyfile(os.path.join(M, sid, 'source.ini'), os.path.join(pack, sid, 'source.ini'))
         for r, ds, fs in os.walk(os.path.join(pack, sid)):
             lhdetree.copy_xattrs(os.path.join(M, os.path.relpath(r, pack)), r)
     return lines
@@ -933,8 +985,13 @@ def import_pack(pack, W, force=False, recipes=True):
     classic schemes into W/generated/schemes, the index, then the recipes into W/generated"""
     import lhdetree
     srcs = sorted(d for d in os.listdir(pack) if os.path.isfile(os.path.join(pack, d, 'source.ini')))
-    if not srcs:
+    local = os.path.join(pack, 'local')
+    if not srcs and not os.path.isdir(local):
         die('%s is no resource pack (no <source>/source.ini)' % pack)
+    if os.path.isdir(local):   # the pack's local/ (the packer's styles and files dropped in by hand): W/local, indexed below
+        rep = {'copied': 0, 'kept': 0}
+        copy_tree(local, os.path.join(W, 'local'), force, rep)
+        log('local: %d files copied, %d kept -> %s' % (rep['copied'], rep['kept'], os.path.join(W, 'local')))
     todo = []
     for sid in srcs:
         root = os.path.join(pack, sid)
@@ -957,9 +1014,15 @@ def import_pack(pack, W, force=False, recipes=True):
     if recipes:
         for s in todo:
             run_recipes(W, s.id, s.ini, force)
+        if os.path.isdir(local):   # the styles of the pack's local/ feed recipes too (as lhde-import --style runs them)
+            for name, rs in STYLE_RECIPES.items():
+                if os.path.isfile(os.path.join(local, 'themes', name + '.msstyles')):
+                    for kind, target, spec in rs:
+                        run_recipe(os.path.join(W, 'index'), kind, target, spec, 'style', force)
+            lhdetree.reindex(W, True)
     lhdetree.annotate_tree(W)
     with open(os.path.join(W, 'import.log'), 'a') as f:
-        f.write('# lhde-import --pack %s, %s: %s\n' % (pack, datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), ' '.join(srcs)))
+        f.write('# lhde-import --pack %s, %s: %s\n' % (pack, datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), ' '.join(srcs + (['local'] if os.path.isdir(local) else []))))
 
 
 def import_schemes(W, sid, ini, force):

@@ -12,9 +12,12 @@ usage:
   lhde-import --iso FILE [--source ID]        a Windows / Longhorn ISO: its build is detected (explorer.exe's version, the
   lhde-import --wim FILE [--source ID]        layout), the files of data/sources/<build>.ini packed into a temporary pack and
   lhde-import --dir PATH [--source ID]        imported from there (one code path with --pack); PATH = a Windows directory
-  lhde-import --style FILE [NAME]             drop one visual style in (local/themes/NAME.msstyles; NAME defaults to the file's
-                                              stem), with its Shell/ when it has one beside it, and run the recipes that read it
-                                              (aero-patch: the frame sets aero-patch and aerovision)
+  lhde-import --style FILE [NAME]             drop one visual style in (local/themes/NAME.msstyles: the style's name, the one
+                                              theme files ask for, e.g. aero-patch for the Aero reconstruction), with its Shell/
+                                              when it has one beside it, and run the recipes that read it (aero-patch: the frame
+                                              sets aero-patch and aerovision). Without NAME the file's stem is used and printed;
+                                              a stem that is already a source's style (aero.msstyles: Vista's aero) is
+                                              refused: give the NAME
   lhde-import --icons DIR NAME [--licence FILE]   an icon pack (PNGs, .ico; e.g. the CC0 Windows XP High Resolution Icon
                                               Pack) into local/icons/NAME/ as .ico files (16-256 px), for icon recipes that
                                               name files (file:NAME/PATH.ico; data/icons/xp-hires.theme)
@@ -223,6 +226,13 @@ def main():
         return 0
     if mode == 'style':
         name = extra[0] if extra else os.path.basename(arg).rsplit('.', 1)[0].lower()
+        if not extra:
+            L.log('--style: no NAME given, the style is called %s (from the file name); lhde-import --style FILE NAME names it' % name)
+            have = os.path.join(data, 'index', 'styles', name + '.msstyles')
+            mine = os.path.realpath(os.path.join(data, 'local', 'themes', name + '.msstyles'))
+            if os.path.lexists(have) and os.path.realpath(have) != mine:
+                L.die('--style: %s is already a style of the Windows tree (%s); the index keeps that one and a dropped-in %s.msstyles would not be used: '
+                      'give the style its own NAME (lhde-import --style %s NAME)' % (name, os.path.relpath(os.path.realpath(have), data), name, arg))
         rep = {'copied': 0, 'kept': 0}
         L.copy_file(arg, os.path.join(data, 'local', 'themes', name + '.msstyles'), o['force'], rep)
         shell = os.path.join(os.path.dirname(arg), 'Shell')

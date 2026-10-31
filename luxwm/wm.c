@@ -1066,6 +1066,12 @@ handle_client_message(XEvent *e)
         struct client *c = get_client_from_window(cme->window);
         if (c) wmmenu_open(c, (int)cme->data.l[1], (int)cme->data.l[2], WMMENU_FLIP, 0, false);
 
+    } else if (cme->message_type == net_atom[NetWMDesktop]) {
+        /* EWMH: a pager (luxshell, flxp) moves a window to another desktop; the current desktop stays (0xFFFFFFFF, all desktops, is
+           not supported) */
+        struct client *c = get_client_from_window(cme->window);
+        long d = cme->data.l[0];
+        if (c && d >= 0 && d < WORKSPACE_NUMBER && d != c->ws) { LOGP("_NET_WM_DESKTOP: 0x%lx to desktop %ld", c->window, d); client_send_to_ws(c, (int)d); }
     } else if (cme->message_type == net_atom[NetCurrentDesktop]) {
         if (cme->data.l[0] >= 0 && cme->data.l[0] < WORKSPACE_NUMBER)   /* a pager's or lhshell's request (lh.set_desktop) */
             switch_ws(cme->data.l[0]);
@@ -1181,6 +1187,11 @@ handle_button_press(XEvent *e)
         if (hit == HIT_CAPTION && bev->button == 1 && conf.last_caption_click + 350 > bev->time && conf.last_caption_win == c->dec) {
             conf.last_caption_click = 0; client_monocle(c); draw_text(c, client_active(c)); return; }
         conf.last_caption_click = bev->time; conf.last_caption_win = c->dec;
+    }
+    /* a move (caption, or the move modifier with its button): drag_run, which knows snapping and EDGE_LOCK */
+    if ((bev->window == c->dec && bev->button == 1) || (state == (unsigned)conf.move_mask && bev->button == (unsigned)conf.move_button)) {
+        drag_run(c, HIT_CAPTION, bev->x_root, bev->y_root, bev->button, false);
+        return;
     }
     // Otherwise process window movement or resize
     ocx = c->geom.x;
@@ -2494,19 +2505,21 @@ client_apply_max(struct client *c)
     client_geom_max(c, x, y, w, h, true);
 }
 
+/* the restore geometry of a maximised window (c->prev); it survives a WM restart (read back when adopting) */
+static void
+client_set_restore(struct client *c, int x, int y, int w, int h)
+{
+    c->prev.x = x; c->prev.y = y; c->prev.width = w; c->prev.height = h;
+    long g[4] = { x, y, w, h };
+    XChangeProperty(display, c->window, XInternAtom(display, "_LHWM_RESTORE_GEOMETRY", False), XA_CARDINAL, 32, PropModeReplace, (unsigned char *)g, 4);
+}
+
 static void
 client_maximize(struct client *c)
 {
     if (c->mono || c->fullscreen || client_fixed(c))
         return;
-    c->prev.x = c->hidden ? c->x_hide : c->geom.x;
-    c->prev.y = c->geom.y;
-    c->prev.width = c->geom.width;
-    c->prev.height = c->geom.height;
-    {   /* the restore geometry survives a WM restart (read back when adopting) */
-        long g[4] = { c->prev.x, c->prev.y, c->prev.width, c->prev.height };
-        XChangeProperty(display, c->window, XInternAtom(display, "_LHWM_RESTORE_GEOMETRY", False), XA_CARDINAL, 32, PropModeReplace, (unsigned char *)g, 4);
-    }
+    client_set_restore(c, c->hidden ? c->x_hide : c->geom.x, c->geom.y, c->geom.width, c->geom.height);
     if (c->hidden) {   /* minimised: applied by client_show */
         c->mono = true;
         ewmh_update_state(c);
@@ -3291,23 +3304,125 @@ client_show(struct client *c)
     }
 }
 
+/* ---- snap (Windows 7's Aero Snap, docs/LUXWM.md "Snap"): a window put on the left or right half of the work area, or stretched to
+   its full height, remembering the rectangle it had before (c->snap_prev), which a drag away restores ---- */
+
+/* the rectangle of a snap kind on c's work area (SNAP_VERT keeps c's columns) */
+static void
+snap_rect(struct client *c, int kind, int *x, int *y, int *w, int *h)
+{
+    int ax, ay, aw, ah; workarea_mon(ws_m_list[c->ws], &ax, &ay, &aw, &ah);
+    *y = ay; *h = ah;
+    switch (kind) {
+    case SNAP_LEFT:  *x = ax; *w = aw / 2; break;
+    case SNAP_RIGHT: *x = ax + aw / 2; *w = aw - aw / 2; break;
+    case SNAP_VERT:  *x = c->geom.x; *w = c->geom.width; break;
+    default:         *x = ax; *w = aw; break;
+    }
+}
+
+/* snap c (SNAP_LEFT, SNAP_RIGHT, SNAP_VERT, or SNAP_MAX = maximise); rest: the rectangle to come back to (a window that is snapped
+   already keeps its first one) */
+static void
+client_snap_to(struct client *c, int kind, struct client_geom rest)
+{
+    if (c->snap) rest = c->snap_prev;
+    if (kind == SNAP_MAX) {
+        c->snap = SNAP_NONE;
+        client_maximize(c);
+        client_set_restore(c, rest.x, rest.y, rest.width, rest.height);
+        draw_text(c, client_active(c));
+        return;
+    }
+    if (c->mono) client_unmax_margins(c);
+    int x, y, w, h; snap_rect(c, kind, &x, &y, &w, &h);
+    c->snap_prev = rest; c->snap = kind;
+    client_move_absolute(c, x, y);
+    client_resize_absolute(c, w, h);
+    if (kind == SNAP_RIGHT && c->geom.width != w) client_move_absolute(c, x + w - c->geom.width, y);   /* size hints made it narrower */
+    ewmh_update_state(c);
+    LOGP("snap 0x%lx: %s, back to %dx%d+%d+%d", c->window, kind == SNAP_LEFT ? "left" : kind == SNAP_RIGHT ? "right" : "vertical",
+         rest.width, rest.height, rest.x, rest.y);
+}
+
 static void
 client_snap_left(struct client *c)
 {
-    int x, y, w, h;
-    workarea_mon(ws_m_list[c->ws], &x, &y, &w, &h);
-    client_move_absolute(c, x, y);
-    client_resize_absolute(c, w / 2, h);
+    client_snap_to(c, SNAP_LEFT, c->geom);
 }
 
 static void
 client_snap_right(struct client *c)
 {
-    int x, y, w, h;
-    workarea_mon(ws_m_list[c->ws], &x, &y, &w, &h);
-    client_move_absolute(c, x + w / 2, y);
-    client_resize_absolute(c, w - w / 2, h);
-    if (c->geom.width != w - w / 2) client_move_absolute(c, x + w - c->geom.width, y);   /* size hints made it narrower */
+    client_snap_to(c, SNAP_RIGHT, c->geom);
+}
+
+/* the snap preview: an outline of the rectangle a drop would give, 4 px of XP's drag-rectangle checker (luxwm's choice; 7 draws a
+   glass sheet) */
+static Window snap_win;
+static Pixmap snap_pat;
+static void
+snap_preview(int x, int y, int w, int h)
+{
+    if (w <= 0) { if (snap_win) XUnmapWindow(display, snap_win); return; }
+    if (!snap_win) {
+        static const char bits[] = { 0x01, 0x02 };   /* 2x2 checker */
+        snap_pat = XCreatePixmapFromBitmapData(display, root, (char *)bits, 2, 2, BlackPixel(display, screen), WhitePixel(display, screen),
+                                               (unsigned)DefaultDepth(display, screen));
+        XSetWindowAttributes a = { .override_redirect = True, .background_pixmap = snap_pat, .save_under = True };
+        snap_win = XCreateWindow(display, root, 0, 0, 1, 1, 0, CopyFromParent, InputOutput, CopyFromParent,
+                                 CWOverrideRedirect | CWBackPixmap | CWSaveUnder, &a);
+        XClassHint ch = { (char *)"lhwm-snap", (char *)"lhwm" }; XSetClassHint(display, snap_win, &ch);
+        XStoreName(display, snap_win, "lhwm snap preview");
+    }
+    const int t = 4;
+    XRectangle r[4] = { { 0, 0, (unsigned short)w, t }, { 0, (short)(h - t), (unsigned short)w, t },
+                        { 0, t, t, (unsigned short)MAX(h - 2 * t, 0) }, { (short)(w - t), t, t, (unsigned short)MAX(h - 2 * t, 0) } };
+    XMoveResizeWindow(display, snap_win, x, y, (unsigned)w, (unsigned)h);
+    XShapeCombineRectangles(display, snap_win, ShapeBounding, 0, 0, r, 4, ShapeSet, Unsorted);
+    XShapeCombineRectangles(display, snap_win, ShapeInput, 0, 0, NULL, 0, ShapeSet, Unsorted);
+    XMapRaised(display, snap_win);
+}
+
+/* the snap a drag would give with the pointer at x, y: a move (HIT_CAPTION) whose pointer reaches the left or right edge of the work
+   area snaps to that half, the top edge maximises; a resize of the top or bottom border whose pointer reaches that edge stretches the
+   window to the full height. The pointer, not the frame, has to be there. */
+static int
+snap_target(struct client *c, int hit, int x, int y)
+{
+    if (c->fullscreen || client_fixed(c)) return SNAP_NONE;
+    int ax, ay, aw, ah; workarea_mon(ws_m_list[c->ws], &ax, &ay, &aw, &ah);
+    if (hit == HIT_CAPTION) {
+        if (x <= ax) return SNAP_LEFT;
+        if (x >= ax + aw - 1) return SNAP_RIGHT;
+        if (y <= ay) return SNAP_MAX;
+        return SNAP_NONE;
+    }
+    if ((hit == HIT_T && y <= ay) || (hit == HIT_B && y >= ay + ah - 1)) return SNAP_VERT;
+    return SNAP_NONE;
+}
+
+/* a move drag takes a maximised or snapped window away: it gets its earlier size back, under the pointer at the same fraction of its
+   width (Windows 7), and the drag continues with it */
+static void
+snap_tear_off(struct client *c, int px, int py)
+{
+    struct client_geom r = c->snap ? c->snap_prev : c->prev;
+    if (r.width <= 0 || r.height <= 0) { r.width = c->geom.width; r.height = c->geom.height; }
+    double f = c->geom.width > 0 ? (double)(px - c->geom.x) / c->geom.width : 0.5;
+    int nx = px - (int)(f * r.width + 0.5), ny = c->geom.y;
+    LOGP("drag: 0x%lx leaves its %s, back to %dx%d", c->window, c->mono ? "maximised state" : "snap", r.width, r.height);
+    (void)py;
+    c->snap = SNAP_NONE;
+    if (c->mono) {
+        c->mono = false; c->xfade_t0 = 0;
+        maxmode_update();
+        client_geom_max(c, nx, ny, r.width, r.height, false);
+    } else {
+        client_move_absolute(c, nx, ny);
+        client_resize_absolute(c, r.width, r.height);
+        ewmh_update_state(c);
+    }
 }
 
 static void
@@ -3643,6 +3758,7 @@ ewmh_update_state(struct client *c)
     unsigned st = ST_VALID;
     if (c->minimized)  st |= ST_HIDDEN;
     if (c->mono)       st |= ST_MAXV | ST_MAXH;
+    if (c->snap)       st |= ST_MAXV;   /* snapped: the work area's full height */
     if (c->attention)  st |= ST_ATTN;
     if (client_active(c)) st |= ST_FOCUSED;
     if (c->fullscreen) st |= ST_FS;
@@ -4810,7 +4926,7 @@ frame_resize_drag(struct client *c, int hit, XButtonPressedEvent *bev)
 }
 
 /* ---- the window menu (README "The window menu"): XP's system menu, drawn by menu.c ---- */
-enum { SC_RESTORE_ID, SC_MOVE_ID, SC_SIZE_ID, SC_MINIMIZE_ID, SC_MAXIMIZE_ID, SC_SEP_ID, SC_CLOSE_ID };
+enum { SC_RESTORE_ID, SC_MOVE_ID, SC_SIZE_ID, SC_MINIMIZE_ID, SC_MAXIMIZE_ID, SC_SEP_ID, SC_CLOSE_ID, SC_DESKMENU_ID, SC_DESK_ID /* + desktop */ };
 
 /* the caption icon is drawn (client or theme default icon, no NO_ICON, a caption of the frame's own) and (x, y) lies on it */
 static bool
@@ -4848,6 +4964,12 @@ sysmenu_command(void *arg, int id)
     case SC_CLOSE_ID: client_close(c); break;
     case SC_MOVE_ID: drag_run(c, HIT_CAPTION, 0, 0, 0, true); break;
     case SC_SIZE_ID: if (!c->mono && !client_fixed(c)) drag_run(c, HIT_BR, 0, 0, 0, true); break;
+    default:   /* Move to Desktop N: the window goes there and the desktop with it, as a desktop key during a move */
+        if (id >= SC_DESK_ID && id < SC_DESK_ID + WORKSPACE_NUMBER && id - SC_DESK_ID != c->ws) {
+            int ws = id - SC_DESK_ID;
+            client_send_to_ws(c, ws); switch_ws(ws); client_manage_focus(c);
+        }
+        break;
     }
 }
 
@@ -4863,14 +4985,23 @@ wmmenu_open(struct client *c, int x, int y, unsigned flags, unsigned button, boo
     Window w = c->window; void *arg = (void *)(uintptr_t)w;
     bool fixed = c->max_w > 0 && c->max_h > 0 && c->min_w == c->max_w && c->min_h == c->max_h, mini = c->minimized;
     unsigned mx = c->mono && !mini ? WMMENU_DISABLED : 0, mn = mini ? WMMENU_DISABLED : 0;
+    /* luxwm's own: the desktops by number (Desktop 1 is desktop 0, as the Mod4+1 key), the window's own one checked */
+    static char desk_text[WORKSPACE_NUMBER][24];
+    struct wmmenu_item desk[WORKSPACE_NUMBER];
+    for (int i = 0; i < WORKSPACE_NUMBER; i++) {
+        if (i < 9) snprintf(desk_text[i], sizeof desk_text[i], "Desktop &%d", i + 1);
+        else snprintf(desk_text[i], sizeof desk_text[i], "Desktop %d&%d", (i + 1) / 10, (i + 1) % 10);
+        desk[i] = (struct wmmenu_item){ desk_text[i], NULL, i == c->ws ? WMMENU_CHECKED : 0, WMMENU_GLYPH_NONE, SC_DESK_ID + i, sysmenu_command, arg, NULL, 0 };
+    }
     struct wmmenu_item it[] = {
-        { "&Restore",  NULL,     mini ? WMMENU_DEFAULT : c->mono ? 0 : WMMENU_DISABLED, WMMENU_GLYPH_RESTORE, SC_RESTORE_ID, sysmenu_command, arg },
-        { "&Move",     NULL,     mx | mn,                       WMMENU_GLYPH_NONE,     SC_MOVE_ID,     sysmenu_command, arg },
-        { "&Size",     NULL,     mx | mn | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_NONE, SC_SIZE_ID, sysmenu_command, arg },
-        { "Mi&nimize", NULL,     mn,                            WMMENU_GLYPH_MINIMIZE, SC_MINIMIZE_ID, sysmenu_command, arg },
-        { "Ma&ximize", NULL,     (mini ? 0 : mx) | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_MAXIMIZE, SC_MAXIMIZE_ID, sysmenu_command, arg },
-        { NULL,        NULL,     WMMENU_SEPARATOR,              WMMENU_GLYPH_NONE,     SC_SEP_ID,      NULL, NULL },
-        { "&Close",    "Alt+F4", mini ? 0 : WMMENU_DEFAULT,     WMMENU_GLYPH_CLOSE,    SC_CLOSE_ID,    sysmenu_command, arg },
+        { "&Restore",  NULL,     mini ? WMMENU_DEFAULT : c->mono ? 0 : WMMENU_DISABLED, WMMENU_GLYPH_RESTORE, SC_RESTORE_ID, sysmenu_command, arg, NULL, 0 },
+        { "&Move",     NULL,     mx | mn,                       WMMENU_GLYPH_NONE,     SC_MOVE_ID,     sysmenu_command, arg, NULL, 0 },
+        { "&Size",     NULL,     mx | mn | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_NONE, SC_SIZE_ID, sysmenu_command, arg, NULL, 0 },
+        { "Mi&nimize", NULL,     mn,                            WMMENU_GLYPH_MINIMIZE, SC_MINIMIZE_ID, sysmenu_command, arg, NULL, 0 },
+        { "Ma&ximize", NULL,     (mini ? 0 : mx) | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_MAXIMIZE, SC_MAXIMIZE_ID, sysmenu_command, arg, NULL, 0 },
+        { "Move to &Desktop", NULL, 0,                          WMMENU_GLYPH_NONE,     SC_DESKMENU_ID, NULL, NULL, desk, WORKSPACE_NUMBER },
+        { NULL,        NULL,     WMMENU_SEPARATOR,              WMMENU_GLYPH_NONE,     SC_SEP_ID,      NULL, NULL, NULL, 0 },
+        { "&Close",    "Alt+F4", mini ? 0 : WMMENU_DEFAULT,     WMMENU_GLYPH_CLOSE,    SC_CLOSE_ID,    sysmenu_command, arg, NULL, 0 },
     };
     struct wmmenu_env e = { .dpy = display, .screen = screen, .root = root, .visual = argb_visual, .cmap = argb_cmap, .depth = argb_depth,
                             .theme = &theme, .composited = compositor && argb_depth == 32, .dispatch = menu_dispatch };
@@ -4904,7 +5035,7 @@ drag_pred(Display *d, XEvent *ev, XPointer arg)
 {
     (void)d; (void)arg;
     switch (ev->type) {
-    case MotionNotify: case ButtonPress: case ButtonRelease: case KeyPress:
+    case MotionNotify: case ButtonPress: case ButtonRelease: case KeyPress: case KeyRelease:
     case Expose: case MapRequest: case ConfigureRequest:
         return True;
     case ClientMessage:
@@ -5131,6 +5262,14 @@ kb_hit(int kx, int ky)
     return tab[kx + 1][ky + 1];
 }
 
+/* the other way round: the edges of a border hit (HIT_L..HIT_BR) */
+static void
+kb_edges(int hit, int *kx, int *ky)
+{
+    *kx = hit == HIT_L || hit == HIT_TL || hit == HIT_BL ? -1 : hit == HIT_R || hit == HIT_TR || hit == HIT_BR ? 1 : 0;
+    *ky = hit == HIT_T || hit == HIT_TL || hit == HIT_TR ? -1 : hit == HIT_B || hit == HIT_BL || hit == HIT_BR ? 1 : 0;
+}
+
 /* the keyboard move/size step (movesize.c: max(SM_CXSIZE / 2, 1), Ctrl 1 px): half a caption button, at least one size-hint
    increment when sizing */
 static int
@@ -5142,16 +5281,36 @@ kb_step(struct client *c, bool ctrl, bool size, bool horz)
     return s;
 }
 
+/* the desktop a "workspace N" key binding switches to for this key and modifier state, -1 when it is no such binding */
+static int
+key_workspace(KeySym k, unsigned state)
+{
+    unsigned mods = mod_clean(state);
+    for (int i = 0; i < nkeys; i++)
+        if (keys[i].sym == k && keys[i].mods == mods && !strcmp(keys[i].action, "workspace")) {
+            int ws = atoi(keys[i].arg);
+            return ws >= 0 && ws < WORKSPACE_NUMBER ? ws : -1;
+        }
+    return -1;
+}
+
 static void
 drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboard)
 {
     XEvent ev; int ox = c->geom.x, oy = c->geom.y, ow = c->geom.width, oh = c->geom.height; bool was_max = c->mono, cancel = false;
     const int dg_x = ox, dg_y = oy, dg_w = ow, dg_h = oh;   /* where Escape / a cancel puts the window back (ox.. are rebased in size mode) */
+    const int was_snap = c->snap;
+    /* snap (mouse drags only): the target under the pointer (shown as an outline, applied on the release); the rectangle a snapped or
+       maximised window comes back to */
+    int snap = SNAP_NONE; struct client_geom rest = { dg_x, dg_y, dg_w, dg_h };
     /* keyboard size (Alt+Space, S; _NET_WM_MOVERESIZE_SIZE_KEYBOARD) starts with no edge, as Windows' WMSZ_KEYSIZE: the first arrow
        picks the edge (left/right, top/bottom; two arrows a corner) and puts the pointer on it, the next ones move it; or the mouse
        picks the edges it moves towards. Keyboard move (Alt+Space, M; ..._MOVE_KEYBOARD) moves at once; the mouse takes over too */
     bool kbsize = keyboard && hit != HIT_CAPTION;
     int kx = 0, ky = 0, rx0 = 0, ry0 = 0, vx = 0, vy = 0;   /* chosen edges; pointer before the mode (put back on Return/Escape); last pointer */
+    int first_ax = 0;           /* size mode: the axis of the edge picked first (1 x, 2 y; 0 none or a corner at once): Shift toggles back to it */
+    bool held[4] = { false };   /* keyboard modes: the arrows held down (Left, Right, Up, Down): two of them move diagonally */
+    Bool repeat_was = False;
     if (kbsize) hit = HIT_NONE;
     Cursor cur = hit == HIT_CAPTION || hit == HIT_NONE ? move_cursor : edge_cursor[hit];
     int grabbed = GrabNotViewable;
@@ -5163,6 +5322,8 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         int kg = GrabNotViewable;
         for (int i = 0; i < 20 && (kg = XGrabKeyboard(display, root, False, GrabModeAsync, GrabModeAsync, CurrentTime)) != GrabSuccess; i++) usleep(5000);
         if (kg != GrabSuccess) { XUngrabPointer(display, CurrentTime); return; }
+        repeat_was = XkbGetDetectableAutoRepeat(display, NULL);
+        XkbSetDetectableAutoRepeat(display, True, NULL);   /* a held arrow repeats as presses only, its release is real */
         Window rw, cw; int wx, wy; unsigned m; XQueryPointer(display, root, &rw, &cw, &rx0, &ry0, &wx, &wy, &m);
         /* movesize.c: the pointer goes to the middle of the caption (move) or of the window (size) */
         int l, r, t, b; margins(c, &l, &r, &t, &b);
@@ -5200,6 +5361,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         if (pend) { DRAG_STEP(); pend = false; } \
         if (nkx) kx = nkx; \
         if (nky) ky = nky; \
+        if (!first_ax) first_ax = kx && !ky ? 1 : ky && !kx ? 2 : 0; \
         hit = kb_hit(kx, ky); ox = c->geom.x; oy = c->geom.y; ow = c->geom.width; oh = c->geom.height; \
         px = vx = (ax); py = vy = (ay); \
         XChangeActivePointerGrab(display, MOUSEMASK, edge_cursor[hit], CurrentTime); } while (0)
@@ -5226,19 +5388,54 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         case ButtonRelease:
             if (!keyboard && (button == 0 || ev.xbutton.button == button)) done = true;
             break;
+        case KeyRelease: {
+            KeySym k = XkbKeycodeToKeysym(display, ev.xkey.keycode, 0, 0);
+            int a = k == XK_Left || k == XK_KP_Left ? 0 : k == XK_Right || k == XK_KP_Right ? 1 : k == XK_Up || k == XK_KP_Up ? 2 : k == XK_Down || k == XK_KP_Down ? 3 : -1;
+            if (a >= 0) held[a] = false;
+            break;
+        }
         case KeyPress: {
             KeySym k = XkbKeycodeToKeysym(display, ev.xkey.keycode, 0, 0);
+            int to_ws = key_workspace(k, ev.xkey.state);
+            if (to_ws >= 0 && hit == HIT_CAPTION) {   /* a desktop key while moving: the window goes along to that desktop */
+                if (to_ws != c->ws) {
+                    LOGP("drag: 0x%lx moved along to desktop %d", c->window, to_ws);
+                    client_send_to_ws(c, to_ws); switch_ws(to_ws); client_manage_focus(c);
+                }
+                break;
+            }
             if (k == XK_Escape) { cancel = true; done = true; kb_end = keyboard; }
             else if (keyboard && (k == XK_Return || k == XK_KP_Enter)) { done = true; kb_end = true; }
+            else if (kbsize && (k == XK_Shift_L || k == XK_Shift_R)) {
+                /* luxwm's own: Shift toggles between the edge and the corner next to it (the end nearer the pointer), and back to the
+                   edge picked first; the pointer is put on the new edge or corner, and the drag continues from there */
+                if (hit == HIT_NONE) break;
+                if (pend) { DRAG_STEP(); pend = false; }
+                int ax = vx, ay = vy;
+                if (kx && ky) { if (first_ax == 2) kx = 0; else ky = 0; }
+                else if (kx) { ky = vy < c->geom.y + c->geom.height / 2 ? -1 : 1; ay = ky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1; ax = kx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1; }
+                else { kx = vx < c->geom.x + c->geom.width / 2 ? -1 : 1; ax = kx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1; ay = ky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1; }
+                hit = kb_hit(kx, ky); ox = c->geom.x; oy = c->geom.y; ow = c->geom.width; oh = c->geom.height;
+                px = vx = ax; py = vy = ay;
+                XChangeActivePointerGrab(display, MOUSEMASK, edge_cursor[hit], CurrentTime);
+                XWarpPointer(display, None, root, 0, 0, 0, 0, vx, vy);
+                XSync(display, False); while (XCheckTypedEvent(display, MotionNotify, &ev)) ;
+                LOGP("size mode: Shift -> %s", kx && ky ? "corner" : "edge");
+            }
             else if (keyboard) {
                 int dx = k == XK_Left || k == XK_KP_Left ? -1 : k == XK_Right || k == XK_KP_Right ? 1 : 0;
                 int dy = k == XK_Up || k == XK_KP_Up ? -1 : k == XK_Down || k == XK_KP_Down ? 1 : 0;
                 if (!dx && !dy) break;
+                held[dx < 0 ? 0 : dx > 0 ? 1 : dy < 0 ? 2 : 3] = true;
+                /* an arrow of the other axis that is still held joins in: Right and Down held together size (or move) diagonally */
+                if (!dx) dx = held[1] - held[0];
+                if (!dy) dy = held[3] - held[2];
                 bool ctrl = (ev.xkey.state & ControlMask) != 0;
-                if (kbsize && ((dx && !kx) || (dy && !ky))) {   /* a new edge: the pointer onto it, nothing moves yet */
-                    int ax = dx ? (dx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1) : vx;
-                    int ay = dy ? (dy < 0 ? c->geom.y : c->geom.y + c->geom.height - 1) : vy;
-                    KB_PICK(dx, dy, ax, ay);
+                int nkx = kbsize && !kx ? dx : 0, nky = kbsize && !ky ? dy : 0;
+                if (nkx || nky) {   /* a new edge (both: a corner): the pointer onto it, nothing moves yet (movesize.c NoOffset) */
+                    int ax = nkx ? (nkx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1) : vx;
+                    int ay = nky ? (nky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1) : vy;
+                    KB_PICK(nkx, nky, ax, ay);
                 } else {
                     vx += dx * kb_step(c, ctrl, kbsize, true); vy += dy * kb_step(c, ctrl, kbsize, false);
                     pend = true; pend_x = vx; pend_y = vy; pend_time = ev.xkey.time;
@@ -5251,17 +5448,45 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         }
         case MotionNotify:
             p_ev++; while (XCheckTypedEvent(display, MotionNotify, &ev)) p_ev++;   /* only the latest position */
-            if (kbsize && hit == HIT_NONE) {   /* the mouse picks the edges it moves towards, from where it is (no jump) */
-                int mx = ev.xmotion.x_root - px, my = ev.xmotion.y_root - py;
-                int nkx = abs(mx) > DRAG_THRESHOLD ? (mx < 0 ? -1 : 1) : 0, nky = abs(my) > DRAG_THRESHOLD ? (my < 0 ? -1 : 1) : 0;
-                if (nkx || nky) KB_PICK(nkx, nky, ev.xmotion.x_root, ev.xmotion.y_root);
+            if (kbsize && hit == HIT_NONE) {
+                /* the mouse picks the edges: the border or corner it is on (movesize.c: a hit test on every move in WMSZ_KEYSIZE), or
+                   the ones it moves towards, from where it is (no jump): past 3 x DRAG_THRESHOLD, both edges of a corner when the move is
+                   within about 27 degrees of the diagonal (the shorter axis at least half the longer) */
+                int mx = ev.xmotion.x_root - px, my = ev.xmotion.y_root - py, m = MAX(abs(mx), abs(my)), nkx = 0, nky = 0;
+                int fx = ev.xmotion.x_root - c->geom.x, fy = ev.xmotion.y_root - c->geom.y;
+                int on = fx >= 0 && fy >= 0 && fx < c->geom.width && fy < c->geom.height ? client_hit(c, fx, fy) : HIT_NONE;
+                if (on >= HIT_L && on <= HIT_BR) kb_edges(on, &nkx, &nky);
+                else if (m > 3 * DRAG_THRESHOLD) {
+                    if (2 * abs(mx) >= m) nkx = mx < 0 ? -1 : 1;
+                    if (2 * abs(my) >= m) nky = my < 0 ? -1 : 1;
+                }
+                if (nkx || nky) {   /* the pointer onto the picked edge (or corner): the edge follows it from there */
+                    int ax = nkx ? (nkx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1) : ev.xmotion.x_root;
+                    int ay = nky ? (nky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1) : ev.xmotion.y_root;
+                    KB_PICK(nkx, nky, ax, ay);
+                    XWarpPointer(display, None, root, 0, 0, 0, 0, vx, vy);
+                    XSync(display, False); while (XCheckTypedEvent(display, MotionNotify, &ev)) ;
+                }
                 break;
             }
             if (!moved && abs(ev.xmotion.x_root - px) <= DRAG_THRESHOLD && abs(ev.xmotion.y_root - py) <= DRAG_THRESHOLD)
                 break;
+            if (!moved && !keyboard && hit == HIT_CAPTION && (c->mono || c->snap)) {   /* dragged away: the earlier size again */
+                rest = c->snap ? c->snap_prev : c->prev;
+                snap_tear_off(c, ev.xmotion.x_root, ev.xmotion.y_root);
+                ox = c->geom.x; oy = c->geom.y; px = ev.xmotion.x_root; py = ev.xmotion.y_root;
+            }
             moved = true;
             vx = ev.xmotion.x_root; vy = ev.xmotion.y_root;
             pend = true; pend_x = vx; pend_y = vy; pend_time = ev.xmotion.time;
+            if (!keyboard) {
+                int t = snap_target(c, hit, vx, vy);
+                if (t != snap) {
+                    snap = t;
+                    if (t == SNAP_NONE) snap_preview(0, 0, 0, 0);
+                    else { int x, y, w, h; snap_rect(c, t, &x, &y, &w, &h); snap_preview(x, y, w, h); }
+                }
+            }
             break;
         default:   /* XSyncAlarmNotify: the client has drawn the last step */
             drag_client_alarm(&dc, &ev);
@@ -5282,6 +5507,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
     }
     #undef KB_PICK
     #undef DRAG_STEP
+    if (snap != SNAP_NONE) snap_preview(0, 0, 0, 0);
     if (kbsize || hit != HIT_CAPTION) drag_client_end(c, &dc);
     if (prof && p_n)
         fprintf(stderr, "luxwm prof: drag %s %.0f ms, %d motion events, %d steps, step avg %.2f max %.2f ms (incl. XSync); "
@@ -5289,12 +5515,17 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
                 now_ms() - p_start, p_ev, p_n, p_step / p_n, p_max, frame_prof_ms[3], frame_prof_ms[0] / frame_prof_ms[3], frame_prof_ms[1] / frame_prof_ms[3], frame_prof_ms[2] / frame_prof_ms[3]);
     if (kb_end) XWarpPointer(display, None, root, 0, 0, 0, 0, rx0, ry0);   /* movesize.c: ptRestore when the keyboard ended it */
     XUngrabPointer(display, CurrentTime);
-    if (keyboard) XUngrabKeyboard(display, CurrentTime);
+    if (keyboard) { XUngrabKeyboard(display, CurrentTime); if (!repeat_was) XkbSetDetectableAutoRepeat(display, False, NULL); }
     if (cancel) {
         LOGN("drag cancelled");
         if (was_max) { if (!c->mono) client_apply_max(c); }
         else if (c->geom.x != dg_x || c->geom.y != dg_y || c->geom.width != dg_w || c->geom.height != dg_h) {
             client_move_absolute(c, dg_x, dg_y); client_resize_absolute(c, dg_w, dg_h); }
+        if (was_snap && !c->snap) { c->snap = was_snap; ewmh_update_state(c); }   /* a torn-off snap: snapped again (snap_prev is kept) */
+    } else if (snap != SNAP_NONE) {
+        client_snap_to(c, snap, rest);
+    } else if (hit != HIT_CAPTION && c->snap && c->geom.height != dg_h) {
+        c->snap = SNAP_NONE; ewmh_update_state(c);   /* resized off the full height: no longer snapped */
     }
     XFlush(display);
 }

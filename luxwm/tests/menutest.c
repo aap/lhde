@@ -15,13 +15,13 @@ int main(int argc, char **argv) {
     int sel = argc > 3 ? atoi(argv[3]) : -1, max = argc > 4 ? atoi(argv[4]) : 0, kb = argc > 5 ? atoi(argv[5]) : 1;
     unsigned mx = max ? WMMENU_DISABLED : 0;
     struct wmmenu_item it[] = {
-        { "&Restore", NULL, max ? 0 : WMMENU_DISABLED, WMMENU_GLYPH_RESTORE, 0, NULL, NULL },
-        { "&Move", NULL, mx, 0, 1, NULL, NULL },
-        { "&Size", NULL, mx, 0, 2, NULL, NULL },
-        { "Mi&nimize", NULL, 0, WMMENU_GLYPH_MINIMIZE, 3, NULL, NULL },
-        { "Ma&ximize", NULL, mx, WMMENU_GLYPH_MAXIMIZE, 4, NULL, NULL },
-        { NULL, NULL, WMMENU_SEPARATOR, 0, 5, NULL, NULL },
-        { "&Close", "Alt+F4", WMMENU_DEFAULT, WMMENU_GLYPH_CLOSE, 6, NULL, NULL },
+        { "&Restore", NULL, max ? 0 : WMMENU_DISABLED, WMMENU_GLYPH_RESTORE, 0, NULL, NULL, NULL, 0 },
+        { "&Move", NULL, mx, 0, 1, NULL, NULL, NULL, 0 },
+        { "&Size", NULL, mx, 0, 2, NULL, NULL, NULL, 0 },
+        { "Mi&nimize", NULL, 0, WMMENU_GLYPH_MINIMIZE, 3, NULL, NULL, NULL, 0 },
+        { "Ma&ximize", NULL, mx, WMMENU_GLYPH_MAXIMIZE, 4, NULL, NULL, NULL, 0 },
+        { NULL, NULL, WMMENU_SEPARATOR, 0, 5, NULL, NULL, NULL, 0 },
+        { "&Close", "Alt+F4", WMMENU_DEFAULT, WMMENU_GLYPH_CLOSE, 6, NULL, NULL, NULL, 0 },
     };
     int w, h; cairo_surface_t *s = wmmenu_render(&t, it, 7, sel, kb ? WMMENU_KEYBOARD : 0, &w, &h);
     cairo_surface_write_to_png(s, argv[2]);

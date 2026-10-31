@@ -210,13 +210,19 @@ paints; a double click on the icon, the second press within 500 ms, closes the w
 the caption at the frame's left border; a `_GTK_SHOW_WINDOW_MENU` client message (CLIENT-PROTOCOL.md: luxshell's task buttons, GTK's
 client-side headers) at the point it names, for a minimised window too. Items, mnemonics and greying as `mnsys.c` `xxxSetSysMenu`: **R**estore (greyed unless
 maximised), **M**ove, **S**ize (greyed while maximised; Size also for a window whose size hints fix its size), Mi**n**imize,
-Ma**x**imize (greyed while maximised), separator, **C**lose (the default item, bold) with `Alt+F4` right-aligned. Opened from the
+Ma**x**imize (greyed while maximised), Move to **D**esktop (luxwm's own, below: "Virtual desktops"), separator, **C**lose (the
+default item, bold) with `Alt+F4` right-aligned. Opened from the
 keyboard the first item is selected (greyed or not, as `MNFindNextValidItem`, which skips only separators) and the mnemonics are
 underlined (XP's keyboard cues; a key press shows them in a mouse-opened menu too). Keys: Up/Down/Tab (wrapping, separators skipped),
 Home/End, Enter (on a greyed item nothing happens), a mnemonic (the only item with it is chosen at once; a greyed one is only
 selected; several: the next one), Esc, Alt or F10 close it. Mouse: hover selects (greyed items too, as XP), a release over an enabled
 item chooses it (also the release of the button that opened it, dragged onto an item), a click outside closes it (the click is not
 passed on). Modal like the drags: pointer and keyboard grabbed, Expose/MapRequest/ConfigureRequest of other windows handled meanwhile.
+**Submenus** (`item.sub`) cascade as XP's: a 4 x 7 arrow in the right margin; hovering the item for MenuShowDelay (400 ms), a click on
+it, Right, Enter or its mnemonic opens the submenu beside the item (3 px overlap, left of the parent when it does not fit); Left or
+Esc closes only the submenu, the pointer back over another item of the parent (or a press there) closes it and the parent takes
+over, a click outside both, Alt or F10 closes everything. The submenu shares the parent's keyboard grab and hands the pointer grab
+back when it closes.
 
 **Rendering** (`wmmenu_popup`, an override-redirect ARGB window with `_NET_WM_WINDOW_TYPE_POPUP_MENU`, `_LHWM_MENU` and
 WM_CLASS `lhwm-menu`): the pixels are wuxtheme's popup menu painter (`ut_menu_layout` / `ut_menu_draw` in `<wuxtheme/ut.h>`, over
@@ -268,13 +274,55 @@ while the menu was open is left alone).
 goes to the middle of the caption (Move) or of the window (Size), cursor fleur. Move: arrows move by half a caption button
 (`max(SM_CXSIZE / 2, 1)`: msstyles CAPTIONBARHEIGHT / 2, DWM caption height / 2 = 13 px), Ctrl+arrow 1 px. Size starts with no edge
 (WMSZ_KEYSIZE): the first Left/Right picks the left/right edge, the first Up/Down the top/bottom edge (two of them a corner) and
-puts the pointer on it without changing anything; further arrows move it by the same step (at least one size-hint increment); or
-the mouse picks the edges it moves towards (past `DRAG_THRESHOLD`) and continues from there. In both modes mouse motion takes over;
+puts the pointer on it without changing anything; further arrows move it by the same step (at least one size-hint increment).
+Two arrows held together (Right and Down) step diagonally, in Move as in Size (luxwm's own; X repeats only the last key held).
+**The mouse in Size mode** (luxwm's own, not Windows'): the pointer picks the edges it moves towards once it is 12 px (3 x
+`DRAG_THRESHOLD`) from where the mode started, both edges of the corner when the move is within about 27 degrees of the diagonal
+(the shorter axis at least half the longer), one edge otherwise; a pointer that reaches a border or corner of the frame picks that
+one. The pointer is then put on the picked edge (corner) and the edge follows it. **Shift** toggles between the edge and the
+corner next to it (the end nearer the pointer) and back to the edge picked first, putting the pointer on the new edge or corner;
+the size carries on from there. In both modes mouse motion takes over;
 Enter accepts and puts the pointer back where it was before the mode (ptRestore), a click accepts and leaves it, Esc (or a
 `_NET_WM_MOVERESIZE` cancel) puts the window back to its original rectangle (and the pointer back). Size hints, sync requests and the
 flicker-free resize path are the mouse drag's. Lab (`:3`, aero): Alt+Space, M, Right x3, Down x2, Enter: +39/+26, pointer restored;
-Alt+Space, S, Right x3, Down x2, Enter on an xterm (inc 6x13): +24/+13; Left/Up corner + Esc: unchanged; `_NET_WM_MOVERESIZE` 9 +
-mouse +30 +30: the right edge picked, +30.
+Alt+Space, S, Right x3, Down x2, Enter on an xterm (inc 6x13): +24/+13; Left/Up corner + Esc: unchanged; Size, mouse +15/+1: right edge, pointer on it; Shift: bottom-right corner,
+pointer there, +30/+40 grows both (+30/+39); Shift: the right edge again, +20/+50 widens only; Size, mouse +14/+10: the corner.
+
+## Snap (from Windows 7, not Longhorn)
+
+Windows 7's Aero Snap, added because aap asked for it; neither XP nor the Longhorn builds had it. A **move** drag (the caption, the
+move modifier with its button, `_NET_WM_MOVERESIZE` 8) whose pointer reaches the left or right edge of the work area (the window's
+monitor minus struts, as maximise uses) snaps the window to that half of the work area; one that reaches the top edge maximises it.
+A **resize** drag of the top or bottom border whose pointer reaches that edge of the work area stretches the window to the work
+area's full height, keeping its columns (7's vertical maximise; corners do not). The pointer has to touch the edge, not the frame,
+so an ordinary drag that pushes the frame against or past an edge does not snap; and nothing happens until the button is released:
+while the pointer is at an edge an outline of the target rectangle is shown (4 px of XP's checkered drag-rectangle pattern, an
+override-redirect window `lhwm-snap`: luxwm's choice, 7 drew a glass sheet), and moving away from the edge before the release drops
+it. Escape cancels the drag and the snap. Keyboard Move and Size do not snap.
+
+A snapped window (`c->snap`, `_NET_WM_STATE_MAXIMIZED_VERT` while it spans the full height) remembers the rectangle it had before
+(`c->snap_prev`); a maximised one its restore rectangle as always. **Dragging either away** by the caption gives it that size back at
+once, placed under the pointer at the same fraction of its width (as 7), and the drag continues; dropping it at the top again
+maximises with the pre-snap rectangle as the restore geometry. A resize that changes a snapped window's height ends the snap; a
+width-only resize keeps it. `luxwmc snap_left`, `snap_right` (IPC) go through the same code.
+Lab (`:17`, slate4074, xterm 400x238 at 300,200): drag to x 0 → left half (636 px frame, size hints), `MAXIMIZED_VERT`; dragged away →
+400x238 again under the pointer; to y 0 → maximised; dragged away → 400x238; to x 1279 and back before the release → no snap;
+bottom border to y 799 → full height at the same x; dragged away → 400x238.
+
+## Virtual desktops
+
+Ten desktops (`_NET_NUMBER_OF_DESKTOPS`), switched by the key action `workspace N` (defaults Mod4+1..4 = desktops 0..3), by
+`_NET_CURRENT_DESKTOP` requests (luxshell, any pager) and `_LHSHELL_COMMAND desktop`. A window changes desktop by:
+- **a desktop key while it is moved**: during a move (the window menu's Move, a caption or modifier drag, `_NET_WM_MOVERESIZE`
+  8/10), a key bound to `workspace N` takes the window along to desktop N and switches there; the move goes on;
+- **the window menu's Move to Desktop**: a submenu with Desktop 1..10 (desktop 0..9; mnemonics 1..9 and 0), the window's own one
+  checked; choosing another moves the window there and switches to it;
+- **`_NET_WM_DESKTOP` client messages** (EWMH, data.l[0] = the desktop): the window moves there and the current desktop stays, as a
+  pager expects; 0xFFFFFFFF (all desktops) is not supported and ignored.
+None of this is Windows': XP had no virtual desktops, Longhorn neither. Lab (`:17`): Alt+Space, D, 3 → the window and the session
+on desktop 2; Alt+Space, M, Right, Super+1, Enter → both back on 0; `xdotool set_desktop_for_window W 4` → the window on 4, the
+current desktop still 0; a caption drag with Super+1 pressed on desktop 4 → window and session on 0; the submenu by mouse: open
+after the hover delay, closed when the pointer goes back to Move, a click on Desktop 2 moves the window.
 
 ## Live-editing a theme (2026-10-26)
 

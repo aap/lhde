@@ -23,6 +23,8 @@ struct client {
     int max_prop; Window max_prop_dec; /* _LHWM_MAXIMIZED last written (0 = never, else value + 1) and on which decoration */
     struct client_geom geom;
     struct client_geom prev;
+    int snap;                           /* SNAP_LEFT / SNAP_RIGHT / SNAP_VERT: snapped by a drag to a work-area edge (docs/LUXWM.md "Snap") */
+    struct client_geom snap_prev;       /* the frame rectangle before the snap: a drag away restores its size */
     struct client *next, *f_next;
     int hover, pressed;
     void *icon;   /* cairo_surface_t* */
@@ -52,6 +54,8 @@ struct client {
     long fext[4];                       /* _NET_FRAME_EXTENTS last written (fext_set) */
     bool fext_set;
 };
+
+enum { SNAP_NONE, SNAP_LEFT, SNAP_RIGHT, SNAP_VERT, SNAP_MAX /* a drag target only: maximise */ };
 
 struct config {
     int b_width, i_width, t_height, top_gap, bot_gap, left_gap, right_gap, r_step, m_step, focus_button, move_button, move_mask, resize_button, resize_mask, pointer_interval;
