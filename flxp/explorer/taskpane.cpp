@@ -1,16 +1,38 @@
-// The task band (taskpane.h). The look is taken, not measured: 4051's band
-// (lh4051-232843.png: the folder's big document image faded at the left, links
-// white Tahoma in two columns 26 rows apart, "more" with a small arrow, a light
-// and a dark line at the bottom) and the PDC 2003 demo's (demo_resources:
-// orange/blue/purple aurora backgrounds 788x180, a 128 px preview with the
-// name in ~18 px and metadata in ~12 px beside it, the links in two columns
-// ~180 px apart, 33 rows apart, 16 px icons).
+// The task band (taskpane.h): 4051's preview pane, measured on the 4051
+// screenshots at 1:1 (lh4051-152854/152900 nothing selected, 152336/152329 one
+// file, 152415/152354 one picture, 152420/152358 four pictures; the band
+// starts under the command bar, x from its left edge) and laid out with the
+// rules of System.Windows.Explorer (taskpane/managed.md):
+// - PreviewManager: padding 18 left; the preview box (the band's height - 22
+//   + the 30 px overhang = the height + 8 wide: 134 expanded, 56 compact);
+//   18 px; the title (14 pt) and the metadata, two 180 px columns of 8 pt
+//   rows 17 px apart from y 36, "all properties..." (white in the screenshots,
+//   not the sheet's #C4ECFD; pointer over #F3B680) on the last line, 14 px above the bottom; the preview's natural
+//   width ends 18 px after the two columns.
+// - a framed picture: 2 px white, fitted into the box less 12 (122 x 92 for
+//   800 x 600 expanded, 44 x 33 compact), its bottom 10 px below the band; the
+//   stack's front one 1 - (n-1)/6 * 0.3 of that, the ones behind it 7 and 6 px
+//   further up and left each (ShellViewMultiSelectPreviewer: up to 7, the scale
+//   stepping down; its opacity steps do not show in 152420: drawn opaque).
+// - an icon: 128 px expanded, 48 compact, its bottom 11 px below the band.
+// - WelcomePane: "N" 18 pt, " items" 12 pt, "in this folder" 10 pt, from the
+//   left 18 and the bottom 14; compact on one line ("in this folder" 5 px
+//   after).
+// - PreviewTaskPresenter / OverflowCanvas: the tasks start 8 px right of the
+//   preview's natural width (123 for the count; compact without a selection:
+//   half the band), nothing when fewer than 200 px are left; 189 px columns,
+//   26 px rows (5 + 16 + 5) from y 12, the icon then 4 px then the 10 pt text
+//   in #DBE9F3; compact: one row, the tasks side by side.
+// The faded folder image of the count, the aurora and the band's ends are as
+// before (lh4051-232843.png, the PDC 2003 demo's resources).
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <algorithm>
 #include "taskpane.h"
 #include "lhbar.h"
+#include "preview.h"
 #include "uiicons.h"
 #include "commands.h"
 #include "gdi/png.h"
@@ -18,86 +40,98 @@
 #include "shell/lhdata.h"
 #include "shell/lhtheme.h"
 #include "shell/netres.h"
-#include "shell/thumbs.h"
 
 namespace taskpane {
 
 namespace {
 
-// The band's height (doc/4051-explorer-research.md section 5): expanded
-// (4051's Preview on) 150 rows by default with its two bottom lines, dragged
-// by the bottom edge between EXP_MIN and EXP_MAX (taskpane_height); compact
-// (taskpane_compact = 1, Preview off): 71 rows, a line of text and a row of
-// tasks (lh4051-194746.png). Dragging an expanded band under EXP_MIN - SNAP
-// makes it compact, a compact one dragged down by SNAP expands it; an
+using shell::details::Info;
+using shell::details::Kind;
+
+// The band's height below the command bar (4051: PreviewSplitter Min 150, Max
+// 270, MiniModeHeight 72, all less HeightOffset 24): expanded 126 by default,
+// dragged by the bottom edge between EXP_MIN and EXP_MAX (taskpane_height);
+// compact (taskpane_compact = 1, Preview off) 48. A drag under SPLIT makes it
+// compact, a compact one dragged to SPLIT expands it ((72 + 150) / 2 - 24); an
 // expanded band that would leave the list less than LIST_MIN rows shows
-// compact (4051's _ShouldShowPreview).
-const int EXP_DEFAULT = 150, EXP_MIN = 100, EXP_MAX = 400, COMPACT_H = 71, SNAP = 20, GRIP = 4, LIST_MIN = 150;
+// compact (4051's _OnDragDelta clamps to the total - 150).
+const int EXP_DEFAULT = 126, EXP_MIN = 126, EXP_MAX = 246, COMPACT_H = 48, SPLIT = 87, GRIP = 4, LIST_MIN = 150;
+const int HANG = 16;                   // the rows the preview may hang below the band (its 10 px, the shadow)
+const int PAD = 18, COL = 180, LINE_Y = 36, LINE_H = 17, TASK_COL = 189, TASK_ROW = 26, TASK_Y = 12, TASK_MIN = 200;
+const COLORREF WHITE = RGB(255, 255, 255), TASK_TEXT = RGB(0xDB, 0xE9, 0xF3), MORE_TEXT = RGB(255, 255, 255),
+               MORE_HOT = RGB(0xF3, 0xB6, 0x80);
 int g_room = 100000;                   // rows for the band and the list (set_room)
-const int ICON_X = 12;
-const int COL_W = 196, ROW0 = 16, LINK_ICON = 16;
 int g_exp_h = EXP_DEFAULT;
 bool g_compact;
 int H = EXP_DEFAULT;                   // the current height
-// the big image and the text beside it follow the height (96 px at 104 rows)
-int icon_px() { int i = H == COMPACT_H ? 48 : H - 8; return i < 48 ? 48 : i > 128 ? 128 : i; }
-int text_x() { return ICON_X + icon_px() + 16; }
-int row_h() { int r = (H - 2 - ROW0 - 18) / 2; return r > 27 ? 27 : r; }
-
-struct Link { int id; std::string text, icon; RECT r = {}; };
 
 int effective() { return g_compact || g_room - g_exp_h < LIST_MIN ? COMPACT_H : g_exp_h; }
+bool small() { return H == COMPACT_H; }
+int box_x() { return PAD; }
+int box_w() { return H + 8; }
+int text_x() { return PAD + box_w() + PAD; }
 
-HWND g_wnd;
+struct Link { int id; std::string text, icon; RECT r = {}; };
+struct Text { std::string text; RECT r; int font; COLORREF color; };   // font: an index of g_fonts
+
+HWND g_wnd, g_hang;
+RECT g_hang_rc;                        // what of the preview is below the band (band coordinates; empty: nothing)
+void hang_add(int l, int t, int r, int b)
+{
+    if (b <= H) return;
+    RECT x = { l, t > H ? t : H, r, b };
+    if (g_hang_rc.right <= g_hang_rc.left) g_hang_rc = x;
+    else UnionRect(&g_hang_rc, &g_hang_rc, &x);
+}
 Callbacks g_cb;
 bool g_sizing;                         // dragging the bottom edge
 int g_size_y0, g_size_h0;              // where the drag started (screen y) and the height then
 bool g_size_compact0;
 std::shared_ptr<shell::Folder> g_folder;
-std::vector<shell::Item> g_sel;
+Info g_info;
+bool g_pictures_ok;
+preview::Pictures* g_pics;
 std::vector<Link> g_links;
-RECT g_more = {};
-int g_hot = -1;                        // link index, or -2 = more
+std::vector<Text> g_texts;             // the count, the title and the values
+RECT g_more = {}, g_props = {};        // "more", "all properties..." (empty: none)
+int g_hot = -1;                        // link index, -2 = more, -3 = all properties
 bool g_tracking;
-HFONT g_title, g_text, g_text_u;
+enum { F_NUMBER, F_ITEMS, F_INFOLDER, F_TITLE, F_LINE, F_TASK, F_TASK_U, F_LINE_U, F_COUNT };
+HFONT g_fonts[F_COUNT];
 HBITMAP g_aurora;                      // the demo's background for the current kind, or null
 std::string g_aurora_file, g_aurora_dir;
 bool g_aurora_looked;
-// the selected picture's preview in place of the big icon (the demo's 128 px
-// preview, fitted into the icon's 96 px box: the band keeps its 104 rows)
-const UINT WM_THUMB = WM_APP + 0x31;
-shell::thumbs::Loader* g_loader;
-HBITMAP g_thumb;                       // premultiplied, g_thumb_w x g_thumb_h
-int g_thumb_w, g_thumb_h;
-std::string g_thumb_path;              // the item it shows ("" = none)
-uint32_t g_thumb_gen;
+const UINT WM_PICTURE = WM_APP + 0x31;
 
 std::u16string W(const std::string& s) { return w32::utf16_of(s.c_str()); }
+inline int imax(int a, int b) { return a > b ? a : b; }
+inline int imin(int a, int b) { return a < b ? a : b; }
 
 bool exists(const std::string& p) { struct stat st; return stat(p.c_str(), &st) == 0; }
 
-HFONT font(int px, int weight, bool underline)
+// 4051 draws the pane in Tahoma
+HFONT tahoma(int px, bool underline)
 {
     LOGFONTW lf = {};
-    lf.lfHeight = -px; lf.lfWeight = weight; lf.lfUnderline = underline; lf.lfQuality = ANTIALIASED_QUALITY;
-    const wchar_t* face = L"Segoe UI";
-    for (int i = 0; face[i]; i++) lf.lfFaceName[i] = face[i];
-    HFONT f = CreateFontIndirectW(&lf);
-    // Tahoma when Segoe UI is not there (4051 itself uses Tahoma)
-    HDC dc = GetDC(nullptr);
-    HGDIOBJ old = SelectObject(dc, f);
-    WCHAR got[LF_FACESIZE] = {};
-    GetTextFaceW(dc, LF_FACESIZE, got);
-    SelectObject(dc, old);
-    ReleaseDC(nullptr, dc);
-    if (lstrcmpiW(got, L"Segoe UI")) {
-        DeleteObject(f);
-        const wchar_t* t = L"Tahoma";
-        memset(lf.lfFaceName, 0, sizeof lf.lfFaceName);
-        for (int i = 0; t[i]; i++) lf.lfFaceName[i] = t[i];
-        f = CreateFontIndirectW(&lf);
-    }
-    return f;
+    lf.lfHeight = -px; lf.lfWeight = FW_NORMAL; lf.lfUnderline = underline;
+    lf.lfQuality = px > 13 ? ANTIALIASED_QUALITY : DEFAULT_QUALITY;   // small: as the gasp table says
+    const wchar_t* t = L"Tahoma";
+    for (int i = 0; t[i]; i++) lf.lfFaceName[i] = t[i];
+    return CreateFontIndirectW(&lf);
+}
+
+void make_fonts()
+{
+    if (g_fonts[0]) return;
+    // 18, 12, 10, 14, 8, 10 pt at 96 dpi
+    g_fonts[F_NUMBER] = tahoma(24, false);
+    g_fonts[F_ITEMS] = tahoma(16, false);
+    g_fonts[F_INFOLDER] = tahoma(13, false);
+    g_fonts[F_TITLE] = tahoma(19, false);
+    g_fonts[F_LINE] = tahoma(11, false);
+    g_fonts[F_TASK] = tahoma(13, false);
+    g_fonts[F_TASK_U] = tahoma(13, true);
+    g_fonts[F_LINE_U] = tahoma(11, true);
 }
 
 // The demo's resource directory, only with taskpane_style = aurora:
@@ -174,76 +208,152 @@ const Task ITEM_TASKS[] = {
     { ID_PROPERTIES, "Properties", "settings" },
 };
 
-std::string title()
+SIZE text_size(HDC dc, int font, const std::string& s)
 {
-    if (g_sel.size() == 1) return g_sel[0].name;
-    if (!g_sel.empty()) return std::to_string(g_sel.size()) + " items selected";
-    return g_folder ? g_folder->name() : "";
-}
-
-std::string subtitle()
-{
-    if (g_sel.size() == 1) return g_sel[0].type;
-    if (!g_sel.empty()) return "";
-    return g_folder && g_folder->is_filesystem() ? g_folder->path() : "";
-}
-
-int text_width(HDC dc, HFONT f, const std::string& s)
-{
-    HGDIOBJ old = SelectObject(dc, f);
+    HGDIOBJ old = SelectObject(dc, g_fonts[font]);
     std::u16string w = W(s);
     SIZE sz = {};
     GetTextExtentPoint32W(dc, (LPCWSTR)w.c_str(), (int)w.size(), &sz);
     SelectObject(dc, old);
-    return sz.cx;
+    return sz;
+}
+
+int ascent(HDC dc, int font)
+{
+    HGDIOBJ old = SelectObject(dc, g_fonts[font]);
+    TEXTMETRICW tm = {};
+    GetTextMetricsW(dc, &tm);
+    SelectObject(dc, old);
+    return tm.tmAscent;
+}
+
+// a text whose baseline is at `base`
+void put_base(HDC dc, int font, const std::string& s, int x, int base, COLORREF c, int right = 100000)
+{
+    SIZE sz = text_size(dc, font, s);
+    int top = base - ascent(dc, font);
+    g_texts.push_back(Text{ s, RECT{ x, top, right < x + sz.cx ? right : x + sz.cx, top + sz.cy }, font, c });
+}
+
+void put_top(HDC dc, int font, const std::string& s, int x, int top, COLORREF c, int right = 100000)
+{
+    SIZE sz = text_size(dc, font, s);
+    g_texts.push_back(Text{ s, RECT{ x, top, right < x + sz.cx ? right : x + sz.cx, top + sz.cy }, font, c });
+}
+
+void redraw()
+{
+    if (g_wnd) InvalidateRect(g_wnd, nullptr, FALSE);
+    if (g_hang) InvalidateRect(g_hang, nullptr, FALSE);
+}
+
+// Where everything goes for the width w (layout() with the window's)
+void layout_for(HDC dc, int w)
+{
+    g_texts.clear();
+    g_links.clear();
+    g_more = g_props = RECT{};
+    bool sel = g_info.kind != Kind::Location;
+    int w0;   // the preview's natural width (PreviewTaskPresenter's child 0)
+    if (!sel) {
+        // WelcomePane: the count over the folder's image
+        std::string n = std::to_string(g_info.count), items = shell::details::lh_items_word(g_info.count);
+        bool infolder = g_info.count != 0;
+        int x = PAD, end;
+        if (small()) {
+            int base = H / 2 + 6;
+            put_base(dc, F_NUMBER, n, x, base, WHITE);
+            x += text_size(dc, F_NUMBER, n).cx;
+            put_base(dc, F_ITEMS, items, x, base, WHITE);
+            x += text_size(dc, F_ITEMS, items).cx;
+            if (infolder) { put_base(dc, F_INFOLDER, "in this folder", x + 5, base, WHITE); x += 5 + text_size(dc, F_INFOLDER, "in this folder").cx; }
+            end = x;
+            w0 = w / 2 > end + PAD ? w / 2 : end + PAD;   // no natural width: half the band
+        } else {
+            int base2 = H - 14 - (text_size(dc, F_INFOLDER, "Ag").cy - ascent(dc, F_INFOLDER));
+            int base1 = infolder ? base2 - text_size(dc, F_INFOLDER, "Ag").cy - 1 : base2;
+            put_base(dc, F_NUMBER, n, x, base1, WHITE);
+            int ix = x + text_size(dc, F_NUMBER, n).cx;
+            put_base(dc, F_ITEMS, items, ix, base1, WHITE);
+            end = ix + text_size(dc, F_ITEMS, items).cx;
+            if (infolder) { put_base(dc, F_INFOLDER, "in this folder", x, base2, WHITE); end = imax(end, x + (int)text_size(dc, F_INFOLDER, "in this folder").cx); }
+            w0 = imax(123, end + PAD);
+        }
+    } else {
+        // PreviewManager: the title, the values in two columns, all properties
+        int tx = text_x();
+        w0 = tx + 2 * COL + PAD;
+        int right = imax(tx + 40, imin(w0, w) - PAD);
+        put_top(dc, F_TITLE, shell::details::lh_title(g_info), tx, small() ? 6 : 7, WHITE, right);
+        if (!small()) {
+            int lh = text_size(dc, F_LINE, "Ag").cy;
+            int props_top = H - 14 - lh;
+            std::vector<shell::details::LhLine> lines = shell::details::lh_lines(g_info);
+            int rows = imax(1, (props_top - 4 - LINE_Y - lh) / LINE_H + 1);
+            for (size_t i = 0; i < lines.size() && (int)i < 2 * rows; i++) {
+                int col = (int)i / rows, row = (int)i % rows;
+                put_top(dc, F_LINE, lines[i].text, tx + col * COL, LINE_Y + row * LINE_H, WHITE, tx + col * COL + COL - 8);
+            }
+            SIZE ps = text_size(dc, F_LINE, "all properties...");
+            g_props = RECT{ tx, props_top, tx + ps.cx, props_top + ps.cy };
+        }
+    }
+    // the tasks right of the preview
+    int x0 = w0 + 8;
+    if (w - w0 < TASK_MIN) return;
+    const Task* t = sel ? ITEM_TASKS : FOLDER_TASKS;
+    std::vector<Link> all;
+    for (int i = 0; i < 5; i++) {
+        Link l; l.id = t[i].id; l.text = t[i].text; l.icon = t[i].icon;
+        if (l.id == ID_OPEN && g_info.kind == Kind::One) l.icon = g_info.icon;
+        all.push_back(l);
+    }
+    SIZE more = text_size(dc, F_TASK, "more");
+    int more_w = 12 + more.cx;
+    if (small()) {   // one row, side by side
+        int y = (H - TASK_ROW) / 2 + 5, x = x0;
+        for (size_t i = 0; i < all.size(); i++) {
+            int lw = 16 + 4 + text_size(dc, F_TASK, all[i].text).cx;
+            bool last = i + 1 == all.size();
+            if (x + lw > w - 8 || (!last && x + lw + 15 + more_w > w - 8)) {
+                g_more = RECT{ x, y, x + more_w, y + 16 };
+                return;
+            }
+            all[i].r = RECT{ x, y, x + lw, y + 16 };
+            g_links.push_back(all[i]);
+            x += lw + 15;
+        }
+        return;
+    }
+    int cols = imax(1, (w - x0 - 8) / TASK_COL), rows = imax(1, (H - 2 * TASK_Y) / TASK_ROW);
+    int slots = cols * rows;
+    int shown = (int)all.size() <= slots - 1 ? (int)all.size() : slots - 1;   // the last slot: more
+    for (int i = 0; i < shown; i++) {
+        int x = x0 + (i / rows) * TASK_COL, y = TASK_Y + (i % rows) * TASK_ROW + 5;
+        all[(size_t)i].r = RECT{ x, y, x + 16 + 4 + text_size(dc, F_TASK, all[(size_t)i].text).cx, y + 16 };
+        g_links.push_back(all[(size_t)i]);
+    }
+    int x = x0 + (shown / rows) * TASK_COL, y = TASK_Y + (shown % rows) * TASK_ROW + 5;
+    g_more = RECT{ x, y, x + more_w, y + 16 };
 }
 
 void layout()
 {
-    g_links.clear();
-    const Task* t = g_sel.empty() ? FOLDER_TASKS : ITEM_TASKS;
-    for (int i = 0; i < 5; i++) {
-        Link l; l.id = t[i].id; l.text = t[i].text; l.icon = t[i].icon;
-        if (l.id == ID_OPEN && g_sel.size() == 1) l.icon = g_sel[0].icon;
-        g_links.push_back(l);
-    }
     if (!g_wnd) return;
+    RECT rc; GetClientRect(g_wnd, &rc);
     HDC dc = GetDC(g_wnd);
-    if (H == COMPACT_H) {   // a line of text, then the links side by side and more
-        int x = text_x(), y = 38;
-        for (size_t i = 0; i < g_links.size(); i++) {
-            int w = LINK_ICON + 5 + text_width(dc, g_text, g_links[i].text);
-            g_links[i].r = RECT{ x, y, x + w, y + 18 };
-            x += w + 18;
-        }
-        g_more = RECT{ x, y, x + 12 + text_width(dc, g_text, "more"), y + 18 };
-        ReleaseDC(g_wnd, dc);
-        InvalidateRect(g_wnd, nullptr, FALSE);
-        return;
-    }
-    int tw = text_width(dc, g_title, title());
-    int sw = text_width(dc, g_text, subtitle());
-    int c0 = text_x() + (tw > sw ? tw : sw) + 40;
-    if (c0 < text_x() + 170) c0 = text_x() + 170;
-    if (c0 > text_x() + 320) c0 = text_x() + 320;   // a long path is clipped
-    for (size_t i = 0; i < g_links.size(); i++) {
-        int col = (int)i / 3, row = (int)i % 3;
-        int x = c0 + col * COL_W, y = ROW0 + row * row_h();
-        int w = LINK_ICON + 5 + text_width(dc, g_text, g_links[i].text);
-        g_links[i].r = RECT{ x, y, x + w, y + 18 };
-    }
-    int mx = c0 + COL_W + 8, my = ROW0 + 2 * row_h();
-    g_more = RECT{ mx, my, mx + 12 + text_width(dc, g_text, "more"), my + 18 };
+    layout_for(dc, rc.right);
     ReleaseDC(g_wnd, dc);
-    InvalidateRect(g_wnd, nullptr, FALSE);
+    redraw();
 }
 
-void draw_text(HDC dc, HFONT f, const std::string& s, int x, int y, COLORREF c, int right = 100000)
+void draw_text(HDC dc, const Text& t)
 {
-    HGDIOBJ old = SelectObject(dc, f);
-    std::u16string w = W(s);
-    RECT r = { x, y, right, y + 40 };
-    SetTextColor(dc, c);
+    HGDIOBJ old = SelectObject(dc, g_fonts[t.font]);
+    std::u16string w = W(t.text);
+    RECT r = t.r;
+    r.bottom += 4;
+    SetTextColor(dc, t.color);
     DrawTextW(dc, (LPCWSTR)w.c_str(), (int)w.size(), &r, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
     SelectObject(dc, old);
 }
@@ -291,69 +401,71 @@ void draw_icon(HDC dc, const std::string& key, int size, int x, int y, int alpha
     DestroyIcon(ic);
 }
 
-void notify(void*) { if (g_wnd) PostMessageW(g_wnd, WM_THUMB, 0, 0); }   // a worker thread
-
-void drop_thumb()
+void notify_pictures()
 {
-    if (g_thumb) DeleteObject(g_thumb);
-    g_thumb = nullptr;
-    g_thumb_path.clear();
+    std::vector<std::string> want;
+    if (g_pictures_ok) want = g_info.previews;
+    if (!g_pics && !want.empty() && g_wnd) g_pics = new preview::Pictures(g_wnd, WM_PICTURE);
+    if (g_pics) g_pics->want(want, 256);
 }
 
-// one picture selected: ask for its thumbnail (cached 128 px, fitted to icon_px())
-void request_thumb()
+// one framed picture: 2 px white around it, a 3 px shadow right and below;
+// (x, y, w, h) is the frame's outside, `alpha` its opacity
+void draw_framed(HDC dc, HBITMAP bmp, int bw, int bh, int x, int y, int alpha)
 {
-    if (g_loader) g_thumb_gen = g_loader->cancel();
-    if (g_sel.size() == 1 && g_thumb_path == g_sel[0].path) return;
-    drop_thumb();
-    if (g_sel.size() != 1) return;
-    const shell::Item& it = g_sel[0];
-    if (it.is_folder() || (it.flags & shell::IsVirtual) || it.path.empty() || it.path[0] != '/') return;
-    if (!shell::thumbs::can_thumbnail(it.path)) return;
-    if (!g_loader) { g_loader = new shell::thumbs::Loader(notify, nullptr, 1); g_thumb_gen = g_loader->generation(); }
-    g_loader->request(g_thumb_gen, 0, it.path, it.mtime, icon_px());
-}
-
-void take_thumbs()
-{
-    shell::thumbs::Loader::Result r;
-    while (g_loader && g_loader->take(r)) {
-        if (r.gen == g_thumb_gen && r.bmp && g_sel.size() == 1 && r.path == g_sel[0].path) {
-            drop_thumb();
-            BITMAPINFO bi = {};
-            bi.bmiHeader.biSize = sizeof bi.bmiHeader;
-            bi.bmiHeader.biWidth = r.bmp->width; bi.bmiHeader.biHeight = -r.bmp->height;
-            bi.bmiHeader.biPlanes = 1; bi.bmiHeader.biBitCount = 32;
-            void* bits = nullptr;
-            g_thumb = CreateDIBSection(nullptr, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
-            if (g_thumb) {
-                for (int y = 0; y < r.bmp->height; y++) {
-                    const uint32_t* s = r.bmp->row(y);
-                    uint32_t* d = (uint32_t*)bits + (size_t)y * r.bmp->width;
-                    for (int x = 0; x < r.bmp->width; x++) {     // straight -> premultiplied
-                        uint32_t p = s[x], a = p >> 24;
-                        d[x] = a << 24 | (((p >> 16) & 0xff) * a / 255) << 16 | (((p >> 8) & 0xff) * a / 255) << 8 | (p & 0xff) * a / 255;
-                    }
-                }
-                g_thumb_w = r.bmp->width; g_thumb_h = r.bmp->height;
-                g_thumb_path = r.path;
-                if (g_wnd) InvalidateRect(g_wnd, nullptr, FALSE);
-            }
-        }
-        shell::thumbs::free_result(r);
+    int w = bw + 4, h = bh + 4;
+    hang_add(x, y, x + w + 3, y + h + 3);
+    static const int SHADOW[3] = { 150, 90, 40 };
+    for (int i = 0; i < 3; i++) {
+        preview::fill_alpha(dc, x + w + i, y + 3 + i, 1, h - 3, RGB(0, 0, 0), SHADOW[i] * alpha / 255);
+        preview::fill_alpha(dc, x + 3 + i, y + h + i, w - 3 + 1, 1, RGB(0, 0, 0), SHADOW[i] * alpha / 255);
     }
+    preview::fill_alpha(dc, x, y, w, h, WHITE, alpha);
+    preview::blend(dc, bmp, x + 2, y + 2, bw, bh, alpha);
 }
 
-// the preview centred in the icon's box, a thin dark frame around it
-void draw_thumb(HDC dc, int x, int y)
+// the preview box: the picture(s) or the icon; nothing selected the folder's image faded
+void draw_preview(HDC dc)
 {
-    int tx = x + (icon_px() - g_thumb_w) / 2, ty = y + (icon_px() - g_thumb_h) / 2;
-    HDC mem = CreateCompatibleDC(dc);
-    HGDIOBJ old = SelectObject(mem, g_thumb);
-    BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-    AlphaBlend(dc, tx, ty, g_thumb_w, g_thumb_h, mem, 0, 0, g_thumb_w, g_thumb_h, bf);
-    SelectObject(mem, old);
-    DeleteDC(mem);
+    int bx = box_x(), bw = box_w();
+    if (g_info.kind == Kind::Location) {
+        std::string key = g_folder ? g_folder->icon() : "folder";
+        draw_icon(dc, key, 128, 4, 8, 90);
+        return;
+    }
+    // the pictures there are, the item of interest first
+    struct Pic { HBITMAP bmp; int w, h; };
+    std::vector<Pic> pics;
+    int n = (int)g_info.previews.size();
+    double front = 1.0 - (n > 1 ? (n - 1) / 6.0 * 0.3 : 0.0);
+    int maxf = (int)((bw - 12) * front);
+    for (int i = 0; g_pics && g_pictures_ok && i < n; i++) {
+        int k = i == 0 ? maxf : (int)(maxf * (1.0 - 0.01 * i));
+        Pic p = {};
+        p.bmp = g_pics->get(g_info.previews[(size_t)i], k - 4, k - 4, &p.w, &p.h);
+        if (p.bmp) pics.push_back(p);
+    }
+    if (pics.empty()) {
+        int size = small() ? 48 : 128;
+        draw_icon(dc, g_info.icon, size, bx + (bw - size) / 2, H + 11 - size, 255);
+        hang_add(bx + (bw - size) / 2, H, bx + (bw + size) / 2, H + 11);
+        return;
+    }
+    int bottom = H + 10;
+    if (pics.size() == 1) {
+        const Pic& p = pics[0];
+        draw_framed(dc, p.bmp, p.w, p.h, bx + (bw - p.w - 4) / 2, bottom - p.h - 4, 255);
+        return;
+    }
+    // the stack: the front one at the box's right and bottom (as one picture of
+    // the box's width would end), the others up and left of it
+    int right = bx + bw - 6;
+    double dx = bw * 7.0 / 134, dy = bw * 6.0 / 134;
+    for (int i = (int)pics.size() - 1; i >= 0; i--) {
+        const Pic& p = pics[(size_t)i];
+        int x = right - (int)(dx * i) - (p.w + 4), y = bottom - (int)(dy * i) - (p.h + 4);
+        draw_framed(dc, p.bmp, p.w, p.h, x, y, 255);
+    }
 }
 
 void paint_background(HDC dc, int w)
@@ -392,58 +504,101 @@ void paint_background(HDC dc, int w)
         DeleteObject(b);
     }
     DeleteDC(mem);
+    // under the band (what the preview hangs over): the left pane's white
+    RECT under = { 0, H, w, H + HANG };
+    HBRUSH wb = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
+    FillRect(dc, &under, wb);
+    DeleteObject(wb);
 }
 
-void paint(HDC wdc)
+// The band and what hangs below it, into a bitmap w x (H + HANG)
+HBITMAP render(HDC wdc, int w)
+{
+    HDC dc = CreateCompatibleDC(wdc);
+    HBITMAP buf = CreateCompatibleBitmap(wdc, w, H + HANG);
+    HGDIOBJ oldb = SelectObject(dc, buf);
+    paint_background(dc, w);
+    SetBkMode(dc, TRANSPARENT);
+    g_hang_rc = RECT{};
+    draw_preview(dc);
+    for (const Text& t : g_texts) draw_text(dc, t);
+    if (g_props.right > g_props.left)
+        draw_text(dc, Text{ "all properties...", g_props, g_hot == -3 ? F_LINE_U : F_LINE, g_hot == -3 ? MORE_HOT : MORE_TEXT });
+    for (size_t i = 0; i < g_links.size(); i++) {
+        const Link& l = g_links[i];
+        if (!l.icon.empty()) draw_icon(dc, l.icon, 16, l.r.left, l.r.top, 255);
+        RECT r = l.r; r.left += 20; r.top -= 1;
+        draw_text(dc, Text{ l.text, r, (int)i == g_hot ? F_TASK_U : F_TASK, TASK_TEXT });
+    }
+    if (g_more.right > g_more.left) {
+        // more: imageres 4110's 5 x 3 down arrow, then the word
+        int ax = g_more.left + 2, ay = g_more.top + 7;
+        HPEN pen = CreatePen(PS_SOLID, 1, TASK_TEXT);
+        HGDIOBJ op = SelectObject(dc, pen);
+        for (int k = 0; k < 3; k++) { MoveToEx(dc, ax + k, ay + k, nullptr); LineTo(dc, ax + 5 - k, ay + k); }
+        SelectObject(dc, op);
+        DeleteObject(pen);
+        RECT r = g_more; r.left += 12; r.top -= 1;
+        draw_text(dc, Text{ "more", r, g_hot == -2 ? F_TASK_U : F_TASK, TASK_TEXT });
+    }
+    SelectObject(dc, oldb);
+    DeleteDC(dc);
+    return buf;
+}
+
+void place_hang();
+void paint(HWND h, HDC wdc)
 {
     RECT rc; GetClientRect(g_wnd, &rc);
     int w = rc.right;
     if (w <= 0) return;
-    HDC dc = CreateCompatibleDC(wdc);
-    HBITMAP buf = CreateCompatibleBitmap(wdc, w, H);
-    HGDIOBJ oldb = SelectObject(dc, buf);
-    paint_background(dc, w);
-    SetBkMode(dc, TRANSPARENT);
-    // the big image: the folder's faded (4051), the selection's whole (the demo's preview)
-    std::string key = g_sel.size() == 1 ? g_sel[0].icon : g_folder ? g_folder->icon() : "folder";
-    const COLORREF WHITE = RGB(255, 255, 255), SOFT = RGB(226, 232, 245);
-    int c0 = g_links.empty() ? w : g_links[0].r.left;
-    if (H == COMPACT_H) {
-        draw_icon(dc, key, 48, ICON_X, (H - 2 - 48) / 2, g_sel.size() == 1 ? 255 : 90);
-        std::string line = title(), sub = subtitle();
-        if (!sub.empty() && g_sel.size() == 1) line += "  -  " + sub;
-        draw_text(dc, g_text, line, text_x(), 14, WHITE, w - 8);
-    } else {
-        if (g_thumb && g_sel.size() == 1 && g_thumb_path == g_sel[0].path) draw_thumb(dc, ICON_X, (H - icon_px()) / 2);
-        else draw_icon(dc, key, icon_px(), ICON_X, (H - icon_px()) / 2, g_sel.size() == 1 ? 255 : 90);
-        draw_text(dc, g_title, title(), text_x(), 12, WHITE, c0 - 16);
-        draw_text(dc, g_text, subtitle(), text_x(), 40, SOFT, c0 - 16);
-    }
-    for (size_t i = 0; i < g_links.size(); i++) {
-        const Link& l = g_links[i];
-        if (l.r.left >= w) continue;
-        if (!l.icon.empty()) draw_icon(dc, l.icon, LINK_ICON, l.r.left, l.r.top + 1, 255);
-        draw_text(dc, (int)i == g_hot ? g_text_u : g_text, l.text, l.r.left + LINK_ICON + 5, l.r.top, WHITE, w);
-    }
-    // more: a small down arrow, then the word (4051)
-    int ax = g_more.left + 2, ay = g_more.top + 8;
-    HPEN pen = CreatePen(PS_SOLID, 1, SOFT);
-    HGDIOBJ op = SelectObject(dc, pen);
-    for (int k = 0; k < 3; k++) { MoveToEx(dc, ax + k, ay + k, nullptr); LineTo(dc, ax + 5 - k, ay + k); }
-    SelectObject(dc, op);
-    DeleteObject(pen);
-    draw_text(dc, g_hot == -2 ? g_text_u : g_text, "more", g_more.left + 12, g_more.top, SOFT, w);
-    BitBlt(wdc, 0, 0, w, H, dc, 0, 0, SRCCOPY);
-    SelectObject(dc, oldb);
+    HBITMAP buf = render(wdc, w);
+    HDC mem = CreateCompatibleDC(wdc);
+    HGDIOBJ old = SelectObject(mem, buf);
+    if (h == g_wnd) BitBlt(wdc, 0, 0, w, H, mem, 0, 0, SRCCOPY);
+    else BitBlt(wdc, 0, 0, g_hang_rc.right - g_hang_rc.left, g_hang_rc.bottom - g_hang_rc.top, mem, g_hang_rc.left, g_hang_rc.top, SRCCOPY);
+    SelectObject(mem, old);
+    DeleteDC(mem);
     DeleteObject(buf);
-    DeleteDC(dc);
+    static RECT placed;
+    if (h == g_wnd && !EqualRect(&placed, &g_hang_rc)) { placed = g_hang_rc; place_hang(); }
+}
+
+// the overhang window: over the left pane, under the preview box
+void place_hang()
+{
+    if (!g_wnd || !g_hang) return;
+    RECT r; GetWindowRect(g_wnd, &r);
+    POINT p = { r.left, r.top };
+    ScreenToClient(GetParent(g_wnd), &p);
+    bool show = IsWindowVisible(g_wnd) && g_hang_rc.right > g_hang_rc.left;
+    if (!show) { if (IsWindowVisible(g_hang)) ShowWindow(g_hang, SW_HIDE); return; }   // (never moved to 0 x 0)
+    SetWindowPos(g_hang, HWND_TOP, p.x + g_hang_rc.left, p.y + g_hang_rc.top, g_hang_rc.right - g_hang_rc.left,
+                 g_hang_rc.bottom - g_hang_rc.top, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    InvalidateRect(g_hang, nullptr, FALSE);
 }
 
 int hit(POINT p)
 {
     for (size_t i = 0; i < g_links.size(); i++) if (PtInRect(&g_links[i].r, p)) return (int)i;
     if (PtInRect(&g_more, p)) return -2;
+    if (PtInRect(&g_props, p)) return -3;
     return -1;
+}
+
+LRESULT CALLBACK hang_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
+{
+    switch (msg) {
+    case WM_ERASEBKGND: return 1;
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC dc = BeginPaint(h, &ps);
+        paint(h, dc);
+        EndPaint(h, &ps);
+        return 0;
+    }
+    }
+    return DefWindowProcW(h, msg, wp, lp);
 }
 
 LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
@@ -453,7 +608,7 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC dc = BeginPaint(h, &ps);
-        paint(dc);
+        paint(h, dc);
         EndPaint(h, &ps);
         return 0;
     }
@@ -484,11 +639,10 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         if (g_sizing) {
             POINT s = p; ClientToScreen(h, &s);
             int want = g_size_h0 + (s.y - g_size_y0);
-            bool compact = g_compact;
+            bool compact = want < SPLIT;
             int eh = g_exp_h;
-            if (compact) { if (want >= COMPACT_H + SNAP) { compact = false; eh = want < EXP_MIN ? EXP_MIN : want; } }
-            else if (want < EXP_MIN - SNAP) { compact = true; if (!g_size_compact0) eh = g_size_h0; }   // expands again to where it was
-            else eh = want < EXP_MIN ? EXP_MIN : want;
+            if (!compact) eh = want < EXP_MIN ? EXP_MIN : want;
+            else if (!g_size_compact0) eh = g_size_h0;   // expands again to where it was
             if (eh > EXP_MAX) eh = EXP_MAX;
             if (!compact && eh > g_room - LIST_MIN) eh = g_room - LIST_MIN < EXP_MIN ? EXP_MIN : g_room - LIST_MIN;
             if (compact != g_compact || eh != g_exp_h) {
@@ -500,7 +654,7 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             return 0;
         }
         int i = hit(p);
-        if (i != g_hot) { g_hot = i; InvalidateRect(h, nullptr, FALSE); }
+        if (i != g_hot) { g_hot = i; redraw(); }
         if (!g_tracking) {
             TRACKMOUSEEVENT t = { sizeof t, TME_LEAVE, h, 0 };
             g_tracking = TrackMouseEvent(&t);
@@ -509,17 +663,19 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     }
     case WM_MOUSELEAVE:
         g_tracking = false;
-        if (g_hot != -1) { g_hot = -1; InvalidateRect(h, nullptr, FALSE); }
+        if (g_hot != -1) { g_hot = -1; redraw(); }
         return 0;
     case WM_LBUTTONUP: {
         if (g_sizing) { ReleaseCapture(); return 0; }
         POINT p = { (SHORT)LOWORD(lp), (SHORT)HIWORD(lp) };
         int i = hit(p);
-        bool sel = !g_sel.empty();
+        bool sel = g_info.kind != Kind::Location;
         if (i == -2 && g_cb.more) {
             POINT s = { g_more.left, g_more.bottom };
             ClientToScreen(h, &s);
             g_cb.more(sel, s.x, s.y);
+        } else if (i == -3 && g_cb.command) {
+            g_cb.command(ID_PROPERTIES, true);     // MoreButton: the selection's "properties" verb
         } else if (i >= 0 && g_cb.command) {
             int id = g_links[(size_t)i].id;
             g_cb.command(id, sel);
@@ -527,10 +683,17 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     }
     case WM_SIZE:
-        InvalidateRect(h, nullptr, FALSE);
+        layout();
+        place_hang();
         return 0;
-    case WM_THUMB:
-        take_thumbs();
+    case WM_WINDOWPOSCHANGED:
+        place_hang();
+        break;
+    case WM_SHOWWINDOW:
+        if (g_hang) ShowWindow(g_hang, wp && g_hang_rc.right > g_hang_rc.left ? SW_SHOWNA : SW_HIDE);
+        break;
+    case WM_PICTURE:
+        if (g_pics && g_pics->take()) redraw();
         return 0;
     }
     return DefWindowProcW(h, msg, wp, lp);
@@ -561,34 +724,37 @@ void set_compact(bool on)
 HWND create(HWND frame, const Callbacks& cb)
 {
     g_cb = cb;
-    int eh = atoi(shell::setting("taskpane_height", "150").c_str());
+    int eh = atoi(shell::setting("taskpane_height", "126").c_str());
     g_exp_h = eh < EXP_MIN ? EXP_MIN : eh > EXP_MAX ? EXP_MAX : eh;
     g_compact = shell::setting("taskpane_compact", "0") == "1";
     H = effective();
-    if (!g_title) {
-        g_title = font(18, FW_NORMAL, false);
-        g_text = font(12, FW_NORMAL, false);
-        g_text_u = font(12, FW_NORMAL, true);
-    }
+    make_fonts();
     WNDCLASSW wc = {};
     wc.lpfnWndProc = proc;
     wc.hCursor = LoadCursorW(nullptr, (LPCWSTR)IDC_ARROW);
     wc.lpszClassName = L"flxp_taskband";
     RegisterClassW(&wc);
+    wc.lpfnWndProc = hang_proc;
+    wc.lpszClassName = L"flxp_taskband_hang";
+    RegisterClassW(&wc);
     g_wnd = CreateWindowExW(0, L"flxp_taskband", nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
         0, 0, 0, H, frame, nullptr, nullptr, nullptr);
+    g_hang = CreateWindowExW(0, L"flxp_taskband_hang", nullptr, WS_CHILD | WS_CLIPSIBLINGS,
+        0, 0, 0, 0, frame, nullptr, nullptr, nullptr);
+    notify_pictures();
     layout();
     return g_wnd;
 }
 
 void destroy()
 {
+    if (g_hang) DestroyWindow(g_hang);
     if (g_wnd) DestroyWindow(g_wnd);
-    g_wnd = nullptr;
+    g_wnd = g_hang = nullptr;
     g_hot = -1;
     g_tracking = false;
-    if (g_loader) g_thumb_gen = g_loader->cancel();
-    drop_thumb();
+    delete g_pics;
+    g_pics = nullptr;
 }
 
 HWND window() { return g_wnd; }
@@ -596,20 +762,14 @@ HWND window() { return g_wnd; }
 void set_folder(const std::shared_ptr<shell::Folder>& f)
 {
     g_folder = f;
-    g_sel.clear();
-    request_thumb();
     layout();
 }
 
-void set_selection(const std::vector<shell::Item>& items)
+void set_details(const Info& in, bool pictures)
 {
-    if (items.size() == g_sel.size()) {
-        bool same = true;
-        for (size_t i = 0; i < items.size() && same; i++) same = items[i].path == g_sel[i].path;
-        if (same) return;
-    }
-    g_sel = items;
-    request_thumb();
+    g_info = in;
+    g_pictures_ok = pictures;
+    notify_pictures();
     layout();
 }
 
@@ -617,7 +777,7 @@ void theme_changed()
 {
     g_aurora_looked = false;
     g_aurora_file = "-";
-    if (g_wnd) InvalidateRect(g_wnd, nullptr, FALSE);
+    redraw();
 }
 
 std::string source()

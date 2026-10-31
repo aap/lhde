@@ -23,6 +23,8 @@
 #include "shell/runtime.h"
 #include "shell/lhdata.h"
 #include "shell/lhtheme.h"
+#include "shell/details.h"
+#include "shell/thumbs.h"
 #include "commands.h"
 #include "dialogs.h"
 #include "fileopui.h"
@@ -523,10 +525,44 @@ static void destroy(HWND rebar)
 
 } // namespace brand
 
+// ---- the details: XP's Details section, 4051's band ---------------------------
+
+enum { WM_APP_DETAILS = WM_APP + 2 };
+static bool g_details_pending;
+
+// What shell/details says about the folder or the selection, to the panes that
+// show it: computed once per burst of changes (a selection of many items
+// sends a notification per item)
+static void schedule_details()
+{
+    if (g_details_pending || !g.frame) return;
+    g_details_pending = true;
+    PostMessageW(g.frame, WM_APP_DETAILS, 0, 0);
+}
+
+static void update_details()
+{
+    g_details_pending = false;
+    bool xp = places::window() && !g.longhorn;
+    if (!g.folder || (!xp && !g.taskband)) return;
+    std::vector<Item> sel = browser::selection(g);
+    int focus = -1;
+    int fi = (int)SendMessageW(g.list, LVM_GETNEXTITEM, (WPARAM)-1, LVNI_FOCUSED);
+    if (fi >= 0 && fi < (int)g.items.size())
+        for (size_t i = 0; i < sel.size(); i++) if (sel[i].path == g.items[(size_t)fi].path) focus = (int)i;
+    shell::details::Info in = shell::details::describe(sel, shell::details::location_item(*g.folder), (int)g.items.size(), focus);
+    // pictures: where thumbnails are allowed (thumbnails, thumbnails_network)
+    bool pictures = g.folder->is_filesystem() && shell::thumbs::enabled_for(g.folder->path());
+    // XP: no mini preview in the Thumbnails view (CDUIView::ShouldShowMiniPreview)
+    if (xp) places::set_details(in, pictures && browser::view_code(g) != VIEW_THUMBNAILS, g.folder->path() == "::computer");
+    if (g.taskband) taskpane::set_details(in, pictures);
+}
+
 // ---- status bar -------------------------------------------------------------
 
 static void update_status()
 {
+    schedule_details();
     if (!g.status) return;
     int sel = (int)SendMessageW(g.list, LVM_GETSELECTEDCOUNT, 0, 0);
     char buf[128];
@@ -730,6 +766,7 @@ void Explorer::shown()
     places::folder_changed();
     browser::set_window_icon(frame, folder->icon());
     if (taskband) taskpane::set_folder(folder);
+    schedule_details();
     sync_tree();
 }
 
@@ -1212,6 +1249,7 @@ static void create_children(HWND frame)
         places::Options po;
         po.groups = g.longhorn;              // the Longhorn frame: the dialog's groups look; XP: the task pane
         po.remember = "places_collapsed";
+        po.details = true;                   // XP's Details section
         places::create(frame, IDC_PLACES, pcb, po);
     }
     // XP's Folders tree has no client edge inside the band site
@@ -1595,7 +1633,6 @@ static LRESULT on_notify(NMHDR* nm)
             return 0;
         case LVN_ITEMCHANGED:
             update_status();
-            if (g.taskband) taskpane::set_selection(selection());
             return 0;
         case LVN_KEYDOWN: {
             NMLVKEYDOWN* kd = (NMLVKEYDOWN*)nm;
@@ -1954,9 +1991,12 @@ static void sync_taskpane()
         taskpane::Callbacks cb = { taskpane_command, taskpane_more, taskpane_resized };
         g.taskband = taskpane::create(g.frame, cb);
         if (g.folder) taskpane::set_folder(g.folder);
+        places::set_top_inset(14);           // the band's preview hangs over the left pane
+        schedule_details();
     } else if (!want && g.taskband) {
         taskpane::destroy();
         g.taskband = nullptr;
+        places::set_top_inset(0);
     }
     HMENU view = GetSubMenu(g.menu, 2);
     EnableMenuItem(view, ID_VIEW_TASKPANE, MF_BYCOMMAND | (g.longhorn ? MF_ENABLED : MF_GRAYED));
@@ -2118,6 +2158,9 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     case WM_FLXP_DROP:
     case WM_FLXP_DRAGLEAVE:
         return drop_message(msg, (const FLXPDROP*)lp);
+    case WM_APP_DETAILS:
+        update_details();
+        return 0;
     case WM_APP_REFRESH:
         refresh();
         if (!g_reload_dir.empty()) { tree_reload(g_reload_dir); g_reload_dir.clear(); }

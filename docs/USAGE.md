@@ -378,6 +378,36 @@ a song's artist and album, which XP's tiles show, are not read: those files show
 context menu, the Views drop-down, Folder Options' default view and the XP-look file dialog's View Menu (Tiles, Icons, List,
 Details) list it; a folder shown in Tiles keeps it (`tiles` in `flxp-views`, which the Longhorn frame reads as its Tiles).
 
+## The Explorer's details and task band (flxp)
+
+What the Explorer says about the folder shown or the selection comes from one model (`flxp/shell/details.h`) shown two ways.
+Per kind of item (file, picture, song, folder, drive, a virtual folder such as My Computer) it lists properties from a small
+registry: the derived Type, Attributes, Date Modified, Size, Dimensions, File System, Free Space, Total Size, and the stored
+Description (`user.lux.desc`), Tags (`user.xdg.tags`) and Comment (`user.xdg.comment`), the extended attributes of
+`docs/ANNOTATIONS.md`, read-only for now (set them with `setfattr` or luxfs's `x`).
+
+**XP frame: the Details section.** The task pane's last section, under Places and Bookmarks, is XP's Details rollout. With nothing
+selected it describes the folder itself (its name in bold, "File Folder", Date Modified; My Computer "System Folder"; a drive "Local
+Disk", File System, Free Space, Total Size); with one item its name, type and its kind's lines in XP's order and wording ("Date
+Modified: Today, October 31, 2026, 12:45 PM", "Size: 23.1 KB", "Dimensions: 800 x 600", "Attributes: Read-only, Hidden"), the
+extended attributes when they are set; a picture gets its thumbnail above the name (at most 150 x 100), except in the Thumbnails
+view and where thumbnails are off (`thumbnails = 0`, or a network mount without `thumbnails_network = 1`). Several items: "N items
+selected." and the files' "Total File Size" (for up to 100 items). Like XP the section starts folded except in My Computer; its
+chevron folds and opens it, and from then on it stays as it was left (`places_details = 0|1` in `flxp.ini`).
+
+**Longhorn frame: the task band** (View > Task Band, `taskpane = 1` or `--taskpane`). Build 4051's band under the command bar:
+left to right the preview, the details and the tasks. Nothing selected: the folder's image faded at the left with "N items / in this
+folder" over it, and the folder's tasks (Make a new folder, Search, Open a terminal here, Add to Bookmarks, folder Properties) in
+columns, "more" opening the rest of the folder's menu. One item: its thumbnail in a white frame (a picture) or its 128 px icon,
+hanging a little below the band over the left pane, then its name, its values in two columns (size, date, type; a picture's size,
+date and dimensions) with "Add a description", "Add tags", "Add comments" where those attributes are empty, and "all properties..."
+(the Properties dialog). Several items: a stack of up to seven thumbnails, the focused one in front, "N items selected" and each
+value shared by all or "(multiple values)". The item tasks (Open, Rename, Copy, Delete, Properties) follow when 200 px are left
+right of the details. View > Preview switches between the expanded band (126 rows, its bottom edge drags it up to 246) and the
+compact one (48 rows: the count or the name on one line, a small icon or thumbnail, the tasks side by side); dragging the edge
+above 87 rows expands it, below compacts it (`taskpane_compact`, `taskpane_height` in `flxp.ini`). Thumbnails follow the same
+`thumbnails` and `thumbnails_network` settings as the views; without them the icon shows.
+
 ## Start menu, taskbar autohide, sidebar modes (luxshell M6, `SHELL-DESIGN.md` 6.3/6.4)
 
 **Start menu.** The Start button and the Super key (luxwm sends the root client message `_LHSHELL_START` when Super is pressed
