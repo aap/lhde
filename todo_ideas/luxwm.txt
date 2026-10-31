@@ -6,7 +6,6 @@
 	maximize to left/right half when dragging to left/half edge
 
 * alt-space S to resize works really well for one direction, but diagonal is hard to get right. should be easier
-* dialogs like "Display Properties" currently resizable. not sure whose fault that is, but at the wm layer this should be handled correctly
 
 ## virtual desktops
 

@@ -99,7 +99,8 @@ struct theme {
 /* extended frame (CLIENT-PROTOCOL.md): the plate reaches l/r/t/b client pixels into the client (_LHWM_EXTEND_FRAME), flags from
    _LHWM_FRAME_FLAGS. sheet: the whole client is glass (all four 0xFFFFFFFF). NULL or all zero = the normal frame. */
 /* FRAME_NO_HEADER_PIXMAP is wm.c's only (no _LHWM_HEADER_PIXMAP for the client); the painter never sees it */
-enum { FRAME_NO_TITLE = 1, FRAME_NO_ICON = 2, FRAME_NO_FOG = 4, FRAME_CLIENT_CAPTION = 8, FRAME_NO_HEADER_PIXMAP = 16 };
+enum { FRAME_NO_TITLE = 1, FRAME_NO_ICON = 2, FRAME_NO_FOG = 4, FRAME_CLIENT_CAPTION = 8, FRAME_NO_HEADER_PIXMAP = 16,
+       FRAME_MAX_DISABLED = 1 << 16 };   /* lhwm's own (not a client flag): a fixed-size window's maximise button drawn disabled */
 struct frame_ext { int l, r, t, b, sheet; unsigned flags; };
 
 /* spec: a theme directory (theme.ini + PNG cache), optionally followed by a visual style: "DIR|STYLE.msstyles|COLOR|SIZE"; or the

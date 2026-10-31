@@ -683,6 +683,7 @@ LONG_PTR WINAPI SetWindowLongPtrW(HWND h, INT idx, LONG_PTR v)
         SendMessageW(h, WM_STYLECHANGING, GWL_STYLE, (LPARAM)&ss);
         if (!win::is_window(w)) return 0;
         w->style = (ss.styleNew & ~WS_CHILD) | (w->style & WS_CHILD);
+        win::style_changed(w);
         SendMessageW(h, WM_STYLECHANGED, GWL_STYLE, (LPARAM)&ss);
         return old;
     }

@@ -1249,6 +1249,13 @@ left a strip below the last row / right of the last column that they never repai
   state, sampled in the middle: slate4074 a dark grey; button-face grey without the part), as if the border went on around the client.
   `_NET_FRAME_EXTENTS` stays true: it is the frame around the client as it lies, so a maximised urxvt reads `0 4 27 2` (left, right,
   top, bottom) on aero and `0 4 20 9` on slate4074; it is written only when it changes.
+- **Fixed size** (`client_fixed`): minimum and maximum equal (a win32 window without `WS_THICKFRAME`: wux writes min == max == its
+  size, following every resize it makes itself, and `_MOTIF_WM_HINTS` without resize and maximize; flxp's dialogs, property sheets
+  and message boxes). In every frame mode its edges and corners are a plain border (`client_hit`: `HTBORDER`, no size cursor; a drag
+  there neither sizes nor moves), Alt+drag resize, `_NET_WM_MOVERESIZE` 0..7 and the window menu's Size do nothing, maximise is off
+  (button, double click, Super+Up, the menu's Maximize greyed) and its maximise button is drawn disabled (msstyles: the strip's
+  disabled image; classic: `DFCS_INACTIVE`; DWM sprites have none, so the inactive one at 45 %; `FRAME_MAX_DISABLED`, lhwm's own bit
+  above the client's `_LHWM_FRAME_FLAGS`).
 - **ConfigureRequest** (berry bug, fixed on the way): only the fields in the request's `value_mask` are applied. The others hold the
   geometry the window had when it sent the request, so a client that asked for a size before luxwm had placed it was moved back there
   (`emacs -Q` came up with its client at 0,0 and the frame off-screen). The requested size is fitted like any other.
