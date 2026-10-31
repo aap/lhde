@@ -32,6 +32,7 @@ static void set_font(LOGFONTW& lf, const char16_t* face, int height, int weight)
 namespace w32 {
 void init_sysparams()
 {
+    g_flat_menu = FALSE;    // a style's [SysMetrics] FlatMenus turns it on again; classic and a switch to it: off
     memset(&g_ncm, 0, sizeof g_ncm);
     g_ncm.cbSize = sizeof g_ncm;
     g_ncm.iBorderWidth = 1;
