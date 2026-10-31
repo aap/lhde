@@ -60,7 +60,7 @@ $(O)/flxp/settings/settings.o: flxp/rc/settings.res
 # ---- programs (build/bin) -----------------------------------------------------------------
 # liblhde probes a style through weak ut_* references (liblhde/style.c): a program that does not
 # call them itself (flxp-taskbar) would link without the probe and see every style as "classic"
-UT_PROBE = -Wl,-u,ut_open,-u,ut_close,-u,ut_format,-u,ut_list_classes,-u,ut_color,-u,ut_size,-u,ut_get_resource
+UT_PROBE = -Wl,-u,ut_open,-u,ut_close,-u,ut_format,-u,ut_list_classes,-u,ut_color,-u,ut_size,-u,ut_get_resource,-u,ut_prop,-u,ut_get_string,-u,ut_get_bitmap,-u,ut_free
 W32LINK = $(UT_PROBE) $(SHELLOBJS) $(WUX_LINK)
 W32DEPS = $(SHELLOBJS) $(WUXA) $(LUXNAVA) $(UTA)
 build/bin/flxp: $(EXPLOBJS) $(W32DEPS)

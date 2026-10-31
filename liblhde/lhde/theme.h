@@ -137,6 +137,8 @@ typedef struct {
     char build[16];        /* "4074", "5048", "xp", "" */
     char family[32];       /* slate, jade, aero, luna, plex, royale, ... (OriginalFilename, else the name) */
     char color[64], size[64];   /* the style's first scheme and size */
+    int broken;            /* opens, but an image it needs is not in the file (Button's push button): used as missing */
+    char broken_why[300];
     char path[1024];
 } lhde_style_info;
 /* a style by name (styles/NAME.msstyles, styles/NAME/<name>.msstyles) or path; "classic" gives kind CLASSIC; 0 when missing */

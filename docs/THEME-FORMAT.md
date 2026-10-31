@@ -156,7 +156,8 @@ it was resolved at); a client resolves itself when the property is missing or st
 
 Derived keys besides the theme keys: `theme`, `file`, `chain`, `current` (section 3), `style.kind`, `style.format`,
 `style.family`, `style.missing` and `path.*` (`<lhde/theme.h>`). `style.missing = 1` when the visual style the theme names is
-not imported and the theme fell back to classic (section 6; a substitute style such as luna -> luna4051 is a style: `0`).
+not imported, or is broken (the style probe finds the image its push button names missing from the file: XP refuses such a
+style), and the theme fell back to classic (section 6; a substitute style such as luna -> luna4051 is a style: `0`).
 A theme with its style missing is not offered: Display Properties' Themes list, luxshell's settings flyout and flxp's start menu
 Theme list leave it out (the selected theme stays listed), and `lhde-theme list` marks it "style missing". `classic` is always
 complete. The lists ask `lhde_theme_has_style(NAME)` (the files only, without the current layer); a record has

@@ -589,15 +589,21 @@ static void choose_style(lhde_theme *t, lhde_style_info *si)
     const char *s = get(t, "VisualStyle.style");
     if (!s) { put(t, "VisualStyle.style", "classic", LHDE_FROM_DEFAULT, "default: no style named: classic"); s = "classic"; }
     char want[256]; snprintf(want, sizeof want, "%s", s);
-    if (lhde_style_probe(want, si)) return;
+    char broken[400] = "";
+    if (lhde_style_probe(want, si)) {
+        if (!si->broken) return;
+        snprintf(broken, sizeof broken, "%s", si->broken_why);   /* XP refuses such a style: so do we */
+    }
     static const char *const alt[][3] = { { "luna", "luna4051", "luna4074" }, { "luna-xp", "luna", "luna4051" }, { NULL, NULL, NULL } };
     for (int i = 0; alt[i][0]; i++) {
         if (strcmp(alt[i][0], want)) continue;
-        for (int j = 1; j < 3; j++) if (lhde_style_probe(alt[i][j], si)) {
+        for (int j = 1; j < 3; j++) if (lhde_style_probe(alt[i][j], si) && !si->broken) {
             char w[600]; snprintf(w, sizeof w, "style %s not imported: %s", want, alt[i][j]);
             fallback(t, "VisualStyle.style", alt[i][j], w); return; }
     }
-    char w[600]; snprintf(w, sizeof w, "style %s not imported (styles/%s.msstyles): no visual style", want, want);
+    char w[800];
+    if (broken[0]) snprintf(w, sizeof w, "style %s is broken (%s): no visual style", want, broken);
+    else snprintf(w, sizeof w, "style %s not imported (styles/%s.msstyles): no visual style", want, want);
     fallback(t, "VisualStyle.style", "classic", w);
     lhde_style_probe("classic", si);
 }
