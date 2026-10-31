@@ -49,6 +49,10 @@ struct wmmenu_env {
    WMMENU_CANCEL or WMMENU_DBLCLICK. Modal: grabs pointer and keyboard. Submenus (item.sub) open beside their item as XP's cascades:
    after MenuShowDelay (400 ms) of hovering, on a click, Right, Enter or the item's mnemonic; Left or Esc closes only the submenu,
    the pointer back over another item of the parent closes it too. */
+/* the session theme's Fonts.smoothing (standard | cleartype | off): the menus' text smoothing when settings.ini [fonts] smoothing
+   does not say, as for flxp's menus */
+void wmmenu_set_theme_smoothing(const char *v);
+
 int wmmenu_popup(const struct wmmenu_env *env, int x, int y, const struct wmmenu_item *items, int n, unsigned flags, unsigned button);
 
 /* LHWM_MENUTEST: render the menu as wmmenu_popup would draw it (selected item sel, -1 none) into a new image (caller destroys it),

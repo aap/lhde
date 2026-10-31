@@ -2,11 +2,6 @@
 
 ## visuals
 
-* three kinds of context menu still (aap, after the menu unification): flxp's menus draw the Aero/Jade highlight but it is
-	sticky (an item never gets unhighlighted); the taskbar button menu looks the same without the bug (same font rendering?);
-	the start button's right-click menu and the start menu's Programs cascade are a third kind: a different font and no Aero
-	highlight. 4074 itself has no Aero highlight on the Avalon bars' context menus (probably an oversight); it should be
-	universal. Reference: lh4074-215101.png (the Jade Programs menu)
 * XP's Customize Toolbar dialog (View > Toolbars > Customize...: buttons, text options); the icon size alone is in View >
 	Toolbars > Icon Options
 

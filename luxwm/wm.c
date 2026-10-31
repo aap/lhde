@@ -4456,6 +4456,7 @@ lh_theme_apply(const char *arg, char *canon, size_t n)
         snprintf(theme_req_classic, sizeof theme_req_classic, "%s", classic[0] ? classic : "style");
         theme_comp_off = true;
     }
+    wmmenu_set_theme_smoothing(TV("Fonts.smoothing"));   /* the menus' text, with settings.ini [fonts] smoothing over it */
     frame_fonts_set(TV("path.fonts"));   /* registered by the theme_load that follows (docs/history/THEMES.md "fonts") */
     snprintf(theme_anim, sizeof theme_anim, "%s", TV("Glass.animations"));
     if (canon) snprintf(canon, n, "%s", TV("theme"));

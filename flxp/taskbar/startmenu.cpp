@@ -21,6 +21,7 @@
 #include "shell/config.h"
 #include "shell/lhtheme.h"
 #include "taskbar.h"
+#include "wuxtheme/menu.h"
 
 namespace tb {
 namespace startmenu {
@@ -77,10 +78,14 @@ void append_popup(HMENU m, HMENU sub, const std::string& text)
 
 // The Programs menus are XP's start menu bands (the shell's menu band, not user32's menus): items of a 16 px icon
 // and the menu font, owner-drawn here on user32's popups (WM_MEASUREITEM / WM_DRAWITEM to the menus' owner, the
-// bar or the start panel). Measured on XP SP3 (Windows Classic): items 20 px, the icon 5 px from the menu's edge
+// bar or the start panel), marked as bands (UXMENU_MNS_BAND). The plate, the highlight, the arrow, the font and
+// the text colour are the popup menu painter's (wuxtheme/menu.cpp, through menu.c.patch: the DC comes with the
+// highlight drawn and the font and colour selected); the owner draws the icon and the text. Geometry: XP SP3
+// (Windows Classic, and every look without a band of its own): items 20 px, the icon 5 px from the menu's edge
 // (user32 gives the item rectangle from the window's edge; its 3 px border is clipped), the text 29 px, 26 px
-// after the text to the menu's edge (the submenu arrow's room). The items and their icons are kept until
-// the next Programs menu is built.
+// after the text to the menu's edge (the submenu arrow's room); a style with the Longhorn Menu class (UXMENU_SetBand,
+// lh4074-215101.png): the painter's item height (22 px in Segoe UI 9), the icon 10 px and the text 35 px from the
+// outline, 35 px after the text. The items and their icons are kept until the next Programs menu is built.
 struct BandItem { std::u16string text; HBITMAP icon = nullptr; };
 std::deque<BandItem> band_items;
 
@@ -88,6 +93,17 @@ void append_band(HMENU m, UINT_PTR id_or_popup, const std::string& text, HBITMAP
 {
     band_items.push_back({ W(text), icon });
     AppendMenuW(m, MF_OWNERDRAW | (popup ? MF_POPUP : 0), id_or_popup, (LPCWSTR)&band_items.back());
+}
+
+HMENU band_menu()
+{
+    HMENU m = CreatePopupMenu();
+    MENUINFO mi = {};
+    mi.cbSize = sizeof mi;
+    mi.fMask = MIM_STYLE;
+    mi.dwStyle = UXMENU_MNS_BAND;
+    SetMenuInfo(m, &mi);
+    return m;
 }
 
 bool is_band_item(ULONG_PTR data)
@@ -129,13 +145,13 @@ HMENU programs_menu()
     }
     for (BandItem& b : band_items) if (b.icon) DeleteObject(b.icon);    // the previous Programs menu is destroyed by now
     band_items.clear();
-    HMENU m = CreatePopupMenu();
+    HMENU m = band_menu();
     for (int gi = 0; gi < n; gi++) {
         if (by[gi].empty()) continue;
         std::sort(by[gi].begin(), by[gi].end(), [](const shell::App* a, const shell::App* b) {
             return strcasecmp(a->name.c_str(), b->name.c_str()) < 0;
         });
-        HMENU sub = CreatePopupMenu();
+        HMENU sub = band_menu();
         for (const shell::App* a : by[gi]) {
             append_band(sub, CMD_APP + (UINT)app_cmds.size(), a->name, startpanel::menu_bitmap(a->icon, "exe"), false);
             app_cmds.push_back(a);
@@ -460,6 +476,18 @@ bool run_line(const std::string& cmd) { return run_shell(cmd); }
 
 HMENU programs_popup() { return programs_menu(); }
 
+// the band's geometry in the look of the moment: item height, icon and text x from the item's left, room after the text
+struct BandGeom { int item_h, icon_x, text_x, after; bool band; };
+BandGeom band_geom(int text_h)
+{
+    UXMENU_LOOK L;
+    UXMENU_OpenLook(nullptr, TRUE, &L);     // the look user32 gives the band (menu.c.patch)
+    BandGeom g = L.band ? BandGeom{ L.item_h, L.band_icon_x, L.band_text_x, L.band_text_x, true }
+                        : BandGeom{ (std::max)(20, text_h + 7), 5, 29, 19, false };
+    UXMENU_CloseLook(&L);
+    return g;
+}
+
 bool measure_item(MEASUREITEMSTRUCT* mi)
 {
     if (!mi || mi->CtlType != ODT_MENU || !is_band_item(mi->itemData)) return false;
@@ -473,43 +501,39 @@ bool measure_item(MEASUREITEMSTRUCT* mi)
     SelectObject(dc, o);
     ReleaseDC(nullptr, dc);
     int avg = (abc.cx / 26 + 1) / 2;
-    mi->itemWidth = (UINT)(std::max)(0, 29 + (int)t.cx + 19 - 2 * avg);
-    mi->itemHeight = (UINT)(std::max)(20, (int)t.cy + 7);
+    BandGeom g = band_geom((int)t.cy);
+    mi->itemWidth = (UINT)(std::max)(0, g.text_x + (int)t.cx + g.after - 2 * avg);
+    mi->itemHeight = (UINT)g.item_h;
     return true;
 }
 
+// the plate and the highlight are drawn and the DC has the menu font and the item's text colour (menu.c.patch)
 bool draw_item(const DRAWITEMSTRUCT* di)
 {
     if (!di || di->CtlType != ODT_MENU || !is_band_item(di->itemData)) return false;
     const BandItem* b = (const BandItem*)di->itemData;
     HDC dc = di->hDC;
     RECT r = di->rcItem;
-    bool sel = di->itemState & ODS_SELECTED, flat = false;
-    SystemParametersInfoW(SPI_GETFLATMENU, 0, &flat, 0);
-    if (sel && flat) {      // as user32's own items: the flat menus' selection colour in a frame of the highlight
-        RECT in = r;
-        InflateRect(&in, -1, -1);
-        FillRect(dc, &in, GetSysColorBrush(COLOR_MENUHILIGHT));
-        FrameRect(dc, &r, GetSysColorBrush(COLOR_HIGHLIGHT));
-    } else FillRect(dc, &r, GetSysColorBrush(sel ? COLOR_HIGHLIGHT : COLOR_MENU));
+    TEXTMETRICW tm = {};
+    GetTextMetricsW(dc, &tm);
+    BandGeom g = band_geom((int)tm.tmHeight);
     if (b->icon) {
         BITMAP bm = {};
         GetObjectW(b->icon, sizeof bm, &bm);
         HDC m = CreateCompatibleDC(dc);
         HGDIOBJ o = SelectObject(m, b->icon);
         BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-        GdiAlphaBlend(dc, r.left + 5, (r.top + r.bottom - bm.bmHeight) / 2, bm.bmWidth, bm.bmHeight, m, 0, 0, bm.bmWidth, bm.bmHeight, bf);
+        // the 4074 band: the icon a pixel below the middle (lh4074-215101.png: 4 px above it, 2 below in 22 px)
+        int y = (r.top + r.bottom - bm.bmHeight) / 2 + (g.band ? 1 : 0);
+        GdiAlphaBlend(dc, r.left + g.icon_x, y, bm.bmWidth, bm.bmHeight, m, 0, 0, bm.bmWidth, bm.bmHeight, bf);
         SelectObject(m, o);
         DeleteDC(m);
     }
-    HGDIOBJ o = SelectObject(dc, band_font());
     int mode = SetBkMode(dc, TRANSPARENT);
-    COLORREF tc = SetTextColor(dc, GetSysColor(di->itemState & ODS_GRAYED ? COLOR_GRAYTEXT : sel ? COLOR_HIGHLIGHTTEXT : COLOR_MENUTEXT));
-    RECT tr = { r.left + 29, r.top, r.right - 19, r.bottom };
+    // the arrow's room after the text; the 4074 band's text, as its icon, a pixel below the middle
+    RECT tr = { r.left + g.text_x, r.top + (g.band ? 1 : 0), r.right - 19, r.bottom + (g.band ? 1 : 0) };
     DrawTextW(dc, (LPCWSTR)b->text.c_str(), (int)b->text.size(), &tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
-    SetTextColor(dc, tc);
     SetBkMode(dc, mode);
-    SelectObject(dc, o);
     return true;
 }
 

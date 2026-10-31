@@ -818,8 +818,10 @@ static UINT MENU_FindItemByKey( HWND hwndOwner, HMENU hmenu,
 }
 
 
-/* flxp: the popup look of the moment (released with menu_look_done) */
-static void menu_look( HWND hwnd, UXMENU_LOOK *look )
+/* flxp: the popup look of the moment (released with UXMENU_CloseLook): the Menu class, FLATMENUS, the menu font; band: the
+ * shell's menu band where the style has one (the StartMenu::Toolbar plate and the StartMenu::MenuBand arrow colour, UXMENU_SetBand).
+ * Exported for the band's owner (flxp's start menu measures its items in it) */
+void UXMENU_OpenLook( HWND hwnd, BOOL band, UXMENU_LOOK *look )
 {
     NONCLIENTMETRICSW ncm;
     BOOL flat = FALSE;
@@ -830,11 +832,51 @@ static void menu_look( HWND hwnd, UXMENU_LOOK *look )
     theme = OpenThemeData( hwnd, L"Menu" );
     UXMENU_InitLook( look, theme, NULL, flat, &ncm.lfMenuFont );
     if (theme && !look->theme) CloseThemeData( theme );   /* a Menu class without POPUPITEM: XP's look */
+    if (band && look->theme)
+    {
+        HTHEME tb = OpenThemeData( hwnd, L"StartMenu::Toolbar" ), mb = OpenThemeData( hwnd, L"StartMenu::MenuBand" );
+        UXMENU_SetBand( look, tb, mb );
+        if (tb && look->band_theme != tb) CloseThemeData( tb );
+        if (mb) CloseThemeData( mb );
+    }
+}
+void UXMENU_CloseLook( UXMENU_LOOK *look )
+{
+    if (look->theme) CloseThemeData( look->theme );
+    if (look->band_theme) CloseThemeData( look->band_theme );
+    UXMENU_FreeLook( look );
+}
+static void menu_look( HWND hwnd, const POPUPMENU *menu, UXMENU_LOOK *look )
+{
+    UXMENU_OpenLook( hwnd, menu && (menu->dwStyle & UXMENU_MNS_BAND), look );
 }
 static void menu_look_done( UXMENU_LOOK *look )
 {
-    if (look->theme) CloseThemeData( look->theme );
-    UXMENU_FreeLook( look );
+    UXMENU_CloseLook( look );
+}
+/* flxp: the space between a popup's outline and its items (none for a menu band) */
+static int menu_margin( const POPUPMENU *menu )
+{
+    UXMENU_LOOK look;
+    int m = MENU_MARGIN;
+    if (!menu || !(menu->dwStyle & UXMENU_MNS_BAND)) return m;
+    menu_look( menu->hwndOwner, menu, &look );
+    if (look.band) m = 0;
+    menu_look_done( &look );
+    return m;
+}
+/* flxp: the plate under one item (the frame's pixels there: background, the style's borders and gutter), so an item drawn
+ * again alone (MENU_SelectItem: the old item unselected, the new one selected) loses its old highlight, and an alpha
+ * highlight is not drawn over itself; a menu with its own background brush (MIM_BACKGROUND) gets that brush */
+static void menu_plate( HWND hwnd, const POPUPMENU *menu, HDC hdc, const UXMENU_LOOK *look, const RECT *item )
+{
+    RECT rc;
+    int saved = SaveDC( hdc );
+    GetClientRect( hwnd, &rc );
+    IntersectClipRect( hdc, item->left, item->top, item->right, item->bottom );
+    if (menu->hbrBack) FillRect( hdc, item, menu->hbrBack );
+    else UXMENU_DrawFrame( look, hdc, &rc );
+    RestoreDC( hdc, saved );
 }
 
 /***********************************************************************
@@ -1248,7 +1290,7 @@ static void MENU_PopupMenuCalcSize( LPPOPUPMENU lppop, UINT max_height )
 
     lppop->textOffset = 0;
     UXMENU_LOOK look;
-    menu_look( lppop->hwndOwner, &look );
+    menu_look( lppop->hwndOwner, lppop, &look );
 
     while (start < lppop->nItems)
     {
@@ -1299,12 +1341,15 @@ static void MENU_PopupMenuCalcSize( LPPOPUPMENU lppop, UINT max_height )
     if( !textandbmp) lppop->textOffset = 0;
 
     lppop->nTotalHeight = lppop->items_rect.bottom;
-    menu_look_done( &look );
 
-    /* space for the border */
-    OffsetRect(&lppop->items_rect, MENU_MARGIN, MENU_MARGIN);
-    lppop->Height = lppop->items_rect.bottom + MENU_MARGIN;
-    lppop->Width = lppop->items_rect.right + MENU_MARGIN;
+    /* space for the border (flxp: none in a menu band, whose items cover the outline) */
+    {
+        int margin = look.band ? 0 : MENU_MARGIN;
+        OffsetRect(&lppop->items_rect, margin, margin);
+        lppop->Height = lppop->items_rect.bottom + margin;
+        lppop->Width = lppop->items_rect.right + margin;
+    }
+    menu_look_done( &look );
 
     /* Adjust popup height if it exceeds maximum */
     if (lppop->Height >= max_height)
@@ -1582,19 +1627,32 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
 	      dis.hDC, wine_dbgstr_rect( &dis.rcItem));
         old_bk = GetBkColor( hdc );
         old_text = GetTextColor( hdc );
-        SendMessageW( hwndOwner, WM_DRAWITEM, 0, (LPARAM)&dis );
+        if (!menuBar)
+        {   /* flxp: an owner-drawn popup item (the start menu's band items) gets the painter's plate and highlight under it and
+             * the menu font and the item's text colour in the DC: the owner draws its icon and text over them */
+            UXMENU_LOOK look;
+            unsigned f = ((lpitem->fState & MF_HILITE) ? UXMENU_HOT : 0) | ((lpitem->fState & MF_GRAYED) ? UXMENU_DISABLED : 0);
+            HGDIOBJ old_font;
+            int old_mode;
+            menu_look( hwnd, menu, &look );
+            menu_plate( hwnd, menu, hdc, &look, &rect );
+            if (f & UXMENU_HOT) UXMENU_DrawItem( &look, hdc, &rect, f, 0, NULL, 0, NULL, -1 );
+            old_font = SelectObject( hdc, look.font );
+            old_mode = SetBkMode( hdc, TRANSPARENT );
+            SetTextColor( hdc, UXMENU_TextColor( &look, f ) );
+            SendMessageW( hwndOwner, WM_DRAWITEM, 0, (LPARAM)&dis );
+            SelectObject( hdc, old_font );
+            SetBkMode( hdc, old_mode );
+            /* XP's 4 x 7 arrow (or the style's), not OBM_MNARROW */
+            if (lpitem->fType & MF_POPUP) UXMENU_DrawArrow( &look, hdc, &rect, f );
+            menu_look_done( &look );
+        }
+        else
+            SendMessageW( hwndOwner, WM_DRAWITEM, 0, (LPARAM)&dis );
         /* Draw the popup-menu arrow */
         SetBkColor( hdc, old_bk );
         SetTextColor( hdc, old_text );
-        if ((lpitem->fType & MF_POPUP) && !menuBar)
-        {   /* flxp: XP's 4 x 7 arrow (or the style's), not OBM_MNARROW */
-            UXMENU_LOOK look;
-            menu_look( hwnd, &look );
-            UXMENU_DrawArrow( &look, hdc, &rect, ((lpitem->fState & MF_HILITE) ? UXMENU_HOT : 0) |
-                                                ((lpitem->fState & MF_GRAYED) ? UXMENU_DISABLED : 0) );
-            menu_look_done( &look );
-        }
-        else if (lpitem->fType & MF_POPUP)
+        if (menuBar && (lpitem->fType & MF_POPUP))
             draw_popup_arrow( hdc, rect, arrow_bitmap_width,
                     arrow_bitmap_height);
         goto done;
@@ -1611,7 +1669,7 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
         int n = 0, accel_x = -1;
         RECT trc;
 
-        menu_look( hwnd, &look );
+        menu_look( hwnd, menu, &look );
         SystemParametersInfoW( SPI_GETKEYBOARDCUES, 0, &cues, 0 );
         if (lpitem->fType & MF_SEPARATOR) f |= UXMENU_SEPARATOR;
         if (lpitem->fState & MF_HILITE) f |= UXMENU_HOT;
@@ -1626,6 +1684,7 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
             else if (lpitem->fState & MF_CHECKED)
                 f |= UXMENU_CHECKED | ((lpitem->fType & MFT_RADIOCHECK) ? UXMENU_RADIO : 0);
         }
+        menu_plate( hwnd, menu, hdc, &look, &rect );
         UXMENU_DrawItem( &look, hdc, &rect, f, 0, NULL, 0, NULL, -1 );
         if (!(f & UXMENU_SEPARATOR))
         {
@@ -1944,7 +2003,7 @@ static void MENU_DrawPopupMenu( HWND hwnd, HDC hdc, HMENU hmenu )
 	    if (!menu || !menu->hbrBack)
 	    {   /* flxp: the painter's plate (outline, background, the style's borders and gutter) */
 		UXMENU_LOOK look;
-		menu_look( hwnd, &look );
+		menu_look( hwnd, menu, &look );
 		UXMENU_DrawFrame( &look, hdc, &rect );
 		menu_look_done( &look );
 	    }
@@ -2562,13 +2621,15 @@ static HMENU MENU_ShowSubPopup( HWND hwndOwner, HMENU hmenu,
 	{
 	    /* The first item in the popup menu has to be at the
 	       same y position as the focused menu item */
+            /* flxp: a menu band's cascade starts right of its parent band's outline, its first item level with the item */
+            int sub_margin = menu_margin( MENU_GetMenu( item->hSubMenu ) ), band = !menu_margin( menu );
             if (wFlags & TPM_LAYOUTRTL)
                 rect.left += GetSystemMetrics(SM_CXBORDER);
 	    else
-                rect.left += item_rect.right - GetSystemMetrics(SM_CXBORDER);
-	    rect.top += item_rect.top - MENU_MARGIN;
-	    rect.right = item_rect.left - item_rect.right + GetSystemMetrics(SM_CXBORDER);
-	    rect.bottom = item_rect.top - item_rect.bottom - 2 * MENU_MARGIN;
+                rect.left += item_rect.right - (band ? 0 : GetSystemMetrics(SM_CXBORDER));
+	    rect.top += item_rect.top - sub_margin;
+	    rect.right = item_rect.left - item_rect.right + (band ? 0 : GetSystemMetrics(SM_CXBORDER));
+	    rect.bottom = item_rect.top - item_rect.bottom - 2 * sub_margin;
 	}
 	else
 	{
