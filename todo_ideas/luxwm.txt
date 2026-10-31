@@ -1,11 +1,5 @@
 # Luxwm things
 
-## resizing (NEXT, aap: the maximization items)
-* maximize vertically when resize-dragging window border to edge of maximize-area
-* maximize when move-dragging window to top edge,
-	maximize to left/right half when dragging to left/half edge
-
-
 ## virtual desktops
 
 looks like Ctrl-n switches desktops. this is very nice

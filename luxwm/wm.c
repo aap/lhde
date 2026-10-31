@@ -1177,6 +1177,11 @@ handle_button_press(XEvent *e)
             conf.last_caption_click = 0; client_monocle(c); draw_text(c, client_active(c)); return; }
         conf.last_caption_click = bev->time; conf.last_caption_win = c->dec;
     }
+    /* a move (caption, or the move modifier with its button): drag_run, which knows snapping and EDGE_LOCK */
+    if ((bev->window == c->dec && bev->button == 1) || (state == (unsigned)conf.move_mask && bev->button == (unsigned)conf.move_button)) {
+        drag_run(c, HIT_CAPTION, bev->x_root, bev->y_root, bev->button, false);
+        return;
+    }
     // Otherwise process window movement or resize
     ocx = c->geom.x;
     ocy = c->geom.y;
@@ -2489,19 +2494,21 @@ client_apply_max(struct client *c)
     client_geom_max(c, x, y, w, h, true);
 }
 
+/* the restore geometry of a maximised window (c->prev); it survives a WM restart (read back when adopting) */
+static void
+client_set_restore(struct client *c, int x, int y, int w, int h)
+{
+    c->prev.x = x; c->prev.y = y; c->prev.width = w; c->prev.height = h;
+    long g[4] = { x, y, w, h };
+    XChangeProperty(display, c->window, XInternAtom(display, "_LHWM_RESTORE_GEOMETRY", False), XA_CARDINAL, 32, PropModeReplace, (unsigned char *)g, 4);
+}
+
 static void
 client_maximize(struct client *c)
 {
     if (c->mono || c->fullscreen || client_fixed(c))
         return;
-    c->prev.x = c->hidden ? c->x_hide : c->geom.x;
-    c->prev.y = c->geom.y;
-    c->prev.width = c->geom.width;
-    c->prev.height = c->geom.height;
-    {   /* the restore geometry survives a WM restart (read back when adopting) */
-        long g[4] = { c->prev.x, c->prev.y, c->prev.width, c->prev.height };
-        XChangeProperty(display, c->window, XInternAtom(display, "_LHWM_RESTORE_GEOMETRY", False), XA_CARDINAL, 32, PropModeReplace, (unsigned char *)g, 4);
-    }
+    client_set_restore(c, c->hidden ? c->x_hide : c->geom.x, c->geom.y, c->geom.width, c->geom.height);
     if (c->hidden) {   /* minimised: applied by client_show */
         c->mono = true;
         ewmh_update_state(c);
@@ -3285,23 +3292,125 @@ client_show(struct client *c)
     }
 }
 
+/* ---- snap (Windows 7's Aero Snap, docs/LUXWM.md "Snap"): a window put on the left or right half of the work area, or stretched to
+   its full height, remembering the rectangle it had before (c->snap_prev), which a drag away restores ---- */
+
+/* the rectangle of a snap kind on c's work area (SNAP_VERT keeps c's columns) */
+static void
+snap_rect(struct client *c, int kind, int *x, int *y, int *w, int *h)
+{
+    int ax, ay, aw, ah; workarea_mon(ws_m_list[c->ws], &ax, &ay, &aw, &ah);
+    *y = ay; *h = ah;
+    switch (kind) {
+    case SNAP_LEFT:  *x = ax; *w = aw / 2; break;
+    case SNAP_RIGHT: *x = ax + aw / 2; *w = aw - aw / 2; break;
+    case SNAP_VERT:  *x = c->geom.x; *w = c->geom.width; break;
+    default:         *x = ax; *w = aw; break;
+    }
+}
+
+/* snap c (SNAP_LEFT, SNAP_RIGHT, SNAP_VERT, or SNAP_MAX = maximise); rest: the rectangle to come back to (a window that is snapped
+   already keeps its first one) */
+static void
+client_snap_to(struct client *c, int kind, struct client_geom rest)
+{
+    if (c->snap) rest = c->snap_prev;
+    if (kind == SNAP_MAX) {
+        c->snap = SNAP_NONE;
+        client_maximize(c);
+        client_set_restore(c, rest.x, rest.y, rest.width, rest.height);
+        draw_text(c, client_active(c));
+        return;
+    }
+    if (c->mono) client_unmax_margins(c);
+    int x, y, w, h; snap_rect(c, kind, &x, &y, &w, &h);
+    c->snap_prev = rest; c->snap = kind;
+    client_move_absolute(c, x, y);
+    client_resize_absolute(c, w, h);
+    if (kind == SNAP_RIGHT && c->geom.width != w) client_move_absolute(c, x + w - c->geom.width, y);   /* size hints made it narrower */
+    ewmh_update_state(c);
+    LOGP("snap 0x%lx: %s, back to %dx%d+%d+%d", c->window, kind == SNAP_LEFT ? "left" : kind == SNAP_RIGHT ? "right" : "vertical",
+         rest.width, rest.height, rest.x, rest.y);
+}
+
 static void
 client_snap_left(struct client *c)
 {
-    int x, y, w, h;
-    workarea_mon(ws_m_list[c->ws], &x, &y, &w, &h);
-    client_move_absolute(c, x, y);
-    client_resize_absolute(c, w / 2, h);
+    client_snap_to(c, SNAP_LEFT, c->geom);
 }
 
 static void
 client_snap_right(struct client *c)
 {
-    int x, y, w, h;
-    workarea_mon(ws_m_list[c->ws], &x, &y, &w, &h);
-    client_move_absolute(c, x + w / 2, y);
-    client_resize_absolute(c, w - w / 2, h);
-    if (c->geom.width != w - w / 2) client_move_absolute(c, x + w - c->geom.width, y);   /* size hints made it narrower */
+    client_snap_to(c, SNAP_RIGHT, c->geom);
+}
+
+/* the snap preview: an outline of the rectangle a drop would give, 4 px of XP's drag-rectangle checker (luxwm's choice; 7 draws a
+   glass sheet) */
+static Window snap_win;
+static Pixmap snap_pat;
+static void
+snap_preview(int x, int y, int w, int h)
+{
+    if (w <= 0) { if (snap_win) XUnmapWindow(display, snap_win); return; }
+    if (!snap_win) {
+        static const char bits[] = { 0x01, 0x02 };   /* 2x2 checker */
+        snap_pat = XCreatePixmapFromBitmapData(display, root, (char *)bits, 2, 2, BlackPixel(display, screen), WhitePixel(display, screen),
+                                               (unsigned)DefaultDepth(display, screen));
+        XSetWindowAttributes a = { .override_redirect = True, .background_pixmap = snap_pat, .save_under = True };
+        snap_win = XCreateWindow(display, root, 0, 0, 1, 1, 0, CopyFromParent, InputOutput, CopyFromParent,
+                                 CWOverrideRedirect | CWBackPixmap | CWSaveUnder, &a);
+        XClassHint ch = { (char *)"lhwm-snap", (char *)"lhwm" }; XSetClassHint(display, snap_win, &ch);
+        XStoreName(display, snap_win, "lhwm snap preview");
+    }
+    const int t = 4;
+    XRectangle r[4] = { { 0, 0, (unsigned short)w, t }, { 0, (short)(h - t), (unsigned short)w, t },
+                        { 0, t, t, (unsigned short)MAX(h - 2 * t, 0) }, { (short)(w - t), t, t, (unsigned short)MAX(h - 2 * t, 0) } };
+    XMoveResizeWindow(display, snap_win, x, y, (unsigned)w, (unsigned)h);
+    XShapeCombineRectangles(display, snap_win, ShapeBounding, 0, 0, r, 4, ShapeSet, Unsorted);
+    XShapeCombineRectangles(display, snap_win, ShapeInput, 0, 0, NULL, 0, ShapeSet, Unsorted);
+    XMapRaised(display, snap_win);
+}
+
+/* the snap a drag would give with the pointer at x, y: a move (HIT_CAPTION) whose pointer reaches the left or right edge of the work
+   area snaps to that half, the top edge maximises; a resize of the top or bottom border whose pointer reaches that edge stretches the
+   window to the full height. The pointer, not the frame, has to be there. */
+static int
+snap_target(struct client *c, int hit, int x, int y)
+{
+    if (c->fullscreen || client_fixed(c)) return SNAP_NONE;
+    int ax, ay, aw, ah; workarea_mon(ws_m_list[c->ws], &ax, &ay, &aw, &ah);
+    if (hit == HIT_CAPTION) {
+        if (x <= ax) return SNAP_LEFT;
+        if (x >= ax + aw - 1) return SNAP_RIGHT;
+        if (y <= ay) return SNAP_MAX;
+        return SNAP_NONE;
+    }
+    if ((hit == HIT_T && y <= ay) || (hit == HIT_B && y >= ay + ah - 1)) return SNAP_VERT;
+    return SNAP_NONE;
+}
+
+/* a move drag takes a maximised or snapped window away: it gets its earlier size back, under the pointer at the same fraction of its
+   width (Windows 7), and the drag continues with it */
+static void
+snap_tear_off(struct client *c, int px, int py)
+{
+    struct client_geom r = c->snap ? c->snap_prev : c->prev;
+    if (r.width <= 0 || r.height <= 0) { r.width = c->geom.width; r.height = c->geom.height; }
+    double f = c->geom.width > 0 ? (double)(px - c->geom.x) / c->geom.width : 0.5;
+    int nx = px - (int)(f * r.width + 0.5), ny = c->geom.y;
+    LOGP("drag: 0x%lx leaves its %s, back to %dx%d", c->window, c->mono ? "maximised state" : "snap", r.width, r.height);
+    (void)py;
+    c->snap = SNAP_NONE;
+    if (c->mono) {
+        c->mono = false; c->xfade_t0 = 0;
+        maxmode_update();
+        client_geom_max(c, nx, ny, r.width, r.height, false);
+    } else {
+        client_move_absolute(c, nx, ny);
+        client_resize_absolute(c, r.width, r.height);
+        ewmh_update_state(c);
+    }
 }
 
 static void
@@ -3637,6 +3746,7 @@ ewmh_update_state(struct client *c)
     unsigned st = ST_VALID;
     if (c->minimized)  st |= ST_HIDDEN;
     if (c->mono)       st |= ST_MAXV | ST_MAXH;
+    if (c->snap)       st |= ST_MAXV;   /* snapped: the work area's full height */
     if (c->attention)  st |= ST_ATTN;
     if (client_active(c)) st |= ST_FOCUSED;
     if (c->fullscreen) st |= ST_FS;
@@ -5143,6 +5253,10 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
 {
     XEvent ev; int ox = c->geom.x, oy = c->geom.y, ow = c->geom.width, oh = c->geom.height; bool was_max = c->mono, cancel = false;
     const int dg_x = ox, dg_y = oy, dg_w = ow, dg_h = oh;   /* where Escape / a cancel puts the window back (ox.. are rebased in size mode) */
+    const int was_snap = c->snap;
+    /* snap (mouse drags only): the target under the pointer (shown as an outline, applied on the release); the rectangle a snapped or
+       maximised window comes back to */
+    int snap = SNAP_NONE; struct client_geom rest = { dg_x, dg_y, dg_w, dg_h };
     /* keyboard size (Alt+Space, S; _NET_WM_MOVERESIZE_SIZE_KEYBOARD) starts with no edge, as Windows' WMSZ_KEYSIZE: the first arrow
        picks the edge (left/right, top/bottom; two arrows a corner) and puts the pointer on it, the next ones move it; or the mouse
        picks the edges it moves towards. Keyboard move (Alt+Space, M; ..._MOVE_KEYBOARD) moves at once; the mouse takes over too */
@@ -5303,9 +5417,22 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
             }
             if (!moved && abs(ev.xmotion.x_root - px) <= DRAG_THRESHOLD && abs(ev.xmotion.y_root - py) <= DRAG_THRESHOLD)
                 break;
+            if (!moved && !keyboard && hit == HIT_CAPTION && (c->mono || c->snap)) {   /* dragged away: the earlier size again */
+                rest = c->snap ? c->snap_prev : c->prev;
+                snap_tear_off(c, ev.xmotion.x_root, ev.xmotion.y_root);
+                ox = c->geom.x; oy = c->geom.y; px = ev.xmotion.x_root; py = ev.xmotion.y_root;
+            }
             moved = true;
             vx = ev.xmotion.x_root; vy = ev.xmotion.y_root;
             pend = true; pend_x = vx; pend_y = vy; pend_time = ev.xmotion.time;
+            if (!keyboard) {
+                int t = snap_target(c, hit, vx, vy);
+                if (t != snap) {
+                    snap = t;
+                    if (t == SNAP_NONE) snap_preview(0, 0, 0, 0);
+                    else { int x, y, w, h; snap_rect(c, t, &x, &y, &w, &h); snap_preview(x, y, w, h); }
+                }
+            }
             break;
         default:   /* XSyncAlarmNotify: the client has drawn the last step */
             drag_client_alarm(&dc, &ev);
@@ -5326,6 +5453,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
     }
     #undef KB_PICK
     #undef DRAG_STEP
+    if (snap != SNAP_NONE) snap_preview(0, 0, 0, 0);
     if (kbsize || hit != HIT_CAPTION) drag_client_end(c, &dc);
     if (prof && p_n)
         fprintf(stderr, "luxwm prof: drag %s %.0f ms, %d motion events, %d steps, step avg %.2f max %.2f ms (incl. XSync); "
@@ -5339,6 +5467,11 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         if (was_max) { if (!c->mono) client_apply_max(c); }
         else if (c->geom.x != dg_x || c->geom.y != dg_y || c->geom.width != dg_w || c->geom.height != dg_h) {
             client_move_absolute(c, dg_x, dg_y); client_resize_absolute(c, dg_w, dg_h); }
+        if (was_snap && !c->snap) { c->snap = was_snap; ewmh_update_state(c); }   /* a torn-off snap: snapped again (snap_prev is kept) */
+    } else if (snap != SNAP_NONE) {
+        client_snap_to(c, snap, rest);
+    } else if (hit != HIT_CAPTION && c->snap && c->geom.height != dg_h) {
+        c->snap = SNAP_NONE; ewmh_update_state(c);   /* resized off the full height: no longer snapped */
     }
     XFlush(display);
 }

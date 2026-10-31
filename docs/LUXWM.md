@@ -273,6 +273,27 @@ flicker-free resize path are the mouse drag's. Lab (`:3`, aero): Alt+Space, M, R
 Alt+Space, S, Right x3, Down x2, Enter on an xterm (inc 6x13): +24/+13; Left/Up corner + Esc: unchanged; Size, mouse +15/+1: right edge, pointer on it; Shift: bottom-right corner,
 pointer there, +30/+40 grows both (+30/+39); Shift: the right edge again, +20/+50 widens only; Size, mouse +14/+10: the corner.
 
+## Snap (from Windows 7, not Longhorn)
+
+Windows 7's Aero Snap, added because aap asked for it; neither XP nor the Longhorn builds had it. A **move** drag (the caption, the
+move modifier with its button, `_NET_WM_MOVERESIZE` 8) whose pointer reaches the left or right edge of the work area (the window's
+monitor minus struts, as maximise uses) snaps the window to that half of the work area; one that reaches the top edge maximises it.
+A **resize** drag of the top or bottom border whose pointer reaches that edge of the work area stretches the window to the work
+area's full height, keeping its columns (7's vertical maximise; corners do not). The pointer has to touch the edge, not the frame,
+so an ordinary drag that pushes the frame against or past an edge does not snap; and nothing happens until the button is released:
+while the pointer is at an edge an outline of the target rectangle is shown (4 px of XP's checkered drag-rectangle pattern, an
+override-redirect window `lhwm-snap`: luxwm's choice, 7 drew a glass sheet), and moving away from the edge before the release drops
+it. Escape cancels the drag and the snap. Keyboard Move and Size do not snap.
+
+A snapped window (`c->snap`, `_NET_WM_STATE_MAXIMIZED_VERT` while it spans the full height) remembers the rectangle it had before
+(`c->snap_prev`); a maximised one its restore rectangle as always. **Dragging either away** by the caption gives it that size back at
+once, placed under the pointer at the same fraction of its width (as 7), and the drag continues; dropping it at the top again
+maximises with the pre-snap rectangle as the restore geometry. A resize that changes a snapped window's height ends the snap; a
+width-only resize keeps it. `luxwmc snap_left`, `snap_right` (IPC) go through the same code.
+Lab (`:17`, slate4074, xterm 400x238 at 300,200): drag to x 0 → left half (636 px frame, size hints), `MAXIMIZED_VERT`; dragged away →
+400x238 again under the pointer; to y 0 → maximised; dragged away → 400x238; to x 1279 and back before the release → no snap;
+bottom border to y 799 → full height at the same x; dragged away → 400x238.
+
 ## Live-editing a theme (2026-10-26)
 
 `luxwmc reload-theme` (or the root ClientMessage `_LHWM_RELOAD`, or any write of a root property `_LHWM_RELOAD`, or `_LH_THEME` set
