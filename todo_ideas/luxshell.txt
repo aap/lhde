@@ -2,7 +2,7 @@
 
 * taskbar
 	* window buttons
-		* context menu
+		* context menu (NEXT, aap: with the menu unification in flxp_wux.txt)
 		* drag to reorder
 		* center buttons mode for plex and concepts
 
