@@ -250,9 +250,10 @@ style's MENUFONT) or, for Windows Classic, the scheme's colour table and `Metric
   marks and bullets from Marlett (`a`, `h`) in that column; the submenu arrow XP's 4x7 (Marlett's menu arrow in the 13 px cell at the
   item's end: its right column 6 px before the end, 8 px from the outline, as `WinXP-193221.png`; user32's OBM_MNARROW is 5x9);
 - the font is `[SysMetrics] MENUFONT` (Slate/Luna Tahoma 8 = 11 px, Jade/Aero Segoe UI 9 = 12 px) in wux's GDI text (FreeType with
-  the v35 interpreter, hinted integer advances as GDI's), item height and baseline from its tmHeight / tmAscent; smoothing as the
-  captions': ClearType for the DWM themes and the frame sets that say `text_antialias = subpixel` (the 4074 ones; the 4074 references
-  show ClearType), none for Luna's (XP's Standard leaves Tahoma 8 bi-level), the theme's `Fonts.smoothing` for Windows Classic;
+  the v35 interpreter, hinted integer advances as GDI's), item height and baseline from its tmHeight / tmAscent; smoothing the
+  system's, as flxp's menus have it: settings.ini `[fonts] smoothing`, else the session theme's `Fonts.smoothing` (ClearType for the
+  4074 themes, whose references show it); only when neither says, the captions': ClearType for the DWM themes and the frame sets that
+  say `text_antialias = subpixel`, none for Luna's (XP's Standard leaves Tahoma 8 bi-level);
 - without a visual style (a DWM theme whose style cannot be opened): XP's Windows Standard colours and Tahoma 8.
 Geometry (XP's `mncomput.c`, and measured on the 4074 Slate menu of `lh4074-195235.png`: identical): 1 px border + 2 px inside, text
 19 px into the item (22 px from the border: MNLEFTMARGIN + the 13 px check column + MNXSPACE), separator 8 px (Slate's part) / 9 px

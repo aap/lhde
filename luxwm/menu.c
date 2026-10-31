@@ -17,16 +17,29 @@
 #include <cairo/cairo-xlib.h>
 #include <glib.h>
 #include <wuxtheme/ut.h>
+#include <lhde/settings.h>
 
 #define SHADOW 4   /* XP's menu drop shadow: right and bottom, 4 px (measured on the 4074 Slate window menu) */
 
 /* what the painter is asked: the frame theme's visual style (its Menu class, [SysMetrics] colours, FLATMENUS, MENUFONT), or
-   Windows Classic from the scheme's colours and Metrics.menufont; the text smoothed as the frames' captions are */
+   Windows Classic from the scheme's colours and Metrics.menufont; the text smoothed as the system's (sys_smoothing), else as the
+   frames' captions are */
 struct look {
     ut_menu_spec spec; ut_font font; ut_menu_item it[64]; int n;
 };
 
 struct geom { int w, h, pad, y[64], ih[64]; };
+
+/* the system's font smoothing, as wux's GDI has it for flxp's menus (flxp shell::setup_fonts): settings.ini [fonts] smoothing, else
+   the session theme's Fonts.smoothing (wmmenu_set_theme_smoothing); -1 when neither says */
+static char theme_smoothing[16];
+void wmmenu_set_theme_smoothing(const char *v) { snprintf(theme_smoothing, sizeof theme_smoothing, "%s", v ? v : ""); }
+static int sys_smoothing(void) {
+    char b[32]; const char *v = lhde_settings_get("fonts", "smoothing", b, sizeof b);
+    if (!v || !*v) v = theme_smoothing;
+    if (!*v) return -1;
+    return !strcasecmp(v, "cleartype") ? 2 : !strcasecmp(v, "off") || !strcasecmp(v, "none") || !strcmp(v, "0") ? 0 : 1;
+}
 
 static void look_build(const struct theme *t, const struct wmmenu_item *items, int n, struct look *L) {
     memset(L, 0, sizeof *L);
@@ -40,6 +53,7 @@ static void look_build(const struct theme *t, const struct wmmenu_item *items, i
         s->theme = (ut_theme *)t->ut; s->flat = -1;
         s->smoothing = t->mode != THEME_MSSTYLES || t->ms_font_aa == CAIRO_ANTIALIAS_SUBPIXEL ? 2 : t->ms_font_aa == CAIRO_ANTIALIAS_NONE ? 0 : 1;
     }
+    if (sys_smoothing() >= 0) s->smoothing = sys_smoothing();   /* the same text as flxp's menus, not the caption's own tuning */
     L->n = n < 64 ? n : 64;
     for (int i = 0; i < L->n; i++) {   /* WMMENU_* flags and glyphs are ut_menu's */
         L->it[i].text = items[i].text; L->it[i].accel = items[i].accel;
