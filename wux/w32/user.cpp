@@ -8,6 +8,7 @@
 #include <deque>
 #include "user.h"
 #include "sys/sys.h"
+#include "wuxtheme/ut.h"   // ut_menu_shadow_alpha
 
 using namespace w32;
 
@@ -363,6 +364,11 @@ HWND WINAPI CreateWindowExW(DWORD ex, LPCWSTR clsname, LPCWSTR name, DWORD style
     g_pending = nullptr;
     if (!w) return nullptr;
     w->class_style = c->style;
+    if (w->top && (c->style & CS_DROPSHADOW)) {   // XP's popup menus (and its v6 tooltips, which Wine's comctl32 does not ask for)
+        BOOL on = FALSE;
+        SystemParametersInfoW(SPI_GETDROPSHADOW, 0, &on, 0);
+        win::set_drop_shadow(w, UT_MENU_SHADOW, on ? ut_menu_shadow_alpha : nullptr);
+    }
     HWND h = hwnd_of(w);
     if (!(style & WS_CHILD) && menu) MENU_SetMenu(h, menu);   // attaches the bar to the window and recomputes the frame
     SendMessageW(h, WM_SIZE, SIZE_RESTORED, MAKELONG(w->client.width(), w->client.height()));

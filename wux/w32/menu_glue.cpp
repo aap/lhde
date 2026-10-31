@@ -57,10 +57,11 @@ SHORT WINAPI NtUserGetKeyState(INT vk) { return GetKeyState(vk); }
 INT WINAPI CopyAcceleratorTableW(HACCEL, LPACCEL, INT) { return 0; }
 void __wine_finally_handler(void) {}
 
-/* menu.c keeps its class descriptor static; this is the same one */
+/* menu.c keeps its class descriptor static; this is the same one (with XP's CS_DROPSHADOW: CreateWindowExW gives the popup
+   its shadow) */
 const struct builtin_class_descr POPUPMENU_builtin_class =
 {
-    (LPCWSTR)POPUPMENU_CLASS_ATOM, CS_SAVEBITS | CS_DBLCLKS, WINPROC_MENU, sizeof(HMENU), IDC_ARROW, (HBRUSH)(COLOR_MENU + 1)
+    (LPCWSTR)POPUPMENU_CLASS_ATOM, CS_DROPSHADOW | CS_SAVEBITS | CS_DBLCLKS, WINPROC_MENU, sizeof(HMENU), IDC_ARROW, (HBRUSH)(COLOR_MENU + 1)
 };
 
 } // extern "C"

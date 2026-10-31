@@ -258,9 +258,11 @@ style's MENUFONT) or, for Windows Classic, the scheme's colour table and `Metric
 Geometry (XP's `mncomput.c`, and measured on the 4074 Slate menu of `lh4074-195235.png`: identical): 1 px border + 2 px inside, text
 19 px into the item (22 px from the border: MNLEFTMARGIN + the 13 px check column + MNXSPACE), separator 8 px (Slate's part) / 9 px
 (XP), accelerator right-aligned 17 px before the inner edge (user32's menus put a tab's accelerators in one column after the widest
-text plus two average character widths, as XP). The drop shadow is XP's 4 px right/bottom shadow (alpha 0.44, 0.33, 0.17, 0.055
-outwards, starting 5 px in, as measured on the 4074 menu): real alpha with a compositor (`picom-glass.conf` excludes `_LHWM_MENU@`
-from picom's own shadow and blur), otherwise blended over a copy of the screen taken before the map, as XP does.
+text plus two average character widths, as XP). The drop shadow is XP's 5 px right/bottom shadow, wuxtheme's `ut_menu_shadow_alpha`
+(the one wux's popup menus have: alpha 113, 84, 43, 14, 3 outwards, starting 5 px in, with XP's rounded corners; the 4074 menus of
+`lh4074-195235.png` show the same grey levels over the white list): real alpha with a compositor (`picom-glass.conf` excludes
+`_LHWM_MENU@` from picom's own shadow and blur), otherwise blended over a copy of the screen taken before the map, as XP does;
+none with `[effects] menu_shadows = 0` (Display Properties' "Show shadows under menus").
 Measured against the 4074 Slate menu: border, plate, highlight, separator, bullet and arrow colours and positions, item pitch (19),
 text start (x 22) and text rows are identical; the reference's ClearType fringes are BGR-ordered while the painter renders RGB.
 `tests/menutest.c` renders the menu offline (`make build/luxwm/tests/menutest`; `build/luxwm/tests/menutest THEMESPEC out.png [SEL

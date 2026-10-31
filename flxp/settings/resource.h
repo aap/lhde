@@ -54,6 +54,7 @@
 
 #define IDC_EF_SMOOTH   1301
 #define IDC_EF_METHOD   1302
+#define IDC_EF_SHADOWS  1303
 
 #define IDC_SA_NAME     1401
 

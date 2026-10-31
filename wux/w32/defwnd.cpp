@@ -620,6 +620,9 @@ void register_builtin_classes()
     EDIT_Register();
     LISTBOX_Register();
     COMBOLBOX_Register();
+    // Wine's ComboLBox has Vista's CS_DROPSHADOW; XP's drop-down lists have no shadow (only the menu class and comctl32 v6's
+    // tooltips ask for one there)
+    if (Class* c = find_class(L"ComboLBox")) c->style &= ~CS_DROPSHADOW;
     COMBO_Register();
 }
 

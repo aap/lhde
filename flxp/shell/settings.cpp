@@ -89,6 +89,7 @@ const Ini& current()
 struct Map { const char* flxp; const char* section; const char* key; };
 const Map maps[] = {
     { "font_smoothing", "fonts", "smoothing" },
+    { "menu_shadows", "effects", "menu_shadows" },
     { "pinned", "start", "pinned" },
 };
 

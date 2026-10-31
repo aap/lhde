@@ -722,7 +722,7 @@ is ignored by everybody (the current theme stays; luxwm and lux log it).
 **Display Properties (flxp-settings).** flxp's dialog (`~/src/flxp/build/settings/flxp-settings [--tab
 themes|desktop|appearance|effects]`, or `flxp --settings`; also flxp's start panel Control Panel > Display Properties...) is the
 full settings UI on the same file: Themes (registry themes and presets, Save As..., Delete), Desktop (background, position, icon
-set), Appearance (explorer frame, taskbar kind, start menu, composition, animations), Effects (font smoothing). Apply writes
+set), Appearance (explorer frame, taskbar kind, start menu, composition, animations), Effects (font smoothing, shadows under menus). Apply writes
 settings.ini, sets `_LH_THEME` for a theme change and sends one `_LH_SETTINGS_CHANGED`; lux applies the theme, composition
 (starts/stops picom), taskbar kind, start menu and wallpaper live, luxwm the frames and animations. Checked on the lab with luxwm +
 lux + picom (`lhshell/compare_settings_sync.png`): Jade, composition off, animations invented, classic taskbar, a saved

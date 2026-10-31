@@ -1022,6 +1022,35 @@ int ut_menu_draw(const ut_menu_spec* spec, const ut_menu_item* items, int n, int
     return 1;
 }
 
+// XP's drop shadow (user32 shadow.c's grey levels; lh4074-195235.png shows the same values under 4074's menus over the white
+// list: 142 171 212 241 252 = alpha 113 84 43 14 3). Image rows top down; the right edge's corner starts CY_SHADOW rows down.
+namespace {
+const unsigned char kShadowRamp[UT_MENU_SHADOW] = { 113, 84, 43, 14, 3 };   // the right and bottom edges, outwards
+const unsigned char kShadowTopRight[UT_MENU_SHADOW][UT_MENU_SHADOW] = {    // rows 5..9, columns w..w+4
+    { 13, 9, 5, 2, 1 }, { 38, 28, 14, 5, 1 }, { 75, 56, 28, 10, 2 }, { 100, 75, 38, 13, 2 }, { 111, 83, 42, 14, 3 } };
+const unsigned char kShadowBottomRight[UT_MENU_SHADOW][UT_MENU_SHADOW] = { // rows h..h+4, columns w..w+4
+    { 100, 75, 38, 13, 2 }, { 75, 56, 28, 10, 2 }, { 38, 28, 14, 5, 1 }, { 13, 9, 5, 2, 1 }, { 2, 2, 1, 1, 0 } };
+const unsigned char kShadowBottomLeft[UT_MENU_SHADOW][UT_MENU_SHADOW] = {  // rows h..h+4, columns 5..9
+    { 13, 38, 75, 100, 111 }, { 9, 28, 56, 75, 83 }, { 5, 14, 28, 38, 42 }, { 2, 5, 10, 13, 14 }, { 1, 1, 2, 2, 3 } };
+}
+
+int ut_menu_shadow_alpha(int x, int y, int w, int h)
+{
+    const int S = UT_MENU_SHADOW;
+    if (w <= 0 || h <= 0 || x < 0 || y < 0 || x >= w + S || y >= h + S || (x < w && y < h)) return 0;
+    if (x >= w) {                       // the right edge
+        int j = x - w;
+        if (y >= h) return kShadowBottomRight[y - h][j];
+        if (y < S) return 0;
+        if (y < 2 * S) return kShadowTopRight[y - S][j];
+        return kShadowRamp[j];
+    }
+    int i = y - h;                      // the bottom edge
+    if (x < S) return 0;
+    if (x < 2 * S) return kShadowBottomLeft[i][x - S];
+    return kShadowRamp[i];
+}
+
 void ut_set_font_smoothing(int mode)
 {
     Lock l;

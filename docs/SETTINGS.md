@@ -103,6 +103,7 @@ the theme registry (`data/themes.ini`, docs/history/THEMES.md) and the live root
   [start]      pinned = a.desktop;b.desktop ; menu = flxp   ; flxp | lux (provider when both exist)
   [commands]   logoff = ... ; standby = ... ; shutdown = ... ; restart = ... ; lock = ... ; picom = ... ; taskbar = ... ; run = ...
   [fonts]      smoothing = standard        ; off | standard | cleartype (flxp, luxwm's menus); luxshell uses fontconfig's
+  [effects]    menu_shadows = 1            ; 0 | 1: XP's drop shadow under menus (wux's popup menus, luxwm's window menu)
   ```
   Unknown keys are kept by every writer (read, modify, write back the whole file preserving
   comments and order).
@@ -281,6 +282,7 @@ Key audit against flxp-settings (flxp bf79f78, `src/settings/settings.cpp` `appl
 | Desktop: position | `[desktop] mode` | fill, fit, center, tile, stretch | lux (feh modes; `fit` = `--bg-max`) |
 | Desktop: icons | `[desktop] icons` | longhorn, xp, 2k | lux (`_LH_THEME_RESOLVED` only), flxp |
 | Effects: smoothing | `[fonts] smoothing` | off, standard, cleartype | flxp, luxwm's menus (luxwm's captions: the frame set; luxshell: fontconfig) |
+| Effects: menu shadows | `[effects] menu_shadows` | 1 (default), 0 | flxp's programs when they start (SPI_SETDROPSHADOW), luxwm's window menu when it opens |
 | Save As | `themes/NAME.theme` | `[Theme] name/base`, `[Composition] composition` (unless follow) + `animations`, `[Desktop] wallpaper/mode` (if set) + `icons` | lux `S.resolve`, luxwm `theme_preset_lookup` |
 
 `[start] pinned` is not written by the dialog; both sides read it as a `;` list (lux: desktop ids; flxp also takes

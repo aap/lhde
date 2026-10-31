@@ -10,6 +10,7 @@
 #include "gdi/font.h"
 #include "lhtheme.h"
 #include "lhdata.h"
+#include "win/window.h"   // win::set_drop_shadows (SPI_SETDROPSHADOW)
 
 namespace shell {
 
@@ -214,6 +215,8 @@ void setup_fonts()
     std::string sm = theme_setting("font_smoothing");
     gdi::set_font_smoothing(sm == "off" || sm == "0" ? gdi::SMOOTH_OFF :
                             sm == "cleartype" ? gdi::SMOOTH_CLEARTYPE : gdi::SMOOTH_STANDARD);
+    // Effects' "Show shadows under menus" (settings.ini [effects] menu_shadows; on unless 0): the menus opened from now on
+    win::set_drop_shadows(setting("menu_shadows") != "0");
     // font_path, else the imported Windows fonts (lhde's fonts/<build> with Tahoma)
     std::vector<std::string> fp = split_path(setting("font_path"));
     if (fp.empty()) fp = default_font_dirs();

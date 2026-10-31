@@ -104,6 +104,18 @@ after the button that asked for it is released). GTK's own name, in `_NET_SUPPOR
 minimised window gets its menu as well (XP's task button menu): Restore (the default item) and Maximize bring it back, Move, Size
 and Minimize are greyed. luxshell's task buttons send it on a right click.
 
+## Drop shadows: `_LH_DROP_SHADOW`
+
+XP's drop shadow under a popup menu (CS_DROPSHADOW; Display Properties > Appearance > Effects..., "Show shadows under menus",
+`[effects] menu_shadows`) is drawn by the client, not by the compositor: wux gives a popup menu a window of its own, 5 px wider
+and higher than the menu at the menu's top left, stacked right under it, holding only the shadow (`ut_menu_shadow_alpha`, the
+same shadow as luxwm's window menu). With a compositor (the `_NET_WM_CM_Sn` selection has an owner) it is ARGB, black with the
+shadow's alpha; without one it is a copy of the screen under it, taken before the map and darkened. It takes no input.
+
+| Property | Type | Meaning |
+| --- | --- | --- |
+| `_LH_DROP_SHADOW` | CARDINAL | on an override-redirect window: 1 = a popup whose drop shadow is its client's own (or none, when the setting is off), 2 = such a shadow window. The compositor adds no shadow of its own and does not blur behind either (`picom-glass.conf`, `picom-glass-fvwm.conf`). |
+
 ## Theme changes
 
 The session theme is the root property `_LH_THEME` (UTF8_STRING), a theme name; its resolved record is `_LH_THEME_RESOLVED`

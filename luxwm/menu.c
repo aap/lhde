@@ -19,7 +19,7 @@
 #include <wuxtheme/ut.h>
 #include <lhde/settings.h>
 
-#define SHADOW 4   /* XP's menu drop shadow: right and bottom, 4 px (measured on the 4074 Slate window menu) */
+#define SHADOW UT_MENU_SHADOW   /* XP's menu drop shadow, right and bottom (wuxtheme's, the same as wux's menus) */
 
 /* what the painter is asked: the frame theme's visual style (its Menu class, [SysMetrics] colours, FLATMENUS, MENUFONT), or
    Windows Classic from the scheme's colours and Metrics.menufont; the text smoothed as the system's (sys_smoothing), else as the
@@ -87,16 +87,13 @@ static void strip_amp(const char *s, char *out, size_t n, int *mn) {
     out[o] = 0;
 }
 
-/* the drop shadow right of and below the W x H menu, alpha per pixel (4074 Slate measurement: 0.44 0.33 0.17 0.055 outwards, starting
-   5 px in from the far corner with a 4 px ramp) */
-static double shadow_alpha(int x, int y, int W, int H) {
-    static const double p[5] = { 0, 0.44, 0.33, 0.17, 0.055 }, q[5] = { 0.12, 0.33, 0.65, 0.88, 1 };
-    int dx = x - W + 1, dy = y - H + 1;   /* 1..SHADOW outside the right / bottom edge */
-    if (dx >= 1 && dy >= 1) return dx <= SHADOW && dy <= SHADOW ? p[dx] * p[dy] / p[1] : 0;
-    if (dx >= 1 && dx <= SHADOW) { int k = y - 5; return k < 0 ? 0 : p[dx] * (k < 5 ? q[k] : 1); }
-    if (dy >= 1 && dy <= SHADOW) { int k = x - 5; return k < 0 ? 0 : p[dy] * (k < 5 ? q[k] : 1); }
-    return 0;
+/* the drop shadow right of and below the W x H menu, alpha per pixel (ut_menu_shadow_alpha: XP's, measured the same on 4074),
+   unless Display Properties' Effects turned "Show shadows under menus" off (settings.ini [effects] menu_shadows = 0) */
+static int shadow_on(void) {
+    char b[16]; const char *v = lhde_settings_get("effects", "menu_shadows", b, sizeof b);
+    return !v || !*v || strcmp(v, "0") != 0;
 }
+static double shadow_alpha(int x, int y, int W, int H) { return ut_menu_shadow_alpha(x, y, W, H) / 255.0; }
 
 cairo_surface_t *wmmenu_render(const struct theme *t, const struct wmmenu_item *items, int n, int sel, unsigned flags, int *w, int *h) {
     struct look L; struct geom g; look_build(t, items, n, &L); measure(&L, &g);
@@ -219,7 +216,7 @@ static int popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_i
     if (n > 64) n = 64;
     r.env = e; r.items = items; r.n = n; r.cues = (flags & WMMENU_KEYBOARD) != 0;
     look_build(e->theme, items, n, &r.L); measure(&r.L, &r.g);
-    r.W = r.g.w + SHADOW; r.H = r.g.h + SHADOW;
+    int sh = shadow_on() ? SHADOW : 0; r.W = r.g.w + sh; r.H = r.g.h + sh;
     /* fit into the monitor: a context menu flips to the left of / above the point, the window menu is shifted (TrackPopupMenu) */
     int bx1 = e->bx + e->bw, by1 = e->by + e->bh;
     if (parent && x + r.g.w > bx1 && parent->x - r.g.w + 3 >= e->bx) x = parent->x - r.g.w + 3;   /* a cascade goes left of its parent */

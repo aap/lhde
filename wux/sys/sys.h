@@ -115,6 +115,13 @@ bool grab_pointer(NativeWindow* w, bool on);
 bool is_maximized(NativeWindow* w);         // _NET_WM_STATE has both MAXIMIZED atoms
 void set_maximized(NativeWindow* w, int action);   // 0 restore, 1 maximise, 2 toggle
 
+// A drop shadow under a popup (win32's CS_DROPSHADOW: the menus): size px right
+// of and below it, alpha(x, y, w, h) 0..255 black per pixel of the (w + size) x
+// (h + size) area at the window's top left (ut_menu_shadow_alpha); shown and
+// hidden with the window. alpha null: none (XP's "Show shadows under menus" off).
+// Either way the window is marked _LH_DROP_SHADOW: the compositor adds none.
+void set_drop_shadow(NativeWindow* w, int size, int (*alpha)(int x, int y, int w, int h));
+
 // Copy the given area of bmp to the window. bmp must be at least window-sized.
 void present(NativeWindow* w, const gdi::Bitmap* bmp, const gdi::Rect& area);
 

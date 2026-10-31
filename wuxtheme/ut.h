@@ -209,6 +209,12 @@ int ut_menu_layout(const ut_menu_spec *spec, const ut_menu_item *items, int n, i
  * mnemonics (opened from the keyboard). 1 on success. */
 int ut_menu_draw(const ut_menu_spec *spec, const ut_menu_item *items, int n, int sel, int cues,
                  uint32_t *pixels, int width, int height, int stride);
+/* XP's drop shadow under a popup menu (CS_DROPSHADOW, Display Properties' "Show shadows under menus"; 4074's is the same): the
+ * alpha (0..255, black) at (x, y) of the (w + UT_MENU_SHADOW) x (h + UT_MENU_SHADOW) area whose top left w x h is the menu:
+ * 5 px right of and below it, starting 5 px in from its top right and bottom left corners, with XP's rounded corners; 0 over the
+ * menu and outside the shadow. */
+enum { UT_MENU_SHADOW = 5 };
+int ut_menu_shadow_alpha(int x, int y, int w, int h);
 
 #ifdef UT_WITH_CAIRO
 /* cairo: the part is rendered at rect's size (device pixels = user units) and

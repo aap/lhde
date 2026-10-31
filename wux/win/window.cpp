@@ -414,7 +414,10 @@ bool set_window_pos(Window* w, Window* after, const Rect& nr, uint32_t flags)
     bool moved = r.left != old.left || r.top != old.top;
     bool visible_before = (w->style & WS_VISIBLE) != 0;
 
-    if (flags & SWP_SHOWWINDOW) show_window(w, SW_SHOW);
+    // a toplevel is shown where it goes (a menu or a drop-down list would map at its old place first, then move; the
+    // drop shadow is taken from the screen under the new place)
+    bool show_late = (flags & SWP_SHOWWINDOW) && w->top;
+    if ((flags & SWP_SHOWWINDOW) && !show_late) show_window(w, SW_SHOW);
     if (flags & SWP_HIDEWINDOW) show_window(w, SW_HIDE);
 
     // z-order
@@ -462,6 +465,8 @@ bool set_window_pos(Window* w, Window* after, const Rect& nr, uint32_t flags)
         w->nc_invalid = true;
         if (!(flags & SWP_NOREDRAW)) invalidate(w);
     }
+
+    if (show_late) show_window(w, SW_SHOW);
 
     WindowPos wp{w, after, r, flags};
     if (moved || resized || (flags & SWP_FRAMECHANGED) || !(flags & SWP_NOZORDER))
@@ -1006,6 +1011,14 @@ gdi::Bitmap* header_pixmap(Window* w) { return is_window(w) && w->top ? sys::hea
 bool caption_rect(Window* w, Rect& r) { return is_window(w) && w->top && sys::caption_rect(w->top->native, r); }
 void set_input_hole(Window* w, const Rect* r) { if (is_window(w) && w->top) sys::set_input_hole(w->top->native, r); }
 void set_shape(Window* w, const std::vector<Rect>* rects) { if (is_window(w) && w->top) sys::set_shape(w->top->native, rects); }
+static bool g_drop_shadows = true;
+bool drop_shadows() { return g_drop_shadows; }
+void set_drop_shadows(bool on) { g_drop_shadows = on; }
+
+void set_drop_shadow(Window* w, int size, int (*alpha)(int, int, int, int))
+{
+    if (is_window(w) && w->top) sys::set_drop_shadow(w->top->native, size, alpha);
+}
 
 // HT* -> _NET_WM_MOVERESIZE direction (HTCAPTION move, the sizing borders resize)
 static int moveresize_direction(intptr_t ht)

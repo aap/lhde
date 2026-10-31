@@ -39,6 +39,12 @@ struct NativeWindow {
     int min_w = 0, min_h = 0;
     bool fixed = false;     // set_fixed_size: min == max size hints, no MWM resize / maximize
     std::vector<unsigned long> icon;   // _NET_WM_ICON (set_icon), put back likewise
+    // set_drop_shadow: the shadow's own window, under this one while it is mapped
+    bool shadow_own = false;   // _LH_DROP_SHADOW = 1: the shadow is ours (or none), not the compositor's
+    int shadow = 0;
+    int (*shadow_alpha)(int, int, int, int) = nullptr;
+    ::Window shadow_xw = 0;
+    gdi::Rect shadow_at;    // the rect it was painted for
 };
 
 static Display* dpy;
@@ -149,6 +155,11 @@ static void put_fixed_hints(NativeWindow* w, int cx, int cy)
     XSetWMNormalHints(dpy, w->xw, &hints);
 }
 
+static void put_drop_shadow_mark(::Window xw, long v)
+{
+    XChangeProperty(dpy, xw, XInternAtom(dpy, "_LH_DROP_SHADOW", False), XA_CARDINAL, 32, PropModeReplace, (const unsigned char*)&v, 1);
+}
+
 // (Re)create the X window of w with its current flags; rect, title and the
 // frame properties carry over.
 static void make_xwindow(NativeWindow* w)
@@ -201,6 +212,7 @@ static void make_xwindow(NativeWindow* w)
     if (w->has_extend || w->frame_flags) put_frame_props(w);
     if (w->type != WindowType::Normal) set_window_type(w, w->type);
     if (!w->popup) set_xdnd_aware(w->xw);   // every toplevel takes drops (win32: RegisterDragDrop per window)
+    if (w->shadow_own) put_drop_shadow_mark(w->xw, 1);
 }
 
 NativeWindow* create_window(const gdi::Rect& r, const char* title, void* user, bool popup, bool argb)
@@ -247,10 +259,13 @@ bool set_argb(NativeWindow* w, bool on)
     return true;
 }
 
+static void drop_shadow_show(NativeWindow* w, const gdi::Rect& r, bool show);
+
 void destroy_window(NativeWindow* w)
 {
     for (size_t i = 0; i < windows.size(); i++)
         if (windows[i] == w) { windows.erase(windows.begin() + i); break; }
+    drop_shadow_show(w, w->rect, false);
     XFreeGC(dpy, w->gc);
     XDestroyWindow(dpy, w->xw);
     if (w->cmap) XFreeColormap(dpy, w->cmap);
@@ -478,7 +493,12 @@ void set_cursor(NativeWindow* w, PointerShape shape)
     XFlush(dpy);
 }
 
-void raise_window(NativeWindow* w) { XRaiseWindow(dpy, w->xw); XFlush(dpy); }
+void raise_window(NativeWindow* w)
+{
+    if (w->shadow_xw && w->mapped) XRaiseWindow(dpy, w->shadow_xw);
+    XRaiseWindow(dpy, w->xw);
+    XFlush(dpy);
+}
 
 static int ignore_x_error(Display*, XErrorEvent*);
 
@@ -500,6 +520,7 @@ void activate_window(NativeWindow* w)
 void show_window(NativeWindow* w, bool show)
 {
     w->mapped = show;
+    if (w->shadow && w->popup && show) drop_shadow_show(w, w->rect, true);   // first: the window maps above it
     // win32 shows a popup on top (ShowWindow and SWP_SHOWWINDOW without SWP_NOZORDER;
     // a combo's list and menus use HWND_TOPMOST). An override-redirect window
     // keeps its old place in the stack when mapped again, under windows the WM
@@ -507,7 +528,94 @@ void show_window(NativeWindow* w, bool show)
     if (show && w->popup) XMapRaised(dpy, w->xw);
     else if (show) XMapWindow(dpy, w->xw); else XUnmapWindow(dpy, w->xw);
     if (show && w->type == WindowType::Desktop) XLowerWindow(dpy, w->xw);   // without a window manager too
+    if (!show) drop_shadow_show(w, w->rect, false);
     XFlush(dpy);
+}
+
+// ---- drop shadow (CS_DROPSHADOW) --------------------------------------------------
+// XP's SysShadow: a window of its own, (w + size) x (h + size) at the window's
+// top left and stacked right under it, holding only the shadow. With a
+// compositor (the _NET_WM_CM_Sn selection has an owner) it is ARGB, black with
+// the shadow's alpha; without one it is a copy of the screen under it taken
+// before the map, darkened (what XP's layered window composes to). Its
+// contents are its background pixmap, so the server repaints it without us;
+// it takes no input. The window carries _LH_DROP_SHADOW = 1 (also with the
+// shadow off: no compositor shadow either), the shadow window 2, so that picom
+// neither shadows nor blurs them (docs/CLIENT-PROTOCOL.md).
+
+void set_drop_shadow(NativeWindow* w, int size, int (*alpha)(int x, int y, int w, int h))
+{
+    if (w->shadow_xw) drop_shadow_show(w, w->rect, false);
+    w->shadow = alpha ? size : 0;
+    w->shadow_alpha = alpha;
+    if (!w->shadow_own) { w->shadow_own = true; put_drop_shadow_mark(w->xw, 1); }
+}
+
+static void drop_shadow_show(NativeWindow* w, const gdi::Rect& r, bool show)
+{
+    if (!show || !w->shadow || r.width() <= 0 || r.height() <= 0) {
+        if (w->shadow_xw) { XDestroyWindow(dpy, w->shadow_xw); w->shadow_xw = 0; }
+        return;
+    }
+    if (w->shadow_xw && w->shadow_at == r) { XMapRaised(dpy, w->shadow_xw); return; }
+    if (w->shadow_xw) { XDestroyWindow(dpy, w->shadow_xw); w->shadow_xw = 0; }
+    int W = r.width() + w->shadow, H = r.height() + w->shadow;
+    static Atom cm;
+    if (!cm) { char n[32]; snprintf(n, sizeof n, "_NET_WM_CM_S%d", screen); cm = XInternAtom(dpy, n, False); }
+    bool composited = have_argb_visual && XGetSelectionOwner(dpy, cm) != None;
+    Visual* vis = composited ? argb_visual.visual : DefaultVisual(dpy, screen);
+    int depth = composited ? 32 : DefaultDepth(dpy, screen);
+    std::vector<uint32_t> px((size_t)W * H, 0);
+    if (!composited) {   // the screen under it, before it (and the window) map
+        int sw = DisplayWidth(dpy, screen), sh = DisplayHeight(dpy, screen);
+        gdi::Rect g = gdi::intersect(gdi::rect_xywh(r.left, r.top, W, H), gdi::rect_xywh(0, 0, sw, sh));
+        if (!g.empty()) {
+            XImage* img = XGetImage(dpy, root, g.left, g.top, (unsigned)g.width(), (unsigned)g.height(), AllPlanes, ZPixmap);
+            if (img) {
+                for (int y = 0; y < g.height(); y++)
+                    for (int x = 0; x < g.width(); x++)
+                        px[(size_t)(y + g.top - r.top) * W + (x + g.left - r.left)] = (uint32_t)XGetPixel(img, x, y);
+                XDestroyImage(img);
+            }
+        }
+    }
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) {
+            uint32_t a = (uint32_t)w->shadow_alpha(x, y, r.width(), r.height());
+            uint32_t& p = px[(size_t)y * W + x];
+            if (composited) { p = a << 24; continue; }   // black, premultiplied
+            uint32_t k = 255 - a, o = 0;
+            for (int sh = 0; sh < 24; sh += 8) o |= (((p >> sh) & 0xff) * k + 127) / 255 << sh;
+            p = o;
+        }
+    Pixmap pm = XCreatePixmap(dpy, root, (unsigned)W, (unsigned)H, (unsigned)depth);
+    XImage* img = XCreateImage(dpy, vis, (unsigned)depth, ZPixmap, 0, (char*)px.data(), (unsigned)W, (unsigned)H, 32, W * 4);
+    if (img) {
+        GC gc = XCreateGC(dpy, pm, 0, nullptr);
+        XPutImage(dpy, pm, gc, img, 0, 0, 0, 0, (unsigned)W, (unsigned)H);
+        XFreeGC(dpy, gc);
+        img->data = nullptr;
+        XDestroyImage(img);
+    }
+    XSetWindowAttributes a;
+    unsigned long mask = CWOverrideRedirect | CWBackPixmap | CWBorderPixel | CWColormap;
+    a.override_redirect = True;
+    a.background_pixmap = pm;
+    a.border_pixel = 0;
+    static Colormap argb_cmap;
+    if (composited && !argb_cmap) argb_cmap = XCreateColormap(dpy, root, argb_visual.visual, AllocNone);
+    a.colormap = composited ? argb_cmap : DefaultColormap(dpy, screen);
+    w->shadow_xw = XCreateWindow(dpy, root, r.left, r.top, (unsigned)W, (unsigned)H, 0, depth, InputOutput, vis, mask, &a);
+    XFreePixmap(dpy, pm);
+    w->shadow_at = r;
+    XShapeCombineRectangles(dpy, w->shadow_xw, ShapeInput, 0, 0, nullptr, 0, ShapeSet, Unsorted);   // clicks go through
+    put_drop_shadow_mark(w->shadow_xw, 2);
+    XClassHint ch;
+    ch.res_name = program_invocation_short_name;
+    ch.res_class = (char*)"Flxp";
+    XSetClassHint(dpy, w->shadow_xw, &ch);
+    XStoreName(dpy, w->shadow_xw, "drop shadow");
+    XMapRaised(dpy, w->shadow_xw);
 }
 
 void set_title(NativeWindow* w, const char* title)
@@ -522,6 +630,11 @@ void set_title(NativeWindow* w, const char* title)
 
 void set_window_rect(NativeWindow* w, const gdi::Rect& r)
 {
+    if (w->popup) w->rect = r;   // override-redirect: the server takes it as asked (show_window's shadow goes there)
+    if (w->shadow_xw && w->mapped && !(w->shadow_at == r)) {   // a menu that moves or grows while shown: a new shadow under it
+        drop_shadow_show(w, r, true);
+        XRaiseWindow(dpy, w->xw);
+    }
     if (w->fixed) put_fixed_hints(w, r.width(), r.height());   // before the request: the WM refuses other sizes
     XMoveResizeWindow(dpy, w->xw, r.left, r.top, r.width(), r.height());
     XFlush(dpy);

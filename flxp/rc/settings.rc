@@ -88,16 +88,17 @@ BEGIN
     AUTOCHECKBOX    "S&how the sidebar with the classic taskbar", IDC_AP_SBCLASSIC, 13, 226, 220, 10
 END
 
-IDD_EFFECTS DIALOGEX 0, 0, 272, 80
+IDD_EFFECTS DIALOGEX 0, 0, 272, 94
 STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Effects"
 FONT 8, "MS Shell Dlg"
 BEGIN
     AUTOCHECKBOX    "U&se the following method to smooth edges of screen fonts:", IDC_EF_SMOOTH, 7, 7, 250, 10
     COMBOBOX        IDC_EF_METHOD, 20, 19, 80, 60, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Window animations and composition are on the Shell tab.", -1, 7, 40, 250, 9
-    DEFPUSHBUTTON   "OK", IDOK, 161, 59, 50, 14
-    PUSHBUTTON      "Cancel", IDCANCEL, 215, 59, 50, 14
+    AUTOCHECKBOX    "Show s&hadows under menus", IDC_EF_SHADOWS, 7, 38, 250, 10
+    LTEXT           "Window animations and composition are on the Shell tab.", -1, 7, 54, 250, 9
+    DEFPUSHBUTTON   "OK", IDOK, 161, 73, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 215, 73, 50, 14
 END
 
 IDD_ADVANCED DIALOGEX 0, 0, 252, 238

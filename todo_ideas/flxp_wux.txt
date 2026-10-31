@@ -11,9 +11,6 @@
 	shows "Filter by" in Segoe UI under Jade; the box is GR_BOX_H high, too low for Segoe UI 9 as it stands), dialogs (MS
 	Shell Dlg; 4074's About box is Segoe UI under Jade, unverified whether 4074 mapped MS Shell Dlg or the dialog named it)
 
-* wux's popup menus have no drop shadow (CS_DROPSHADOW is ignored); luxwm's window menu has XP's 4 px shadow, measured on
-	the 4074 menu (luxwm/menu.c shadow_alpha), which wux could give its menu windows the same way
-
 * keyboard cues: SPI_GETKEYBOARDCUES answers TRUE, so every wux menu and the menu band underline their mnemonics all the
 	time; XP and the 4074 screenshots hide them until Alt or a keyboard-opened menu (luxwm's window menu does that already)
 

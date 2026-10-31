@@ -222,7 +222,9 @@ BOOL WINAPI SystemParametersInfoW(UINT action, UINT param, void* pv, UINT)
         if (gdi::font_smoothing() != gdi::SMOOTH_OFF)
             gdi::set_font_smoothing((UINT)(UINT_PTR)pv == FE_FONTSMOOTHINGCLEARTYPE ? gdi::SMOOTH_CLEARTYPE : gdi::SMOOTH_STANDARD);
         return TRUE;
-    case SPI_GETDROPSHADOW: if (pv) *(BOOL*)pv = FALSE; return TRUE;
+    // XP's "Show shadows under menus" (on by default; flxp: menu_shadows), for the popups created after it
+    case SPI_GETDROPSHADOW: if (pv) *(BOOL*)pv = win::drop_shadows(); return TRUE;
+    case SPI_SETDROPSHADOW: win::set_drop_shadows((BOOL)(INT_PTR)pv != FALSE); return TRUE;
     case SPI_GETLISTBOXSMOOTHSCROLLING: if (pv) *(BOOL*)pv = FALSE; return TRUE;
     case SPI_GETMOUSEHOVERTIME: if (pv) *(UINT*)pv = 400; return TRUE;
     case SPI_GETMOUSEHOVERWIDTH: case SPI_GETMOUSEHOVERHEIGHT: if (pv) *(UINT*)pv = 4; return TRUE;
