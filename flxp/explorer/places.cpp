@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include "places.h"
+#include "preview.h"
 #include "uiicons.h"
 #include "verbs.h"
 #include "shell/apps.h"
@@ -40,6 +41,7 @@ struct Group {
     std::vector<Place> custom;   // a Custom group's places
     std::vector<Entry> items;
     bool collapsed = false;
+    bool hidden = false;         // Details with nothing to say (XP hides the section)
     RECT head = {}, body = {};
 };
 
@@ -50,6 +52,7 @@ static bool g_icons = true;             // the groups look's 16 px icons (places
 static Options g_opts;
 static std::vector<Group> g_groups;     // the explorer: 0 Places, 1 Bookmarks; Options::spec otherwise
 static int g_scroll, g_content_h;
+static int g_inset;                     // the groups look: rows kept free at the top (set_top_inset)
 static int g_hot_group = -1, g_hot_item = -1;   // item -1 with a group: its header
 static int g_down_group = -1, g_down_item = -2;
 static bool g_tracking;
@@ -61,7 +64,16 @@ static POINT g_down_pt;
 static int g_rename_group = -1, g_rename_item = -1;
 static struct stat g_bm_stat;
 static HFONT g_font, g_bold, g_under, g_bold_under;
-enum { TIMER_BOOKMARKS = 1, WM_RENAME_DONE = WM_APP + 0x41 };
+enum { TIMER_BOOKMARKS = 1, WM_RENAME_DONE = WM_APP + 0x41, WM_DETAILS_PICTURE = WM_APP + 0x42 };
+
+// the Details section (XP look): the model's content and where its pieces went
+static shell::details::Info g_details;
+static bool g_details_set, g_details_preview, g_details_open_default;
+static preview::Pictures* g_pics;
+struct DetailText { RECT r; std::string text; bool bold; };
+static std::vector<DetailText> g_dtext;      // content coordinates
+static RECT g_dpic;                          // the mini preview (content coordinates; empty: none)
+enum { PREVIEW_W = 150, PREVIEW_H = 100, INFO_GAP = 5 };   // CDUIView's 150 x 100; NameSpaceItemInfo's top margin
 
 // XDG user dirs ($XDG_CONFIG_HOME/user-dirs.dirs: XDG_PICTURES_DIR="$HOME/Pictures")
 std::string user_dir(const char* key, const char* fallback)
@@ -358,6 +370,44 @@ static int text_height(HDC dc, const std::string& s, int width, UINT extra)
     return r.bottom - r.top;
 }
 
+// The Details section's pieces from y down, between x0 and x1: the mini
+// preview, the bold name, then the lines (the type right under the name, the
+// others INFO_GAP apart; several items: one block); returns the bottom
+static int layout_details(HDC dc, int x0, int x1, int y)
+{
+    using namespace shell::details;
+    g_dtext.clear();
+    g_dpic = RECT{};
+    int w = imax(20, x1 - x0);
+    if (g_details_preview && g_details.xp_preview && g_pics && !g_details.previews.empty()) {
+        int pw = 0, ph = 0;
+        if (g_pics->get(g_details.previews[0], imin(PREVIEW_W, w), PREVIEW_H, &pw, &ph)) {
+            g_dpic = RECT{ x0, y, x0 + pw, y + ph };
+            y += ph;
+        }
+    }
+    auto block = [&](const std::string& text, bool bold, int gap) {
+        if (text.empty()) return;
+        HGDIOBJ of = SelectObject(dc, bold ? g_bold : g_font);
+        int h = text_height(dc, text, w, DT_WORDBREAK);
+        SelectObject(dc, of);
+        y += gap;
+        g_dtext.push_back(DetailText{ RECT{ x0, y, x0 + w, y + h }, text, bold });
+        y += h;
+    };
+    block(xp_title(g_details), true, INFO_GAP);
+    std::vector<Line> lines = xp_lines(g_details);
+    if (g_details.kind == shell::details::Kind::Many) {
+        std::string all;
+        for (size_t i = 0; i < lines.size(); i++) all += (i ? "\n" : "") + lines[i].text();
+        block(all, false, INFO_GAP);
+    } else {
+        for (size_t i = 0; i < lines.size(); i++)
+            block(lines[i].text(), false, i == 0 && lines[i].label.empty() ? 0 : INFO_GAP);
+    }
+    return y;
+}
+
 static void layout()
 {
     RECT rc; GetClientRect(g_wnd, &rc);
@@ -365,7 +415,7 @@ static void layout()
     HDC dc = GetDC(g_wnd);
     HGDIOBJ of = SelectObject(dc, g_font);
     if (g_grp) {
-        int y = g_filter ? GR_FIRST : GR_X;
+        int y = (g_filter ? GR_FIRST : GR_X) + g_inset;
         int right = imax(GR_INDENT + 60, w - 6);
         for (Group& g : g_groups) {
             g.head = RECT{ 2, y, right, y + GR_HEAD };
@@ -393,10 +443,13 @@ static void layout()
         if (R - L < 80) R = L + 80;
         int y = 12;
         for (Group& g : g_groups) {
+            if (g.hidden) { g.head = g.body = RECT{}; continue; }
             g.head = RECT{ L, y, R, y + HEAD_H };
             y += HEAD_H;
             int top = y;
-            if (!g.collapsed) {
+            if (!g.collapsed && g.kind == GroupSpec::Details) {
+                y = layout_details(dc, L + 1 + PAD_X, R - 1 - PAD_X, y + PAD_Y) + PAD_Y + 1;
+            } else if (!g.collapsed) {
                 y += PAD_Y;
                 int x0 = L + 1 + PAD_X, x1 = R - 1 - PAD_X;
                 for (size_t i = 0; i < g.items.size(); i++) {
@@ -433,7 +486,7 @@ static void layout()
     SetScrollInfo(g_wnd, SB_VERT, &si, TRUE);
     if (g_filter) {
         int bw = imax(60, w - 2 * GR_X - 1);
-        SetWindowPos(g_filter, nullptr, GR_X, GR_BOX_Y - g_scroll, bw, GR_BOX_H, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(g_filter, nullptr, GR_X, GR_BOX_Y + g_inset - g_scroll, bw, GR_BOX_H, SWP_NOZORDER | SWP_NOACTIVATE);
     }
 }
 
@@ -609,6 +662,26 @@ static void draw_group_header(HDC dc, const Group& g, int gi, int dy)
     SelectObject(dc, of);
 }
 
+// the Details section's content (NameSpaceItemInfo: the default foreground,
+// black; classic: the window text)
+static void draw_details(HDC dc, int dy)
+{
+    if (g_dpic.right > g_dpic.left && g_pics) {
+        int pw = 0, ph = 0;
+        HBITMAP b = g_pics->get(g_details.previews[0], g_dpic.right - g_dpic.left, g_dpic.bottom - g_dpic.top, &pw, &ph);
+        if (b) preview::blend(dc, b, g_dpic.left, g_dpic.top - dy, pw, ph);
+    }
+    SetBkMode(dc, TRANSPARENT);
+    SetTextColor(dc, g_look.kind == Classic ? GetSysColor(COLOR_WINDOWTEXT) : RGB(0, 0, 0));
+    for (const DetailText& t : g_dtext) {
+        HGDIOBJ of = SelectObject(dc, t.bold ? g_bold : g_font);
+        std::u16string u = W(t.text);
+        RECT r = t.r; OffsetRect(&r, 0, -dy);
+        DrawTextW(dc, (LPCWSTR)u.c_str(), -1, &r, DT_WORDBREAK | DT_NOPREFIX);
+        SelectObject(dc, of);
+    }
+}
+
 static void draw_insert(HDC dc);
 static void paint(HDC dc)
 {
@@ -647,12 +720,14 @@ static void paint(HDC dc)
     int dy = g_scroll;
     for (size_t gi = 0; gi < g_groups.size(); gi++) {
         const Group& g = g_groups[gi];
+        if (g.hidden) continue;
         draw_header(dc, g, (int)gi, dy);
         if (g.collapsed) continue;
         RECT b = g.body; OffsetRect(&b, 0, -dy);
         fill(dc, b, g_look.body_border);
         RECT in = { b.left + 1, b.top, b.right - 1, b.bottom - 1 };
         fill(dc, in, g_look.body);
+        if (g.kind == GroupSpec::Details) draw_details(dc, dy);
         for (size_t i = 0; i < g.items.size(); i++)
             draw_entry(dc, g.items[i], g_hot_group == (int)gi && g_hot_item == (int)i, dy);
     }
@@ -666,6 +741,7 @@ static bool hit(POINT pt, int* group, int* item)
     pt.y += g_scroll;
     for (size_t gi = 0; gi < g_groups.size(); gi++) {
         const Group& g = g_groups[gi];
+        if (g.hidden) continue;
         if (PtInRect(&g.head, pt)) { *group = (int)gi; *item = -1; return true; }
         if (g.collapsed) continue;
         for (size_t i = 0; i < g.items.size(); i++) {
@@ -1175,8 +1251,13 @@ static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             return 0;
         }
         break;
+    case WM_DETAILS_PICTURE:
+        if (g_pics && g_pics->take()) { layout(); InvalidateRect(h, nullptr, FALSE); }
+        return 0;
     case WM_DESTROY:
         KillTimer(h, TIMER_BOOKMARKS);
+        delete g_pics;
+        g_pics = nullptr;
         g_wnd = g_filter = g_rename = nullptr;
         return 0;
     }
@@ -1194,6 +1275,17 @@ static void make_filter()
     g_filter_old = (WNDPROC)SetWindowLongPtrW(g_filter, GWLP_WNDPROC, (LONG_PTR)filter_proc);
 }
 
+// the Details section open: places_details once the user folded or opened
+// it, else XP's default (CDUIView::_ShowSectionExpanded: open where the
+// folder's web view layout is SFVMWVL_DETAILS, My Computer)
+static bool details_open()
+{
+    std::string s = shell::setting("places_details", "");
+    if (s == "1") return true;
+    if (s == "0") return false;
+    return g_details_open_default;
+}
+
 // the groups for the look: the XP task pane's Places and Bookmarks, the
 // groups look's Options::spec or standard_spec(); folded ones from
 // Options::remember
@@ -1205,6 +1297,11 @@ static void build_groups()
         spec.resize(2);
         spec[0].kind = GroupSpec::Places; spec[0].title = "Places";
         spec[1].kind = GroupSpec::Bookmarks; spec[1].title = "Bookmarks";
+        if (g_opts.details) {
+            GroupSpec d;
+            d.kind = GroupSpec::Details; d.title = "Details";
+            spec.push_back(d);
+        }
     }
     std::string folded = ";" + (g_opts.remember.empty() ? std::string() : shell::setting(g_opts.remember.c_str())) + ";";
     g_groups.clear();
@@ -1215,6 +1312,7 @@ static void build_groups()
         g.title = gs.title;
         g.custom = gs.places;
         g.collapsed = gs.collapsed || (g_grp && folded.find(";" + gs.title + ";") != std::string::npos);
+        if (g.kind == GroupSpec::Details) { g.collapsed = !details_open(); g.hidden = !g_details_set; }
         fill_group(g);
         g_groups.push_back(g);
     }
@@ -1225,6 +1323,8 @@ static void build_groups()
 // a fold remembered: Options::remember = the folded groups' titles, ';'-separated
 static void remember_fold(const std::string& title, bool collapsed)
 {
+    for (const Group& g : g_groups)
+        if (g.kind == GroupSpec::Details && g.title == title && !g_grp) { shell::write_setting("places_details", collapsed ? "0" : "1"); return; }
     if (g_cb.group_toggled) g_cb.group_toggled(title, collapsed);
     if (g_opts.remember.empty() || !g_grp) return;
     std::string cur = shell::setting(g_opts.remember.c_str()), out;
@@ -1312,6 +1412,35 @@ void set_icons(bool on)
 }
 
 void folder_changed() { if (g_wnd && g_grp) InvalidateRect(g_wnd, nullptr, FALSE); }
+
+void set_top_inset(int px)
+{
+    if (px == g_inset) return;
+    g_inset = px;
+    if (!g_wnd) return;
+    layout();
+    InvalidateRect(g_wnd, nullptr, FALSE);
+}
+
+void set_details(const shell::details::Info& in, bool preview_ok, bool open_by_default)
+{
+    g_details = in;
+    g_details_set = true;
+    g_details_preview = preview_ok;
+    g_details_open_default = open_by_default;
+    if (!g_wnd) return;
+    std::vector<std::string> want;
+    if (preview_ok && in.xp_preview && !in.previews.empty()) want.push_back(in.previews[0]);
+    if (!g_pics && !want.empty()) g_pics = new preview::Pictures(g_wnd, WM_DETAILS_PICTURE);
+    if (g_pics) g_pics->want(want, PREVIEW_W);
+    for (Group& g : g_groups)
+        if (g.kind == GroupSpec::Details) {
+            g.hidden = shell::details::xp_title(in).empty() && shell::details::xp_lines(in).empty();
+            g.collapsed = !details_open();
+        }
+    layout();
+    InvalidateRect(g_wnd, nullptr, FALSE);
+}
 
 void destroy()
 {

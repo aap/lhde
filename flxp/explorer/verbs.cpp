@@ -282,7 +282,7 @@ bool run(int id)
         if (dest.empty() || g_clip.empty()) { MessageBeep(0); return true; }
         std::vector<std::string> dirs = { dest };
         for (const std::string& c : g_clip) dirs.push_back(shell::dir_of(c));
-        if (!shell::paste_items(g_clip, dest, g_clip_cut, &err)) error_box(err);
+        if (!shell::paste_items(g_clip, dest, g_clip_cut, &err) && !err.empty()) error_box(err);
         if (g_clip_cut) { g_clip.clear(); shell::xclip::set_files(g_clip, false); }   // moved: the clipboard is emptied (as GNOME)
         g_host->changed(dirs);
         return true;

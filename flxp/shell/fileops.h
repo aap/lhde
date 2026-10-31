@@ -23,6 +23,12 @@ bool new_text_file(const std::string& dir, std::string* path, std::string* err =
 // fileops::run (fileops_job.h: replace confirmation, progress, worker Job);
 // err gets the summary of every failed item.
 bool paste_items(const std::vector<std::string>& sources, const std::string& dest_dir, bool move, std::string* err = nullptr);
+// A program with a user interface sets one for paste_items (and so drop_items):
+// the explorer's (explorer/fileopui.h) asks XP's questions, shows the progress
+// dialog and the errors as they happen; err then gets only what it did not show
+// ("" when the user cancelled or saw every error).
+typedef bool (*PasteUI)(const std::vector<std::string>& sources, const std::string& dest_dir, bool move, std::string* err);
+void set_paste_ui(PasteUI ui);
 
 // Drag and drop (the effects are win32's DROPEFFECT_* values). drop_effect is
 // what a drop of these files into dest_dir does, as XP decides it: Ctrl or

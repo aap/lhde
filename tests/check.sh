@@ -25,12 +25,18 @@ result gditest $? "$T/gditest.log"
 # the copy/move engine (in fresh directories under $TMPDIR and /dev/shm)
 build/tests/fileops_test > "$T/fileops.log" 2>&1
 result "fileops_test ($(tail -n 1 "$T/fileops.log"))" $? "$T/fileops.log"
+# the copy/move dialogs' texts against XP's (sizes, dates, CopyError's messages)
+build/tests/w32/fileopuitest > "$T/fileopui.log" 2>&1
+result "fileopuitest ($(tail -n 1 "$T/fileopui.log"))" $? "$T/fileopui.log"
 # flxp's lookups in lhde's data directories (shell/lhdata.h) on a fake import
 build/tests/lhdatatest > "$T/lhdata.log" 2>&1
 result "lhdatatest ($(tail -n 1 "$T/lhdata.log"))" $? "$T/lhdata.log"
 # the Explorer's view model (shell/viewmodel.h): views, sizes, 4074's slider stops, memory
 build/tests/viewmodeltest > "$T/viewmodel.log" 2>&1
 result "viewmodeltest ($(tail -n 1 "$T/viewmodel.log"))" $? "$T/viewmodel.log"
+# the details model (shell/details.h): XP's Details lines, 4051's band values
+build/tests/detailstest > "$T/details.log" 2>&1
+result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"
 # libwuxtheme through its own API: every style the user imported
 styles=${LHDE_STYLES:-$(build/bin/lhde-theme find styles 2>/dev/null)}   # liblhde's lookup: the Windows tree's index/styles (docs/LAYOUT.md)
 n=0

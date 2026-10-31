@@ -14,13 +14,17 @@ not *entirely* sure about the font for all themes though
 
 * future: put the aurora example into longhorn flxp as an option
 
+* an option to put the Longhorn task pane (the band) at the bottom instead of the top: with the 5048 and 5112 styles that gets
+	close to Vista's details pane; a theme key (Explorer section) with the basic/aero 5048 and 5112 themes set to bottom
+
+* lab (picom xrender): an explorer window that loses activation to a dialog soon after it was resized shows parts of
+	itself (toolbar, task pane, status bar) as holes until it is activated again; seen with Properties (Alt+Enter) and
+	with the copy dialogs alike
+
 ## flxp behavior
 
-* match copy/move behaviour with windows
-	* handle collision with existing files
-	* need to show a progress dialog for bigger operations
-
-* file-rename still feels off, especially on long filenames that show as multi-line
+* copy/move: Cancel rolls the current top-level item back (a folder copied half-way is removed again); XP keeps
+	what was copied. fileops' choice (all or nothing per item), kept for now
 
 * see xatttribs.txt idea
 
@@ -28,15 +32,9 @@ not *entirely* sure about the font for all themes though
 
 ### details and task pane
 
-* want details rollout for the XP web-pane
 * also for longhorn flxp, but more complicated:
-	* no selection should show the number of elements in the current location
-	* 4051: left to right: (thumbnailed) icon, details, tasks
-	* 4051 pictures for preview on/off
-		* no selection: lh4051-152854.png / lh4051-152900.png
-		* single selection: lh4051-152336.png / lh4051-152329.png
-		* single selection picture: lh4051-152415.png / lh4051-152354.png
-		* multi selection picture: lh4051-152420.png / lh4051-152358.png
 	* 4074: (I) icon in the top right to flip between details and "tasks" (but no winfs?)
 
 ## misc
+
+* tests/headless/filedlg.sh is flaky under load (make check with a lab running): a different check fails each run (xp multi, longhorn filter index, the view keys), alone it passes; its xdotool waits need to wait for the dialog, not sleep

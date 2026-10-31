@@ -868,7 +868,7 @@
  
      /* now check if we need to update the focus rectangle */
      focus = infoPtr->bFocus && (item->state & LVIS_FOCUSED) ? &infoPtr->rcFocus : 0;
-@@ -4662,7 +5318,60 @@
+@@ -4662,7 +5318,61 @@
      else
          background = &rcSelect;
  
@@ -925,12 +925,13 @@
 +
 +    /* flxp: on a transparent icon list (the desktop) a selected label still
 +       gets its highlight box, as XP's (prepaint_setup made the DC opaque) */
-+    if (!themed && (nmlvcd->clrTextBk != CLR_NONE ||
-+        (infoPtr->uView == LV_VIEW_ICON && GetBkMode(nmlvcd->nmcd.hdc) == OPAQUE)))
++    /* flxp: not under the item being edited (lvicon.c: its label is erased, the edit box is it) */
++    if (!themed && !(infoPtr->hwndEdit && item->iItem == infoPtr->nEditLabelItem && item->iSubItem == 0) &&
++        (nmlvcd->clrTextBk != CLR_NONE || (infoPtr->uView == LV_VIEW_ICON && GetBkMode(nmlvcd->nmcd.hdc) == OPAQUE)))
          ExtTextOutW(nmlvcd->nmcd.hdc, background->left, background->top, ETO_OPAQUE, background, NULL, 0, NULL);
  
      if (item->state & LVIS_FOCUSED)
-@@ -4693,6 +5402,17 @@
+@@ -4693,6 +5403,17 @@
          }
          else
              infoPtr->rcFocus = rcLabel;
@@ -948,7 +949,7 @@
      }
  
      /* state icons */
-@@ -4714,20 +5434,89 @@
+@@ -4714,20 +5435,89 @@
  
          TRACE("iImage=%d\n", item->iImage);
  
@@ -1040,7 +1041,7 @@
      /* figure out the text drawing flags */
      format = (infoPtr->uView == LV_VIEW_ICON ? (focus ? LV_FL_DT_FLAGS : LV_ML_DT_FLAGS) : LV_SL_DT_FLAGS);
      if (infoPtr->uView == LV_VIEW_ICON)
-@@ -4752,6 +5541,15 @@
+@@ -4752,6 +5542,15 @@
      if (infoPtr->uView == LV_VIEW_DETAILS && infoPtr->dwLvExStyle & LVS_EX_GRIDLINES)
          rcLabel.bottom--;
  
@@ -1056,7 +1057,7 @@
      DrawTextW(nmlvcd->nmcd.hdc, item->pszText, -1, &rcLabel, format);
  }
  
-@@ -4785,7 +5583,7 @@
+@@ -4785,7 +5584,7 @@
      /* get information needed for drawing the item */
      lvItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM | LVIF_STATE;
      if (infoPtr->uView == LV_VIEW_DETAILS) lvItem.mask |= LVIF_INDENT;
@@ -1065,7 +1066,7 @@
      lvItem.iItem = nItem;
      lvItem.iSubItem = 0;
      lvItem.state = 0;
-@@ -5252,6 +6050,9 @@
+@@ -5252,6 +6051,9 @@
      cdmode = notify_customdraw(infoPtr, CDDS_PREPAINT, &nmlvcd);
      if (cdmode & CDRF_SKIPDEFAULT) goto enddraw;
  
@@ -1075,16 +1076,157 @@
      /* nothing to draw */
      if(infoPtr->nItemCount == 0) goto enddraw;
  
-@@ -6171,6 +6972,8 @@
-     ReleaseDC(infoPtr->hwndSelf, hdc);
+@@ -6065,19 +6867,90 @@
+     return EditLblWndProcT(hwnd, uMsg, wParam, lParam, FALSE);
+ }
  
-     sz.cy = rect.bottom - rect.top + 2;
-+    /* flxp: a tile's name is its first line; without labels the box goes under the image */
-+    if (is_tile(infoPtr) || hide_labels(infoPtr)) sz.cy = infoPtr->ntmHeight + 2;
-     rect.left -= 2;
-     rect.top  -= 1;
-     TRACE("moving edit (%ld,%ld)-(%ld,%ld)\n", rect.left, rect.top, sz.cx, sz.cy);
-@@ -6208,6 +7011,14 @@
++/* flxp: comctl32 6's in-place edit (lvicon.c ListView_DoOnEditLabel): in the
++   icon view a centred multi-line box that wraps the name as the label does */
++static inline BOOL edit_wraps(const LISTVIEW_INFO *infoPtr)
++{
++    return infoPtr->uView == LV_VIEW_ICON && !is_tile(infoPtr) && !hide_labels(infoPtr) && !(infoPtr->dwStyle & LVS_NOLABELWRAP);
++}
++
++/* flxp: comctl32 6's ListView_SetEditSize / SetEditInPlaceSize, on every
++   change of the text: wrapping, the box is as wide as the label wraps (a
++   quarter of the item at least) and as tall as the wrapped name, centred on
++   the label's middle; on one line it is as wide as the text and four
++   margins, on the label's line. The box goes round the text by the edit's
++   margins and border, so the name stays where the label drew it. */
++static void LISTVIEW_SetEditSize(LISTVIEW_INFO *infoPtr)
++{
++    WCHAR text[DISP_TEXT_SIZE];
++    HFONT font = infoPtr->hFont ? infoPtr->hFont : infoPtr->hDefaultFont, old;
++    RECT label, rc, client, fmt, cl, win;
++    BOOL wrap = edit_wraps(infoPtr);
++    INT len, bx, by, min_cx = infoPtr->nItemWidth / 4;
++    HDC hdc;
++
++    if (!infoPtr->hwndEdit) return;
++    label.left = LVIR_LABEL;
++    if (!LISTVIEW_GetItemRect(infoPtr, infoPtr->nEditLabelItem, &label)) return;
++    len = GetWindowTextW(infoPtr->hwndEdit, text, DISP_TEXT_SIZE);
++    if (!len) { text[0] = ' '; text[1] = 0; len = 1; }   /* an empty name: a box of a blank */
++    hdc = GetDC(infoPtr->hwndSelf);
++    old = SelectObject(hdc, font);
++    SetRectEmpty(&rc);
++    if (wrap)
++    {
++        rc.right = infoPtr->nItemWidth - TRAILING_LABEL_PADDING;   /* as the label wraps (LV_ML_DT_FLAGS) */
++        DrawTextW(hdc, text, len, &rc, DT_CALCRECT | DT_CENTER | DT_WORDBREAK | DT_EDITCONTROL | DT_NOPREFIX);
++    }
++    else
++        DrawTextW(hdc, text, len, &rc, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
++    SelectObject(hdc, old);
++    ReleaseDC(infoPtr->hwndSelf, hdc);
++    if (rc.bottom < infoPtr->ntmHeight) rc.bottom = infoPtr->ntmHeight;
++    if (rc.right < min_cx) rc.right = min_cx;
++    if (wrap)   /* the label's text is centred in it, from its top */
++        OffsetRect(&rc, label.left + (label.right - label.left - rc.right) / 2, label.top);
++    else if (is_tile(infoPtr) || hide_labels(infoPtr))   /* the name's line: the first of the tile's text */
++        OffsetRect(&rc, label.left, label.top);
++    else   /* LISTVIEW_DrawItemText: one line from IMAGE_PADDING in, centred vertically */
++    {
++        OffsetRect(&rc, label.left + IMAGE_PADDING, label.top + (label.bottom - label.top - rc.bottom) / 2);
++        rc.right += 4 * 2;   /* g_cxLabelMargin * 4: room to type */
++    }
++    rc.right += 2;   /* g_cyEdge: a little more for blanks */
++    GetClientRect(infoPtr->hwndSelf, &client);
++    IntersectRect(&rc, &rc, &client);
++    /* the edit's formatting rectangle in its window (EM_GETRECT: inside the margins, the border
++       around the client area): the window goes round the text by as much */
++    SendMessageW(infoPtr->hwndEdit, EM_GETRECT, 0, (LPARAM)&fmt);
++    GetClientRect(infoPtr->hwndEdit, &cl);
++    GetWindowRect(infoPtr->hwndEdit, &win);
++    bx = (win.right - win.left - cl.right) / 2;
++    by = (win.bottom - win.top - cl.bottom) / 2;
++    rc.left -= fmt.left + bx;
++    rc.top -= fmt.top + by;
++    rc.right += cl.right - fmt.right + bx;
++    rc.bottom += fmt.top + by;
++    SetWindowPos(infoPtr->hwndEdit, NULL, rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
++                 SWP_NOZORDER | SWP_NOACTIVATE);
++}
++
+ static HWND CreateEditLabelT(LISTVIEW_INFO *infoPtr, LPCWSTR text, BOOL isW)
+ {
+-    static const DWORD style = WS_CHILDWINDOW|WS_CLIPSIBLINGS|ES_LEFT|ES_AUTOHSCROLL|WS_BORDER|WS_VISIBLE;
++    /* flxp: wrapping in the icon view (comctl32 6: ES_CENTER | ES_MULTILINE | ES_AUTOVSCROLL) */
++    DWORD style = WS_CHILDWINDOW|WS_CLIPSIBLINGS|WS_BORDER|ES_AUTOHSCROLL |
++                  (edit_wraps(infoPtr) ? ES_CENTER|ES_MULTILINE|ES_AUTOVSCROLL : ES_LEFT);
+     HINSTANCE hinst = (HINSTANCE)GetWindowLongPtrW(infoPtr->hwndSelf, GWLP_HINSTANCE);
+     HWND hedit;
+ 
+     TRACE("(%p, text=%s, isW=%d)\n", infoPtr, debugtext_t(text, isW), isW);
+ 
+-    /* window will be resized and positioned after LVN_BEGINLABELEDIT */
++    /* window will be resized and positioned after LVN_BEGINLABELEDIT; flxp: made wide and hidden
++       until then (comctl32 6 CreateEditInPlaceWindow: so the margins work out) */
+     if (isW)
+-	hedit = CreateWindowW(WC_EDITW, text, style, 0, 0, 0, 0, infoPtr->hwndSelf, 0, hinst, 0);
++	hedit = CreateWindowW(WC_EDITW, text, style, 0, 0, 16384, 20, infoPtr->hwndSelf, 0, hinst, 0);
+     else
+-	hedit = CreateWindowA(WC_EDITA, (LPCSTR)text, style, 0, 0, 0, 0, infoPtr->hwndSelf, 0, hinst, 0);
++	hedit = CreateWindowA(WC_EDITA, (LPCSTR)text, style, 0, 0, 16384, 20, infoPtr->hwndSelf, 0, hinst, 0);
+ 
+     if (!hedit) return 0;
+ 
+@@ -6096,11 +6969,7 @@
+     WCHAR disptextW[DISP_TEXT_SIZE] = { 0 };
+     HWND hwndSelf = infoPtr->hwndSelf;
+     NMLVDISPINFOW dispInfo;
+-    HFONT hOldFont = NULL;
+-    TEXTMETRICW tm;
+     RECT rect;
+-    SIZE sz;
+-    HDC hdc;
+ 
+     TRACE("(nItem=%d, isW=%d)\n", nItem, isW);
+ 
+@@ -6147,36 +7016,14 @@
+ 
+     TRACE("disp text=%s\n", debugtext_t(dispInfo.item.pszText, isW));
+ 
+-    /* position and display edit box */
+-    hdc = GetDC(infoPtr->hwndSelf);
+-
+-    /* select the font to get appropriate metric dimensions */
+-    if (infoPtr->hFont)
+-        hOldFont = SelectObject(hdc, infoPtr->hFont);
+-
+-    /* use real edit box content, it could be altered during LVN_BEGINLABELEDIT notification */
+-    GetWindowTextW(infoPtr->hwndEdit, disptextW, DISP_TEXT_SIZE);
+-    TRACE("edit box text=%s\n", debugstr_w(disptextW));
+-
+-    /* get string length in pixels */
+-    GetTextExtentPoint32W(hdc, disptextW, lstrlenW(disptextW), &sz);
+-
+-    /* add extra spacing for the next character */
+-    GetTextMetricsW(hdc, &tm);
+-    sz.cx += tm.tmMaxCharWidth * 2;
+-
+-    if (infoPtr->hFont)
+-        SelectObject(hdc, hOldFont);
+-
+-    ReleaseDC(infoPtr->hwndSelf, hdc);
+-
+-    sz.cy = rect.bottom - rect.top + 2;
+-    rect.left -= 2;
+-    rect.top  -= 1;
+-    TRACE("moving edit (%ld,%ld)-(%ld,%ld)\n", rect.left, rect.top, sz.cx, sz.cy);
+-    MoveWindow(infoPtr->hwndEdit, rect.left, rect.top, sz.cx, sz.cy, FALSE);
++    /* flxp: comctl32 6 (lvicon.c ListView_OnEditLabel): the item in view, the box sized by
++       LISTVIEW_SetEditSize (the text may have changed in LVN_BEGINLABELEDIT), shown, the
++       text scrolled to its end and all of it selected */
++    LISTVIEW_EnsureVisible(infoPtr, nItem, FALSE);
++    LISTVIEW_SetEditSize(infoPtr);
+     ShowWindow(infoPtr->hwndEdit, SW_NORMAL);
+     SetFocus(infoPtr->hwndEdit);
++    SendMessageW(infoPtr->hwndEdit, EM_SETSEL, -1, -1);
+     SendMessageW(infoPtr->hwndEdit, EM_SETSEL, 0, -1);
+     return infoPtr->hwndEdit;
+ }
+@@ -6208,6 +7055,14 @@
      rcItem.left = LVIR_BOUNDS;
      if (!LISTVIEW_GetItemRect(infoPtr, nItem, &rcItem)) return FALSE;
  
@@ -1099,7 +1241,7 @@
      if (bPartial && IntersectRect(&rcTemp, &infoPtr->rcList, &rcItem)) return TRUE;
      
      if (rcItem.left < infoPtr->rcList.left || rcItem.right > infoPtr->rcList.right)
-@@ -6781,6 +7592,9 @@
+@@ -6781,6 +7636,9 @@
      else
  	pItemHdr = &lpItem->hdr;
  
@@ -1109,7 +1251,7 @@
      /* Do we need to query the state from the app? */
      if ((lpLVItem->mask & LVIF_STATE) && infoPtr->uCallbackMask && (!lpLVItem->iSubItem || is_subitem_invalid))
      {
-@@ -7800,6 +8614,7 @@
+@@ -7800,6 +8658,7 @@
      if (!is_assignable_item(lpLVItem, infoPtr->dwStyle)) return -1;
  
      if (!(lpItem = Alloc(sizeof(*lpItem)))) return -1;
@@ -1117,7 +1259,7 @@
      
      /* insert item in listview control data structure */
      if ( !(hdpaSubItems = DPA_Create(8)) ) goto fail;
-@@ -7921,6 +8736,7 @@
+@@ -7921,6 +8780,7 @@
  
  	LISTVIEW_MoveIconTo(infoPtr, nItem, &pt, TRUE);
      }
@@ -1125,7 +1267,7 @@
  
      /* now is the invalidation fun */
      LISTVIEW_ScrollOnInsert(infoPtr, nItem, 1);
-@@ -8698,6 +9514,9 @@
+@@ -8698,6 +9558,9 @@
              LISTVIEW_SetBkColor(infoPtr, CLR_NONE);
      }
  
@@ -1135,7 +1277,7 @@
      if((infoPtr->dwLvExStyle ^ old_ex_style) & LVS_EX_HEADERINALLVIEWS)
      {
          if (infoPtr->dwLvExStyle & LVS_EX_HEADERINALLVIEWS)
-@@ -8825,6 +9644,50 @@
+@@ -8825,6 +9688,50 @@
      return oldspacing;
  }
  
@@ -1186,7 +1328,7 @@
  static inline void set_icon_size(SIZE *size, HIMAGELIST himl, BOOL is_small)
  {
      INT cx, cy;
-@@ -8867,7 +9730,9 @@
+@@ -8867,7 +9774,9 @@
          himlOld = infoPtr->himlNormal;
          infoPtr->himlNormal = himl;
          if (infoPtr->uView == LV_VIEW_ICON) set_icon_size(&infoPtr->iconSize, himl, FALSE);
@@ -1197,7 +1339,7 @@
              LISTVIEW_SetIconSpacing(infoPtr, -1, -1);
      break;
  
-@@ -9018,6 +9883,16 @@
+@@ -9018,6 +9927,16 @@
      if (!pt || nItem < 0 || nItem >= infoPtr->nItemCount ||
  	!(infoPtr->uView == LV_VIEW_ICON || infoPtr->uView == LV_VIEW_SMALLICON)) return FALSE;
  
@@ -1214,7 +1356,7 @@
      Pt = *pt;
      LISTVIEW_GetOrigin(infoPtr, &Origin);
  
-@@ -9278,17 +10153,16 @@
+@@ -9278,17 +10197,16 @@
  static INT LISTVIEW_SetView(LISTVIEW_INFO *infoPtr, DWORD nView)
  {
    HIMAGELIST himl;
@@ -1238,7 +1380,7 @@
  
    SendMessageW(infoPtr->hwndEdit, WM_KILLFOCUS, 0, 0);
    ShowWindow(infoPtr->hwndHeader, SW_HIDE);
-@@ -9298,6 +10172,7 @@
+@@ -9298,6 +10216,7 @@
  
    himl = (nView == LV_VIEW_ICON ? infoPtr->himlNormal : infoPtr->himlSmall);
    set_icon_size(&infoPtr->iconSize, himl, nView != LV_VIEW_ICON);
@@ -1246,7 +1388,7 @@
  
    switch (nView)
    {
-@@ -9563,6 +10438,7 @@
+@@ -9563,6 +10482,7 @@
    SetWindowLongPtrW(hwnd, 0, (DWORD_PTR)infoPtr);
  
    infoPtr->hwndSelf = hwnd;
@@ -1254,7 +1396,7 @@
    infoPtr->dwStyle = lpcs->style;    /* Note: may be changed in WM_CREATE */
    map_style_view(infoPtr);
    /* determine the type of structures to use */
-@@ -9573,6 +10449,7 @@
+@@ -9573,6 +10493,7 @@
    infoPtr->clrBk = CLR_NONE;
    infoPtr->clrText = CLR_DEFAULT;
    infoPtr->clrTextBk = CLR_DEFAULT;
@@ -1262,7 +1404,7 @@
    LISTVIEW_SetBkColor(infoPtr, comctl32_color.clrWindow);
  
    /* set default values */
-@@ -9609,6 +10486,7 @@
+@@ -9609,6 +10530,7 @@
    if (!(infoPtr->hdpaItemIds = DPA_Create(10))) goto fail;
    if (!(infoPtr->hdpaPosX  = DPA_Create(10))) goto fail;
    if (!(infoPtr->hdpaPosY  = DPA_Create(10))) goto fail;
@@ -1270,7 +1412,7 @@
    if (!(infoPtr->hdpaColumns = DPA_Create(10))) goto fail;
  
    return DefWindowProcW(hwnd, WM_NCCREATE, wParam, (LPARAM)lpcs);
-@@ -10055,6 +10933,13 @@
+@@ -10055,6 +10977,13 @@
  
    TRACE("(nVirtualKey=%d, lKeyData=%ld)\n", nVirtualKey, lKeyData);
  
@@ -1284,7 +1426,7 @@
    /* send LVN_KEYDOWN notification */
    nmKeyDown.wVKey = nVirtualKey;
    nmKeyDown.flags = 0;
-@@ -10309,6 +11194,24 @@
+@@ -10309,6 +11238,24 @@
    infoPtr->bMarqueeSelect = FALSE;
    infoPtr->bScrolling = FALSE;
  
@@ -1309,7 +1451,7 @@
    lvHitTestInfo.pt.x = x;
    lvHitTestInfo.pt.y = y;
  
-@@ -10495,6 +11398,10 @@
+@@ -10495,6 +11442,10 @@
    DPA_Destroy(infoPtr->hdpaItemIds);
    DPA_Destroy(infoPtr->hdpaPosX);
    DPA_Destroy(infoPtr->hdpaPosY);
@@ -1320,7 +1462,7 @@
    /* columns */
    for (i = 0; i < DPA_GetPtrCount(infoPtr->hdpaColumns); i++)
        Free(DPA_GetPtr(infoPtr->hdpaColumns, i));
-@@ -10790,6 +11697,14 @@
+@@ -10790,6 +11741,14 @@
  	    LISTVIEW_Arrange(infoPtr, LVA_DEFAULT);
  	LISTVIEW_UpdateScroll(infoPtr);
      }
@@ -1335,7 +1477,7 @@
  
      if (infoPtr->hwndHeader)  UpdateWindow(infoPtr->hwndHeader);
  
-@@ -11043,6 +11958,7 @@
+@@ -11043,6 +12002,7 @@
      if (infoPtr->hFont == oldFont) return 0;
      
      LISTVIEW_SaveTextMetrics(infoPtr);
@@ -1343,7 +1485,7 @@
  
      infoPtr->nItemHeight = LISTVIEW_CalculateItemHeight(infoPtr);
  
-@@ -11448,7 +12364,17 @@
+@@ -11448,7 +12408,17 @@
    case LVM_EDITLABELW:
      return (LRESULT)LISTVIEW_EditLabelT(infoPtr, (INT)wParam,
                                          uMsg == LVM_EDITLABELW);
@@ -1362,7 +1504,7 @@
  
    case LVM_ENSUREVISIBLE:
      return LISTVIEW_EnsureVisible(infoPtr, (INT)wParam, (BOOL)lParam);
-@@ -11558,7 +12484,8 @@
+@@ -11558,7 +12528,8 @@
      LISTVIEW_GetOrigin(infoPtr, (LPPOINT)lParam);
      return TRUE;
  
@@ -1372,7 +1514,7 @@
  
    case LVM_GETSELECTEDCOLUMN:
      return infoPtr->selected_column;
-@@ -11583,9 +12510,29 @@
+@@ -11583,9 +12554,29 @@
    case LVM_GETTEXTCOLOR:
      return infoPtr->clrText;
  
@@ -1404,7 +1546,7 @@
  
    case LVM_GETTOOLTIPS:
      if( !infoPtr->hwndToolTip )
-@@ -11599,7 +12546,7 @@
+@@ -11599,7 +12590,7 @@
      return (infoPtr->notifyFormat == NFR_UNICODE);
  
    case LVM_GETVIEW:
@@ -1413,7 +1555,7 @@
  
    case LVM_GETVIEWRECT:
      return LISTVIEW_GetViewRect(infoPtr, (LPRECT)lParam);
-@@ -11618,7 +12565,8 @@
+@@ -11618,7 +12609,8 @@
      return LISTVIEW_InsertColumnT(infoPtr, (INT)wParam, (LPLVCOLUMNW)lParam,
                                    uMsg == LVM_INSERTCOLUMNW);
  
@@ -1423,7 +1565,7 @@
  
    /* case LVM_INSERTGROUPSORTED: */
  
-@@ -11628,7 +12576,33 @@
+@@ -11628,7 +12620,33 @@
  
    /* case LVM_INSERTMARKHITTEST: */
  
@@ -1458,7 +1600,7 @@
  
    case LVM_ISITEMVISIBLE:
      return LISTVIEW_IsItemVisible(infoPtr, (INT)wParam);
-@@ -11734,7 +12708,12 @@
+@@ -11734,7 +12752,12 @@
      return LISTVIEW_SetItemTextT(infoPtr, (INT)wParam, (LPLVITEMW)lParam,
                                   uMsg == LVM_SETITEMTEXTW);
  
@@ -1472,7 +1614,7 @@
  
    case LVM_SETSELECTEDCOLUMN:
      infoPtr->selected_column = (INT)wParam;
-@@ -11749,9 +12728,36 @@
+@@ -11749,9 +12772,36 @@
    case LVM_SETTEXTCOLOR:
      return LISTVIEW_SetTextColor(infoPtr, (COLORREF)lParam);
  
@@ -1511,7 +1653,7 @@
  
    /* case LVM_SETTILEWIDTH: */
  
-@@ -11817,6 +12823,17 @@
+@@ -11817,6 +12867,17 @@
    case WM_KEYDOWN:
      return LISTVIEW_KeyDown(infoPtr, (INT)wParam, (LONG)lParam);
  
@@ -1529,7 +1671,7 @@
    case WM_KILLFOCUS:
      return LISTVIEW_KillFocus(infoPtr);
  
-@@ -11835,6 +12852,15 @@
+@@ -11835,6 +12896,15 @@
    case WM_MOUSEHOVER:
      return LISTVIEW_MouseHover(infoPtr, (SHORT)LOWORD(lParam), (SHORT)HIWORD(lParam));
  
@@ -1545,3 +1687,51 @@
    case WM_NCDESTROY:
      return LISTVIEW_NCDestroy(infoPtr);
  
+@@ -11983,45 +13053,9 @@
+     switch (HIWORD(wParam))
+     {
+ 	case EN_UPDATE:
+-	{
+-	    /*
+-	     * Adjust the edit window size
+-	     */
+-	    WCHAR buffer[1024];
+-	    HDC           hdc = GetDC(infoPtr->hwndEdit);
+-            HFONT         hFont, hOldFont = 0;
+-	    RECT	  rect;
+-	    SIZE	  sz;
+-
+-	    if (!infoPtr->hwndEdit || !hdc) return 0;
+-	    GetWindowTextW(infoPtr->hwndEdit, buffer, ARRAY_SIZE(buffer));
+-	    GetWindowRect(infoPtr->hwndEdit, &rect);
+-
+-            /* Select font to get the right dimension of the string */
+-            hFont = (HFONT)SendMessageW(infoPtr->hwndEdit, WM_GETFONT, 0, 0);
+-            if (hFont)
+-            {
+-                hOldFont = SelectObject(hdc, hFont);
+-            }
+-
+-	    if (GetTextExtentPoint32W(hdc, buffer, lstrlenW(buffer), &sz))
+-	    {
+-                TEXTMETRICW textMetric;
+-
+-                /* Add Extra spacing for the next character */
+-                GetTextMetricsW(hdc, &textMetric);
+-                sz.cx += (textMetric.tmMaxCharWidth * 2);
+-
+-		SetWindowPos(infoPtr->hwndEdit, NULL, 0, 0, sz.cx,
+-		    rect.bottom - rect.top, SWP_DRAWFRAME | SWP_NOMOVE | SWP_NOZORDER);
+-	    }
+-            if (hFont)
+-                SelectObject(hdc, hOldFont);
+-
+-	    ReleaseDC(infoPtr->hwndEdit, hdc);
+-
++	    /* flxp: the box follows the text as comctl32 6's does (ListView_OnCommand) */
++	    if (IsWindowVisible(infoPtr->hwndEdit)) LISTVIEW_SetEditSize(infoPtr);
+ 	    break;
+-	}
+ 	case EN_KILLFOCUS:
+ 	{
+             if (infoPtr->notify_mask & NOTIFY_MASK_END_LABEL_EDIT)

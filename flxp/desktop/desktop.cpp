@@ -33,6 +33,7 @@
 #include "sys/sys.h"
 #include "explorer/commands.h"
 #include "explorer/dialogs.h"
+#include "explorer/fileopui.h"
 #include "explorer/uiicons.h"
 #include "explorer/verbs.h"
 #include "wallpaper.h"
@@ -615,10 +616,12 @@ LRESULT on_notify(NMHDR* nm)
         NMLVDISPINFOW* di = (NMLVDISPINFOW*)nm;
         int i = di->item.iItem;
         if (!di->item.pszText || i < 0 || i >= (int)g.items.size()) return FALSE;
-        std::string from = g.items[(size_t)i].path, to, err;
+        std::string from = g.items[(size_t)i].path, to;
         std::string name = w32::utf8_of((const WCHAR*)di->item.pszText);
         if (name == g.items[(size_t)i].name) return FALSE;
-        if (!shell::rename_item(from, name, &to, &err)) { verbs::error_box(err); return FALSE; }
+        // XP: refused or failed, the label is edited again with what was typed
+        if (!fileopui::rename(g.wnd, from, name, &to)) { fileopui::edit_again(g.list, i, name); return FALSE; }
+        if (to == from) return FALSE;
         g.pos[shell::base_of(to)] = item_pos(i);   // the icon stays where it is
         g.pos.erase(g.items[(size_t)i].name);
         save_positions();
@@ -853,6 +856,28 @@ void usage(FILE* f)
         "  --quit-after MS           close after MS milliseconds (testing)\n");
 }
 
+// the keys the desktop handles before the list sees them (also while a file operation runs: fileopui)
+static bool loop_keys(MSG& msg)
+{
+    bool in_list = GetFocus() == g.list;
+    if (in_list && ((msg.message == WM_KEYDOWN && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
+                    (msg.message == WM_KEYUP && msg.wParam == VK_APPS))) { context_menu(POINT{ -1, -1 }); return true; }
+    if (in_list && msg.message == WM_KEYDOWN && msg.wParam == VK_APPS) return true;
+    if (in_list && msg.message == WM_KEYUP && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) return true;
+    if (msg.message == WM_KEYDOWN && msg.wParam == VK_F5) { fill(); return true; }
+    if (in_list && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000)) {
+        if (msg.wParam == 'A') {
+            LVITEMW lvi = {}; lvi.stateMask = LVIS_SELECTED; lvi.state = LVIS_SELECTED;
+            SendMessageW(g.list, LVM_SETITEMSTATE, (WPARAM)-1, (LPARAM)&lvi);
+            return true;
+        }
+        if (msg.wParam == 'X' || msg.wParam == 'C') { g_ctx = Ctx(); g_ctx.items = selection(); verbs::run(msg.wParam == 'X' ? ID_CUT : ID_COPY); return true; }
+        if (msg.wParam == 'V') { g_ctx = Ctx(); verbs::run(ID_PASTE); return true; }
+    }
+    if (in_list && msg.message == WM_SYSKEYDOWN && msg.wParam == VK_RETURN) { g_ctx = Ctx(); g_ctx.items = selection(); verbs::run(ID_PROPERTIES); return true; }
+    return false;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -906,24 +931,10 @@ int main(int argc, char** argv)
     SetTimer(h, TIMER_WATCH, 2000, nullptr);
     if (quit_ms) SetTimer(h, TIMER_QUIT, (UINT)quit_ms, nullptr);
 
+    fileopui::set_message_filter(loop_keys);   // the same keys while a copy runs
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
-        bool in_list = GetFocus() == g.list;
-        if (in_list && ((msg.message == WM_KEYDOWN && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
-                        (msg.message == WM_KEYUP && msg.wParam == VK_APPS))) { context_menu(POINT{ -1, -1 }); continue; }
-        if (in_list && msg.message == WM_KEYDOWN && msg.wParam == VK_APPS) continue;
-        if (in_list && msg.message == WM_KEYUP && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) continue;
-        if (msg.message == WM_KEYDOWN && msg.wParam == VK_F5) { fill(); continue; }
-        if (in_list && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000)) {
-            if (msg.wParam == 'A') {
-                LVITEMW lvi = {}; lvi.stateMask = LVIS_SELECTED; lvi.state = LVIS_SELECTED;
-                SendMessageW(g.list, LVM_SETITEMSTATE, (WPARAM)-1, (LPARAM)&lvi);
-                continue;
-            }
-            if (msg.wParam == 'X' || msg.wParam == 'C') { g_ctx = Ctx(); g_ctx.items = selection(); verbs::run(msg.wParam == 'X' ? ID_CUT : ID_COPY); continue; }
-            if (msg.wParam == 'V') { g_ctx = Ctx(); verbs::run(ID_PASTE); continue; }
-        }
-        if (in_list && msg.message == WM_SYSKEYDOWN && msg.wParam == VK_RETURN) { g_ctx = Ctx(); g_ctx.items = selection(); verbs::run(ID_PROPERTIES); continue; }
+        if (loop_keys(msg)) continue;
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }

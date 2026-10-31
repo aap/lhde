@@ -23,8 +23,11 @@
 #include "shell/runtime.h"
 #include "shell/lhdata.h"
 #include "shell/lhtheme.h"
+#include "shell/details.h"
+#include "shell/thumbs.h"
 #include "commands.h"
 #include "dialogs.h"
+#include "fileopui.h"
 #include "header.h"
 #include "lhbar.h"
 #include "thumbview.h"
@@ -522,10 +525,44 @@ static void destroy(HWND rebar)
 
 } // namespace brand
 
+// ---- the details: XP's Details section, 4051's band ---------------------------
+
+enum { WM_APP_DETAILS = WM_APP + 2 };
+static bool g_details_pending;
+
+// What shell/details says about the folder or the selection, to the panes that
+// show it: computed once per burst of changes (a selection of many items
+// sends a notification per item)
+static void schedule_details()
+{
+    if (g_details_pending || !g.frame) return;
+    g_details_pending = true;
+    PostMessageW(g.frame, WM_APP_DETAILS, 0, 0);
+}
+
+static void update_details()
+{
+    g_details_pending = false;
+    bool xp = places::window() && !g.longhorn;
+    if (!g.folder || (!xp && !g.taskband)) return;
+    std::vector<Item> sel = browser::selection(g);
+    int focus = -1;
+    int fi = (int)SendMessageW(g.list, LVM_GETNEXTITEM, (WPARAM)-1, LVNI_FOCUSED);
+    if (fi >= 0 && fi < (int)g.items.size())
+        for (size_t i = 0; i < sel.size(); i++) if (sel[i].path == g.items[(size_t)fi].path) focus = (int)i;
+    shell::details::Info in = shell::details::describe(sel, shell::details::location_item(*g.folder), (int)g.items.size(), focus);
+    // pictures: where thumbnails are allowed (thumbnails, thumbnails_network)
+    bool pictures = g.folder->is_filesystem() && shell::thumbs::enabled_for(g.folder->path());
+    // XP: no mini preview in the Thumbnails view (CDUIView::ShouldShowMiniPreview)
+    if (xp) places::set_details(in, pictures && browser::view_code(g) != VIEW_THUMBNAILS, g.folder->path() == "::computer");
+    if (g.taskband) taskpane::set_details(in, pictures);
+}
+
 // ---- status bar -------------------------------------------------------------
 
 static void update_status()
 {
+    schedule_details();
     if (!g.status) return;
     int sel = (int)SendMessageW(g.list, LVM_GETSELECTEDCOUNT, 0, 0);
     char buf[128];
@@ -729,6 +766,7 @@ void Explorer::shown()
     places::folder_changed();
     browser::set_window_icon(frame, folder->icon());
     if (taskband) taskpane::set_folder(folder);
+    schedule_details();
     sync_tree();
 }
 
@@ -1211,6 +1249,7 @@ static void create_children(HWND frame)
         places::Options po;
         po.groups = g.longhorn;              // the Longhorn frame: the dialog's groups look; XP: the task pane
         po.remember = "places_collapsed";
+        po.details = true;                   // XP's Details section
         places::create(frame, IDC_PLACES, pcb, po);
     }
     // XP's Folders tree has no client edge inside the band site
@@ -1594,7 +1633,6 @@ static LRESULT on_notify(NMHDR* nm)
             return 0;
         case LVN_ITEMCHANGED:
             update_status();
-            if (g.taskband) taskpane::set_selection(selection());
             return 0;
         case LVN_KEYDOWN: {
             NMLVKEYDOWN* kd = (NMLVKEYDOWN*)nm;
@@ -1614,10 +1652,12 @@ static LRESULT on_notify(NMHDR* nm)
             NMLVDISPINFOW* di = (NMLVDISPINFOW*)nm;
             int i = di->item.iItem;
             if (!di->item.pszText || i < 0 || i >= (int)g.items.size()) return FALSE;
-            std::string from = g.items[(size_t)i].path, to, err;
+            std::string from = g.items[(size_t)i].path, to;
             std::string name = w32::utf8_of((const WCHAR*)di->item.pszText);
             if (name == g.items[(size_t)i].name) return FALSE;
-            if (!shell::rename_item(from, name, &to, &err)) { error_box(err); return FALSE; }
+            // XP: refused or failed, the label is edited again with what was typed
+            if (!fileopui::rename(g.frame, from, name, &to)) { fileopui::edit_again(g.list, i, name); return FALSE; }
+            if (to == from) return FALSE;
             // refill after the list view has finished with its edit control
             g.select_after_refresh = to;
             g_reload_dir = shell::dir_of(from);
@@ -1663,10 +1703,10 @@ static LRESULT on_notify(NMHDR* nm)
             NMTVDISPINFOW* di = (NMTVDISPINFOW*)nm;
             const std::string* p = tree_path(di->item.hItem);
             if (!di->item.pszText || !p) return FALSE;
-            std::string from = *p, to, err;
+            std::string from = *p, to;
             std::string name = w32::utf8_of((const WCHAR*)di->item.pszText);
             if (name == shell::base_of(from)) return FALSE;
-            if (!shell::rename_item(from, name, &to, &err)) { error_box(err); return FALSE; }
+            if (!fileopui::rename(g.frame, from, name, &to) || to == from) return FALSE;
             g_reload_dir = shell::dir_of(from);
             renamed(from, to);
             PostMessageW(g.frame, WM_APP_REFRESH, 0, 0);
@@ -1951,9 +1991,12 @@ static void sync_taskpane()
         taskpane::Callbacks cb = { taskpane_command, taskpane_more, taskpane_resized };
         g.taskband = taskpane::create(g.frame, cb);
         if (g.folder) taskpane::set_folder(g.folder);
+        places::set_top_inset(14);           // the band's preview hangs over the left pane
+        schedule_details();
     } else if (!want && g.taskband) {
         taskpane::destroy();
         g.taskband = nullptr;
+        places::set_top_inset(0);
     }
     HMENU view = GetSubMenu(g.menu, 2);
     EnableMenuItem(view, ID_VIEW_TASKPANE, MF_BYCOMMAND | (g.longhorn ? MF_ENABLED : MF_GRAYED));
@@ -2115,6 +2158,9 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     case WM_FLXP_DROP:
     case WM_FLXP_DRAGLEAVE:
         return drop_message(msg, (const FLXPDROP*)lp);
+    case WM_APP_DETAILS:
+        update_details();
+        return 0;
     case WM_APP_REFRESH:
         refresh();
         if (!g_reload_dir.empty()) { tree_reload(g_reload_dir); g_reload_dir.clear(); }
@@ -2239,6 +2285,44 @@ static void print_info()
     if (lh) printf("task band    %s; %s\n", taskpane::wanted() ? "on" : "off (taskpane=1, --taskpane or View > Task Band)", taskpane::source().c_str());
 }
 
+// the keys the frame handles before a control sees them (also while a file operation runs: fileopui)
+static bool loop_keys(MSG& msg)
+{
+    HWND focus = GetFocus();
+    bool in_view = focus == g.list || focus == g.tree;
+    if (msg.message == WM_KEYDOWN && msg.wParam == 'A' && (GetKeyState(VK_CONTROL) & 0x8000) && in_view) { on_command(ID_EDIT_SELECTALL); return true; }
+    if (in_view && ((msg.message == WM_KEYDOWN && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
+                    (msg.message == WM_KEYUP && msg.wParam == VK_APPS))) {
+        context_menu(focus, POINT{ -1, -1 });
+        return true;
+    }
+    if (in_view && msg.message == WM_KEYDOWN && msg.wParam == VK_APPS) return true;
+    if (in_view && msg.message == WM_KEYUP && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) return true;   // no menu-bar activation after Shift+F10
+    if (focus == g.list && msg.message == WM_SYSKEYDOWN && msg.wParam == VK_RETURN) {   // Alt+Enter: Properties
+        g_ctx = Ctx(); g_ctx.items = selection(); verb(ID_PROPERTIES);
+        return true;
+    }
+    if (focus == g.list && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000) && (msg.wParam == 'X' || msg.wParam == 'C' || msg.wParam == 'V')) {
+        on_command(msg.wParam == 'X' ? ID_CUT : msg.wParam == 'C' ? ID_COPY : ID_PASTE);
+        return true;
+    }
+    if (msg.message == WM_KEYDOWN && msg.wParam == VK_F5) { refresh(); return true; }
+    if (g.header && msg.message == WM_KEYDOWN && msg.wParam == 'L' && (GetKeyState(VK_CONTROL) & 0x8000)) { header::edit_address(); return true; }
+    if (g.zoomable && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000) && (focus == g.list || focus == g.frame) &&
+        (msg.wParam == VK_OEM_PLUS || msg.wParam == VK_ADD || msg.wParam == VK_OEM_MINUS || msg.wParam == VK_SUBTRACT)) {
+        browser::zoom_step(g, msg.wParam == VK_OEM_PLUS || msg.wParam == VK_ADD ? 1 : -1);
+        return true;
+    }
+    if (msg.message == WM_KEYDOWN && msg.wParam >= '0' && msg.wParam <= '5' && (GetKeyState(VK_CONTROL) & 0x8000) && !(GetKeyState(VK_MENU) & 0x8000)) {
+        // XP: Ctrl+0 default view, 1 Details, 2 Icons, 3 Thumbnails (browser::view_key), 4 List, 5 Small Icons;
+        // Longhorn: 0 default view, 1..5 the slider's stops (Details, Tiles, Large, Medium, Small Icons)
+        static const int keys[] = { ID_VIEW_DEFAULT, ID_VIEW_DETAILS, ID_VIEW_ICONS, ID_VIEW_BIGICONS, ID_VIEW_LIST, ID_VIEW_SMALLICONS };
+        if (!g.zoomable || !browser::view_key(g, (int)msg.wParam)) on_command(keys[msg.wParam - '0']);
+        return true;
+    }
+    return false;
+}
+
 int main(int argc, char** argv)
 {
     // Command line: options become FLXP_<KEY> overrides for this run (children inherit them).
@@ -2350,40 +2434,10 @@ int main(int argc, char** argv)
     SetFocus(g.list);
     if (!open_err.empty()) error_box(open_err);
     if (quit_ms) SetTimer(frame, 1, (UINT)quit_ms, quit_timer);
+    fileopui::set_message_filter(loop_keys);   // the same keys while a copy runs
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
-        HWND focus = GetFocus();
-        bool in_view = focus == g.list || focus == g.tree;
-        if (msg.message == WM_KEYDOWN && msg.wParam == 'A' && (GetKeyState(VK_CONTROL) & 0x8000) && in_view) { on_command(ID_EDIT_SELECTALL); continue; }
-        if (in_view && ((msg.message == WM_KEYDOWN && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
-                        (msg.message == WM_KEYUP && msg.wParam == VK_APPS))) {
-            context_menu(focus, POINT{ -1, -1 });
-            continue;
-        }
-        if (in_view && msg.message == WM_KEYDOWN && msg.wParam == VK_APPS) continue;
-        if (in_view && msg.message == WM_KEYUP && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) continue;   // no menu-bar activation after Shift+F10
-        if (focus == g.list && msg.message == WM_SYSKEYDOWN && msg.wParam == VK_RETURN) {   // Alt+Enter: Properties
-            g_ctx = Ctx(); g_ctx.items = selection(); verb(ID_PROPERTIES);
-            continue;
-        }
-        if (focus == g.list && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000) && (msg.wParam == 'X' || msg.wParam == 'C' || msg.wParam == 'V')) {
-            on_command(msg.wParam == 'X' ? ID_CUT : msg.wParam == 'C' ? ID_COPY : ID_PASTE);
-            continue;
-        }
-        if (msg.message == WM_KEYDOWN && msg.wParam == VK_F5) { refresh(); continue; }
-        if (g.header && msg.message == WM_KEYDOWN && msg.wParam == 'L' && (GetKeyState(VK_CONTROL) & 0x8000)) { header::edit_address(); continue; }
-        if (g.zoomable && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000) && (focus == g.list || focus == g.frame) &&
-            (msg.wParam == VK_OEM_PLUS || msg.wParam == VK_ADD || msg.wParam == VK_OEM_MINUS || msg.wParam == VK_SUBTRACT)) {
-            browser::zoom_step(g, msg.wParam == VK_OEM_PLUS || msg.wParam == VK_ADD ? 1 : -1);
-            continue;
-        }
-        if (msg.message == WM_KEYDOWN && msg.wParam >= '0' && msg.wParam <= '5' && (GetKeyState(VK_CONTROL) & 0x8000) && !(GetKeyState(VK_MENU) & 0x8000)) {
-            // XP: Ctrl+0 default view, 1 Details, 2 Icons, 3 Thumbnails (browser::view_key), 4 List, 5 Small Icons;
-            // Longhorn: 0 default view, 1..5 the slider's stops (Details, Tiles, Large, Medium, Small Icons)
-            static const int keys[] = { ID_VIEW_DEFAULT, ID_VIEW_DETAILS, ID_VIEW_ICONS, ID_VIEW_BIGICONS, ID_VIEW_LIST, ID_VIEW_SMALLICONS };
-            if (!g.zoomable || !browser::view_key(g, (int)msg.wParam)) on_command(keys[msg.wParam - '0']);
-            continue;
-        }
+        if (loop_keys(msg)) continue;
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
