@@ -5312,6 +5312,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
     int kx = 0, ky = 0, rx0 = 0, ry0 = 0, vx = 0, vy = 0;   /* chosen edges; pointer before the mode (put back on Return/Escape); last pointer */
     int first_ax = 0;           /* size mode: the axis of the edge picked first (1 x, 2 y; 0 none or a corner at once): Shift toggles back to it */
     bool held[4] = { false };   /* keyboard modes: the arrows held down (Left, Right, Up, Down): two of them move diagonally */
+    bool corner_armed = true;   /* size mode: an edge's pointer reaching its corner takes the corner (not right after Shift went back to the edge) */
     Bool repeat_was = False;
     if (kbsize) hit = HIT_NONE;
     Cursor cur = hit == HIT_CAPTION || hit == HIT_NONE ? move_cursor : edge_cursor[hit];
@@ -5367,6 +5368,16 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         hit = kb_hit(kx, ky); ox = c->geom.x; oy = c->geom.y; ow = c->geom.width; oh = c->geom.height; \
         px = vx = (ax); py = vy = (ay); \
         XChangeActivePointerGrab(display, MOUSEMASK, edge_cursor[hit], CurrentTime); } while (0)
+    /* size mode: from one edge to the corner nkx, nky (Shift, or the pointer at the end of the edge): the pointer is put on the corner
+       and both edges follow it from there */
+    #define KB_CORNER(nkx, nky) do { \
+        if (pend) { DRAG_STEP(); pend = false; } \
+        kx = (nkx); ky = (nky); \
+        hit = kb_hit(kx, ky); ox = c->geom.x; oy = c->geom.y; ow = c->geom.width; oh = c->geom.height; \
+        px = vx = kx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1; py = vy = ky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1; \
+        XChangeActivePointerGrab(display, MOUSEMASK, edge_cursor[hit], CurrentTime); \
+        XWarpPointer(display, None, root, 0, 0, 0, 0, vx, vy); \
+        XSync(display, False); while (XCheckTypedEvent(display, MotionNotify, &ev)) ; } while (0)
     for (bool done = false; !done; ) {
         int wait = -1;
         if (pend) {
@@ -5412,16 +5423,15 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
                 /* luxwm's own: Shift toggles between the edge and the corner next to it (the end nearer the pointer), and back to the
                    edge picked first; the pointer is put on the new edge or corner, and the drag continues from there */
                 if (hit == HIT_NONE) break;
-                if (pend) { DRAG_STEP(); pend = false; }
-                int ax = vx, ay = vy;
-                if (kx && ky) { if (first_ax == 2) kx = 0; else ky = 0; }
-                else if (kx) { ky = vy < c->geom.y + c->geom.height / 2 ? -1 : 1; ay = ky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1; ax = kx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1; }
-                else { kx = vx < c->geom.x + c->geom.width / 2 ? -1 : 1; ax = kx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1; ay = ky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1; }
-                hit = kb_hit(kx, ky); ox = c->geom.x; oy = c->geom.y; ow = c->geom.width; oh = c->geom.height;
-                px = vx = ax; py = vy = ay;
-                XChangeActivePointerGrab(display, MOUSEMASK, edge_cursor[hit], CurrentTime);
-                XWarpPointer(display, None, root, 0, 0, 0, 0, vx, vy);
-                XSync(display, False); while (XCheckTypedEvent(display, MotionNotify, &ev)) ;
+                if (kx && ky) {   /* back to the edge picked first; the pointer stays where it is */
+                    if (pend) { DRAG_STEP(); pend = false; }
+                    if (first_ax == 2) kx = 0; else ky = 0;
+                    hit = kb_hit(kx, ky); ox = c->geom.x; oy = c->geom.y; ow = c->geom.width; oh = c->geom.height;
+                    px = vx; py = vy; corner_armed = false;   /* the pointer is still on the corner: not straight back to it */
+                    XChangeActivePointerGrab(display, MOUSEMASK, edge_cursor[hit], CurrentTime);
+                }
+                else if (kx) KB_CORNER(kx, vy < c->geom.y + c->geom.height / 2 ? -1 : 1);
+                else KB_CORNER(vx < c->geom.x + c->geom.width / 2 ? -1 : 1, ky);
                 LOGP("size mode: Shift -> %s", kx && ky ? "corner" : "edge");
             }
             else if (keyboard) {
@@ -5481,6 +5491,22 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
             moved = true;
             vx = ev.xmotion.x_root; vy = ev.xmotion.y_root;
             pend = true; pend_x = vx; pend_y = vy; pend_time = ev.xmotion.time;
+            if (kbsize && !kx != !ky) {
+                /* luxwm's own: a pointer that slides along the one edge it sizes to that edge's corner (the frame's corner hit area,
+                   or past the end) gets the corner, as Shift: put on it, both edges follow; after Shift went back to the edge, only once
+                   the pointer has left the corner */
+                int fx = kx ? (kx < 0 ? 0 : c->geom.width - 1) : MIN(MAX(vx - c->geom.x, 0), c->geom.width - 1);
+                int fy = ky ? (ky < 0 ? 0 : c->geom.height - 1) : MIN(MAX(vy - c->geom.y, 0), c->geom.height - 1);
+                int on = client_hit(c, fx, fy), ex, ey;
+                kb_edges(on, &ex, &ey);
+                bool at_corner = on >= HIT_TL && on <= HIT_BR && (kx ? ex == kx : ey == ky);
+                if (!at_corner) corner_armed = true;
+                else if (corner_armed) {
+                    KB_CORNER(ex, ey);
+                    LOGP("size mode: the pointer reached corner %d", hit);
+                    break;
+                }
+            }
             if (!keyboard) {
                 int t = snap_target(c, hit, vx, vy);
                 if (t != snap) {
@@ -5508,6 +5534,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         }
     }
     #undef KB_PICK
+    #undef KB_CORNER
     #undef DRAG_STEP
     if (snap != SNAP_NONE) snap_preview(0, 0, 0, 0);
     if (kbsize || hit != HIT_CAPTION) drag_client_end(c, &dc);

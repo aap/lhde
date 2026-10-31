@@ -284,12 +284,14 @@ Two arrows held together (Right and Down) step diagonally, in Move as in Size (l
 (the shorter axis at least 0.4 of the longer, so a corner is easy to pick on purpose), one edge otherwise; a pointer that reaches a border or corner of the frame picks that
 one. The pointer is then put on the picked edge (corner) and the edge follows it. **Shift** toggles between the edge and the
 corner next to it (the end nearer the pointer) and back to the edge picked first, putting the pointer on the new edge or corner;
-the size carries on from there. In both modes mouse motion takes over;
+the size carries on from there. A pointer that slides along the one edge it sizes to the end of it (the frame's corner hit area, or
+past it) takes that corner the same way: the pointer is put on the corner and both edges follow; after Shift went back to the edge
+the pointer has to leave the corner first. A corner never goes back to an edge by itself. In both modes mouse motion takes over;
 Enter accepts and puts the pointer back where it was before the mode (ptRestore), a click accepts and leaves it, Esc (or a
 `_NET_WM_MOVERESIZE` cancel) puts the window back to its original rectangle (and the pointer back). Size hints, sync requests and the
 flicker-free resize path are the mouse drag's. Lab (`:3`, aero): Alt+Space, M, Right x3, Down x2, Enter: +39/+26, pointer restored;
 Alt+Space, S, Right x3, Down x2, Enter on an xterm (inc 6x13): +24/+13; Left/Up corner + Esc: unchanged; Size, mouse +15/+1: right edge, pointer on it; Shift: bottom-right corner,
-pointer there, +30/+40 grows both (+30/+39); Shift: the right edge again, +20/+50 widens only; Size, mouse +18/+0: nothing yet, +21/+7: the right edge, +21/+9: the bottom-right corner (lab `:16`, slate4074).
+pointer there, +30/+40 grows both (+30/+39); Shift: the right edge again, +20/+50 widens only; Size, mouse +18/+0: nothing yet, +21/+7: the right edge, +21/+9: the bottom-right corner; right edge, then the pointer 180 px down: the bottom-right corner, pointer on it, +20/+20 grows both; bottom edge, the pointer 300 px left: the bottom-left corner (lab `:16`, slate4074).
 
 ## Snap (from Windows 7, not Longhorn)
 
