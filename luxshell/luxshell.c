@@ -301,6 +301,13 @@ static int l_surface_layer(lua_State *L) { struct surface *s = check_surface(L, 
     XChangeProperty(dpy, s->win, atom[A_NET_WM_STATE], XA_ATOM, 32, PropModeReplace, (unsigned char *)st, ns); return 0; }
 static int l_surface_lower(lua_State *L) { struct surface *s = check_surface(L, 1); XLowerWindow(dpy, s->win); return 0; }
 static int l_surface_damage(lua_State *L) { surface_damage(check_surface(L, 1)); return 0; }
+/* surface:press(node): node holds the press from now on (its on_drag, on_release), as when a drag rebuilt the buttons under the
+   pointer (the taskbar's reorder: clear() dropped the pressed one); the press point stays. Only while a button is held. */
+static int l_surface_press(lua_State *L) {
+    struct surface *s = check_surface(L, 1); struct node *n = check_node(L, 2);
+    set_node_slot(&s->pressed, n);
+    return 0;
+}
 static int l_surface_id(lua_State *L) { lua_pushinteger(L, (lua_Integer)check_surface(L, 1)->win); return 1; }
 /* surface:background("#aarrggbb" | nil): the X window background, painted by the server itself on map/expose before our
    first cairo frame (the desktop layer switches to black atomically with its XMapWindow) */
@@ -480,6 +487,12 @@ static void send_root_message(Window w, Atom type, long d0, long d1, long d2) {
 static int l_activate(lua_State *L) { Window w = (Window)luaL_checkinteger(L, 1); send_root_message(w, atom[A_NET_ACTIVE_WINDOW], 2, CurrentTime, 0); return 0; }
 static int l_minimize(lua_State *L) { Window w = (Window)luaL_checkinteger(L, 1); XIconifyWindow(dpy, w, screen); XFlush(dpy); return 0; }
 static int l_close(lua_State *L) { Window w = (Window)luaL_checkinteger(L, 1); send_root_message(w, atom[A_NET_CLOSE_WINDOW], CurrentTime, 2, 0); return 0; }
+/* lh.window_menu(win, x, y): the window manager's window menu of win at root x, y (_GTK_SHOW_WINDOW_MENU, CLIENT-PROTOCOL.md) */
+static int l_window_menu(lua_State *L) {
+    Window w = (Window)luaL_checkinteger(L, 1);
+    send_root_message(w, XInternAtom(dpy, "_GTK_SHOW_WINDOW_MENU", False), 0, (long)luaL_checkinteger(L, 2), (long)luaL_checkinteger(L, 3));
+    return 0;
+}
 static int l_spawn(lua_State *L) { const char *cmd = luaL_checkstring(L, 1); if (fork() == 0) { setsid(); execl("/bin/sh", "sh", "-c", cmd, NULL); _exit(1); } return 0; }
 /* lh.set_desktop(n): ask the WM to switch to desktop n (EWMH _NET_CURRENT_DESKTOP client message to the root) */
 static int l_set_desktop(lua_State *L) { long n = (long)luaL_checkinteger(L, 1); send_root_message(root, atom[A_NET_CURRENT_DESKTOP], n, CurrentTime, 0); return 0; }
@@ -947,7 +960,7 @@ static int l_image_filter(lua_State *L) {
 /* image_get hook for "@icon:" keys: wrap the scene loader */
 cairo_surface_t *image_get_hook(const char *path);
 
-static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"timer", l_timer}, {"cancel", l_cancel}, {"windows", l_windows}, {"activate", l_activate}, {"minimize", l_minimize}, {"close", l_close},
+static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"timer", l_timer}, {"cancel", l_cancel}, {"windows", l_windows}, {"activate", l_activate}, {"minimize", l_minimize}, {"close", l_close}, {"window_menu", l_window_menu},
     {"tray_start", l_tray_start}, {"tray_count", l_tray_count}, {"tray_manager", l_tray_manager}, {"tray_stop", l_tray_stop},
     {"selection_owner", l_selection_owner}, {"watch_selection", l_watch_selection}, {"own_selection", l_own_selection}, {"send_message", l_send_message}, {"send_root_message", l_send_root_message}, {"atom", l_atom},
     {"set_root_cardinal", l_set_root_cardinal}, {"struts", l_struts}, {"spawn_pid", l_spawn_pid}, {"notification_closed", l_notification_closed}, {"notification_action", l_notification_action},
@@ -960,7 +973,7 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"settings_path", l_settings_path}, {"config_file", l_config_file}, {"state_file", l_state_file}, {"settings_reload", l_settings_reload}, {"settings_migrate", l_settings_migrate},
     {"cm_owner", l_cm_owner}, {"kill", l_kill}, {"image_alpha", l_image_alpha}, {"fonts", l_fonts}, {"image_filter", l_image_filter}, {"image_flush", l_image_flush}, {"wm_moveresize", l_wm_moveresize}, {NULL, NULL} };
 static const luaL_Reg nodemeth[] = { {"add", l_node_add}, {"remove", l_node_remove}, {"clear", l_node_clear}, {"set", l_node_set}, {"bounds", l_node_bounds}, {"measure", l_node_measure}, {"desired", l_node_desired}, {NULL, NULL} };
-static const luaL_Reg surfmeth[] = { {"root", l_surface_root}, {"show", l_surface_show}, {"hide", l_surface_hide}, {"move", l_surface_move}, {"raise", l_surface_raise}, {"lower", l_surface_lower}, {"set_layer", l_surface_layer}, {"stackpos", l_surface_stackpos}, {"damage", l_surface_damage}, {"id", l_surface_id},
+static const luaL_Reg surfmeth[] = { {"root", l_surface_root}, {"show", l_surface_show}, {"hide", l_surface_hide}, {"move", l_surface_move}, {"raise", l_surface_raise}, {"lower", l_surface_lower}, {"set_layer", l_surface_layer}, {"stackpos", l_surface_stackpos}, {"damage", l_surface_damage}, {"id", l_surface_id}, {"press", l_surface_press},
     {"background", l_surface_background}, {"round", l_surface_round}, {"grab", l_surface_grab}, {"ungrab", l_surface_ungrab}, {"icon_offset", l_surface_icon_offset}, {NULL, NULL} };
 
 int xerror_quiet;   /* > 0: expected errors (freeing an icon's Picture after the icon window died) are not logged */

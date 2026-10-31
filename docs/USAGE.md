@@ -612,6 +612,10 @@ classic bar has no way to it): `xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL
 - Tray: luxshell hands its tray icons to flxp-taskbar (one tray per display) and hides its notifications tile; when the
   classic bar goes away the tile takes the tray back and the icons return. Any other program that owns
   `_NET_SYSTEM_TRAY_S0` (stalonetray, a panel) is treated the same way.
+- Task buttons: a right click opens the window's window menu (luxwm's, through `_GTK_SHOW_WINDOW_MENU`: XP's task button menu;
+  for a minimised window Restore is the default item); dragging a button past 4 px moves it to the place of the button under the
+  pointer (4074's taskbar). The order holds for the X session (root property `_LHSHELL_TASK_ORDER`, the window ids in order);
+  new windows go to the end.
 - Clock: luxshell publishes the root property `_LHSHELL_CLOCK_VISIBLE` = 1 while a clock tile of its own is on screen, 0
   otherwise (sidebar minimized, clock tile closed); flxp-taskbar hides its clock while it is 1.
 - Start menu: see "Start menu: flxp's start panel everywhere" below; in `classic` the classic Start button and Super open

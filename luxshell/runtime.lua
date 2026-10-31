@@ -400,10 +400,64 @@ local function task_button(win, width)
   local ts = lh.taskbar_text_style()
   content:add(N{ kind = "text", text = win.title, color = ts.color, glow = ts.glow, glow_size = ts.glow_size, glow_strength = ts.glow_strength, font = T.taskbutton.font or T.font, ellipsis = true, valign = "center", dock = "fill" })
   if win.active then b.checked = true; b:set{ state = "checked" } end
+  -- drag to reorder (4074's taskbar): past the drag threshold the button takes the place of the one under the pointer
+  b.on_press = function(self, button) if button == 1 then tb.drag = { id = self.win.id }; tb.dragged = false end end
+  b.on_drag = function(self, dx, dy)
+    local d = tb.drag
+    if not d or d.id ~= self.win.id then return end
+    if not d.moved and math.abs(dx) < 4 and math.abs(dy) < 4 then return end   -- SM_CXDRAG / SM_CYDRAG
+    d.moved = true
+    local px, py = lh.pointer()
+    local x, y = px - tb.geo.x, py - tb.geo.y
+    for j, n in ipairs(tb.task_nodes or {}) do
+      local bx, by, bw, bh = n:bounds()
+      if x >= bx and x < bx + bw and y >= by and y < by + bh then
+        if n.win.id ~= d.id then tb.move_task(d.id, n.win.id) end
+        break
+      end
+    end
+  end
+  b.on_release = function(self, button) if button == 1 and tb.drag then tb.dragged = tb.drag.moved; tb.drag = nil end end
   b.on_click = function(self, button)
+    if button == 1 and tb.dragged then tb.dragged = false return end   -- the end of a drag is no click
     if button == 1 then if self.win.active and not self.win.hidden then lh.minimize(self.win.id) else lh.activate(self.win.id) end end
+    -- XP's task button menu is the window's system menu: luxwm's window menu at the pointer (minimised windows too)
+    if button == 3 then local x, y = lh.pointer(); lh.window_menu(self.win.id, x, y) end
   end
   return b
+end
+-- the buttons' order: the windows as they came (lh.windows()), rearranged by dragging; kept for the X session in the root
+-- property _LHSHELL_TASK_ORDER (the window ids, decimal, space separated; every desktop's), so a restarted luxshell keeps it
+tb.order = {}
+for id in (lh.root_prop("_LHSHELL_TASK_ORDER") or ""):gmatch("%d+") do table.insert(tb.order, tonumber(id)) end
+-- (ids of windows that are gone stay until the next drag: at startup the window list may still be empty)
+local function task_order(wins)
+  local seen, order = {}, {}
+  for _, id in ipairs(tb.order) do if not seen[id] then seen[id] = true; table.insert(order, id) end end
+  for _, w in ipairs(lh.windows()) do if not seen[w.id] then seen[w.id] = true; table.insert(order, w.id) end end
+  tb.order = order
+  local pos = {}
+  for i, id in ipairs(order) do pos[id] = i end
+  table.sort(wins, function(a, b) return (pos[a.id] or 0) < (pos[b.id] or 0) end)
+  return wins
+end
+-- id goes where target is: after it when it was before it (dragged right), else before it
+function tb.move_task(id, target)
+  local i, j
+  for k, v in ipairs(tb.order) do if v == id then i = k elseif v == target then j = k end end
+  if not i or not j then return end
+  table.remove(tb.order, i)
+  if i < j then j = j - 1 end
+  table.insert(tb.order, i <= j and j + 1 or j, id)
+  local alive, ids = {}, {}
+  for _, w in ipairs(lh.windows()) do alive[w.id] = true end
+  for k = #tb.order, 1, -1 do if not alive[tb.order[k]] then table.remove(tb.order, k) end end
+  for k, v in ipairs(tb.order) do ids[k] = tostring(v) end
+  lh.set_root_prop("_LHSHELL_TASK_ORDER", table.concat(ids, " "))
+  if not tb.rebuild then return end
+  tb.rebuild()
+  -- the rebuilt button of the dragged window takes the press over, so the drag goes on
+  for _, n in ipairs(tb.task_nodes or {}) do if n.win.id == id then tb.surface:press(n) break end end
 end
 local function rebuild_tasks()
   tb.tasks:clear(); tb.task_nodes = {}
@@ -412,6 +466,7 @@ local function rebuild_tasks()
   for _, w in ipairs(lh.windows()) do   -- the current desktop's windows and the sticky ones (EWMH _NET_WM_DESKTOP 0xFFFFFFFF)
     if w.desktop == desk or w.desktop == -1 or w.desktop == 0xFFFFFFFF then table.insert(wins, w) end
   end
+  task_order(wins)
   local n = #wins; if n == 0 then tb.surface:damage() return end
   local hostw = tb.tbhost:desired(screen_w, tb.h)
   local avail = tb.geo.w - (tb.start_w or T.start.w) - toggle_slot_w() - hostw   -- the task list's width after this layout (bounds() lags one paint)
@@ -432,6 +487,7 @@ local function rebuild_tasks()
   tb.surface:damage()
   tb.surface:raise()
 end
+tb.rebuild = rebuild_tasks
 lh.on("windows", rebuild_tasks); lh.on("window", rebuild_tasks); lh.on("desktop", rebuild_tasks)
 
 ------------------------------------------------------------------ sidebar (SHELL-DESIGN 2.3)
