@@ -93,6 +93,7 @@ struct State {
     Layer layer;
     std::string sbmode, sbstack, sbclassic, smoothing;
     std::string shadows;          // [effects] menu_shadows: "1" | "0"
+    std::string cues;             // [effects] keyboard_cues: "0" (hide the underlines until Alt) | "1"
 };
 State committed, cur;
 std::string stash_theme;          // the "(Modified)" state while another theme is picked (XP: pick it again to get it back)
@@ -142,6 +143,7 @@ State load_state()
     s.smoothing = shell::theme_setting("font_smoothing", "standard");
     if (s.smoothing == "0") s.smoothing = "off";
     s.shadows = store::get("effects", "menu_shadows") == "0" ? "0" : "1";
+    s.cues = store::get("effects", "keyboard_cues") == "1" ? "1" : "0";
     return s;
 }
 
@@ -881,6 +883,7 @@ void apply()
     if (cur.sbclassic != committed.sbclassic) edits.push_back(store::Edit{ "sidebar", "with_classic", cur.sbclassic });
     if (cur.smoothing != committed.smoothing) edits.push_back(store::Edit{ "fonts", "smoothing", cur.smoothing });
     if (cur.shadows != committed.shadows) edits.push_back(store::Edit{ "effects", "menu_shadows", cur.shadows });
+    if (cur.cues != committed.cues) edits.push_back(store::Edit{ "effects", "keyboard_cues", cur.cues });
     bool theme_changed = cur.theme != committed.theme;
     bool layer_changed = cur.layer != committed.layer;
     bool wall = cur.layer.count("Desktop.wallpaper") && (!committed.layer.count("Desktop.wallpaper") ||
@@ -1025,7 +1028,7 @@ void save_theme(HWND dlg)
     State keep = cur;
     cur = load_state();
     cur.sbmode = keep.sbmode; cur.sbstack = keep.sbstack; cur.sbclassic = keep.sbclassic; cur.smoothing = keep.smoothing;
-    cur.shadows = keep.shadows;
+    cur.shadows = keep.shadows; cur.cues = keep.cues;
     committed = cur;
     refresh_all();
 }
@@ -1043,7 +1046,7 @@ void delete_theme(HWND dlg)
         State keep = cur;
         cur = load_state();
         cur.sbmode = keep.sbmode; cur.sbstack = keep.sbstack; cur.sbclassic = keep.sbclassic; cur.smoothing = keep.smoothing;
-        cur.shadows = keep.shadows;
+        cur.shadows = keep.shadows; cur.cues = keep.cues;
         committed = cur;
     } else {
         cur.theme = base.empty() ? committed.theme : base;
@@ -1422,7 +1425,7 @@ void pick_style(const std::string& name)
     for (auto it = cur.layer.begin(); it != cur.layer.end(); ) it = it->second.empty() ? cur.layer.erase(it) : std::next(it);
 }
 
-// ---- Effects... (the user's: settings.ini [fonts] smoothing, [effects] menu_shadows) -----------
+// ---- Effects... (the user's: settings.ini [fonts] smoothing, [effects] menu_shadows, keyboard_cues) -----------
 
 const std::vector<Item> kMethods = { { "Standard", "standard" }, { "ClearType", "cleartype" } };
 
@@ -1435,6 +1438,7 @@ INT_PTR CALLBACK effects_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM)
         fill_list(dlg, IDC_EF_METHOD, m, cur.smoothing == "cleartype" ? "cleartype" : "standard");
         EnableWindow(GetDlgItem(dlg, IDC_EF_METHOD), cur.smoothing != "off");
         CheckDlgButton(dlg, IDC_EF_SHADOWS, cur.shadows != "0" ? BST_CHECKED : BST_UNCHECKED);
+        CheckDlgButton(dlg, IDC_EF_HIDEKEYS, cur.cues != "1" ? BST_CHECKED : BST_UNCHECKED);
         return TRUE;
     }
     case WM_COMMAND:
@@ -1447,6 +1451,7 @@ INT_PTR CALLBACK effects_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM)
             int i = (int)SendDlgItemMessageW(dlg, IDC_EF_METHOD, CB_GETCURSEL, 0, 0);
             cur.smoothing = on ? (i == 1 ? "cleartype" : "standard") : "off";
             cur.shadows = IsDlgButtonChecked(dlg, IDC_EF_SHADOWS) == BST_CHECKED ? "1" : "0";
+            cur.cues = IsDlgButtonChecked(dlg, IDC_EF_HIDEKEYS) == BST_CHECKED ? "0" : "1";
             EndDialog(dlg, IDOK);
             return TRUE;
         }
@@ -1779,7 +1784,7 @@ INT_PTR CALLBACK appearance_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         case IDC_AP_EFFECTS: {
             State was = cur;
             DialogBoxParamW(module(), MAKEINTRESOURCEW(IDD_EFFECTS), GetParent(dlg), effects_proc, 0);
-            if (cur.smoothing != was.smoothing || cur.shadows != was.shadows) changed(dlg);
+            if (cur.smoothing != was.smoothing || cur.shadows != was.shadows || cur.cues != was.cues) changed(dlg);
             return TRUE;
         }
         case IDC_AP_ADVANCED: advanced(dlg); return TRUE;

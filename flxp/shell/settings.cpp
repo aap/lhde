@@ -90,6 +90,7 @@ struct Map { const char* flxp; const char* section; const char* key; };
 const Map maps[] = {
     { "font_smoothing", "fonts", "smoothing" },
     { "menu_shadows", "effects", "menu_shadows" },
+    { "keyboard_cues", "effects", "keyboard_cues" },
     { "pinned", "start", "pinned" },
 };
 

@@ -172,6 +172,10 @@ static UINT     ODitemheight; /* default owner drawn item height */
  * be tracked at the same time.  */
 static HWND top_popup;
 static HMENU top_popup_hmenu;
+/* flxp: the mnemonics of the menus being tracked are underlined (XP's MENUSTATE fUnderline): a menu opened from the keyboard
+ * (the last input was a key press, LINP_KEYBOARD), and every submenu of it; SPI_GETKEYBOARDCUES underlines them always */
+static BOOL menu_cues;
+extern BOOL MENU_LastInputKeyboard(void);
 
   /* Flag set by EndMenu() to force an exit from menu tracking */
 static BOOL fEndMenu = FALSE;
@@ -1676,7 +1680,7 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
         if (lpitem->fState & MF_GRAYED) f |= UXMENU_DISABLED;
         if (lpitem->fState & MFS_DEFAULT) f |= UXMENU_DEFAULT;
         if (lpitem->fType & MF_POPUP) f |= UXMENU_SUBMENU;
-        if (cues) f |= UXMENU_CUES;
+        if (cues || menu_cues) f |= UXMENU_CUES;
         if (!(menu->dwStyle & MNS_NOCHECK))
         {
             cbm = (lpitem->fState & MF_CHECKED) ? lpitem->hCheckBit : lpitem->hUnCheckBit;
@@ -3563,6 +3567,7 @@ static BOOL MENU_InitTracking(HWND hWnd, HMENU hMenu, BOOL bPopup, UINT wFlags)
     HideCaret(0);
 
     if (!(menu = MENU_GetMenu( hMenu ))) return FALSE;
+    menu_cues = MENU_LastInputKeyboard();   /* flxp */
 
     /* This makes the menus of applications built with Delphi work.
      * It also enables menus to be displayed in more than one window,

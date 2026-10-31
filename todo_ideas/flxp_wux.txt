@@ -10,8 +10,9 @@
 * the Filter box's text sits 2 px higher and 1 px further left than 4074's (Jade, 4074-dwm.png: cap top 8 px below the box's
 	top, 5 px in; ours 6 and 4): 4074's box is not a plain Edit with a client edge (1 px rounded border)
 
-* keyboard cues: SPI_GETKEYBOARDCUES answers TRUE, so every wux menu and the menu band underline their mnemonics all the
-	time; XP and the 4074 screenshots hide them until Alt or a keyboard-opened menu (luxwm's window menu does that already)
+* keyboard cues in dialogs: Wine's buttons, statics and tabs (comctl32 button.c, static.c, tab.c) draw their mnemonics
+	without asking WM_QUERYUISTATE, so dialog labels stay underlined; XP hides them until Alt (the UI state is there now:
+	defwnd, the menu band, rebar)
 
 * flicker on resize (a lead, not confirmed): wux windows use the default ForgetGravity, so the X server drops a window's
 	contents on every resize, and a glass (ARGB) window's transparent background shows before wux repaints; try NorthWest

@@ -16,6 +16,8 @@ struct Toplevel {
     bool argb = false;      // native window is ARGB, backbuffer tracks alpha
 };
 
+static bool g_last_input_keyboard;   // the last input was a key press, not a click (XP's LINP_KEYBOARD)
+
 struct Timer { Window* w; uintptr_t id; uint32_t interval; uint32_t due; void* callback; };
 
 struct Caret {
@@ -1014,6 +1016,10 @@ void set_shape(Window* w, const std::vector<Rect>* rects) { if (is_window(w) && 
 static bool g_drop_shadows = true;
 bool drop_shadows() { return g_drop_shadows; }
 void set_drop_shadows(bool on) { g_drop_shadows = on; }
+static bool g_keyboard_cues = false;
+bool keyboard_cues() { return g_keyboard_cues; }
+void set_keyboard_cues(bool on) { g_keyboard_cues = on; }
+bool last_input_keyboard() { return g_last_input_keyboard; }
 
 void set_drop_shadow(Window* w, int size, int (*alpha)(int, int, int, int))
 {
@@ -1483,6 +1489,7 @@ static void handle_event(const sys::Event& ev)
     case sys::EventKind::ButtonDown:
     case sys::EventKind::ButtonUp:
     case sys::EventKind::Wheel:
+        if (ev.kind == sys::EventKind::ButtonDown) g_last_input_keyboard = false;
         dispatch_mouse(t, ev);
         break;
     case sys::EventKind::PointerLeft:
@@ -1502,6 +1509,7 @@ static void handle_event(const sys::Event& ev)
     case sys::EventKind::KeyUp: {
         uint32_t vk = vk_from_keysym(ev.keysym);
         bool down = ev.kind == sys::EventKind::KeyDown;
+        if (down) g_last_input_keyboard = true;
         if (vk < 256) g_keys[vk] = down;
         if (vk == VK_SHIFT) g_keys[VK_LSHIFT] = down;
         if (vk == VK_CONTROL) g_keys[VK_LCONTROL] = down;

@@ -1010,7 +1010,8 @@ INT WINAPI DrawTextExW( HDC hdc, LPWSTR str, INT i_count,
                                  ((flags & DT_RTLREADING) ? ETO_RTLREADING : 0),
                                  rect, str, len_seg, NULL ))
                     goto done;
-                if (prefix_offset != -1 && prefix_offset < len_seg)
+                /* flxp: DT_HIDEPREFIX (the keyboard cues hidden): the prefix is taken out, its underline not drawn */
+                if (prefix_offset != -1 && prefix_offset < len_seg && !(flags & DT_HIDEPREFIX))
                 {
                     TEXT_DrawUnderscore (hdc, xseg, y + tm.tmAscent + 1, str, prefix_offset, (flags & DT_NOCLIP) ? NULL : rect);
                 }

@@ -54,6 +54,7 @@ void NC_DrawSysButton(HWND, HDC, BOOL) {}
 LRESULT NC_HandleNCHitTest(HWND hwnd, POINT pt) { return w32::nc_hit_test(hwnd, pt); }
 
 SHORT WINAPI NtUserGetKeyState(INT vk) { return GetKeyState(vk); }
+BOOL MENU_LastInputKeyboard(void) { return win::last_input_keyboard(); }   // menu.c: a menu opened from the keyboard
 INT WINAPI CopyAcceleratorTableW(HACCEL, LPACCEL, INT) { return 0; }
 void __wine_finally_handler(void) {}
 

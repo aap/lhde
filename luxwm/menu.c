@@ -94,6 +94,11 @@ static int shadow_on(void) {
     return !v || !*v || strcmp(v, "0") != 0;
 }
 static double shadow_alpha(int x, int y, int W, int H) { return ut_menu_shadow_alpha(x, y, W, H) / 255.0; }
+/* Effects' "Hide underlined letters ... until I press the Alt key" off ([effects] keyboard_cues = 1): always underlined */
+static int cues_always(void) {
+    char b[16]; const char *v = lhde_settings_get("effects", "keyboard_cues", b, sizeof b);
+    return v && strcmp(v, "1") == 0;
+}
 
 cairo_surface_t *wmmenu_render(const struct theme *t, const struct wmmenu_item *items, int n, int sel, unsigned flags, int *w, int *h) {
     struct look L; struct geom g; look_build(t, items, n, &L); measure(&L, &g);
@@ -214,7 +219,7 @@ static int popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_i
     struct run r; memset(&r, 0, sizeof r);
     if (n <= 0) return WMMENU_CANCEL;
     if (n > 64) n = 64;
-    r.env = e; r.items = items; r.n = n; r.cues = (flags & WMMENU_KEYBOARD) != 0;
+    r.env = e; r.items = items; r.n = n; r.cues = (flags & WMMENU_KEYBOARD) != 0 || cues_always();
     look_build(e->theme, items, n, &r.L); measure(&r.L, &r.g);
     int sh = shadow_on() ? SHADOW : 0; r.W = r.g.w + sh; r.H = r.g.h + sh;
     /* fit into the monitor: a context menu flips to the left of / above the point, the window menu is shifted (TrackPopupMenu) */

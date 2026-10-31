@@ -347,6 +347,10 @@ HWND WINAPI CreateWindowExW(DWORD ex, LPCWSTR clsname, LPCWSTR name, DWORD style
     memset(&d->wnd, 0, sizeof d->wnd);
     d->paint_dc = nullptr;
     d->in_paint = false;
+    // XP: the mnemonics hidden until the keyboard is used (a child starts as its parent is; a top level as the last input)
+    if (win::keyboard_cues()) d->uistate = 0;
+    else if (Window* pd = (style & WS_CHILD) ? wdata(parent) : nullptr) d->uistate = pd->uistate;
+    else d->uistate = win::last_input_keyboard() ? 0 : UISF_HIDEACCEL;
 
     CREATESTRUCTW cs;
     cs.lpCreateParams = param; cs.hInstance = inst; cs.hMenu = menu; cs.hwndParent = parent;

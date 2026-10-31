@@ -38,6 +38,7 @@ struct Window {              // hangs off win::Window::w32
     WND wnd;                 // view handed to WIN_GetPtr
     gdi::DC* paint_dc;       // underlying gdi DC between BeginPaint/EndPaint
     bool in_paint;
+    UINT uistate = 0;        // WM_QUERYUISTATE: UISF_HIDEACCEL / UISF_HIDEFOCUS (defwnd)
 };
 
 inline Window* wdata(HWND h) { win::Window* w = window_of(h); return w ? (Window*)w->w32 : nullptr; }

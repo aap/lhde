@@ -210,7 +210,9 @@ BOOL WINAPI SystemParametersInfoW(UINT action, UINT param, void* pv, UINT)
     case SPI_GETGRADIENTCAPTIONS: if (pv) *(BOOL*)pv = TRUE; return TRUE;
     case SPI_GETKEYBOARDDELAY: if (pv) *(INT*)pv = 1; return TRUE;
     case SPI_GETKEYBOARDSPEED: if (pv) *(DWORD*)pv = 31; return TRUE;
-    case SPI_GETKEYBOARDCUES: if (pv) *(BOOL*)pv = TRUE; return TRUE;
+    // off by default as XP's (mnemonics underlined while Alt is held and in menus opened from the keyboard: defwnd, menu.c)
+    case SPI_GETKEYBOARDCUES: if (pv) *(BOOL*)pv = win::keyboard_cues(); return TRUE;
+    case SPI_SETKEYBOARDCUES: win::set_keyboard_cues((BOOL)(INT_PTR)pv != FALSE); return TRUE;
     case SPI_GETKEYBOARDPREF: if (pv) *(BOOL*)pv = FALSE; return TRUE;
     case SPI_GETWORKAREA:   // the window manager's _NET_WORKAREA, else the screen
         if (pv) { gdi::Rect wa = win::work_area(); RECT* r = (RECT*)pv; r->left = wa.left; r->top = wa.top; r->right = wa.right; r->bottom = wa.bottom; }

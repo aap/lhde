@@ -18,6 +18,23 @@ static bool g_kbd_mode;          // Alt pressed: hot item moves with the keys
 static WNDPROC g_tb_proc;
 static bool g_active = true;    // the owner window is active (WM_ACTIVATE)
 static LRESULT (*g_custom_draw)(NMTBCUSTOMDRAW*, bool);
+static bool g_cues = true;      // the mnemonics are underlined now (set_cues)
+enum { TIMER_CUES = 1 };
+
+// XP's menu bar underlines its mnemonics while Alt is held, in keyboard mode and while a menu it opened from the keyboard is
+// open (xxxDrawMenuBarUnderlines), and hides them again after (unless SPI_GETKEYBOARDCUES: always)
+static void set_cues(bool on)
+{
+    BOOL always = FALSE;
+    SystemParametersInfoW(SPI_GETKEYBOARDCUES, 0, &always, 0);
+    on = on || always;
+    if (!g_tb || on == g_cues) return;
+    g_cues = on;
+    SendMessageW(g_tb, TB_SETDRAWTEXTFLAGS, DT_HIDEPREFIX, on ? 0 : DT_HIDEPREFIX);
+    if (on) SetTimer(g_tb, TIMER_CUES, 100, nullptr);   // off again once Alt is up and no menu mode began
+    else KillTimer(g_tb, TIMER_CUES);
+    InvalidateRect(g_tb, nullptr, TRUE);
+}
 
 static int count() { return g_menu ? GetMenuItemCount(g_menu) : 0; }
 
@@ -70,9 +87,10 @@ static LRESULT CALLBACK filter(INT code, WPARAM wp, LPARAM lp)
     return 0;
 }
 
-static void track(int index)
+static void track(int index, bool keyboard)
 {
     if (!g_menu || index < 0 || index >= count()) return;
+    if (keyboard) set_cues(true);
     g_hook = SetWindowsHookExW(WH_MSGFILTER, filter, nullptr, GetCurrentThreadId());
     for (;;) {
         g_tracking = index;
@@ -96,6 +114,7 @@ static void track(int index)
     g_hook = nullptr;
     g_kbd_mode = false;
     SendMessageW(g_tb, TB_SETHOTITEM, (WPARAM)-1, 0);
+    set_cues(GetKeyState(VK_MENU) < 0);
 }
 
 // XP's menu band draws in the menu font (browseui menuband.cpp: _hFontMenu from NONCLIENTMETRICS lfMenuFont): the style's
@@ -138,15 +157,29 @@ static LRESULT CALLBACK tb_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             int hot = (int)SendMessageW(h, TB_GETHOTITEM, 0, 0);
             if (wp == VK_LEFT) { SendMessageW(h, TB_SETHOTITEM, (WPARAM)((hot + count() - 1) % count()), 0); return 0; }
             if (wp == VK_RIGHT) { SendMessageW(h, TB_SETHOTITEM, (WPARAM)((hot + 1) % count()), 0); return 0; }
-            if (wp == VK_RETURN || wp == VK_DOWN || wp == VK_UP) { track(hot < 0 ? 0 : hot); return 0; }
-            if (wp == VK_ESCAPE) { g_kbd_mode = false; SendMessageW(h, TB_SETHOTITEM, (WPARAM)-1, 0); SetFocus(g_owner); return 0; }
+            if (wp == VK_RETURN || wp == VK_DOWN || wp == VK_UP) { track(hot < 0 ? 0 : hot, true); return 0; }
+            if (wp == VK_ESCAPE) { g_kbd_mode = false; SendMessageW(h, TB_SETHOTITEM, (WPARAM)-1, 0); SetFocus(g_owner); set_cues(false); return 0; }
         }
         break;
     case WM_CHAR:
-        if (g_kbd_mode) { int i = mnemonic_index((WCHAR)wp); if (i >= 0) track(i); return 0; }
+        if (g_kbd_mode) { int i = mnemonic_index((WCHAR)wp); if (i >= 0) track(i, true); return 0; }
         break;
     case WM_KILLFOCUS:
-        if (g_kbd_mode && g_tracking < 0) { g_kbd_mode = false; SendMessageW(h, TB_SETHOTITEM, (WPARAM)-1, 0); }
+        if (g_kbd_mode && g_tracking < 0) { g_kbd_mode = false; SendMessageW(h, TB_SETHOTITEM, (WPARAM)-1, 0); set_cues(false); }
+        break;
+    case WM_STYLECHANGED: {   // a new style resets the toolbar's text flags (TOOLBAR_SetStyle)
+        LRESULT r = CallWindowProcW(g_tb_proc, h, msg, wp, lp);
+        SendMessageW(h, TB_SETDRAWTEXTFLAGS, DT_HIDEPREFIX, g_cues ? 0 : DT_HIDEPREFIX);
+        return r;
+    }
+    case WM_UPDATEUISTATE:   // Alt pressed (defwnd: WM_CHANGEUISTATE)
+        if (LOWORD(wp) == UIS_CLEAR && (HIWORD(wp) & UISF_HIDEACCEL)) set_cues(true);
+        break;
+    case WM_TIMER:
+        if (wp == TIMER_CUES) {
+            if (!g_kbd_mode && g_tracking < 0 && GetKeyState(VK_MENU) >= 0) set_cues(false);
+            return 0;
+        }
         break;
     }
     return CallWindowProcW(g_tb_proc, h, msg, wp, lp);
@@ -167,6 +200,7 @@ HWND create(HWND rebar, HWND owner, HMENU menu, int band_id)
     SendMessageW(g_tb, TB_SETBITMAPSIZE, 0, MAKELONG(0, 0));   // XP: TB_SETIMAGELIST(NULL) -> SetBitmapSize(0,0) -> 1x1 slot, button height 16->1: max(1,13)+6 = 19
     set_font();
     g_tb_proc = (WNDPROC)SetWindowLongPtrW(g_tb, GWLP_WNDPROC, (LONG_PTR)tb_proc);
+    set_cues(false);
     rebuild();
     SIZE sz = {0, 0};
     SendMessageW(g_tb, TB_GETMAXSIZE, 0, (LPARAM)&sz);
@@ -232,7 +266,7 @@ LRESULT on_notify(NMHDR* nm, bool* handled)
         NMTOOLBARW* t = (NMTOOLBARW*)nm;
         *handled = true;
         if (g_tracking >= 0) return TBDDRET_DEFAULT;
-        track(t->iItem - 1000);
+        track(t->iItem - 1000, false);
         return TBDDRET_DEFAULT;
     }
     return 0;
@@ -260,8 +294,9 @@ void on_activate(bool active)
 bool key_menu(WCHAR ch)
 {
     if (!g_tb) return false;
-    if (ch) { int i = mnemonic_index(ch); if (i < 0) return false; track(i); return true; }
+    if (ch) { int i = mnemonic_index(ch); if (i < 0) return false; track(i, true); return true; }
     g_kbd_mode = true;
+    set_cues(true);
     SetFocus(g_tb);
     SendMessageW(g_tb, TB_SETHOTITEM, 0, 0);
     return true;

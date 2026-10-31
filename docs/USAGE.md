@@ -273,6 +273,13 @@ Tahoma as in XP's FontSubstitutes, under XP's styles and Windows Classic. Under 
 UI (the 4074 and later Longhorn styles) they stand for Segoe UI at the size asked for, as 4074's dialogs show it (4074-dwm.png's
 About box: Segoe UI 8, from a template of 8 pt); without a Segoe UI among the font directories they stay Tahoma. The Explorer's
 Filter box is in the pane's own font (the icon title font: Segoe UI 9 under Jade, as 4074's).
+
+**Keyboard cues (wux).** As in XP, mnemonics are not underlined until the keyboard is used (Display Properties > Appearance >
+Effects..., "Hide underlined letters for keyboard navigation until I press the Alt key", `[effects] keyboard_cues`): a popup menu
+underlines them when it was opened from the keyboard (the last input was a key press: Alt+V, Shift+F10, the menu key), the
+Explorer's menu band while Alt is held and while it is in keyboard mode or has a menu open from it, and pressing Alt shows them
+in the window for good (XP's UI state: WM_CHANGEUISTATE / WM_UPDATEUISTATE / WM_QUERYUISTATE; the rebar's "Address" label
+follows it).
 Since 2026-10-27 lux draws all its text with libuxtheme's GDI text (the glyphs flxp and luxnav draw: whole-pixel stems instead of
 pango's fractional positions); `make` needs a libuxtheme with the text calls, found as luxnav finds it
 (`(gone: the top-level build)`: flxp's build tree `~/src/flxp` until it is installed). In Aero vision the task buttons' text is black on
@@ -728,7 +735,7 @@ is ignored by everybody (the current theme stays; luxwm and lux log it).
 **Display Properties (flxp-settings).** flxp's dialog (`~/src/flxp/build/settings/flxp-settings [--tab
 themes|desktop|appearance|effects]`, or `flxp --settings`; also flxp's start panel Control Panel > Display Properties...) is the
 full settings UI on the same file: Themes (registry themes and presets, Save As..., Delete), Desktop (background, position, icon
-set), Appearance (explorer frame, taskbar kind, start menu, composition, animations), Effects (font smoothing, shadows under menus). Apply writes
+set), Appearance (explorer frame, taskbar kind, start menu, composition, animations), Effects (font smoothing, shadows under menus, hiding underlined letters until Alt). Apply writes
 settings.ini, sets `_LH_THEME` for a theme change and sends one `_LH_SETTINGS_CHANGED`; lux applies the theme, composition
 (starts/stops picom), taskbar kind, start menu and wallpaper live, luxwm the frames and animations. Checked on the lab with luxwm +
 lux + picom (`lhshell/compare_settings_sync.png`): Jade, composition off, animations invented, classic taskbar, a saved

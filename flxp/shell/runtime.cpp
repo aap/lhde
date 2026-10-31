@@ -217,6 +217,8 @@ void setup_fonts()
                             sm == "cleartype" ? gdi::SMOOTH_CLEARTYPE : gdi::SMOOTH_STANDARD);
     // Effects' "Show shadows under menus" (settings.ini [effects] menu_shadows; on unless 0): the menus opened from now on
     win::set_drop_shadows(setting("menu_shadows") != "0");
+    // Effects' "Hide underlined letters for keyboard navigation until I press the Alt key" ([effects] keyboard_cues = 1: off)
+    win::set_keyboard_cues(setting("keyboard_cues") == "1");
     // font_path, else the imported Windows fonts (lhde's fonts/<build> with Tahoma)
     std::vector<std::string> fp = split_path(setting("font_path"));
     if (fp.empty()) fp = default_font_dirs();

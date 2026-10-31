@@ -395,6 +395,10 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         if (wp == VK_F10) g_f10_key = VK_F10;
         return 0;
     case WM_SYSKEYDOWN:
+        // XP: the first Alt press shows the window's keyboard cues (WM_CHANGEUISTATE to the top level, which tells
+        // every child); they stay for that window
+        if ((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && !(lp & 0x40000000))
+            SendMessageW(GetAncestor(h, GA_ROOT), WM_CHANGEUISTATE, MAKEWPARAM(UIS_CLEAR, UISF_HIDEACCEL), 0);
         if (HIWORD(lp) & KEYDATA_ALT) {
             if ((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && !g_menu_sys_key) g_menu_sys_key = 1;
             else g_menu_sys_key = 0;
@@ -428,6 +432,36 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_MENUCHAR:
         return MAKELRESULT(0, MNC_CLOSE);
+    // the keyboard cues (XP's UI state, UISF_HIDEACCEL / UISF_HIDEFOCUS): hidden while SPI_GETKEYBOARDCUES is off, until
+    // the keyboard is used. A child hands WM_CHANGEUISTATE to its parent; the top level applies it and tells its children
+    case WM_CHANGEUISTATE: {
+        UINT action = LOWORD(wp), flags = HIWORD(wp) & (UISF_HIDEACCEL | UISF_HIDEFOCUS);
+        if (action != UIS_SET && action != UIS_CLEAR && action != UIS_INITIALIZE) return 0;
+        if ((w->style & WS_CHILD) && GetParent(h)) return SendMessageW(GetParent(h), msg, wp, lp);
+        Window* d = wdata(h);
+        if (!d) return 0;
+        if (action == UIS_INITIALIZE) {
+            action = win::last_input_keyboard() ? UIS_CLEAR : UIS_SET;
+            flags = UISF_HIDEACCEL | UISF_HIDEFOCUS;
+        }
+        if (win::keyboard_cues() && action == UIS_SET) flags &= ~UISF_HIDEACCEL;
+        UINT next = action == UIS_SET ? d->uistate | flags : d->uistate & ~flags;
+        if (next != d->uistate) SendMessageW(h, WM_UPDATEUISTATE, MAKEWPARAM(action, flags), 0);
+        return 0;
+    }
+    case WM_UPDATEUISTATE: {
+        UINT action = LOWORD(wp), flags = HIWORD(wp) & (UISF_HIDEACCEL | UISF_HIDEFOCUS);
+        if (Window* d = wdata(h)) {
+            if (action == UIS_SET) d->uistate |= flags;
+            else if (action == UIS_CLEAR) d->uistate &= ~flags;
+        }
+        for (HWND c = GetWindow(h, GW_CHILD); c; c = GetWindow(c, GW_HWNDNEXT)) SendMessageW(c, WM_UPDATEUISTATE, wp, lp);
+        return 0;
+    }
+    case WM_QUERYUISTATE: {
+        Window* d = wdata(h);
+        return d ? d->uistate : 0;
+    }
     case WM_RBUTTONUP: {
         POINT pt = { (SHORT)LOWORD(lp), (SHORT)HIWORD(lp) };
         ClientToScreen(h, &pt);

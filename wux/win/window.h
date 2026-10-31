@@ -197,6 +197,12 @@ void set_drop_shadow(Window* w, int size, int (*alpha)(int, int, int, int));   /
 // SPI_GETDROPSHADOW / SPI_SETDROPSHADOW: XP's "Show shadows under menus" (on by default), for the popups created after it
 bool drop_shadows();
 void set_drop_shadows(bool on);
+// SPI_GETKEYBOARDCUES / SPI_SETKEYBOARDCUES: mnemonics underlined always (off by default, XP's "Hide underlined letters for
+// keyboard navigation until I press the Alt key"), and whether the last input was a key press rather than a click (XP's
+// LINP_KEYBOARD: a menu opened then underlines its mnemonics)
+bool keyboard_cues();
+void set_keyboard_cues(bool on);
+bool last_input_keyboard();
 // Caption behaviour for a WM-framed toplevel: let the window manager run a
 // move (HTCAPTION), a resize (HTLEFT..HTBOTTOMRIGHT, HTSIZE) or a keyboard
 // move/size (MOVE_KEYBOARD/SIZE_KEYBOARD) for the last button press.
