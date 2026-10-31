@@ -9,6 +9,7 @@
 //
 //   flxp-taskbar [--edge bottom|top|left|right] [--theme NAME|PATH] [--classic] [--no-tray] [--quit-after MS]
 #include <langinfo.h>
+#include <math.h>
 #include <locale.h>
 #include <signal.h>
 #include <stdio.h>
@@ -89,12 +90,76 @@ void make_fonts()
     g.font_caption_bold = CreateFontIndirectW(&ncm.lfCaptionFont);
 }
 
+// Our own start flag, for a desktop without XP's or Windows 2000's explorer.exe (the free baseline; ReactOS's IDB_START is
+// ReactOS's logo, which is not ours to show): a generic four-pane waving flag rendered here, no bitmap of anyone's. The
+// cell is the one the bitmap it stands in for has (startclassic.bmp 16x16, start.bmp 25x20), straight alpha like theirs,
+// with a soft shadow down and right. The panes are red-orange, green, blue, yellow; each pane lighter towards its top left,
+// the cloth arched (the right column lower, the left edge leaning) and shaded along the wave. Taste, not a measurement.
+HBITMAP drawn_flag(int w, int h)
+{
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+    bi.bmiHeader.biWidth = w;
+    bi.bmiHeader.biHeight = h;          // bottom-up, as the resource bitmaps
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+    void* bits = nullptr;
+    HBITMAP bmp = CreateDIBSection(nullptr, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    if (!bmp || !bits) return bmp;
+    // the flag's box in the cell, and its wave: the arch (A), the right column's drop (B), the left edge's lean (C), all in px
+    bool small = w < 20;
+    double x0 = small ? 0.6 : 2.0, y0 = small ? 0.8 : 1.2, bw = small ? 13.6 : 19.0, bh = small ? 12.2 : 15.0;
+    double A = small ? 1.0 : 1.4, B = small ? 1.4 : 2.0, C = small ? 1.0 : 1.6;
+    static const double pane[4][3] = { { 240, 82, 28 }, { 122, 190, 24 }, { 34, 112, 236 }, { 252, 192, 8 } };
+    const int SS = 5;                   // supersampling per axis
+    std::vector<double> cov((size_t)w * h), col((size_t)w * h * 3);
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+            double a = 0, r = 0, gg = 0, b = 0;
+            for (int sy = 0; sy < SS; sy++)
+                for (int sx = 0; sx < SS; sx++) {
+                    double px = x + (sx + 0.5) / SS, py = y + (sy + 0.5) / SS;
+                    // invert the wave (two rounds: u and v depend on each other)
+                    double u = (px - x0) / bw, v = (py - y0) / bh;
+                    for (int it = 0; it < 3; it++) {
+                        u = (px - x0 + C * (v - 0.5)) / bw;
+                        v = (py - y0 + A * sin(M_PI * u) - B * u) / bh;
+                    }
+                    if (u < 0 || u >= 1 || v < 0 || v >= 1) continue;
+                    double gu = 0.9 / bw, gv = 0.9 / bh;            // the gap between the panes: about a pixel
+                    if (fabs(u - 0.5) < gu / 2 || fabs(v - 0.5) < gv / 2) continue;
+                    int k = (u > 0.5) + 2 * (v > 0.5);
+                    double lu = u > 0.5 ? (u - 0.5) * 2 : u * 2, lv = v > 0.5 ? (v - 0.5) * 2 : v * 2;
+                    double shade = 1.18 - 0.30 * (0.6 * lu + 0.4 * lv) + 0.10 * cos(2 * M_PI * u);
+                    a += 1;
+                    r += fmin(255, pane[k][0] * shade); gg += fmin(255, pane[k][1] * shade); b += fmin(255, pane[k][2] * shade);
+                }
+            size_t i = (size_t)y * w + x;
+            cov[i] = a / (SS * SS);
+            if (a > 0) { col[i * 3] = r / a; col[i * 3 + 1] = gg / a; col[i * 3 + 2] = b / a; }
+        }
+    uint8_t* p = (uint8_t*)bits;
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+            size_t i = (size_t)y * w + x;
+            double fa = cov[i];
+            double sa = x > 0 && y > 0 ? 0.35 * cov[(size_t)(y - 1) * w + x - 1] : 0;   // the shadow, one pixel down and right
+            double oa = fa + sa * (1 - fa);
+            double cr = oa > 0 ? col[i * 3] * fa / oa : 0, cg = oa > 0 ? col[i * 3 + 1] * fa / oa : 0, cb = oa > 0 ? col[i * 3 + 2] * fa / oa : 0;
+            uint8_t* q = p + ((size_t)(h - 1 - y) * w + x) * 4;
+            q[0] = (uint8_t)lround(cb); q[1] = (uint8_t)lround(cg); q[2] = (uint8_t)lround(cr); q[3] = (uint8_t)lround(oa * 255);
+        }
+    return bmp;
+}
+
 void load_flag()
 {
     if (flag_list) ImageList_Destroy(flag_list);
     flag_list = nullptr;
     flag_size = SIZE{ g.theme ? 25 : 16, g.theme ? 20 : 16 };
     HBITMAP bmp = xp_explorer_bitmap(g.theme ? 143 : 176, LR_CREATEDIBSECTION);   // start.bmp / startclassic.bmp
+    if (!bmp) bmp = drawn_flag(flag_size.cx, flag_size.cy);
     if (!bmp) return;
     BITMAP bm = {};
     GetObjectW(bmp, sizeof bm, &bm);
@@ -104,7 +169,7 @@ void load_flag()
     DeleteObject(bmp);
 }
 
-// Without XP's explorer.exe: the four panes of the flag as plain squares
+// Without a bitmap at all (no DIB): the four panes of the flag as plain squares
 void draw_flag(HDC hdc, int x, int y)
 {
     if (flag_list) { ImageList_Draw(flag_list, 0, hdc, x, y, ILD_TRANSPARENT); return; }

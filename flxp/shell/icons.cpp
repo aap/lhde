@@ -253,13 +253,15 @@ std::string resource_src(const std::string& build, const std::string& file, int 
     return f.empty() ? "" : "pe:" + f + "#" + std::to_string(id);
 }
 
-// Where a source keeps XP's art under another file or id (the rest are XP's own): ReactOS's explorer.exe has one start
-// bitmap, IDB_START 143, the classic button's too (XP: startclassic.bmp 176); its toolbar strips, Go button and brand are
-// browseui's (the icon recipe data/icons/reactos.theme). What no source but XP has (the Log Off buttons 7010/7011, the
-// chess tile logonui.exe 114, shellstyle.dll) stays "" and its caller draws without it.
+// Where a source keeps XP's art under another file or id (the rest are XP's own), or has a picture of its own under XP's id
+// (to_id 0: not taken from it): ReactOS's explorer.exe IDB_START 143 is ReactOS's logo, so neither start button takes it
+// (flxp-taskbar draws its own flag); its toolbar strips, Go button and brand are browseui's (the icon recipe
+// data/icons/reactos.theme). What no source but XP has (the Log Off buttons 7010/7011, the chess tile logonui.exe 114,
+// shellstyle.dll) stays "" and its caller draws without it.
 struct ArtMap { const char* source; const char* file; int id; const char* to_file; int to_id; };
 static const ArtMap art_map[] = {
-    { "reactos", "explorer.exe", 176, "explorer.exe", 143 },
+    { "reactos", "explorer.exe", 143, "explorer.exe", 0 },
+    { "reactos", "explorer.exe", 176, "explorer.exe", 0 },
 };
 
 std::string xp_art(const std::string& file, int id, int type)
@@ -269,6 +271,7 @@ std::string xp_art(const std::string& file, int id, int type)
         int i = id;
         for (const ArtMap& m : art_map)
             if (!strcmp(m.source, src) && !strcasecmp(m.file, file.c_str()) && m.id == id) { f = m.to_file; i = m.to_id; }
+        if (!i) continue;
         std::string path = resource_file(src, f);
         if (path.empty()) continue;
         res::Module* mod = res::load(path.c_str());

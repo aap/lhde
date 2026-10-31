@@ -193,7 +193,10 @@ Vista visual styles and everything made from them (the frame sets, the glass, lu
 art, the 4051/4074 navigation headers' art), XP's shellstyle.dll (the task pane's Luna bitmaps), the start
 panel's Log Off buttons (explorer.exe 7010/7011) and chess tile (logonui.exe 114), comctl32 6.0's file dialog
 strips, the classic Appearance schemes (ReactOS's hive has them only in Vista's form: the built-in Windows
-Standard stands in), and the builds' wallpapers.
+Standard stands in), and the builds' wallpapers. The start button's flag (explorer.exe's start.bmp 143 and startclassic.bmp
+176) is XP's or Windows 2000's; ReactOS's 143 is ReactOS's logo and is not taken: without XP's or 2000's explorer.exe
+flxp-taskbar draws a waving four-pane flag of its own (taste). ReactOS's own styles draw no flag at all (their Start::Button
+image carries their logo and hides the content).
 
 ## 7. Runtime
 `_LH_THEME` = the theme name. Whoever changes it writes `settings.ini [theme] name` first, then the
