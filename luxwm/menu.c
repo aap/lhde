@@ -178,18 +178,19 @@ struct geom { int w, h, y[64], ih[64]; };
 
 static void measure(const struct look *L, const struct wmmenu_item *items, int n, struct geom *g) {
     cairo_surface_t *s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1); cairo_t *cr = cairo_create(s);
-    int tw = 0, aw = 0, y = L->pad;
+    int tw = 0, aw = 0, y = L->pad, sub = 0;
     for (int i = 0; i < n && i < 64; i++) {
         g->y[i] = y;
         if (items[i].flags & WMMENU_SEPARATOR) { g->ih[i] = L->sep_h; y += L->sep_h; continue; }
         g->ih[i] = L->item_h; y += L->item_h;
+        if (items[i].sub) sub = 1;
         int w, h; PangoLayout *lay = layout(cr, L, items[i].text, items[i].flags & WMMENU_DEFAULT, 0);
         pango_layout_get_pixel_size(lay, &w, &h); g_object_unref(lay);
         if (w > tw) tw = w;
         if (items[i].accel) { lay = layout(cr, L, items[i].accel, items[i].flags & WMMENU_DEFAULT, 0);
             pango_layout_get_pixel_size(lay, &w, &h); g_object_unref(lay); if (w > aw) aw = w; }
     }
-    g->w = 2 * L->pad + L->text_x + tw + (aw ? L->gap + aw : 0) + L->right_pad;
+    g->w = 2 * L->pad + L->text_x + tw + (aw ? L->gap + aw : 0) + L->right_pad + (sub && !aw ? L->gap : 0);
     g->h = y + L->pad;
     cairo_destroy(cr); cairo_surface_destroy(s);
 }
@@ -279,6 +280,12 @@ static void paint(cairo_t *cr, const struct look *L, const struct wmmenu_item *i
             cairo_move_to(cr, tx, yy); pango_cairo_show_layout(cr, lay);
             g_object_unref(lay);
         }
+        if (it->sub) {   /* the cascade arrow (XP: Marlett '8', a 4 x 7 triangle) in the right margin */
+            if (emboss) set_rgb(cr, L->shadow); else set_rgb(cr, tc);
+            int ax = W - L->pad - 12, ay = y + h / 2;
+            for (int k = 0; k < 4; k++) cairo_rectangle(cr, ax + k, ay - 3 + k, 1, 7 - 2 * k);
+            cairo_fill(cr);
+        }
         if (it->flags & WMMENU_CHECKED) { set_rgb(cr, tc); cairo_arc(cr, x + L->glyph_x + 6.5, y + h / 2.0, 2.5, 0, 6.2832); cairo_fill(cr); }
     }
 }
@@ -366,7 +373,50 @@ static Bool menu_pred(Display *d, XEvent *ev, XPointer arg) {
 
 static double ms_now(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6; }
 
+#define MENU_SHOW_DELAY 400   /* SPI_GETMENUSHOWDELAY's default: hovering a submenu item this long opens it */
+#define SUB_BACK   (-3)       /* a submenu returns: the pointer went back to its parent (the event is put back for the parent) */
+#define SUB_ALL    (-4)       /* a submenu returns: the whole menu is dismissed */
+
+/* the next menu event, waiting at most timeout ms (-1: no limit); false on timeout */
+static bool menu_next(Display *dpy, XEvent *ev, int timeout) {
+    for (;;) {
+        if (XCheckIfEvent(dpy, ev, menu_pred, NULL)) return true;
+        XFlush(dpy);
+        struct pollfd pfd = { .fd = ConnectionNumber(dpy), .events = POLLIN };
+        if (poll(&pfd, 1, timeout) == 0) return false;
+    }
+}
+
+static bool menu_grab(Display *dpy, Window w, Window root, bool keyboard) {
+    int gp = GrabNotViewable, gk = keyboard ? GrabNotViewable : GrabSuccess;
+    for (int i = 0; i < 50; i++) {   /* a client's own grab (or lhwm's passive key grab) may be ending */
+        if (gp != GrabSuccess) gp = XGrabPointer(dpy, w, False, ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
+        if (gk != GrabSuccess) gk = XGrabKeyboard(dpy, root, False, GrabModeAsync, GrabModeAsync, CurrentTime);
+        if (gp == GrabSuccess && gk == GrabSuccess) return true;
+        struct timespec ts = { 0, 5000000 }; nanosleep(&ts, NULL);
+    }
+    fprintf(stderr, "luxwm: menu: grab failed (pointer %d, keyboard %d)\n", gp, gk);
+    return false;
+}
+
+static int popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_item *items, int n, unsigned flags, unsigned button, struct run *parent);
+
+/* open the submenu of item i of r beside it; returns what the submenu returned (>= 0: chosen, r is done) */
+static int open_sub(struct run *r, int i, bool keyboard) {
+    const struct wmmenu_item *it = &r->items[i];
+    if (!it->sub || it->nsub <= 0 || (it->flags & WMMENU_DISABLED)) return WMMENU_CANCEL;
+    r->sel = i; run_paint(r);
+    int res = popup(r->env, r->x + r->g.w - 3, r->y + r->g.y[i] - r->L.pad, it->sub, it->nsub, keyboard ? WMMENU_KEYBOARD : 0, 0, r);
+    if (res < 0 && res != SUB_ALL) menu_grab(r->env->dpy, r->win, r->env->root, false);   /* the pointer grab went with the submenu's window */
+    return res;
+}
+
 int wmmenu_popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_item *items, int n, unsigned flags, unsigned button) {
+    int r = popup(e, x, y, items, n, flags, button, NULL);
+    return r == SUB_ALL || r == SUB_BACK ? WMMENU_CANCEL : r;
+}
+
+static int popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_item *items, int n, unsigned flags, unsigned button, struct run *parent) {
     struct run r; memset(&r, 0, sizeof r);
     if (n <= 0) return WMMENU_CANCEL;
     if (n > 64) n = 64;
@@ -375,6 +425,7 @@ int wmmenu_popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_i
     r.W = r.g.w + SHADOW; r.H = r.g.h + SHADOW;
     /* fit into the monitor: a context menu flips to the left of / above the point, the window menu is shifted (TrackPopupMenu) */
     int bx1 = e->bx + e->bw, by1 = e->by + e->bh;
+    if (parent && x + r.g.w > bx1 && parent->x - r.g.w + 3 >= e->bx) x = parent->x - r.g.w + 3;   /* a cascade goes left of its parent */
     if (x + r.g.w > bx1) x = (flags & WMMENU_FLIP) && x - r.g.w >= e->bx ? x - r.g.w : bx1 - r.g.w;
     if (y + r.g.h > by1) y = (flags & WMMENU_FLIP) && y - r.g.h >= e->by ? y - r.g.h : by1 - r.g.h;
     if (x < e->bx) x = e->bx;
@@ -400,19 +451,25 @@ int wmmenu_popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_i
     XStoreName(dpy, r.win, "lhwm window menu");
     run_paint(&r);   /* before the map: the first frame the compositor sees is the finished menu */
     XMapRaised(dpy, r.win);
-    int gp = GrabNotViewable, gk = GrabNotViewable;
-    for (int i = 0; i < 50; i++) {   /* a client's own grab (or lhwm's passive key grab) may be ending */
-        if (gp != GrabSuccess) gp = XGrabPointer(dpy, r.win, False, ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
-        if (gk != GrabSuccess) gk = XGrabKeyboard(dpy, e->root, False, GrabModeAsync, GrabModeAsync, CurrentTime);
-        if (gp == GrabSuccess && gk == GrabSuccess) break;
-        struct timespec ts = { 0, 5000000 }; nanosleep(&ts, NULL);
-    }
     int result = WMMENU_CANCEL;
-    if (gp != GrabSuccess || gk != GrabSuccess) { fprintf(stderr, "luxwm: menu: grab failed (pointer %d, keyboard %d)\n", gp, gk); goto out; }
-    double t0 = ms_now(); bool down = button != 0, mouse_sel = false; int px0 = -1, py0 = -1;
+    bool sub_chosen = false;
+    if (!menu_grab(dpy, r.win, e->root, parent == NULL)) goto out;
+    double t0 = ms_now(), sub_at = 0; bool down = button != 0, mouse_sel = false; int px0 = -1, py0 = -1;
     { Window rw, cw; int wx, wy; unsigned m; XQueryPointer(dpy, e->root, &rw, &cw, &px0, &py0, &wx, &wy, &m); }
+    /* a submenu's answer: chosen (this menu is done too), dismissed altogether, or closed (this menu goes on) */
+    #define SUB_RESULT(res) do { int sr_ = (res); \
+        if (sr_ >= 0) { result = r.sel; sub_chosen = true; done = true; } \
+        else if (sr_ == SUB_ALL) { result = parent ? SUB_ALL : WMMENU_CANCEL; done = true; } \
+        else run_paint(&r); } while (0)
     for (bool done = false; !done; ) {
-        XEvent ev; XIfEvent(dpy, &ev, menu_pred, NULL);
+        XEvent ev;
+        int wait = sub_at > 0 ? (int)(sub_at - ms_now() + 0.999) : -1;
+        if (sub_at > 0 && wait < 0) wait = 0;
+        if (!menu_next(dpy, &ev, wait)) {   /* hovered long enough over a submenu item */
+            sub_at = 0;
+            if (r.sel >= 0 && items[r.sel].sub) SUB_RESULT(open_sub(&r, r.sel, false));
+            continue;
+        }
         switch (ev.type) {
         case Expose:
             if (ev.xexpose.window == r.win) { if (ev.xexpose.count == 0) run_paint(&r); }
@@ -424,8 +481,12 @@ int wmmenu_popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_i
         case MotionNotify: {
             while (XCheckTypedEvent(dpy, MotionNotify, &ev)) ;
             int i = item_at(&r, ev.xmotion.x_root, ev.xmotion.y_root);
+            if (parent && !inside(&r, ev.xmotion.x_root, ev.xmotion.y_root) && inside(parent, ev.xmotion.x_root, ev.xmotion.y_root)
+                && item_at(parent, ev.xmotion.x_root, ev.xmotion.y_root) != parent->sel) {
+                XPutBackEvent(dpy, &ev); result = SUB_BACK; done = true; break;   /* back over another item of the parent */
+            }
             if (i >= 0 || mouse_sel || inside(&r, ev.xmotion.x_root, ev.xmotion.y_root)) {
-                if (i != r.sel) { r.sel = i; run_paint(&r); }
+                if (i != r.sel) { r.sel = i; run_paint(&r); sub_at = i >= 0 && items[i].sub ? ms_now() + MENU_SHOW_DELAY : 0; }
                 mouse_sel = i >= 0;
             }
             break;
@@ -433,6 +494,10 @@ int wmmenu_popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_i
         case ButtonPress: {
             int rx = ev.xbutton.x_root, ry = ev.xbutton.y_root;
             if (!inside(&r, rx, ry)) {
+                if (parent) {   /* in the parent: it handles the press; elsewhere the whole menu goes */
+                    if (inside(parent, rx, ry)) { XPutBackEvent(dpy, &ev); result = SUB_BACK; } else result = SUB_ALL;
+                    done = true; break;
+                }
                 if (e->dbl_w > 0 && rx >= e->dbl_x && rx < e->dbl_x + e->dbl_w && ry >= e->dbl_y && ry < e->dbl_y + e->dbl_h && ms_now() - t0 < e->dbl_ms)
                     result = WMMENU_DBLCLICK;
                 done = true;   /* a click outside dismisses the menu (and is not passed on, as in XP) */
@@ -440,13 +505,15 @@ int wmmenu_popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_i
             }
             down = true; int i = item_at(&r, rx, ry);
             if (i != r.sel) { r.sel = i; run_paint(&r); }
+            if (i >= 0 && items[i].sub) { down = false; sub_at = 0; SUB_RESULT(open_sub(&r, i, false)); }
             break;
         }
         case ButtonRelease: {
             int rx = ev.xbutton.x_root, ry = ev.xbutton.y_root, i = item_at(&r, rx, ry);
             if (!down) break;
             down = false;
-            if (i >= 0 && !(items[i].flags & WMMENU_DISABLED)) { result = i; done = true; }
+            if (i >= 0 && items[i].sub) { sub_at = 0; SUB_RESULT(open_sub(&r, i, false)); }   /* the release of the button that opened the menu */
+            else if (i >= 0 && !(items[i].flags & WMMENU_DISABLED)) { result = i; done = true; }
             /* the release of the press that opened the menu, where it was pressed or off the items: the menu stays */
             (void)px0; (void)py0;
             break;
@@ -454,12 +521,15 @@ int wmmenu_popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_i
         case KeyPress: {
             KeySym k = XkbKeycodeToKeysym(dpy, ev.xkey.keycode, 0, 0);
             r.cues = 1;   /* a key shows the keyboard cues from now on (XP) */
-            if (k == XK_Escape || k == XK_Alt_L || k == XK_Alt_R || k == XK_F10 || k == XK_Meta_L || k == XK_Meta_R) { done = true; break; }
+            if (k == XK_Alt_L || k == XK_Alt_R || k == XK_F10 || k == XK_Meta_L || k == XK_Meta_R) { result = parent ? SUB_ALL : WMMENU_CANCEL; done = true; break; }
+            if (k == XK_Escape || (parent && (k == XK_Left || k == XK_KP_Left))) { done = true; break; }   /* a submenu: only it closes */
+            if ((k == XK_Right || k == XK_KP_Right) && r.sel >= 0 && items[r.sel].sub) { sub_at = 0; SUB_RESULT(open_sub(&r, r.sel, true)); break; }
             if (k == XK_Down || k == XK_KP_Down || k == XK_Tab) r.sel = next_item(&r, r.sel < 0 ? -1 : r.sel, 1);
             else if (k == XK_Up || k == XK_KP_Up) r.sel = next_item(&r, r.sel < 0 ? 0 : r.sel, -1);
             else if (k == XK_Home || k == XK_KP_Home) r.sel = next_item(&r, -1, 1);
             else if (k == XK_End || k == XK_KP_End) r.sel = next_item(&r, 0, -1);
             else if (k == XK_Return || k == XK_KP_Enter || k == XK_space) {
+                if (r.sel >= 0 && items[r.sel].sub) { SUB_RESULT(open_sub(&r, r.sel, true)); break; }
                 if (r.sel >= 0 && !(items[r.sel].flags & WMMENU_DISABLED)) { result = r.sel; done = true; break; }
             } else {
                 /* a mnemonic: the next item with it after the selection; the only one with it is chosen at once (greyed: selected) */
@@ -476,6 +546,7 @@ int wmmenu_popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_i
                 }
                 if (count == 1) {
                     r.sel = first;
+                    if (items[first].sub) { SUB_RESULT(open_sub(&r, first, true)); break; }
                     if (!(items[first].flags & WMMENU_DISABLED)) { result = first; done = true; break; }
                 } else if (count > 1) r.sel = after >= 0 ? after : first;
             }
@@ -485,10 +556,11 @@ int wmmenu_popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_i
         }
         }
     }
+    #undef SUB_RESULT
 out:
-    XUngrabPointer(dpy, CurrentTime); XUngrabKeyboard(dpy, CurrentTime);
+    if (!parent) { XUngrabPointer(dpy, CurrentTime); XUngrabKeyboard(dpy, CurrentTime); }   /* a submenu leaves the grabs to its parent */
     XDestroyWindow(dpy, r.win); XFlush(dpy);
     if (r.under) cairo_surface_destroy(r.under);
-    if (result >= 0 && items[result].cb) items[result].cb(items[result].arg, items[result].id);
+    if (result >= 0 && !sub_chosen && items[result].cb) items[result].cb(items[result].arg, items[result].id);   /* a submenu's choice: its cb ran */
     return result;
 }

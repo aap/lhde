@@ -1061,6 +1061,12 @@ handle_client_message(XEvent *e)
         struct client *c = get_client_from_window(cme->window);
         if (c) client_close(c);
 
+    } else if (cme->message_type == net_atom[NetWMDesktop]) {
+        /* EWMH: a pager (luxshell, flxp) moves a window to another desktop; the current desktop stays (0xFFFFFFFF, all desktops, is
+           not supported) */
+        struct client *c = get_client_from_window(cme->window);
+        long d = cme->data.l[0];
+        if (c && d >= 0 && d < WORKSPACE_NUMBER && d != c->ws) { LOGP("_NET_WM_DESKTOP: 0x%lx to desktop %ld", c->window, d); client_send_to_ws(c, (int)d); }
     } else if (cme->message_type == net_atom[NetCurrentDesktop]) {
         if (cme->data.l[0] >= 0 && cme->data.l[0] < WORKSPACE_NUMBER)   /* a pager's or lhshell's request (lh.set_desktop) */
             switch_ws(cme->data.l[0]);
@@ -4914,7 +4920,7 @@ frame_resize_drag(struct client *c, int hit, XButtonPressedEvent *bev)
 }
 
 /* ---- the window menu (README "The window menu"): XP's system menu, drawn by menu.c ---- */
-enum { SC_RESTORE_ID, SC_MOVE_ID, SC_SIZE_ID, SC_MINIMIZE_ID, SC_MAXIMIZE_ID, SC_SEP_ID, SC_CLOSE_ID };
+enum { SC_RESTORE_ID, SC_MOVE_ID, SC_SIZE_ID, SC_MINIMIZE_ID, SC_MAXIMIZE_ID, SC_SEP_ID, SC_CLOSE_ID, SC_DESKMENU_ID, SC_DESK_ID /* + desktop */ };
 
 /* the caption icon is drawn (client or theme default icon, no NO_ICON, a caption of the frame's own) and (x, y) lies on it */
 static bool
@@ -4947,6 +4953,12 @@ sysmenu_command(void *arg, int id)
     case SC_CLOSE_ID: client_close(c); break;
     case SC_MOVE_ID: drag_run(c, HIT_CAPTION, 0, 0, 0, true); break;
     case SC_SIZE_ID: if (!c->mono && !client_fixed(c)) drag_run(c, HIT_BR, 0, 0, 0, true); break;
+    default:   /* Move to Desktop N: the window goes there and the desktop with it, as a desktop key during a move */
+        if (id >= SC_DESK_ID && id < SC_DESK_ID + WORKSPACE_NUMBER && id - SC_DESK_ID != c->ws) {
+            int ws = id - SC_DESK_ID;
+            client_send_to_ws(c, ws); switch_ws(ws); client_manage_focus(c);
+        }
+        break;
     }
 }
 
@@ -4961,14 +4973,23 @@ wmmenu_open(struct client *c, int x, int y, unsigned flags, unsigned button, boo
     Window w = c->window; void *arg = (void *)(uintptr_t)w;
     bool fixed = c->max_w > 0 && c->max_h > 0 && c->min_w == c->max_w && c->min_h == c->max_h;
     unsigned mx = c->mono ? WMMENU_DISABLED : 0;
+    /* luxwm's own: the desktops by number (Desktop 1 is desktop 0, as the Mod4+1 key), the window's own one checked */
+    static char desk_text[WORKSPACE_NUMBER][24];
+    struct wmmenu_item desk[WORKSPACE_NUMBER];
+    for (int i = 0; i < WORKSPACE_NUMBER; i++) {
+        if (i < 9) snprintf(desk_text[i], sizeof desk_text[i], "Desktop &%d", i + 1);
+        else snprintf(desk_text[i], sizeof desk_text[i], "Desktop %d&%d", (i + 1) / 10, (i + 1) % 10);
+        desk[i] = (struct wmmenu_item){ desk_text[i], NULL, i == c->ws ? WMMENU_CHECKED : 0, WMMENU_GLYPH_NONE, SC_DESK_ID + i, sysmenu_command, arg, NULL, 0 };
+    }
     struct wmmenu_item it[] = {
-        { "&Restore",  NULL,     c->mono ? 0 : WMMENU_DISABLED, WMMENU_GLYPH_RESTORE,  SC_RESTORE_ID,  sysmenu_command, arg },
-        { "&Move",     NULL,     mx,                            WMMENU_GLYPH_NONE,     SC_MOVE_ID,     sysmenu_command, arg },
-        { "&Size",     NULL,     mx | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_NONE, SC_SIZE_ID,    sysmenu_command, arg },
-        { "Mi&nimize", NULL,     0,                             WMMENU_GLYPH_MINIMIZE, SC_MINIMIZE_ID, sysmenu_command, arg },
-        { "Ma&ximize", NULL,     mx | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_MAXIMIZE, SC_MAXIMIZE_ID, sysmenu_command, arg },
-        { NULL,        NULL,     WMMENU_SEPARATOR,              WMMENU_GLYPH_NONE,     SC_SEP_ID,      NULL, NULL },
-        { "&Close",    "Alt+F4", WMMENU_DEFAULT,                WMMENU_GLYPH_CLOSE,    SC_CLOSE_ID,    sysmenu_command, arg },
+        { "&Restore",  NULL,     c->mono ? 0 : WMMENU_DISABLED, WMMENU_GLYPH_RESTORE,  SC_RESTORE_ID,  sysmenu_command, arg, NULL, 0 },
+        { "&Move",     NULL,     mx,                            WMMENU_GLYPH_NONE,     SC_MOVE_ID,     sysmenu_command, arg, NULL, 0 },
+        { "&Size",     NULL,     mx | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_NONE, SC_SIZE_ID,    sysmenu_command, arg, NULL, 0 },
+        { "Mi&nimize", NULL,     0,                             WMMENU_GLYPH_MINIMIZE, SC_MINIMIZE_ID, sysmenu_command, arg, NULL, 0 },
+        { "Ma&ximize", NULL,     mx | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_MAXIMIZE, SC_MAXIMIZE_ID, sysmenu_command, arg, NULL, 0 },
+        { "Move to &Desktop", NULL, 0,                          WMMENU_GLYPH_NONE,     SC_DESKMENU_ID, NULL, NULL, desk, WORKSPACE_NUMBER },
+        { NULL,        NULL,     WMMENU_SEPARATOR,              WMMENU_GLYPH_NONE,     SC_SEP_ID,      NULL, NULL, NULL, 0 },
+        { "&Close",    "Alt+F4", WMMENU_DEFAULT,                WMMENU_GLYPH_CLOSE,    SC_CLOSE_ID,    sysmenu_command, arg, NULL, 0 },
     };
     struct wmmenu_env e = { .dpy = display, .screen = screen, .root = root, .visual = argb_visual, .cmap = argb_cmap, .depth = argb_depth,
                             .theme = &theme, .composited = compositor && argb_depth == 32, .dispatch = menu_dispatch };
@@ -5248,6 +5269,19 @@ kb_step(struct client *c, bool ctrl, bool size, bool horz)
     return s;
 }
 
+/* the desktop a "workspace N" key binding switches to for this key and modifier state, -1 when it is no such binding */
+static int
+key_workspace(KeySym k, unsigned state)
+{
+    unsigned mods = mod_clean(state);
+    for (int i = 0; i < nkeys; i++)
+        if (keys[i].sym == k && keys[i].mods == mods && !strcmp(keys[i].action, "workspace")) {
+            int ws = atoi(keys[i].arg);
+            return ws >= 0 && ws < WORKSPACE_NUMBER ? ws : -1;
+        }
+    return -1;
+}
+
 static void
 drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboard)
 {
@@ -5350,6 +5384,14 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         }
         case KeyPress: {
             KeySym k = XkbKeycodeToKeysym(display, ev.xkey.keycode, 0, 0);
+            int to_ws = key_workspace(k, ev.xkey.state);
+            if (to_ws >= 0 && hit == HIT_CAPTION) {   /* a desktop key while moving: the window goes along to that desktop */
+                if (to_ws != c->ws) {
+                    LOGP("drag: 0x%lx moved along to desktop %d", c->window, to_ws);
+                    client_send_to_ws(c, to_ws); switch_ws(to_ws); client_manage_focus(c);
+                }
+                break;
+            }
             if (k == XK_Escape) { cancel = true; done = true; kb_end = keyboard; }
             else if (keyboard && (k == XK_Return || k == XK_KP_Enter)) { done = true; kb_end = true; }
             else if (kbsize && (k == XK_Shift_L || k == XK_Shift_R)) {

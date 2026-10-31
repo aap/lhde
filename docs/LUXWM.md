@@ -209,13 +209,19 @@ it flips left/up at the monitor edge) and a click on the caption icon (`frame_ic
 paints; a double click on the icon, the second press within 500 ms, closes the window as XP's). Alt+Space and the icon put it under
 the caption at the frame's left border. Items, mnemonics and greying as `mnsys.c` `xxxSetSysMenu`: **R**estore (greyed unless
 maximised), **M**ove, **S**ize (greyed while maximised; Size also for a window whose size hints fix its size), Mi**n**imize,
-Ma**x**imize (greyed while maximised), separator, **C**lose (the default item, bold) with `Alt+F4` right-aligned. Opened from the
+Ma**x**imize (greyed while maximised), Move to **D**esktop (luxwm's own, below: "Virtual desktops"), separator, **C**lose (the
+default item, bold) with `Alt+F4` right-aligned. Opened from the
 keyboard the first item is selected (greyed or not, as `MNFindNextValidItem`, which skips only separators) and the mnemonics are
 underlined (XP's keyboard cues; a key press shows them in a mouse-opened menu too). Keys: Up/Down/Tab (wrapping, separators skipped),
 Home/End, Enter (on a greyed item nothing happens), a mnemonic (the only item with it is chosen at once; a greyed one is only
 selected; several: the next one), Esc, Alt or F10 close it. Mouse: hover selects (greyed items too, as XP), a release over an enabled
 item chooses it (also the release of the button that opened it, dragged onto an item), a click outside closes it (the click is not
 passed on). Modal like the drags: pointer and keyboard grabbed, Expose/MapRequest/ConfigureRequest of other windows handled meanwhile.
+**Submenus** (`item.sub`) cascade as XP's: a 4 x 7 arrow in the right margin; hovering the item for MenuShowDelay (400 ms), a click on
+it, Right, Enter or its mnemonic opens the submenu beside the item (3 px overlap, left of the parent when it does not fit); Left or
+Esc closes only the submenu, the pointer back over another item of the parent (or a press there) closes it and the parent takes
+over, a click outside both, Alt or F10 closes everything. The submenu shares the parent's keyboard grab and hands the pointer grab
+back when it closes.
 
 **Rendering** (`wmmenu_popup`, an override-redirect ARGB window with `_NET_WM_WINDOW_TYPE_POPUP_MENU`, `_LHWM_MENU` and
 WM_CLASS `lhwm-menu`), from the frame theme's visual style through libuxtheme:
@@ -293,6 +299,21 @@ width-only resize keeps it. `luxwmc snap_left`, `snap_right` (IPC) go through th
 Lab (`:17`, slate4074, xterm 400x238 at 300,200): drag to x 0 → left half (636 px frame, size hints), `MAXIMIZED_VERT`; dragged away →
 400x238 again under the pointer; to y 0 → maximised; dragged away → 400x238; to x 1279 and back before the release → no snap;
 bottom border to y 799 → full height at the same x; dragged away → 400x238.
+
+## Virtual desktops
+
+Ten desktops (`_NET_NUMBER_OF_DESKTOPS`), switched by the key action `workspace N` (defaults Mod4+1..4 = desktops 0..3), by
+`_NET_CURRENT_DESKTOP` requests (luxshell, any pager) and `_LHSHELL_COMMAND desktop`. A window changes desktop by:
+- **a desktop key while it is moved**: during a move (the window menu's Move, a caption or modifier drag, `_NET_WM_MOVERESIZE`
+  8/10), a key bound to `workspace N` takes the window along to desktop N and switches there; the move goes on;
+- **the window menu's Move to Desktop**: a submenu with Desktop 1..10 (desktop 0..9; mnemonics 1..9 and 0), the window's own one
+  checked; choosing another moves the window there and switches to it;
+- **`_NET_WM_DESKTOP` client messages** (EWMH, data.l[0] = the desktop): the window moves there and the current desktop stays, as a
+  pager expects; 0xFFFFFFFF (all desktops) is not supported and ignored.
+None of this is Windows': XP had no virtual desktops, Longhorn neither. Lab (`:17`): Alt+Space, D, 3 → the window and the session
+on desktop 2; Alt+Space, M, Right, Super+1, Enter → both back on 0; `xdotool set_desktop_for_window W 4` → the window on 4, the
+current desktop still 0; a caption drag with Super+1 pressed on desktop 4 → window and session on 0; the submenu by mouse: open
+after the hover delay, closed when the pointer goes back to Move, a click on Desktop 2 moves the window.
 
 ## Live-editing a theme (2026-10-26)
 

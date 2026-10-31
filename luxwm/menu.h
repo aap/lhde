@@ -26,6 +26,8 @@ struct wmmenu_item {
     int id;
     void (*cb)(void *arg, int id);      /* called after the menu has closed (may be NULL) */
     void *arg;
+    const struct wmmenu_item *sub;      /* a submenu (nsub items): the item shows an arrow and opens it (hover 400 ms, click, Right, Enter) */
+    int nsub;
 };
 
 /* how wmmenu_popup was asked: WMMENU_KEYBOARD = opened from the keyboard (first item selected, mnemonics underlined, as XP's
@@ -48,7 +50,10 @@ struct wmmenu_env {
 
 /* show the menu with its top-left corner at x, y (root) and run it until an item is chosen or it is dismissed (Esc, Alt, a click
    outside). button: the mouse button that opened it and is still held (0: none): releasing it over an item chooses that item.
-   Returns the chosen index (its cb has been called), WMMENU_CANCEL or WMMENU_DBLCLICK. Modal: grabs pointer and keyboard. */
+   Returns the chosen index (its cb has been called; for a choice in a submenu the index of the item that holds the submenu),
+   WMMENU_CANCEL or WMMENU_DBLCLICK. Modal: grabs pointer and keyboard. Submenus (item.sub) open beside their item as XP's cascades:
+   after MenuShowDelay (400 ms) of hovering, on a click, Right, Enter or the item's mnemonic; Left or Esc closes only the submenu,
+   the pointer back over another item of the parent closes it too. */
 int wmmenu_popup(const struct wmmenu_env *env, int x, int y, const struct wmmenu_item *items, int n, unsigned flags, unsigned button);
 
 /* LHWM_MENUTEST: render the menu as wmmenu_popup would draw it (selected item sel, -1 none) into a new image (caller destroys it),

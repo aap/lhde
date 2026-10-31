@@ -315,7 +315,7 @@ Inside the session (default keys, override in `~/.config/lhde/keys`, one binding
 | Alt+Space, M / S | keyboard move / size: arrows move (size: the first arrow picks the edge) in half-button steps, Ctrl+arrow 1 px, the mouse takes over, Enter or a click accepts, Esc puts the window back |
 | Alt+Tab, Super+Tab (Shift: backwards) | as Windows': while Alt (Super) is held each Tab previews the next window by raising it (the previous one goes back to its place; minimised windows come last and are not previewed); releasing Alt focuses and raises the chosen one, every other window keeps its stacking order; Esc cancels |
 | Super+Up / Super+Down | maximise / minimise |
-| Super+1..4 | workspaces (virtual desktops: the taskbars show the current one's windows; `_LHSHELL_COMMAND desktop N\|next\|prev` or any pager's `_NET_CURRENT_DESKTOP` request switches too) |
+| Super+1..4 | workspaces (virtual desktops: the taskbars show the current one's windows; `_LHSHELL_COMMAND desktop N\|next\|prev` or any pager's `_NET_CURRENT_DESKTOP` request switches too; pressed while moving a window, the window goes along; the window menu's Move to Desktop moves one too) |
 | drag caption | move; drag edges and corners | resize |
 | double-click caption | maximise/restore |
 | Super+drag / Alt+drag | move / resize anywhere on the window (berry's defaults) |
