@@ -241,6 +241,7 @@ std::string theme_setting(const std::string& key, const std::string& fallback)
         std::string nb = t.value("Explorer.navbar");
         return nb == "vision" ? "lhnav" : nb == "4051" || nb == "4074" ? "flxp" : fallback;
     }
+    if (key == "taskpane_position") return or_fallback(t.value("Explorer.taskpane"));   // top | bottom
     if (key == "header_preset") {
         std::string p = t.value("Explorer.navbar_preset");
         return t.value("Explorer.navbar") == "vision" && !p.empty() && p != "auto" ? p : fallback;

@@ -103,7 +103,10 @@ What `luxshell` (the taskbar/sidebar) relies on, all in `wm.c`:
   above the clients after every restack unless they carry `_NET_WM_STATE_BELOW` (luxshell's sidebar does). `docks_raise()` raises them as a group
   in the order the server has them (`XQueryTree`), not in map order, so a dock orders itself against another dock with
   `XRaiseWindow`/`XLowerWindow`/a `ConfigureRequest` with `stack_mode` (applied with `XConfigureWindow`, then the group raise);
-  `tests/dockorder.c` (raise|lower|above|below) checks it. lux's `[sidebar] stacking` switches the sidebar between
+  `tests/dockorder.c` (raise|lower|above|below) checks it. The exception is EWMH's: the focused window, when it is fullscreen,
+  goes above the docks at the end of every group raise (and when it gets the focus or enters fullscreen); when it loses the focus
+  or leaves fullscreen the next group raise puts the docks back on top. A dock that raises itself (luxshell's bars do on every
+  client-list change) goes through a `ConfigureRequest`, so the rule holds whoever raises. lux's `[sidebar] stacking` switches the sidebar between
   `_NET_WM_STATE_ABOVE` (raised over the taskbar) and `_NET_WM_STATE_BELOW` (lowered under the clients, no strut) by rewriting
   the property of the mapped dock; `dock_property()` re-reads it and restacks at once, while `_NET_WORKAREA` and the refit of
   maximised windows wait until the event queue is drained (`workarea_dirty`, in `run()`), so a burst of dock changes (Win+S:
@@ -138,7 +141,7 @@ What `luxshell` (the taskbar/sidebar) relies on, all in `wm.c`:
   `shell run`, `Mod4+s` = `shell sidebar-stacking toggle` (lux's sidebar under the windows ⇄ on top, instantly). A user keys file
   keeps its own bindings; `Mod4+d`, `Mod4+r` and `Mod4+s` are added to it only where that key is unbound there. Actions:
   `showdesktop`, `sysmenu` (the window menu, default Alt+Space, added to a user keys file where unbound: "The window menu"), `shell CMD` (sets the root property `_LHSHELL_COMMAND` = CMD, UTF8_STRING; luxshell's runtime.lua accepts `run` =
-  lux's own Run box, `sidebar-stacking toggle|top|bottom`, `taskbar KIND`, `sidebar-with-classic 0|1`, `settings`). Every `exec` child does `chdir($HOME)` first (luxwm itself runs in its own directory).
+  lux's own Run box, `sidebar-stacking toggle|top|bottom`, `taskbar KIND`, `sidebar-with-classic 0|1`, `settings`, `desktop N|next|prev` = switch the virtual desktop, N 0-based, through the EWMH `_NET_CURRENT_DESKTOP` request). Every `exec` child does `chdir($HOME)` first (luxwm itself runs in its own directory).
   **Show desktop** (2026-10-27: Windows' Win+D) = EWMH `_NET_SHOWING_DESKTOP` (in `_NET_SUPPORTED`, root CARDINAL, 0 at start,
   deleted on quit). On (the key, or a `_NET_SHOWING_DESKTOP` client message with data[0] = 1 from a pager or taskbar): the visible
   windows of the current desktop are really minimised (iconic, task buttons stay; bottom first, so the focus is not handed down the
@@ -820,9 +823,11 @@ Fixed (`client_set_icon`, `client_icon`, frame.c `frame_icon_from_netwm`, `frame
 `_NET_WM_ICON` (read up to 16M items) → the smallest image at least the icon size (`icon_size`, msstyles 16), else the largest,
 scaled once to the size with `CAIRO_FILTER_BEST` (aspect kept, centred); else `WM_HINTS` `icon_pixmap` + `icon_mask` (depth 1: black
 on white as the classic X icon box; other depths through the default visual; depth 32 taken as premultiplied ARGB; errors from a
-pixmap the client freed meanwhile are swallowed), scaled the same way; else the theme's default icon. PropertyNotify: `_NET_WM_ICON`
+pixmap the client freed meanwhile are swallowed), scaled the same way; else the generic application icon (`app_icon`: shell32 #3,
+what Windows draws for a window without an icon, from the first imported pack of 4074, 4051, 5112, 4042, `packs/BUILD/shell32/16|32/3.png`;
+urxvt and xterm get it instead of the DWM default's flag); else the theme's default icon. PropertyNotify: `_NET_WM_ICON`
 set, changed or deleted re-reads it; `WM_HINTS` re-reads the icon when its pixmap or mask id changed (urgency updates do not). Theme
-switches re-read at the new size (as before). `LHWM_DEBUG=1` logs `icon 0x...: client | theme default | none`.
+switches re-read at the new size (as before). `LHWM_DEBUG=1` logs `icon 0x...: client | application | theme default | none`.
 Default icons, theme key `default_icon = FILE [FILE...]` (relative to the theme directory; the nearest size at or above is used),
 else `default_icon.png`: aero/jade `default_icon.png` = the CompositedWindow `DEFAULTICON` part (msstyles STREAM 506, a 20x17
 Windows flag; aero from `res/aero/aero.msstyles/`, jade from `res/4074/jade.msstyles/`), drawn 1:1 centred on the 16 px cell (icons
@@ -1247,6 +1252,13 @@ left a strip below the last row / right of the last column that they never repai
   state, sampled in the middle: slate4074 a dark grey; button-face grey without the part), as if the border went on around the client.
   `_NET_FRAME_EXTENTS` stays true: it is the frame around the client as it lies, so a maximised urxvt reads `0 4 27 2` (left, right,
   top, bottom) on aero and `0 4 20 9` on slate4074; it is written only when it changes.
+- **Fixed size** (`client_fixed`): minimum and maximum equal (a win32 window without `WS_THICKFRAME`: wux writes min == max == its
+  size, following every resize it makes itself, and `_MOTIF_WM_HINTS` without resize and maximize; flxp's dialogs, property sheets
+  and message boxes). In every frame mode its edges and corners are a plain border (`client_hit`: `HTBORDER`, no size cursor; a drag
+  there neither sizes nor moves), Alt+drag resize, `_NET_WM_MOVERESIZE` 0..7 and the window menu's Size do nothing, maximise is off
+  (button, double click, Super+Up, the menu's Maximize greyed) and its maximise button is drawn disabled (msstyles: the strip's
+  disabled image; classic: `DFCS_INACTIVE`; DWM sprites have none, so the inactive one at 45 %; `FRAME_MAX_DISABLED`, lhwm's own bit
+  above the client's `_LHWM_FRAME_FLAGS`).
 - **ConfigureRequest** (berry bug, fixed on the way): only the fields in the request's `value_mask` are applied. The others hold the
   geometry the window had when it sent the request, so a client that asked for a size before luxwm had placed it was moved back there
   (`emacs -Q` came up with its client at 0,0 and the frame off-screen). The requested size is fitted like any other.

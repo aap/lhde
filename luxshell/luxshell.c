@@ -481,6 +481,8 @@ static int l_activate(lua_State *L) { Window w = (Window)luaL_checkinteger(L, 1)
 static int l_minimize(lua_State *L) { Window w = (Window)luaL_checkinteger(L, 1); XIconifyWindow(dpy, w, screen); XFlush(dpy); return 0; }
 static int l_close(lua_State *L) { Window w = (Window)luaL_checkinteger(L, 1); send_root_message(w, atom[A_NET_CLOSE_WINDOW], CurrentTime, 2, 0); return 0; }
 static int l_spawn(lua_State *L) { const char *cmd = luaL_checkstring(L, 1); if (fork() == 0) { setsid(); execl("/bin/sh", "sh", "-c", cmd, NULL); _exit(1); } return 0; }
+/* lh.set_desktop(n): ask the WM to switch to desktop n (EWMH _NET_CURRENT_DESKTOP client message to the root) */
+static int l_set_desktop(lua_State *L) { long n = (long)luaL_checkinteger(L, 1); send_root_message(root, atom[A_NET_CURRENT_DESKTOP], n, CurrentTime, 0); return 0; }
 static int l_desktop(lua_State *L) { unsigned long n; int fmt; unsigned char *d = get_prop(root, atom[A_NET_CURRENT_DESKTOP], XA_CARDINAL, &n, &fmt); lua_pushinteger(L, d ? ((long *)d)[0] : 0); if (d) XFree(d); return 1; }
 /* lh.maxmode([desktop]): lhwm's _LHWM_MAXIMIZED_MODE for that desktop (default: the current one) as a boolean, or nil when
    lhwm is not the running WM (no _NET_SUPPORTING_WM_CHECK window named lhwm: the caller falls back to its own EWMH rule) */
@@ -947,7 +949,7 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"tray_start", l_tray_start}, {"tray_count", l_tray_count}, {"tray_manager", l_tray_manager}, {"tray_stop", l_tray_stop},
     {"selection_owner", l_selection_owner}, {"watch_selection", l_watch_selection}, {"own_selection", l_own_selection}, {"send_message", l_send_message}, {"send_root_message", l_send_root_message}, {"atom", l_atom},
     {"set_root_cardinal", l_set_root_cardinal}, {"struts", l_struts}, {"spawn_pid", l_spawn_pid}, {"notification_closed", l_notification_closed}, {"notification_action", l_notification_action},
-    {"spawn", l_spawn}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"realpath", l_realpath}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"quit", l_quit}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"mtime", l_mtime},
+    {"spawn", l_spawn}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"realpath", l_realpath}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"quit", l_quit}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"mtime", l_mtime},
     {"data_find", l_data_find}, {"data_resolve", l_data_resolve}, {"data_resolve_dir", l_data_resolve_dir}, {"data_dirs", l_data_dirs}, {"data_user", l_data_user},
     {"component_dir", l_component_dir},
     {"theme_resolve", l_theme_resolve}, {"theme_record", l_theme_record}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},

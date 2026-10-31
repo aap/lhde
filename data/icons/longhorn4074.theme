@@ -33,6 +33,7 @@ trash = pe:shell32.dll#32
 help = pe:shell32.dll#24
 pictures = pe:shell32.dll#236
 control_panel = pe:shell32.dll#137
+display = pe:desk.cpl#100
 run = pe:shell32.dll#25
 recent = pe:shell32.dll#21
 

@@ -37,6 +37,7 @@ struct NativeWindow {
     bool transient = false, transient_modal = false;
     uint64_t transient_owner = 0;
     int min_w = 0, min_h = 0;
+    bool fixed = false;     // set_fixed_size: min == max size hints, no MWM resize / maximize
     std::vector<unsigned long> icon;   // _NET_WM_ICON (set_icon), put back likewise
 };
 
@@ -127,6 +128,27 @@ static void put_frame_props(NativeWindow* w)
     }
 }
 
+// _MOTIF_WM_HINTS of a fixed-size window: functions all but resize and maximize (MWM_FUNC_ALL with those bits
+// excluding them), decorations left to the window manager
+static void put_fixed_mwm(NativeWindow* w)
+{
+    Atom mwm = XInternAtom(dpy, "_MOTIF_WM_HINTS", False);
+    long h[5] = { 1 /* MWM_HINTS_FUNCTIONS */, 1 | 2 | 16 /* MWM_FUNC_ALL, minus RESIZE and MAXIMIZE */, 0, 0, 0 };
+    XChangeProperty(dpy, w->xw, mwm, mwm, 32, PropModeReplace, (const unsigned char*)h, 5);
+}
+
+// The size hints of a fixed-size window follow its size (min == max == the window's size)
+static void put_fixed_hints(NativeWindow* w, int cx, int cy)
+{
+    XSizeHints hints = {};
+    long supplied = 0;
+    XGetWMNormalHints(dpy, w->xw, &hints, &supplied);
+    hints.flags |= PMinSize | PMaxSize | PSize;
+    hints.min_width = hints.max_width = hints.width = cx;
+    hints.min_height = hints.max_height = hints.height = cy;
+    XSetWMNormalHints(dpy, w->xw, &hints);
+}
+
 // (Re)create the X window of w with its current flags; rect, title and the
 // frame properties carry over.
 static void make_xwindow(NativeWindow* w)
@@ -165,7 +187,12 @@ static void make_xwindow(NativeWindow* w)
     XSizeHints hints;
     hints.flags = PPosition | PSize;
     hints.x = r.left; hints.y = r.top; hints.width = r.width(); hints.height = r.height();
+    if (w->fixed) {
+        hints.flags |= PMinSize | PMaxSize;
+        hints.min_width = hints.max_width = r.width(); hints.min_height = hints.max_height = r.height();
+    }
     XSetWMNormalHints(dpy, w->xw, &hints);
+    if (w->fixed) put_fixed_mwm(w);
     // WM_CLASS = <program>, "Flxp": lets picom/WM rules and xdotool --class find us
     XClassHint ch;
     ch.res_name = program_invocation_short_name;
@@ -495,6 +522,7 @@ void set_title(NativeWindow* w, const char* title)
 
 void set_window_rect(NativeWindow* w, const gdi::Rect& r)
 {
+    if (w->fixed) put_fixed_hints(w, r.width(), r.height());   // before the request: the WM refuses other sizes
     XMoveResizeWindow(dpy, w->xw, r.left, r.top, r.width(), r.height());
     XFlush(dpy);
 }
@@ -1598,6 +1626,25 @@ void set_icon(NativeWindow* w, const std::vector<unsigned long>& data)
     Atom a = XInternAtom(dpy, "_NET_WM_ICON", False);
     if (data.empty()) XDeleteProperty(dpy, w->xw, a);
     else XChangeProperty(dpy, w->xw, a, XA_CARDINAL, 32, PropModeReplace, (const unsigned char*)data.data(), (int)data.size());
+    XFlush(dpy);
+}
+
+void set_fixed_size(NativeWindow* w, bool fixed)
+{
+    if (!w || w->fixed == fixed) return;
+    w->fixed = fixed;
+    if (fixed) {
+        put_fixed_hints(w, w->rect.width(), w->rect.height());
+        put_fixed_mwm(w);
+    } else {
+        XSizeHints hints = {};
+        long supplied = 0;
+        XGetWMNormalHints(dpy, w->xw, &hints, &supplied);
+        hints.flags &= ~PMaxSize;
+        if (!w->min_w && !w->min_h) hints.flags &= ~PMinSize;
+        XSetWMNormalHints(dpy, w->xw, &hints);
+        XDeleteProperty(dpy, w->xw, XInternAtom(dpy, "_MOTIF_WM_HINTS", False));
+    }
     XFlush(dpy);
 }
 

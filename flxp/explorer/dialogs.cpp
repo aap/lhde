@@ -500,6 +500,7 @@ static void take(HWND, bool from_general)
     if (view) {
         o->remember = IsDlgButtonChecked(view, IDC_FO_REMEMBER) == BST_CHECKED;
         o->hidden = IsDlgButtonChecked(view, IDC_FO_HIDDEN) == BST_CHECKED;
+        o->full_path = IsDlgButtonChecked(view, IDC_FO_FULLPATH) == BST_CHECKED;
     }
 }
 
@@ -556,6 +557,7 @@ static INT_PTR CALLBACK view_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         view = dlg;
         CheckDlgButton(dlg, IDC_FO_REMEMBER, o->remember ? BST_CHECKED : BST_UNCHECKED);
         CheckDlgButton(dlg, IDC_FO_HIDDEN, o->hidden ? BST_CHECKED : BST_UNCHECKED);
+        CheckDlgButton(dlg, IDC_FO_FULLPATH, o->full_path ? BST_CHECKED : BST_UNCHECKED);
         return TRUE;
     case WM_COMMAND:
         if (LOWORD(wp) == IDC_FO_APPLYALL) {

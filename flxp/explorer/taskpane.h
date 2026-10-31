@@ -12,6 +12,9 @@
 // - several: a stack of up to 7 thumbnails, "N items selected", the shared
 //   values.
 // The picture hangs 10 px below the band (4051's overhang), over the left pane.
+// With the theme's Explorer.taskpane = bottom (the 5048/5112 themes: close to
+// Vista's details pane) the band lies under the list instead, mirrored: the
+// picture hangs 10 px above it and its top edge drags it.
 // Expanded (4051's Preview on) and compact (off) differ only in size: the
 // preview box is the band's height + 8 wide, the details show only the title
 // when compact, the count goes on one line. Tasks take what is right of the
@@ -37,6 +40,7 @@ struct Callbacks {
 
 bool wanted();                       // taskpane= (flxp.ini, FLXP_TASKPANE, --taskpane): default off
 int height();                        // the band's rows (compact: 48; expanded: taskpane_height)
+bool bottom();                       // the band goes under the list (Explorer.taskpane = bottom), else under the command bar
 // 4051's Preview: expanded (126 rows below the command bar by default, dragged
 // between 126 and 246) or compact (48; 4051's 150 / 270 / 72 less the command
 // bar's 24); remembered as taskpane_compact, the expanded height as

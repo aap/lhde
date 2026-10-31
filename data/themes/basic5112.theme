@@ -21,6 +21,7 @@ pack     = 5112-aero         ; the 5112 Start pill, bar and task buttons, for ta
 chrome   = longhorn
 navbar   = vision
 navbar_preset = small
+taskpane = bottom            ; the task band under the list, close to Vista's details pane (a choice, not 5048's/5112's)
 
 [Desktop]
 wallpaper = 5112/Longhorn    ; the grass blades

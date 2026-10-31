@@ -280,6 +280,9 @@ int lhde_explain(const char *name)
             }
         }
     }
+    if (!strcasecmp(G("Explorer.chrome"), "longhorn"))
+        more(r, "task band (View > Task Band): %s", !strcasecmp(G("Explorer.taskpane"), "bottom") ? "under the list (Explorer.taskpane = bottom)"
+                                                                                                   : "under the command bar");
     /* icons */
     r = row("icons", G("Desktop.icons"));
     if (!status(r, t, "Desktop.icons") || G("path.icons")[0]) {

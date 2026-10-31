@@ -9,17 +9,7 @@ not *entirely* sure about the font for all themes though
 
 * the jade/aero theme in any case does not currently use Segoe UI for everything
 
-* longhorn icon highlights are currently too big.
-	should only take up the actual bounding box of the icon (only for actual icon view, details/tiles seem fine)
-
 * future: put the aurora example into longhorn flxp as an option
-
-* an option to put the Longhorn task pane (the band) at the bottom instead of the top: with the 5048 and 5112 styles that gets
-	close to Vista's details pane; a theme key (Explorer section) with the basic/aero 5048 and 5112 themes set to bottom
-
-* lab (picom xrender): an explorer window that loses activation to a dialog soon after it was resized shows parts of
-	itself (toolbar, task pane, status bar) as holes until it is activated again; seen with Properties (Alt+Enter) and
-	with the copy dialogs alike
 
 ## flxp behavior
 
@@ -28,8 +18,6 @@ not *entirely* sure about the font for all themes though
 
 * see xatttribs.txt idea
 
-* not so sure about "Home" replacing the actual path in the breadcrumb bar
-
 ### details and task pane
 
 * also for longhorn flxp, but more complicated:
@@ -37,5 +25,4 @@ not *entirely* sure about the font for all themes though
 
 ## misc
 
-* flxp portal save dialog seems to get stuck on an "Open" button label when changing directories
 * tests/headless/filedlg.sh is flaky under load (make check with a lab running): a different check fails each run (xp multi, longhorn filter index, the view keys), alone it passes; its xdotool waits need to wait for the dialog, not sleep

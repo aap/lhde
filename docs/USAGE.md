@@ -259,7 +259,7 @@ Inside the session (default keys, override in `~/.config/lhde/keys`, one binding
 | Alt+Space, M / S | keyboard move / size: arrows move (size: the first arrow picks the edge) in half-button steps, Ctrl+arrow 1 px, the mouse takes over, Enter or a click accepts, Esc puts the window back |
 | Alt+Tab, Super+Tab (Shift: backwards) | as Windows': while Alt (Super) is held each Tab previews the next window by raising it (the previous one goes back to its place; minimised windows come last and are not previewed); releasing Alt focuses and raises the chosen one, every other window keeps its stacking order; Esc cancels |
 | Super+Up / Super+Down | maximise / minimise |
-| Super+1..4 | workspaces |
+| Super+1..4 | workspaces (virtual desktops: the taskbars show the current one's windows; `_LHSHELL_COMMAND desktop N\|next\|prev` or any pager's `_NET_CURRENT_DESKTOP` request switches too) |
 | drag caption | move; drag edges and corners | resize |
 | double-click caption | maximise/restore |
 | Super+drag / Alt+drag | move / resize anywhere on the window (berry's defaults) |
@@ -351,6 +351,10 @@ stop used last, so going back to a view brings its size back; the sizes are kept
 (`remember_views`, Tools > Folder Options); a folder never opened gets `default_view_longhorn` (Icons at 48 px unless Folder Options
 says otherwise).
 
+The breadcrumb names your home folder "Home" (Home > Documents), as the namespace places it under the Desktop. Folder Options'
+"Display the full path in the address bar" (`breadcrumb_home = 0` in `flxp.ini`) shows a folder under it by its real path instead,
+My Computer > Local Disk (/) > home > you > Documents; the default is `breadcrumb_home = 1`.
+
 View > Show in Groups (`groups = 1` in `flxp.ini`) groups Tiles and Icons by type, under the theme's group headers (4074's
 GROUPHEADER band with the title and its count, the collapse button at the right end; a click on a header folds the group).
 
@@ -361,8 +365,8 @@ Thumbnails show in every view and are just bigger or smaller images: a picture i
 shadow, a grey line, a mat graded from white to light grey; no frame below 32 px), any other file its own icon at the size, a
 folder 4074's photo standing in the open folder where the build has that art (shell32 #389/#390 of `longhorn_system32`; the
 folder's `folder.jpg` first, else its first picture), else the folder icon with up to four pictures on it. There is no square
-behind them; selection and hover are the theme's `Explorer::ListView` LISTITEM underlay (Slate tan, Jade blue), the classic
-highlight in styles without it. View > Show Thumbnails (and Folder Options) turn them off for every folder (`thumbnails = 0` in
+behind them; selection and hover are the theme's `Explorer::ListView` LISTITEM underlay (Slate tan, Jade blue; in Icons around
+the icon and its label, not the whole cell), the classic highlight in styles without it. View > Show Thumbnails (and Folder Options) turn them off for every folder (`thumbnails = 0` in
 `flxp.ini`); on network mounts (NFS, SMB, sshfs and other FUSE network filesystems) they are off unless `thumbnails_network = 1`,
 since every picture would be read over the network. The thumbnails are cached in `~/.cache/thumbnails` (the freedesktop spec, shared
 with other programs).
@@ -406,7 +410,10 @@ value shared by all or "(multiple values)". The item tasks (Open, Rename, Copy, 
 right of the details. View > Preview switches between the expanded band (126 rows, its bottom edge drags it up to 246) and the
 compact one (48 rows: the count or the name on one line, a small icon or thumbnail, the tasks side by side); dragging the edge
 above 87 rows expands it, below compacts it (`taskpane_compact`, `taskpane_height` in `flxp.ini`). Thumbnails follow the same
-`thumbnails` and `thumbnails_network` settings as the views; without them the icon shows.
+`thumbnails` and `thumbnails_network` settings as the views; without them the icon shows. The theme puts the band at the top
+or the bottom (`Explorer.taskpane`): the 5048 and 5112 themes have it under the list and the left pane, across the window's width,
+which comes close to Vista's details pane; there it is the same band mirrored, the picture hanging above it over the left pane
+(whose view button moves up out of its way) and its top edge dragging it.
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell M6, `SHELL-DESIGN.md` 6.3/6.4)
 
@@ -460,7 +467,9 @@ with one key when you want to look at it.
   all clients) and reserves **no strut**, so windows dragged over it cover it and maximised windows take the full width
   (`_NET_WORKAREA` 1280x770 on the lab, the taskbar's strut only). The Avalon taskbar runs the full width over it, above it in the
   stack, and the sidebar ends at the taskbar's top (the 4015/M4 look; it follows autohide). Pinned: the block sits above the
-  full-width taskbar, under the windows, no strut. Minimized: as always (no sidebar, the tiles in the taskbar).
+  full-width taskbar, under the windows, no strut. Minimized: as always (no sidebar, the tiles in the taskbar). Since the
+  sidebar's clock can be covered by windows, the taskbar shows the time at its right end as well (the clock tile's taskbar
+  view, as 4074's taskbar shows it when the sidebar has no clock on screen).
 - `top` (default, "Sidebar on top of windows"): the sidebar is above the windows (`_NET_WM_STATE_ABOVE`, like the taskbar),
   runs the full height and is above the taskbar at the corner, which is shortened by its width (4074); its strut keeps maximised
   windows clear (full 1099x770 with a 181 px sidebar, pinned 1280x662).

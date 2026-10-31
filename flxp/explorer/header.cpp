@@ -3091,13 +3091,29 @@ void set_folder(const std::shared_ptr<shell::Folder>& f)
     g_title = g_fixed_title.empty() ? f->name() : g_fixed_title;
     // the path from the namespace root, without the Desktop itself (4074 starts at Computer)
     std::vector<Crumb> chain;
-    for (auto p = f; p; p = p->parent()) {
-        if (p->path() == "::desktop" && !chain.empty()) break;
+    auto add = [&](const std::string& name, const std::string& path) {
         Crumb c;
-        c.name = p->name().empty() ? p->path() : p->name();
-        c.path = p->path();
+        c.name = name.empty() ? path : name;
+        c.path = path;
         SetRectEmpty(&c.text);
         chain.insert(chain.begin(), c);
+    };
+    // flxp.ini breadcrumb_home = 0 (Folder Options' "Display the full path"): a folder under the home folder as the real path,
+    // Computer > Local Disk (/) > u > aap > ..., instead of the namespace's Home > ...
+    const char* home = getenv("HOME");
+    std::string fp = f->path();
+    bool full = home && *home && fp[0] == '/' && shell::setting("breadcrumb_home", "1") == "0" &&
+                (fp == home || (fp.size() > strlen(home) && !fp.compare(0, strlen(home), home) && fp[strlen(home)] == '/'));
+    if (full) {
+        for (std::string p = fp; p.size() > 1; p = p.substr(0, std::max<size_t>(p.rfind('/'), 1)))
+            add(p.substr(p.rfind('/') + 1), p);
+        if (auto r = shell::folder_for("/")) add(r->name(), "/");
+        if (auto c = shell::folder_for("::computer")) add(c->name(), "::computer");
+    } else {
+        for (auto p = f; p; p = p->parent()) {
+            if (p->path() == "::desktop" && !chain.empty()) break;
+            add(p->name(), p->path());
+        }
     }
     g_crumbs = chain;
     g_hot = -1;
