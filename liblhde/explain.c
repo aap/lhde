@@ -347,7 +347,8 @@ int lhde_explain(const char *name)
    classic scheme is made from; every input of the manifest of the frame sets and the pack images the theme uses (those
    recipes, run by lhde-import, name their inputs with sha256); the DLLs the icon recipe's pe: references name; the wallpaper;
    the fonts directory; and of the theme's build the DLLs flxp, luxnav and luxshell open (FLXP_DLLS). Run it on a tree that
-   holds everything (a museum import); files from local/ or generated/ are not packed and are left out. */
+   holds everything (a museum import); files of local/ (a style dropped in by hand, lhde-import --style) are named as
+   local/<path>, lhde-pack carries them as the pack's local/; generated/ is made again by the import and is left out. */
 static const char *FLXP_DLLS[] = { "shell32.dll", "browseui.dll", "explorer.exe", "shellstyle.dll", "comctl32.dll", "themeui.dll",
                                    "imageres.dll", "logonui.exe", NULL };
 static char *seen[4096]; static int nseen;
@@ -359,7 +360,7 @@ static void emit_file(const char *path)
     size_t l = strlen(wr);
     if (strncmp(rp, wr, l) || rp[l] != '/') return;
     const char *rel = rp + l + 1;
-    if (!strncmp(rel, "generated/", 10) || !strncmp(rel, "local/", 6) || !strncmp(rel, "index/", 6)) return;
+    if (!strncmp(rel, "generated/", 10) || !strncmp(rel, "index/", 6)) return;
     struct stat st; if (stat(rp, &st) || !S_ISREG(st.st_mode)) return;
     for (int i = 0; i < nseen; i++) if (!strcmp(seen[i], rel)) return;
     if (nseen < 4096) seen[nseen++] = strdup(rel);

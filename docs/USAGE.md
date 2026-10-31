@@ -81,6 +81,8 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    tools/lhde-pack --themes luna,jade4074,classic --isos DIR --out ~/packs    # essentials for three themes
    tools/lhde-pack --profile museum --isos DIR --out ~/packs                  # everything: today's complete pack
    tools/lhde-pack --from-pack ~/packs/lhde-resources-2026-10-28 --out ~/packs   # re-profile a museum pack: no ISO is read (seconds)
+   tools/lhde-pack --from-tree --out ~/packs                                  # the Windows tree you run on, local/ included
+   tools/lhde-pack --from-tree --profile museum --out ~/packs                 # all of it
    tools/lhde-pack --isos DIR --sources 4074,5048,xp --profile museum         # a subset; --all adds 4074r2
    tools/lhde-pack --medium 4074=~/fun/longhorn/wim/4074/3/WINDOWS --sources 4074   # an extracted tree instead of the ISO
    tools/lhde-pack --list                                                     # the sources and whether their ISO was found
@@ -89,6 +91,14 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    first (in `--tmp`, about 400 MB, deleted after) and profiles it, so both ways give the same pack. `lhde-theme explain --files`
    must be built (`make build/bin/lhde-theme`); it is also what you run to see what one theme reads:
    `lhde-theme explain --files luna` (one real path per line, relative to the Windows tree).
+   **`local/`** (the files dropped in by hand: the Aero reconstruction `aero-patch.msstyles` that `aero4074` and `aerovision`
+   use, other styles from `lhde-import --style`, hand-copied schemes, resources, fonts, wallpapers, icon packs) is a source of
+   its own in both profiles: the pack's `local/` mirrors the Windows tree's `local/` (default the tree's own, `$LHDE_WINDOWS`;
+   `--local DIR` another, `--no-local` none; with `--from-pack` the tree's only when the pack has no `local/`), its MANIFEST lines
+   have the source `local` and the in-image path `local:<path>`. museum takes all of it; essentials what a theme's
+   `explain --files` names (a style of `local/` is named as `local/themes/NAME.msstyles`). `--from-tree [DIR]` takes the files
+   from a Windows tree instead of the media: its `<source>/` directories are packed as they are (the MANIFEST's in-image path is
+   `tree:<path>`, the tree does not record the image's), so a pack made from the tree a desktop runs on reproduces its themes.
    Output: `lhde-resources-<date>[-essentials]/` with `<source>/{system32,themes,fonts,wallpapers}/`, `<source>/source.ini`, `MANIFEST`
    (sha256, size, pack path, source, medium:in-image path; its `# profile:` and `# themes:` header lines say which profile and
    themes made it) and the tarball `.tar.zst` (`.tar.xz` without zstd); with `--zip` also `NAME.zip` (no hard links, no
@@ -126,13 +136,16 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    raw (377 MB stored once), 57 MB compressed; **essentials** for the 14 shipped themes 169 MB raw (164 MB stored once), 36 MB
    compressed, in 5 builds (4051 4074 5048 5112 xp) and the 2k icon DLLs. About 20 s from the ISOs, 10 s `--from-pack` (the
    tarball's xz is most of it).
-   Themes that need a file no medium has (`aero4074`, `aerovision`: `aero-patch.msstyles`) report it missing in
-   `lhde-theme explain` with either profile: those styles go in with `lhde-import --style` (below).
+   Themes that need a file no medium has (`aero4074`, `aerovision`: `aero-patch.msstyles`) are complete in a pack made where
+   that file is in the Windows tree's `local/` (above); otherwise they report it missing in `lhde-theme explain`, and the style
+   goes in with `lhde-import --style` (below).
 2. **`lhde-import`** (every user): the pack into the Windows tree (`$LHDE_WINDOWS`, else `~/.local/share/lhde-windows`;
    docs/LAYOUT.md "The three trees"):
    ```
    lhde-import --pack lhde-resources-2026-10-28.tar.xz        # or the directory
-   lhde-import --style ~/aero.msstyles aero-patch              # a style dropped in by hand (the 4074 Aero patch: aero4074, aerovision)
+   lhde-import --style ~/aero.msstyles aero-patch              # a style dropped in by hand (the 4074 Aero patch: aero4074, aerovision);
+                                                               # NAME is the style's name for the themes; without it the file's stem
+                                                               # is used and printed, and a stem that is a source's style is refused
    lhde-import --regenerate                                    # delete generated/ and make it again from the imported files
    lhde-import --reindex                                       # make index/ again (after moving files by hand)
    lhde-import --migrate -n                                    # what the move from the old ~/.local/share/lhde would do; without -n: do it
@@ -141,7 +154,8 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    ```
    Each `<source>/` of the pack is copied as it is to `~/.local/share/lhde-windows/<source>/` (`system32/` with shell32,
    imageres, explorer, browseui, comctl32, themeui, shellstyle, uDWM; `themes/` = the build's Resources/Themes; `fonts/`,
-   `wallpapers/`, `source.ini`); a style dropped in by hand goes to `local/themes/`. `index/` holds the names the programs ask
+   `wallpapers/`, `source.ini`); a style dropped in by hand goes to `local/themes/`, and the pack's `local/` to the tree's
+   `local/` (indexed as if dropped in by hand, and the recipes of its styles run: aero-patch's frame sets). `index/` holds the names the programs ask
    for, as relative symlinks: `styles/<name>.msstyles` (build-qualified: jade4074, slate4051, aero5112, luna = XP's own, whose
    `styles/luna/` is XP's `themes/Luna/` with `Shell/<Scheme>/shellstyle.dll`; luna4051 / luna4074 = Longhorn's copies),
    `resources/<source>`, `fonts/<source>`, `wallpapers/<source>`, `frames` and `packs` (-> `generated/`). Then the recipes of

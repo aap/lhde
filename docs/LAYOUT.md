@@ -44,7 +44,8 @@ WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_D
     source.ini                           the rules it was taken with
   local/                               files that come from no source: themes/ (lhde-import --style: aero-patch, zune, ...),
                                        schemes/ (lhde-schemes), icons/PACK/ (lhde-import --icons: a free icon pack as .ico),
-                                       wallpapers/ resources/ fonts/ (copied by hand, the workspace)
+                                       wallpapers/ resources/ fonts/ (copied by hand, the workspace); a resource pack carries
+                                       it as its local/ (below)
   generated/                           everything derived; deleting it is always safe (lhde-import --regenerate)
     frames/SET/                          PNGs + manifest.ini (recipe, inputs with sha256); theme.ini of a set we do not ship
     packs/<build>/                       imageres/ID.png, shell32/SIZE/ID.png, manifest-*.ini
@@ -56,6 +57,14 @@ WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_D
     icons/PACK                             -> ../../local/icons/PACK
     frames -> ../generated/frames,  packs -> ../generated/packs
   import.log
+
+A RESOURCE PACK                      lhde-pack; lhde-import --pack makes the Windows tree from it (docs/USAGE.md)
+lhde-resources-<date>[-essentials]/
+  <source>/                            the raw files as the Windows tree's <source>/ holds them, source.ini
+  local/                               the Windows tree's local/ (themes/ schemes/ resources/ fonts/ wallpapers/ icons/): all
+                                       of it in a museum pack, what the themes name in an essentials pack
+  MANIFEST                             sha256, size, pack path, source (`local` for local/), in-image path (local:<path>,
+                                       tree:<path> for a pack made --from-tree); # profile: and # themes: header lines
 
 USER FILES                           yours; lhde writes only what you change in its settings UIs
 ~/.config/lhde/                      ${XDG_CONFIG_HOME:-~/.config}/lhde: what you chose (docs/SETTINGS.md "Files")
