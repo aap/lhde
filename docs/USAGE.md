@@ -112,6 +112,16 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    form, which lhde-schemes does not read: the built-in Windows Standard stands in), its cursors (user32 resources; lhde
    uses X cursors), and Blackshade, which ReactOS's source tree has only as the unbuilt sources of a style
    (`media/themes/Blackshade`, a placeholder its build skips): there is no blackshade.msstyles to import.
+   **What the free baseline shows**, and what needs XP's files: Windows Classic and the four ReactOS styles with ReactOS's
+   icons, fonts and Marlett; the classic start button with flxp-taskbar's own flag (XP's or 2000's explorer.exe give theirs);
+   the Explorer's XP task pane (the web view's Places / Details sections) in the classic look, as XP itself shows it under a
+   style that has no shellstyle.dll: ReactOS implements no web view (its DefView has no task pane, browseui says "We don't
+   support WebView") and ships no shellstyle.dll, and its styles' ExplorerBar images are placeholders (flat fills), so flxp
+   draws the classic sections in the style's system colours, with the chevrons drawn after XP's. The Luna task pane (the
+   blue, olive or silver gradient, the white-to-colour section headers, the round chevrons) needs XP's Luna and its
+   `Shell/<colour>/shellstyle.dll`; with Luna imported but no shellstyle.dll (a Longhorn build's copy) flxp draws that look
+   itself from the colour scheme. ReactOS's Modern style loads here although XP rejects it ("Light_Button_BMP missing": its
+   bitmaps carry BITMAPV5 headers, which XP's uxtheme does not read and wuxtheme does).
    Sizes with the ISOs here (2026-10-28; the tarball is `tar` + `xz -9e`, as no zstd is installed here): **museum** 418 MB
    raw (377 MB stored once), 57 MB compressed; **essentials** for the 14 shipped themes 169 MB raw (164 MB stored once), 36 MB
    compressed, in 5 builds (4051 4074 5048 5112 xp) and the 2k icon DLLs. About 20 s from the ISOs, 10 s `--from-pack` (the

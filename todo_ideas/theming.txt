@@ -12,10 +12,6 @@ imported is the free baseline. Left:
 * With nothing imported at all (not even ReactOS): Marlett's glyphs come out as letters unless the system has Wine's Marlett;
   ship or fetch it, or draw the glyphs (luxwm had bitmaps that were bit-exact at 16x14); a fontconfig alias set for Tahoma /
   Microsoft Sans Serif without an import.
-* ReactOS's Lunar, Mizu and Lautus have placeholder ExplorerBar art: NormalGroupCollapse/Expand.bmp are a flat green
-  (31,255,41) fill with TRANSPARENT and the default magenta key, Mizu's NormalGroupHead a flat purple; flxp's places pane draws
-  them as green blocks in the group headers (ReactOS's own explorer never draws those parts). Decide: the plain pane for a style
-  whose collapse image is a flat fill, or a per-style override.
 * The ReactOS styles' start panel user pane is a blank white band (no StartPanel UserPane art?); check against ReactOS.
 * Cursors: an X cursor theme in XP's shapes (free ones exist); ReactOS's are user32.dll resources.
 * Sounds, wallpaper: a generated classic wallpaper (the teal), none for sounds.
