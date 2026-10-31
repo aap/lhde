@@ -794,11 +794,26 @@ static void update_cursor(struct surface *s, struct node *n) {
     if (c > 0 && c < 5 && !shapes[c]) shapes[c] = XCreateFontCursor(dpy, glyph[c]);
     if (c != s->cursor) { s->cursor = c; XDefineCursor(dpy, s->win, c > 0 && c < 5 ? shapes[c] : None); }
 }
+/* node.on_within(self, inside): the pointer entered / left the node's subtree (the hot node is the node or one of its
+   descendants), called on every node whose state changes (4042-plex's tile side strip fades in while the pointer is within the
+   tile: Tile.PointerFocusWithinWorkaround). The ancestor chains are referenced first: the handlers may rebuild the tree. */
+static void within_notify(struct node *old, struct node *n) {
+    struct node *a[64], *b[64]; int na = 0, nb = 0;
+    for (struct node *x = old; x && na < 64; x = x->parent) { node_ref(x); a[na++] = x; }
+    for (struct node *x = n; x && nb < 64; x = x->parent) { node_ref(x); b[nb++] = x; }
+    for (int i = 0; i < na; i++) { int both = 0; for (int j = 0; j < nb; j++) if (a[i] == b[j]) both = 1;
+        if (!both) { lua_pushboolean(L, 0); call_handler(a[i], "on_within", 1); } }
+    for (int j = 0; j < nb; j++) { int both = 0; for (int i = 0; i < na; i++) if (a[i] == b[j]) both = 1;
+        if (!both) { lua_pushboolean(L, 1); call_handler(b[j], "on_within", 1); } }
+    for (int i = 0; i < na; i++) node_unref(a[i]);
+    for (int j = 0; j < nb; j++) node_unref(b[j]);
+}
 static void set_hot(struct surface *s, struct node *n) {
     if (s->pressed == NULL) update_cursor(s, n);
     if (s->hot == n) return;
     if (n) { node_ref(n); node_ref(n); }   /* s->hot's reference, and ours across the handlers (they may rebuild the tree n is in) */
     struct node *old = s->hot; s->hot = n;   /* old's reference is ours now */
+    within_notify(old, n);
     if (old) { if (old->kind == N_BUTTON) { old->state = old->checked ? B_CHECKED : B_NORMAL; } lua_pushboolean(L, 0); call_handler(old, "on_hover", 1); damage_owner(old); node_unref(old); }
     if (n) { if (n->kind == N_BUTTON) n->state = n->checked ? B_HOTCHECKED : B_HOT; lua_pushboolean(L, 1); call_handler(n, "on_hover", 1); damage_owner(n); node_unref(n); }
 }
