@@ -26,9 +26,18 @@
 // for bookmarks, Rename (in place) and Remove. Drops: on the Bookmarks group
 // (header, entries, gaps) folders become bookmarks at the insertion mark and
 // files are refused; on another group's entry the files go there.
+//
+// The XP look's last section, Details (the explorer: Options::details), is
+// XP's Details rollout (shell32 duiinfo.cpp): the mini preview of one picture
+// (fitted into 150 x 100, left), the name in bold, the type and the
+// "Label: value" lines of shell/details.h, each wrapped, 5 px apart (the type
+// right under the name), black (classic: the window text); several items:
+// "N items selected." and the total size. XP folds it unless the folder is My
+// Computer; once folded or opened here it stays so (places_details = 0|1).
 #pragma once
 #include <string>
 #include <vector>
+#include "shell/details.h"
 #include "w32/w32.h"
 
 namespace places {
@@ -45,7 +54,7 @@ struct Callbacks {
 struct Place { std::string label, path, icon; };
 
 struct GroupSpec {
-    enum Kind { Places, Bookmarks, Custom } kind = Custom;
+    enum Kind { Places, Bookmarks, Custom, Details } kind = Custom;
     std::string title;
     std::vector<Place> places;                  // Custom
     bool collapsed = false;
@@ -56,6 +65,7 @@ struct Options {
     bool new_window = true;                     // "Open in New Window" in the menu (spawns this program)
     std::vector<GroupSpec> spec;                // the groups look's groups; empty: standard_spec()
     std::string remember;                       // a setting keeping the folded groups' titles ("" = none)
+    bool details = false;                       // the XP look's Details section (the explorer)
 };
 
 HWND create(HWND parent, int id, const Callbacks& cb, const Options& o);
@@ -73,5 +83,9 @@ void set_longhorn(bool longhorn);       // a frame switch between the XP and the
 HWND window();
 void bookmarks_changed();      // re-read now (the pane also notices on its own)
 void clear_filter();           // the folder changed: empty the Filter box
+// The Details section's content: what the model says, whether the mini
+// preview may show (thumbnails allowed there, not the Thumbnails view) and
+// XP's default fold for the folder (open on My Computer)
+void set_details(const shell::details::Info& in, bool preview, bool open_by_default);
 
 }

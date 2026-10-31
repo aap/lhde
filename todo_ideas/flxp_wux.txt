@@ -28,7 +28,6 @@ not *entirely* sure about the font for all themes though
 
 ### details and task pane
 
-* want details rollout for the XP web-pane
 * also for longhorn flxp, but more complicated:
 	* no selection should show the number of elements in the current location
 	* 4051: left to right: (thumbnailed) icon, details, tasks
