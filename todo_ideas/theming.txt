@@ -6,6 +6,14 @@ Then a graphical theme installer: something that provides the base shell files/r
 A test for wux; inspiration: 3683's (broken) Avalon settings dialog, and what Vista made of it.
 
 ## 1. The desktop with nothing imported (the baseline)
+aap: Wine's icons have no resource ids, ReactOS's do: an all-ReactOS-compatible mode. ReactOS's shell32/browseui/comctl32/
+explorer keep Windows' resource ids (applications load icons by index), and it ships Marlett, fonts, cursors, wallpapers and its
+own visual styles (Lautus, Mizu). So: a `reactos` source for lhde-pack / lhde-import (data/sources/reactos.ini: from a ReactOS
+ISO or live CD, the system32 files, fonts, cursors, themes, wallpapers), and one more link in the resolver's fallback chains
+(resources and icons: xp -> 2k -> reactos -> wine/drawn; fonts: the build's -> reactos -> fontconfig; Marlett from reactos).
+A desktop with only the ReactOS source imported is the free baseline and the enforced test configuration. To verify on the
+way: whether ReactOS's browseui/shell32 bitmaps keep XP's ids for the toolbar strips (214-217, 276-279) and the task pane art;
+the licences of its visual styles.
 What lhde-theme explain classic says today with an empty Windows tree: style classic (no msstyles needed), the built-in Windows
 Standard colours, classic frames, classic taskbar and the 2000-style start menu, icons -> Wine's set, fonts -> fontconfig,
 resources -> drawn art, wallpaper -> colour. Still to make free:
