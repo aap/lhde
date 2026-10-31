@@ -60,7 +60,8 @@ struct Explorer : browser::Browser {
     HMENU menu = nullptr;
     HWND bandsite = nullptr;
     HWND frame = nullptr, rebar = nullptr, toolbar = nullptr, address = nullptr, tree = nullptr, status = nullptr;
-    HFONT font = nullptr;
+    HFONT font = nullptr;                            // DEFAULT_GUI_FONT: the address bar
+    HFONT item_font = nullptr, status_font = nullptr;   // the style's ICONTITLEFONT (tree, list) and STATUSFONT (fonts_changed)
     bool longhorn = false;                           // frame=longhorn: the 4074 header on lhwm's glass
     bool show_folders = false;        // folders= / View > Explorer Bar > Folders (remembered); off = the places pane
     bool show_status = true;
@@ -1135,6 +1136,24 @@ static bool status_setting()
 }
 static void layout();
 static void taskpane_resized() { sync_taskpane(); layout(); }
+// The fonts the visual style names ([SysMetrics], or the classic scheme's Metrics): XP's Folders tree and defview's list take
+// comctl32's default, the icon title font (ICONTITLEFONT: Segoe UI 9 under Jade and Aero, Tahoma 8 under Luna and Slate), the
+// status bar the status font; the menu band its menu font (menuband.cpp). Again on WM_THEMECHANGED.
+static void fonts_changed()
+{
+    LOGFONTW lf = {};
+    SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof lf, &lf, 0);
+    HFONT item = CreateFontIndirectW(&lf);
+    NONCLIENTMETRICSW ncm = {}; ncm.cbSize = sizeof ncm;
+    SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
+    HFONT status = CreateFontIndirectW(&ncm.lfStatusFont);
+    if (g.tree) SendMessageW(g.tree, WM_SETFONT, (WPARAM)item, TRUE);
+    if (g.list) SendMessageW(g.list, WM_SETFONT, (WPARAM)item, TRUE);
+    if (g.status) SendMessageW(g.status, WM_SETFONT, (WPARAM)status, TRUE);
+    if (g.item_font) DeleteObject(g.item_font);
+    if (g.status_font) DeleteObject(g.status_font);
+    g.item_font = item; g.status_font = status;
+}
 static void create_children(HWND frame)
 {
     g.frame = frame;
@@ -1266,7 +1285,6 @@ static void create_children(HWND frame)
     g.tree = CreateWindowExW(0, WC_TREEVIEWW, nullptr,
         WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_TABSTOP | TVS_HASLINES | TVS_HASBUTTONS | TVS_LINESATROOT | TVS_SHOWSELALWAYS | TVS_EDITLABELS,
         0, 0, 0, 0, g.bandsite, (HMENU)IDC_TREE, nullptr, nullptr);
-    SendMessageW(g.tree, WM_SETFONT, (WPARAM)g.font, TRUE);
     SendMessageW(g.tree, TVM_SETIMAGELIST, TVSIL_NORMAL, (LPARAM)g.small);
     auto root = shell::desktop();
     g.tree_root = tree_insert(TVI_ROOT, root->name(), root->path(), root->icon(), true);
@@ -1276,7 +1294,6 @@ static void create_children(HWND frame)
     g.list = CreateWindowExW(0, WC_LISTVIEWW, nullptr,
         WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_EDITLABELS,
         0, 0, 0, 0, frame, (HMENU)IDC_LIST, nullptr, nullptr);
-    SendMessageW(g.list, WM_SETFONT, (WPARAM)g.font, TRUE);
     // Explorer::ListView where the msstyles has it (Longhorn/Vista: themed item
     // selection, LVP_LISTITEM); XP's styles have no such class, nothing changes there
     SetWindowTheme(g.list, L"Explorer", nullptr);
@@ -1299,7 +1316,7 @@ static void create_children(HWND frame)
     // status bar
     g.status = CreateWindowExW(0, STATUSCLASSNAMEW, nullptr, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | SBARS_SIZEGRIP,
         0, 0, 0, 0, frame, (HMENU)IDC_STATUS, nullptr, nullptr);
-    SendMessageW(g.status, WM_SETFONT, (WPARAM)g.font, TRUE);
+    fonts_changed();
     g.show_taskpane = taskpane::wanted();
     sync_taskpane();
 }
@@ -2109,6 +2126,8 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         if (g.header) header::pixmap_changed();
         return 0;
     case WM_THEMECHANGED:                   // the session theme: the header's images, the command bar
+        fonts_changed();                    // the style's fonts (tree, list, status bar, menu band)
+        menuband::fonts_changed();
         lhbar::theme_changed();             // before a 4051 command bar is made for this theme
         taskpane::theme_changed();          // (Explorer.taskpane: the band at the top or the bottom)
         if (g.taskband) { places::set_top_inset(taskpane::bottom() ? 0 : 14); layout(); }

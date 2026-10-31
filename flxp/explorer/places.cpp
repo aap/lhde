@@ -475,14 +475,10 @@ static void load_look(HWND h)
 static void make_fonts()
 {
     if (g_font) { DeleteObject(g_font); DeleteObject(g_bold); DeleteObject(g_under); DeleteObject(g_bold_under); }
-    // style.uix: Tahoma 8pt (classic: the icon title font)
+    // the icon title font, as the tree it stands for: Tahoma 8 under Slate and Luna (style.uix's Tahoma 8pt), Segoe UI 9 under
+    // Jade (4074-dwm.png: "Storage Favorites" in Segoe UI), the scheme's under classic
     LOGFONTW lf = {};
-    if (g_look.kind == Classic) SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof lf, &lf, 0);
-    else {
-        GetObjectW(GetStockObject(DEFAULT_GUI_FONT), sizeof lf, &lf);
-        lf.lfHeight = -11;   // 8pt at 96 dpi
-        memcpy(lf.lfFaceName, L"Tahoma", 7 * sizeof(WCHAR));
-    }
+    SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof lf, &lf, 0);
     g_font = CreateFontIndirectW(&lf);
     LOGFONTW b = lf; b.lfWeight = FW_BOLD;
     g_bold = CreateFontIndirectW(&b);

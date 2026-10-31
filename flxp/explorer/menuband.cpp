@@ -98,6 +98,19 @@ static void track(int index)
     SendMessageW(g_tb, TB_SETHOTITEM, (WPARAM)-1, 0);
 }
 
+// XP's menu band draws in the menu font (browseui menuband.cpp: _hFontMenu from NONCLIENTMETRICS lfMenuFont): the style's
+// MENUFONT, Segoe UI 9 under Jade and Aero
+static HFONT g_font;
+static void set_font()
+{
+    NONCLIENTMETRICSW ncm = {}; ncm.cbSize = sizeof ncm;
+    SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
+    HFONT f = CreateFontIndirectW(&ncm.lfMenuFont);
+    SendMessageW(g_tb, WM_SETFONT, (WPARAM)f, TRUE);
+    if (g_font) DeleteObject(g_font);
+    g_font = f;
+}
+
 static void rebuild()
 {
     while (SendMessageW(g_tb, TB_BUTTONCOUNT, 0, 0) > 0) SendMessageW(g_tb, TB_DELETEBUTTON, 0, 0);
@@ -152,7 +165,7 @@ HWND create(HWND rebar, HWND owner, HMENU menu, int band_id)
     // open menu title shows the classic sunken flat-button edge even under Luna
     SetWindowTheme(g_tb, L"", L"");
     SendMessageW(g_tb, TB_SETBITMAPSIZE, 0, MAKELONG(0, 0));   // XP: TB_SETIMAGELIST(NULL) -> SetBitmapSize(0,0) -> 1x1 slot, button height 16->1: max(1,13)+6 = 19
-    SendMessageW(g_tb, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), TRUE);
+    set_font();
     g_tb_proc = (WNDPROC)SetWindowLongPtrW(g_tb, GWLP_WNDPROC, (LONG_PTR)tb_proc);
     rebuild();
     SIZE sz = {0, 0};
@@ -175,6 +188,25 @@ HWND create(HWND rebar, HWND owner, HMENU menu, int band_id)
 }
 
 void set_menu(HMENU menu) { g_menu = menu; rebuild(); }
+
+void fonts_changed()
+{
+    if (!g_tb) return;
+    set_font();
+    rebuild();
+    // the band follows the buttons' new height (itbar.cpp GetBandInfo: the first button's)
+    RECT item = {0, 0, 0, 0};
+    SendMessageW(g_tb, TB_GETITEMRECT, 0, (LPARAM)&item);
+    SIZE sz = {0, 0};
+    SendMessageW(g_tb, TB_GETMAXSIZE, 0, (LPARAM)&sz);
+    int i = (int)SendMessageW(g_rebar, RB_IDTOINDEX, (WPARAM)GetDlgCtrlID(g_tb), 0);
+    if (i < 0) return;
+    REBARBANDINFOW rb = {};
+    rb.cbSize = sizeof rb;
+    rb.fMask = RBBIM_CHILDSIZE;
+    rb.cxMinChild = (UINT)sz.cx; rb.cyMinChild = (UINT)(item.bottom - item.top); rb.cyChild = rb.cyMinChild;
+    SendMessageW(g_rebar, RB_SETBANDINFOW, (WPARAM)i, (LPARAM)&rb);
+}
 
 bool active() { return g_active; }
 
