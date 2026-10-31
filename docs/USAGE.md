@@ -336,7 +336,7 @@ Inside the session (default keys, override in `~/.config/lhde/keys`, one binding
 | Super+1..4 | workspaces (virtual desktops: the taskbars show the current one's windows; `_LHSHELL_COMMAND desktop N\|next\|prev` or any pager's `_NET_CURRENT_DESKTOP` request switches too; pressed while moving a window, the window goes along; the window menu's Move to Desktop moves one too) |
 | drag caption | move; drag edges and corners | resize |
 | double-click caption | maximise/restore |
-| Super+drag / Alt+drag | move / resize anywhere on the window (berry's defaults) |
+| Super+drag | move the window from anywhere on it (berry's default; berry's Alt+drag resize is off, Alt+clicks go to the program: Alt+Space, S sizes with the mouse) |
 
 Extended glass frames (`docs/CLIENT-PROTOCOL.md`): `make && DISPLAY=:1 build/examples/extendframe` builds and opens the
 reference client (Explorer-style 60 px glass header; drag it, double-click to maximise, drag the right edge, Escape or q quits;

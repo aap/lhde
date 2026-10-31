@@ -137,6 +137,9 @@ What `luxshell` (the taskbar/sidebar) relies on, all in `wm.c`:
   in between, luxwm sends the client message `_LHSHELL_START` to the root (SubstructureNotify|SubstructureRedirect, data[0] =
   the key time), which luxshell answers by toggling its start menu. While Super is held the keyboard is luxwm's, so the Mod4
   bindings still arrive here; unbound Super+key combinations are swallowed. `Super_L none` in the keys file disables it.
+- Mouse bindings: Super+drag (button 1) moves a window from anywhere on it (berry's `move_mask` / `move_button`). berry's
+  Alt+drag resize is off: it took Alt+clicks and Alt+drags from every client, and the window menu's Size (Alt+Space, S) sizes
+  with the mouse. `luxwmc resize_button N` turns a modifier resize drag on again (with `resize_mask`, default Alt).
 - Default keys (2026-10-25): `Mod4+d` = show desktop, `Mod4+e` = `flxp` (falls back to `rox` when flxp is not on PATH), `Mod4+r` =
   `shell run`, `Mod4+s` = `shell sidebar-stacking toggle` (lux's sidebar under the windows ⇄ on top, instantly). A user keys file
   keeps its own bindings; `Mod4+d`, `Mod4+r` and `Mod4+s` are added to it only where that key is unbound there. Actions:
@@ -1176,7 +1179,7 @@ What made it slow, and the fixes:
   before it blocks).
 - **Unthrottled steps.** `drag_run` coalesced motion already, but applied every batch at once. Steps are now applied at most every
   `DRAG_INTERVAL` ms (config.h, 16); a position held back is applied when the interval is over (poll with a timeout on the X
-  connection) or when the drag ends, so the final geometry is exact. Super/Alt drags (berry's loop in `handle_button_press`) now
+  connection) or when the drag ends, so the final geometry is exact. Modifier drags (berry's loop in `handle_button_press`)
   coalesce motion too.
 - **Painting what nobody sees.** The plate under an opaque client (depth != 32, no `_LHWM_EXTEND_FRAME`) is covered by the client.
   `frame_paint_ex2` takes that hole (client rectangle, kept clear of the 24 top/bottom rows the shape scan reads), clips cairo to the
@@ -1312,7 +1315,7 @@ left a strip below the last row / right of the last column that they never repai
 - **Fixed size** (`client_fixed`): minimum and maximum equal (a win32 window without `WS_THICKFRAME`: wux writes min == max == its
   size, following every resize it makes itself, and `_MOTIF_WM_HINTS` without resize and maximize; flxp's dialogs, property sheets
   and message boxes). In every frame mode its edges and corners are a plain border (`client_hit`: `HTBORDER`, no size cursor; a drag
-  there neither sizes nor moves), Alt+drag resize, `_NET_WM_MOVERESIZE` 0..7 and the window menu's Size do nothing, maximise is off
+  there neither sizes nor moves), a modifier resize drag, `_NET_WM_MOVERESIZE` 0..7 and the window menu's Size do nothing, maximise is off
   (button, double click, Super+Up, the menu's Maximize greyed) and its maximise button is drawn disabled (msstyles: the strip's
   disabled image; classic: `DFCS_INACTIVE`; DWM sprites have none, so the inactive one at 45 %; `FRAME_MAX_DISABLED`, lhwm's own bit
   above the client's `_LHWM_FRAME_FLAGS`).

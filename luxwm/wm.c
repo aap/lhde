@@ -1152,7 +1152,7 @@ handle_button_press(XEvent *e)
     }
     // If it's not window movement or resize then process focus on click
     state = mod_clean(bev->state);
-    if (conf.focus_on_click && bev->button == (unsigned)conf.focus_button && state != (unsigned)conf.move_mask && state != (unsigned)conf.resize_mask && bev->window != c->dec)
+    if (conf.focus_on_click && bev->button == (unsigned)conf.focus_button && state != (unsigned)conf.move_mask && !(conf.resize_button && state == (unsigned)conf.resize_mask) && bev->window != c->dec)
     {
         LOGN("Handling focus on click");
         // Ungrab buttons, propagate event to the window, and regrab
@@ -1226,7 +1226,7 @@ handle_button_press(XEvent *e)
                     nx = ocx + (ev.xmotion.x - x);
                     ny = ocy + (ev.xmotion.y - y);
                     drag_move_step(c, nx, ny);
-                } else if (state == (unsigned)conf.resize_mask && bev->button == (unsigned)conf.resize_button && !client_fixed(c)) {
+                } else if (conf.resize_button && state == (unsigned)conf.resize_mask && bev->button == (unsigned)conf.resize_button && !client_fixed(c)) {
                     nw = ev.xmotion.x - x;
                     nh = ev.xmotion.y - y;
                     if (conf.edge_lock)
@@ -2282,7 +2282,8 @@ static void
 window_grab_buttons(Window window)
 {
     XGrabButton(display, conf.move_button, conf.move_mask, window, True, ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
-    XGrabButton(display, conf.resize_button, conf.resize_mask, window, True, ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
+    if (conf.resize_button)   /* the modifier resize drag is off by default (config.h RESIZE_BUTTON) */
+        XGrabButton(display, conf.resize_button, conf.resize_mask, window, True, ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
     if (conf.focus_on_click)
         XGrabButton(display, conf.focus_button, AnyModifier, window, True, ButtonPressMask, GrabModeSync, GrabModeSync, None, None);
 }
@@ -2291,7 +2292,8 @@ static void
 window_ungrab_buttons(Window window)
 {
     XUngrabButton(display, conf.move_button, conf.move_mask, window);
-    XUngrabButton(display, conf.resize_button, conf.resize_mask, window);
+    if (conf.resize_button)
+        XUngrabButton(display, conf.resize_button, conf.resize_mask, window);
     if (conf.focus_on_click)
         XUngrabButton(display, conf.focus_button, AnyModifier, window);
 }

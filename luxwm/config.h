@@ -64,7 +64,9 @@
 #define FOCUS_BUTTON 1
 #define MOVE_BUTTON 1
 #define MOVE_MASK Mod4Mask
-#define RESIZE_BUTTON 1
+/* lhwm: no modifier drag resizes by default (berry's Alt+drag took Alt+clicks from every client; Alt+Space S sizes with the mouse);
+   `luxwmc resize_button N` turns it on with RESIZE_MASK */
+#define RESIZE_BUTTON 0
 #define RESIZE_MASK Mod1Mask
 #define POINTER_INTERVAL 0
 #define FOLLOW_POINTER false
