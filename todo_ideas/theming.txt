@@ -1,0 +1,59 @@
+# Theming and resources
+
+aap (2026-10-31): a fully working desktop without any Microsoft resources, with free Wine/ReactOS fallbacks for everything
+(except maybe the Longhorn-specific parts; we'll see): that probably means classic mode, but there may be free msstyles around.
+Then a graphical theme installer: something that provides the base shell files/resources of the OS and a way to add new themes.
+A test for wux; inspiration: 3683's (broken) Avalon settings dialog, and what Vista made of it.
+
+## 1. The desktop with nothing imported (the baseline)
+aap: Wine's icons have no resource ids, ReactOS's do: an all-ReactOS-compatible mode. ReactOS's shell32/browseui/comctl32/
+explorer keep Windows' resource ids (applications load icons by index), and it ships Marlett, fonts, cursors, wallpapers and its
+own visual styles (Lautus, Mizu). So: a `reactos` source for lhde-pack / lhde-import (data/sources/reactos.ini: from a ReactOS
+ISO or live CD, the system32 files, fonts, cursors, themes, wallpapers), and one more link in the resolver's fallback chains
+(resources and icons: xp -> 2k -> reactos -> wine/drawn; fonts: the build's -> reactos -> fontconfig; Marlett from reactos).
+A desktop with only the ReactOS source imported is the free baseline and the enforced test configuration. To verify on the
+way: whether ReactOS's browseui/shell32 bitmaps keep XP's ids for the toolbar strips (214-217, 276-279) and the task pane art;
+the licences of its visual styles.
+Verified 2026-10-31 against the 0.4.16 source (~/lib/reactos-0.4.16, a shallow clone of the release tag) and the ISO
+(~/lib/windows_isos/ReactOS-0.4.16-i386.iso): shell32's icon ids are XP's (document 1, folder 4, drive 9, My Computer 16,
+desktop 35); browseui keeps the Explorer toolbar strips at 214-217 (shell32 has its own IE/edit strips at 204-207 and 225-228,
+so a per-source id table where XP and ReactOS differ); five visual styles are in the tree and the ISO (Lunar, Modern, Mizu,
+Lautus, Blackshade; ReactOS's, GPL); reactos/Fonts has Marlett.ttf, tahoma.ttf, micross.ttf and more; the DLLs are inside
+i386/reactos.cab (cab extraction as for XP's).
+What lhde-theme explain classic says today with an empty Windows tree: style classic (no msstyles needed), the built-in Windows
+Standard colours, classic frames, classic taskbar and the 2000-style start menu, icons -> Wine's set, fonts -> fontconfig,
+resources -> drawn art, wallpaper -> colour. Still to make free:
+* Marlett (the caption button glyphs, check boxes, scroll arrows): ReactOS ships a free Marlett; without any marlett.ttf the
+  glyphs come out as letters. Ship or fetch it, or draw the glyphs (luxwm had bitmaps that were bit-exact at 16x14).
+* Fonts: Tahoma / Microsoft Sans Serif / Trebuchet / Verdana -> Wine's Tahoma (metric-compatible), DejaVu Sans; a fontconfig
+  alias set lhde installs so the classic look has the right metrics without the import.
+* Icons: the Wine set covers the shell; check every pe: reference falls back (start flag, log off buttons, user tile, the
+  toolbar strips, the Folders bar close glyph, the task pane art) and what the fallback looks like.
+* Cursors: an X cursor theme in XP's shapes (free ones exist).
+* Sounds, wallpaper: a generated classic wallpaper (the teal), none for sounds.
+* A `make check` run and a lab screenshot with LHDE_WINDOWS pointing at an empty directory, kept green: the free baseline is a
+  test configuration, not a hope.
+
+aap: Makefile targets that install a clean Windows tree of (a) just the free stuff, (b) the small Windows pack, (c) free + all
+of Windows; (b) and (c) refer to files we do not supply, under generic names (lhde_winthemes.zip, lhde_wintheme_full.zip or
+the like); the same import, a different archive.
+
+## 2. Free visual styles
+* ReactOS's own msstyles (Lautus, Mizu, ...) are free: candidates to ship or to fetch, as the first non-classic look without
+  Microsoft files; check their licences and whether wuxtheme draws them (v3).
+* Community XP styles: licences vary; the installer can import any .msstyles the user has (lhde-import --style exists).
+
+## 3. The theme installer (a wux program)
+* Provides the base resources: pick an ISO / WIM / resource pack / Windows directory, see what builds it holds, import with
+  progress (lhde-import does the work; the dialog is the face), then what themes became complete (lhde-theme explain per
+  theme, "missing -> fallback" shown as what the user would notice).
+* Adds themes: a .msstyles dropped in (+ shellstyle), a theme file, a frame set recipe; shows the subset we curate (the
+  Appearance list question: the "Windows and buttons" combo lists every imported style; aap wants the curated themes visible).
+* Look: 3683's Avalon settings dialog and Vista's Personalization as inspiration; XP's Display Properties stays the classic
+  path. Where it lives: Display Properties' Themes tab ("Install theme...") and a standalone `lhde-setup`.
+* Also the place for the migration messages and lhde-theme dirs' view of the three trees.
+
+## 4. Open smaller points
+* frame sets that exist only as copied pixels without a recipe (aerovision: "copied in"); every set should be regenerable.
+* Aero vision's resources resolve into the research workspace ([elsewhere] in explain); the import should own them.
+* Slate vision and Metal vision are still .todo theme files.
