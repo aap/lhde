@@ -133,6 +133,7 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    ```
    lhde-import --pack lhde-resources-2026-10-28.tar.xz        # or the directory
    lhde-import --style ~/aero.msstyles aero-patch              # a style dropped in by hand (the 4074 Aero patch: aero4074, aerovision)
+   lhde-import --style ~/styles/Royale/Royale.msstyles royale  # an XP style with its Shell/ directory beside the file: both go in
    lhde-import --regenerate                                    # delete generated/ and make it again from the imported files
    lhde-import --reindex                                       # make index/ again (after moving files by hand)
    lhde-import --migrate -n                                    # what the move from the old ~/.local/share/lhde would do; without -n: do it
@@ -141,7 +142,10 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    ```
    Each `<source>/` of the pack is copied as it is to `~/.local/share/lhde-windows/<source>/` (`system32/` with shell32,
    imageres, explorer, browseui, comctl32, themeui, shellstyle, uDWM; `themes/` = the build's Resources/Themes; `fonts/`,
-   `wallpapers/`, `source.ini`); a style dropped in by hand goes to `local/themes/`. `index/` holds the names the programs ask
+   `wallpapers/`, `source.ini`); a style dropped in by hand goes to `local/themes/` (its `Shell/` directory, the task pane's
+shellstyle.dll per colour scheme, with it when it lies beside the file) and then shows on Display Properties' Appearance tab
+("Windows and buttons") beside the styles the shipped themes use; choosing it there gives "THEME (Modified)", and Save As
+on the Themes tab makes it a theme of its own. `index/` holds the names the programs ask
    for, as relative symlinks: `styles/<name>.msstyles` (build-qualified: jade4074, slate4051, aero5112, luna = XP's own, whose
    `styles/luna/` is XP's `themes/Luna/` with `Shell/<Scheme>/shellstyle.dll`; luna4051 / luna4074 = Longhorn's copies),
    `resources/<source>`, `fonts/<source>`, `wallpapers/<source>`, `frames` and `packs` (-> `generated/`). Then the recipes of

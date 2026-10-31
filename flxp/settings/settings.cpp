@@ -326,7 +326,12 @@ void load_styles()
             if (const char* v = lhde_theme_get(t, "VisualStyle.style")) named.insert(v);
             lhde_theme_free(t);
         }
-    for (Style& s : styles) if (named.count(s.name)) s.named = true;
+    for (Style& s : styles) {
+        if (named.count(s.name)) s.named = true;
+        // a style dropped in by hand (lhde-import --style: the Windows tree's local/themes) is the user's own choice: offered too
+        char real[PATH_MAX];
+        if (!s.named && !s.path.empty() && realpath(s.path.c_str(), real) && strstr(real, "/local/themes/")) s.named = true;
+    }
 }
 
 const Style* style_named(const std::string& n)
