@@ -410,7 +410,10 @@ value shared by all or "(multiple values)". The item tasks (Open, Rename, Copy, 
 right of the details. View > Preview switches between the expanded band (126 rows, its bottom edge drags it up to 246) and the
 compact one (48 rows: the count or the name on one line, a small icon or thumbnail, the tasks side by side); dragging the edge
 above 87 rows expands it, below compacts it (`taskpane_compact`, `taskpane_height` in `flxp.ini`). Thumbnails follow the same
-`thumbnails` and `thumbnails_network` settings as the views; without them the icon shows.
+`thumbnails` and `thumbnails_network` settings as the views; without them the icon shows. The theme puts the band at the top
+or the bottom (`Explorer.taskpane`): the 5048 and 5112 themes have it under the list and the left pane, across the window's width,
+which comes close to Vista's details pane; there it is the same band mirrored, the picture hanging above it over the left pane
+(whose view button moves up out of its way) and its top edge dragging it.
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell M6, `SHELL-DESIGN.md` 6.3/6.4)
 

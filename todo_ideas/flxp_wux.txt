@@ -11,9 +11,6 @@ not *entirely* sure about the font for all themes though
 
 * future: put the aurora example into longhorn flxp as an option
 
-* an option to put the Longhorn task pane (the band) at the bottom instead of the top: with the 5048 and 5112 styles that gets
-	close to Vista's details pane; a theme key (Explorer section) with the basic/aero 5048 and 5112 themes set to bottom
-
 ## flxp behavior
 
 * copy/move: Cancel rolls the current top-level item back (a folder copied half-way is removed again); XP keeps

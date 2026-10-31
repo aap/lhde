@@ -61,11 +61,16 @@ const int PAD = 18, COL = 180, LINE_Y = 36, LINE_H = 17, TASK_COL = 189, TASK_RO
 const COLORREF WHITE = RGB(255, 255, 255), TASK_TEXT = RGB(0xDB, 0xE9, 0xF3), MORE_TEXT = RGB(255, 255, 255),
                MORE_HOT = RGB(0xF3, 0xB6, 0x80);
 int g_room = 100000;                   // rows for the band and the list (set_room)
+bool g_bottom;                         // the theme's Explorer.taskpane = bottom: the band under the list, mirrored
 int g_exp_h = EXP_DEFAULT;
 bool g_compact;
 int H = EXP_DEFAULT;                   // the current height
 
 int effective() { return g_compact || g_room - g_exp_h < LIST_MIN ? COMPACT_H : g_exp_h; }
+// the band's first row in the bitmap render() makes: what hangs over the left pane is below the band at the top, above it at
+// the bottom
+int band_y() { return g_bottom ? HANG : 0; }
+bool read_bottom() { return shell::theme_setting("taskpane_position", "top") == "bottom"; }
 bool small() { return H == COMPACT_H; }
 int box_x() { return PAD; }
 int box_w() { return H + 8; }
@@ -75,11 +80,11 @@ struct Link { int id; std::string text, icon; RECT r = {}; };
 struct Text { std::string text; RECT r; int font; COLORREF color; };   // font: an index of g_fonts
 
 HWND g_wnd, g_hang;
-RECT g_hang_rc;                        // what of the preview is below the band (band coordinates; empty: nothing)
+RECT g_hang_rc;                        // what of the preview is outside the band (band coordinates; empty: nothing)
 void hang_add(int l, int t, int r, int b)
 {
-    if (b <= H) return;
-    RECT x = { l, t > H ? t : H, r, b };
+    if (g_bottom ? t >= 0 : b <= H) return;
+    RECT x = g_bottom ? RECT{ l, t, r, b < 0 ? b : 0 } : RECT{ l, t > H ? t : H, r, b };
     if (g_hang_rc.right <= g_hang_rc.left) g_hang_rc = x;
     else UnionRect(&g_hang_rc, &g_hang_rc, &x);
 }
@@ -446,24 +451,28 @@ void draw_preview(HDC dc)
         if (p.bmp) pics.push_back(p);
     }
     if (pics.empty()) {
-        int size = small() ? 48 : 128;
-        draw_icon(dc, g_info.icon, size, bx + (bw - size) / 2, H + 11 - size, 255);
-        hang_add(bx + (bw - size) / 2, H, bx + (bw + size) / 2, H + 11);
+        // hanging 11 px out of the band: below it (at the top of the window), above it (at the bottom)
+        int size = small() ? 48 : 128, y = g_bottom ? -11 : H + 11 - size;
+        draw_icon(dc, g_info.icon, size, bx + (bw - size) / 2, y, 255);
+        hang_add(bx + (bw - size) / 2, y, bx + (bw + size) / 2, y + size);
         return;
     }
-    int bottom = H + 10;
+    // the pictures hang 10 px out of the band: their bottom 10 below it, or (at the bottom) their top 10 above it
+    int bottom = H + 10, top = -10;
     if (pics.size() == 1) {
         const Pic& p = pics[0];
-        draw_framed(dc, p.bmp, p.w, p.h, bx + (bw - p.w - 4) / 2, bottom - p.h - 4, 255);
+        draw_framed(dc, p.bmp, p.w, p.h, bx + (bw - p.w - 4) / 2, g_bottom ? top : bottom - p.h - 4, 255);
         return;
     }
     // the stack: the front one at the box's right and bottom (as one picture of
-    // the box's width would end), the others up and left of it
+    // the box's width would end), the others up and left of it; mirrored at the
+    // bottom of the window (the front one at the top, the others down and left)
     int right = bx + bw - 6;
     double dx = bw * 7.0 / 134, dy = bw * 6.0 / 134;
     for (int i = (int)pics.size() - 1; i >= 0; i--) {
         const Pic& p = pics[(size_t)i];
-        int x = right - (int)(dx * i) - (p.w + 4), y = bottom - (int)(dy * i) - (p.h + 4);
+        int x = right - (int)(dx * i) - (p.w + 4);
+        int y = g_bottom ? top + (int)(dy * i) : bottom - (int)(dy * i) - (p.h + 4);
         draw_framed(dc, p.bmp, p.w, p.h, x, y, 255);
     }
 }
@@ -487,7 +496,7 @@ void paint_background(HDC dc, int w)
         RECT r = { 0, -1, w, H };    // the command bar's strip, without its highlight row
         lhbar::paint_background(dc, r);
     }
-    // the band's end (4051: a light row, then a dark one)
+    // the band's end towards the list (4051: a light row, then a dark one; at the bottom of the window mirrored, its top edge)
     HDC mem = CreateCompatibleDC(dc);
     BITMAPINFO bi = {};
     bi.bmiHeader.biSize = sizeof bi.bmiHeader;
@@ -495,28 +504,30 @@ void paint_background(HDC dc, int w)
     void* bits = nullptr;
     HBITMAP b = CreateDIBSection(mem, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
     if (b) {
-        ((uint32_t*)bits)[0] = 0x60606060;       // white at 0.38, premultiplied
-        ((uint32_t*)bits)[1] = 0x90000000;       // black at 0.56
+        ((uint32_t*)bits)[g_bottom ? 1 : 0] = 0x60606060;   // white at 0.38, premultiplied
+        ((uint32_t*)bits)[g_bottom ? 0 : 1] = 0x90000000;   // black at 0.56
         HGDIOBJ old = SelectObject(mem, b);
         BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-        AlphaBlend(dc, 0, H - 2, w, 2, mem, 0, 0, 1, 2, bf);
+        AlphaBlend(dc, 0, g_bottom ? 0 : H - 2, w, 2, mem, 0, 0, 1, 2, bf);
         SelectObject(mem, old);
         DeleteObject(b);
     }
     DeleteDC(mem);
-    // under the band (what the preview hangs over): the left pane's white
-    RECT under = { 0, H, w, H + HANG };
+    // beside the band (what the preview hangs over): the left pane's white
+    RECT under = g_bottom ? RECT{ 0, -HANG, w, 0 } : RECT{ 0, H, w, H + HANG };
     HBRUSH wb = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
     FillRect(dc, &under, wb);
     DeleteObject(wb);
 }
 
-// The band and what hangs below it, into a bitmap w x (H + HANG)
+// The band and what hangs out of it, into a bitmap w x (H + HANG): the band
+// from row band_y(), drawn in band coordinates
 HBITMAP render(HDC wdc, int w)
 {
     HDC dc = CreateCompatibleDC(wdc);
     HBITMAP buf = CreateCompatibleBitmap(wdc, w, H + HANG);
     HGDIOBJ oldb = SelectObject(dc, buf);
+    SetViewportOrgEx(dc, 0, band_y(), nullptr);
     paint_background(dc, w);
     SetBkMode(dc, TRANSPARENT);
     g_hang_rc = RECT{};
@@ -541,6 +552,7 @@ HBITMAP render(HDC wdc, int w)
         RECT r = g_more; r.left += 12; r.top -= 1;
         draw_text(dc, Text{ "more", r, g_hot == -2 ? F_TASK_U : F_TASK, TASK_TEXT });
     }
+    SetViewportOrgEx(dc, 0, 0, nullptr);
     SelectObject(dc, oldb);
     DeleteDC(dc);
     return buf;
@@ -555,8 +567,9 @@ void paint(HWND h, HDC wdc)
     HBITMAP buf = render(wdc, w);
     HDC mem = CreateCompatibleDC(wdc);
     HGDIOBJ old = SelectObject(mem, buf);
-    if (h == g_wnd) BitBlt(wdc, 0, 0, w, H, mem, 0, 0, SRCCOPY);
-    else BitBlt(wdc, 0, 0, g_hang_rc.right - g_hang_rc.left, g_hang_rc.bottom - g_hang_rc.top, mem, g_hang_rc.left, g_hang_rc.top, SRCCOPY);
+    if (h == g_wnd) BitBlt(wdc, 0, 0, w, H, mem, 0, band_y(), SRCCOPY);
+    else BitBlt(wdc, 0, 0, g_hang_rc.right - g_hang_rc.left, g_hang_rc.bottom - g_hang_rc.top, mem, g_hang_rc.left,
+                g_hang_rc.top + band_y(), SRCCOPY);
     SelectObject(mem, old);
     DeleteDC(mem);
     DeleteObject(buf);
@@ -564,7 +577,7 @@ void paint(HWND h, HDC wdc)
     if (h == g_wnd && !EqualRect(&placed, &g_hang_rc)) { placed = g_hang_rc; place_hang(); }
 }
 
-// the overhang window: over the left pane, under the preview box
+// the overhang window: over the left pane, under the preview box (above it at the bottom)
 void place_hang()
 {
     if (!g_wnd || !g_hang) return;
@@ -614,13 +627,14 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     }
     case WM_SETCURSOR: {
         POINT p; GetCursorPos(&p); ScreenToClient(h, &p);
-        LPCWSTR c = g_sizing || p.y >= H - GRIP ? (LPCWSTR)IDC_SIZENS : hit(p) != -1 ? (LPCWSTR)IDC_HAND : (LPCWSTR)IDC_ARROW;
+        bool grip = g_bottom ? p.y < GRIP : p.y >= H - GRIP;   // the edge towards the list
+        LPCWSTR c = g_sizing || grip ? (LPCWSTR)IDC_SIZENS : hit(p) != -1 ? (LPCWSTR)IDC_HAND : (LPCWSTR)IDC_ARROW;
         SetCursor(LoadCursorW(nullptr, c));
         return TRUE;
     }
     case WM_LBUTTONDOWN: {
         POINT p = { (SHORT)LOWORD(lp), (SHORT)HIWORD(lp) };
-        if (p.y < H - GRIP) return 0;
+        if (g_bottom ? p.y >= GRIP : p.y < H - GRIP) return 0;
         POINT s = p; ClientToScreen(h, &s);
         g_sizing = true;
         g_size_y0 = s.y; g_size_h0 = H; g_size_compact0 = g_compact;
@@ -638,7 +652,7 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         POINT p = { (SHORT)LOWORD(lp), (SHORT)HIWORD(lp) };
         if (g_sizing) {
             POINT s = p; ClientToScreen(h, &s);
-            int want = g_size_h0 + (s.y - g_size_y0);
+            int want = g_size_h0 + (g_bottom ? g_size_y0 - s.y : s.y - g_size_y0);   // at the bottom it grows upwards
             bool compact = want < SPLIT;
             int eh = g_exp_h;
             if (!compact) eh = want < EXP_MIN ? EXP_MIN : want;
@@ -704,6 +718,7 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 bool wanted() { return shell::setting("taskpane", "0") == "1"; }
 
 int height() { return H; }
+bool bottom() { return g_bottom; }
 bool compact() { return g_compact; }
 
 void set_room(int rows)
@@ -727,6 +742,7 @@ HWND create(HWND frame, const Callbacks& cb)
     int eh = atoi(shell::setting("taskpane_height", "126").c_str());
     g_exp_h = eh < EXP_MIN ? EXP_MIN : eh > EXP_MAX ? EXP_MAX : eh;
     g_compact = shell::setting("taskpane_compact", "0") == "1";
+    g_bottom = read_bottom();
     H = effective();
     make_fonts();
     WNDCLASSW wc = {};
@@ -775,6 +791,7 @@ void set_details(const Info& in, bool pictures)
 
 void theme_changed()
 {
+    g_bottom = read_bottom();   // (the explorer lays the band out again)
     g_aurora_looked = false;
     g_aurora_file = "-";
     redraw();

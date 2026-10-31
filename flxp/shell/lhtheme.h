@@ -61,6 +61,7 @@ void set_session_theme(const SessionTheme& t);
 //   menubar_style      flxp.ini, else document for chrome = longhorn
 //   header_engine      flxp.ini, else Explorer.navbar: vision -> lhnav, 4051 | 4074 -> flxp
 //   header_preset      flxp.ini, else Explorer.navbar_preset for navbar = vision
+//   taskpane_position  flxp.ini, else Explorer.taskpane (top | bottom: the Longhorn task band under the list)
 //   font_smoothing     settings.ini [fonts] smoothing (the user's), else Fonts.smoothing
 // any other key: setting(key, fallback) (flxp.ini, the settings store), as before; the registry's flxp_<key> are gone.
 std::string theme_setting(const std::string& key, const std::string& fallback = "");
