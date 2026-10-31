@@ -872,7 +872,7 @@ void load_user()
     // ~/.face (the freedesktop/AccountsService picture), user_picture=, else XP's chess tile
     // (logonui.exe's IDB_USER0 114, when lhde-import has it in resources/xp)
     std::vector<std::string> cand = { home() + "/.face", home() + "/.face.icon", setting("user_picture") };
-    std::string chess = shell::resource_src("xp", "logonui.exe", 114);
+    std::string chess = shell::xp_art("logonui.exe", 114, 2);
     if (!chess.empty()) cand.push_back(chess);
     bool show = P->user_h > 0;
     if (P->th) { BOOL b = TRUE; if (SUCCEEDED(GetThemeBool(P->th, SPP_USERPANE, 0, TMT_USERPICTURE, &b))) show = b; }

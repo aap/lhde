@@ -177,7 +177,7 @@ static void keep_above(HWND dlg, bool modal)
 
 static HICON shell32_icon(int id)
 {
-    std::string src = shell::resource_src("xp", "shell32.dll", id);
+    std::string src = shell::xp_art("shell32.dll", id, 14);
     HICON h = src.empty() ? nullptr : (HICON)uiicons::load_themed(src, IMAGE_ICON, 32, 32, 0);
     return h ? h : uiicons::load_icon("folder", 32);
 }
@@ -349,7 +349,8 @@ static uint32_t rd32(const uint8_t* p) { return (uint32_t)p[0] | (uint32_t)p[1] 
 
 bool Animation::load(int id)
 {
-    std::string dll = shell::resource_file("xp", "shell32.dll");
+    std::string src = shell::xp_art("shell32.dll", id, 0);   // the AVI: xp's, else 2k's or ReactOS's (same ids)
+    std::string dll = src.empty() ? "" : src.substr(3, src.rfind('#') - 3);
     res::Module* m = dll.empty() ? nullptr : res::load(dll.c_str());
     res::Blob b = {};
     bool found = m && res::find(m, res::Id("AVI"), res::Id((uint32_t)id), b);

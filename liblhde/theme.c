@@ -214,17 +214,22 @@ int lhde_theme_list(void (*fn)(const char *, const char *, const char *, int, vo
 }
 
 /* ---------------------------------------------------------------- components: present or not */
-/* frames/NAME: theme.ini somewhere; a glass (mode = dwm) set also needs its pixels (a PNG in any copy, or in cache/) */
+/* frames/NAME: theme.ini somewhere; a glass (mode = dwm) set also needs its pixels (a PNG in any copy, or in cache/), a classic
+   (msstyles) set its style, which luxwm reads live, or else its pixels */
 static int frames_present(const char *name, char *dir, size_t n)
 {
     char rel[300]; snprintf(rel, sizeof rel, "frames/%s", name);
     lhde_data_resolve_dir(rel, "theme.ini", dir, n);
     char ti[PATH_MAX + 16]; snprintf(ti, sizeof ti, "%s/theme.ini", dir);
     if (!lhde__exists(ti)) return 0;
-    lhde_ini *ini = lhde_ini_load(ti); char mode[32] = "";
+    lhde_ini *ini = lhde_ini_load(ti); char mode[32] = "", style[256] = "";
     lhde_ini_get(ini, "", "mode", mode, sizeof mode);
+    lhde_ini_get(ini, "", "msstyles", style, sizeof style);
     lhde_ini_free(ini);
-    if (strcmp(mode, "dwm")) return 1;
+    if (strcmp(mode, "dwm")) {
+        char sp[PATH_MAX];
+        if (!style[0] || style[0] == '/' || lhde_data_find(style, sp, sizeof sp)) return 1;
+    }
     const char *dirs[LHDE_DATA_MAX]; int nd = lhde_data_dirs(dirs, LHDE_DATA_MAX);
     for (int i = 0; i < nd; i++) {   /* imported: lhde-import's manifest (the CompositedWindow sets are read live from the style) */
         char mf[PATH_MAX + 320]; snprintf(mf, sizeof mf, "%s/frames/%s/manifest.ini", dirs[i], name);
@@ -400,6 +405,19 @@ static void apply_defaults(lhde_theme *t, const lhde_style_info *si, const char 
     dflt(t, "Fonts.smoothing", "standard", "default");
 }
 
+/* the free fallback chain of resources and icons (section 6): XP's art, then Windows 2000's, then ReactOS's (which keeps
+   Windows' resource ids). The first imported one other than skip; fmt has one %s for it; its path into out */
+static const char *const FREE_CHAIN[] = { "xp", "2k", "reactos", NULL };
+static const char *free_chain(const char *fmt, const char *skip, char *out, size_t n)
+{
+    for (int i = 0; FREE_CHAIN[i]; i++) {
+        char rel[128]; snprintf(rel, sizeof rel, fmt, FREE_CHAIN[i]);
+        if ((!skip || strcmp(skip, FREE_CHAIN[i])) && lhde_data_find(rel, out, n)) return FREE_CHAIN[i];
+    }
+    out[0] = 0;
+    return NULL;
+}
+
 /* section 6: what is asked for but not there becomes something plainer, with the reason; path.* derived */
 static void apply_fallbacks(lhde_theme *t, const lhde_style_info *si)
 {
@@ -413,7 +431,7 @@ static void apply_fallbacks(lhde_theme *t, const lhde_style_info *si)
         if (!is_none(v)) {
             char nm[256]; snprintf(nm, sizeof nm, "%s", v);
             if (!frames_present(nm, p, sizeof p)) {
-                snprintf(w, sizeof w, "frame set %s not imported (frames/%s)%s", nm, nm, c ? ": the style's own decorations" : ": frames_classic, else the style's decorations");
+                snprintf(w, sizeof w, "frame set %s not imported (frames/%s: its pixels or its style)%s", nm, nm, c ? ": the style's own decorations" : ": frames_classic, else the style's decorations");
                 fallback(t, key, "none", w); p[0] = 0;
             }
         }
@@ -437,8 +455,15 @@ static void apply_fallbacks(lhde_theme *t, const lhde_style_info *si)
     const char *b = get(t, "Theme.build"); p[0] = 0;
     if (b && b[0]) { char rel[64]; snprintf(rel, sizeof rel, "resources/%s", b);
         if (!lhde_data_find(rel, p, sizeof p)) p[0] = 0; }
-    put(t, "path.resources", p, LHDE_FROM_DERIVED, p[0] ? "derived" : "fallback: resources of the build not imported: drawn art");
-    /* icons: the recipe and the resources it reads; else xp (resources/xp), else Wine's built-in set */
+    if (p[0] || !b || !b[0]) put(t, "path.resources", p, LHDE_FROM_DERIVED, "derived");
+    else {
+        const char *fb = free_chain("resources/%s", b, p, sizeof p);
+        if (fb) snprintf(w, sizeof w, "fallback: resources/%s not imported: resources/%s", b, fb);
+        else snprintf(w, sizeof w, "fallback: resources/%s not imported (nor xp, 2k, reactos): drawn art", b);
+        put(t, "path.resources", p, LHDE_FROM_DERIVED, w);
+    }
+    /* icons: the recipe and the resources it reads; else the first of xp, 2k, reactos whose recipe and resources are imported,
+       else Wine's built-in set */
     v = get(t, "Desktop.icons"); p[0] = 0;
     if (!is_none(v)) {
         char nm[128], rel[300]; snprintf(nm, sizeof nm, "%s", v); snprintf(rel, sizeof rel, "icons/%s.theme", nm);
@@ -447,12 +472,16 @@ static void apply_fallbacks(lhde_theme *t, const lhde_style_info *si)
         if (ok) { lhde_ini *ini = lhde_ini_load(p); lhde_ini_get(ini, "theme", "resources", res, sizeof res); lhde_ini_free(ini);
                   char o[PATH_MAX]; if (res[0] && !lhde_data_find(res, o, sizeof o)) ok = 0; }
         if (!ok) {
-            char o[PATH_MAX];
-            const char *fb = strcmp(nm, "xp") && lhde_data_find("resources/xp", o, sizeof o) && lhde_data_find("icons/xp.theme", o, sizeof o) ? "xp" : "wine";
-            snprintf(w, sizeof w, "icon set %s %s: %s", nm, res[0] ? "has no resources (" : "has no recipe", fb);
+            const char *fb = "wine";
+            for (int i = 0; FREE_CHAIN[i]; i++) {
+                char o[PATH_MAX], ir[64], rr[64];
+                snprintf(ir, sizeof ir, "icons/%s.theme", FREE_CHAIN[i]); snprintf(rr, sizeof rr, "resources/%s", FREE_CHAIN[i]);
+                if (strcmp(nm, FREE_CHAIN[i]) && lhde_data_find(rr, o, sizeof o) && lhde_data_find(ir, o, sizeof o)) { fb = FREE_CHAIN[i]; break; }
+            }
+            snprintf(w, sizeof w, "icon set %s has no recipe: %s", nm, fb);
             if (res[0]) snprintf(w, sizeof w, "icon set %s: %s not imported: %s", nm, res, fb);
             fallback(t, "Desktop.icons", fb, w);
-            if (!strcmp(fb, "xp")) lhde_data_find("icons/xp.theme", p, sizeof p); else p[0] = 0;
+            if (strcmp(fb, "wine")) { char ir[64]; snprintf(ir, sizeof ir, "icons/%s.theme", fb); lhde_data_find(ir, p, sizeof p); } else p[0] = 0;
         }
     }
     put(t, "path.icons", p, LHDE_FROM_DERIVED, "derived");
@@ -469,12 +498,17 @@ static void apply_fallbacks(lhde_theme *t, const lhde_style_info *si)
     put(t, "path.wallpaper", p, LHDE_FROM_DERIVED, "derived");
     /* fonts */
     v = get(t, "Fonts.fonts"); p[0] = 0;
+    const char *fwhy = "derived";
     if (!is_none(v)) {
         if (v[0] == '/' || v[0] == '~') lhde_data_resolve(v, p, sizeof p);
         else { char rel[300]; snprintf(rel, sizeof rel, "fonts/%s", v); if (!lhde_data_find(rel, p, sizeof p)) p[0] = 0; }
-        if (!p[0] || !lhde__exists(p)) { p[0] = 0; put(t, "path.fonts", "", LHDE_FROM_DERIVED, "fallback: fonts not imported: fontconfig's"); }
+        if (!p[0] || !lhde__exists(p)) {   /* the build's fonts, else ReactOS's (Tahoma, Marlett, ...), else fontconfig's */
+            if (strcmp(v, "reactos") && lhde_data_find("fonts/reactos", p, sizeof p)) {
+                snprintf(w, sizeof w, "fallback: fonts/%s not imported: fonts/reactos", v); fwhy = w;
+            } else { p[0] = 0; fwhy = "fallback: fonts not imported: fontconfig's"; }
+        }
     }
-    if (p[0] || is_none(v)) put(t, "path.fonts", p, LHDE_FROM_DERIVED, "derived");
+    put(t, "path.fonts", p, LHDE_FROM_DERIVED, fwhy);
     /* the style file and its shellstyle.dll; a classic scheme */
     put(t, "path.style", si->path, LHDE_FROM_DERIVED, "derived");
     p[0] = 0;

@@ -15,7 +15,8 @@
    Besides the theme keys the record carries derived ones: theme (the name resolved), file (its file, "" for a bare style),
    style.kind (xp | longhorn | dwm | classic | missing), style.format, style.family, and path.* (absolute paths of the components:
    path.style, path.shellstyle, path.frames, path.frames_classic, path.pack, path.navbar, path.icons, path.wallpaper,
-   path.fonts, path.resources, path.scheme; "" when the component is none or missing). */
+   path.fonts, path.resources, path.scheme; "" when the component is none or missing; path.fonts and path.resources may be
+   another source's directory, the free chain of section 6, with a why that starts "fallback:"). */
 #ifndef LHDE_THEME_H
 #define LHDE_THEME_H
 #include <stddef.h>

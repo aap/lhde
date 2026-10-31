@@ -71,6 +71,13 @@ static void more(struct row *r, const char *fmt, ...)
     va_list ap; va_start(ap, fmt); vsnprintf(r->more[r->nmore++], sizeof r->more[0], fmt, ap); va_end(ap);
 }
 static void file(struct row *r, const char *path) { where(path, r->file, sizeof r->file); }
+/* a derived path that another source supplies (its why starts "fallback:"), and that source's name (the path's last part) */
+static int fell_back(const lhde_theme *t, const char *key)
+{
+    const char *w = lhde_theme_why(t, key);
+    return w && !strncmp(w, "fallback:", 9);
+}
+static const char *base_of(const char *p) { const char *s = p ? strrchr(p, '/') : NULL; return s ? s + 1 : nz(p); }
 /* the status from the record: a key that fell back says so, with its reason */
 static int status(struct row *r, const lhde_theme *t, const char *key)
 {
@@ -309,11 +316,19 @@ int lhde_explain(const char *name)
     r = row("fonts", G("Fonts.fonts"));
     if (none(G("Fonts.fonts"))) { snprintf(r->status, sizeof r->status, "off"); more(r, "fontconfig's fonts"); }
     else if (!G("path.fonts")[0]) { snprintf(r->status, sizeof r->status, "missing -> fontconfig"); more(r, "why: fonts/%s not imported", G("Fonts.fonts")); }
-    else { file(r, G("path.fonts")); more(r, "%d TrueType files, registered by luxwm, luxshell and flxp", count_ext(G("path.fonts"), ".ttf")); }
+    else {
+        file(r, G("path.fonts"));
+        if (fell_back(t, "path.fonts")) { snprintf(r->status, sizeof r->status, "missing -> fallback %s", base_of(G("path.fonts"))); more(r, "why: fonts/%s not imported", G("Fonts.fonts")); }
+        more(r, "%d TrueType files, registered by luxwm, luxshell and flxp", count_ext(G("path.fonts"), ".ttf"));
+    }
     r = row("resources", G("Theme.build"));
     if (!G("Theme.build")[0]) { snprintf(r->status, sizeof r->status, "off"); more(r, "no build: no Longhorn DLLs"); }
-    else if (!G("path.resources")[0]) { snprintf(r->status, sizeof r->status, "missing -> drawn art"); more(r, "why: resources/%s not imported", G("Theme.build")); }
-    else { file(r, G("path.resources")); more(r, "the build's shell32/imageres/explorer/browseui (icons, flxp's Longhorn art)"); }
+    else if (!G("path.resources")[0]) { snprintf(r->status, sizeof r->status, "missing -> drawn art"); more(r, "why: resources/%s not imported (nor xp, 2k, reactos)", G("Theme.build")); }
+    else {
+        file(r, G("path.resources"));
+        if (fell_back(t, "path.resources")) { snprintf(r->status, sizeof r->status, "missing -> fallback %s", base_of(G("path.resources"))); more(r, "why: resources/%s not imported", G("Theme.build")); }
+        more(r, "%s shell32/imageres/explorer/browseui (icons, flxp's art by resource id)", fell_back(t, "path.resources") ? "that source's" : "the build's");
+    }
 #undef G
     print_rows();
     printf("\nTrees: user = %s, windows = %s, shipped = the install's share/lhde (lhde-theme dirs). A key's source: lhde-theme resolve %s --why.\n",

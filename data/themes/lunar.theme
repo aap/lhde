@@ -1,0 +1,26 @@
+; ReactOS's Lunar (its default visual style; free, GPL: the reactos source, data/sources/reactos.ini): an XP-format style,
+; drawn live by wuxtheme (luxwm's msstyles mode, no frame set). Build reactos: ReactOS's icons, fonts and wallpapers. The XP
+; explorer chrome, the classic taskbar. The wallpaper is taste (ReactOS sets none; Polarlicht is CC0).
+[Theme]
+name     = ReactOS Lunar
+build    = reactos
+
+[VisualStyle]
+style    = lunar
+
+[Glass]
+frames         = none
+frames_classic = none
+composition    = off
+
+[Shell]
+taskbar  = classic
+
+[Explorer]
+chrome   = xp
+navbar   = none
+
+[Desktop]
+wallpaper = reactos/Polarlicht
+mode      = fill
+icons     = reactos

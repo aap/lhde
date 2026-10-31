@@ -54,6 +54,10 @@ std::string icon_theme_file(const std::string& name);    // the recipe a name se
 std::string resource_file(const std::string& build, const std::string& file);
 // "pe:PATH#ID" for that file's resource ID, "" when the file is not imported
 std::string resource_src(const std::string& build, const std::string& file, int id);
+// XP's art by resource id, named as XP has it (file, id, the resource type: RT_BITMAP 2, RT_GROUP_ICON 14, 0 for "AVI"),
+// from the first imported source that has that resource: xp, then 2k, then reactos (the free baseline: ReactOS keeps XP's
+// ids, and where it does not, the per-source table in icons.cpp maps them). "pe:PATH#ID" or "" when none has it.
+std::string xp_art(const std::string& file, int id, int type);
 // XP's shellstyle.dll for a visual style: <style dir>/Shell/<color>/shellstyle.dll or
 // styles/NAME/Shell/<color>/ (lhde-import's copy beside styles/NAME.msstyles), the
 // colour matched case-insensitively; with no style (classic) system32's from resources/xp.

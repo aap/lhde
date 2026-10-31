@@ -118,9 +118,11 @@ std::string default_longhorn_system32()
 
 std::vector<std::string> default_font_dirs()
 {
-    std::vector<std::string> out;
+    // ReactOS's free faces last: a Windows build's Tahoma (or Marlett) wins where both are imported
+    std::vector<std::string> out, free_;
     for (const std::string& d : lhde_subdirs("fonts"))
-        if (is_file(d + "/tahoma.ttf") || is_file(d + "/TAHOMA.TTF")) out.push_back(d);
+        if (is_file(d + "/tahoma.ttf") || is_file(d + "/TAHOMA.TTF")) (d.substr(d.rfind('/') + 1) == "reactos" ? free_ : out).push_back(d);
+    out.insert(out.end(), free_.begin(), free_.end());
     return out;
 }
 
@@ -180,6 +182,7 @@ std::string lhde_report()
     look("styles", "styles");
     look("XP art", "resources/xp", "the xp icons, toolbar strips, start flag, task pane, Log Off buttons");
     look("", "resources/2k", "the 2k icons and toolbar");
+    look("", "resources/reactos", "the free stand-in: ReactOS's icons, toolbar strips and start flag by XP's ids");
     return out;
 }
 

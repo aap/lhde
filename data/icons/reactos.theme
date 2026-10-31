@@ -1,0 +1,61 @@
+; ReactOS's icons and toolbar art, read by resource id from lhde-import's resources/reactos (ReactOS 0.4.16: free, GPL/LGPL).
+; The free stand-in for the xp and 2k recipes (the resolver's fallback chain: xp, 2k, reactos, Wine's set). The recipe format
+; is xp.theme's (flxp/shell/icons.h). The icon ids are XP's (ReactOS's shell32 keeps them); the per-source difference: XP has
+; the toolbar strips, the Go button and the brand in shell32 (214-217, 230/231, 240), ReactOS in browseui under the same ids
+; (its shell32's own strips 204-207 and 225-228 are Internet Explorer's and the edit buttons). The strips have XP's cells
+; (1128x24, 752x16: 47 images in XP's order), so the button indices are XP's.
+[theme]
+name = ReactOS
+resources = resources/reactos
+depth = 32
+
+[icons]
+folder = pe:shell32.dll#4
+folder_open = pe:shell32.dll#5
+document = pe:shell32.dll#1
+text = pe:shell32.dll#152
+drive = pe:shell32.dll#9
+computer = pe:shell32.dll#16
+desktop = pe:shell32.dll#35
+home = pe:shell32.dll#235
+image = pe:shell32.dll#226
+audio = pe:shell32.dll#225
+video = pe:shell32.dll#224
+zip = pe:shell32.dll#4
+pdf = pe:shell32.dll#2
+exe = pe:shell32.dll#3
+dll = pe:shell32.dll#154
+html = pe:shell32.dll#178
+disc = pe:shell32.dll#294
+settings = pe:shell32.dll#151
+binary = pe:shell32.dll#154
+network = pe:shell32.dll#18
+favorites = pe:shell32.dll#173
+search = pe:shell32.dll#134
+trash = pe:shell32.dll#32
+help = pe:shell32.dll#24
+pictures = pe:shell32.dll#236
+control_panel = pe:shell32.dll#137
+run = pe:shell32.dll#25
+recent = pe:shell32.dll#21
+
+[toolbar]
+; browseui's IDB_SHELL_EXPLORER_LG / _LG_HOT / _SM / _SM_HOT (XP: shell32's IDB_TB_SH_DEF_24 ...)
+strip = pe:browseui.dll#214
+hot = pe:browseui.dll#215
+size = 24
+small = pe:browseui.dll#216
+small_hot = pe:browseui.dll#217
+small_size = 16
+back = 0
+forward = 1
+up = 28
+search = 17
+folders = 43
+views = 32
+; browseui's IDB_SHELL_BRANDBAND_SM_HI, IDB_SHELL_GO / _HOT, IDB_BANDBUTTONS (the Folders bar's close)
+brand = pe:browseui.dll#240
+go = pe:browseui.dll#230
+go_hot = pe:browseui.dll#231
+go_size = 20
+close = pe:browseui.dll#545

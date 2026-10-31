@@ -1,0 +1,26 @@
+; ReactOS's Mizu (free, GPL: the reactos source, data/sources/reactos.ini): an XP-format style, drawn live by wuxtheme
+; (luxwm's msstyles mode, no frame set), with the Mizu wallpaper made for it. Build reactos: ReactOS's icons, fonts and
+; wallpapers. The XP explorer chrome, the classic taskbar.
+[Theme]
+name     = ReactOS Mizu
+build    = reactos
+
+[VisualStyle]
+style    = mizu
+
+[Glass]
+frames         = none
+frames_classic = none
+composition    = off
+
+[Shell]
+taskbar  = classic
+
+[Explorer]
+chrome   = xp
+navbar   = none
+
+[Desktop]
+wallpaper = reactos/Mizu
+mode      = fill
+icons     = reactos

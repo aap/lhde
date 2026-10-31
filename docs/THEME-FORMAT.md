@@ -164,8 +164,23 @@ to the build.
 ## 6. Fallbacks (never fail, look plainer, report it)
 frames missing or no compositor -> `frames_classic`, else the style's decorations; pack missing ->
 taskbar classic; navbar `vision` without luxnav -> `4074`; a navbar family whose art the style lacks ->
-drawn buttons; icons missing -> `xp` if `resources/xp` exists, else the built-in Wine set; resources
-missing -> drawn art. Each substitution is in the resolved record's "came from".
+drawn buttons; a classic (msstyles) frame set whose style is not imported and that has no pixels -> none (the
+style's own decorations, classic for classic). The free chain, ReactOS last (it keeps Windows' resource ids;
+docs/USAGE.md "Getting the Windows resources"): icons missing -> the first of `xp`, `2k`, `reactos` whose
+recipe and `resources/<source>` are imported, else the built-in Wine set; the build's resources missing ->
+`resources/xp`, `2k`, `reactos`, else drawn art; the build's fonts missing -> `fonts/reactos`, else
+fontconfig's. luxwm registers the first imported `marlett.ttf` of a Windows build, ReactOS's when there is
+none. Each substitution is in the resolved record's "came from" (`path.resources` and `path.fonts` keep the
+setting and say "fallback: ..." in their why); `lhde-theme explain` shows `missing -> fallback SOURCE`.
+
+With only the reactos source imported (the free baseline): `classic` and the four ReactOS
+themes (`lunar`, `modern`, `mizu`, `lautus`) resolve fully; every other theme resolves to Windows Classic with
+ReactOS's icons, fonts and resources. Microsoft-only by nature, with no free stand-in: the Luna, Longhorn and
+Vista visual styles and everything made from them (the frame sets, the glass, luxshell's packs and imageres
+art, the 4051/4074 navigation headers' art), XP's shellstyle.dll (the task pane's Luna bitmaps), the start
+panel's Log Off buttons (explorer.exe 7010/7011) and chess tile (logonui.exe 114), comctl32 6.0's file dialog
+strips, the classic Appearance schemes (ReactOS's hive has them only in Vista's form: the built-in Windows
+Standard stands in), and the builds' wallpapers.
 
 ## 7. Runtime
 `_LH_THEME` = the theme name. Whoever changes it writes `settings.ini [theme] name` first, then the
@@ -186,6 +201,7 @@ settings.ini write: `_LH_SETTINGS_CHANGED`, and every client resolves the sessio
 | `basic5048` / `aero5048` | aero5048 | aero5048 / jade4074 | off / on (`aero5048: base = basic5048`) | - (classic bar) | vision | 5048's own |
 | `basic5112` / `aero5112` | aero5112 | aero5112 / jade4074 | off / on | - | vision | 5112's own |
 | `luna`, `luna-olive`, `luna-silver` | luna-xp | - / luna4051-* | off | - | none (XP chrome) | Bliss (XP) |
+| `lunar`, `modern` (Light), `mizu`, `lautus` | ReactOS's own (build reactos, free) | - / - (the style's own) | off | - | none (XP chrome) | ReactOS's (taste; Mizu's own) |
 | any dropped XP style | itself | - | off | - | none | - |
 Later: plex (various versions), plex vision.
 

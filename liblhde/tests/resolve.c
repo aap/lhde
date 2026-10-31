@@ -152,6 +152,18 @@ int main(void)
     CHECK(lhde_theme_source(t, "Desktop.icons") == LHDE_FROM_FALLBACK);   /* icons xp: no resources/xp */
     lhde_theme_free(t);
 
+    /* the free baseline: only ReactOS imported; icons, resources and fonts fall back to it (section 6), then it goes again */
+    put("data/resources/reactos/shell32.dll", "x"); put("data/fonts/reactos/marlett.ttf", "x");
+    put("data/icons/reactos.theme", "[theme]\nresources = resources/reactos\n");
+    t = R("royale");
+    EQ(G(t, "Desktop.icons"), "reactos"); HAS(G(t, "path.icons"), "icons/reactos.theme"); HAS(W(t, "Desktop.icons"), "resources/xp not imported: reactos");
+    HAS(G(t, "path.resources"), "/data/resources/reactos"); HAS(W(t, "path.resources"), "fallback: resources/xp not imported: resources/reactos");
+    HAS(G(t, "path.fonts"), "/data/fonts/reactos"); HAS(W(t, "path.fonts"), "fallback: fonts/xp not imported: fonts/reactos");
+    lhde_theme_free(t);
+    for (const char *const *f = (const char *const[]){ "data/resources/reactos/shell32.dll", "data/fonts/reactos/marlett.ttf", "data/icons/reactos.theme",
+                                                        "data/resources/reactos", "data/fonts/reactos", NULL }; *f; f++) {
+        char c[PATH_MAX + 64]; snprintf(c, sizeof c, "%s/%s", T, *f); remove(c); }
+
     put("data/resources/xp/shell32.dll", "x");   /* from here on the XP icon set has its resources */
     /* ---- theme files: inheritance, none, aliases, fallbacks ---- */
     put("data/themes/jade.theme", "[Theme]\nname = Jade (4074)\naliases = jade-old jadeclassic\n[VisualStyle]\nstyle = jade4074\n"

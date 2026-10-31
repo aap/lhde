@@ -180,6 +180,7 @@ starts without one. Your own variants of a theme (presets) are described under "
 | `slate4051` | Slate 4051 msstyles frames | Slate 4051 (29 px bar, bilinear scaling, 4051 images, clock tile in the list) | never |
 | `luna` (aliases `luna-blue`, `luna4051`), `luna-olive`, `luna-silver` | Windows XP Luna msstyles frames from 4051's copy (blue, olive green, silver) | Slate bars, flxp's start panel in Luna's look | never |
 | `luna-xp` | XP SP3's own Luna, drawn live from the style | Slate bars, flxp's start panel in Luna's look | never |
+| `lunar`, `modern`, `mizu`, `lautus` | ReactOS's free styles (the reactos source), drawn live from the style | flxp's classic taskbar and start panel in the style's look | never |
 | `royale`, `zune`, `embedded` | Microsoft's later XP styles (Media Center 2005, Zune, Embedded), drawn live from the style | flxp's classic taskbar in the style's look (Slate pack as stand-in) | never |
 | `aero5048` | 5048's uDWM bitmaps | Aero | glass with picom |
 

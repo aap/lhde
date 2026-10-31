@@ -253,6 +253,34 @@ std::string resource_src(const std::string& build, const std::string& file, int 
     return f.empty() ? "" : "pe:" + f + "#" + std::to_string(id);
 }
 
+// Where a source keeps XP's art under another file or id (the rest are XP's own): ReactOS's explorer.exe has one start
+// bitmap, IDB_START 143, the classic button's too (XP: startclassic.bmp 176); its toolbar strips, Go button and brand are
+// browseui's (the icon recipe data/icons/reactos.theme). What no source but XP has (the Log Off buttons 7010/7011, the
+// chess tile logonui.exe 114, shellstyle.dll) stays "" and its caller draws without it.
+struct ArtMap { const char* source; const char* file; int id; const char* to_file; int to_id; };
+static const ArtMap art_map[] = {
+    { "reactos", "explorer.exe", 176, "explorer.exe", 143 },
+};
+
+std::string xp_art(const std::string& file, int id, int type)
+{
+    for (const char* src : { "xp", "2k", "reactos" }) {
+        std::string f = file;
+        int i = id;
+        for (const ArtMap& m : art_map)
+            if (!strcmp(m.source, src) && !strcasecmp(m.file, file.c_str()) && m.id == id) { f = m.to_file; i = m.to_id; }
+        std::string path = resource_file(src, f);
+        if (path.empty()) continue;
+        res::Module* mod = res::load(path.c_str());
+        if (!mod) continue;
+        res::Blob b;
+        bool has = res::find(mod, type ? res::Id((uint32_t)type) : res::Id("AVI"), res::Id((uint32_t)i), b);
+        res::unload(mod);
+        if (has) return "pe:" + path + "#" + std::to_string(i);
+    }
+    return "";
+}
+
 // DIR/NAME matched case-insensitively ("" if none)
 static std::string find_nocase(const std::string& dir, const std::string& name)
 {

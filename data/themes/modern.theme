@@ -1,0 +1,27 @@
+; ReactOS's Modern, Light (free, GPL: the reactos source, data/sources/reactos.ini; its other scheme is Dark): an XP-format
+; style, drawn live by wuxtheme (luxwm's msstyles mode, no frame set). Build reactos: ReactOS's icons, fonts and wallpapers.
+; The XP explorer chrome, the classic taskbar. The wallpaper is taste (ReactOS sets none).
+[Theme]
+name     = ReactOS Modern
+build    = reactos
+
+[VisualStyle]
+style    = modern
+color    = Light
+
+[Glass]
+frames         = none
+frames_classic = none
+composition    = off
+
+[Shell]
+taskbar  = classic
+
+[Explorer]
+chrome   = xp
+navbar   = none
+
+[Desktop]
+wallpaper = reactos/Deep Sea
+mode      = fill
+icons     = reactos

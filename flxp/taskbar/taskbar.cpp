@@ -16,6 +16,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <map>
 #include <string>
 #include "shell/config.h"
 #include "shell/icons.h"
@@ -31,18 +32,18 @@ extern "C" {
 
 namespace tb {
 
-// a bitmap of XP's explorer.exe (lhde-import's resources/xp): IDB_START 143, IDB_STARTCLASSIC 176,
-// IDB_LOGOFF_NORMAL / _HOT 7010 / 7011; null when XP is not imported
+// a bitmap of XP's explorer.exe: IDB_START 143, IDB_STARTCLASSIC 176, IDB_LOGOFF_NORMAL / _HOT 7010 / 7011, from the
+// first imported source that has it (shell::xp_art: xp, 2k, reactos with its own ids); null when none has it
 HBITMAP xp_explorer_bitmap(int id, UINT flags)
 {
-    static HINSTANCE mod;
-    static bool tried;
-    if (!tried) {
-        tried = true;
-        std::string f = shell::resource_file("xp", "explorer.exe");
-        if (!f.empty()) mod = LoadLibraryExW((LPCWSTR)W(f).c_str(), nullptr, LOAD_LIBRARY_AS_DATAFILE);
-    }
-    return mod ? (HBITMAP)LoadImageW(mod, MAKEINTRESOURCEW(id), IMAGE_BITMAP, 0, 0, flags) : nullptr;
+    static std::map<std::string, HINSTANCE> mods;
+    std::string src = shell::xp_art("explorer.exe", id, 2);
+    size_t hash = src.rfind('#');
+    if (src.empty() || hash == std::string::npos) return nullptr;
+    std::string f = src.substr(3, hash - 3);
+    auto it = mods.find(f);
+    if (it == mods.end()) it = mods.emplace(f, LoadLibraryExW((LPCWSTR)W(f).c_str(), nullptr, LOAD_LIBRARY_AS_DATAFILE)).first;
+    return it->second ? (HBITMAP)LoadImageW(it->second, MAKEINTRESOURCEW(atoi(src.c_str() + hash + 1)), IMAGE_BITMAP, 0, 0, flags) : nullptr;
 }
 
 Bar g;

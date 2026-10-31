@@ -372,25 +372,30 @@ static int cl_font_lf(const char *v, char *out, size_t n, char *face_out, size_t
    standard | cleartype | off), gradient (0: SPI_SETGRADIENTCAPTIONS off), icons (default icons, space separated) */
 /* the caption buttons' glyphs are Marlett's (DrawFrameControl): the first imported fonts/<build>/marlett.ttf, registered as a
    single file with libwuxtheme's text, so a theme whose own fonts lack it (classic's are xp: Tahoma, Trebuchet) still has it and
-   no other face of that directory joins the theme's; without one, fontconfig's Marlett (Wine's) if the system has it */
+   no other face of that directory joins the theme's; ReactOS's free Marlett (fonts/reactos) only when no Windows build has
+   one; without any, fontconfig's Marlett (Wine's) if the system has it */
 static void cl_marlett(void) {
     static int done; if (done) return; done = 1;
     const char *dirs[16]; int n = lhde_data_dirs(dirs, 16);
+    char free_[4700] = "";
     for (int i = 0; i < n; i++) {
         char fd[4096]; snprintf(fd, sizeof fd, "%s/fonts", dirs[i]);
         DIR *d = opendir(fd); if (!d) continue;
         struct dirent *e; char found[4700] = "";
         while (!*found && (e = readdir(d))) {
             if (e->d_name[0] == '.') continue;
+            int reactos = !strcmp(e->d_name, "reactos");
+            if (reactos && *free_) continue;
             char sub[4400]; snprintf(sub, sizeof sub, "%s/%s", fd, e->d_name);
             DIR *b = opendir(sub); if (!b) continue;
             struct dirent *f;
-            while ((f = readdir(b))) if (!strcasecmp(f->d_name, "marlett.ttf")) { snprintf(found, sizeof found, "%s/%s", sub, f->d_name); break; }
+            while ((f = readdir(b))) if (!strcasecmp(f->d_name, "marlett.ttf")) { snprintf(reactos ? free_ : found, sizeof found, "%s/%s", sub, f->d_name); break; }
             closedir(b);
         }
         closedir(d);
         if (*found) { fut_add_font_dir(found); return; }
     }
+    if (*free_) fut_add_font_dir(free_);
 }
 
 static int classic_load(struct theme *t, const char *spec) {
