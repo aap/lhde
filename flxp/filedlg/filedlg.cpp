@@ -37,6 +37,7 @@
 #include "explorer/lhbar.h"
 #include "explorer/uiicons.h"
 #include "explorer/verbs.h"
+#include "explorer/fileopui.h"
 #include "w32/w32.h"
 #include "uxtheme.h"
 extern "C" {
@@ -2281,12 +2282,11 @@ static LRESULT on_notify(Dlg& d, NMHDR* nm)
         LVITEMW lvi = {}; lvi.mask = LVIF_PARAM; lvi.iItem = di->item.iItem;
         SendMessageW(d.list, LVM_GETITEMW, 0, (LPARAM)&lvi);
         if (lvi.lParam < 0 || (size_t)lvi.lParam >= d.items.size()) return FALSE;
-        std::string to = w32::utf8_of(di->item.pszText), np, err;
-        if (to.empty() || to == d.items[(size_t)lvi.lParam].name) return FALSE;
-        if (!shell::rename_item(d.items[(size_t)lvi.lParam].path, to, &np, &err)) {
-            message_box(d.dlg, "Error Renaming File or Folder", "Cannot rename " + d.items[(size_t)lvi.lParam].name + ": " + err, MB_OK | MB_ICONEXCLAMATION);
-            return FALSE;
-        }
+        std::string to = w32::utf8_of(di->item.pszText), np;
+        if (to == d.items[(size_t)lvi.lParam].name) return FALSE;
+        // XP: refused or failed, the label is edited again with what was typed
+        if (!fileopui::rename(d.dlg, d.items[(size_t)lvi.lParam].path, to, &np)) { fileopui::edit_again(d.list, di->item.iItem, to); return FALSE; }
+        if (np == d.items[(size_t)lvi.lParam].path) return FALSE;
         d.pending_nav.clear();
         fill_list(d, np);
         return FALSE;   // the list was rebuilt

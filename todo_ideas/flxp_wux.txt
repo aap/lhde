@@ -23,8 +23,6 @@ not *entirely* sure about the font for all themes though
 * copy/move: Cancel rolls the current top-level item back (a folder copied half-way is removed again); XP keeps
 	what was copied. fileops' choice (all or nothing per item), kept for now
 
-* file-rename still feels off, especially on long filenames that show as multi-line
-
 * see xatttribs.txt idea
 
 * not so sure about "Home" replacing the actual path in the breadcrumb bar

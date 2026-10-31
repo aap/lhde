@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -17,6 +18,7 @@
 #include "shell/config.h"
 #include "shell/fileops.h"
 #include "shell/icons.h"
+#include "shell/mime.h"
 #include "shell/namespace.h"
 #include "sys/sys.h"
 extern "C" {
@@ -749,6 +751,95 @@ Result run(HWND owner, Op op, const std::vector<std::string>& sources, const std
     if (g_running.empty() && g_timer) { KillTimer(nullptr, g_timer); g_timer = 0; }
     if (quit) PostQuitMessage(quit_code);
     return job.result();
+}
+
+// ---- renaming ---------------------------------------------------------------------------
+
+static int box(HWND owner, const std::string& title, const std::string& text, UINT type)
+{
+    Box b = { title, text, type };
+    return (int)DialogBoxParamW(dialogs::module(), MAKEINTRESOURCEW(IDD_OP_MESSAGE), IsWindow(owner) ? owner : nullptr, box_proc, (LPARAM)&b);
+}
+
+// PathFindExtension, but a name's leading dot (a hidden file) is not one
+static std::string extension(const std::string& name)
+{
+    size_t dot = name.rfind('.');
+    return dot == std::string::npos || dot == 0 ? std::string() : name.substr(dot);
+}
+
+bool rename(HWND owner, const std::string& path, const std::string& typed, std::string* new_path)
+{
+    // PathRemoveBlanks: the blanks around the name go
+    size_t b = typed.find_first_not_of(' '), e = typed.find_last_not_of(' ');
+    std::string name = b == std::string::npos ? std::string() : typed.substr(b, e - b + 1);
+    std::string old = shell::base_of(path), dir = shell::dir_of(path);
+    if (new_path) *new_path = path;
+    if (name == old) return true;
+    // SHRenameFileEx: PathCleanupSpec's refusals, then an empty name (or one of the two dot names)
+    if (name.find('/') != std::string::npos) {
+        box(owner, "Rename", "A file name cannot contain any of the following characters:\n\t/", MB_OK | MB_ICONHAND);
+        return false;
+    }
+    if (name.size() > 255) {
+        box(owner, "Rename", "The file name you specified is not valid or too long. \nSpecify a different file name.", MB_OK | MB_ICONHAND);
+        return false;
+    }
+    if (name.empty() || name == "." || name == "..") {
+        box(owner, "Rename", "You must type a file name.", MB_OK | MB_ICONHAND);
+        return false;
+    }
+    struct stat st;
+    bool folder = lstat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+    // a file whose extension is a known type, given another one (XP: one with a shell class)
+    std::string oext = extension(old);
+    if (!folder && !oext.empty() && strcasecmp(oext.c_str(), extension(name).c_str()) && !shell::mime_type_for_name(old).empty() &&
+        box(owner, "Rename", "If you change a file name extension, the file may become unusable.\n\nAre you sure you want to change it?",
+            MB_YESNO | MB_ICONEXCLAMATION) != IDYES)
+        return false;
+    std::string to = dir + "/" + name;
+    int code = 0;
+    struct stat ts;
+    if (lstat(to.c_str(), &ts) == 0 && !shell::fileops::same_file(path, to)) code = EEXIST;   // (a change of case alone is the same file)
+    else if (::rename(path.c_str(), to.c_str()) != 0) code = errno;
+    if (code) {
+        Error err;
+        err.what = "Cannot rename"; err.path = path; err.code = code;
+        std::string shown = old;   // CopyError: a file without its extension
+        if (!folder && !oext.empty()) shown.resize(shown.size() - oext.size());
+        std::string why = code == EEXIST ? "A file with the name you specified already exists. Specify a different file name." : reason_text(err);
+        box(owner, "Error Renaming File or Folder", "Cannot rename " + shown + ": " + why, MB_OK | MB_ICONHAND);
+        return false;
+    }
+    if (new_path) *new_path = to;
+    return true;
+}
+
+struct EditAgain { HWND list; int item; std::string text; };
+static std::vector<EditAgain> g_edit_again;
+
+static void CALLBACK edit_again_now(HWND list, UINT, UINT_PTR id, DWORD)
+{
+    KillTimer(list, id);
+    for (size_t i = 0; i < g_edit_again.size(); i++) {
+        if (g_edit_again[i].list != list) continue;
+        EditAgain ea = g_edit_again[i];
+        g_edit_again.erase(g_edit_again.begin() + (long)i);
+        if (!IsWindow(list)) return;
+        SetFocus(list);
+        HWND edit = (HWND)SendMessageW(list, LVM_EDITLABELW, (WPARAM)ea.item, 0);
+        if (edit) {
+            SetWindowTextW(edit, WS(ea.text));
+            SendMessageW(edit, EM_SETSEL, 0, -1);
+        }
+        return;
+    }
+}
+
+void edit_again(HWND list, int item, const std::string& text)
+{
+    g_edit_again.push_back({ list, item, text });
+    SetTimer(list, 0x7e41, 0, edit_again_now);
 }
 
 // shell::paste_items' user interface (shell/fileops.h)

@@ -1615,10 +1615,12 @@ static LRESULT on_notify(NMHDR* nm)
             NMLVDISPINFOW* di = (NMLVDISPINFOW*)nm;
             int i = di->item.iItem;
             if (!di->item.pszText || i < 0 || i >= (int)g.items.size()) return FALSE;
-            std::string from = g.items[(size_t)i].path, to, err;
+            std::string from = g.items[(size_t)i].path, to;
             std::string name = w32::utf8_of((const WCHAR*)di->item.pszText);
             if (name == g.items[(size_t)i].name) return FALSE;
-            if (!shell::rename_item(from, name, &to, &err)) { error_box(err); return FALSE; }
+            // XP: refused or failed, the label is edited again with what was typed
+            if (!fileopui::rename(g.frame, from, name, &to)) { fileopui::edit_again(g.list, i, name); return FALSE; }
+            if (to == from) return FALSE;
             // refill after the list view has finished with its edit control
             g.select_after_refresh = to;
             g_reload_dir = shell::dir_of(from);
@@ -1664,10 +1666,10 @@ static LRESULT on_notify(NMHDR* nm)
             NMTVDISPINFOW* di = (NMTVDISPINFOW*)nm;
             const std::string* p = tree_path(di->item.hItem);
             if (!di->item.pszText || !p) return FALSE;
-            std::string from = *p, to, err;
+            std::string from = *p, to;
             std::string name = w32::utf8_of((const WCHAR*)di->item.pszText);
             if (name == shell::base_of(from)) return FALSE;
-            if (!shell::rename_item(from, name, &to, &err)) { error_box(err); return FALSE; }
+            if (!fileopui::rename(g.frame, from, name, &to) || to == from) return FALSE;
             g_reload_dir = shell::dir_of(from);
             renamed(from, to);
             PostMessageW(g.frame, WM_APP_REFRESH, 0, 0);

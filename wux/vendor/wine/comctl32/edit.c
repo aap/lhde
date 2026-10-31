@@ -3632,8 +3632,10 @@ static void EDIT_WM_Paint(EDITSTATE *es, HDC hdc)
 		old_brush = SelectObject(dc, GetSysColorBrush(COLOR_WINDOWFRAME));
 		PatBlt(dc, rc.left, rc.top, rc.right - rc.left, bh, PATCOPY);
 		PatBlt(dc, rc.left, rc.top, bw, rc.bottom - rc.top, PATCOPY);
-		PatBlt(dc, rc.left, rc.bottom - 1, rc.right - rc.left, -bw, PATCOPY);
-		PatBlt(dc, rc.right - 1, rc.top, -bw, rc.bottom - rc.top, PATCOPY);
+		/* flxp: the bottom and right lines with positive extents: the last row and
+		   column (the shim's PatBlt takes a negative extent as [x + w, x)) */
+		PatBlt(dc, rc.left, rc.bottom - bh, rc.right - rc.left, bh, PATCOPY);
+		PatBlt(dc, rc.right - bw, rc.top, bw, rc.bottom - rc.top, PATCOPY);
 		SelectObject(dc, old_brush);
 
 		/* Keep the border clean */

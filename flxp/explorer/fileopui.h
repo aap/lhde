@@ -23,6 +23,20 @@ shell::fileops::Result run(HWND owner, shell::fileops::Op op, const std::vector<
 // gives that here so they work meanwhile (true: handled).
 void set_message_filter(bool (*filter)(MSG& msg));
 
+// Renaming as XP's shell does it (shapi.cpp SHRenameFileEx, its errors in
+// CopyError's words): blanks around the name dropped; "/" (the one character
+// a name cannot have here), an empty or too long name refused in a "Rename"
+// box; a changed extension of a known type asks "If you change a file name
+// extension, the file may become unusable." (Yes/No); a name that is taken is
+// "Cannot rename x: A file with the name you specified already exists." True:
+// renamed (or nothing to do), new_path is where it is now. False: the user was
+// told why or said No, and XP's view then edits the label again with what was
+// typed (edit_again).
+bool rename(HWND owner, const std::string& path, const std::string& typed, std::string* new_path);
+// A list view's label edit of item again, with text in it, all of it selected,
+// once the current edit has ended (defview: LVN_ENDLABELEDIT -> LVM_EDITLABEL).
+void edit_again(HWND list, int item, const std::string& text);
+
 // The texts XP shows for an error (exposed for the tests): the message box's
 // title, its text, and whether it offers Retry (a full disk).
 struct ErrorText { std::string title, text; bool retry = false; };

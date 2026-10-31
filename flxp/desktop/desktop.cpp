@@ -616,10 +616,12 @@ LRESULT on_notify(NMHDR* nm)
         NMLVDISPINFOW* di = (NMLVDISPINFOW*)nm;
         int i = di->item.iItem;
         if (!di->item.pszText || i < 0 || i >= (int)g.items.size()) return FALSE;
-        std::string from = g.items[(size_t)i].path, to, err;
+        std::string from = g.items[(size_t)i].path, to;
         std::string name = w32::utf8_of((const WCHAR*)di->item.pszText);
         if (name == g.items[(size_t)i].name) return FALSE;
-        if (!shell::rename_item(from, name, &to, &err)) { verbs::error_box(err); return FALSE; }
+        // XP: refused or failed, the label is edited again with what was typed
+        if (!fileopui::rename(g.wnd, from, name, &to)) { fileopui::edit_again(g.list, i, name); return FALSE; }
+        if (to == from) return FALSE;
         g.pos[shell::base_of(to)] = item_pos(i);   // the icon stays where it is
         g.pos.erase(g.items[(size_t)i].name);
         save_positions();
