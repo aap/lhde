@@ -24,7 +24,7 @@ extern "C" const unsigned char flxp_explorer_res_start[], flxp_explorer_res_end[
 
 namespace dialogs {
 
-static HINSTANCE module()
+HINSTANCE module()
 {
     static res::Module* m;
     if (!m) m = res::load_memory(flxp_explorer_res_start, (size_t)(flxp_explorer_res_end - flxp_explorer_res_start));

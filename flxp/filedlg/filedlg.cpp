@@ -2176,7 +2176,7 @@ static LRESULT drop_message(Dlg& d, UINT msg, const FLXPDROP* f)
     if (!e) return 0;
     std::string err;
     bool ok = shell::drop_items(paths, dest, e, &err);
-    if (!ok) message_box(d.dlg, "Error Copying File or Folder", "Cannot copy or move the files.\n" + err, MB_OK | MB_ICONEXCLAMATION);
+    if (!ok && !err.empty()) message_box(d.dlg, "Error Copying File or Folder", "Cannot copy or move the files.\n" + err, MB_OK | MB_ICONEXCLAMATION);
     fill_list(d);
     return ok ? e : 0;
 }

@@ -147,8 +147,12 @@ bool new_text_file(const std::string& dir, std::string* path, std::string* err)
     return true;
 }
 
+static PasteUI g_paste_ui;
+void set_paste_ui(PasteUI ui) { g_paste_ui = ui; }
+
 bool paste_items(const std::vector<std::string>& sources, const std::string& dest_dir, bool move, std::string* err)
 {
+    if (g_paste_ui) return g_paste_ui(sources, dest_dir, move, err);
     fileops::Result r = fileops::run(move ? fileops::Op::Move : fileops::Op::Copy, sources, dest_dir);
     if (!r.ok && err) *err = r.summary();
     return r.ok;

@@ -17,7 +17,6 @@ not *entirely* sure about the font for all themes though
 ## flxp behavior
 
 * match copy/move behaviour with windows
-	* handle collision with existing files
 	* need to show a progress dialog for bigger operations
 
 * file-rename still feels off, especially on long filenames that show as multi-line

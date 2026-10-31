@@ -346,7 +346,7 @@ static void test_overwrite()
         put(t + "/f", "new f"); mk(t + "/d"); put(t + "/d/x", "new x"); put(t + "/d/y", "new y"); put(t + "/g", "new g");
         put(u + "/f", "old f"); mk(u + "/d"); put(u + "/d/x", "old x"); put(u + "/d/keep", "keep"); put(u + "/g", "old g");
     };
-    // No for f, Yes for d (merge) and for d/x, Yes for g
+    // No for f, Yes for d (merge: as XP's, its files are then replaced without asking), g too
     setup();
     std::vector<std::string> asked;
     fileops::Options o;
@@ -358,36 +358,42 @@ static void test_overwrite()
         return Answer::Yes;
     };
     fileops::Result r = fileops::run(Op::Copy, { t + "/f", t + "/d", t + "/g" }, u, o);
-    CHECK(r.ok && asked.size() == 4);
+    CHECK(r.ok && asked.size() == 2);
     CHECK(get(u + "/f") == "old f" && get(u + "/d/x") == "new x" && get(u + "/d/y") == "new y" && get(u + "/d/keep") == "keep" && get(u + "/g") == "new g");
     CHECK(get(t + "/f") == "new f" && entries(u) == 3 && !has_parts(u));
-    // Yes to All: asked once
+    // ... except a read-only file: still asked
+    setup(); asked.clear(); chmod((u + "/d/x").c_str(), 0444);
+    r = fileops::run(Op::Copy, { t + "/f", t + "/d", t + "/g" }, u, o);
+    if (geteuid() != 0) CHECK(r.ok && asked.size() == 3 && asked[2] == u + "/d/x");
+    // Yes to All on a file: no more files asked; the folder still is (XP clears only the files' question)
     setup(); asked.clear();
     o.confirm = [&](const fileops::Conflict& c) { asked.push_back(c.dst); return Answer::YesToAll; };
     r = fileops::run(Op::Copy, { t + "/f", t + "/d", t + "/g" }, u, o);
-    CHECK(r.ok && asked.size() == 1 && get(u + "/f") == "new f" && get(u + "/d/x") == "new x" && get(u + "/g") == "new g");
-    // No to All: nothing replaced, y not copied either (d itself is a No)
+    CHECK(r.ok && asked.size() == 2 && get(u + "/f") == "new f" && get(u + "/d/x") == "new x" && get(u + "/g") == "new g");
+    // No to All on a file: no more files replaced; the folder is still asked (No to All again: y not copied either)
     setup(); asked.clear();
     o.confirm = [&](const fileops::Conflict& c) { asked.push_back(c.dst); return Answer::NoToAll; };
     r = fileops::run(Op::Copy, { t + "/f", t + "/d", t + "/g" }, u, o);
-    CHECK(r.ok && asked.size() == 1 && get(u + "/f") == "old f" && !exists(u + "/d/y") && get(u + "/g") == "old g");
-    // Cancel at d/x: f was replaced already (kept), d's new entries go, g untouched; cancelled
-    setup();
+    CHECK(r.ok && asked.size() == 2 && asked[1] == u + "/d" && get(u + "/f") == "old f" && !exists(u + "/d/y") && get(u + "/g") == "old g");
+    // Cancel at d/x (read-only, so asked): f was replaced already (kept), d's new entries go, g untouched; cancelled
+    setup(); chmod((u + "/d/x").c_str(), 0444);
     o.confirm = [&](const fileops::Conflict& c) { return c.dst == u + "/d/x" ? Answer::Cancel : Answer::Yes; };
     r = fileops::run(Op::Copy, { t + "/f", t + "/d", t + "/g" }, u, o);
-    CHECK(r.cancelled && !r.ok && r.errors.empty());
-    CHECK(get(u + "/f") == "new f" && get(u + "/d/x") == "old x" && get(u + "/d/keep") == "keep" && get(u + "/g") == "old g");
-    CHECK(!exists(u + "/d/y") || get(u + "/d/y") == "<missing>");
+    if (geteuid() != 0) {
+        CHECK(r.cancelled && !r.ok && r.errors.empty());
+        CHECK(get(u + "/f") == "new f" && get(u + "/d/x") == "old x" && get(u + "/d/keep") == "keep" && get(u + "/g") == "old g");
+        CHECK(!exists(u + "/d/y") || get(u + "/d/y") == "<missing>");
+    }
     // move with Yes (same filesystem): merged, the emptied source folder gone, the No'd item stays
     setup();
     o.confirm = [&](const fileops::Conflict& c) { return c.dst == u + "/g" ? Answer::No : Answer::Yes; };
-    r = fileops::run(Op::Move, { t + "/f", t + "/d", t + "/g" }, u, o);
+    r = fileops::run(Op::Move, { t + "/g", t + "/f", t + "/d" }, u, o);
     CHECK(r.ok && get(u + "/f") == "new f" && get(u + "/d/x") == "new x" && get(u + "/d/y") == "new y" && get(u + "/d/keep") == "keep");
     CHECK(!exists(t + "/f") && !exists(t + "/d") && get(t + "/g") == "new g" && get(u + "/g") == "old g");
-    // move with merge across filesystems, a No inside: that file and its folder stay
+    // move with merge across filesystems, a No inside (read-only, so asked): that file and its folder stay
     std::string w = fresh(B, "overx");
     setup();
-    mk(w + "/d"); put(w + "/d/x", "old x"); put(w + "/f", "old f");
+    mk(w + "/d"); put(w + "/d/x", "old x", 0444); put(w + "/f", "old f");
     o.confirm = [&](const fileops::Conflict& c) { return c.dst == w + "/d/x" ? Answer::No : Answer::Yes; };
     r = fileops::run(Op::Move, { t + "/f", t + "/d" }, w, o);
     CHECK(r.ok);
@@ -404,6 +410,117 @@ static void test_overwrite()
     r = fileops::run(Op::Move, { t + "/f" }, u);
     CHECK(r.ok && get(u + "/f") == "old f" && get(u + "/Copy of f") == "new f" && !exists(t + "/f"));
     nuke(t); nuke(u); nuke(w);
+}
+
+// What the explorer's file operation UI relies on (XP's copy engine rules):
+// "Copy of" naming, the questions asked through confirm and when, failures
+// reported as they happen with Retry / go on / stop, the XP reasons.
+static void test_xp_rules()
+{
+    std::string t = fresh(A, "xp"), u = fresh(A, "xpdst");
+    std::vector<fileops::Conflict> asked;
+    fileops::Options o;
+    o.confirm = [&](const fileops::Conflict& c) { asked.push_back(c); return Answer::Yes; };
+    // a copy into its own folder: "Copy of f", "Copy (2) of f", ...; never asked
+    put(t + "/f.txt", "f");
+    fileops::Result r = fileops::run(Op::Copy, { t + "/f.txt" }, t, o);
+    CHECK(r.ok && get(t + "/Copy of f.txt") == "f" && asked.empty());
+    r = fileops::run(Op::Copy, { t + "/f.txt" }, t, o);
+    CHECK(r.ok && exists(t + "/Copy (2) of f.txt") && r.created.size() == 1 && r.created[0] == t + "/Copy (2) of f.txt");
+    // "Copy of x" copied again is "Copy of Copy of x"; "Copy (2) of x" counts on
+    r = fileops::run(Op::Copy, { t + "/Copy of f.txt" }, t, o);
+    CHECK(r.ok && exists(t + "/Copy of Copy of f.txt"));
+    r = fileops::run(Op::Copy, { t + "/Copy (2) of f.txt" }, t, o);
+    CHECK(r.ok && exists(t + "/Copy (3) of f.txt") && !exists(t + "/Copy of Copy (2) of f.txt"));
+    // a gap is filled: (2) gone, the next copy of f is (2) again
+    unlink((t + "/Copy (2) of f.txt").c_str());
+    r = fileops::run(Op::Copy, { t + "/f.txt" }, t, o);
+    CHECK(r.ok && exists(t + "/Copy (2) of f.txt"));
+    // folders too
+    mk(t + "/dir"); put(t + "/dir/x", "x");
+    r = fileops::run(Op::Copy, { t + "/dir" }, t, o);
+    CHECK(r.ok && get(t + "/Copy of dir/x") == "x" && asked.empty());
+
+    // another folder with the name: Confirm File Replace, with both files' details; read-only noticed
+    put(u + "/f.txt", "old", 0444);
+    struct stat st; lstat((t + "/f.txt").c_str(), &st);
+    r = fileops::run(Op::Copy, { t + "/f.txt" }, u, o);
+    CHECK(asked.size() == 1 && asked[0].kind == fileops::Conflict::Replace && !asked[0].folder && asked[0].dst == u + "/f.txt" && asked[0].only);
+    CHECK(asked[0].src_size == 1 && asked[0].dst_size == 3 && asked[0].src_mtime == st.st_mtime);
+    if (geteuid() != 0) CHECK(asked[0].dst_readonly);
+    CHECK(r.ok && get(u + "/f.txt") == "f");
+    put(u + "/g", "old");
+    put(t + "/g", "new");
+    asked.clear();
+    r = fileops::run(Op::Copy, { t + "/g" }, u, o);
+    CHECK(asked.size() == 1 && !asked[0].dst_readonly);
+    // a folder: Confirm Folder Replace (merge)
+    mk(u + "/dir");
+    asked.clear();
+    r = fileops::run(Op::Copy, { t + "/dir" }, u, o);
+    CHECK(r.ok && asked.size() == 1 && asked[0].folder && get(u + "/dir/x") == "x");
+
+    // a read-only file moved: Confirm File Move, once per file; No leaves it, Yes to All asks no more
+    put(t + "/ro1", "1", 0444); put(t + "/ro2", "2", 0444); put(t + "/rw", "w");
+    asked.clear();
+    o.confirm = [&](const fileops::Conflict& c) { asked.push_back(c); return c.src == t + "/ro1" ? Answer::No : Answer::YesToAll; };
+    std::string v = fresh(A, "xpmove");
+    r = fileops::run(Op::Move, { t + "/ro1", t + "/ro2", t + "/rw" }, v, o);
+    CHECK(r.ok && asked.size() == 2 && asked[0].kind == fileops::Conflict::MoveReadOnly && asked[1].src == t + "/ro2" && !asked[0].only);
+    CHECK(exists(t + "/ro1") && !exists(t + "/ro2") && get(v + "/ro2") == "2" && get(v + "/rw") == "w");
+    // no callback: not asked (as before)
+    r = fileops::run(Op::Move, { t + "/ro1" }, v);
+    CHECK(r.ok && get(v + "/ro1") == "1");
+
+    // a move onto itself: XP's "The source and destination file names are the same", reported through confirm
+    asked.clear();
+    o.confirm = [&](const fileops::Conflict& c) { asked.push_back(c); return Answer::Cancel; };
+    r = fileops::run(Op::Move, { v + "/rw" }, v, o);
+    CHECK(!r.ok && asked.size() == 1 && asked[0].kind == fileops::Conflict::Failed && asked[0].error.reason == fileops::Reason::SameFile);
+    CHECK(r.errors.size() == 1 && r.errors[0].reported && r.summary().empty() && get(v + "/rw") == "w");
+    // into itself / into a subfolder
+    mk(t + "/outer"); mk(t + "/outer/inner");
+    asked.clear();
+    o.confirm = [&](const fileops::Conflict& c) { asked.push_back(c); return Answer::No; };
+    r = fileops::run(Op::Copy, { t + "/outer" }, t + "/outer", o);
+    r = fileops::run(Op::Move, { t + "/outer" }, t + "/outer/inner", o);
+    CHECK(asked.size() == 2 && asked[0].error.reason == fileops::Reason::IntoItself && asked[1].error.reason == fileops::Reason::IntoSubfolder);
+    // a file onto a folder
+    mk(v + "/clash"); put(t + "/clash", "c");
+    asked.clear();
+    r = fileops::run(Op::Copy, { t + "/clash" }, v, o);
+    CHECK(asked.size() == 1 && asked[0].error.reason == fileops::Reason::FileOntoFolder && is_dir(v + "/clash"));
+
+    // a failure is asked about when it happens: No goes on with the next item, Cancel stops,
+    // Retry tries the item again (here after the cause is gone); the reported errors leave summary()
+    if (geteuid() != 0) {
+        std::string w = fresh(A, "xpfail");
+        put(t + "/locked", "secret", 0000); put(t + "/after", "after");
+        asked.clear();
+        o.confirm = [&](const fileops::Conflict& c) { asked.push_back(c); return Answer::No; };
+        r = fileops::run(Op::Copy, { t + "/locked", t + "/after" }, w, o);
+        CHECK(asked.size() == 1 && asked[0].kind == fileops::Conflict::Failed && asked[0].error.code == EACCES && !asked[0].error.dest);
+        CHECK(!r.ok && !r.cancelled && get(w + "/after") == "after" && !exists(w + "/locked") && r.summary().empty() && !has_parts(w));
+        unlink((w + "/after").c_str());
+        o.confirm = [&](const fileops::Conflict&) { return Answer::Cancel; };
+        r = fileops::run(Op::Copy, { t + "/locked", t + "/after" }, w, o);
+        CHECK(!r.ok && r.cancelled && !exists(w + "/after"));
+        int tries = 0;
+        o.confirm = [&](const fileops::Conflict&) { tries++; chmod((t + "/locked").c_str(), 0644); return Answer::Retry; };
+        r = fileops::run(Op::Copy, { t + "/locked", t + "/after" }, w, o);
+        CHECK(r.ok && tries == 1 && r.errors.empty() && get(w + "/locked") == "secret" && get(w + "/after") == "after");
+        // the destination side: an unwritable folder
+        chmod((t + "/locked").c_str(), 0644);
+        std::string ro = fresh(A, "xpro");
+        chmod(ro.c_str(), 0555);
+        asked.clear();
+        o.confirm = [&](const fileops::Conflict& c) { asked.push_back(c); return Answer::No; };
+        r = fileops::run(Op::Copy, { t + "/after" }, ro, o);
+        CHECK(asked.size() == 1 && asked[0].error.dest && asked[0].error.code == EACCES);
+        chmod(ro.c_str(), 0755);
+        nuke(ro); nuke(w);
+    }
+    nuke(t); nuke(u); nuke(v);
 }
 
 static void test_trash_remove()
@@ -479,6 +596,7 @@ int main(int argc, char** argv)
     test_metadata();
     test_sparse();
     test_overwrite();
+    test_xp_rules();
     test_trash_remove();
     test_job();
     nuke(A); nuke(B);

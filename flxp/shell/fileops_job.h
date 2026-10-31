@@ -18,7 +18,12 @@
 //   Directories get their times after their contents are in.
 // - Name clashes: without a confirm callback the copy gets Explorer's
 //   "Copy of x" name (as before); with one, XP's Confirm File/Folder Replace:
-//   Yes / Yes to All / No / No to All / Cancel, folders merge.
+//   Yes / Yes to All / No / No to All / Cancel, folders merge. A copy onto
+//   itself (into the folder it is in) is always "Copy of x", "Copy (2) of x".
+// - With a confirm callback the engine also asks what XP's copy engine asks:
+//   for a read-only file being moved (Confirm File Move), and after a failed
+//   item (Conflict::Failed, the item rolled back) whether to retry it, go on
+//   or stop; a move onto itself is then an error (XP's DE_SAMEFILE).
 #pragma once
 #include <stdint.h>
 // includable after windows.h (whose min/max macros break <functional>)
@@ -37,26 +42,43 @@ namespace shell {
 namespace fileops {
 
 enum class Op { Copy, Move, Trash, Remove };   // Remove: permanent delete (never crosses into other filesystems)
-enum class Answer { Yes, YesToAll, No, NoToAll, Cancel };
+enum class Answer { Yes, YesToAll, No, NoToAll, Cancel, Retry };
+
+// What went wrong beyond the errno: the cases XP words itself (its DE_* codes)
+enum class Reason { None, SameFile, IntoItself, IntoSubfolder, FileOntoFolder, FolderOntoFile, Changed };
+
+struct Error {
+    std::string path;
+    int code = 0;                   // errno
+    std::string what;               // "Cannot copy", "Cannot remove the original of", ...
+    Reason reason = Reason::None;
+    bool dest = false;              // on the destination side (creating, writing or replacing the copy)
+    bool reported = false;          // the user saw it (Conflict::Failed): left out of summary()
+    std::string text() const;       // "Cannot copy /a/b: Permission denied"
+};
 
 struct Conflict {
+    enum Kind {
+        Replace,                    // dst exists: Yes, Yes to All, No, No to All, Cancel
+        MoveReadOnly,               // src is a read-only file being moved: the same answers
+        Failed,                     // the item failed and was rolled back: Retry, No (go on), Cancel (stop)
+    };
+    Kind kind = Replace;
     std::string src, dst;           // the item and the existing one it would replace
     bool folder = false;            // both folders: Yes merges (XP's Confirm Folder Replace)
+    bool dst_readonly = false;      // Replace: the existing file is not writable
+    bool only = false;              // the operation's one and only item (XP then offers Yes and No alone)
     uint64_t src_size = 0, dst_size = 0;
     int64_t src_mtime = 0, dst_mtime = 0;   // seconds
+    Error error;                    // Failed: the item's first error
 };
 
 struct Progress {
     uint64_t bytes_done = 0, bytes_total = 0;   // totals 0 while unknown (count = false)
     uint64_t items_done = 0, items_total = 0;   // every file, folder and link
     std::string current;                        // the source being worked on
-};
-
-struct Error {
-    std::string path;
-    int code = 0;                   // errno
-    std::string what;               // "Cannot copy", "Cannot remove the original of", ...
-    std::string text() const;       // "Cannot copy /a/b: Permission denied"
+    std::string current_dst;                    // where it goes (copy and move)
+    bool counting = false;                      // still walking the sources for the totals
 };
 
 struct Result {
@@ -64,11 +86,11 @@ struct Result {
     bool cancelled = false;
     std::vector<Error> errors;      // one per failure, in order
     std::vector<std::string> created;   // where each completed top-level item now is
-    std::string summary(size_t max_lines = 8) const;   // the errors as one message ("" when ok)
+    std::string summary(size_t max_lines = 8) const;   // the unreported errors as one message ("" when ok)
 };
 
 struct Options {
-    std::function<Answer(const Conflict&)> confirm;     // null: "Copy of x" naming
+    std::function<Answer(const Conflict&)> confirm;     // null: "Copy of x" naming, errors only collected
     std::function<void(const Progress&)> progress;      // called on the working thread
     const std::atomic<bool>* cancel = nullptr;          // checked between files and every 1 MiB
     bool count = true;              // walk the sources first for the totals (only with progress)

@@ -89,12 +89,27 @@ bool chain_contains(const std::string& path, const Id& anc)
     return found;
 }
 
+// XP's copy.c _HandleRename with PathYetAnotherMakeUniqueName: the template
+// "Copy () of x" tried as "Copy of x", then "Copy (2) of x", "Copy (3) of x";
+// a name that already is "Copy (n) of x" is its own template ("Copy (n+..) of x",
+// from 2), while "Copy of x" becomes "Copy of Copy of x".
 std::string copy_of_name(const std::string& dir, const std::string& base)
 {
     struct stat st;
-    std::string name = "Copy of " + base;
-    for (int n = 2; lstat((dir + "/" + name).c_str(), &st) == 0; n++) name = "Copy (" + std::to_string(n) + ") of " + base;
-    return name;
+    auto taken = [&](const std::string& n) { return lstat((dir + "/" + n).c_str(), &st) == 0; };
+    std::string rest = base;
+    bool numbered = false;
+    if (base.compare(0, 6, "Copy (") == 0) {
+        size_t i = 6;
+        while (i < base.size() && base[i] >= '0' && base[i] <= '9') i++;
+        if (i > 6 && base.compare(i, 5, ") of ") == 0) { rest = base.substr(i + 5); numbered = true; }
+    }
+    std::string name = "Copy of " + rest;
+    if (!numbered && !taken(name)) return name;
+    for (int n = 2; ; n++) {
+        name = "Copy (" + std::to_string(n) + ") of " + rest;
+        if (!taken(name)) return name;
+    }
 }
 
 bool user_xattr(const char* name) { return !strncmp(name, "user.", 5); }
@@ -107,13 +122,15 @@ struct Engine {
     const Options& o;
     Result& r;
     Progress prog;
-    bool yes_all = false, no_all = false;
+    enum { AskFile = 1, AskFolder = 2, AskMove = 4, AskReadOnly = 8 };
+    unsigned asks = ~0u, no_all = 0;    // see ask()
     bool stop = false;                  // cancelled (flag or a Cancel answer)
     bool root = geteuid() == 0;
     // the item in progress
     std::vector<std::string> created;   // creation order
     std::vector<Moved> moved;           // sources copied by a cross-fs move, pre-order
     int skipped = 0;
+    size_t nsources = 0;                // top-level items in the operation
     std::vector<Id> stack;              // directories being copied (loop guard)
     char* buf = nullptr;                // read/write fallback buffer
     enum { Chunk = 1 << 20 };
@@ -121,9 +138,12 @@ struct Engine {
     Engine(Op op, const Options& o, Result& r) : op(op), o(o), r(r) {}
     ~Engine() { free(buf); }
 
-    void fail(const std::string& what, const std::string& path, int code)
+    // dest: the failure is on the copy's side (XP: "Cannot create or replace x")
+    void fail(const std::string& what, const std::string& path, int code, Reason reason = Reason::None)
     {
-        Error e; e.what = what; e.path = path; e.code = code;
+        Error e; e.what = what; e.path = path; e.code = code; e.reason = reason;
+        for (const char* d : { "Cannot create", "Cannot write", "Cannot set", "Cannot open" })
+            if (what.compare(0, strlen(d), d) == 0) e.dest = true;
         r.errors.push_back(e);
     }
     bool cancelled()
@@ -144,14 +164,26 @@ struct Engine {
         report();
     }
 
+    // XP's confirmation state (copy.c ConfirmFileOp and SetConfirmMaskAndText):
+    // what a question needs still asked, what a Yes / Yes to All takes off for
+    // the rest of the operation, what No to All (Shift+No) answers from now on.
+    // A Yes to replace a folder means its files are replaced without asking.
     Answer ask(const Conflict& c)
     {
-        if (yes_all) return Answer::Yes;
-        if (no_all) return Answer::No;
+        unsigned need, yes = 0, yes_all;
+        if (c.kind == Conflict::MoveReadOnly) { need = AskReadOnly; yes_all = AskMove | AskReadOnly; }
+        else if (c.folder) { need = AskFolder; yes = AskFile; yes_all = AskFile | AskFolder; }
+        else if (c.dst_readonly) { need = AskReadOnly; yes_all = AskFile | AskReadOnly; }
+        else { need = AskFile; yes_all = AskFile; }
+        if (!(asks & need)) return Answer::Yes;
+        if ((no_all & need) == need) return Answer::No;
         Answer a = o.confirm(c);
-        if (a == Answer::YesToAll) { yes_all = true; return Answer::Yes; }
-        if (a == Answer::NoToAll) { no_all = true; return Answer::No; }
-        return a;
+        switch (a) {
+        case Answer::Yes: case Answer::Retry: asks &= ~yes; return Answer::Yes;
+        case Answer::YesToAll: asks &= ~yes_all; return Answer::Yes;
+        case Answer::NoToAll: no_all |= yes_all; return Answer::No;
+        default: return a;
+        }
     }
 
     // a fresh "name.flxp-part" next to dst, opened or made with make(); recorded
@@ -255,7 +287,7 @@ struct Engine {
         if (in < 0) { fail("Cannot read", src, errno); return false; }
         struct stat ss;
         if (fstat(in, &ss) != 0) { fail("Cannot read", src, errno); close(in); return false; }
-        if (!(id_of(ss) == id_of(ls)) || !S_ISREG(ss.st_mode)) { fail("Changed while being copied:", src, ESTALE); close(in); return false; }
+        if (!(id_of(ss) == id_of(ls)) || !S_ISREG(ss.st_mode)) { fail("Changed while being copied:", src, ESTALE, Reason::Changed); close(in); return false; }
         std::string part;
         int out = -1;
         for (int n = 1; n < 100 && out < 0; n++) {
@@ -284,7 +316,7 @@ struct Engine {
         if (ok && ftruncate(out, size) != 0) { fail("Cannot write", dst, errno); ok = false; }
         // verify: the source still has the size that was copied
         struct stat after;
-        if (ok && (fstat(in, &after) != 0 || after.st_size != size)) { fail("Changed while being copied:", src, EAGAIN); ok = false; }
+        if (ok && (fstat(in, &after) != 0 || after.st_size != size)) { fail("Changed while being copied:", src, EAGAIN, Reason::Changed); ok = false; }
         prog.bytes_done += (uint64_t)size - std::min<uint64_t>((uint64_t)size, written);   // the holes
         if (ok) ok = apply_meta(in, out, src, dst, ss);
         close(in);
@@ -396,10 +428,12 @@ struct Engine {
         struct stat ss, ds;
         if (lstat(src.c_str(), &ss) != 0) { fail(op == Op::Move ? "Cannot move" : "Cannot copy", src, errno); return false; }
         prog.current = src;
+        prog.current_dst = dst_dir + "/" + name;
         if (top) report();
         std::string dst = dst_dir + "/" + name;
         bool exists = lstat(dst.c_str(), &ds) == 0;
         if (exists && id_of(ss) == id_of(ds)) {          // onto itself
+            if (top && op == Op::Move && o.confirm) { fail("Cannot move", src, 0, Reason::SameFile); return false; }
             if (!(top && op == Op::Copy)) { skip(src); if (final_dst) *final_dst = dst; return true; }
             name = copy_of_name(dst_dir, name);
             dst = dst_dir + "/" + name;
@@ -413,9 +447,14 @@ struct Engine {
         }
         if (exists) {
             bool sdir = S_ISDIR(ss.st_mode), ddir = S_ISDIR(ds.st_mode);
-            if (sdir != ddir) { fail(ddir ? "A folder with that name exists:" : "A file with that name exists:", dst, ddir ? EISDIR : ENOTDIR); return false; }
+            if (sdir != ddir) {
+                fail(ddir ? "A folder with that name exists:" : "A file with that name exists:", dst, ddir ? EISDIR : ENOTDIR,
+                     ddir ? Reason::FileOntoFolder : Reason::FolderOntoFile);
+                return false;
+            }
             Conflict c;
-            c.src = src; c.dst = dst; c.folder = sdir;
+            c.src = src; c.dst = dst; c.folder = sdir; c.only = top && nsources == 1;
+            c.dst_readonly = !ddir && access(dst.c_str(), W_OK) != 0 && errno == EACCES;
             c.src_size = (uint64_t)ss.st_size; c.dst_size = (uint64_t)ds.st_size;
             c.src_mtime = ss.st_mtime; c.dst_mtime = ds.st_mtime;
             Answer a = ask(c);
@@ -423,6 +462,17 @@ struct Engine {
             if (a == Answer::No) { skip(src); return true; }
             if (sdir && chain_contains(src, id_of(ds))) { fail("Cannot merge a folder into one that contains it:", src, EINVAL); return false; }
         }
+        // XP's Confirm File Move: a read-only file (no write permission at all) moved, asked once per file
+        if (op == Op::Move && o.confirm && S_ISREG(ss.st_mode) && !(ss.st_mode & 0222)) {
+            Conflict c;
+            c.kind = Conflict::MoveReadOnly; c.only = top && nsources == 1;
+            c.src = src; c.dst = dst;
+            c.src_size = (uint64_t)ss.st_size; c.src_mtime = ss.st_mtime;
+            Answer a = ask(c);
+            if (a == Answer::Cancel) { stop = true; return false; }
+            if (a == Answer::No) { skip(src); return true; }
+        }
+        prog.current_dst = dst;
         if (final_dst) *final_dst = dst;
         if (op == Op::Move) {
             if (exists && S_ISDIR(ss.st_mode)) {         // merge: entry by entry, then the emptied folder
@@ -550,15 +600,20 @@ void count_tree(const std::string& p, Totals& t, uint64_t max_items, std::vector
 
 std::string Error::text() const
 {
-    return what + (path.empty() ? std::string() : " " + path) + (code ? std::string(": ") + strerror(code) : std::string());
+    std::string why = code ? strerror(code) : reason == Reason::SameFile ? "the source and destination are the same" : "";
+    return what + (path.empty() ? std::string() : " " + path) + (why.empty() ? std::string() : ": " + why);
 }
 
 std::string Result::summary(size_t max_lines) const
 {
     std::string s;
-    for (size_t i = 0; i < errors.size() && i < max_lines; i++) s += (s.empty() ? "" : "\n") + errors[i].text();
-    if (errors.size() > max_lines) s += "\n(" + std::to_string(errors.size() - max_lines) + " more)";
-    if (s.empty() && cancelled) s = "Cancelled.";
+    size_t n = 0, shown = 0;
+    for (const Error& e : errors) {
+        if (e.reported) continue;
+        if (n++ < max_lines) { s += (s.empty() ? "" : "\n") + e.text(); shown++; }
+    }
+    if (n > shown) s += "\n(" + std::to_string(n - shown) + " more)";
+    if (errors.empty() && cancelled) s = "Cancelled.";
     return s;
 }
 
@@ -596,10 +651,14 @@ Result run(Op op, const std::vector<std::string>& sources, const std::string& de
 {
     Result r;
     Engine e(op, o, r);
+    e.nsources = sources.size();
     if (o.progress && o.count) {
+        e.prog.counting = true;
+        e.report();
         Totals t = count(sources);
         e.prog.bytes_total = t.bytes;
         e.prog.items_total = t.items;
+        e.prog.counting = false;
     }
     if (op == Op::Trash || op == Op::Remove) {
         for (const std::string& s : sources) {
@@ -636,16 +695,18 @@ Result run(Op op, const std::vector<std::string>& sources, const std::string& de
         return r;
     }
     const char* verb = op == Op::Move ? "Cannot move" : "Cannot copy";
-    for (const std::string& s : sources) {
-        if (e.cancelled()) break;
+    // one top-level item; true: done, false: it failed (errors recorded, rolled back)
+    auto item = [&](const std::string& s) -> bool {
         std::string parent, name;
-        if (!split_source(s, &parent, &name)) { e.fail(verb, s, errno); continue; }
+        if (!split_source(s, &parent, &name)) { e.fail(verb, s, errno); return false; }
         std::string src = parent + "/" + name;
         struct stat ss;
-        if (lstat(src.c_str(), &ss) != 0) { e.fail(verb, src, errno); continue; }
+        if (lstat(src.c_str(), &ss) != 0) { e.fail(verb, src, errno); return false; }
         if (S_ISDIR(ss.st_mode) && chain_contains(dest, id_of(ss))) {
-            e.fail(std::string(verb) + " (the destination folder is the folder itself or inside it):", src, EINVAL);
-            continue;
+            bool self = id_of(ss) == id_of(dst_st);
+            e.fail(std::string(verb) + (self ? " (the destination folder is the folder itself):" : " (the destination folder is inside it):"),
+                   src, EINVAL, self ? Reason::IntoItself : Reason::IntoSubfolder);
+            return false;
         }
         e.created.clear(); e.moved.clear(); e.skipped = 0;
         size_t errs = r.errors.size();
@@ -654,11 +715,30 @@ Result run(Op op, const std::vector<std::string>& sources, const std::string& de
         if (!ok || e.stop || r.errors.size() != errs) {
             if (o.rollback) e.rollback();
             e.moved.clear();
-            if (e.stop) break;
-            continue;
+            return false;
         }
-        if (op == Op::Move && !e.remove_moved()) continue;
+        if (op == Op::Move && !e.remove_moved()) return false;
         if (!final_dst.empty()) r.created.push_back(final_dst);
+        return true;
+    };
+    for (const std::string& s : sources) {
+        if (e.cancelled()) break;
+        for (;;) {
+            size_t errs = r.errors.size();
+            uint64_t bytes = e.prog.bytes_done, items = e.prog.items_done;
+            if (item(s) || e.stop || !o.confirm || r.errors.size() == errs) break;
+            // XP's copy engine reports a failure when it happens: Retry the item, go on (No), or stop
+            Conflict c;
+            c.kind = Conflict::Failed;
+            c.src = s;
+            c.error = r.errors[errs];
+            Answer a = o.confirm(c);
+            for (size_t i = errs; i < r.errors.size(); i++) r.errors[i].reported = true;
+            if (a == Answer::Retry) { r.errors.resize(errs); e.prog.bytes_done = bytes; e.prog.items_done = items; continue; }
+            if (a != Answer::No) e.stop = true;
+            break;
+        }
+        if (e.stop) break;
     }
     r.cancelled = e.stop;
     r.ok = r.errors.empty() && !r.cancelled;

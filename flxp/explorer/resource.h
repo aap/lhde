@@ -54,3 +54,24 @@
 #define IDC_FO_RESETALL     1507
 #define IDC_FO_REMEMBER     1508
 #define IDC_FO_HIDDEN       1509
+
+// file operations (fileopui.cpp): XP's shell32 DLG_REPLACE_FILE, DLG_REPLACE_FOLDER,
+// DLG_MOVE_FILE, DLG_MOVECOPYPROGRESS and a message box for the errors
+#define IDD_OP_REPLACEFILE  110
+#define IDD_OP_REPLACEFOLDER 111
+#define IDD_OP_MOVEFILE     112
+#define IDD_OP_PROGRESS     113
+#define IDD_OP_MESSAGE      114
+
+#define IDC_OP_YESTOALL     1601
+#define IDC_OP_ICON         1602
+#define IDC_OP_TEXT         1603
+#define IDC_OP_OLDINFO      1604
+#define IDC_OP_OLDICON      1605
+#define IDC_OP_NEWINFO      1606
+#define IDC_OP_NEWICON      1607
+#define IDC_OP_ANIMATE      1610
+#define IDC_OP_NAME         1611
+#define IDC_OP_TONAME       1612
+#define IDC_OP_PROGRESS     1613
+#define IDC_OP_TIMEEST      1614
