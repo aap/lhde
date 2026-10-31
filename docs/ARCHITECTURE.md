@@ -75,6 +75,11 @@ files are moved there once by liblhde's migration, which every program runs at s
   sample. What stays split: the classic frame's geometry (cnBorders, the button rectangles) is written twice, luxwm's `frame.c`
   and the sample in `flxp/settings`, kept equal by hand; and luxwm's glass and msstyles frames are its own compositions of the
   style's parts (drawn through wuxtheme, laid out by `frame.c` after uxtheme's nctheme rules), not uxtheme's non-client code.
+- **Popup menus**: the themed popup menu has one painter, wuxtheme's (`wuxtheme/menu.cpp`: XP's popup in the style's colours and
+  menu font, the Longhorn/Vista Menu parts where the style has them), which Wine's user32 menus in wux call for every popup (flxp's
+  context menus, menu band, start menu cascades) and luxwm's window menu reaches through `ut_menu_layout` / `ut_menu_draw`; luxwm
+  keeps only the geometry on screen, the shadow and the input. luxshell's Lua menus (`luxshell/menu.lua`) are a different thing on
+  purpose: the Avalon ContextMenu of the 4074 sidebar and taskbar, drawn from the shell pack's colours.
 - **Theme resolution**: one implementation, liblhde; flxp's `shell/lhtheme.cpp` only maps the record onto flxp's older keys.
 
 ## Where to look first

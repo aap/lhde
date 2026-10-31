@@ -24,6 +24,7 @@ extern "C" {
 #include "msstyles.h"
 }
 #include "wuxtheme/ut.h"
+#include "wuxtheme/menu.h"
 
 struct ut_theme {
     PTHEME_FILE tf;
@@ -905,6 +906,119 @@ int ut_draw_caption(uint32_t* pixels, int width, int height, int stride, const u
         SelectObject(dc.hdc(), old);
         DeleteObject(f);
     }
+    return 1;
+}
+
+} // extern "C"
+
+// ---- popup menus (ut_menu_*: wuxtheme/menu.h's painter) ----------------------------------------------------------------------
+namespace {
+
+struct MenuRun {
+    UXMENU_LOOK L;
+    std::vector<std::u16string> text, accel;
+    std::vector<int> y, h;
+    int w = 0, hh = 0;
+    MenuRun(const ut_menu_spec* s, const ut_menu_item* items, int n)
+    {
+        COLORREF tab[UT_SYSCOLORS];
+        for (int i = 0; i < UT_SYSCOLORS; i++) {
+            uint32_t c = s->colors ? s->colors[i] : 0;
+            tab[i] = s->colors ? RGB(c >> 16 & 255, c >> 8 & 255, c & 255) : GetSysColor(i);
+        }
+        int flat = s->flat > 0 ? 1 : 0;
+        LOGFONTW lf = {};
+        bool have_font = false;
+        PTHEME_CLASS menu = nullptr;
+        if (ut_theme* t = s->theme) {
+            // the style's [SysMetrics] colours over the table (TMT_SCROLLBAR.. are in COLOR_ order), FLATMENUS, MENUFONT
+            for (PTHEME_PROPERTY p = t->tf->metrics; p; p = p->next) {
+                int i = p->iPropertyId - TMT_FIRSTCOLOR;
+                COLORREF c;
+                if (i >= 0 && i < UT_SYSCOLORS && SUCCEEDED(MSSTYLES_GetPropertyColor(p, &c))) tab[i] = c;
+                BOOL b;
+                if (p->iPropertyId == TMT_FLATMENUS && s->flat < 0 && SUCCEEDED(MSSTYLES_GetPropertyBool(p, &b))) flat = b ? 1 : 0;
+                if (p->iPropertyId == TMT_MENUFONT && !s->font) {
+                    MemDC dc;
+                    if (SUCCEEDED(MSSTYLES_GetPropertyFont(p, dc.h, &lf)) && lf.lfFaceName[0]) have_font = true;
+                }
+            }
+            menu = class_of(t, "Menu");
+        }
+        if (s->font) {
+            memset(&lf, 0, sizeof lf);
+            lf.lfHeight = s->font->height; lf.lfWeight = s->font->weight ? s->font->weight : FW_NORMAL;
+            lf.lfItalic = (BYTE)(s->font->italic != 0); lf.lfCharSet = DEFAULT_CHARSET;
+            std::u16string f = u16(s->font->face);
+            memcpy(lf.lfFaceName, f.data(), (f.size() < LF_FACESIZE - 1 ? f.size() : LF_FACESIZE - 1) * sizeof(WCHAR));
+            have_font = true;
+        }
+        if (have_font && lf.lfHeight > 0) lf.lfHeight = -MulDiv(lf.lfHeight, 96, 72);   // points (the style's "Tahoma, 8")
+        UXMENU_InitLook(&L, (HTHEME)menu, tab, flat, have_font ? &lf : nullptr);
+        MemDC dc;
+        int tw = 0, aw = 0, yy = L.pad;
+        for (int i = 0; i < n; i++) {
+            text.push_back(u16(items[i].text)); accel.push_back(u16(items[i].accel));
+            y.push_back(yy);
+            if (items[i].flags & UT_MENU_SEPARATOR) { h.push_back(L.sep_h); yy += L.sep_h; continue; }
+            h.push_back(L.item_h); yy += L.item_h;
+            int a, b;
+            UXMENU_MeasureItem(&L, dc.h, W(text.back()), (int)text.back().size(), items[i].accel ? W(accel.back()) : nullptr,
+                               (items[i].flags & UT_MENU_DEFAULT) ? UXMENU_DEFAULT : 0, &a, &b);
+            if (a > tw) tw = a;
+            if (b > aw) aw = b;
+        }
+        w = 2 * L.pad + L.text_x + tw + (aw ? L.gap + aw : 0) + L.right_pad;
+        hh = yy + L.pad;
+    }
+    ~MenuRun() { UXMENU_FreeLook(&L); }
+};
+
+unsigned ux_flags(unsigned f)
+{
+    return ((f & UT_MENU_DISABLED) ? UXMENU_DISABLED : 0) | ((f & UT_MENU_SEPARATOR) ? UXMENU_SEPARATOR : 0) |
+           ((f & UT_MENU_DEFAULT) ? UXMENU_DEFAULT : 0) | ((f & UT_MENU_CHECKED) ? UXMENU_CHECKED : 0) |
+           ((f & UT_MENU_RADIO) ? UXMENU_RADIO : 0) | ((f & UT_MENU_SUBMENU) ? UXMENU_SUBMENU : 0);
+}
+
+} // namespace
+
+extern "C" {
+
+int ut_menu_layout(const ut_menu_spec* spec, const ut_menu_item* items, int n, int* w, int* h, int* pad, int* item_y, int* item_h)
+{
+    Lock l;
+    if (!spec || n < 0 || (n && !items)) return 0;
+    MenuRun m(spec, items, n);
+    if (w) *w = m.w;
+    if (h) *h = m.hh;
+    if (pad) *pad = m.L.pad;
+    for (int i = 0; i < n; i++) { if (item_y) item_y[i] = m.y[i]; if (item_h) item_h[i] = m.h[i]; }
+    return 1;
+}
+
+int ut_menu_draw(const ut_menu_spec* spec, const ut_menu_item* items, int n, int sel, int cues,
+                 uint32_t* pixels, int width, int height, int stride)
+{
+    Lock l;
+    if (!spec || n < 0 || (n && !items) || !buffer_ok(pixels, width, height, stride)) return 0;
+    int smooth = gdi::font_smoothing();
+    gdi::set_font_smoothing(spec->smoothing < 0 ? 0 : spec->smoothing > 2 ? 2 : spec->smoothing);
+    {
+        MenuRun m(spec, items, n);
+        TargetDC dc(pixels, width, height, stride);
+        dc.bmp->has_alpha = false;   // a menu is opaque: ClearType text, the parts blended over the plate
+        RECT whole = { 0, 0, m.w, m.hh };
+        UXMENU_DrawFrame(&m.L, dc.hdc(), &whole);
+        for (int i = 0; i < n; i++) {
+            RECT r = { m.L.pad, m.y[i], m.w - m.L.pad, m.y[i] + m.h[i] };
+            unsigned f = ux_flags(items[i].flags) | (i == sel ? UXMENU_HOT : 0) | (cues ? UXMENU_CUES : 0);
+            UXMENU_DrawItem(&m.L, dc.hdc(), &r, f, items[i].glyph, (items[i].flags & UT_MENU_SEPARATOR) ? nullptr : W(m.text[i]),
+                            (int)m.text[i].size(), items[i].accel ? W(m.accel[i]) : nullptr, -1);
+        }
+        opaque_rect(pixels, width, height, stride, whole);
+    }
+    gdi::set_font_smoothing(smooth);
     return 1;
 }
 

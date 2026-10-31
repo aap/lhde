@@ -349,9 +349,7 @@ static int cl_has(const char *s, const char *w) {   /* case-insensitive strstr (
     for (size_t n = strlen(w); *s; s++) if (!strncasecmp(s, w, n)) return 1;
     return 0;
 }
-static int cl_font_lf(const char *v, char *out, size_t n, char *face_out, size_t nf, int *px_out, int *bold_out, int *italic_out);
-static int cl_font(const char *v, char *out, size_t n) { return cl_font_lf(v, out, n, NULL, 0, NULL, NULL, NULL); }
-/* the same, with the LOGFONT fields (face, pixel height, bold, italic) when asked for */
+/* the same font's LOGFONT fields (face, pixel height, bold, italic), each when asked for */
 static int cl_font_lf(const char *v, char *out, size_t n, char *face_out, size_t nf, int *px_out, int *bold_out, int *italic_out) {
     char face[64] = ""; int size = 0; const char *c = strchr(v, ',');
     if (!c) return 0;
@@ -403,7 +401,7 @@ static int classic_load(struct theme *t, const char *spec) {
     t->mode = THEME_MSSTYLES; t->classic = 1; t->cl_gradient = 1;
     memcpy(t->cl, cl_standard, sizeof t->cl);
     t->ms_border = 1; t->ms_cap_h = 18; t->cl_capw = 18;
-    strcpy(t->ms_font, "Tahoma Bold 11px"); strcpy(t->cl_menufont, "Tahoma 11px");
+    strcpy(t->ms_font, "Tahoma Bold 11px"); strcpy(t->cl_mface, "Tahoma"); t->cl_mpx = 11; t->cl_mbold = t->cl_mitalic = 0;
     strcpy(t->cl_face, "Tahoma"); t->cl_px = 11; t->cl_bold = 1; t->cl_italic = 0; t->cl_smooth = 1;
     t->ms_font_aa = CAIRO_ANTIALIAS_NONE; t->ms_hint = CAIRO_HINT_STYLE_FULL;
     char icons[600] = "packs/xp/shell32/16/3.png packs/4074/shell32/16/3.png packs/2k/shell32/16/3.png";
@@ -418,7 +416,7 @@ static int classic_load(struct theme *t, const char *spec) {
         else if (!strcasecmp(k, "captionheight")) { t->ms_cap_h = atoi(v); if (t->ms_cap_h < 8) t->ms_cap_h = 8; if (t->ms_cap_h > 100) t->ms_cap_h = 100; }
         else if (!strcasecmp(k, "captionwidth")) { t->cl_capw = atoi(v); if (t->cl_capw < 8) t->cl_capw = 8; if (t->cl_capw > 100) t->cl_capw = 100; }
         else if (!strcasecmp(k, "captionfont")) cl_font_lf(v, t->ms_font, sizeof t->ms_font, t->cl_face, sizeof t->cl_face, &t->cl_px, &t->cl_bold, &t->cl_italic);
-        else if (!strcasecmp(k, "menufont")) cl_font(v, t->cl_menufont, sizeof t->cl_menufont);
+        else if (!strcasecmp(k, "menufont")) { char d[96]; cl_font_lf(v, d, sizeof d, t->cl_mface, sizeof t->cl_mface, &t->cl_mpx, &t->cl_mbold, &t->cl_mitalic); }
         else if (!strcasecmp(k, "smoothing")) {
             t->ms_font_aa = !strcasecmp(v, "cleartype") ? CAIRO_ANTIALIAS_SUBPIXEL : CAIRO_ANTIALIAS_NONE;
             t->cl_smooth = !strcasecmp(v, "cleartype") ? 2 : !strcasecmp(v, "off") || !strcasecmp(v, "none") ? 0 : 1;

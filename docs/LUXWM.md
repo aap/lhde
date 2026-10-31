@@ -218,34 +218,42 @@ item chooses it (also the release of the button that opened it, dragged onto an 
 passed on). Modal like the drags: pointer and keyboard grabbed, Expose/MapRequest/ConfigureRequest of other windows handled meanwhile.
 
 **Rendering** (`wmmenu_popup`, an override-redirect ARGB window with `_NET_WM_WINDOW_TYPE_POPUP_MENU`, `_LHWM_MENU` and
-WM_CLASS `lhwm-menu`), from the frame theme's visual style through libuxtheme:
+WM_CLASS `lhwm-menu`): the pixels are wuxtheme's popup menu painter (`ut_menu_layout` / `ut_menu_draw` in `<wuxtheme/ut.h>`, over
+`wuxtheme/menu.cpp`), the code that also draws every user32 menu of the wux side (flxp's context menus, menu band and menu bar
+popups, the start menu cascades: `menu.c.patch`), so the window menu and an Explorer context menu are the same pixels. luxwm keeps the
+geometry on screen, the shadow and the input. The painter, with the frame theme's visual style (luxwm passes it, `flat = -1`, the
+style's MENUFONT) or, for Windows Classic, the scheme's colour table and `Metrics.menufont`:
 - styles with a `Menu` class (`POPUPITEM` present: the 4074 Slate, Jade and Aero-patch styles, also used for the DWM themes aero and
   jade; Vista's aero5048/aero5112): `POPUPBORDERS` over the whole menu (else `POPUPBACKGROUND` and a 1 px BTNSHADOW line),
   `POPUPGUTTER` when the style has one (Vista), `POPUPITEM` in state 2 (hot) / 4 (disabled hot) under the selected item, `SEPARATOR` /
   `POPUPSEPARATOR` at its true height plus its content margins, the text colours of `POPUPITEM` states 1-4 (TEXTCOLOR), item height =
-  text height + `POPUPITEM` content margins, Vista's `SYSTEMRESTORE`/`MINIMIZE`/`MAXIMIZE`/`CLOSE` glyphs in the gutter (the 4074
-  styles have none, and the 4074 menus show none);
+  text height + `POPUPITEM` content margins, the `CHECK` / `POPUPCHECK` part for check marks (states 1, 2) and radio bullets (3, 4)
+  centred in the check column (the 4074 bullet of `lh4074-195235.png` is exactly Slate's state 3), `FLYOUTARROW` / `POPUPSUBMENU` for
+  submenus with its right edge 6 px before the item's end (measured there: Slate's 9x9 arrow, the triangle 4x7 at 14..11 px from
+  the outline), Vista's `SYSTEMRESTORE`/`MINIMIZE`/`MAXIMIZE`/`CLOSE` glyphs in the gutter (the 4074 styles have none, and the 4074 menus
+  show none);
 - styles without one (XP's Luna, Royale, Zune, Noir, Embedded): XP's own drawing (`mndraw.c`) with the style's `[SysMetrics]`
   colours over XP's Windows Standard scheme: FLATMENUS = 1 px BTNSHADOW outline, MENU inside, MENUHILIGHT bar framed in HIGHLIGHT
   with HIGHLIGHTTEXT, greyed text GRAYTEXT; without FLATMENUS the raised 3D edge, a HIGHLIGHT bar and embossed greyed text on a
-  BTNFACE menu; the separator a BDR_SUNKENOUTER etch (BTNSHADOW over BTNHIGHLIGHT) at the middle of a 9 px item; the system menu
-  bitmaps (XP's Marlett glyphs for Restore, Minimize, Maximize, Close) drawn in the 13 px check column in the text colour;
-- the font is `[SysMetrics] MENUFONT` (Slate/Luna Tahoma 8 = 11 px, Jade/Aero Segoe UI 9 = 12 px; `Quality:ClearType-Natural`: no
-  hinting); item height and baseline use GDI's tmHeight / tmAscent (unhinted pango metrics rounded), as frame.c's captions;
-- without the library: the DWM themes use the 4074 Jade values (menu #f4f4f4, border #4e5358, text #00025c, highlight #c5e7f6, the
-  theme.ini `font`), msstyles themes XP's Windows Standard classic menu with Tahoma 11 px.
+  BTNFACE menu; the separator a BDR_SUNKENOUTER etch (BTNSHADOW over BTNHIGHLIGHT) at the middle of a 9 px item, flat or not; the
+  system menu bitmaps (XP's Marlett glyphs for Restore, Minimize, Maximize, Close) in the 13 px check column in the text colour; check
+  marks and bullets from Marlett (`a`, `h`) in that column; the submenu arrow XP's 4x7 (Marlett's menu arrow in the 13 px cell at the
+  item's end: its right column 6 px before the end, 8 px from the outline, as `WinXP-193221.png`; user32's OBM_MNARROW is 5x9);
+- the font is `[SysMetrics] MENUFONT` (Slate/Luna Tahoma 8 = 11 px, Jade/Aero Segoe UI 9 = 12 px) in wux's GDI text (FreeType with
+  the v35 interpreter, hinted integer advances as GDI's), item height and baseline from its tmHeight / tmAscent; smoothing as the
+  captions': ClearType for the DWM themes and the frame sets that say `text_antialias = subpixel` (the 4074 ones; the 4074 references
+  show ClearType), none for Luna's (XP's Standard leaves Tahoma 8 bi-level), the theme's `Fonts.smoothing` for Windows Classic;
+- without a visual style (a DWM theme whose style cannot be opened): XP's Windows Standard colours and Tahoma 8.
 Geometry (XP's `mncomput.c`, and measured on the 4074 Slate menu of `lh4074-195235.png`: identical): 1 px border + 2 px inside, text
 19 px into the item (22 px from the border: MNLEFTMARGIN + the 13 px check column + MNXSPACE), separator 8 px (Slate's part) / 9 px
-(XP), accelerator right-aligned 17 px before the inner edge. The drop shadow is XP's 4 px right/bottom shadow (alpha 0.44, 0.33,
-0.17, 0.055 outwards, starting 5 px in, as measured on the 4074 menu): real alpha with a compositor (`picom-glass.conf` excludes
-`_LHWM_MENU@` from picom's own shadow and blur), otherwise blended over a copy of the screen taken before the map, as XP does.
-Measured against the 4074 Slate menu: border, plate, highlight and separator colours, item pitch (19), text start (x 22) and text
-rows (cap height 6..13) are identical; the glyph advances differ by up to 5 px over a word (FreeType vs GDI ClearType, as in the
-captions) and the reference's ClearType fringes are BGR-ordered while luxwm renders RGB like its captions.
-`compare_wmmenu.png`: the 4074 Slate reference | luxwm on slate4074 (Size selected with the keyboard) | jade4074 | luna-xp | flxp's
-classic menus for the classic layout. `tests/menutest.c` renders the menu offline (`cc -I.. $(../tools/uxtheme-flags.sh | sed -n 1p)
-menutest.c ../frame.c ../frame_ut.c ../menu.c -o menutest $(pkg-config --cflags --libs cairo cairo-xlib pangocairo x11 fontconfig)
--lXext -lm $(../tools/uxtheme-flags.sh | sed -n 2p)`; `./menutest THEMESPEC out.png [SEL [MAXIMIZED [KEYBOARD]]]`, `MENUTEST_FONTS`).
+(XP), accelerator right-aligned 17 px before the inner edge (user32's menus put a tab's accelerators in one column after the widest
+text plus two average character widths, as XP). The drop shadow is XP's 4 px right/bottom shadow (alpha 0.44, 0.33, 0.17, 0.055
+outwards, starting 5 px in, as measured on the 4074 menu): real alpha with a compositor (`picom-glass.conf` excludes `_LHWM_MENU@`
+from picom's own shadow and blur), otherwise blended over a copy of the screen taken before the map, as XP does.
+Measured against the 4074 Slate menu: border, plate, highlight, separator, bullet and arrow colours and positions, item pitch (19),
+text start (x 22) and text rows are identical; the reference's ClearType fringes are BGR-ordered while the painter renders RGB.
+`tests/menutest.c` renders the menu offline (`make build/luxwm/tests/menutest`; `build/luxwm/tests/menutest THEMESPEC out.png [SEL
+[MAXIMIZED [KEYBOARD]]]`, `MENUTEST_FONTS`).
 
 **API** (`menu.h`, meant for lux-style context menus too): `struct wmmenu_item { text ("&Move"), accel, flags (WMMENU_DISABLED,
 SEPARATOR, DEFAULT, CHECKED), glyph, id, cb(arg, id), arg }`; `wmmenu_popup(env, x, y, items, n, flags, button)` runs the menu

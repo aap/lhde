@@ -1,6 +1,43 @@
 --- a/dlls/user32/menu.c (wine-7.0)
 +++ b/vendor/wine/user32/menu.c
-@@ -1005,6 +1005,18 @@
+@@ -54,6 +54,10 @@
+ #include "controls.h"
+ #include "user_private.h"
+ #include "wine/debug.h"
++/* flxp: popup menus are drawn by wuxtheme's painter (the same pixels as luxwm's window menu): XP's mndraw.c in the style's
++ * colours and menu font, the Longhorn / Vista Menu class where the style has one */
++#include "uxtheme.h"
++#include "../../../../wuxtheme/menu.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(menu);
+ WINE_DECLARE_DEBUG_CHANNEL(accel);
+@@ -814,6 +818,25 @@
+ }
+ 
+ 
++/* flxp: the popup look of the moment (released with menu_look_done) */
++static void menu_look( HWND hwnd, UXMENU_LOOK *look )
++{
++    NONCLIENTMETRICSW ncm;
++    BOOL flat = FALSE;
++    HTHEME theme;
++    ncm.cbSize = sizeof(ncm);
++    SystemParametersInfoW( SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0 );
++    SystemParametersInfoW( SPI_GETFLATMENU, 0, &flat, 0 );
++    theme = OpenThemeData( hwnd, L"Menu" );
++    UXMENU_InitLook( look, theme, NULL, flat, &ncm.lfMenuFont );
++    if (theme && !look->theme) CloseThemeData( theme );   /* a Menu class without POPUPITEM: XP's look */
++}
++static void menu_look_done( UXMENU_LOOK *look )
++{
++    if (look->theme) CloseThemeData( look->theme );
++    UXMENU_FreeLook( look );
++}
++
+ /***********************************************************************
+  *           MENU_GetBitmapItemSize
+  *
+@@ -1005,6 +1028,18 @@
      /* handle fontsize > bitmap_height */
      top = (h>bm.bmHeight) ? rect->top+(h-bm.bmHeight)/2 : rect->top;
      left=rect->left;
@@ -19,7 +56,193 @@
      rop=((lpitem->fState & MF_HILITE) && !IS_MAGIC_BITMAP(hbmToDraw)) ? NOTSRCCOPY : SRCCOPY;
      if ((lpitem->fState & MF_HILITE) && lpitem->hbmpItem)
          SetBkColor(hdc, GetSysColor(COLOR_HIGHLIGHT));
-@@ -3110,6 +3122,11 @@
+@@ -1019,7 +1054,7 @@
+  * Calculate the size of the menu item and store it in lpitem->rect.
+  */
+ static void MENU_CalcItemSize( HDC hdc, MENUITEM *lpitem, HWND hwndOwner,
+-			       INT orgX, INT orgY, BOOL menuBar, POPUPMENU* lppop )
++			       INT orgX, INT orgY, BOOL menuBar, POPUPMENU* lppop, const UXMENU_LOOK *look )
+ {
+     WCHAR *p;
+     UINT check_bitmap_width = GetSystemMetrics( SM_CXMENUCHECK );
+@@ -1073,12 +1108,39 @@
+ 
+     if (lpitem->fType & MF_SEPARATOR)
+     {
++        if (!menuBar && look) { lpitem->rect.bottom += look->sep_h; return; }   /* flxp */
+         lpitem->rect.bottom += GetSystemMetrics( SM_CYMENUSIZE)/2;
+         if( !menuBar)
+             lpitem->rect.right += arrow_bitmap_width + menucharsize.cx;
+         return;
+     }
+ 
++    /* flxp: a popup's item as XP's mncomput.c sizes it (the painter's geometry): the check column, the text, the accelerator
++     * column after the widest text plus a gap (xTab: where the text ends), the arrow column; bitmaps as Wine has them */
++    if (!menuBar && look)
++    {
++        int tw = 0, aw = 0, n = 0, h = look->item_h;
++        lpitem->xTab = 0;
++        if (lpitem->hbmpItem) {
++            SIZE size;
++            MENU_GetBitmapItemSize(lpitem, &size, hwndOwner);
++            lpitem->bmpsize = size;
++            lppop->textOffset = max( lppop->textOffset, size.cx);
++            lpitem->rect.right += size.cx + 2;
++            h = max( h, size.cy + 2 );
++        }
++        if (!(lpitem->fType & MF_SYSMENU) && lpitem->text) {
++            for (n = 0; lpitem->text[n] && lpitem->text[n] != '\t' && lpitem->text[n] != '\b'; n++) ;
++            UXMENU_MeasureItem( look, hdc, lpitem->text, n, lpitem->text[n] ? lpitem->text + n + 1 : NULL,
++                                (lpitem->fState & MFS_DEFAULT) ? UXMENU_DEFAULT : 0, &tw, &aw );
++        }
++        lpitem->rect.right += look->text_x + tw;
++        lpitem->xTab = lpitem->rect.right;
++        lpitem->rect.right += (aw ? look->gap + aw : 0) + look->right_pad;
++        lpitem->rect.bottom += h;
++        return;
++    }
++
+     itemheight = 0;
+     lpitem->xTab = 0;
+ 
+@@ -1185,6 +1247,8 @@
+     start = 0;
+ 
+     lppop->textOffset = 0;
++    UXMENU_LOOK look;
++    menu_look( lppop->hwndOwner, &look );
+ 
+     while (start < lppop->nItems)
+     {
+@@ -1204,7 +1268,7 @@
+                 if (i != start) break;
+             }
+ 
+-	    MENU_CalcItemSize( hdc, lpitem, lppop->hwndOwner, orgX, orgY, FALSE, lppop );
++	    MENU_CalcItemSize( hdc, lpitem, lppop->hwndOwner, orgX, orgY, FALSE, lppop, &look );
+ 	    lppop->items_rect.right = max( lppop->items_rect.right, lpitem->rect.right );
+ 	    orgY = lpitem->rect.bottom;
+ 	    if (IS_STRING_ITEM(lpitem->fType) && lpitem->xTab)
+@@ -1235,6 +1299,7 @@
+     if( !textandbmp) lppop->textOffset = 0;
+ 
+     lppop->nTotalHeight = lppop->items_rect.bottom;
++    menu_look_done( &look );
+ 
+     /* space for the border */
+     OffsetRect(&lppop->items_rect, MENU_MARGIN, MENU_MARGIN);
+@@ -1302,7 +1367,7 @@
+ 
+ 	    TRACE("calling MENU_CalcItemSize org=(%d, %d)\n", orgX, orgY );
+ 	    debug_print_menuitem ("  item: ", lpitem, "");
+-	    MENU_CalcItemSize( hdc, lpitem, hwndOwner, orgX, orgY, TRUE, lppop );
++	    MENU_CalcItemSize( hdc, lpitem, hwndOwner, orgX, orgY, TRUE, lppop, NULL );
+ 
+ 	    if (lpitem->rect.right > lppop->items_rect.right)
+ 	    {
+@@ -1521,12 +1586,84 @@
+         /* Draw the popup-menu arrow */
+         SetBkColor( hdc, old_bk );
+         SetTextColor( hdc, old_text );
+-        if (lpitem->fType & MF_POPUP)
++        if ((lpitem->fType & MF_POPUP) && !menuBar)
++        {   /* flxp: XP's 4 x 7 arrow (or the style's), not OBM_MNARROW */
++            UXMENU_LOOK look;
++            menu_look( hwnd, &look );
++            UXMENU_DrawArrow( &look, hdc, &rect, ((lpitem->fState & MF_HILITE) ? UXMENU_HOT : 0) |
++                                                ((lpitem->fState & MF_GRAYED) ? UXMENU_DISABLED : 0) );
++            menu_look_done( &look );
++        }
++        else if (lpitem->fType & MF_POPUP)
+             draw_popup_arrow( hdc, rect, arrow_bitmap_width,
+                     arrow_bitmap_height);
+         goto done;
+     }
+ 
++    /* flxp: a popup's item through the painter: background or highlight, separator, check mark, the owner's check bitmap or
++     * item bitmap as Wine draws them, text and accelerator (after a tab: in the accelerator column), submenu arrow */
++    if (!menuBar)
++    {
++        UXMENU_LOOK look;
++        unsigned f = 0;
++        BOOL cues = TRUE, custom = FALSE;
++        HBITMAP cbm = NULL;
++        int n = 0, accel_x = -1;
++        RECT trc;
++
++        menu_look( hwnd, &look );
++        SystemParametersInfoW( SPI_GETKEYBOARDCUES, 0, &cues, 0 );
++        if (lpitem->fType & MF_SEPARATOR) f |= UXMENU_SEPARATOR;
++        if (lpitem->fState & MF_HILITE) f |= UXMENU_HOT;
++        if (lpitem->fState & MF_GRAYED) f |= UXMENU_DISABLED;
++        if (lpitem->fState & MFS_DEFAULT) f |= UXMENU_DEFAULT;
++        if (lpitem->fType & MF_POPUP) f |= UXMENU_SUBMENU;
++        if (cues) f |= UXMENU_CUES;
++        if (!(menu->dwStyle & MNS_NOCHECK))
++        {
++            cbm = (lpitem->fState & MF_CHECKED) ? lpitem->hCheckBit : lpitem->hUnCheckBit;
++            if (cbm) custom = TRUE;
++            else if (lpitem->fState & MF_CHECKED)
++                f |= UXMENU_CHECKED | ((lpitem->fType & MFT_RADIOCHECK) ? UXMENU_RADIO : 0);
++        }
++        UXMENU_DrawItem( &look, hdc, &rect, f, 0, NULL, 0, NULL, -1 );
++        if (!(f & UXMENU_SEPARATOR))
++        {
++            if (custom)
++            {
++                HDC hdcMem = CreateCompatibleDC( hdc );
++                UINT cw = GetSystemMetrics( SM_CXMENUCHECK ), ch = GetSystemMetrics( SM_CYMENUCHECK );
++                SelectObject( hdcMem, cbm );
++                BitBlt( hdc, rect.left, (rect.top + rect.bottom - ch) / 2, cw, ch, hdcMem, 0, 0, SRCCOPY );
++                DeleteDC( hdcMem );
++            }
++            if (lpitem->hbmpItem && !(custom && (menu->dwStyle & MNS_CHECKORBMP)))
++            {
++                POINT origorg;
++                if (menu->dwStyle & MNS_NOCHECK) bmprc.left = 4;
++                else if (menu->dwStyle & MNS_CHECKORBMP) bmprc.left = 2;
++                else bmprc.left = 4 + GetSystemMetrics(SM_CXMENUCHECK);
++                bmprc.right = bmprc.left + lpitem->bmpsize.cx;
++                bmprc.top = (rect.bottom - rect.top - lpitem->bmpsize.cy) / 2;
++                bmprc.bottom = bmprc.top + lpitem->bmpsize.cy;
++                SetViewportOrgEx( hdc, rect.left, rect.top, &origorg );
++                MENU_DrawBitmapItem( hdc, lpitem, &bmprc, menu, hwndOwner, odaction );
++                SetViewportOrgEx( hdc, origorg.x, origorg.y, NULL );
++            }
++            if (lpitem->text)
++            {
++                for (n = 0; lpitem->text[n] && lpitem->text[n] != '\t' && lpitem->text[n] != '\b'; n++) ;
++                trc = rect;
++                if (!(menu->dwStyle & MNS_CHECKORBMP)) trc.left += menu->textOffset;
++                if (lpitem->text[n] == '\t') accel_x = lpitem->xTab + look.gap + (rect.left - lpitem->rect.left);
++                UXMENU_DrawItem( &look, hdc, &trc, f | UXMENU_TEXTONLY, 0, lpitem->text, n,
++                                 lpitem->text[n] ? lpitem->text + n + 1 : NULL, accel_x );
++            }
++        }
++        menu_look_done( &look );
++        goto done;
++    }
++
+     if (menuBar && (lpitem->fType & MF_SEPARATOR)) goto done;
+ 
+     if (lpitem->fState & MF_HILITE)
+@@ -1804,7 +1941,14 @@
+ 	    BOOL flat_menu = FALSE;
+ 
+ 	    SystemParametersInfoW (SPI_GETFLATMENU, 0, &flat_menu, 0);
+-	    if (flat_menu)
++	    if (!menu || !menu->hbrBack)
++	    {   /* flxp: the painter's plate (outline, background, the style's borders and gutter) */
++		UXMENU_LOOK look;
++		menu_look( hwnd, &look );
++		UXMENU_DrawFrame( &look, hdc, &rect );
++		menu_look_done( &look );
++	    }
++	    else if (flat_menu)
+ 		FrameRect(hdc, &rect, GetSysColorBrush(COLOR_BTNSHADOW));
+ 	    else
+ 		DrawEdge (hdc, &rect, EDGE_RAISED, BF_RECT);
+@@ -3110,6 +3254,11 @@
              }
          }
  
@@ -31,7 +254,7 @@
  	/* check if EndMenu() tried to cancel us, by posting this message */
          if(msg.message == WM_CANCELMODE)
  	{
-@@ -3156,6 +3173,9 @@
+@@ -3156,6 +3305,9 @@
  		    /* Else, end menu tracking */
  		    fRemove = MENU_ButtonDown( &mt, msg.message, hmenu, wFlags );
  		    fEndMenu = !fRemove;

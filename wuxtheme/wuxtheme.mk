@@ -9,7 +9,7 @@
 UTVEND   = $(addprefix $(WINE_DIR)/uxtheme/,msstyles.c draw.c property.c stylemap.c uxini.c) \
            $(addprefix $(WINE_DIR)/user32/,text.c uitools.c)
 UTSHIM   = $(addprefix wux/w32/,gdi.cpp gdi_draw.cpp gdi_text.cpp image.cpp crt.cpp debug.cpp syscolor.cpp kernel.cpp usp10.cpp)
-UTOWN    = wuxtheme/ut.cpp wuxtheme/v4.cpp
+UTOWN    = wuxtheme/ut.cpp wuxtheme/v4.cpp wuxtheme/menu.cpp
 UTGDI    = $(wildcard wux/gdi/*.cpp wux/res/*.cpp)
 UTOBJS   = $(patsubst %.c,$(O)/%.o,$(UTVEND)) $(patsubst %.cpp,$(O)/%.o,$(UTSHIM) $(UTOWN) $(UTGDI))
 UTPIC    = $(patsubst $(O)/%,$(P)/%,$(UTOBJS)) $(P)/wuxtheme/nowin.o

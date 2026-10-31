@@ -182,6 +182,34 @@ int ut_gradient_fill_h(uint32_t *pixels, int width, int height, int stride, cons
  * table; grey where the target keeps alpha). Default 1. */
 void ut_set_font_smoothing(int mode);
 
+/* ---- Popup menus: the painter of wux's user32 menus (wuxtheme/menu.h), for a window manager's own menus. XP's popup menu
+ * (ntuser mncomput.c / mndraw.c) in the style's [SysMetrics] colours and MENUFONT, with the Longhorn / Vista Menu class
+ * (POPUPBORDERS, POPUPITEM, SEPARATOR, CHECK, FLYOUTARROW, SYSTEM*) where the style has POPUPITEM; Windows Classic from a
+ * colour table. docs/LUXWM.md "The window menu". ---- */
+typedef struct {
+    const char *text;         /* UTF-8, "&Move": '&' marks the mnemonic, "&&" is a literal '&' */
+    const char *accel;        /* right-aligned shortcut ("Alt+F4") or NULL */
+    unsigned flags;           /* UT_MENU_* */
+    int glyph;                /* UT_MENU_GLYPH_*: the system menu's bitmaps */
+} ut_menu_item;
+enum { UT_MENU_DISABLED = 1, UT_MENU_SEPARATOR = 2, UT_MENU_DEFAULT = 4 /* bold */, UT_MENU_CHECKED = 8, UT_MENU_RADIO = 16,
+       UT_MENU_SUBMENU = 32 };
+enum { UT_MENU_GLYPH_NONE, UT_MENU_GLYPH_RESTORE, UT_MENU_GLYPH_MINIMIZE, UT_MENU_GLYPH_MAXIMIZE, UT_MENU_GLYPH_CLOSE };
+typedef struct {
+    ut_theme *theme;          /* the visual style: its Menu class, [SysMetrics] colours, FLATMENUS and MENUFONT; NULL: none */
+    const uint32_t *colors;   /* UT_SYSCOLORS colours under the style's (Windows Classic: the scheme's); NULL: Windows Standard */
+    int flat;                 /* FLATMENUS: -1 the style's (none: 0), 0 or 1 */
+    const ut_font *font;      /* the menu font; NULL: the style's MENUFONT, else Tahoma 8 */
+    int smoothing;            /* the text: 0 off, 1 standard, 2 ClearType (ut_set_font_smoothing) */
+} ut_menu_spec;
+/* the menu's size (*w x *h, the outline included), the inset of the items (*pad: outline + space; an item spans pad .. w - pad)
+ * and each item's top and height (item_y, item_h: n entries, or NULL). 1 on success. */
+int ut_menu_layout(const ut_menu_spec *spec, const ut_menu_item *items, int n, int *w, int *h, int *pad, int *item_y, int *item_h);
+/* draw the menu (its layout's w x h, opaque) at the buffer's top left; sel: the selected item (-1 none); cues: underline the
+ * mnemonics (opened from the keyboard). 1 on success. */
+int ut_menu_draw(const ut_menu_spec *spec, const ut_menu_item *items, int n, int sel, int cues,
+                 uint32_t *pixels, int width, int height, int stride);
+
 #ifdef UT_WITH_CAIRO
 /* cairo: the part is rendered at rect's size (device pixels = user units) and
  * painted at rect.left/top through the current clip. Header-only, so the

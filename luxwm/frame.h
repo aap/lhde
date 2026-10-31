@@ -91,7 +91,7 @@ struct theme {
     int classic;
     unsigned cl[31];                    /* COLOR_SCROLLBAR .. COLOR_MENUBAR as 0xRRGGBB (Windows Standard where the theme has none) */
     int cl_capw, cl_gradient;           /* Metrics.captionwidth (SM_CXSIZE); gradient captions (activecaption != gradientactivecaption) */
-    char cl_menufont[96];               /* Metrics.menufont as a pango description (the window menu) */
+    char cl_mface[64]; int cl_mpx, cl_mbold, cl_mitalic;   /* Metrics.menufont as a LOGFONT (the window menu, drawn by wuxtheme) */
     char cl_face[64]; int cl_px, cl_bold, cl_italic;   /* Metrics.captionfont as a LOGFONT: face, pixel height, bold, italic (wuxtheme draws it) */
     int cl_smooth;                      /* Fonts.smoothing for the caption text: 0 off, 1 standard (gray where the font's gasp allows), 2 cleartype */
 };

@@ -1,14 +1,9 @@
-/* lhwm: popup menus drawn by the window manager (README "The window menu"). The system menu of a window (wm.c wmmenu_open) is the
-   first user; the API takes a plain item list so other context menus can reuse it.
+/* lhwm: popup menus shown by the window manager (docs/LUXWM.md "The window menu"). The system menu of a window (wm.c wmmenu_open)
+   is the first user; the API takes a plain item list so other context menus can reuse it.
 
-   Look, from the frame theme (struct theme, frame.h):
-   - the visual style opened through libuxtheme has a Menu class with POPUP* parts (the Longhorn 4074 Slate/Jade/Aero styles, the
-     Vista 5048/5112 Aero styles): POPUPBORDERS (else POPUPBACKGROUND), POPUPGUTTER, POPUPITEM in its four states, SEPARATOR /
-     POPUPSEPARATOR, the SYSTEM* glyphs; text colours from the POPUPITEM states, the font from [SysMetrics] MENUFONT;
-   - otherwise (XP styles such as Luna, which have no Menu class; or no library): XP's own COLOR_MENU drawing (ntuser mndraw.c) with
-     the style's [SysMetrics] colours and MENUFONT: FLATMENUS = the 1 px BTNSHADOW outline and a MENUHILIGHT bar framed in
-     HIGHLIGHT, else the raised 3D edge and a HIGHLIGHT bar; the system menu bitmaps (Marlett glyphs) in the check column.
-   Without the library the DWM themes fall back to the Jade 4074 values, msstyles themes to XP's Windows Standard colours. */
+   Look: wuxtheme's popup menu painter (ut_menu_draw), the one that draws wux's user32 menus too: the frame theme's visual style
+   (its Menu class with the POPUP* parts where it has one, else XP's own drawing in its [SysMetrics] colours, FLATMENUS and
+   MENUFONT), or Windows Classic from the scheme's colours and menu font. */
 #ifndef LHWM_MENU_H
 #define LHWM_MENU_H
 #include <X11/Xlib.h>
