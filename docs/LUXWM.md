@@ -103,7 +103,10 @@ What `luxshell` (the taskbar/sidebar) relies on, all in `wm.c`:
   above the clients after every restack unless they carry `_NET_WM_STATE_BELOW` (luxshell's sidebar does). `docks_raise()` raises them as a group
   in the order the server has them (`XQueryTree`), not in map order, so a dock orders itself against another dock with
   `XRaiseWindow`/`XLowerWindow`/a `ConfigureRequest` with `stack_mode` (applied with `XConfigureWindow`, then the group raise);
-  `tests/dockorder.c` (raise|lower|above|below) checks it. lux's `[sidebar] stacking` switches the sidebar between
+  `tests/dockorder.c` (raise|lower|above|below) checks it. The exception is EWMH's: the focused window, when it is fullscreen,
+  goes above the docks at the end of every group raise (and when it gets the focus or enters fullscreen); when it loses the focus
+  or leaves fullscreen the next group raise puts the docks back on top. A dock that raises itself (luxshell's bars do on every
+  client-list change) goes through a `ConfigureRequest`, so the rule holds whoever raises. lux's `[sidebar] stacking` switches the sidebar between
   `_NET_WM_STATE_ABOVE` (raised over the taskbar) and `_NET_WM_STATE_BELOW` (lowered under the clients, no strut) by rewriting
   the property of the mapped dock; `dock_property()` re-reads it and restacks at once, while `_NET_WORKAREA` and the refit of
   maximised windows wait until the event queue is drained (`workarea_dirty`, in `run()`), so a burst of dock changes (Win+S:

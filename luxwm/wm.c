@@ -894,6 +894,8 @@ client_fullscreen(struct client *c, bool toggle, bool fullscreen, bool max)
         client_refresh(c);
     }
 
+    docks_raise();   /* entering fullscreen with the focus: above the docks; leaving it: the docks back on top */
+    ewmh_update_stacking();
     client_set_status(c);
 }
 
@@ -1286,6 +1288,7 @@ focus_set_active(bool on)
     if (f_active == on)
         return;
     f_active = on;
+    if (f_client->fullscreen) docks_raise();   /* above the docks only while it has the focus */
     LOGP("focus: 0x%lx %s", f_client->window, on ? "active again" : "inactive (focus outside the managed windows)");
     if (f_client->decorated) draw_text(f_client, on);
     Window a = on ? f_client->window : None;
@@ -2046,6 +2049,7 @@ client_manage_focus(struct client *c)
         if (conf.warp_pointer)
             warp_pointer(c);
         ewmh_set_focus(c);
+        if (c->fullscreen || (old != NULL && old != c && old->fullscreen)) docks_raise();   /* a focused fullscreen window is above the docks */
         c->attention = false;   /* DEMANDS_ATTENTION ends with focus */
         if (old != c) ewmh_update_state(old);
         ewmh_update_state(c);
@@ -2057,6 +2061,7 @@ client_manage_focus(struct client *c)
         LOGN("Giving focus to dummy window");
         f_client = NULL;
         f_active = false;
+        if (old != NULL && old->fullscreen) docks_raise();
         XSetInputFocus(display, nofocus, RevertToPointerRoot, CurrentTime);
         if (net_atom[NetActiveWindow]) {   /* no active window: _NET_ACTIVE_WINDOW = None */
             Window none = None;
@@ -3976,6 +3981,13 @@ docks_raise(void)
     qsort(desk, nd, sizeof desk[0], desktop_cmp);
     for (int i = 0; i < nd; i++)
         XLowerWindow(display, desk[i]->w);
+    /* EWMH "_NET_WM_STATE_FULLSCREEN": a focused fullscreen window is above the docks; once it loses the focus or leaves
+       fullscreen, the next call puts the docks back on top of it */
+    struct client *f = f_client;
+    if (f != NULL && f_active && f->fullscreen && f->ws == curr_ws && !f->minimized && !f->unmapped) {
+        if (f->decorated) { Window w[2] = { f->window, f->dec }; XRaiseWindow(display, f->window); XRestackWindows(display, w, 2); }
+        else XRaiseWindow(display, f->window);
+    }
 }
 
 /* a rectangle of the root minus the struts that overlap it, minus the configured gaps */
