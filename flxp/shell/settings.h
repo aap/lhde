@@ -65,9 +65,11 @@ bool set_theme_keys(const std::string& theme, const std::vector<KeyValue>& kv, s
                     std::string* err = nullptr, bool notify_now = true);
 
 // The themes as liblhde lists them: the user's theme files, the shipped ones, the bare styles (group 0, 1, 2)
-struct ThemeEntry { std::string name, title, file; int group; };
+struct ThemeEntry { std::string name, title, file; int group; bool style_missing = false; };
 std::vector<ThemeEntry> theme_list();
-// the theme files only (groups 0 and 1): what Display Properties' Themes tab and the start menu's Theme list offer
+// the theme files only (groups 0 and 1): what Display Properties' Themes tab and the start menu's Theme list offer;
+// style_missing set where the theme's visual style is not imported (lhde_theme_has_style): the lists leave those out,
+// except the selected theme
 std::vector<ThemeEntry> theme_files();
 
 // The current layer (docs/THEME-FORMAT.md section 3, Windows' "NAME (Modified)"): settings.ini [current], the unsaved

@@ -1,6 +1,8 @@
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include "places.h"
@@ -182,6 +184,7 @@ struct Look {
     COLORREF body = 0, body_border = 0;
     COLORREF title = 0, title_hot = 0, link = 0, link_hot = 0;
     COLORREF head1 = 0, head2 = 0;          // the drawn header's gradient (no bitmap)
+    int head_from = 46;                     // where it starts, % of the width (IDB_HEADERSECTION: blue 86 of 186 px white)
     Bmp head, up, up_hot, down, down_hot;   // shellstyle bitmaps
     HTHEME theme = nullptr;                 // ExplorerBar parts
 };
@@ -218,6 +221,144 @@ static Bmp load_bmp(const std::string& src)
         }
     gdi::destroy_bitmap(b);
     return out;
+}
+
+static COLORREF mix(COLORREF a, COLORREF b, int num, int den);
+
+// The section chevrons without shellstyle.dll (the free baseline: ReactOS has no web view and no shellstyle; docs/USAGE.md),
+// drawn here after XP's IDB_UP/IDB_UPHOT/IDB_DOWN/IDB_DOWNHOT (themes/themedir/shellstyle in the XP SP1 source): the glyph is
+// two 2-px chevrons four rows apart, 7 px wide, apex at column 9, rows 5-12 (up) or 6-13 (down). Luna (21x23): on a pale disc
+// (radius about 8.3 around (9.5, 9), a ring in the pane's colour, white inside shading to the ring at the bottom, a faint
+// shadow down and to the right). Classic (21x21): the glyph alone, the hot one inside a raised 17x16 frame.
+// As premultiplied DIBs, so they draw like the bitmaps.
+static Bmp make_chevron(bool down, bool hot, bool classic, COLORREF glyph, COLORREF ring)
+{
+    int W = 21, H = classic ? 21 : 23;
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+    bi.bmiHeader.biWidth = W;
+    bi.bmiHeader.biHeight = -H;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    void* bits = nullptr;
+    Bmp out;
+    out.h = CreateDIBSection(nullptr, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    if (!out.h || !bits) return Bmp();
+    out.w = W; out.h_ = H;
+    uint32_t* d = (uint32_t*)bits;
+    std::vector<double> A((size_t)W * H, 0), R((size_t)W * H, 0), G((size_t)W * H, 0), B((size_t)W * H, 0);
+    auto over = [&](int x, int y, COLORREF c, double a) {   // straight-alpha "over" into the work buffers
+        if (x < 0 || y < 0 || x >= W || y >= H || a <= 0) return;
+        size_t i = (size_t)y * W + x;
+        double na = a + A[i] * (1 - a);
+        if (na <= 0) return;
+        R[i] = (GetRValue(c) * a + R[i] * A[i] * (1 - a)) / na;
+        G[i] = (GetGValue(c) * a + G[i] * A[i] * (1 - a)) / na;
+        B[i] = (GetBValue(c) * a + B[i] * A[i] * (1 - a)) / na;
+        A[i] = na;
+    };
+    if (classic) {
+        if (hot) {
+            COLORREF hi = GetSysColor(COLOR_BTNHIGHLIGHT), sh = GetSysColor(COLOR_BTNSHADOW);
+            for (int x = 1; x <= 17; x++) over(x, 2, hi, 1);
+            for (int y = 3; y <= 17; y++) over(1, y, hi, 1);
+            for (int y = 3; y <= 17; y++) over(17, y, sh, 1);
+            for (int x = 2; x <= 16; x++) over(x, 17, sh, 1);
+        }
+    } else {
+        const double cx = 9.5, cy = 9.0, rad = 8.3, ringw = 1.4;
+        const int SS = 4;
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++) {
+                double sh = 0, disc = 0, ringc = 0, shade = 0;
+                for (int sy = 0; sy < SS; sy++)
+                    for (int sx = 0; sx < SS; sx++) {
+                        double px = x + (sx + 0.5) / SS, py = y + (sy + 0.5) / SS;
+                        double r0 = hypot(px - cx, py - cy), r1 = hypot(px - cx - 1.0, py - cy - 1.4);
+                        if (r1 < rad + 0.8) sh += 1;
+                        if (r0 < rad) {
+                            disc += 1;
+                            if (r0 > rad - ringw) ringc += 1;
+                            double t = (py - cy) / rad;                       // the lower half shades to the ring
+                            shade += t > 0 ? 0.30 * t * t : 0;
+                        }
+                    }
+                double n = SS * SS;
+                over(x, y, RGB(0, 40, 100), 0.16 * sh / n);
+                if (disc > 0) {
+                    COLORREF in = mix(RGB(255, 255, 255), ring, (int)lround(100 * shade / disc), 100);
+                    double rf = ringc / disc;
+                    COLORREF c = mix(in, ring, (int)lround(100 * rf), 100);
+                    over(x, y, c, disc / n);
+                }
+            }
+    }
+    for (int k = 0; k < 2; k++)
+        for (int r = 0; r < 4; r++) {
+            int y = down ? 6 + 4 * k + (3 - r) : 5 + 4 * k + r;
+            int xs[4] = { 9 - r, 9 - r + 1, 9 + r - 1, 9 + r };
+            for (int j = 0; j < 4; j++) if (r > 0 || j == 0) over(xs[j], y, glyph, 1);
+        }
+    for (size_t i = 0; i < A.size(); i++) {
+        uint32_t a = (uint32_t)lround(A[i] * 255);
+        d[i] = a << 24 | (uint32_t)lround(R[i] * A[i]) << 16 | (uint32_t)lround(G[i] * A[i]) << 8 | (uint32_t)lround(B[i] * A[i]);
+    }
+    return out;
+}
+
+static void make_chevrons()
+{
+    bool classic = g_look.kind == Classic;
+    COLORREF glyph = classic ? GetSysColor(COLOR_BTNTEXT) : mix(g_look.title, RGB(0, 0, 0), 1, 5);
+    COLORREF hot = classic ? glyph : g_look.title_hot;
+    // the ring: the pane's darker end towards white, then towards its own grey (Luna blue: about 172,180,213)
+    COLORREF ring = mix(RGB(255, 255, 255), g_look.pane2, 11, 20);
+    int lum = (GetRValue(ring) * 30 + GetGValue(ring) * 59 + GetBValue(ring) * 11) / 100;
+    ring = mix(ring, RGB(lum, lum, lum), 2, 5);
+    if (!g_look.up) g_look.up = make_chevron(false, false, classic, glyph, ring);
+    if (!g_look.up_hot) g_look.up_hot = make_chevron(false, true, classic, hot, ring);
+    if (!g_look.down) g_look.down = make_chevron(true, false, classic, glyph, ring);
+    if (!g_look.down_hot) g_look.down_hot = make_chevron(true, true, classic, hot, ring);
+}
+
+// An ExplorerBar part that is a placeholder: at most `most` colours where it is opaque (drawn over black and over white, the
+// pixels both agree on), none at all included. ReactOS's styles carry such parts (a flat green NormalGroupCollapse, Mizu's
+// flat NormalGroupHead) that ReactOS's own explorer never draws, having no web view.
+static bool placeholder_part(HTHEME th, int part, int state, int w, int h, size_t most)
+{
+    SIZE sz = { w, h };
+    if (part != EBP_NORMALGROUPHEAD) GetThemePartSize(th, nullptr, part, state, nullptr, TS_TRUE, &sz);
+    if (sz.cx <= 0 || sz.cy <= 0 || sz.cx > 400 || sz.cy > 100) sz = SIZE{ w, h };
+    std::vector<uint32_t> px[2];
+    for (int pass = 0; pass < 2; pass++) {
+        BITMAPINFO bi = {};
+        bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+        bi.bmiHeader.biWidth = sz.cx;
+        bi.bmiHeader.biHeight = -sz.cy;
+        bi.bmiHeader.biPlanes = 1;
+        bi.bmiHeader.biBitCount = 32;
+        void* bits = nullptr;
+        HDC mem = CreateCompatibleDC(nullptr);
+        HBITMAP b = CreateDIBSection(mem, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+        if (!b || !bits) { if (b) DeleteObject(b); DeleteDC(mem); return false; }
+        HGDIOBJ old = SelectObject(mem, b);
+        RECT r = { 0, 0, sz.cx, sz.cy };
+        HBRUSH br = CreateSolidBrush(pass ? RGB(255, 255, 255) : RGB(0, 0, 0));
+        FillRect(mem, &r, br);
+        DeleteObject(br);
+        DrawThemeBackground(th, mem, part, state, &r, nullptr);
+        px[pass].assign((uint32_t*)bits, (uint32_t*)bits + (size_t)sz.cx * sz.cy);
+        SelectObject(mem, old);
+        DeleteObject(b);
+        DeleteDC(mem);
+    }
+    std::vector<uint32_t> seen;
+    for (size_t i = 0; i < px[0].size(); i++) {
+        uint32_t c = px[0][i] & 0xffffff;
+        if (c != (px[1][i] & 0xffffff)) continue;
+        if (std::find(seen.begin(), seen.end(), c) == seen.end()) { seen.push_back(c); if (seen.size() > most) return false; }
+    }
+    return true;
 }
 
 static std::string lower(std::string s) { for (char& c : s) if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a'); return s; }
@@ -285,7 +426,13 @@ static void load_look(HWND h)
         g_look.link = RGB(33, 93, 198);
         GetThemeColor(t, EBP_NORMALGROUPBACKGROUND, 0, TMT_TEXTCOLOR, &g_look.link);
         g_look.title_hot = g_look.link_hot = RGB(66, 142, 255);
-        return;
+        if (!placeholder_part(t, EBP_NORMALGROUPCOLLAPSE, 1, 19, 19, 2) && !placeholder_part(t, EBP_NORMALGROUPHEAD, 0, 180, 25, 3))
+            return;
+        // the style's ExplorerBar images are placeholders (ReactOS's styles) and it has no shellstyle.dll of its own: as XP
+        // does (SHGetShellStyleHInstance falls back to system32's, the classic one), the classic pane in the style's system
+        // colours (measured: XP SP3 with ReactOS's Lunar and Lautus, ~/fun/longhorn/screenshots/WinXP-193456.png, -193504.png)
+        CloseThemeData(t);
+        g_look = Look();
     }
     if (variant.empty()) {   // classic (class_ss / classic style.uix)
         g_look.kind = Classic;
@@ -304,13 +451,13 @@ static void load_look(HWND h)
             g_look.body = RGB(246, 246, 236);
             g_look.title = g_look.link = RGB(86, 102, 45);
             g_look.title_hot = g_look.link_hot = RGB(114, 146, 29);
-            g_look.head1 = RGB(255, 255, 255); g_look.head2 = RGB(224, 231, 184);
+            g_look.head1 = RGB(255, 252, 236); g_look.head2 = RGB(224, 231, 184); g_look.head_from = 0;
         } else if (variant == "metallic") {
             g_look.pane1 = RGB(196, 200, 212); g_look.pane2 = RGB(177, 179, 200);
             g_look.body = RGB(240, 241, 245);
             g_look.title = g_look.link = RGB(63, 61, 61);
             g_look.title_hot = g_look.link_hot = RGB(126, 124, 124);
-            g_look.head1 = RGB(255, 255, 255); g_look.head2 = RGB(214, 215, 224);
+            g_look.head1 = RGB(255, 255, 255); g_look.head2 = RGB(214, 215, 224); g_look.head_from = 0;
         } else {
             g_look.pane1 = RGB(123, 162, 231); g_look.pane2 = RGB(99, 117, 214);
             g_look.body = RGB(214, 223, 247);
@@ -322,6 +469,7 @@ static void load_look(HWND h)
     }
     g_look.up = load_bmp(art(100)); g_look.up_hot = load_bmp(art(101));        // IDB_UP, IDB_UPHOT
     g_look.down = load_bmp(art(102)); g_look.down_hot = load_bmp(art(103));    // IDB_DOWN, IDB_DOWNHOT
+    make_chevrons();   // the ones shellstyle.dll did not give (no XP files: all four)
 }
 
 static void make_fonts()
@@ -530,36 +678,6 @@ static void blend_grid(HDC dc, const Bmp& b, const RECT& r)
             blend(dc, b, xs[i], ys[j], xs[i + 1] - xs[i], ys[j + 1] - ys[j], xd[i], yd[j], xd[i + 1] - xd[i], yd[j + 1] - yd[j]);
 }
 
-// the chevron without the bitmaps: a pale disc with a ring and two chevrons
-static void draw_chevron(HDC dc, int x, int y, bool collapsed, bool hot)
-{
-    COLORREF ring = g_look.kind == Classic ? GetSysColor(COLOR_BTNSHADOW) : mix(g_look.title, RGB(255, 255, 255), 2, 3);
-    COLORREF glyph = hot ? g_look.title_hot : g_look.title;
-    if (g_look.kind != Classic) {
-        HBRUSH b = CreateSolidBrush(RGB(255, 255, 255));
-        HPEN p = CreatePen(PS_SOLID, 1, ring);
-        HGDIOBJ ob = SelectObject(dc, b), op = SelectObject(dc, p);
-        Ellipse(dc, x + 2, y + 2, x + 19, y + 19);
-        SelectObject(dc, ob); SelectObject(dc, op);
-        DeleteObject(b); DeleteObject(p);
-    } else if (hot) {
-        RECT r = { x + 2, y + 2, x + 19, y + 19 };
-        DrawEdge(dc, &r, BDR_RAISEDINNER, BF_RECT);
-    }
-    HPEN p = CreatePen(PS_SOLID, 1, glyph);
-    HGDIOBJ op = SelectObject(dc, p);
-    for (int k = 0; k < 2; k++) {
-        int cy = y + 7 + k * 4;
-        for (int t = 0; t < 2; t++) {   // 2 px thick
-            int yy = cy + t;
-            if (!collapsed) { MoveToEx(dc, x + 7, yy + 3, nullptr); LineTo(dc, x + 10, yy); LineTo(dc, x + 14, yy + 4); }
-            else { MoveToEx(dc, x + 7, yy, nullptr); LineTo(dc, x + 10, yy + 3); LineTo(dc, x + 14, yy - 1); }
-        }
-    }
-    SelectObject(dc, op);
-    DeleteObject(p);
-}
-
 static void draw_header(HDC dc, const Group& g, int gi, int dy)
 {
     RECT r = g.head; OffsetRect(&r, 0, -dy);
@@ -569,10 +687,10 @@ static void draw_header(HDC dc, const Group& g, int gi, int dy)
     } else if (g_look.head) {
         blend_grid(dc, g_look.head, r);
     } else {
-        // gradient from the left colour (first half) to the right one; cut corners
-        int w = r.right - r.left;
+        // IDB_HEADERSECTION's gradient: the left colour up to head_from, then to the right one; cut corners
+        int w = r.right - r.left, x0 = w * g_look.head_from / 100;
         for (int x = 0; x < w; x++) {
-            COLORREF c = x < w / 2 ? g_look.head1 : mix(g_look.head1, g_look.head2, x - w / 2, w - w / 2);
+            COLORREF c = x < x0 ? g_look.head1 : mix(g_look.head1, g_look.head2, x - x0, imax(1, w - 1 - x0));
             int top = r.top;
             if (g_look.kind != Classic) {
                 if (x == 0 || x == w - 1) top += 2;
@@ -605,8 +723,6 @@ static void draw_header(HDC dc, const Group& g, int gi, int dy)
     if (b) {
         if (g_look.kind == Classic) cy = r.top + (r.bottom - r.top - b.h_) / 2;
         blend(dc, b, 0, 0, b.w, b.h_, cx, cy, b.w, b.h_);
-    } else {
-        draw_chevron(dc, cx, cy, g.collapsed, hot);
     }
 }
 

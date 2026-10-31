@@ -12,10 +12,6 @@ imported is the free baseline. Left:
 * With nothing imported at all (not even ReactOS): Marlett's glyphs come out as letters unless the system has Wine's Marlett;
   ship or fetch it, or draw the glyphs (luxwm had bitmaps that were bit-exact at 16x14); a fontconfig alias set for Tahoma /
   Microsoft Sans Serif without an import.
-* ReactOS's Lunar, Mizu and Lautus have placeholder ExplorerBar art: NormalGroupCollapse/Expand.bmp are a flat green
-  (31,255,41) fill with TRANSPARENT and the default magenta key, Mizu's NormalGroupHead a flat purple; flxp's places pane draws
-  them as green blocks in the group headers (ReactOS's own explorer never draws those parts). Decide: the plain pane for a style
-  whose collapse image is a flat fill, or a per-style override.
 * The ReactOS styles' start panel user pane is a blank white band (no StartPanel UserPane art?); check against ReactOS.
 * Cursors: an X cursor theme in XP's shapes (free ones exist); ReactOS's are user32.dll resources.
 * Sounds, wallpaper: a generated classic wallpaper (the teal), none for sounds.
@@ -28,13 +24,19 @@ imported is the free baseline. Left:
 * Provides the base resources: pick an ISO / WIM / resource pack / Windows directory, see what builds it holds, import with
   progress (lhde-import does the work; the dialog is the face), then what themes became complete (lhde-theme explain per
   theme, "missing -> fallback" shown as what the user would notice).
-* Adds themes: a .msstyles dropped in (+ shellstyle), a theme file, a frame set recipe; shows the subset we curate (the
-  Appearance list question: the "Windows and buttons" combo lists every imported style; aap wants the curated themes visible).
+* Adds themes: a .msstyles dropped in (+ shellstyle), a theme file, a frame set recipe; Appearance's "Windows and buttons"
+  lists only the styles a theme file names, so adding a style means adding a theme for it.
 * Look: 3683's Avalon settings dialog and Vista's Personalization as inspiration; XP's Display Properties stays the classic
   path. Where it lives: Display Properties' Themes tab ("Install theme...") and a standalone `lhde-setup`.
 * Also the place for the migration messages and lhde-theme dirs' view of the three trees.
 
 ## 4. Open smaller points
+* the ReactOS styles' frames show a black edge along the top of the decoration (luxwm msstyles mode with lunar/mizu/lautus):
+	find whether it is the style (a part wuxtheme draws black where XP's uxtheme would skip it: compare with the XP screenshots
+	WinXP-193456/193504/193512.png, which show the real caption) or luxwm's geometry for these styles
+* the Windows pack misses the Aero reconstruction (aero-patch.msstyles and the other styles dropped into local/): lhde-pack must
+	carry local/ (dropped-in styles, schemes, hand-copied resources) in both profiles, and the essentials profile must count
+	aerovision's and aero4074's style as needed; a pack made from aap's tree must reproduce his themes completely
 * frame sets that exist only as copied pixels without a recipe (aerovision: "copied in"); every set should be regenerable.
 * Aero vision's resources resolve into the research workspace ([elsewhere] in explain); the import should own them.
 * Slate vision and Metal vision are still .todo theme files.

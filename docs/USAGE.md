@@ -112,6 +112,16 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    form, which lhde-schemes does not read: the built-in Windows Standard stands in), its cursors (user32 resources; lhde
    uses X cursors), and Blackshade, which ReactOS's source tree has only as the unbuilt sources of a style
    (`media/themes/Blackshade`, a placeholder its build skips): there is no blackshade.msstyles to import.
+   **What the free baseline shows**, and what needs XP's files: Windows Classic and the four ReactOS styles with ReactOS's
+   icons, fonts and Marlett; the classic start button with flxp-taskbar's own flag (XP's or 2000's explorer.exe give theirs);
+   the Explorer's XP task pane (the web view's Places / Details sections) in the classic look, as XP itself shows it under a
+   style that has no shellstyle.dll: ReactOS implements no web view (its DefView has no task pane, browseui says "We don't
+   support WebView") and ships no shellstyle.dll, and its styles' ExplorerBar images are placeholders (flat fills), so flxp
+   draws the classic sections in the style's system colours, with the chevrons drawn after XP's. The Luna task pane (the
+   blue, olive or silver gradient, the white-to-colour section headers, the round chevrons) needs XP's Luna and its
+   `Shell/<colour>/shellstyle.dll`; with Luna imported but no shellstyle.dll (a Longhorn build's copy) flxp draws that look
+   itself from the colour scheme. ReactOS's Modern style loads here although XP rejects it ("Light_Button_BMP missing": its
+   bitmaps carry BITMAPV5 headers, which XP's uxtheme does not read and wuxtheme does).
    Sizes with the ISOs here (2026-10-28; the tarball is `tar` + `xz -9e`, as no zstd is installed here): **museum** 418 MB
    raw (377 MB stored once), 57 MB compressed; **essentials** for the 14 shipped themes 169 MB raw (164 MB stored once), 36 MB
    compressed, in 5 builds (4051 4074 5048 5112 xp) and the 2k icon DLLs. About 20 s from the ISOs, 10 s `--from-pack` (the
@@ -154,10 +164,31 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    22 schemes (XP, Server 2003 and Windows 2000 have the same ones), the "(large)" / "(extra large)" variants as the font sizes of
    their scheme. Without any, "Windows Standard" is the built-in classic colours.
 
+### Icon packs
+An icon recipe (`data/icons/NAME.theme`, chosen by a theme's `Desktop.icons`) maps flxp's icon keys to sources: `pe:FILE#ID`
+(an icon in an imported DLL) or `file:PACK/PATH` (a file of an icon pack imported with `lhde-import --icons`). A pack is any
+directory of PNGs and `.ico` files under a free licence; `lhde-import --icons DIR NAME [--licence FILE]` writes it into the
+Windows tree's `local/icons/NAME/` (relative paths kept; every PNG becomes a `.ico` with 16, 24, 32, 48, 64, 128 and 256 px
+images, downscaled once there instead of at every start; `.ico` files are copied; the licence and readme beside it and
+`source.ini` go with it) and indexes it as `icons/NAME`. A pack recipe says `requires = icons/NAME` (without the pack the
+resolver falls back like a recipe whose resources are missing) and `fallback = RECIPE...`: the first of those whose files are
+there gives every key the pack has no picture for, any file not imported, and the toolbar strips.
+The one shipped: `xp-hires`, the CC0 "Windows XP High Resolution Icon Pack" by marchmountain (1024 px PNGs redrawn after
+XP's icons; release 02 from github.com/marchmountain/-Windows-XP-High-Resolution-Icon-Pack, 159 MB zip; its folder
+`Windows XP Icons`, 500 pictures named by what they show), mapped key by key to xp.theme's ids (pdf and settings have no
+picture: XP's, 2000's or ReactOS's stand in):
+```
+lhde-import --icons "Windows XP High Resolution Icon Pack/Windows XP Icons" xp-hires --licence LICENSE   # 15 s, 36 MB
+lhde-theme layer-set Desktop.icons xp-hires                                                              # or a theme file's [Desktop] icons
+```
+The 16 px images are the 1024 px pictures scaled down: softer than XP's hand-drawn 16 px icons; at 32 px and up they are
+sharper.
+
 ## lhde-theme
 The resolver from the shell (docs/THEME-FORMAT.md, liblhde):
 ```
-lhde-theme list                         every theme: the user's, the shipped ones, bare styles
+lhde-theme list                         every theme: the user's, the shipped ones, bare styles; "style missing" marks a theme
+                                        whose visual style is not imported (the settings lists leave it out)
 lhde-theme resolve aero5048 --why       the record, each key with where it came from (file, base, default, fallback + reason)
 lhde-theme resolve luna --get path.style
 lhde-theme set jade4074                 settings.ini [theme] name (the current layer dropped), then _LH_THEME on $DISPLAY

@@ -15,6 +15,9 @@ usage:
   lhde-import --style FILE [NAME]             drop one visual style in (local/themes/NAME.msstyles; NAME defaults to the file's
                                               stem), with its Shell/ when it has one beside it, and run the recipes that read it
                                               (aero-patch: the frame sets aero-patch and aerovision)
+  lhde-import --icons DIR NAME [--licence FILE]   an icon pack (PNGs, .ico; e.g. the CC0 Windows XP High Resolution Icon
+                                              Pack) into local/icons/NAME/ as .ico files (16-256 px), for icon recipes that
+                                              name files (file:NAME/PATH.ico; data/icons/xp-hires.theme)
   lhde-import --from-workspace DIR [--copy-resources]   aap's research workspace (~/fun/longhorn)
   lhde-import --regenerate                    delete generated/ and make it again from the imported files (--rebuild-cache)
   lhde-import --annotate                      write the file annotations (extended attributes, docs/ANNOTATIONS.md) a tree lacks:
@@ -160,6 +163,10 @@ def main():
             mode, arg = 'style', a.pop(0)
             if a and not a[0].startswith('--'):
                 extra.append(a.pop(0))
+        elif x == '--icons':
+            mode, arg = 'icons', a.pop(0)
+            extra.append(a.pop(0) if a and not a[0].startswith('--') else '')
+        elif x == '--licence': o['licence'] = a.pop(0)
         elif x == '--source': o['source'] = a.pop(0)
         elif x in ('--windows', '--data'): o['data'] = a.pop(0)
         elif x == '--old': o['old'] = a.pop(0)
@@ -208,6 +215,12 @@ def main():
         L.regenerate(data); return 0
     if mode == 'from-workspace':
         from_workspace(os.path.realpath(arg), data, o['force'], o['copyres']); return 0
+    if mode == 'icons':
+        if not extra or not extra[0]:
+            L.die('--icons DIR NAME: a name for the pack (icons/NAME in the index)')
+        L.import_icons(os.path.realpath(arg), data, extra[0], o['force'], o.get('licence'))
+        T.reindex(data)
+        return 0
     if mode == 'style':
         name = extra[0] if extra else os.path.basename(arg).rsplit('.', 1)[0].lower()
         rep = {'copied': 0, 'kept': 0}

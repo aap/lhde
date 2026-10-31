@@ -1,10 +1,12 @@
 // flxp-settings: Display Properties (XP's desk.cpl / themeui) for the lhde session.
 // A property sheet with Themes / Desktop / Appearance / Shell over liblhde's theme files, the current layer and the
 // settings store (docs/THEME-FORMAT.md sections 2a and 3, docs/SETTINGS.md), as Windows has it:
-//   Themes      theme files only (the shipped ones and the user's), and "NAME (Modified)" while the current layer has
-//               keys; Save As writes a theme file, Delete removes one of the user's
+//   Themes      theme files only (the shipped ones and the user's) whose visual style is imported (the selected one
+//               always), and "NAME (Modified)" while the current layer has keys; Save As writes a theme file, Delete
+//               removes one of the user's
 //   Desktop     the background (Desktop.wallpaper, Desktop.mode) and the icon set (Desktop.icons)
-//   Appearance  XP's: "Windows and buttons" = the visual style (every style in styles/, plus Windows Classic style),
+//   Appearance  XP's: "Windows and buttons" = the visual style (the styles some theme file names, Windows Classic style,
+//               and the selected style when it is neither),
 //               "Color scheme" (the style's colours, or a classic scheme), "Font size"; Effects... (font smoothing),
 //               Advanced (classic: the per-item editor writing Colors.* / Metrics.*)
 //   Shell       the Longhorn extras: Explorer chrome, navigation bar and its size, taskbar, start menu, window frames,
@@ -275,8 +277,8 @@ std::string pretty(const std::string& n)
     return out;
 }
 
-struct Style { std::string name, path, label; };
-std::vector<Style> styles;        // "classic" first, then every style in styles/ by label
+struct Style { std::string name, path, label; bool named = false; };
+std::vector<Style> styles;        // "classic" first, then every style in styles/ by label; named: a theme file uses it
 
 std::string style_label(const std::string& name, const std::string& path)
 {
@@ -315,7 +317,16 @@ void load_styles()
     for (Style& s : styles) { s.label = style_label(s.name, s.path); count[s.label]++; }
     for (Style& s : styles) if (count[s.label] > 1) s.label += " [" + s.name + "]";   // two copies of one style
     std::sort(styles.begin(), styles.end(), [](const Style& a, const Style& b) { return strcasecmp(a.label.c_str(), b.label.c_str()) < 0; });
-    styles.insert(styles.begin(), Style{ "classic", "", "Windows Classic style" });
+    styles.insert(styles.begin(), Style{ "classic", "", "Windows Classic style", true });
+    // the curated set: the styles some theme file (shipped or the user's) resolves to; every other imported file is
+    // offered only while it is the one selected
+    std::set<std::string> named;
+    for (const store::ThemeEntry& e : store::theme_files())
+        if (lhde_theme* t = lhde_theme_resolve_flags(e.name.c_str(), LHDE_RESOLVE_FILES, nullptr, 0)) {
+            if (const char* v = lhde_theme_get(t, "VisualStyle.style")) named.insert(v);
+            lhde_theme_free(t);
+        }
+    for (Style& s : styles) if (named.count(s.name)) s.named = true;
 }
 
 const Style* style_named(const std::string& n)
@@ -905,6 +916,7 @@ void fill_theme_list(HWND dlg)
     int sel = -1;
     bool listed = false;
     for (const store::ThemeEntry& e : themes) {
+        if (e.style_missing && e.name != cur.theme && e.name != mod_theme) continue;   // its style is not imported
         theme_items.push_back(ThemeItem{ e.name, false });
         if (e.name == cur.theme && cur.layer.empty()) sel = (int)theme_items.size() - 1;
         if (e.name == cur.theme) listed = true;
@@ -1341,9 +1353,9 @@ void fill_appearance(HWND dlg)
     load_styles();
     load_schemes();
     style_items.clear();
-    for (const Style& s : styles) style_items.push_back(Item{ s.label, s.name });
     bool classic = is_classic(rec);
     std::string style = classic ? "classic" : value("VisualStyle.style");
+    for (const Style& s : styles) if (s.named || s.name == style) style_items.push_back(Item{ s.label, s.name });
     fill_list(dlg, IDC_AP_STYLE, style_items, style);
     if (classic) {
         color_items = scheme_items();
@@ -1783,7 +1795,7 @@ std::vector<Item> items_for(int id)
     case IDC_AP_FRAME: return items({ { "Automatic (Longhorn when luxwm runs)", "auto" }, { "Windows XP", "xp" }, { "Longhorn header", "longhorn" } });
     case IDC_AP_NAVBAR: return items({ { "Longhorn 4074", "4074" }, { "Longhorn 4051", "4051" }, { "Vision (luxnav)", "vision" }, { "None (XP toolbars)", "none" } });
     case IDC_AP_PRESET:
-        if (value("Explorer.navbar") == "vision") return items({ { "Automatic", "auto" }, { "Small", "small" }, { "Big", "big" } });
+        if (value("Explorer.navbar") == "vision") return items({ { "Automatic", "auto" }, { "Small", "small" }, { "Big", "big" }, { "Concept", "concept" } });
         return items({ { "Automatic", "auto" }, { "Small", "small" }, { "Medium", "medium" }, { "Large", "large" }, { "Extra large", "xlarge" } });
     case IDC_AP_TASKBAR: return items({ { "Avalon (luxshell)", "avalon" }, { "Classic (flxp-taskbar)", "classic" }, { "None", "none" } });
     case IDC_AP_FRAMES: {

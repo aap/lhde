@@ -152,7 +152,9 @@ HMENU themes_menu()
 {
     theme_cmds.clear();
     const shell::SessionTheme& cur = shell::session_theme();
-    std::vector<shell::store::ThemeEntry> list = shell::store::theme_files();
+    std::vector<shell::store::ThemeEntry> list;
+    for (shell::store::ThemeEntry& e : shell::store::theme_files())
+        if (!e.style_missing || e.name == cur.name) list.push_back(e);   // a theme whose style is not imported is not offered
     if (list.empty()) return nullptr;
     HMENU m = CreatePopupMenu();
     for (size_t i = 0; i < list.size(); i++) {

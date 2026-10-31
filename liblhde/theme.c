@@ -470,8 +470,10 @@ static void apply_fallbacks(lhde_theme *t, const lhde_style_info *si)
         char nm[128], rel[300]; snprintf(nm, sizeof nm, "%s", v); snprintf(rel, sizeof rel, "icons/%s.theme", nm);
         int ok = lhde_data_find(rel, p, sizeof p) != NULL;
         char res[256] = "";
-        if (ok) { lhde_ini *ini = lhde_ini_load(p); lhde_ini_get(ini, "theme", "resources", res, sizeof res); lhde_ini_free(ini);
-                  char o[PATH_MAX]; if (res[0] && !lhde_data_find(res, o, sizeof o)) ok = 0; }
+        if (ok) { lhde_ini *ini = lhde_ini_load(p); lhde_ini_get(ini, "theme", "resources", res, sizeof res);
+                  char req[256] = ""; lhde_ini_get(ini, "theme", "requires", req, sizeof req); lhde_ini_free(ini);
+                  char o[PATH_MAX]; if (res[0] && !lhde_data_find(res, o, sizeof o)) ok = 0;
+                  if (req[0] && !lhde_data_find(req, o, sizeof o)) { ok = 0; snprintf(res, sizeof res, "%s", req); } }   /* an icon pack */
         if (!ok) {
             const char *fb = "wine";
             for (int i = 0; FREE_CHAIN[i]; i++) {
@@ -589,15 +591,21 @@ static void choose_style(lhde_theme *t, lhde_style_info *si)
     const char *s = get(t, "VisualStyle.style");
     if (!s) { put(t, "VisualStyle.style", "classic", LHDE_FROM_DEFAULT, "default: no style named: classic"); s = "classic"; }
     char want[256]; snprintf(want, sizeof want, "%s", s);
-    if (lhde_style_probe(want, si)) return;
+    char broken[400] = "";
+    if (lhde_style_probe(want, si)) {
+        if (!si->broken) return;
+        snprintf(broken, sizeof broken, "%s", si->broken_why);   /* XP refuses such a style: so do we */
+    }
     static const char *const alt[][3] = { { "luna", "luna4051", "luna4074" }, { "luna-xp", "luna", "luna4051" }, { NULL, NULL, NULL } };
     for (int i = 0; alt[i][0]; i++) {
         if (strcmp(alt[i][0], want)) continue;
-        for (int j = 1; j < 3; j++) if (lhde_style_probe(alt[i][j], si)) {
+        for (int j = 1; j < 3; j++) if (lhde_style_probe(alt[i][j], si) && !si->broken) {
             char w[600]; snprintf(w, sizeof w, "style %s not imported: %s", want, alt[i][j]);
             fallback(t, "VisualStyle.style", alt[i][j], w); return; }
     }
-    char w[600]; snprintf(w, sizeof w, "style %s not imported (styles/%s.msstyles): no visual style", want, want);
+    char w[800];
+    if (broken[0]) snprintf(w, sizeof w, "style %s is broken (%s): no visual style", want, broken);
+    else snprintf(w, sizeof w, "style %s not imported (styles/%s.msstyles): no visual style", want, want);
     fallback(t, "VisualStyle.style", "classic", w);
     lhde_style_probe("classic", si);
 }
@@ -732,7 +740,25 @@ static lhde_theme *resolve_ex(const char *name, int flags, const char *const *kv
     char fmt[8]; snprintf(fmt, sizeof fmt, "%d", si.format);
     put(t, "style.format", fmt, LHDE_FROM_DERIVED, "derived");
     put(t, "style.family", si.family, LHDE_FROM_DERIVED, "derived");
+    /* the style the theme names is not imported and it fell to classic (luna -> luna4051 is a style still): theme lists hide it */
+    { const char *vs = get(t, "VisualStyle.style");
+      int miss = lhde_theme_source(t, "VisualStyle.style") == LHDE_FROM_FALLBACK && vs && !strcasecmp(vs, "classic");
+      put(t, "style.missing", miss ? "1" : "0", LHDE_FROM_DERIVED, miss ? "derived: the theme's style is not imported" : "derived"); }
     return t;
+}
+
+int lhde_theme_style_missing(const lhde_theme *t)
+{
+    const char *v = t ? get(t, "style.missing") : NULL;
+    return v && !strcmp(v, "1");
+}
+int lhde_theme_has_style(const char *name)
+{
+    lhde_theme *t = lhde_theme_resolve_flags(name, LHDE_RESOLVE_FILES, NULL, 0);
+    if (!t) return -1;
+    int r = !lhde_theme_style_missing(t);
+    lhde_theme_free(t);
+    return r;
 }
 
 /* ---------------------------------------------------------------- serialization (_LH_THEME_RESOLVED) */

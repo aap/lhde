@@ -24,6 +24,10 @@
 #pragma weak ut_color
 #pragma weak ut_size
 #pragma weak ut_get_resource
+#pragma weak ut_prop
+#pragma weak ut_get_string
+#pragma weak ut_get_bitmap
+#pragma weak ut_free
 #endif
 
 int lhde__exists(const char *p) { struct stat st; return p && p[0] && stat(p, &st) == 0; }
@@ -91,6 +95,19 @@ static int probe_ut(const char *path, lhde_style_info *o)
     snprintf(o->color, sizeof o->color, "%s", c ? c : "");
     snprintf(o->size, sizeof o->size, "%s", s ? s : "");
     family_from_version(t, o->family, sizeof o->family);
+    /* broken as packaged: the push button names an image that does not load (not in the file, or undecodable). XP refuses
+       such a style ("NAME_BMP missing"); wuxtheme would draw nothing there. (ReactOS's modern.msstyles draws that message on
+       XP only because XP's loader cannot read its BITMAPV5 headers; wuxtheme reads them, so it passes here.) */
+    if (ut_prop && ut_get_string && ut_get_bitmap && ut_free) {
+        int img = ut_prop(t, "IMAGEFILE");
+        char name[256];
+        if (img && ut_get_string(t, "Button", 1, 0, img, name, sizeof name)) {
+            int w = 0, h = 0;
+            uint32_t *px = ut_get_bitmap(t, "Button", 1, 0, img, &w, &h);
+            if (px) ut_free(px);
+            else { o->broken = 1; snprintf(o->broken_why, sizeof o->broken_why, "Button's image %s is not in the file", name); }
+        }
+    }
     ut_close(t);
     return 1;
 }

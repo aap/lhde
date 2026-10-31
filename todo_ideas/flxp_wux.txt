@@ -2,7 +2,7 @@
 
 ## visuals
 
-* currently two ways to draw context menus?
+* NEXT (aap): the context menus: currently two ways to draw context menus?
 luxwm has something for the window menu that looks different from the other wux menus.
 in some respects it looks better because of how the font and (jade/aero) highlights are drawn,
 not *entirely* sure about the font for all themes though
@@ -20,6 +20,9 @@ not *entirely* sure about the font for all themes though
 	panels stay as they are. XP's pinned items have a second line (the program's description) that ours lack
 * menus: user32's submenu arrow (OBM_MNARROW, 5x9, 1 px from the item's end) is bigger than XP's classic one (Marlett,
 	4x7, about 8 px from the menu's edge; WinXP-193221.png): every wux menu
+
+* 5048 and 5112 use the `concept` luxnav preset for now (set in their themes); presets of their own in data/navbar/vision.ini
+	when they diverge; Display Properties still offers Small/Big/Concept for them although the Vista era has no header sizes
 
 ## flxp behavior
 

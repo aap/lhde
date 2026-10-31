@@ -1,0 +1,42 @@
+; Windows XP's icons redrawn at 1024 px: the "Windows XP High Resolution Icon Pack" by marchmountain (CC0 1.0;
+; https://github.com/marchmountain/-Windows-XP-High-Resolution-Icon-Pack, release 02, the folder "Windows XP Icons").
+; Not shipped: imported by the user with
+;   lhde-import --icons "Windows XP High Resolution Icon Pack/Windows XP Icons" xp-hires --licence LICENSE
+; which writes each PNG as a .ico of 16-256 px into the Windows tree's local/icons/xp-hires/ (docs/USAGE.md "Icon packs").
+; file:PACK/PATH names a file of an imported pack (index/icons/PACK/PATH). The keys are xp.theme's, each mapped to the pack's
+; picture of what XP's shell32 id shows; a key the pack has no picture for (pdf, settings), a file not imported, and the
+; toolbar come from the first usable recipe of `fallback` (XP's ids, then 2000's, then ReactOS's: the free chain).
+[theme]
+name = Windows XP (high resolution)
+requires = icons/xp-hires
+fallback = xp 2k reactos
+depth = 32
+
+[icons]
+folder = file:xp-hires/Folder Closed.ico
+folder_open = file:xp-hires/Folder Opened.ico
+document = file:xp-hires/Generic Document.ico
+text = file:xp-hires/Generic Text Document.ico
+drive = file:xp-hires/Local Disk.ico
+computer = file:xp-hires/My Computer.ico
+desktop = file:xp-hires/Desktop.ico
+home = file:xp-hires/My Documents.ico
+image = file:xp-hires/Bitmap.ico
+audio = file:xp-hires/Generic Audio.ico
+video = file:xp-hires/Generic Video.ico
+zip = file:xp-hires/Zip folder.ico
+exe = file:xp-hires/Application Window.ico
+dll = file:xp-hires/DLL.ico
+binary = file:xp-hires/DLL.ico
+html = file:xp-hires/HTML.ico
+disc = file:xp-hires/CD-ROM.ico
+network = file:xp-hires/My Network Places.ico
+favorites = file:xp-hires/Favorites.ico
+search = file:xp-hires/Search.ico
+trash = file:xp-hires/Recycle Bin (empty).ico
+help = file:xp-hires/Help and Support.ico
+pictures = file:xp-hires/My Pictures.ico
+control_panel = file:xp-hires/Control Panel.ico
+display = file:xp-hires/Display Properties.ico
+run = file:xp-hires/Run.ico
+recent = file:xp-hires/Recent Documents.ico

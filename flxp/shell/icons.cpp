@@ -80,6 +80,10 @@ static std::string resolve(const IconTheme& t, const std::string& src)
 {
     if (src.empty()) return src;
     std::string s = expand(src);
+    if (s.rfind("file:", 0) == 0) {   // file:PACK/PATH: an imported icon pack (lhde-import --icons: index/icons/PACK/PATH)
+        std::string rel = "icons/" + s.substr(5), f = lhde_find(rel);
+        return f.empty() ? "/nonexistent/" + rel : f;   // not imported: missing, the fallback recipe's source stands in
+    }
     if (s.rfind("pe:", 0) == 0) {
         std::string rest = s.substr(3);
         size_t hash = rest.rfind('#');
@@ -103,6 +107,9 @@ std::string icon_theme_file(const std::string& name)
     return exists(f) ? f : "";
 }
 
+static bool source_exists(const std::string& src);
+static bool theme_usable(const IconTheme& t);
+
 bool load_icon_theme(const std::string& name)
 {
     std::string path = icon_theme_file(name);
@@ -112,6 +119,7 @@ bool load_icon_theme(const std::string& name)
     IconTheme t;
     t.name = name;
     bool has_resources = false;
+    std::string fallback;   // [theme] fallback = RECIPE...: who fills the keys this one lacks or whose files are missing
     std::string section;
     char line[1024];
     while (fgets(line, sizeof line, f)) {
@@ -134,6 +142,7 @@ bool load_icon_theme(const std::string& name)
                 if (!t.base.empty() && t.base[0] != '/') t.base = dir_of(path) + "/" + t.base;   // relative to the .theme file
             }
             else if (k == "depth") t.depth = atoi(v.c_str());
+            else if (k == "fallback") fallback = v;
         } else if (section == "icons") {
             t.icons.push_back({k, v});
         } else if (section == "toolbar") {
@@ -160,6 +169,28 @@ bool load_icon_theme(const std::string& name)
     t.toolbar.go = resolve(t, t.toolbar.go);
     t.toolbar.go_hot = resolve(t, t.toolbar.go_hot);
     t.toolbar.close = resolve(t, t.toolbar.close);
+    // the fallback recipes, the first usable one: its sources for every key this recipe lacks or whose file is missing, its
+    // toolbar when this one has none (an icon pack has no strips). Not nested further than one level.
+    static int depth;
+    if (!fallback.empty() && depth == 0) {
+        depth++;
+        size_t i = 0;
+        while (i < fallback.size()) {
+            size_t j = fallback.find_first_of(" ,", i);
+            std::string fb = fallback.substr(i, j == std::string::npos ? std::string::npos : j - i);
+            i = j == std::string::npos ? fallback.size() : j + 1;
+            if (fb.empty() || fb == name || !load_icon_theme(fb) || !theme_usable(g_theme)) continue;
+            for (auto& kv : g_theme.icons) {
+                bool found = false;
+                for (auto& mine : t.icons)
+                    if (mine.first == kv.first) { found = true; if (!source_exists(mine.second)) mine.second = kv.second; }
+                if (!found) t.icons.push_back(kv);
+            }
+            if (!source_exists(t.toolbar.strip)) t.toolbar = g_theme.toolbar;
+            break;
+        }
+        depth--;
+    }
     g_theme = t;
     g_loaded = true;
     return true;
@@ -253,13 +284,15 @@ std::string resource_src(const std::string& build, const std::string& file, int 
     return f.empty() ? "" : "pe:" + f + "#" + std::to_string(id);
 }
 
-// Where a source keeps XP's art under another file or id (the rest are XP's own): ReactOS's explorer.exe has one start
-// bitmap, IDB_START 143, the classic button's too (XP: startclassic.bmp 176); its toolbar strips, Go button and brand are
-// browseui's (the icon recipe data/icons/reactos.theme). What no source but XP has (the Log Off buttons 7010/7011, the
-// chess tile logonui.exe 114, shellstyle.dll) stays "" and its caller draws without it.
+// Where a source keeps XP's art under another file or id (the rest are XP's own), or has a picture of its own under XP's id
+// (to_id 0: not taken from it): ReactOS's explorer.exe IDB_START 143 is ReactOS's logo, so neither start button takes it
+// (flxp-taskbar draws its own flag); its toolbar strips, Go button and brand are browseui's (the icon recipe
+// data/icons/reactos.theme). What no source but XP has (the Log Off buttons 7010/7011, the chess tile logonui.exe 114,
+// shellstyle.dll) stays "" and its caller draws without it.
 struct ArtMap { const char* source; const char* file; int id; const char* to_file; int to_id; };
 static const ArtMap art_map[] = {
-    { "reactos", "explorer.exe", 176, "explorer.exe", 143 },
+    { "reactos", "explorer.exe", 143, "explorer.exe", 0 },
+    { "reactos", "explorer.exe", 176, "explorer.exe", 0 },
 };
 
 std::string xp_art(const std::string& file, int id, int type)
@@ -269,6 +302,7 @@ std::string xp_art(const std::string& file, int id, int type)
         int i = id;
         for (const ArtMap& m : art_map)
             if (!strcmp(m.source, src) && !strcasecmp(m.file, file.c_str()) && m.id == id) { f = m.to_file; i = m.to_id; }
+        if (!i) continue;
         std::string path = resource_file(src, f);
         if (path.empty()) continue;
         res::Module* mod = res::load(path.c_str());

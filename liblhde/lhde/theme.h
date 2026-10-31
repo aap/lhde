@@ -13,7 +13,8 @@
      fallback  section 6: what was asked for is not imported (or not usable); the reason is part of the source text
    Absent keys inherit, then take the default; the value `none` switches a component off and is never replaced by a default.
    Besides the theme keys the record carries derived ones: theme (the name resolved), file (its file, "" for a bare style),
-   style.kind (xp | longhorn | dwm | classic | missing), style.format, style.family, and path.* (absolute paths of the components:
+   style.kind (xp | longhorn | dwm | classic | missing), style.format, style.family, style.missing ("1" when the visual style the
+   theme names is not imported and it fell back to classic: the theme lists leave such a theme out), and path.* (absolute paths of the components:
    path.style, path.shellstyle, path.frames, path.frames_classic, path.pack, path.navbar, path.icons, path.wallpaper,
    path.fonts, path.resources, path.scheme; "" when the component is none or missing; path.fonts and path.resources may be
    another source's directory, the free chain of section 6, with a why that starts "fallback:"). */
@@ -65,6 +66,11 @@ lhde_theme *lhde_theme_parse(const char *text, unsigned long *serial);
    each group. fn gets the name, its title, its file ("" for a bare style) and the group (0 user, 1 shipped, 2 style). Returns
    how many. A theme file that does not parse still counts (title = name). */
 int lhde_theme_list(void (*fn)(const char *name, const char *title, const char *file, int group, void *ud), void *ud);
+/* 1 when the record's style.missing is "1": the theme names a visual style that is not imported (it shows as classic) */
+int lhde_theme_style_missing(const lhde_theme *t);
+/* the question a theme list asks: 1 when NAME's own files give a style that is present (classic always is), 0 when its style is
+   missing, -1 when NAME is no theme. Resolves without the current layer (the caller keeps the selected theme listed anyway) */
+int lhde_theme_has_style(const char *name);
 /* the file a name selects ("" for a bare style) and the name after aliases (aero-patch -> aero4074); 0 when unknown */
 int lhde_theme_lookup(const char *name, char *canon, size_t ncanon, char *file, size_t nfile);
 
@@ -131,6 +137,8 @@ typedef struct {
     char build[16];        /* "4074", "5048", "xp", "" */
     char family[32];       /* slate, jade, aero, luna, plex, royale, ... (OriginalFilename, else the name) */
     char color[64], size[64];   /* the style's first scheme and size */
+    int broken;            /* opens, but an image it needs is not in the file (Button's push button): used as missing */
+    char broken_why[300];
     char path[1024];
 } lhde_style_info;
 /* a style by name (styles/NAME.msstyles, styles/NAME/<name>.msstyles) or path; "classic" gives kind CLASSIC; 0 when missing */
