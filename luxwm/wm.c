@@ -5452,15 +5452,15 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
             p_ev++; while (XCheckTypedEvent(display, MotionNotify, &ev)) p_ev++;   /* only the latest position */
             if (kbsize && hit == HIT_NONE) {
                 /* the mouse picks the edges: the border or corner it is on (movesize.c: a hit test on every move in WMSZ_KEYSIZE), or
-                   the ones it moves towards, from where it is (no jump): past 3 x DRAG_THRESHOLD, both edges of a corner when the move is
-                   within about 27 degrees of the diagonal (the shorter axis at least half the longer) */
+                   the ones it moves towards, from where it is (no jump): past 5 x DRAG_THRESHOLD (20 px), both edges of a corner when the
+                   move is within about 23 degrees of the diagonal (the shorter axis at least 0.4 of the longer) */
                 int mx = ev.xmotion.x_root - px, my = ev.xmotion.y_root - py, m = MAX(abs(mx), abs(my)), nkx = 0, nky = 0;
                 int fx = ev.xmotion.x_root - c->geom.x, fy = ev.xmotion.y_root - c->geom.y;
                 int on = fx >= 0 && fy >= 0 && fx < c->geom.width && fy < c->geom.height ? client_hit(c, fx, fy) : HIT_NONE;
                 if (on >= HIT_L && on <= HIT_BR) kb_edges(on, &nkx, &nky);
-                else if (m > 3 * DRAG_THRESHOLD) {
-                    if (2 * abs(mx) >= m) nkx = mx < 0 ? -1 : 1;
-                    if (2 * abs(my) >= m) nky = my < 0 ? -1 : 1;
+                else if (m > 5 * DRAG_THRESHOLD) {
+                    if (5 * abs(mx) >= 2 * m) nkx = mx < 0 ? -1 : 1;
+                    if (5 * abs(my) >= 2 * m) nky = my < 0 ? -1 : 1;
                 }
                 if (nkx || nky) {   /* the pointer onto the picked edge (or corner): the edge follows it from there */
                     int ax = nkx ? (nkx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1) : ev.xmotion.x_root;
