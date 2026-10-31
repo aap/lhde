@@ -477,6 +477,7 @@ Info describe(const std::vector<Item>& sel, const std::vector<Facts>& facts, con
         in.count = count;
         in.icon = location.icon;
         in.name = location.name;
+        in.path = location.path;
         in.rows = rows_for(location, location_facts, now);
         for (Row& r : in.rows) r.lh_rank = -1;   // 4051 shows the count alone
         return in;
@@ -489,6 +490,7 @@ Info describe(const std::vector<Item>& sel, const std::vector<Facts>& facts, con
         Facts f = fact(0);
         in.kind = Kind::One;
         in.name = it.name;
+        in.path = it.path;
         in.rows = rows_for(it, f, now);
         in.xp_preview = !it.is_folder() && f.thumbnail && !f.network;
         if (!it.is_folder() && f.thumbnail) in.previews.push_back(it.path);

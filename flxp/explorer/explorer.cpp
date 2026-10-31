@@ -2011,6 +2011,17 @@ static void taskpane_command(int id, bool on_selection)
     else verb(id);
 }
 
+// the band's editor: an item's description, tags or comment (shell/details write); the
+// item it was opened for, which may not be selected any more (the focus left it for the list)
+static void taskpane_edit(const std::string& path, const std::string& id, const std::string& value)
+{
+    const shell::details::Property* p = shell::details::property(id);
+    if (!p || path.empty() || path[0] != '/') { MessageBeep(0); return; }
+    std::string err;
+    if (!shell::details::write(path, *p, value, &err)) error_box(err);
+    g_host.stored_changed({ path });
+}
+
 static void taskpane_more(bool on_selection, int x, int y)
 {
     g_ctx = Ctx();
@@ -2024,7 +2035,7 @@ static void sync_taskpane()
 {
     bool want = g.longhorn && g.show_taskpane;
     if (want && !g.taskband) {
-        taskpane::Callbacks cb = { taskpane_command, taskpane_more, taskpane_resized };
+        taskpane::Callbacks cb = { taskpane_command, taskpane_more, taskpane_resized, taskpane_edit };
         g.taskband = taskpane::create(g.frame, cb);
         if (g.folder) taskpane::set_folder(g.folder);
         places::set_top_inset(taskpane::bottom() ? 0 : 14);   // the band's preview hangs over the left pane's top

@@ -122,6 +122,7 @@ struct Info {
     int count = 0;                      // Location: the items in it; One/Many: the selection's size
     std::string icon;                   // the icon key: the location's, the item's, the focused one's
     std::string name;                   // the location's or the item's name ("" for Many)
+    std::string path;                   // the location's or the item's path ("" for Many; an editor's target)
     std::vector<Row> rows;
     uint64_t total = 0;                 // Many: the files' bytes (0 for more than 100 items, as XP)
     bool xp_preview = false;            // XP's mini preview (a single non-folder that has a thumbnail)

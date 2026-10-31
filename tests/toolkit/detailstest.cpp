@@ -142,6 +142,7 @@ int main()
     check("one lh", "1 KB|10/23/2026 2:24 PM|BAK File|<Add a description>|<Add tags>|<Add comments>", lh(in));
     check("one no preview", 0, in.xp_preview);
     check("one no pictures", 0, (int)in.previews.size());
+    check("one path", "/x/Boot.BAK", in.path);
     // with its tags set: a value in both
     Facts bf; bf.xattrs = { { "user.xdg.tags", "boot, backup" } };
     in = describe({ bak }, { bf }, loc, Facts(), 107, now);

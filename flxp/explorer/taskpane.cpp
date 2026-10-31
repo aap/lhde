@@ -3,6 +3,10 @@
 // file, 152415/152354 one picture, 152420/152358 four pictures; the band
 // starts under the command bar, x from its left edge) and laid out with the
 // rules of System.Windows.Explorer (taskpane/managed.md):
+// - the editable rows (a stored property's value or invitation, one item):
+//   the hand over them, underlined while hot; a click puts an edit box in the
+//   row's place (white, the line's font, the column's width), Enter or leaving
+//   it keeps the value (the explorer writes the attribute), Escape drops it.
 // - PreviewManager: padding 18 left; the preview box (the band's height - 22
 //   + the 30 px overhang = the height + 8 wide: 134 expanded, 56 compact);
 //   18 px; the title (14 pt) and the metadata, two 180 px columns of 8 pt
@@ -40,6 +44,9 @@
 #include "shell/lhdata.h"
 #include "shell/lhtheme.h"
 #include "shell/netres.h"
+extern "C" {
+#include "commctrl.h"
+}
 
 namespace taskpane {
 
@@ -99,7 +106,12 @@ preview::Pictures* g_pics;
 std::vector<Link> g_links;
 std::vector<Text> g_texts;             // the count, the title and the values
 RECT g_more = {}, g_props = {};        // "more", "all properties..." (empty: none)
-int g_hot = -1;                        // link index, -2 = more, -3 = all properties
+struct EditRow { RECT r; std::string id, raw; size_t text; };   // an editable value: where, which property, g_texts' index
+std::vector<EditRow> g_rows;
+HWND g_edit;                           // the open editor (a row's), or null
+std::string g_edit_id, g_edit_raw, g_edit_path;
+bool g_edit_closing;
+int g_hot = -1;                        // link index, -2 = more, -3 = all properties, ROW_HOT - i = row i
 bool g_tracking;
 enum { F_NUMBER, F_ITEMS, F_INFOLDER, F_TITLE, F_LINE, F_TASK, F_TASK_U, F_LINE_U, F_COUNT };
 HFONT g_fonts[F_COUNT];
@@ -107,6 +119,7 @@ HBITMAP g_aurora;                      // the demo's background for the current 
 std::string g_aurora_file, g_aurora_dir;
 bool g_aurora_looked;
 const UINT WM_PICTURE = WM_APP + 0x31;
+const int ROW_HOT = -100;
 
 std::u16string W(const std::string& s) { return w32::utf16_of(s.c_str()); }
 inline int imax(int a, int b) { return a > b ? a : b; }
@@ -257,6 +270,7 @@ void layout_for(HDC dc, int w)
 {
     g_texts.clear();
     g_links.clear();
+    g_rows.clear();
     g_more = g_props = RECT{};
     bool sel = g_info.kind != Kind::Location;
     int w0;   // the preview's natural width (PreviewTaskPresenter's child 0)
@@ -298,6 +312,13 @@ void layout_for(HDC dc, int w)
             for (size_t i = 0; i < lines.size() && (int)i < 2 * rows; i++) {
                 int col = (int)i / rows, row = (int)i % rows;
                 put_top(dc, F_LINE, lines[i].text, tx + col * COL, LINE_Y + row * LINE_H, WHITE, tx + col * COL + COL - 8);
+                if (lines[i].editable) {
+                    // the row's clickable part: its text, at least a third of the column (an empty-looking value is
+                    // still easy to hit)
+                    RECT r = g_texts.back().r;
+                    if (r.right - r.left < COL / 3) r.right = r.left + COL / 3;
+                    g_rows.push_back(EditRow{ r, lines[i].id, lines[i].raw, g_texts.size() - 1 });
+                }
             }
             SIZE ps = text_size(dc, F_LINE, "all properties...");
             g_props = RECT{ tx, props_top, tx + ps.cx, props_top + ps.cy };
@@ -532,7 +553,12 @@ HBITMAP render(HDC wdc, int w)
     SetBkMode(dc, TRANSPARENT);
     g_hang_rc = RECT{};
     draw_preview(dc);
-    for (const Text& t : g_texts) draw_text(dc, t);
+    for (size_t i = 0; i < g_texts.size(); i++) {
+        Text t = g_texts[i];
+        for (size_t k = 0; k < g_rows.size(); k++)
+            if (g_rows[k].text == i && g_hot == ROW_HOT - (int)k) { t.font = F_LINE_U; t.color = MORE_HOT; }
+        draw_text(dc, t);
+    }
     if (g_props.right > g_props.left)
         draw_text(dc, Text{ "all properties...", g_props, g_hot == -3 ? F_LINE_U : F_LINE, g_hot == -3 ? MORE_HOT : MORE_TEXT });
     for (size_t i = 0; i < g_links.size(); i++) {
@@ -594,9 +620,70 @@ void place_hang()
 int hit(POINT p)
 {
     for (size_t i = 0; i < g_links.size(); i++) if (PtInRect(&g_links[i].r, p)) return (int)i;
+    for (size_t i = 0; i < g_rows.size(); i++) if (PtInRect(&g_rows[i].r, p)) return ROW_HOT - (int)i;
     if (PtInRect(&g_more, p)) return -2;
     if (PtInRect(&g_props, p)) return -3;
     return -1;
+}
+
+// ---- the row editor -----------------------------------------------------------------
+
+void close_editor(bool keep)
+{
+    if (!g_edit || g_edit_closing) return;
+    g_edit_closing = true;
+    std::string text;
+    if (keep) {
+        int n = GetWindowTextLengthW(g_edit);
+        std::vector<WCHAR> buf((size_t)n + 1);
+        GetWindowTextW(g_edit, buf.data(), n + 1);
+        text = w32::utf8_of(buf.data());
+    }
+    HWND e = g_edit;
+    g_edit = nullptr;
+    std::string id = g_edit_id, raw = g_edit_raw, path = g_edit_path;
+    DestroyWindow(e);
+    g_edit_closing = false;
+    if (keep && text != raw && g_cb.edit) g_cb.edit(path, id, text);
+}
+
+LRESULT CALLBACK edit_subclass(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR)
+{
+    switch (msg) {
+    case WM_GETDLGCODE: return DLGC_WANTALLKEYS | DefSubclassProc(h, msg, wp, lp);
+    case WM_KEYDOWN:
+        if (wp == VK_RETURN) { close_editor(true); return 0; }
+        if (wp == VK_ESCAPE) { close_editor(false); return 0; }
+        break;
+    case WM_CHAR:
+        if (wp == '\r' || wp == 27) return 0;   // (no beep)
+        break;
+    case WM_KILLFOCUS:
+        // 4051's popup editor keeps the value when it closes; posted: the focus is moving now
+        if (!g_edit_closing) PostMessageW(GetParent(h), WM_APP + 0x32, 0, 0);
+        break;
+    }
+    return DefSubclassProc(h, msg, wp, lp);
+}
+
+void open_editor(size_t row)
+{
+    close_editor(true);
+    if (row >= g_rows.size() || !g_wnd) return;
+    const EditRow& r = g_rows[row];
+    g_edit_id = r.id;
+    g_edit_raw = r.raw;
+    g_edit_path = g_info.path;
+    int lh = r.r.bottom - r.r.top;
+    int x = r.r.left - 3, w = COL - 4;
+    g_edit = CreateWindowExW(0, L"Edit", (LPCWSTR)W(r.raw).c_str(), WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+                             x, r.r.top - 3, w, lh + 6, g_wnd, nullptr, nullptr, nullptr);
+    if (!g_edit) return;
+    SendMessageW(g_edit, WM_SETFONT, (WPARAM)g_fonts[F_LINE], TRUE);
+    SendMessageW(g_edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(2, 2));
+    SetWindowSubclass(g_edit, edit_subclass, 1, 0);
+    SetFocus(g_edit);
+    SendMessageW(g_edit, EM_SETSEL, 0, -1);
 }
 
 LRESULT CALLBACK hang_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
@@ -690,6 +777,8 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             g_cb.more(sel, s.x, s.y);
         } else if (i == -3 && g_cb.command) {
             g_cb.command(ID_PROPERTIES, true);     // MoreButton: the selection's "properties" verb
+        } else if (i <= ROW_HOT) {
+            open_editor((size_t)(ROW_HOT - i));
         } else if (i >= 0 && g_cb.command) {
             int id = g_links[(size_t)i].id;
             g_cb.command(id, sel);
@@ -708,6 +797,9 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         break;
     case WM_PICTURE:
         if (g_pics && g_pics->take()) redraw();
+        return 0;
+    case WM_APP + 0x32:                     // the editor lost the focus
+        if (g_edit && GetFocus() != g_edit) close_editor(true);
         return 0;
     }
     return DefWindowProcW(h, msg, wp, lp);
@@ -764,6 +856,7 @@ HWND create(HWND frame, const Callbacks& cb)
 
 void destroy()
 {
+    close_editor(false);
     if (g_hang) DestroyWindow(g_hang);
     if (g_wnd) DestroyWindow(g_wnd);
     g_wnd = g_hang = nullptr;
@@ -783,6 +876,8 @@ void set_folder(const std::shared_ptr<shell::Folder>& f)
 
 void set_details(const Info& in, bool pictures)
 {
+    // another item (or none): its editor goes, keeping what was typed for the item it was for
+    if (g_edit && (in.kind != Kind::One || in.path != g_edit_path)) close_editor(true);
     g_info = in;
     g_pictures_ok = pictures;
     notify_pictures();

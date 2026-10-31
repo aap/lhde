@@ -12,6 +12,5 @@ Future: synchronize local metadata catalog with local and remote filesystems
 For existing xattr tooling see ~/src/luxfs [note: perhaps move into lhde? or separate repo...]
 
 Initial features for flxp:
-* full metadata on detail-preview and mouse hover
 * not necessarily tag-filtering in the first version yet
 * not necessarily tied into the task pane yet

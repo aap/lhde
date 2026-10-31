@@ -8,7 +8,10 @@
 //   "in this folder" over it (WelcomePane), the folder's tasks;
 // - one item: its thumbnail (a picture, framed in white) or its icon, the
 //   name, the values of shell/details (two 180 px columns, an empty editable
-//   property as its invitation) and "all properties...";
+//   property as its invitation) and "all properties..."; a click on an
+//   editable value or its invitation opens an editor in its place (4051's
+//   popup editor per row), which keeps what was typed when it closes (Enter,
+//   or the focus going elsewhere; Escape drops it);
 // - several: a stack of up to 7 thumbnails, "N items selected", the shared
 //   values.
 // The picture hangs 10 px below the band (4051's overhang), over the left pane.
@@ -36,6 +39,9 @@ struct Callbacks {
     void (*command)(int id, bool on_selection);   // a task link: a verb id (ID_NEW_FOLDER, ID_SEARCH, ID_PROPERTIES, ...)
     void (*more)(bool on_selection, int x, int y); // "more": the folder's or the selection's menu at screen (x, y)
     void (*resized)() = nullptr;                   // the bottom edge was dragged (height() and compact() changed)
+    // the editor of a property row closed with a new value: the item's path (shell/details
+    // Info::path, the item it was opened for), the property's id
+    void (*edit)(const std::string& path, const std::string& property, const std::string& value) = nullptr;
 };
 
 bool wanted();                       // taskpane= (flxp.ini, FLXP_TASKPANE, --taskpane): default off
