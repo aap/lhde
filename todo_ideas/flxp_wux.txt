@@ -14,17 +14,12 @@ not *entirely* sure about the font for all themes though
 * an option to put the Longhorn task pane (the band) at the bottom instead of the top: with the 5048 and 5112 styles that gets
 	close to Vista's details pane; a theme key (Explorer section) with the basic/aero 5048 and 5112 themes set to bottom
 
-* lab (picom xrender): an explorer window that loses activation to a dialog soon after it was resized shows parts of
-	itself (toolbar, task pane, status bar) as holes until it is activated again; seen with Properties (Alt+Enter) and
-	with the copy dialogs alike
-
 ## flxp behavior
 
 * copy/move: Cancel rolls the current top-level item back (a folder copied half-way is removed again); XP keeps
 	what was copied. fileops' choice (all or nothing per item), kept for now
 
 * see xatttribs.txt idea
-
 
 ### details and task pane
 
