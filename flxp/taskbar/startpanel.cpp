@@ -32,8 +32,13 @@ namespace startpanel {
 namespace {
 
 // 96 dpi metrics: StartPanel DEFAULTPANESIZE 380x440, USERPANE 380x64, PROGLIST 190x306,
-// MOREPROGRAMS 190x30, PLACESLIST 190x336, LOGOFF 380x40 (Luna, Slate and Jade alike)
+// MOREPROGRAMS 190x30, PLACESLIST 190x336, LOGOFF 380x40 (Luna, Slate and Jade alike); a style
+// may say otherwise (ReactOS's Lunar, Mizu, Lautus: 357 wide, 178 + 179, user and log off panes 28)
 const int PANEL_W = 380, USER_H = 64, COL_W = 190, COL_MIN_H = 336, MORE_H = 30, LOGOFF_H = 40;
+// Without a visual style (deskhost.cpp g_spmDefault, the panes in a WS_DLGFRAME window that is the
+// panes' size, so the frame covers their outer 3 px): user pane 40, log off 40; the program list's
+// tiles 32 + 4 SM_CYEDGE, the places' 30 (SP3, measured), separator tiles 4 SM_CYEDGE
+const int CL_USER_H = 40, CL_LOGOFF_H = 40, CL_FRAME = 3, CL_TILE_L = 40, CL_TILE_R = 30, CL_SEP = 8;
 const int USERPIC = 48;                 // userpane.h USERPICWIDTH/HEIGHT
 const int MFU_MAX = 6;                  // XP's default "number of programs on Start menu"
 const UINT TIMER_HOVER = 1;             // All Programs opens after hovering (as XP's menus: SPI_GETMENUSHOWDELAY 400)
@@ -72,6 +77,9 @@ struct Panel {
     std::string user;
     int w = PANEL_W, h = 0, col_h = 0;
     int user_h = USER_H;                // 0: the style has no user pane (4074's Jade, Aero)
+    int col_w = COL_W, more_h = MORE_H, logoff_h = LOGOFF_H, min_col_h = COL_MIN_H;   // the style's DEFAULTPANESIZEs
+    int org = 0;                        // where the panes start (the non-themed frame)
+    SIZE logoff_cell = { 24, 24 };      // one image of the style's LOGOFFBUTTONS strip
     HBITMAP classic_logoff[2] = {};     // desktop2's LogoffButtons.bmp / LogoffButtonsHot.bmp (non-themed)
 };
 Panel* P;
@@ -389,7 +397,7 @@ int text_width(HFONT f, const std::string& s)
 }
 
 // sfthost.cpp: tile = icon + 4 * SM_CYEDGE; separators after the pinned items, after My Computer and Control Panel
-void layout()
+void layout_themed()
 {
     int top = P->user_h;
     MARGINS ml = margins(SPP_PROGLIST, 6, 9, 4, 5), mr = margins(SPP_PLACESLIST, 4, 9, 6, 5);
@@ -399,44 +407,98 @@ void layout()
         if (it.col != ColLeft || it.kind == KMore) continue;
         if (!it.bold && !pinned_done) {      // the first MFU item: the separator under the pinned ones
             pinned_done = true;
-            if (&it != &P->items[0]) { P->seps.push_back({ { ml.cxLeftWidth, y, COL_W - ml.cxRightWidth, y + sep_l }, SPP_PROGLISTSEPARATOR }); y += sep_l; }
+            if (&it != &P->items[0]) { P->seps.push_back({ { ml.cxLeftWidth, y, P->col_w - ml.cxRightWidth, y + sep_l }, SPP_PROGLISTSEPARATOR }); y += sep_l; }
         }
-        it.rc = { ml.cxLeftWidth, y, COL_W - ml.cxRightWidth, y + 32 + 8 };
+        it.rc = { ml.cxLeftWidth, y, P->col_w - ml.cxRightWidth, y + 32 + 8 };
         y = it.rc.bottom;
     }
-    int left_need = y + ml.cyBottomHeight - top + MORE_H;
+    int left_need = y + ml.cyBottomHeight - top + P->more_h;
     y = top + mr.cyTopHeight;
     for (Item& it : P->items) {
         if (it.col != ColRight) continue;
         if (it.kind == KControl || it.kind == KRun) {
-            P->seps.push_back({ { COL_W + mr.cxLeftWidth, y, P->w - mr.cxRightWidth, y + sep_r }, SPP_PLACESLISTSEPARATOR });
+            P->seps.push_back({ { P->col_w + mr.cxLeftWidth, y, P->w - mr.cxRightWidth, y + sep_r }, SPP_PLACESLISTSEPARATOR });
             y += sep_r;
         }
-        it.rc = { COL_W + mr.cxLeftWidth, y, P->w - mr.cxRightWidth, y + 24 + 8 };
+        it.rc = { P->col_w + mr.cxLeftWidth, y, P->w - mr.cxRightWidth, y + 24 + 8 };
         y = it.rc.bottom;
     }
     int right_need = y + mr.cyBottomHeight - top;
-    P->col_h = (std::max)(COL_MIN_H, (std::max)(left_need, right_need));
-    P->h = P->user_h + P->col_h + LOGOFF_H;
+    P->col_h = (std::max)(P->min_col_h, (std::max)(left_need, right_need));
+    P->h = P->user_h + P->col_h + P->logoff_h;
 
     // All Programs (moreprog.cpp): the button fills the pane's content rectangle
     MARGINS mm = margins(SPP_MOREPROGRAMS, 8, 8, 0, 6);
-    int mt = top + P->col_h - MORE_H;
+    int mt = top + P->col_h - P->more_h;
     for (Item& it : P->items) {
-        if (it.kind == KMore) it.rc = { mm.cxLeftWidth, mt + mm.cyTopHeight, COL_W - mm.cxRightWidth, top + P->col_h - mm.cyBottomHeight };
+        if (it.kind == KMore) it.rc = { mm.cxLeftWidth, mt + mm.cyTopHeight, P->col_w - mm.cxRightWidth, top + P->col_h - mm.cyBottomHeight };
     }
     // log off pane (logoff.cpp): a flat list toolbar of 24 px images with text, right-aligned
     MARGINS mo = margins(SPP_LOGOFF, 0, 0, 4, 2);
-    int lt = P->h - LOGOFF_H + mo.cyTopHeight, lb = P->h - mo.cyBottomHeight;
+    int lt = P->h - P->logoff_h + mo.cyTopHeight, lb = P->h - mo.cyBottomHeight;
     int x = P->w - mo.cxRightWidth - 6;
     for (int i = (int)P->items.size() - 1; i >= 0; i--) {
         Item& it = P->items[i];
         if (it.col != ColFooter) continue;
-        int wdt = 4 + 24 + 4 + text_width(P->font, it.text) + 6;
-        int cy = (lt + lb) / 2;
-        it.rc = { x - wdt, cy - 15, x, cy + 15 };
+        int wdt = 4 + P->logoff_cell.cx + 4 + text_width(P->font, it.text) + 6;
+        int cy = (lt + lb) / 2, half = (std::min)(15, (std::max)(12, (lb - lt) / 2));   // ReactOS's 28 px pane
+        it.rc = { x - wdt, cy - half, x, cy + half };
         x -= wdt + 4;
     }
+}
+
+// Without a visual style (the unthemed branches of sfthost.cpp, moreprog.cpp, logoff.cpp; measured on XP SP3 with
+// Windows Classic): the list margins are 2 SM_CXEDGE left, top and right, the tiles start SM_CXEDGE further in; the
+// program list ends in a separator above All Programs; the panel is as high as the taller column needs (deskhost.cpp
+// _ComputeActualSize), there is no minimum. Coordinates are the window's: the panes start inside the 3 px frame.
+void layout_classic()
+{
+    const int O = P->org, top = O + P->user_h, cx = 2 * GetSystemMetrics(SM_CXEDGE), tx = cx + GetSystemMetrics(SM_CXEDGE);
+    const int left_r = O + P->col_w - cx, right_l = O + P->col_w;
+    int y = top + cx;
+    bool pinned_done = false;
+    for (Item& it : P->items) {
+        if (it.col != ColLeft || it.kind == KMore) continue;
+        if (!it.bold && !pinned_done) {
+            pinned_done = true;
+            if (&it != &P->items[0]) { P->seps.push_back({ { O + tx, y + 3, left_r, y + 5 }, SPP_PROGLISTSEPARATOR }); y += CL_SEP; }
+        }
+        it.rc = { O + tx, y, left_r, y + CL_TILE_L };
+        y = it.rc.bottom;
+    }
+    int left_need = y - top + 2 + P->more_h;            // the separator at the bottom of the list (SM_CYEDGE)
+    y = top + cx;
+    for (Item& it : P->items) {
+        if (it.col != ColRight) continue;
+        if (it.kind == KControl || it.kind == KRun) {
+            P->seps.push_back({ { right_l + tx, y + 3, O + P->w - cx, y + 5 }, SPP_PLACESLISTSEPARATOR });
+            y += CL_SEP;
+        }
+        it.rc = { right_l + tx, y, O + P->w - cx, y + CL_TILE_R };
+        y = it.rc.bottom;
+    }
+    P->col_h = (std::max)(left_need, y - top);
+    P->h = P->user_h + P->col_h + P->logoff_h;          // the window is the panes' size: the frame covers 3 px of them
+    int mt = top + P->col_h - P->more_h;
+    P->seps.push_back({ { O + tx, mt - 2, left_r, mt }, SPP_PROGLISTSEPARATOR });
+    for (Item& it : P->items)
+        if (it.kind == KMore) it.rc = { O + cx, mt, left_r, mt + P->more_h };
+    // the log off toolbar: list buttons (3 + image + 4 + text + 8) right-aligned to the pane's width less SM_CXEDGE,
+    // 2 SM_CYEDGE below the pane's top
+    int lt = top + P->col_h + 2 * GetSystemMetrics(SM_CYEDGE), x = O + P->w - GetSystemMetrics(SM_CXEDGE);
+    for (int i = (int)P->items.size() - 1; i >= 0; i--) {
+        Item& it = P->items[i];
+        if (it.col != ColFooter) continue;
+        int wdt = 3 + 24 + 4 + text_width(P->font, it.text) + 8;
+        it.rc = { x - wdt, lt, x, lt + 30 };
+        x -= wdt;
+    }
+}
+
+void layout()
+{
+    if (P->th) layout_themed();
+    else layout_classic();
 }
 
 // ---- painting ------------------------------------------------------------------------
@@ -454,15 +516,27 @@ void text_out(HDC dc, const std::string& s, RECT r, UINT flags)
     DrawTextW(dc, (LPCWSTR)w.c_str(), (int)w.size(), &r, flags | DT_SINGLELINE | DT_NOPREFIX);
 }
 
+// does the style draw this part (a style may leave parts out: then they are drawn as without a style)
+bool has_part(int part) { return P->th && IsThemePartDefined(P->th, part, 0); }
+
+// LOGOFFBUTTONS: three cells (eject, log off, turn off; logoff.cpp cuts the strip in three: 24x24 in Luna, Slate and
+// Jade, 34x18 in ReactOS's styles); 5112's aero has two 24 px ones (lock, power)
+int logoff_cells(SIZE* cell)
+{
+    SIZE ss = { 72, 24 };
+    GetThemePartSize(P->th, nullptr, SPP_LOGOFFBUTTONS, SPLS_NORMAL, nullptr, TS_TRUE, &ss);
+    int cells = ss.cx % 24 == 0 && ss.cx / 24 >= 1 && ss.cx / 24 <= 3 ? (int)ss.cx / 24 : 3;
+    if (cell) *cell = { (std::max)(1, (int)ss.cx / cells), (std::max)(1, (int)ss.cy) };
+    return cells;
+}
+
 void draw_footer_image(HDC dc, int idx, bool hot, int x, int y)
 {
-    // LOGOFFBUTTONS: three 24x24 cells (eject, log off, turn off); 5112's aero has two (lock, power)
-    if (P->th) {
-        SIZE ss = { 72, 24 };
-        GetThemePartSize(P->th, nullptr, SPP_LOGOFFBUTTONS, SPLS_NORMAL, nullptr, TS_TRUE, &ss);
-        int cells = (std::max)(1, (std::min)(3, (int)ss.cx / 24));
+    if (has_part(SPP_LOGOFFBUTTONS)) {
+        SIZE c;
+        int cells = logoff_cells(&c);
         if (cells < 3) idx = (std::max)(0, idx - (3 - cells));
-        RECT strip = { x - idx * 24, y, x - idx * 24 + cells * 24, y + 24 }, clip = { x, y, x + 24, y + 24 };
+        RECT strip = { x - idx * c.cx, y, x - idx * c.cx + cells * c.cx, y + c.cy }, clip = { x, y, x + c.cx, y + c.cy };
         DrawThemeBackground(P->th, dc, SPP_LOGOFFBUTTONS, hot ? SPLS_HOT : SPLS_NORMAL, &strip, &clip);
         return;
     }
@@ -478,7 +552,7 @@ void draw_footer_image(HDC dc, int idx, bool hot, int x, int y)
 
 void draw_arrow(HDC dc, const RECT& r, COLORREF c)
 {
-    // the non-themed More Programs arrow (Marlett's right triangle): a 4 px high triangle
+    // the non-themed More Programs arrow (Marlett's right triangle at the 8 pt font's ascent): 4 x 7 px
     int cx = r.left + 4, cy = (r.top + r.bottom) / 2;
     HPEN pen = CreatePen(PS_SOLID, 1, c);
     HGDIOBJ o = SelectObject(dc, pen);
@@ -487,18 +561,61 @@ void draw_arrow(HDC dc, const RECT& r, COLORREF c)
     DeleteObject(pen);
 }
 
-// the themed panes' backgrounds (deskhost.cpp: each pane draws its own part)
+// moreprog.cpp without a style: the text indented by 3 edges and a large icon; Marlett's arrow after the width of
+// "All &Programs" (it measures the ampersand too) and an edge. Where the arrow's 8 px cell starts.
+int classic_more_text_x(const RECT& r) { return r.left + 3 * GetSystemMetrics(SM_CXEDGE) + 32; }
+int classic_more_arrow_x(const RECT& r)
+{
+    return classic_more_text_x(r) + text_width(P->more_font, "All &Programs") + GetSystemMetrics(SM_CXEDGE);
+}
+
+// the user pane without a style: userpane.cpp's DrawCaption(DC_ACTIVE | DC_TEXT | DC_GRADIENT) of a window without
+// a title, the active caption's gradient across the pane (each column a + (b - a) * x / width, as on XP SP3)
+void caption_gradient(HDC dc, const RECT& r)
+{
+    COLORREF a = GetSysColor(COLOR_ACTIVECAPTION), b = GetSysColor(COLOR_GRADIENTACTIVECAPTION);
+    int w = r.right - r.left;
+    for (int x = 0; x < w; x++) {
+        auto mix = [&](int ca, int cb) { return ca + (cb - ca) * x / w; };
+        HBRUSH br = CreateSolidBrush(RGB(mix(GetRValue(a), GetRValue(b)), mix(GetGValue(a), GetGValue(b)), mix(GetBValue(a), GetBValue(b))));
+        RECT c = { r.left + x, r.top, r.left + x + 1, r.bottom };
+        FillRect(dc, &c, br);
+        DeleteObject(br);
+    }
+}
+
+// a pane as XP draws it without a style: the menu colour; the places list's etched left edge (sfthost.cpp
+// _OnEraseBackground), the log off pane's etched top (logoff.cpp)
+void classic_pane(HDC dc, int part, const RECT& r)
+{
+    if (part == SPP_USERPANE) { caption_gradient(dc, r); return; }
+    FillRect(dc, &r, GetSysColorBrush(COLOR_MENU));
+    RECT e = r;
+    if (part == SPP_PLACESLIST) DrawEdge(dc, &e, EDGE_ETCHED, BF_LEFT);
+    if (part == SPP_LOGOFF) DrawEdge(dc, &e, EDGE_ETCHED, BF_TOP);
+}
+
+// the panes' backgrounds (deskhost.cpp: each pane draws its own part). A part with BGTYPE NONE (ReactOS's Lunar
+// and Mizu user panes) draws nothing; XP's panel shows black there (the host window paints nothing and the panel
+// is shown from a snapshot), so do we. A part the style lacks is drawn as without a style.
 void draw_panes(HDC dc)
 {
     const int UH = P->user_h;
-    RECT user = { 0, 0, P->w, UH }, left = { 0, UH, COL_W, UH + P->col_h - MORE_H },
-         more = { 0, UH + P->col_h - MORE_H, COL_W, UH + P->col_h }, right = { COL_W, UH, P->w, UH + P->col_h },
-         logoff = { 0, P->h - LOGOFF_H, P->w, P->h };
-    if (UH) DrawThemeBackground(P->th, dc, SPP_USERPANE, 0, &user, nullptr);
-    DrawThemeBackground(P->th, dc, SPP_PROGLIST, 0, &left, nullptr);
-    DrawThemeBackground(P->th, dc, SPP_MOREPROGRAMS, 0, &more, nullptr);
-    DrawThemeBackground(P->th, dc, SPP_PLACESLIST, 0, &right, nullptr);
-    DrawThemeBackground(P->th, dc, SPP_LOGOFF, 0, &logoff, nullptr);
+    struct { int part; RECT r; } panes[] = {
+        { SPP_USERPANE, { 0, 0, P->w, UH } },
+        { SPP_PROGLIST, { 0, UH, P->col_w, UH + P->col_h - P->more_h } },
+        { SPP_MOREPROGRAMS, { 0, UH + P->col_h - P->more_h, P->col_w, UH + P->col_h } },
+        { SPP_PLACESLIST, { P->col_w, UH, P->w, UH + P->col_h } },
+        { SPP_LOGOFF, { 0, P->h - P->logoff_h, P->w, P->h } },
+    };
+    for (auto& p : panes) {
+        if (p.part == SPP_USERPANE && !UH) continue;
+        if (!has_part(p.part)) { classic_pane(dc, p.part, p.r); continue; }
+        int bg = BT_IMAGEFILE;
+        if (SUCCEEDED(GetThemeEnumValue(P->th, p.part, 0, TMT_BGTYPE, &bg)) && bg == BT_NONE)
+            FillRect(dc, &p.r, (HBRUSH)GetStockObject(BLACK_BRUSH));
+        else DrawThemeBackground(P->th, dc, p.part, 0, &p.r, nullptr);
+    }
 }
 
 // XP's panel has round top corners: the panes' images are transparent there (Luna's user pane, Slate's; Jade's
@@ -543,36 +660,105 @@ void apply_shape()
     else DeleteObject(rgn);
 }
 
-void paint(HDC dc)
+int text_height(HDC dc, HFONT f, const std::string& s)
+{
+    HGDIOBJ o = SelectObject(dc, f);
+    std::u16string w = W(s.empty() ? std::string("0") : s);
+    SIZE sz = {};
+    GetTextExtentPoint32W(dc, (LPCWSTR)w.c_str(), (int)w.size(), &sz);
+    SelectObject(dc, o);
+    return sz.cy;
+}
+
+// XP's panel without a visual style (Windows Classic), measured on XP SP3: everything on the menu colour, the
+// user pane in the active caption's gradient with the name in a bold italic 175% of the GUI font and no picture,
+// etched separators, the places list's etched left edge, the log off pane's etched top, a dialog frame
+void paint_classic(HDC dc)
 {
     RECT all = { 0, 0, P->w, P->h };
+    const int O = P->org, UH = P->user_h;
+    COLORREF hl_text = GetSysColor(COLOR_HIGHLIGHTTEXT), text = GetSysColor(COLOR_MENUTEXT);
+    SetBkMode(dc, TRANSPARENT);
+    FillRect(dc, &all, GetSysColorBrush(COLOR_MENU));
+    RECT user = { O, O, O + P->w, O + UH }, places = { O + P->col_w, O + UH, O + P->w, O + UH + P->col_h },
+         logoff = { O, O + UH + P->col_h, O + P->w, O + UH + P->col_h + P->logoff_h };
+    classic_pane(dc, SPP_USERPANE, user);
+    classic_pane(dc, SPP_PLACESLIST, places);
+    classic_pane(dc, SPP_LOGOFF, logoff);
+
+    // userpane.cpp: the name at (h - text height) / 2 from the top and from the left, COLOR_CAPTIONTEXT
+    int off = (std::max)(0, (UH - text_height(dc, P->user_font, P->user)) / 2);
+    HGDIOBJ o = SelectObject(dc, P->user_font);
+    SetTextColor(dc, GetSysColor(COLOR_CAPTIONTEXT));
+    text_out(dc, P->user, { user.left + off, user.top + off, user.right - off, user.bottom }, DT_LEFT | DT_TOP | DT_END_ELLIPSIS);
+    SelectObject(dc, o);
+
+    for (const Sep& s : P->seps) { RECT r = s.rc; DrawEdge(dc, &r, EDGE_ETCHED, BF_TOPLEFT); }   // sfthost _DrawSeparator
+
+    for (int i = 0; i < (int)P->items.size(); i++) {
+        const Item& it = P->items[i];
+        bool hot = i == P->hot;
+        RECT r = it.rc;
+        if (hot) FillRect(dc, &r, GetSysColorBrush(COLOR_HIGHLIGHT));
+        if (it.col == ColFooter) {
+            // logoff.cpp: a flat list toolbar, the hot button filled with the selection colour, no edges
+            draw_footer_image(dc, it.kind == KLogOff ? 1 : 2, hot, r.left + 3, r.top + 3);
+            o = SelectObject(dc, P->font);
+            SetTextColor(dc, hot ? hl_text : text);
+            text_out(dc, it.text, { r.left + 3 + 24 + 4, r.top, r.right, r.bottom }, DT_LEFT | DT_VCENTER);
+            SelectObject(dc, o);
+            continue;
+        }
+        if (it.kind == KMore) {
+            o = SelectObject(dc, P->more_font);
+            COLORREF col = hot ? hl_text : text;
+            SetTextColor(dc, col);
+            int ax = classic_more_arrow_x(r), cy = (r.top + r.bottom) / 2;
+            text_out(dc, it.text, { classic_more_text_x(r), r.top, r.right, r.bottom }, DT_LEFT | DT_VCENTER);
+            draw_arrow(dc, { ax, cy - 9, ax + 8, cy + 7 }, col);
+            SelectObject(dc, o);
+            continue;
+        }
+        // sfthost.cpp: tiles of icon + 4 SM_CYEDGE (the places' 30 on SP3), the icon at the tile's left, the text
+        // 6 px after it (an edge and the list view's label margin); both centred 2 px above the middle
+        int tile = r.bottom - r.top;
+        if (it.icon) DrawIconEx(dc, r.left, r.top + (tile - it.icon_size) / 2 - 2, it.icon, it.icon_size, it.icon_size, 0, nullptr, DI_NORMAL);
+        HFONT f = it.bold ? P->bold : P->font;
+        int th = text_height(dc, f, it.text), ty = r.top + (tile - th) / 2 - 2;
+        o = SelectObject(dc, f);
+        SetTextColor(dc, hot ? hl_text : text);
+        int right = it.kind == KControl ? r.right - 12 : r.right;
+        text_out(dc, it.text, { r.left + it.icon_size + 6, ty, right, ty + th }, DT_LEFT | DT_TOP | DT_END_ELLIPSIS);
+        if (it.kind == KControl)        // HOSTF_CASCADEMENU: Marlett's arrow 5 px from the tile's right, on the text
+            draw_arrow(dc, { r.right - 13, ty, r.right - 5, ty + th }, hot ? hl_text : text);
+        SelectObject(dc, o);
+    }
+    // deskhost.cpp: WS_DLGFRAME without a style (a raised edge and a pixel of the face colour)
+    DrawEdge(dc, &all, EDGE_RAISED, BF_RECT);
+    RECT in = { 2, 2, P->w - 2, P->h - 2 };
+    FrameRect(dc, &in, GetSysColorBrush(COLOR_BTNFACE));
+}
+
+void paint(HDC dc)
+{
+    if (!P->th) { paint_classic(dc); return; }
+    RECT all = { 0, 0, P->w, P->h };
     const int UH = P->user_h;
-    RECT user = { 0, 0, P->w, UH }, more = { 0, UH + P->col_h - MORE_H, COL_W, UH + P->col_h }, logoff = { 0, P->h - LOGOFF_H, P->w, P->h };
     HTHEME th = P->th;
     SetBkMode(dc, TRANSPARENT);
-    COLORREF hl = GetSysColor(th ? COLOR_MENUHILIGHT : COLOR_HIGHLIGHT), hl_text = GetSysColor(COLOR_HIGHLIGHTTEXT);
+    COLORREF hl = GetSysColor(COLOR_MENUHILIGHT), hl_text = GetSysColor(COLOR_HIGHLIGHTTEXT);
 
-    if (th) {
-        FillRect(dc, &all, GetSysColorBrush(COLOR_MENU));
-        draw_panes(dc);
-    } else {
-        // XP without a visual style: the menu colour, the panes in the selection colour, a raised frame
-        FillRect(dc, &all, GetSysColorBrush(COLOR_MENU));
-        FillRect(dc, &user, GetSysColorBrush(COLOR_HIGHLIGHT));
-        FillRect(dc, &logoff, GetSysColorBrush(COLOR_HIGHLIGHT));
-        RECT v = { COL_W - 1, UH + 4, COL_W + 1, UH + P->col_h - 4 };
-        DrawEdge(dc, &v, EDGE_ETCHED, BF_LEFT);
-        RECT hsep = { 4, more.top, COL_W - 4, more.top + 2 };
-        DrawEdge(dc, &hsep, EDGE_ETCHED, BF_TOP);
-    }
+    FillRect(dc, &all, GetSysColorBrush(COLOR_MENU));
+    draw_panes(dc);
 
     // the user pane: picture in its frame, the name (userpane.cpp); none in Jade/Aero (no USERPANE part)
-    int name_x = 10;
+    int name_x = -1;
     if (UH && P->user_pic) {
         MARGINS pm = margins(SPP_USERPICTURE, 0, 0, 0, 0);
         int fw = USERPIC + pm.cxLeftWidth + pm.cxRightWidth, fh = USERPIC + pm.cyTopHeight + pm.cyBottomHeight;
         int off = (std::max)(0, (UH - fh) / 2);
-        if (th) {
+        bool framed = has_part(SPP_USERPICTURE);
+        if (framed) {
             RECT fr = { off, off, off + fw, off + fh };
             DrawThemeBackground(th, dc, SPP_USERPICTURE, 0, &fr, nullptr);
         } else {
@@ -582,15 +768,17 @@ void paint(HDC dc)
         }
         DrawIconEx(dc, off + pm.cxLeftWidth + (USERPIC - P->pic_size.cx) / 2, off + pm.cyTopHeight + (USERPIC - P->pic_size.cy) / 2,
                    P->user_pic, P->pic_size.cx, P->pic_size.cy, 0, nullptr, DI_NORMAL);
-        name_x = off + fw + 2 * GetSystemMetrics(SM_CYEDGE) + (th ? 0 : 3);
+        name_x = off + fw + 2 * GetSystemMetrics(SM_CYEDGE) + (framed ? 0 : 3);
     }
     if (UH) {
+        // userpane.cpp: without a picture the name is as far from the left as from the top
+        if (name_x < 0) name_x = (std::max)(0, (UH - text_height(dc, P->user_font, P->user)) / 2);
         HGDIOBJ o = SelectObject(dc, P->user_font);
         RECT tr = { name_x, 0, P->w - 6, UH };
         std::u16string w = W(P->user);
         COLORREF col = theme_color(SPP_USERPANE, TMT_TEXTCOLOR, hl_text), sh = 0;
         POINT so = { 0, 0 };
-        if (th && SUCCEEDED(GetThemePosition(th, SPP_USERPANE, 0, TMT_TEXTSHADOWOFFSET, &so)) &&
+        if (SUCCEEDED(GetThemePosition(th, SPP_USERPANE, 0, TMT_TEXTSHADOWOFFSET, &so)) &&
             SUCCEEDED(GetThemeColor(th, SPP_USERPANE, 0, TMT_TEXTSHADOWCOLOR, &sh)))
             DrawShadowText(dc, (LPCWSTR)w.c_str(), (UINT)w.size(), &tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS, col, sh, so.x, so.y);
         else {
@@ -602,8 +790,8 @@ void paint(HDC dc)
 
     for (const Sep& s : P->seps) {
         // clipped to the list (sfthost's separators are in the pane's window): 5112's are 216 px TRUESIZE lines
-        if (th) DrawThemeBackground(th, dc, s.part, 0, &s.rc, &s.rc);
-        else { RECT r = s.rc; r.top = (r.top + r.bottom) / 2 - 1; DrawEdge(dc, &r, EDGE_ETCHED, BF_TOP); }
+        if (has_part(s.part)) DrawThemeBackground(th, dc, s.part, 0, &s.rc, &s.rc);
+        else { RECT r = s.rc; r.top = (r.top + r.bottom) / 2 - 1; r.bottom = r.top + 2; DrawEdge(dc, &r, EDGE_ETCHED, BF_TOPLEFT); }
     }
 
     for (int i = 0; i < (int)P->items.size(); i++) {
@@ -612,12 +800,11 @@ void paint(HDC dc)
         RECT r = it.rc;
         if (it.col == ColFooter) {
             int idx = it.kind == KLogOff ? 1 : 2;
-            draw_footer_image(dc, idx, hot, r.left + 4, (r.top + r.bottom) / 2 - 12);
+            draw_footer_image(dc, idx, hot, r.left + 4, (r.top + r.bottom - P->logoff_cell.cy) / 2);
             HGDIOBJ o = SelectObject(dc, P->font);
             SetTextColor(dc, theme_color(SPP_LOGOFF, TMT_TEXTCOLOR, hl_text));
-            RECT tr = { r.left + 32, r.top, r.right, r.bottom };
+            RECT tr = { r.left + 4 + P->logoff_cell.cx + 4, r.top, r.right, r.bottom };
             text_out(dc, it.text, tr, DT_LEFT | DT_VCENTER);
-            if (hot && !th) { RECT fr = r; DrawEdge(dc, &fr, BDR_RAISEDINNER, BF_RECT); }
             SelectObject(dc, o);
             continue;
         }
@@ -632,13 +819,14 @@ void paint(HDC dc)
             COLORREF col = hot ? hl_text : theme_color(SPP_MOREPROGRAMS, TMT_TEXTCOLOR, GetSysColor(COLOR_MENUTEXT));
             SetTextColor(dc, col);
             int indent = 3 * GetSystemMetrics(SM_CXEDGE) + 32, tw = text_width(P->more_font, it.text);
+            bool arrow = has_part(SPP_MOREPROGRAMSARROW);
             SIZE as = { 16, 16 };
-            if (th) GetThemePartSize(th, nullptr, SPP_MOREPROGRAMSARROW, SPS_NORMAL, nullptr, TS_TRUE, &as);
+            if (arrow) GetThemePartSize(th, nullptr, SPP_MOREPROGRAMSARROW, SPS_NORMAL, nullptr, TS_TRUE, &as);
             indent = (std::max)(0, (std::min)(indent, (int)(r.right - r.left) - tw - 4 - (int)as.cx));
             RECT tr = { r.left + indent, r.top, r.right, r.bottom };
             text_out(dc, it.text, tr, DT_LEFT | DT_VCENTER);
             RECT ar = { tr.left + tw + 4, (r.top + r.bottom - as.cy) / 2, tr.left + tw + 4 + as.cx, (r.top + r.bottom - as.cy) / 2 + as.cy };
-            if (th) DrawThemeBackground(th, dc, SPP_MOREPROGRAMSARROW, hot ? SPS_HOT : SPS_NORMAL, &ar, nullptr);
+            if (arrow) DrawThemeBackground(th, dc, SPP_MOREPROGRAMSARROW, hot ? SPS_HOT : SPS_NORMAL, &ar, nullptr);
             else draw_arrow(dc, ar, col);
             SelectObject(dc, o);
             continue;
@@ -656,7 +844,6 @@ void paint(HDC dc)
         }
         SelectObject(dc, o);
     }
-    if (!th) DrawEdge(dc, &all, EDGE_RAISED, BF_RECT);
 }
 
 // ---- behaviour -----------------------------------------------------------------------
@@ -729,7 +916,13 @@ void flyout(int i)
         UINT flags = TPM_RETURNCMD | TPM_LEFTBUTTON | TPM_LEFTALIGN | (it.kind == KMore && g.edge != EdgeTop ? TPM_BOTTOMALIGN : TPM_TOPALIGN);
         int y = it.kind == KMore && g.edge != EdgeTop ? r.bottom : r.top;
         ReleaseCapture();
-        POINT edge = { it.col == ColLeft ? COL_W : P->w, 0 };
+        POINT edge = { it.col == ColLeft ? P->col_w : P->w, 0 };
+        if (!P->th && it.kind == KMore) {
+            // XP without a style: All Programs opens right of its arrow, the menu's items (inside its 3 px border)
+            // level with the button
+            edge.x = classic_more_arrow_x(it.rc) + 8;
+            y += g.edge != EdgeTop ? 3 : -3;
+        }
         ClientToScreen(P->wnd, &edge);
         P->open_item = i;
         P->reopen = -1;
@@ -799,6 +992,8 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     if (!P || h != P->wnd) return DefWindowProcW(h, msg, wp, lp);
     switch (msg) {
     case WM_ERASEBKGND: return 1;
+    case WM_MEASUREITEM: if (startmenu::measure_item((MEASUREITEMSTRUCT*)lp)) return TRUE; break;
+    case WM_DRAWITEM: if (startmenu::draw_item((const DRAWITEMSTRUCT*)lp)) return TRUE; break;
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC dc = BeginPaint(h, &ps);
@@ -874,7 +1069,7 @@ void load_user()
     std::vector<std::string> cand = { home() + "/.face", home() + "/.face.icon", setting("user_picture") };
     std::string chess = shell::xp_art("logonui.exe", 114, 2);
     if (!chess.empty()) cand.push_back(chess);
-    bool show = P->user_h > 0;
+    bool show = P->user_h > 0 && P->th;    // userpane.cpp: no picture without a style
     if (P->th) { BOOL b = TRUE; if (SUCCEEDED(GetThemeBool(P->th, SPP_USERPANE, 0, TMT_USERPICTURE, &b))) show = b; }
     if (!show) return;
     for (const std::string& c : cand) {
@@ -892,6 +1087,24 @@ void load_user()
 
 void make_fonts()
 {
+    if (!P->th) {
+        // without a style: the lists' font is the icon title font (sfthost.cpp LoadControlFont), the user name the
+        // GUI font at 175%, bold and italic (userpane.cpp)
+        LOGFONTW lf = {};
+        SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof lf, &lf, 0);
+        P->font = CreateFontIndirectW(&lf);
+        P->more_font = CreateFontIndirectW(&lf);
+        lf.lfWeight = FW_BOLD;
+        P->bold = CreateFontIndirectW(&lf);
+        LOGFONTW uf = {};
+        GetObjectW(GetStockObject(DEFAULT_GUI_FONT), sizeof uf, &uf);
+        uf.lfItalic = TRUE;
+        uf.lfHeight = uf.lfHeight * 175 / 100;
+        uf.lfWidth = 0;
+        uf.lfWeight = FW_BOLD;
+        P->user_font = CreateFontIndirectW(&uf);
+        return;
+    }
     NONCLIENTMETRICSW ncm = {};
     ncm.cbSize = sizeof ncm;
     SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
@@ -1014,9 +1227,31 @@ void show(const RECT& b, bool anchored)
         if (!IsThemePartDefined(P->th, SPP_USERPANE, 0)) P->user_h = 0;
         else if (SUCCEEDED(GetThemeRect(P->th, SPP_USERPANE, 0, TMT_DEFAULTPANESIZE, &ps)) && ps.bottom - ps.top >= 0 && ps.bottom - ps.top < 200)
             P->user_h = ps.bottom - ps.top;
+        // the other panes' sizes (deskhost.cpp _ReadPaneSizeFromTheme: a part's size that is the panel's own is
+        // inherited from it, not the part's)
+        RECT all = {};
+        bool have_all = SUCCEEDED(GetThemeRect(P->th, 0, 0, TMT_DEFAULTPANESIZE, &all));
+        auto pane = [&](int part, SIZE& out) {
+            RECT r = {};
+            if (FAILED(GetThemeRect(P->th, part, 0, TMT_DEFAULTPANESIZE, &r))) return false;
+            if (have_all && r.right - r.left == all.right - all.left && r.bottom - r.top == all.bottom - all.top) return false;
+            out = { r.right - r.left, r.bottom - r.top };
+            return out.cx > 0 && out.cx < 2000 && out.cy >= 0 && out.cy < 2000;
+        };
+        SIZE z;
+        if (have_all && all.right - all.left >= 200 && all.right - all.left < 2000) P->w = all.right - all.left;
+        if (pane(SPP_USERPANE, z) && z.cx >= 200) P->w = z.cx;
+        if (pane(SPP_PROGLIST, z) && z.cx > 50 && z.cx < P->w - 50) P->col_w = z.cx;
+        if (pane(SPP_MOREPROGRAMS, z) && z.cy >= 16) P->more_h = z.cy;
+        if (pane(SPP_LOGOFF, z) && z.cy >= 16) P->logoff_h = z.cy;
+        if (pane(SPP_PLACESLIST, z) && z.cy >= 100) P->min_col_h = z.cy;
+    } else {
+        P->w = PANEL_W; P->user_h = CL_USER_H; P->col_w = COL_W; P->more_h = MORE_H; P->logoff_h = CL_LOGOFF_H;
+        P->org = CL_FRAME;
     }
     make_fonts();
-    if (!P->th) load_classic_logoff();
+    if (!has_part(SPP_LOGOFFBUTTONS)) load_classic_logoff();
+    else logoff_cells(&P->logoff_cell);
     load_user();
     shell::refresh_icon_theme();   // the icon set is per theme and may have changed (Display Properties)
     build_items();

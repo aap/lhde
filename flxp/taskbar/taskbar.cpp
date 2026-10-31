@@ -634,6 +634,8 @@ void notify_from_x()
 LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
+    case WM_MEASUREITEM: if (startmenu::measure_item((MEASUREITEMSTRUCT*)lp)) return TRUE; break;   // the Programs menus
+    case WM_DRAWITEM: if (startmenu::draw_item((const DRAWITEMSTRUCT*)lp)) return TRUE; break;
     case WM_ERASEBKGND: {
         RECT rc;
         GetClientRect(h, &rc);

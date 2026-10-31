@@ -72,6 +72,9 @@ void window_menu(uint64_t id, const xwm::Task& t, POINT pt);
 HMENU programs_popup();                     // Programs: the .desktop applications by category
 HMENU settings_popup();                     // Display Properties, Theme >
 bool command(UINT cmd);                     // a command of those menus (false: not one)
+// the Programs menus' owner-drawn items (XP's menu band look): their owner's WM_MEASUREITEM / WM_DRAWITEM
+bool measure_item(MEASUREITEMSTRUCT* mi);   // false: not one of them
+bool draw_item(const DRAWITEMSTRUCT* di);
 void launch(const shell::App& a);           // start it and count it for the panel's MFU list
 bool run_line(const std::string& cmd);      // /bin/sh -c in $HOME
 void log_off();                             // asks first

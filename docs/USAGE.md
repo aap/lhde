@@ -444,7 +444,10 @@ which comes close to Vista's details pane; there it is the same band mirrored, t
 
 **Start menu.** The Start button and the Super key (luxwm sends the root client message `_LHSHELL_START` when Super is pressed
 and released alone; the Mod4 bindings keep working, unbound Super+key combinations are swallowed while Super is held; `Super_L
-none` in `~/.config/lhde/keys` turns it off) open flxp's XP start panel, drawn from the visual style's StartPanel parts: with the
+none` in `~/.config/lhde/keys` turns it off) open flxp's XP start panel, drawn from the visual style's StartPanel parts (and
+at their sizes: ReactOS's styles make it 357 px wide); under Windows Classic it is XP's unthemed panel in the system colours
+(the user name on the active caption's gradient, the menu colour, etched separators, a dialog frame, the All Programs menus
+as XP's classic menu bands), and a part a style leaves out is drawn that way too. With the
 Avalon taskbar luxshell runs `flxp-startmenu` (flxp-taskbar's panel without the bar) and forwards both to it, with the classic
 bar flxp-taskbar answers itself. See "Start menu: flxp's start panel everywhere" below. Longhorn's Avalon shell never had a start
 menu of its own, so luxshell draws none.

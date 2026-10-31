@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <algorithm>
+#include <deque>
 #include <fstream>
 #include <map>
 #include <string>
@@ -74,18 +75,40 @@ void append_popup(HMENU m, HMENU sub, const std::string& text)
     AppendMenuW(m, MF_POPUP | MF_STRING, (UINT_PTR)sub, (LPCWSTR)w.c_str());
 }
 
-// the Programs menus' 16 px icons (XP's start menu has them): kept until the next Programs menu is built
-std::vector<HBITMAP> menu_bitmaps;
+// The Programs menus are XP's start menu bands (the shell's menu band, not user32's menus): items of a 16 px icon
+// and the menu font, owner-drawn here on user32's popups (WM_MEASUREITEM / WM_DRAWITEM to the menus' owner, the
+// bar or the start panel). Measured on XP SP3 (Windows Classic): items 20 px, the icon 5 px from the menu's edge
+// (user32 gives the item rectangle from the window's edge; its 3 px border is clipped), the text 29 px, 26 px
+// after the text to the menu's edge (the submenu arrow's room). The items and their icons are kept until
+// the next Programs menu is built.
+struct BandItem { std::u16string text; HBITMAP icon = nullptr; };
+std::deque<BandItem> band_items;
 
-void set_bitmap(HMENU m, int pos, HBITMAP b)
+void append_band(HMENU m, UINT_PTR id_or_popup, const std::string& text, HBITMAP icon, bool popup)
 {
-    if (!b) return;
-    menu_bitmaps.push_back(b);
-    MENUITEMINFOW mi = {};
-    mi.cbSize = sizeof mi;
-    mi.fMask = MIIM_BITMAP;
-    mi.hbmpItem = b;
-    SetMenuItemInfoW(m, (UINT)pos, TRUE, &mi);
+    band_items.push_back({ W(text), icon });
+    AppendMenuW(m, MF_OWNERDRAW | (popup ? MF_POPUP : 0), id_or_popup, (LPCWSTR)&band_items.back());
+}
+
+bool is_band_item(ULONG_PTR data)
+{
+    for (const BandItem& b : band_items) if ((ULONG_PTR)&b == data) return true;
+    return false;
+}
+
+HFONT band_font()
+{
+    static HFONT f;
+    static LOGFONTW cur;
+    NONCLIENTMETRICSW ncm = {};
+    ncm.cbSize = sizeof ncm;
+    SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
+    if (!f || memcmp(&cur, &ncm.lfMenuFont, sizeof cur)) {
+        if (f) DeleteObject(f);
+        cur = ncm.lfMenuFont;
+        f = CreateFontIndirectW(&cur);
+    }
+    return f;
 }
 
 std::string menu_text(std::string s)
@@ -104,8 +127,8 @@ HMENU programs_menu()
         if (a.no_display || a.name.empty()) continue;
         by[group_of(a)].push_back(&a);
     }
-    for (HBITMAP b : menu_bitmaps) DeleteObject(b);    // the previous Programs menu is destroyed by now
-    menu_bitmaps.clear();
+    for (BandItem& b : band_items) if (b.icon) DeleteObject(b.icon);    // the previous Programs menu is destroyed by now
+    band_items.clear();
     HMENU m = CreatePopupMenu();
     for (int gi = 0; gi < n; gi++) {
         if (by[gi].empty()) continue;
@@ -114,12 +137,10 @@ HMENU programs_menu()
         });
         HMENU sub = CreatePopupMenu();
         for (const shell::App* a : by[gi]) {
-            append(sub, CMD_APP + (UINT)app_cmds.size(), menu_text(a->name));
-            set_bitmap(sub, GetMenuItemCount(sub) - 1, startpanel::menu_bitmap(a->icon, "exe"));
+            append_band(sub, CMD_APP + (UINT)app_cmds.size(), a->name, startpanel::menu_bitmap(a->icon, "exe"), false);
             app_cmds.push_back(a);
         }
-        append_popup(m, sub, groups[gi].title);
-        set_bitmap(m, GetMenuItemCount(m) - 1, startpanel::menu_bitmap("", "folder"));
+        append_band(m, (UINT_PTR)sub, groups[gi].title, startpanel::menu_bitmap("", "folder"), true);
     }
     if (app_cmds.empty()) append(m, 0, "(Empty)", MF_GRAYED);
     return m;
@@ -436,6 +457,59 @@ void launch(const shell::App& a)
 bool run_line(const std::string& cmd) { return run_shell(cmd); }
 
 HMENU programs_popup() { return programs_menu(); }
+
+bool measure_item(MEASUREITEMSTRUCT* mi)
+{
+    if (!mi || mi->CtlType != ODT_MENU || !is_band_item(mi->itemData)) return false;
+    const BandItem* b = (const BandItem*)mi->itemData;
+    HDC dc = GetDC(nullptr);
+    HGDIOBJ o = SelectObject(dc, band_font());
+    SIZE t = {}, abc = {};
+    GetTextExtentPoint32W(dc, (LPCWSTR)b->text.c_str(), (int)b->text.size(), &t);
+    // user32 adds twice the menu font's average character width (GdiGetCharDimensions) to an owner-drawn item
+    GetTextExtentPoint32W(dc, L"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", 52, &abc);
+    SelectObject(dc, o);
+    ReleaseDC(nullptr, dc);
+    int avg = (abc.cx / 26 + 1) / 2;
+    mi->itemWidth = (UINT)(std::max)(0, 29 + (int)t.cx + 19 - 2 * avg);
+    mi->itemHeight = (UINT)(std::max)(20, (int)t.cy + 7);
+    return true;
+}
+
+bool draw_item(const DRAWITEMSTRUCT* di)
+{
+    if (!di || di->CtlType != ODT_MENU || !is_band_item(di->itemData)) return false;
+    const BandItem* b = (const BandItem*)di->itemData;
+    HDC dc = di->hDC;
+    RECT r = di->rcItem;
+    bool sel = di->itemState & ODS_SELECTED, flat = false;
+    SystemParametersInfoW(SPI_GETFLATMENU, 0, &flat, 0);
+    if (sel && flat) {      // as user32's own items: the flat menus' selection colour in a frame of the highlight
+        RECT in = r;
+        InflateRect(&in, -1, -1);
+        FillRect(dc, &in, GetSysColorBrush(COLOR_MENUHILIGHT));
+        FrameRect(dc, &r, GetSysColorBrush(COLOR_HIGHLIGHT));
+    } else FillRect(dc, &r, GetSysColorBrush(sel ? COLOR_HIGHLIGHT : COLOR_MENU));
+    if (b->icon) {
+        BITMAP bm = {};
+        GetObjectW(b->icon, sizeof bm, &bm);
+        HDC m = CreateCompatibleDC(dc);
+        HGDIOBJ o = SelectObject(m, b->icon);
+        BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+        GdiAlphaBlend(dc, r.left + 5, (r.top + r.bottom - bm.bmHeight) / 2, bm.bmWidth, bm.bmHeight, m, 0, 0, bm.bmWidth, bm.bmHeight, bf);
+        SelectObject(m, o);
+        DeleteDC(m);
+    }
+    HGDIOBJ o = SelectObject(dc, band_font());
+    int mode = SetBkMode(dc, TRANSPARENT);
+    COLORREF tc = SetTextColor(dc, GetSysColor(di->itemState & ODS_GRAYED ? COLOR_GRAYTEXT : sel ? COLOR_HIGHLIGHTTEXT : COLOR_MENUTEXT));
+    RECT tr = { r.left + 29, r.top, r.right - 19, r.bottom };
+    DrawTextW(dc, (LPCWSTR)b->text.c_str(), (int)b->text.size(), &tr, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+    SetTextColor(dc, tc);
+    SetBkMode(dc, mode);
+    SelectObject(dc, o);
+    return true;
+}
 
 HMENU settings_popup()
 {

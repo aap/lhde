@@ -15,9 +15,11 @@ not *entirely* sure about the font for all themes though
 	contents on every resize, and a glass (ARGB) window's transparent background shows before wux repaints; try NorthWest
 	gravity (and a background of None) and watch a resize under picom
 
-* the start panel looks very wrong with most themes, including Windows Classic: XP's panel under the classic theme is drawn
-	with the system colours (screenshots WinXP-193211.png, WinXP-193221.png in the research workspace: the gradient user band,
-	white left column, light grey right column, raised edges, classic All Programs cascade); check the ReactOS styles too
+* start panel, styled: XP puts the All Programs arrow after the width of "All &Programs" (moreprog.cpp measures the
+	ampersand), about 6 px further right than ours in every style (WinXP-193504.png, Lunar); kept so the Luna and Longhorn
+	panels stay as they are. XP's pinned items have a second line (the program's description) that ours lack
+* menus: user32's submenu arrow (OBM_MNARROW, 5x9, 1 px from the item's end) is bigger than XP's classic one (Marlett,
+	4x7, about 8 px from the menu's edge; WinXP-193221.png): every wux menu
 
 ## flxp behavior
 
