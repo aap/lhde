@@ -19,6 +19,13 @@ then README.md (build, install, run). docs/README.md lists every document.
   docs/ tools/` are shared and change by agreement. Two sessions may be working in this tree at once: keep commits small and
   do not move files another side owns.
 
+- **Leave nothing behind.** A script or program that starts something stops it: `lhde-session stop` and `lab.sh stop` must end
+  every process their start began (the window manager, the shell, picom, the session bus and what lives on it, the X server
+  they started). Check with `pgrep` after a stop. Leaked daemons once used up the user's inotify instances.
+- **Search inside the repository only.** Never run a file search (Glob, find, bfs, grep -r) rooted at the home directory or
+  anywhere under `/u/aap/n` (network mounts); the research workspace `~/fun/longhorn` is read by the paths a brief names, not
+  crawled. A search of the whole home directory walks the NFS mounts and holds thousands of descriptors for minutes.
+
 ## Working here
 
 - Build: `make -j`; everything runs uninstalled from `build/bin`. Tests: `make check` (wux tests, headless Xvfb scripts, ut-dump

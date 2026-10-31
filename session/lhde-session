@@ -49,6 +49,26 @@ target() {
 themename() { lhde_themename "$1"; }
 nosuch() { echo "lhde-session: no such theme $1; have: $(lhde_themes)" >&2; exit 1; }
 LHDE_THEME_TOOL=$(lhde_bin lhde-theme)
+# the session's own D-Bus session bus: started by the session when the login has none, its pid and address kept in the state
+# directory, and stopped with the session together with everything that lives on it (an at-spi bus launcher and its dbus-daemon,
+# xdg-desktop-portal and its backends, whatever GTK started): every process whose DBUS_SESSION_BUS_ADDRESS is this bus's
+bus_start() {
+	out=$(dbus-daemon --session --fork --print-address 1 --print-pid 1 2>/dev/null) || return 1
+	addr=$(printf '%s\n' "$out" | sed -n 1p); pid=$(printf '%s\n' "$out" | sed -n 2p)
+	[ -n "$addr" ] && [ -n "$pid" ] || return 1
+	export DBUS_SESSION_BUS_ADDRESS=$addr
+	printf '%s\n' "$addr" > "$STATE/dbus.addr"; printf '%s\n' "$pid" > "$STATE/dbus.pid"
+}
+bus_stop() {
+	[ -f "$STATE/dbus.addr" ] || return 0
+	addr=$(cat "$STATE/dbus.addr"); pid=$(cat "$STATE/dbus.pid" 2>/dev/null)
+	for p in $(pgrep -u "$(id -u)"); do   # our own processes only (another user's environ is not readable anyway)
+		[ "$p" = "$$" ] && continue
+		tr '\0' '\n' 2>/dev/null </proc/$p/environ | grep -qxF "DBUS_SESSION_BUS_ADDRESS=$addr" && kill $p 2>/dev/null
+	done
+	[ -n "$pid" ] && [ -d "/proc/$pid" ] && kill $pid 2>/dev/null
+	rm -f "$STATE/dbus.addr" "$STATE/dbus.pid"
+}
 killon() { # kill processes named $1 whose DISPLAY is $D (never pkill -f: it matches this shell)
 	for p in $(pgrep -x "$1"); do tr '\0' '\n' </proc/$p/environ 2>/dev/null | grep -qx "DISPLAY=$D" && kill $p; done
 }
@@ -96,8 +116,10 @@ session() {
 	rm -f "$STATE/quit"; echo $$ > "$STATE/loop.pid"
 	[ "$LHDE_MODE" = real ] && [ -f "$HOME/.xinit_all" ] && . "$HOME/.xinit_all"   # the x11 lab's personal X startup, real sessions only
 	[ -f "$HOME/.Xresources" ] && xrdb "$HOME/.Xresources" 2>/dev/null
-	# a session bus for luxshell's notification server (toasts via notify-send); a tty login has none
-	if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && [ "$LHDE_MODE" = real ]; then eval "$(dbus-launch --sh-syntax 2>/dev/null)"; fi
+	# a session bus for luxshell's notification server (toasts via notify-send); a tty login has none. Ours, ended with the session
+	# (bus_stop): dbus-launch left one dbus-daemon per start behind, and with it an at-spi bus and an xdg-desktop-portal; a hundred
+	# of them used up the user's inotify instances (fs.inotify.max_user_instances, 128)
+	if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && [ "$LHDE_MODE" = real ]; then bus_start; fi
 	xset -b 2>/dev/null
 	# the root background once, from the settings luxshell and flxp-desktop read (lhwall.sh): the first frames already show the
 	# wallpaper the session keeps
@@ -131,6 +153,7 @@ session() {
 		if [ $(( $(date +%s) - t0 )) -lt 2 ]; then sleep 3; else sleep 0.3; fi
 	done
 	killon luxshell; killon flxp-desktop; killon picom
+	bus_stop
 	rm -f "$STATE/loop.pid"
 }
 
@@ -202,6 +225,7 @@ stop)
 	D=$(target); STATE=$(statedir "$D")
 	[ -d "$STATE" ] && touch "$STATE/quit"
 	killon luxshell; killon flxp-desktop; killon luxwm; killon picom; killon fvwm2
+	bus_stop
 	# the X server this script started for --nested (Xephyr whose command line names the display)
 	for p in $(pgrep -x Xephyr); do tr '\0' '\n' </proc/$p/cmdline | grep -qx -- "$D" && kill $p; done
 	echo "stopped $D" ;;
