@@ -320,6 +320,13 @@ typedef struct tagLISTVIEW_INFO
      its right; uView stays LV_VIEW_ICON, LVM_GETVIEW answers LV_VIEW_TILE */
   BOOL bTile;
   INT nTileLines;
+  /* flxp: XP's tiles (LVM_SETTILEVIEWINFO with LVTVIM_LABELMARGIN, as XP's
+     defview sets them): comctl32 6.0's lvtile.c layout instead of 4051's,
+     the tile autosized as its ListView_RecalcTileSize (LVTVIF_AUTOSIZE); the
+     icon spacing it takes over is given back when the view ends */
+  BOOL bTileXP, bTileAutoSize, bTileSpacingSaved, bTileSavedAuto;
+  RECT rcTileLabelMargin;
+  SIZE tileSavedSpacing;
 
   /* flxp: group view */
   BOOL groupView;
@@ -407,6 +414,12 @@ typedef struct tagLISTVIEW_INFO
 #define TILE_ICON_LEFT               4
 #define TILE_TEXT_GAP                5
 #define TILE_INSET                   2
+/* flxp: XP's tiles (comctl32 6.0 lvtile.c): g_cxLabelMargin (SM_CXEDGE) and
+   g_cyIconMargin (SM_CYEDGE) around and between the parts, an autosized tile
+   20 'm's wide for the text (TILELABELRATIO) */
+#define XPTILE_CX                    2
+#define XPTILE_CY                    2
+#define XPTILE_LABEL_RATIO           20
 
 /* default label width for items in list and small icon display modes */
 #define DEFAULT_LABEL_WIDTH 40
@@ -1117,29 +1130,38 @@ static BOOL LISTVIEW_HasThemedItems(const LISTVIEW_INFO *infoPtr)
     return theme && IsThemePartDefined(theme, LVP_LISTITEM, 0);
 }
 
-/* flxp: the sorted column's shade in Details (LVM_SETSELECTEDCOLUMN; XP lvrept.c
-   GetSortColor(10, the background): white becomes #F7F7F7, as 4074's and XP's
-   Name column); not in group view. FALSE when the column is not shaded. */
-static BOOL LISTVIEW_SortedColumnColor(const LISTVIEW_INFO *infoPtr, INT nSubItem, COLORREF *clr)
+/* flxp: XP's GetSortColor(10, clr) (lvrept.c): the colour 10% more saturated (a
+   near-white one a little darker), black #808080; the sorted column's shade of
+   the background, and the tile lines' grey of the text colour */
+static COLORREF LISTVIEW_SortColor(COLORREF clr)
 {
-    COLORREF bk = infoPtr->clrBk;
     BYTE c[3];
     BOOL desaturate;
     int i;
 
-    if (infoPtr->uView != LV_VIEW_DETAILS || infoPtr->groupView || bk == CLR_NONE ||
-        infoPtr->selected_column < 0 || infoPtr->selected_column >= DPA_GetPtrCount(infoPtr->hdpaColumns) ||
-        (nSubItem >= 0 && nSubItem != infoPtr->selected_column)) return FALSE;
-    if (bk == CLR_DEFAULT) bk = comctl32_color.clrWindow;
-    if (bk == 0) { *clr = RGB(128, 128, 128); return TRUE; }
-    c[0] = GetRValue(bk); c[1] = GetGValue(bk); c[2] = GetBValue(bk);
+    if (clr == 0) return RGB(128, 128, 128);
+    c[0] = GetRValue(clr); c[1] = GetGValue(clr); c[2] = GetBValue(clr);
     desaturate = c[0] > 0xf0 && c[1] > 0xf0 && c[2] > 0xf0;
     for (i = 0; i < 3; i++)
     {
         if (c[i] + (10 * 10 * c[i]) / 1000 > 0xff) c[i] = desaturate ? c[i] - c[i] / 30 : 0xff;
         else c[i] += (10 * 10 * c[i]) / 1000;
     }
-    *clr = RGB(c[0], c[1], c[2]);
+    return RGB(c[0], c[1], c[2]);
+}
+
+/* flxp: the sorted column's shade in Details (LVM_SETSELECTEDCOLUMN; XP lvrept.c
+   GetSortColor(10, the background): white becomes #F7F7F7, as 4074's and XP's
+   Name column); not in group view. FALSE when the column is not shaded. */
+static BOOL LISTVIEW_SortedColumnColor(const LISTVIEW_INFO *infoPtr, INT nSubItem, COLORREF *clr)
+{
+    COLORREF bk = infoPtr->clrBk;
+
+    if (infoPtr->uView != LV_VIEW_DETAILS || infoPtr->groupView || bk == CLR_NONE ||
+        infoPtr->selected_column < 0 || infoPtr->selected_column >= DPA_GetPtrCount(infoPtr->hdpaColumns) ||
+        (nSubItem >= 0 && nSubItem != infoPtr->selected_column)) return FALSE;
+    if (bk == CLR_DEFAULT) bk = comctl32_color.clrWindow;
+    *clr = LISTVIEW_SortColor(bk);
     return TRUE;
 }
 
@@ -2465,6 +2487,57 @@ static INT LISTVIEW_TileLines(const LISTVIEW_INFO *infoPtr, INT nItem, LPCWSTR *
     return n;
 }
 
+/* flxp: XP's tiles */
+static inline BOOL is_xp_tile(const LISTVIEW_INFO *infoPtr)
+{
+    return is_tile(infoPtr) && infoPtr->bTileXP;
+}
+
+static inline INT xp_tile_state_cx(const LISTVIEW_INFO *infoPtr)
+{
+    return infoPtr->himlState ? infoPtr->iconStateSize.cx : 0;
+}
+
+/* XP's tile text (lvtile.c TCalculateSubItemRect, ListView_TRecomputeLabelSize):
+   the name on one line, or wrapped to two where it does not fit and a line is
+   left for it (then one tile line fewer); the lines' widest text, at most the
+   room right of the image. Returns the lines under the name in lines[]. */
+static INT LISTVIEW_XPTileText(const LISTVIEW_INFO *infoPtr, INT nItem, LPCWSTR name,
+                               INT *name_lines, INT *width, LPCWSTR *lines, INT max)
+{
+    HFONT hFont = infoPtr->hFont ? infoPtr->hFont : infoPtr->hDefaultFont;
+    HDC hdc = GetDC(infoPtr->hwndSelf);
+    HFONT hOldFont = SelectObject(hdc, hFont);
+    const RECT *m = &infoPtr->rcTileLabelMargin;
+    INT room = infoPtr->nItemWidth - 5 * XPTILE_CX - infoPtr->iconSize.cx - xp_tile_state_cx(infoPtr) - m->left - m->right;
+    RECT r;
+    INT n, k, w;
+    SIZE sz;
+
+    *name_lines = 1;
+    SetRectEmpty(&r);
+    if (name && name[0]) DrawTextW(hdc, name, -1, &r, DT_SINGLELINE | DT_NOPREFIX | DT_EDITCONTROL | DT_CALCRECT);
+    w = r.right - r.left;
+    if (name && name[0] && infoPtr->nTileLines > 0 && room > 0)
+    {
+        RECT wrap = { 0, 0, room, 0 };
+        INT h = r.bottom - r.top;
+        DrawTextW(hdc, name, -1, &wrap, DT_WORDBREAK | DT_NOPREFIX | DT_EDITCONTROL | DT_WORD_ELLIPSIS | DT_CALCRECT);
+        if (wrap.bottom - wrap.top > h)
+        {
+            *name_lines = 2;
+            w = wrap.right - wrap.left;
+        }
+    }
+    n = LISTVIEW_TileLines(infoPtr, nItem, lines, min(max, infoPtr->nTileLines - (*name_lines - 1)));
+    for (k = 0; k < n; k++)
+        if (GetTextExtentPoint32W(hdc, lines[k], lstrlenW(lines[k]), &sz)) w = max(w, sz.cx);
+    *width = max(0, min(w, room));
+    SelectObject(hdc, hOldFont);
+    ReleaseDC(infoPtr->hwndSelf, hdc);
+    return n;
+}
+
 static void LISTVIEW_GetItemMetrics(const LISTVIEW_INFO *infoPtr, const LVITEMW *lpLVItem,
 				    LPRECT lprcBox, LPRECT lprcSelectBox,
 				    LPRECT lprcIcon, LPRECT lprcStateIcon, LPRECT lprcLabel)
@@ -2520,7 +2593,16 @@ static void LISTVIEW_GetItemMetrics(const LISTVIEW_INFO *infoPtr, const LVITEMW 
 	if (infoPtr->himlState && lpLVItem->iSubItem == 0)
 	    state_width = infoPtr->iconStateSize.cx;
 
-	if (is_tile(infoPtr))
+	if (is_xp_tile(infoPtr))
+	{
+	    /* flxp: XP (lvtile.c ListView_TGetRects, the image drawn g_cxLabelMargin
+	       into its part, centred in the tile less the margins) */
+	    Icon.left   = Box.left + 2 * XPTILE_CX + state_width;
+	    Icon.top    = Box.top + XPTILE_CY + (infoPtr->nItemHeight - 2 * XPTILE_CY - infoPtr->iconSize.cy) / 2;
+	    Icon.right  = Icon.left + infoPtr->iconSize.cx;
+	    Icon.bottom = Icon.top + infoPtr->iconSize.cy;
+	}
+	else if (is_tile(infoPtr))
 	{
 	    Icon.left   = Box.left + TILE_ICON_LEFT + state_width;
 	    Icon.top    = Box.top + (infoPtr->nItemHeight - infoPtr->iconSize.cy) / 2;
@@ -2635,7 +2717,24 @@ static void LISTVIEW_GetItemMetrics(const LISTVIEW_INFO *infoPtr, const LVITEMW 
 	}
 
 calc_label:
-	if (is_tile(infoPtr))
+	if (is_xp_tile(infoPtr))
+	{
+	    /* flxp: XP: the text right of the image's part (its width + 3 margins),
+	       as wide as its widest line, the lines centred in the tile less the
+	       margins; the label is the text block, which the selection fills */
+	    LPCWSTR lines[8];
+	    const RECT *m = &infoPtr->rcTileLabelMargin;
+	    INT name_lines, width, n, h, inner;
+	    n = LISTVIEW_XPTileText(infoPtr, lpLVItem->iItem, is_text(lpLVItem->pszText) ? lpLVItem->pszText : NULL,
+	                            &name_lines, &width, lines, 8);
+	    h = (name_lines + n) * infoPtr->ntmHeight;
+	    inner = infoPtr->nItemHeight - 2 * XPTILE_CY - m->top - m->bottom;
+	    Label.left = Box.left + XPTILE_CX + xp_tile_state_cx(infoPtr) + infoPtr->iconSize.cx + 3 * XPTILE_CX + m->left;
+	    Label.right = Label.left + width;
+	    Label.top = Box.top + XPTILE_CY + m->top + (inner - h - m->top - m->bottom) / 2;
+	    Label.bottom = Label.top + h;
+	}
+	else if (is_tile(infoPtr))
 	{
 	    /* flxp: the name and the tile lines, centred vertically right of the image */
 	    LPCWSTR lines[8];
@@ -2708,6 +2807,13 @@ calc_label:
 	        SelectBox.right = min(Label.left + labelSize.cx, Label.right);
 	    else
 	        SelectBox.right = min(Label.left + MAX_EMPTYTEXT_SELECT_WIDTH, Label.right);
+	}
+	else if (is_xp_tile(infoPtr))
+	{
+	    RECT part;   /* flxp: XP's image part and the label */
+	    SetRect(&part, Box.left + XPTILE_CX, Box.top + XPTILE_CY, Label.left - infoPtr->rcTileLabelMargin.left,
+	            Box.top + infoPtr->nItemHeight - XPTILE_CY);
+	    UnionRect(&SelectBox, &part, &Label);
 	}
 	else if (is_tile(infoPtr))
 	{
@@ -5296,6 +5402,12 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
         }
         else
             infoPtr->rcFocus = rcLabel;
+        /* flxp: XP's tile focus takes in the label's margins (lvtile.c rcFocus) */
+        if (is_xp_tile(infoPtr))
+        {
+            infoPtr->rcFocus.left -= infoPtr->rcTileLabelMargin.left;
+            infoPtr->rcFocus.right += infoPtr->rcTileLabelMargin.right;
+        }
         if (themed && item->iSubItem == 0)
         {
             infoPtr->rcFocus = rcTheme;
@@ -5380,7 +5492,7 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
     if (is_tile(infoPtr))
     {
         LPCWSTR lines[8];
-        INT n = LISTVIEW_TileLines(infoPtr, item->iItem, lines, 8), k;
+        INT n, k, name_lines = 1, width;
         UINT fmt = DT_TOP | DT_LEFT | DT_NOPREFIX | DT_SINGLELINE | DT_END_ELLIPSIS;
         HDC hdc = nmlvcd->nmcd.hdc;
         COLORREF old = GetTextColor(hdc);
@@ -5388,9 +5500,14 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
                            (infoPtr->bFocus || (infoPtr->dwStyle & LVS_SHOWSELALWAYS));
         RECT r = rcLabel;
 
-        r.bottom = r.top + infoPtr->ntmHeight;
-        DrawTextW(hdc, item->pszText, -1, &r, fmt);
-        if (!classic_sel) SetTextColor(hdc, RGB(128, 128, 128));
+        /* XP: a name too long for one line wraps to two (lvtile.c DT_LVTILEWRAP), the
+           lines in GetSortColor(10, the text colour) (#808080 for black) */
+        if (is_xp_tile(infoPtr)) n = LISTVIEW_XPTileText(infoPtr, item->iItem, item->pszText, &name_lines, &width, lines, 8);
+        else n = LISTVIEW_TileLines(infoPtr, item->iItem, lines, 8);
+        r.bottom = r.top + name_lines * infoPtr->ntmHeight;
+        DrawTextW(hdc, item->pszText, -1, &r, name_lines > 1 ? DT_TOP | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK | DT_EDITCONTROL | DT_WORD_ELLIPSIS : fmt);
+        r.top = r.bottom - infoPtr->ntmHeight;
+        if (!classic_sel) SetTextColor(hdc, is_xp_tile(infoPtr) ? LISTVIEW_SortColor(old) : RGB(128, 128, 128));
         for (k = 0; k < n; k++)
         {
             OffsetRect(&r, 0, infoPtr->ntmHeight);
@@ -9527,6 +9644,50 @@ static DWORD LISTVIEW_SetIconSpacing(LISTVIEW_INFO *infoPtr, INT cx, INT cy)
     return oldspacing;
 }
 
+static inline void set_icon_size(SIZE *size, HIMAGELIST himl, BOOL is_small);
+
+/* flxp: XP's autosized tile (lvtile.c ListView_RecalcTileSize): the image and
+   20 'm's of text with the margins wide, the image or the name and its lines
+   high, 2 g_cyIconMargin above and below; it is the icon spacing while the
+   view lasts (the spacing before is kept for LISTVIEW_EndXPTile) */
+static void LISTVIEW_XPTileAutoSize(LISTVIEW_INFO *infoPtr)
+{
+    HFONT hFont = infoPtr->hFont ? infoPtr->hFont : infoPtr->hDefaultFont;
+    const RECT *m = &infoPtr->rcTileLabelMargin;
+    HDC hdc;
+    HFONT hOldFont;
+    RECT em;
+    INT cx, cy, cy_icon;
+
+    if (!is_xp_tile(infoPtr) || !infoPtr->bTileAutoSize) return;
+    hdc = GetDC(infoPtr->hwndSelf);
+    hOldFont = SelectObject(hdc, hFont);
+    SetRectEmpty(&em);
+    DrawTextW(hdc, L"m", 1, &em, DT_SINGLELINE | DT_NOPREFIX | DT_EDITCONTROL | DT_CALCRECT);
+    SelectObject(hdc, hOldFont);
+    ReleaseDC(infoPtr->hwndSelf, hdc);
+    cx = 4 * XPTILE_CX + xp_tile_state_cx(infoPtr) + infoPtr->iconSize.cx + m->left +
+         (em.right - em.left) * XPTILE_LABEL_RATIO + m->right;
+    cy_icon = max(infoPtr->himlState ? infoPtr->iconStateSize.cy : 0, infoPtr->iconSize.cy);
+    cy = 4 * XPTILE_CY + max(cy_icon, m->top + (em.bottom - em.top) * (infoPtr->nTileLines + 1) + m->bottom);
+    if (!infoPtr->bTileSpacingSaved)
+    {
+        infoPtr->bTileSpacingSaved = TRUE;
+        infoPtr->tileSavedSpacing = infoPtr->iconSpacing;
+        infoPtr->bTileSavedAuto = infoPtr->autoSpacing;
+    }
+    LISTVIEW_SetIconSpacing(infoPtr, cx, cy);
+}
+
+/* flxp: out of XP's tiles: the icon spacing as it was */
+static void LISTVIEW_EndXPTile(LISTVIEW_INFO *infoPtr)
+{
+    if (!infoPtr->bTileSpacingSaved) return;
+    infoPtr->bTileSpacingSaved = FALSE;
+    if (infoPtr->bTileSavedAuto) LISTVIEW_SetIconSpacing(infoPtr, -1, -1);
+    else LISTVIEW_SetIconSpacing(infoPtr, infoPtr->tileSavedSpacing.cx, infoPtr->tileSavedSpacing.cy);
+}
+
 static inline void set_icon_size(SIZE *size, HIMAGELIST himl, BOOL is_small)
 {
     INT cx, cy;
@@ -9569,7 +9730,9 @@ static HIMAGELIST LISTVIEW_SetImageList(LISTVIEW_INFO *infoPtr, INT nType, HIMAG
         himlOld = infoPtr->himlNormal;
         infoPtr->himlNormal = himl;
         if (infoPtr->uView == LV_VIEW_ICON) set_icon_size(&infoPtr->iconSize, himl, FALSE);
-        if (infoPtr->autoSpacing)
+        if (is_xp_tile(infoPtr) && infoPtr->bTileAutoSize)
+            LISTVIEW_XPTileAutoSize(infoPtr);   /* flxp */
+        else if (infoPtr->autoSpacing)
             LISTVIEW_SetIconSpacing(infoPtr, -1, -1);
     break;
 
@@ -9997,6 +10160,7 @@ static INT LISTVIEW_SetView(LISTVIEW_INFO *infoPtr, DWORD nView)
   if (tile) nView = LV_VIEW_ICON;
   if (infoPtr->uView == nView && infoPtr->bTile == tile) return 1;
 
+  if (!tile) LISTVIEW_EndXPTile(infoPtr);   /* flxp */
   infoPtr->uView = nView;
   infoPtr->bTile = tile;
 
@@ -10008,6 +10172,7 @@ static INT LISTVIEW_SetView(LISTVIEW_INFO *infoPtr, DWORD nView)
 
   himl = (nView == LV_VIEW_ICON ? infoPtr->himlNormal : infoPtr->himlSmall);
   set_icon_size(&infoPtr->iconSize, himl, nView != LV_VIEW_ICON);
+  LISTVIEW_XPTileAutoSize(infoPtr);   /* flxp: XP's tiles, autosized */
 
   switch (nView)
   {
@@ -11793,6 +11958,7 @@ static LRESULT LISTVIEW_SetFont(LISTVIEW_INFO *infoPtr, HFONT hFont, WORD fRedra
     if (infoPtr->hFont == oldFont) return 0;
     
     LISTVIEW_SaveTextMetrics(infoPtr);
+    LISTVIEW_XPTileAutoSize(infoPtr);   /* flxp: XP's tile follows the font */
 
     infoPtr->nItemHeight = LISTVIEW_CalculateItemHeight(infoPtr);
 
@@ -12360,10 +12526,11 @@ LISTVIEW_WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
   {
       LVTILEVIEWINFO *tvi = (LVTILEVIEWINFO *)lParam;
       if (!tvi) return FALSE;
-      tvi->dwMask = LVTVIM_TILESIZE | LVTVIM_COLUMNS;
-      tvi->dwFlags = LVTVIF_FIXEDSIZE;
+      tvi->dwMask = LVTVIM_TILESIZE | LVTVIM_COLUMNS | (infoPtr->bTileXP ? LVTVIM_LABELMARGIN : 0);
+      tvi->dwFlags = infoPtr->bTileAutoSize ? LVTVIF_AUTOSIZE : LVTVIF_FIXEDSIZE;
       tvi->sizeTile = infoPtr->iconSpacing;
       tvi->cLines = infoPtr->nTileLines;
+      if (infoPtr->bTileXP) tvi->rcLabelMargin = infoPtr->rcTileLabelMargin;
       return TRUE;
   }
 
@@ -12579,8 +12746,15 @@ LISTVIEW_WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
       const LVTILEVIEWINFO *tvi = (const LVTILEVIEWINFO *)lParam;
       if (!tvi) return FALSE;
       if (tvi->dwMask & LVTVIM_COLUMNS) infoPtr->nTileLines = max(0, min(tvi->cLines, 8));
+      /* flxp: a label margin asks for XP's tiles (XP's defview: LVTVIF_AUTOSIZE, {1,1,1,1}) */
+      infoPtr->bTileXP = (tvi->dwMask & LVTVIM_LABELMARGIN) != 0;
+      if (infoPtr->bTileXP) infoPtr->rcTileLabelMargin = tvi->rcLabelMargin;
+      infoPtr->bTileAutoSize = infoPtr->bTileXP && (tvi->dwMask & LVTVIM_TILESIZE) && (tvi->dwFlags & LVTVIF_FIXEDSIZE) == 0;
+      if (!infoPtr->bTileAutoSize) LISTVIEW_EndXPTile(infoPtr);
       if ((tvi->dwMask & LVTVIM_TILESIZE) && (tvi->dwFlags & LVTVIF_FIXEDSIZE) == LVTVIF_FIXEDSIZE)
           LISTVIEW_SetIconSpacing(infoPtr, tvi->sizeTile.cx, tvi->sizeTile.cy);
+      LISTVIEW_XPTileAutoSize(infoPtr);
+      if (is_xp_tile(infoPtr)) LISTVIEW_Arrange(infoPtr, LVA_DEFAULT);
       LISTVIEW_InvalidateList(infoPtr);
       return TRUE;
   }

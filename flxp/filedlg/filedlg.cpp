@@ -838,22 +838,30 @@ static void delete_selection(Dlg& d)
     fill_list(d);
 }
 
+// The XP look's views (XP's Open dialog: Thumbnails, Tiles, Icons, List, Details; no Thumbnails here)
+static void xp_view_items(Dlg& d, HMENU m)
+{
+    AppendMenuW(m, MF_STRING, ID_VIEW_TILES, L"Tile&s");
+    AppendMenuW(m, MF_STRING, ID_VIEW_ICONS, L"Ic&ons");
+    AppendMenuW(m, MF_STRING, ID_VIEW_LIST, L"&List");
+    AppendMenuW(m, MF_STRING, ID_VIEW_DETAILS, L"&Details");
+    int at = d.tiles ? 0 : d.view == LVS_ICON || d.view == LVS_SMALLICON ? 1 : d.view == LVS_LIST ? 2 : 3;
+    CheckMenuRadioItem(m, 0, 3, (UINT)at, MF_BYPOSITION);
+}
+
 static void view_menu(Dlg& d)
 {
     RECT r = {};
     SendMessageW(d.toolbar, TB_GETRECT, ID_VIEWMENU, (LPARAM)&r);
     MapWindowPoints(d.toolbar, nullptr, (POINT*)&r, 2);
     HMENU m = CreatePopupMenu();
-    AppendMenuW(m, MF_STRING, ID_VIEW_ICONS, L"Ic&ons");
-    AppendMenuW(m, MF_STRING, ID_VIEW_LIST, L"&List");
-    AppendMenuW(m, MF_STRING, ID_VIEW_DETAILS, L"&Details");
-    CheckMenuRadioItem(m, ID_VIEW_ICONS, ID_VIEW_DETAILS,
-                       d.view == LVS_ICON ? ID_VIEW_ICONS : d.view == LVS_LIST ? ID_VIEW_LIST : ID_VIEW_DETAILS, MF_BYCOMMAND);
+    xp_view_items(d, m);
     SendMessageW(d.toolbar, TB_PRESSBUTTON, ID_VIEWMENU, MAKELONG(TRUE, 0));
     int cmd = (int)TrackPopupMenu(m, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN, r.left, r.bottom, 0, d.dlg, nullptr);
     SendMessageW(d.toolbar, TB_PRESSBUTTON, ID_VIEWMENU, MAKELONG(FALSE, 0));
     DestroyMenu(m);
-    if (cmd == ID_VIEW_ICONS) set_view(d, LVS_ICON);
+    if (cmd == ID_VIEW_TILES) set_view(d, VIEW_TILES);
+    else if (cmd == ID_VIEW_ICONS) set_view(d, LVS_ICON);
     else if (cmd == ID_VIEW_LIST) set_view(d, LVS_LIST);
     else if (cmd == ID_VIEW_DETAILS) set_view(d, LVS_REPORT);
 }
@@ -880,13 +888,7 @@ static void background_menu(Dlg& d, POINT pt)
     if (d.lh) {
         lh_view_items(d, view);
         AppendMenuW(view, MF_STRING | (d.grouped ? MF_CHECKED : 0) | (browser::group_view_applies(d) ? 0 : MF_GRAYED), ID_GROUPS, L"Show in &Groups");
-    } else {
-        AppendMenuW(view, MF_STRING, ID_VIEW_ICONS, L"Ic&ons");
-        AppendMenuW(view, MF_STRING, ID_VIEW_LIST, L"&List");
-        AppendMenuW(view, MF_STRING, ID_VIEW_DETAILS, L"&Details");
-        CheckMenuRadioItem(view, ID_VIEW_ICONS, ID_VIEW_DETAILS,
-                           d.view == LVS_ICON || d.view == LVS_SMALLICON ? ID_VIEW_ICONS : d.view == LVS_LIST ? ID_VIEW_LIST : ID_VIEW_DETAILS, MF_BYCOMMAND);
-    }
+    } else xp_view_items(d, view);
     HMENU arrange = CreatePopupMenu();
     AppendMenuW(arrange, MF_STRING, ID_SORT_NAME, L"&Name");
     AppendMenuW(arrange, MF_STRING, ID_SORT_SIZE, L"&Size");
@@ -2324,7 +2326,7 @@ static void on_command(Dlg& d, int id, int code, HWND ctl)
         if (d.lh) browser::view_command(d, browser::VC_THUMBNAILS);
         else set_view(d, VIEW_THUMBNAILS);
         return;
-    case ID_VIEW_TILES: browser::view_command(d, browser::VC_TILES); return;
+    case ID_VIEW_TILES: if (!browser::view_command(d, browser::VC_TILES)) set_view(d, VIEW_TILES); return;
     case ID_VIEW_HIDENAMES: browser::view_command(d, browser::VC_HIDENAMES); return;
     case ID_VIEW_SMALL: set_view(d, LVS_SMALLICON); return;
     case ID_GROUPS:

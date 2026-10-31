@@ -116,7 +116,7 @@ static const char template_text[] =
     "# The Longhorn views' Show in Groups (by type, Tiles and Icons): 1 or 0 (auto: 0).\n"
     "groups =\n"
     "# The view of folders never opened (Tools > Folder Options), as the views file\n"
-    "# names them: XP frame (default_view) details, icons, smallicons, list,\n"
+    "# names them: XP frame (default_view) details, icons, smallicons, list, tiles,\n"
     "# thumbnails; Longhorn (default_view_longhorn) details, tiles or icons with @px,\n"
     "# the size (details 16..32, tiles 32..96, icons 16..256; none: the size the\n"
     "# view had last), icons also +nonames (Hide File Names); auto: details (XP),\n"

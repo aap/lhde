@@ -369,7 +369,10 @@ HMENU view_submenu(int view, bool thumbnails)
         check_view_items(m, view);
         return m;
     }
-    if (thumbnails) AppendMenuW(m, MF_STRING, ID_VIEW_THUMBNAILS, L"T&humbnails");
+    if (thumbnails) {   // the explorer's (XP's View submenu: Thumbnails, Tiles, Icons, List, Details)
+        AppendMenuW(m, MF_STRING, ID_VIEW_THUMBNAILS, L"T&humbnails");
+        AppendMenuW(m, MF_STRING, ID_VIEW_TILES, L"Tile&s");
+    }
     AppendMenuW(m, MF_STRING, ID_VIEW_ICONS, L"Ico&ns");
     AppendMenuW(m, MF_STRING, ID_VIEW_LIST, L"&List");
     AppendMenuW(m, MF_STRING, ID_VIEW_DETAILS, L"&Details");

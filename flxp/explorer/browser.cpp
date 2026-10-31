@@ -421,7 +421,7 @@ static void put_item(Browser& b, size_t i, int group, bool insert)
     sub.iSubItem = 1; sub.pszText = (LPWSTR)size.c_str(); SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
     sub.iSubItem = 2; sub.pszText = (LPWSTR)type.c_str(); SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
     sub.iSubItem = 3; sub.pszText = (LPWSTR)date.c_str(); SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
-    if (b.zoomable && b.tiles) put_tile_lines(b, i);
+    if (b.tiles) put_tile_lines(b, i);
 }
 
 void fill_list(Browser& b)
@@ -741,18 +741,22 @@ void history_menu(Browser& b, HWND owner, bool back, int x, int y)
     }
 }
 
-// the view as the menus see it: LVS_* or VIEW_THUMBNAILS (XP); LVS_REPORT, VIEW_TILES
-// or LVS_ICON (the Longhorn hosts)
+// XP's Tiles show the extra large icons (defview _SetTileview: SHIL_EXTRALARGE, 48 px)
+enum { XP_TILE_PX = 48 };
+
+// the view as the menus see it: LVS_*, VIEW_THUMBNAILS or VIEW_TILES (XP); LVS_REPORT,
+// VIEW_TILES or LVS_ICON (the Longhorn hosts)
 int menu_view(const Browser& b)
 {
     if (b.zoomable) return b.view == LVS_REPORT ? (int)LVS_REPORT : b.tiles ? (int)VIEW_TILES : (int)LVS_ICON;
-    return thumbview::active() ? (int)VIEW_THUMBNAILS : b.view;
+    return thumbview::active() ? (int)VIEW_THUMBNAILS : b.tiles ? (int)VIEW_TILES : b.view;
 }
 
 int view_code(const Browser& b)
 {
     if (b.zoomable) return menu_view(b) | (b.hide_names ? (int)VIEW_NONAMES_FLAG : 0) | (b.zoom > 0 ? b.zoom << ZOOM_SHIFT : 0);
     if (b.thumbs && b.view == LVS_ICON) return VIEW_THUMBNAILS;
+    if (b.tiles && b.view == LVS_ICON) return VIEW_TILES;
     return b.view;
 }
 
@@ -789,6 +793,7 @@ int icon_px(const Browser& b)
 {
     if (b.zoomable) return b.zoom > 0 ? b.zoom : current_view(b).size;
     if (b.thumbs) return thumbview::default_size();
+    if (b.tiles) return XP_TILE_PX;
     int cx = 32, cy = 32;
     if (b.large) ImageList_GetIconSize(b.large, &cx, &cy);
     return cx;
@@ -884,7 +889,7 @@ static int line_height(HWND list)
 // the first two that are not empty: a folder its Type; a picture Dimensions, Type, Size; a
 // drive Percent Full, Free Space; any other file Type, Size, Date Modified
 enum { TILE_SUBITEM = 8, TILE_LINES = 3 };   // the subitems that hold them (listview.c: beyond the columns)
-static std::vector<std::string> tile_lines(const Item& it)
+static std::vector<std::string> lh_tile_lines(const Item& it)
 {
     std::vector<std::string> out;
     if (it.flags & shell::IsDrive) {
@@ -911,9 +916,40 @@ static std::vector<std::string> tile_lines(const Item& it)
     return out;
 }
 
+// XP's: the values alone, in the two slots XP's list view has (defview TILEVIEWLINES): the
+// column the folder is sorted by first unless it is Name (comctl32 lvtile.c _GetNextColumn),
+// then the type's TileInfo (shell32 selfreg.inx): any file "prop:Type;Size", a picture
+// "prop:Dimensions;Type;Size", a folder or drive Folder's "prop:Size", which they do not have
+// (so only the sorted column shows under their names); the properties XP reads from a
+// program's version resource or a song's tags are not read here, those files show Type and Size
+static std::vector<std::string> xp_tile_lines(Browser& b, const Item& it)
+{
+    auto column = [&](shell::SortBy c) -> std::string {
+        switch (c) {
+        case shell::SortBy::Size: return b.size_shown(it) && !it.is_folder() && !(it.flags & shell::IsDrive) ? shell::format_size(it.size) : "";
+        case shell::SortBy::Type: return it.type;
+        case shell::SortBy::Date: return it.mtime ? shell::format_date(it.mtime) : "";
+        default: return "";
+        }
+    };
+    std::vector<shell::SortBy> cols;
+    bool folder = it.is_folder() || (it.flags & shell::IsDrive);
+    int w = 0, h = 0;
+    bool picture = !folder && shell::thumbs::can_thumbnail(it.path) && shell::thumbs::picture_size(it.path, &w, &h);
+    if (!folder) cols = { shell::SortBy::Type, shell::SortBy::Size };
+    std::vector<std::string> slots;
+    if (b.sort != shell::SortBy::Name) slots.push_back(column(b.sort));
+    if (picture) slots.push_back(std::to_string(w) + " x " + std::to_string(h));
+    for (shell::SortBy c : cols) if (c != b.sort) slots.push_back(column(c));
+    if (slots.size() > 2) slots.resize(2);
+    std::vector<std::string> out;
+    for (auto& t : slots) if (!t.empty()) out.push_back(t);
+    return out;
+}
+
 static void put_tile_lines(Browser& b, size_t i)
 {
-    std::vector<std::string> lines = tile_lines(b.items[i]);
+    std::vector<std::string> lines = b.zoomable ? lh_tile_lines(b.items[i]) : xp_tile_lines(b, b.items[i]);
     UINT cols[TILE_LINES];
     UINT n = 0;
     for (int k = 0; k < TILE_LINES; k++) {
@@ -1043,6 +1079,23 @@ bool view_command(Browser& b, int vc)
 
 // ---- XP's views -------------------------------------------------------------------------
 
+// XP's Tiles: the list view's tiles as XP's defview sets them (CDefView::_SetView: autosized,
+// TILEVIEWLINES 2 lines, a 1 px label margin), the extra large icons (_SetTileview: SHIL_EXTRALARGE);
+// the lines are XP's (xp_tile_lines)
+static void xp_tiles(Browser& b, bool navigating)
+{
+    LVTILEVIEWINFO tvi = {};
+    tvi.cbSize = sizeof tvi;
+    tvi.dwMask = LVTVIM_TILESIZE | LVTVIM_COLUMNS | LVTVIM_LABELMARGIN;
+    tvi.dwFlags = LVTVIF_AUTOSIZE;
+    tvi.cLines = 2;
+    tvi.rcLabelMargin = { 1, 1, 1, 1 };
+    SendMessageW(b.list, LVM_SETTILEVIEWINFO, 0, (LPARAM)&tvi);
+    SendMessageW(b.list, LVM_SETVIEW, LV_VIEW_TILE, 0);
+    SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)b.icons_at(XP_TILE_PX));
+    if (!navigating) for (size_t i = 0; i < b.items.size(); i++) put_tile_lines(b, i);
+}
+
 // XP's Thumbnails view in Icons (thumbview's squares); true when the list was filled again
 static bool apply_images(Browser& b, bool navigating)
 {
@@ -1081,10 +1134,12 @@ void set_view(Browser& b, int view, bool navigating)
     if (b.zoomable) { lh_set(b, view_of_code(view), navigating); return; }
     leave_longhorn(b, navigating);
     view &= ZOOM_VIEW & ~VIEW_NONAMES_FLAG;   // (the views file is shared with the Longhorn frame)
-    if (view == VIEW_TILES) view = LVS_ICON;
+    bool tiles = view == VIEW_TILES;
+    if (tiles) view = LVS_ICON;
     bool th = view == VIEW_THUMBNAILS;
     view = th ? (int)LVS_ICON : view & ~VIEW_THUMBS_FLAG;
     b.thumbs = th;
+    b.tiles = tiles;
     bool was_grouped = !b.group_titles.empty();
     if (!th && thumbview::active()) {
         // the items' images are indices into the thumbnail list: give them their
@@ -1100,6 +1155,7 @@ void set_view(Browser& b, int view, bool navigating)
     SendMessageW(b.list, LVM_SETVIEW, (WPARAM)(view == LVS_REPORT ? LV_VIEW_DETAILS : view == LVS_LIST ? LV_VIEW_LIST :
                                                view == LVS_SMALLICON ? LV_VIEW_SMALLICON : LV_VIEW_ICON), 0);   // (out of tiles)
     bool refilled = apply_images(b, navigating);
+    if (tiles) xp_tiles(b, navigating);
     if (!refilled && !navigating && b.grouped && was_grouped != group_view_applies(b)) fill_list(b);   // groups come or go with the view
     if (view != LVS_REPORT) SendMessageW(b.list, LVM_ARRANGE, LVA_DEFAULT, 0);
     InvalidateRect(b.list, nullptr, TRUE);

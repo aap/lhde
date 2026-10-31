@@ -568,7 +568,7 @@ void Explorer::filled() { update_status(); }
 
 namespace lhtool { static void changed(); }
 
-// the view as the menus see it: LVS_* or VIEW_THUMBNAILS (XP), the view code (Longhorn: Tiles, Hide File Names)
+// the view as the menus see it: LVS_*, VIEW_THUMBNAILS or VIEW_TILES (XP), the view code (Longhorn: Tiles, Hide File Names)
 static int menu_view() { return browser::view_code(g); }
 
 static void set_view(int view, bool navigating = false) { browser::set_view(g, view, navigating); }
@@ -583,7 +583,7 @@ static void sync_thumbs_mode()
 }
 
 // The View menu's views, made again each time it opens (the frame can change): XP's
-// Thumbnails, Icons, Small Icons, List, Details; the Longhorn frame's Details, Tiles,
+// Thumbnails, Tiles, Icons, Small Icons, List, Details; the Longhorn frame's Details, Tiles,
 // Icons, Hide File Names and Show Thumbnails; then Default View
 static void view_items(HMENU view)
 {
@@ -609,6 +609,7 @@ static void view_items(HMENU view)
         EnableMenuItem(view, ID_VIEW_GROUPS, MF_BYCOMMAND | (browser::group_view_applies(g) ? MF_ENABLED : MF_GRAYED));
     } else {
         add(ID_VIEW_THUMBNAILS, L"T&humbnails\tCtrl+3");
+        add(ID_VIEW_TILES, L"Tile&s");
         add(ID_VIEW_ICONS, L"Ico&ns\tCtrl+2");
         add(ID_VIEW_SMALLICONS, L"S&mall Icons\tCtrl+5");
         add(ID_VIEW_LIST, L"&List\tCtrl+4");
@@ -854,6 +855,7 @@ static HMENU build_menu()
     g_xbar_menu = xbar; g_arrange_menu = arrange;
     AppendMenuW(view, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(view, MF_STRING, ID_VIEW_THUMBNAILS, L"T&humbnails\tCtrl+3");
+    AppendMenuW(view, MF_STRING, ID_VIEW_TILES, L"Tile&s");
     AppendMenuW(view, MF_STRING, ID_VIEW_ICONS, L"Ico&ns\tCtrl+2");
     AppendMenuW(view, MF_STRING, ID_VIEW_SMALLICONS, L"S&mall Icons\tCtrl+5");
     AppendMenuW(view, MF_STRING, ID_VIEW_LIST, L"&List\tCtrl+4");
@@ -1841,7 +1843,7 @@ static void on_command(int id)
     case ID_VIEW_LIST: if (!browser::view_command(g, browser::VC_DETAILS)) set_view(LVS_LIST); break;
     case ID_VIEW_SMALLICONS: if (!browser::view_command(g, browser::VC_SMALL)) set_view(LVS_SMALLICON); break;
     case ID_VIEW_DETAILS: if (!browser::view_command(g, browser::VC_DETAILS)) set_view(LVS_REPORT); break;
-    case ID_VIEW_TILES: browser::view_command(g, browser::VC_TILES); break;
+    case ID_VIEW_TILES: if (!browser::view_command(g, browser::VC_TILES)) set_view(VIEW_TILES); break;
     case ID_VIEW_LARGEICONS: browser::view_command(g, browser::VC_LARGE); break;
     case ID_VIEW_MEDIUMICONS: browser::view_command(g, browser::VC_MEDIUM); break;
     case ID_VIEW_HIDENAMES: browser::view_command(g, browser::VC_HIDENAMES); break;

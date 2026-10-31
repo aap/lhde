@@ -455,7 +455,7 @@ HWND general, view;                    // the pages (General refreshed after App
 
 struct ViewName { int view; const char* name; bool xp, lh; };
 static const ViewName k_views[] = {
-    { VIEW_THUMBNAILS, "Thumbnails", true, false }, { LVS_REPORT, "Details", false, true }, { VIEW_TILES, "Tiles", false, true },
+    { VIEW_THUMBNAILS, "Thumbnails", true, false }, { LVS_REPORT, "Details", false, true }, { VIEW_TILES, "Tiles", true, true },
     { LVS_ICON, "Icons", true, true }, { LVS_SMALLICON, "Small Icons", true, false },
     { LVS_LIST, "List", true, false }, { LVS_REPORT, "Details", true, false },
 };

@@ -367,7 +367,16 @@ highlight in styles without it. View > Show Thumbnails (and Folder Options) turn
 since every picture would be read over the network. The thumbnails are cached in `~/.cache/thumbnails` (the freedesktop spec, shared
 with other programs).
 
-In the XP frame the Explorer keeps XP's views: Thumbnails (squares of `thumbnail_size`), Icons, Small Icons, List, Details, Ctrl+1..5.
+In the XP frame the Explorer keeps XP's views: Thumbnails (squares of `thumbnail_size`), Tiles, Icons, Small Icons, List,
+Details; Ctrl+1 Details, 2 Icons, 3 Thumbnails, 4 List, 5 Small Icons. Tiles is XP's: the 48 px icon at the left of a tile and the
+name right of it (wrapped to two lines when it does not fit), with up to two grey lines of values under it, as XP's TileInfo gives
+them: a file its type and size, a picture its dimensions and type; a folder or drive has none of its own, so it shows the name
+alone. The column the folder is arranged by (View > Arrange Icons by; not Name) comes first, so arranged by Type a folder shows
+"File Folder". The tile is sized as XP's list view sizes it (the icon and twenty 'm's of text wide, 56 px high in Tahoma 8 pt);
+a selected tile's text block is filled with the highlight colour and its icon blended with it. A program's version details and
+a song's artist and album, which XP's tiles show, are not read: those files show type and size. The View menu, the list's
+context menu, the Views drop-down, Folder Options' default view and the XP-look file dialog's View Menu (Tiles, Icons, List,
+Details) list it; a folder shown in Tiles keeps it (`tiles` in `flxp-views`, which the Longhorn frame reads as its Tiles).
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell M6, `SHELL-DESIGN.md` 6.3/6.4)
 

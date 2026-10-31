@@ -1,6 +1,6 @@
 // The browsing widget shared by the explorer frame and the file dialog: a
-// folder shown in a list view with its views (Thumbnails, Icons, Small Icons,
-// List, Details; optionally grouped by type), sorting, the filter-as-you-type
+// folder shown in a list view with its views (Thumbnails, Tiles, Icons, Small
+// Icons, List, Details; optionally grouped by type), sorting, the filter-as-you-type
 // of the Longhorn search/Filter boxes, Back/Forward history and the views
 // remembered per folder; plus the frame plumbing every Longhorn host needs:
 // which frame style the session asks for (FLXP_FRAME, the theme's Explorer.chrome,
@@ -98,7 +98,7 @@ struct Browser {
     // at an image size, zoom; Hide File Names in Icons. Remembered per folder.
     bool zoomable = false;
     int zoom = 0;
-    bool tiles = false;
+    bool tiles = false;                              // Tiles: the Longhorn hosts' or XP's (LV_VIEW_TILE at 48 px)
     bool hide_names = false;
     // following the folder on disk (inotify, browser.cpp follow/update); off: F5 only
     bool follow_disk = true;
@@ -145,13 +145,13 @@ void go_forward(Browser& b);
 void go_up(Browser& b);
 void history_menu(Browser& b, HWND owner, bool back, int x, int y);   // the last ten places, nearest first
 
-int menu_view(const Browser& b);       // LVS_* or VIEW_THUMBNAILS (XP); LVS_REPORT, VIEW_TILES, LVS_ICON (Longhorn)
+int menu_view(const Browser& b);       // LVS_*, VIEW_THUMBNAILS, VIEW_TILES (XP); LVS_REPORT, VIEW_TILES, LVS_ICON (Longhorn)
 // what is remembered for the folder: menu_view, in the Longhorn hosts with
 // VIEW_NONAMES_FLAG and the size above ZOOM_SHIFT
 int view_code(const Browser& b);
 // XP: the Thumbnails view on, or off (the view before it); the Longhorn hosts: the thumbnails setting
 void set_thumbnails(Browser& b, bool on);
-// view: a view code (LVS_*, VIEW_THUMBNAILS; the Longhorn hosts' VIEW_TILES,
+// view: a view code (LVS_*, VIEW_THUMBNAILS, VIEW_TILES; the Longhorn hosts'
 // VIEW_NONAMES_FLAG, the size above ZOOM_SHIFT, none: the one the view remembers;
 // earlier codes are read as the nearest view). navigating: the folder's remembered
 // view, applied before refresh() fills the list (no refill or icon restore here,

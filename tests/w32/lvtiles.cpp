@@ -1,7 +1,8 @@
 // The vendored list view's tile view and hidden labels (listview.c, flxp:):
 // LV_VIEW_TILE over the icon layout, LVM_SET/GETTILEVIEWINFO's lines,
 // LVM_SET/GETTILEINFO with subitems beyond the columns, the rectangles of a
-// tile, LVS_EX_HIDELABELS. Needs a display (make check runs it under Xvfb).
+// tile, LVS_EX_HIDELABELS, XP's tiles (a label margin: comctl32 6.0's layout,
+// autosized). Needs a display (make check runs it under Xvfb).
 #include <stdio.h>
 #include <string.h>
 #include "w32/w32.h"
@@ -115,6 +116,41 @@ int main()
     SendMessageW(lv, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_HIDELABELS, 0);
     lb.left = LVIR_LABEL; SendMessageW(lv, LVM_GETITEMRECT, 0, (LPARAM)&lb);
     check("label back", 1, lb.bottom - lb.top >= tm.tmHeight);
+
+    // XP's tiles (as XP's defview sets them): autosized from the icon and 20 'm's, the
+    // image 2 + 2 px in and centred, the text right of its part (image + 3 x 2 px) and
+    // the 1 px margin; leaving the view gives the icon spacing back
+    tvi = {};
+    tvi.cbSize = sizeof tvi;
+    tvi.dwMask = LVTVIM_TILESIZE | LVTVIM_COLUMNS | LVTVIM_LABELMARGIN;
+    tvi.dwFlags = LVTVIF_AUTOSIZE; tvi.cLines = 2; tvi.rcLabelMargin = { 1, 1, 1, 1 };
+    SendMessageW(lv, LVM_SETTILEVIEWINFO, 0, (LPARAM)&tvi);
+    SendMessageW(lv, LVM_SETVIEW, LV_VIEW_TILE, 0);
+    RECT em = {};
+    dc = GetDC(lv);
+    SelectObject(dc, (HFONT)SendMessageW(lv, WM_GETFONT, 0, 0));
+    DrawTextW(dc, L"m", 1, &em, DT_SINGLELINE | DT_NOPREFIX | DT_CALCRECT);
+    ReleaseDC(lv, dc);
+    int xw = 8 + 48 + 1 + 20 * (em.right - em.left) + 1;
+    int xh = 8 + (48 > 2 + 3 * (em.bottom - em.top) ? 48 : 2 + 3 * (em.bottom - em.top));
+    got = {};
+    got.cbSize = sizeof got;
+    SendMessageW(lv, LVM_GETTILEVIEWINFO, 0, (LPARAM)&got);
+    check("xp tile: label margin kept", LVTVIM_LABELMARGIN, (long)(got.dwMask & LVTVIM_LABELMARGIN));
+    check("xp tile: autosize", LVTVIF_AUTOSIZE, (long)got.dwFlags);
+    check("xp tile width", xw, got.sizeTile.cx);
+    check("xp tile height", xh, got.sizeTile.cy);
+    b.left = LVIR_BOUNDS; SendMessageW(lv, LVM_GETITEMRECT, 0, (LPARAM)&b);
+    ic.left = LVIR_ICON; SendMessageW(lv, LVM_GETITEMRECT, 0, (LPARAM)&ic);
+    lb.left = LVIR_LABEL; SendMessageW(lv, LVM_GETITEMRECT, 0, (LPARAM)&lb);
+    check("xp image left", b.left + 4, ic.left);
+    check("xp image top", b.top + 2 + (xh - 4 - 48) / 2, ic.top);
+    check("xp text left", b.left + 2 + 48 + 6 + 1, lb.left);
+    check("xp text: name and two lines", 3 * tm.tmHeight, lb.bottom - lb.top);
+    check("xp text centred", b.top + 2 + 1 + (xh - 4 - 2 - 3 * tm.tmHeight - 2) / 2, lb.top);
+    SendMessageW(lv, LVM_SETVIEW, LV_VIEW_ICON, 0);
+    DWORD sp = (DWORD)SendMessageW(lv, LVM_GETITEMSPACING, FALSE, 0);
+    check("icon spacing back after xp tiles", 110, LOWORD(sp));
 
     DestroyWindow(top);
     printf("%d checks, %d failed\n", checks, fails);

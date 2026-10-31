@@ -51,12 +51,12 @@ void error_box(const std::string& text);
 
 // menus for g_ctx
 void build_item_menu(HMENU m);
-enum { BG_VIEW = 1, BG_ARRANGE = 2, BG_THUMBNAILS = 4 };   // View submenu; Arrange Icons By, Refresh, Paste; View has Thumbnails
+enum { BG_VIEW = 1, BG_ARRANGE = 2, BG_THUMBNAILS = 4 };   // View submenu; Arrange Icons By, Refresh, Paste; View has Thumbnails and Tiles
 void build_background_menu(HMENU m, unsigned flags, int view, int sort);
 // view: a browser::view_code (LVS_*, VIEW_THUMBNAILS, VIEW_TILES, VIEW_NONAMES_FLAG; a zoom is ignored)
 HMENU view_submenu(int view, bool thumbnails = false);
 void check_view_items(HMENU m, int view);   // the radio mark among the views, the check items
-// -1: XP's views (Thumbnails a radio item among Icons/List/Details); else the Longhorn
+// -1: XP's views (Thumbnails a radio item among Tiles/Icons/List/Details); else the Longhorn
 // hosts' (browser.h): Details/Tiles/Icons, Hide File Names, and Show Thumbnails a check
 // item for the thumbnails setting, 0/1 its state
 extern int thumbs_toggle;
