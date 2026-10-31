@@ -1267,7 +1267,7 @@ static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     case WM_SYSCOLORCHANGE:
         load_look(h);
         make_fonts();
-        if (g_filter) SendMessageW(g_filter, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), TRUE);
+        if (g_filter) SendMessageW(g_filter, WM_SETFONT, (WPARAM)g_font, TRUE);
         layout();
         InvalidateRect(h, nullptr, FALSE);
         return 0;
@@ -1382,7 +1382,8 @@ static void make_filter()
 {
     g_filter = CreateWindowExW(WS_EX_CLIENTEDGE, L"Edit", nullptr, WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
         GR_X, GR_BOX_Y, 110, GR_BOX_H, g_wnd, nullptr, nullptr, nullptr);
-    SendMessageW(g_filter, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), FALSE);
+    // the pane's font (the icon title font): 4074-dwm.png's "Filter by" is Segoe UI 9 under Jade, as "Storage Favorites"
+    SendMessageW(g_filter, WM_SETFONT, (WPARAM)g_font, FALSE);
     SendMessageW(g_filter, EM_SETCUEBANNER, TRUE, (LPARAM)L"Filter by");
     g_filter_old = (WNDPROC)SetWindowLongPtrW(g_filter, GWLP_WNDPROC, (LONG_PTR)filter_proc);
 }
@@ -1569,10 +1570,10 @@ void set_longhorn(bool longhorn)
     if (!g_wnd || longhorn == g_grp) return;
     if (g_rename) end_rename(false);
     g_grp = longhorn;
-    if (g_grp) make_filter();
-    else if (g_filter) { DestroyWindow(g_filter); g_filter = nullptr; }
+    if (!g_grp && g_filter) { DestroyWindow(g_filter); g_filter = nullptr; }
     load_look(g_wnd);
     make_fonts();
+    if (g_grp) make_filter();   // in the new font
     build_groups();
     layout();
     InvalidateRect(g_wnd, nullptr, TRUE);

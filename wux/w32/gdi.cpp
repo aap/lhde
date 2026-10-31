@@ -9,6 +9,7 @@
 // gdi logical coordinates are GDI logical coordinates.
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unordered_map>
 #include <unordered_set>
 #include "gdi_priv.h"
@@ -255,6 +256,23 @@ static Font* new_font(const LOGFONTW& lf, bool is_stock)
         if (!once) { once = true; fprintf(stderr, "err:gdi: no font for \"%s\" (and no MS Shell Dlg)\n", face.c_str()); }
     }
     return f;
+}
+
+// MS Shell Dlg's face (gdi::set_shell_dlg_face): the stock fonts named so (DEFAULT_GUI_FONT and the like) are realized again,
+// the fonts a program created keep what they had (a dialog's font is made when the dialog is)
+void set_shell_dlg(const char* face)
+{
+    if (!strcasecmp(gdi::shell_dlg_face(), face && *face ? face : "Tahoma")) return;
+    gdi::set_shell_dlg_face(face);
+    for (int i : { DEFAULT_GUI_FONT, SYSTEM_FONT, ANSI_VAR_FONT, DEVICE_DEFAULT_FONT }) {
+        Font* f = (Font*)stock_objs[i];
+        if (!f) continue;
+        Font* n = new_font(f->lf, true);
+        if (!n->font) { delete n; continue; }
+        gdi::destroy_font(f->font);
+        f->font = n->font;
+        delete n;
+    }
 }
 
 } // namespace w32

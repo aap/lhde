@@ -267,6 +267,12 @@ Avalon taskbar with the 4051 start button stands in for it (`data/packs/4051-sla
 theme is active, so captions, taskbar and menus use the Segoe UI that 4074 ships (`wim/4074/3/WINDOWS/Fonts/seguibk.ttf`, version
 0.7) instead of a fallback. Nothing is installed system-wide. `LHWM_DEBUG=1` (luxwm) and `LHSHELL_DEBUG=1` (luxshell) log the face the
 caption / pack font resolves to.
+
+**Dialog fonts (wux).** "MS Shell Dlg" and "MS Shell Dlg 2", the face of dialog templates and of `DEFAULT_GUI_FONT`, stand for
+Tahoma as in XP's FontSubstitutes, under XP's styles and Windows Classic. Under a style whose `[SysMetrics] MSGBOXFONT` is Segoe
+UI (the 4074 and later Longhorn styles) they stand for Segoe UI at the size asked for, as 4074's dialogs show it (4074-dwm.png's
+About box: Segoe UI 8, from a template of 8 pt); without a Segoe UI among the font directories they stay Tahoma. The Explorer's
+Filter box is in the pane's own font (the icon title font: Segoe UI 9 under Jade, as 4074's).
 Since 2026-10-27 lux draws all its text with libuxtheme's GDI text (the glyphs flxp and luxnav draw: whole-pixel stems instead of
 pango's fractional positions); `make` needs a libuxtheme with the text calls, found as luxnav finds it
 (`(gone: the top-level build)`: flxp's build tree `~/src/flxp` until it is installed). In Aero vision the task buttons' text is black on

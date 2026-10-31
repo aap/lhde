@@ -53,6 +53,8 @@ void register_builtin_classes();
 
 // sysparams.cpp
 void init_sysparams();
+// what MS Shell Dlg (and 2) stands for, as XP's FontSubstitutes: Tahoma, or a Longhorn style's message face (sysparams)
+void set_shell_dlg(const char* face);
 void adjust_frame_rect(RECT* rect, DWORD style, BOOL menu, DWORD ex);   // AdjustWindowRectEx counting our own frame
 
 

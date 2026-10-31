@@ -106,11 +106,15 @@ int font_smoothing() { return smoothing; }
 // ---------------------------------------------------------------------------
 // Face lookup
 
+static std::string shell_dlg = "Tahoma";
+void set_shell_dlg_face(const char* family) { shell_dlg = family && *family ? family : "Tahoma"; }
+const char* shell_dlg_face() { return shell_dlg.c_str(); }
+
 static const char* alias(const char* family)
 {
     if (!family || !*family) return "Tahoma";
     if (!strcasecmp(family, "MS Sans Serif")) return "Microsoft Sans Serif";
-    if (!strcasecmp(family, "MS Shell Dlg") || !strcasecmp(family, "MS Shell Dlg 2")) return "Tahoma";
+    if (!strcasecmp(family, "MS Shell Dlg") || !strcasecmp(family, "MS Shell Dlg 2")) return shell_dlg.c_str();
     return family;
 }
 
@@ -120,6 +124,29 @@ static bool family_matches(FcPattern* p, const char* family)
     for (int i = 0; FcPatternGetString(p, FC_FAMILY, i, &s) == FcResultMatch; i++)
         if (!strcasecmp((const char*)s, family)) return true;
     return false;
+}
+
+bool have_family(const char* family)
+{
+    if (!family || !*family || !init_freetype()) return false;
+    FcPattern* pat = FcPatternCreate();
+    FcPatternAddString(pat, FC_FAMILY, (const FcChar8*)family);
+    FcPatternAddBool(pat, FC_SCALABLE, FcTrue);
+    bool ok = false;
+    FcConfig* configs[4] = { theme_config, app_config, fallback_config, nullptr };
+    for (int c = 0; c < 4 && !ok; c++) {
+        if (c < 3 && !configs[c]) continue;
+        FcPattern* p = FcPatternDuplicate(pat);
+        FcConfigSubstitute(configs[c], p, FcMatchPattern);
+        FcDefaultSubstitute(p);
+        FcResult res;
+        FcPattern* m = FcFontMatch(configs[c], p, &res);
+        ok = m && family_matches(m, family);
+        if (m) FcPatternDestroy(m);
+        FcPatternDestroy(p);
+    }
+    FcPatternDestroy(pat);
+    return ok;
 }
 
 // Returns true and fills file/index. The add_font_dir directories win over

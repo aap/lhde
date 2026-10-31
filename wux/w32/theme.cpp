@@ -190,6 +190,7 @@ void apply_classic_look(const shell::SessionTheme& t)
     font("statusfont", ncm.lfStatusFont); font("messagefont", ncm.lfMessageFont); font("icontitlefont", icon);
     SystemParametersInfoW(SPI_SETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
     SystemParametersInfoW(SPI_SETICONTITLELOGFONT, sizeof icon, &icon, 0);
+    set_shell_dlg("Tahoma");   // Windows Classic: XP's MS Shell Dlg, whatever the scheme's message font
     if (getenv("FLXP_DEBUG"))
         fprintf(stderr, "flxp: classic look of %s: scheme %s, %d colours, caption %d px, active caption %06x\n", t.name.c_str(),
                 t.value("VisualStyle.scheme").c_str(), (int)idx.size(), ncm.iCaptionHeight, (unsigned)GetSysColor(COLOR_ACTIVECAPTION));

@@ -58,6 +58,12 @@ void set_theme_font_dir(const char* dir);
 // ClearType ignores the gasp table and blends R, G and B subpixel coverages
 // (grey on an alpha-tracking surface). Default Standard, as on XP.
 enum { SMOOTH_OFF = 0, SMOOTH_STANDARD = 1, SMOOTH_CLEARTYPE = 2 };
+// The face "MS Shell Dlg" and "MS Shell Dlg 2" stand for (XP's FontSubstitutes: Tahoma; w32 sets the visual style's message
+// face under a Longhorn style, w32::set_shell_dlg). Fonts created afterwards take it; null or "": Tahoma.
+void set_shell_dlg_face(const char* family);
+const char* shell_dlg_face();
+// a face of this family is installed (in the font directories or the system's), not a fallback to another family
+bool have_family(const char* family);
 void set_font_smoothing(int mode);        // SMOOTH_* (true = Standard, false = off)
 int font_smoothing();
 
