@@ -11,6 +11,10 @@ not *entirely* sure about the font for all themes though
 
 * future: put the aurora example into longhorn flxp as an option
 
+* flicker on resize (a lead, not confirmed): wux windows use the default ForgetGravity, so the X server drops a window's
+	contents on every resize, and a glass (ARGB) window's transparent background shows before wux repaints; try NorthWest
+	gravity (and a background of None) and watch a resize under picom
+
 ## flxp behavior
 
 * copy/move: Cancel rolls the current top-level item back (a folder copied half-way is removed again); XP keeps
