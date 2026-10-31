@@ -52,6 +52,7 @@ static bool g_icons = true;             // the groups look's 16 px icons (places
 static Options g_opts;
 static std::vector<Group> g_groups;     // the explorer: 0 Places, 1 Bookmarks; Options::spec otherwise
 static int g_scroll, g_content_h;
+static int g_inset;                     // the groups look: rows kept free at the top (set_top_inset)
 static int g_hot_group = -1, g_hot_item = -1;   // item -1 with a group: its header
 static int g_down_group = -1, g_down_item = -2;
 static bool g_tracking;
@@ -414,7 +415,7 @@ static void layout()
     HDC dc = GetDC(g_wnd);
     HGDIOBJ of = SelectObject(dc, g_font);
     if (g_grp) {
-        int y = g_filter ? GR_FIRST : GR_X;
+        int y = (g_filter ? GR_FIRST : GR_X) + g_inset;
         int right = imax(GR_INDENT + 60, w - 6);
         for (Group& g : g_groups) {
             g.head = RECT{ 2, y, right, y + GR_HEAD };
@@ -485,7 +486,7 @@ static void layout()
     SetScrollInfo(g_wnd, SB_VERT, &si, TRUE);
     if (g_filter) {
         int bw = imax(60, w - 2 * GR_X - 1);
-        SetWindowPos(g_filter, nullptr, GR_X, GR_BOX_Y - g_scroll, bw, GR_BOX_H, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(g_filter, nullptr, GR_X, GR_BOX_Y + g_inset - g_scroll, bw, GR_BOX_H, SWP_NOZORDER | SWP_NOACTIVATE);
     }
 }
 
@@ -1411,6 +1412,15 @@ void set_icons(bool on)
 }
 
 void folder_changed() { if (g_wnd && g_grp) InvalidateRect(g_wnd, nullptr, FALSE); }
+
+void set_top_inset(int px)
+{
+    if (px == g_inset) return;
+    g_inset = px;
+    if (!g_wnd) return;
+    layout();
+    InvalidateRect(g_wnd, nullptr, FALSE);
+}
 
 void set_details(const shell::details::Info& in, bool preview_ok, bool open_by_default)
 {

@@ -87,5 +87,8 @@ void clear_filter();           // the folder changed: empty the Filter box
 // preview may show (thumbnails allowed there, not the Thumbnails view) and
 // XP's default fold for the folder (open on My Computer)
 void set_details(const shell::details::Info& in, bool preview, bool open_by_default);
+// The groups look: rows kept free at the top (the explorer: what 4051's band
+// preview hangs over)
+void set_top_inset(int px);
 
 }

@@ -554,6 +554,7 @@ static void update_details()
     bool pictures = g.folder->is_filesystem() && shell::thumbs::enabled_for(g.folder->path());
     // XP: no mini preview in the Thumbnails view (CDUIView::ShouldShowMiniPreview)
     if (xp) places::set_details(in, pictures && browser::view_code(g) != VIEW_THUMBNAILS, g.folder->path() == "::computer");
+    if (g.taskband) taskpane::set_details(in, pictures);
 }
 
 // ---- status bar -------------------------------------------------------------
@@ -1631,7 +1632,6 @@ static LRESULT on_notify(NMHDR* nm)
             return 0;
         case LVN_ITEMCHANGED:
             update_status();
-            if (g.taskband) taskpane::set_selection(selection());
             return 0;
         case LVN_KEYDOWN: {
             NMLVKEYDOWN* kd = (NMLVKEYDOWN*)nm;
@@ -1988,9 +1988,12 @@ static void sync_taskpane()
         taskpane::Callbacks cb = { taskpane_command, taskpane_more, taskpane_resized };
         g.taskband = taskpane::create(g.frame, cb);
         if (g.folder) taskpane::set_folder(g.folder);
+        places::set_top_inset(14);           // the band's preview hangs over the left pane
+        schedule_details();
     } else if (!want && g.taskband) {
         taskpane::destroy();
         g.taskband = nullptr;
+        places::set_top_inset(0);
     }
     HMENU view = GetSubMenu(g.menu, 2);
     EnableMenuItem(view, ID_VIEW_TASKPANE, MF_BYCOMMAND | (g.longhorn ? MF_ENABLED : MF_GRAYED));

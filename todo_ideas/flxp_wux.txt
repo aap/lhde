@@ -29,13 +29,6 @@ not *entirely* sure about the font for all themes though
 ### details and task pane
 
 * also for longhorn flxp, but more complicated:
-	* no selection should show the number of elements in the current location
-	* 4051: left to right: (thumbnailed) icon, details, tasks
-	* 4051 pictures for preview on/off
-		* no selection: lh4051-152854.png / lh4051-152900.png
-		* single selection: lh4051-152336.png / lh4051-152329.png
-		* single selection picture: lh4051-152415.png / lh4051-152354.png
-		* multi selection picture: lh4051-152420.png / lh4051-152358.png
 	* 4074: (I) icon in the top right to flip between details and "tasks" (but no winfs?)
 
 ## misc
