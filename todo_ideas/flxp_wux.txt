@@ -19,9 +19,8 @@ not *entirely* sure about the font for all themes though
 	with the system colours (screenshots WinXP-193211.png, WinXP-193221.png in the research workspace: the gradient user band,
 	white left column, light grey right column, raised edges, classic All Programs cascade); check the ReactOS styles too
 
-* 5048 and 5112 need luxnav presets of their own: today "concept" looks right for both, but the Vista era has no header
-	size options, so these themes select a fixed preset (navbar_preset = a named preset such as concept, later 5048 / 5112 of
-	their own in data/navbar/vision.ini) and Display Properties offers no size for them
+* 5048 and 5112 use the `concept` luxnav preset for now (set in their themes); presets of their own in data/navbar/vision.ini
+	when they diverge; Display Properties still offers Small/Big/Concept for them although the Vista era has no header sizes
 
 ## flxp behavior
 
