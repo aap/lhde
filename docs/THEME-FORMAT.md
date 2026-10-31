@@ -184,7 +184,8 @@ theme is not listed); icons missing -> the first of `xp`, `2k`, `reactos` whose
 recipe and `resources/<source>` are imported, else the built-in Wine set; the build's resources missing ->
 `resources/xp`, `2k`, `reactos`, else drawn art; the build's fonts missing -> `fonts/reactos`, else
 fontconfig's. luxwm registers the first imported `marlett.ttf` of a Windows build, ReactOS's when there is
-none. Each substitution is in the resolved record's "came from" (`path.resources` and `path.fonts` keep the
+none; flxp registers every imported build's fonts with `fonts/reactos` in a tier asked after them, so a family both have
+(Tahoma, Marlett, Microsoft Sans Serif) comes from the Windows build. Each substitution is in the resolved record's "came from" (`path.resources` and `path.fonts` keep the
 setting and say "fallback: ..." in their why); `lhde-theme explain` shows `missing -> fallback SOURCE`.
 
 With only the reactos source imported (the free baseline, a test configuration: `make check-free`): `classic` and the four ReactOS

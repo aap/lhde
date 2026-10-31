@@ -48,6 +48,7 @@ static FT_Library library;
 static int smoothing = SMOOTH_STANDARD;
 static std::vector<std::string> font_dirs;
 static FcConfig* app_config;     // only the add_font_dir directories
+static FcConfig* fallback_config;  // only the add_font_dir(dir, true) ones, asked after app_config
 static FcConfig* theme_config;   // only the set_theme_font_dir directory
 
 static bool init_freetype()
@@ -62,20 +63,21 @@ static bool init_freetype()
     return true;
 }
 
-void add_font_dir(const char* dir)
+void add_font_dir(const char* dir, bool fallback)
 {
     if (!dir || !*dir) return;
     FcInit();
-    if (!app_config) {
+    FcConfig*& cfg = fallback ? fallback_config : app_config;
+    if (!cfg) {
         // An empty config, so lookups in it only see our directories; give it
         // the usual user cache dir so it doesn't rescan (and complain) each run.
-        app_config = FcConfigCreate();
-        FcConfigParseAndLoadFromMemory(app_config, (const FcChar8*)
+        cfg = FcConfigCreate();
+        FcConfigParseAndLoadFromMemory(cfg, (const FcChar8*)
             "<fontconfig><cachedir prefix=\"xdg\">fontconfig</cachedir></fontconfig>", FcFalse);
     }
     struct stat st;   // a directory, or one font file (luxwm's Marlett without the rest of its directory)
     bool file = stat(dir, &st) == 0 && S_ISREG(st.st_mode);
-    if (file ? FcConfigAppFontAddFile(app_config, (const FcChar8*)dir) : FcConfigAppFontAddDir(app_config, (const FcChar8*)dir))
+    if (file ? FcConfigAppFontAddFile(cfg, (const FcChar8*)dir) : FcConfigAppFontAddDir(cfg, (const FcChar8*)dir))
         font_dirs.push_back(dir);
 }
 
@@ -132,17 +134,17 @@ static bool find_face(const char* family, int32_t weight, bool italic, std::stri
     FcPatternAddBool(pat, FC_SCALABLE, FcTrue);
 
     bool ok = false;
-    // the theme's directory, the add_font_dir ones, then the system (only it may fall back to another family)
-    FcConfig* configs[3] = { theme_config, app_config, nullptr };
-    for (int c = 0; c < 3 && !ok; c++) {
-        if (c < 2 && !configs[c]) continue;
+    // the theme's directory, the add_font_dir ones, the fallback ones, then the system (only it may fall back to another family)
+    FcConfig* configs[4] = { theme_config, app_config, fallback_config, nullptr };
+    for (int c = 0; c < 4 && !ok; c++) {
+        if (c < 3 && !configs[c]) continue;
         FcPattern* p = FcPatternDuplicate(pat);
         FcConfigSubstitute(configs[c], p, FcMatchPattern);
         FcDefaultSubstitute(p);
         FcResult res;
         FcPattern* m = FcFontMatch(configs[c], p, &res);
         FcChar8* f;
-        if (m && (c == 2 || family_matches(m, family)) &&
+        if (m && (c == 3 || family_matches(m, family)) &&
             FcPatternGetString(m, FC_FILE, 0, &f) == FcResultMatch) {
             file = (const char*)f;
             if (FcPatternGetInteger(m, FC_INDEX, 0, &index) != FcResultMatch) index = 0;

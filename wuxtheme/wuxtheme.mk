@@ -82,6 +82,6 @@ uninstall-libs:
 	rm -f $(DESTDIR)$(PKGCONFIGDIR)/wuxtheme.pc
 	rm -rf $(DESTDIR)$(INCLUDEDIR)/wuxtheme
 
--include $(UTPIC:.o=.d) $(O)/wuxtheme/ut-dump.d
+-include $(UTOBJS:.o=.d) $(UTPIC:.o=.d) $(O)/wuxtheme/ut-dump.d
 .PHONY: wuxtheme install-libs uninstall-libs
 wuxtheme: $(UTA) $(UTSO) $(UTPC) $(UTDUMP)

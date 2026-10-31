@@ -45,7 +45,10 @@ void text_out(DC* dc, Point pos, const Font* f, const char* utf8, int32_t len, C
 // text_out afterwards. Works on opaque and alpha-tracking surfaces.
 void glow_text(DC* dc, Point pos, const Font* f, const char* utf8, int32_t len, Color glow, int32_t radius = 3);
 
-void add_font_dir(const char* dir);       // searched before the system fonts (a directory or one font file)
+// searched before the system fonts (a directory or one font file). fallback: a tier of its own asked after the
+// others (ReactOS's free faces), so a family it shares with them comes from them: fontconfig breaks ties between
+// same-family faces of one config by its own scoring, not by the order the directories were added in.
+void add_font_dir(const char* dir, bool fallback = false);
 // The theme's own fonts (path.fonts; a directory or one file; null clears): searched before the
 // add_font_dir ones, so its build's face wins a family that a later build also has.
 void set_theme_font_dir(const char* dir);
