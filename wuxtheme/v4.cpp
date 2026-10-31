@@ -91,20 +91,75 @@ bool load_string16(res::Module* m, uint32_t id, std::u16string& out)
     return false;
 }
 
-// VMAP: (variant, size, colour) triples.
-std::vector<std::string> vmap_names(const res::Blob& b)
+// VMAP: (variant, size, colour) triples. Each string is a count (with the NUL)
+// and the characters, padded to 8 bytes from 4015 on, packed in 3683..4005
+// (G1). A walk is right when every count is sane, every string ends in its NUL
+// and the last one ends the resource; the padded walk is tried first.
+bool vmap_walk(const res::Blob& b, bool pad, std::vector<std::string>& o)
 {
-    std::vector<std::string> o;
+    o.clear();
     size_t off = 0;
     while (off + 4 <= b.size) {
         uint32_t n = u32(b.data + off);
-        if (n == 0 || n > 256 || off + 4 + 2 * (size_t)n > b.size) break;
+        if (n == 0 || n > 256 || off + 4 + 2 * (size_t)n > b.size) return false;
         std::u16string s((const char16_t*)(b.data + off + 4), n);
+        if (s.back()) return false;
         while (!s.empty() && !s.back()) s.pop_back();
         o.push_back(narrow(s));
-        off += 4 + ((2 * (size_t)n + 7) & ~(size_t)7);    // the characters padded to 8 bytes
+        off += 4 + (pad ? (2 * (size_t)n + 7) & ~(size_t)7 : 2 * (size_t)n);
     }
-    return o;
+    return off == b.size && !o.empty() && o.size() % 3 == 0;
+}
+
+std::vector<std::string> vmap_names(const res::Blob& b)
+{
+    std::vector<std::string> o;
+    if (vmap_walk(b, true, o) || vmap_walk(b, false, o)) return o;
+    return {};
+}
+
+// The record stream's value padding: 8 from 4015 on, none in 3683..4005 (G1).
+// The 8-byte walk is right when every record has the reserved word 0 and a
+// class id inside CMAP and the walk ends with the resource; G1 data walked
+// with padding fails within a few records (the next header starts mid-value).
+size_t record_align(const res::Blob& b, size_t nclasses)
+{
+    size_t off = 0;
+    while (off + 32 <= b.size) {
+        const uint8_t* r = b.data + off;
+        uint32_t cls = u32(r + 8), resid = u32(r + 20), reserved = u32(r + 24), size = u32(r + 28);
+        if (reserved || cls >= nclasses || (!resid && off + 32 + (size_t)size > b.size)) return 1;
+        off = resid ? off + 32 : (off + 32 + size + 7) & ~(size_t)7;
+    }
+    return off == b.size ? 8 : 1;
+}
+
+// 3683..4029 (and 4042 main's Plex and Luna, compiled from the same sources)
+// store XP's straight alpha: some pixel has a colour above its alpha. 4039
+// Lab06 on stores every bitmap premultiplied (max(r,g,b) <= a everywhere).
+// One stray image is tolerated: 5112's aero.msstyles is premultiplied but
+// bitmap 254 has colour above alpha (straight files have 22..62 such images).
+bool bitmaps_premultiplied(res::Module* m)
+{
+    res::Id bmp(2u);
+    int straight = 0;
+    for (const res::Entry& e : res::list(m, &bmp)) {
+        const uint8_t* d = e.data.data;
+        if (!d || e.data.size < 40) continue;
+        uint32_t hdr = u32(d), comp = u32(d + 16);
+        int32_t w = i32(d + 4), h = i32(d + 8);
+        uint16_t bpp; memcpy(&bpp, d + 14, 2);
+        if (bpp != 32) return false;                 // the old compiler kept 1..24 bpp images too
+        if (comp != 0 || w <= 0) continue;
+        size_t n = (size_t)w * (size_t)(h < 0 ? -h : h) * 4;
+        if (hdr + n > e.data.size) continue;
+        for (const uint8_t* p = d + hdr; p < d + hdr + n; p += 4)
+            if (p[0] > p[3] || p[1] > p[3] || p[2] > p[3]) {
+                if (++straight > 1) return false;
+                break;
+            }
+    }
+    return true;
 }
 
 void parse_schema(Style& st)
@@ -218,7 +273,7 @@ void class_names(Style& st, int cls, const char16_t** app16, const char16_t** cl
 
 void add_records(Style& st, const res::Blob& b)
 {
-    size_t off = 0;
+    size_t align = record_align(b, st.classes.size()), off = 0;
     while (off + 32 <= b.size) {
         const uint8_t* r = b.data + off;
         int prop = (int)u32(r), typ = (int)u32(r + 4), cls = (int)u32(r + 8);
@@ -226,7 +281,7 @@ void add_records(Style& st, const res::Blob& b)
         uint32_t resid = u32(r + 20), size = u32(r + 28);
         const uint8_t* pay = r + 32;
         if (!resid && off + 32 + (size_t)size > b.size) break;
-        off = resid ? off + 32 : (off + 32 + size + 7) & ~(size_t)7;
+        off = resid ? off + 32 : (off + 32 + size + align - 1) & ~(align - 1);
 
         std::string type;
         auto t = st.props.find(typ);
@@ -359,7 +414,12 @@ bool stream(const Style& st, const std::u16string& value, const uint8_t** data, 
     if (value[0] != u'#') return false;
     res::Blob b;
     for (const char* type : {"STREAM", "BLOB"})
-        if (blob(st.module, res::Id(type), res::Id(n), b)) { *data = b.data; *size = b.size; return true; }
+        if (blob(st.module, res::Id(type), res::Id(n), b)) {
+            // 4015's BLOBs (RSFIMAGE): "RSF1", a 0, four sizing margins, then the PNG
+            if (b.size > 24 && !memcmp(b.data, "RSF1", 4) && !memcmp(b.data + 24, "\x89PNG", 4)) { b.data += 24; b.size -= 24; }
+            *data = b.data; *size = b.size;
+            return true;
+        }
     if (blob(st.module, res::Id(2u), res::Id(n), b)) { *data = b.data; *size = b.size; return true; }
     return false;
 }
@@ -412,15 +472,20 @@ extern "C" HRESULT FLXP_V4_Open(HMODULE hTheme, LPCWSTR pszColorName, LPCWSTR ps
         delete st;
         return HRESULT_FROM_WIN32(ERROR_BAD_FORMAT);
     }
-    if (blob(m, res::Id("CMAP"), res::Id("CMAP"), b)) {          // NUL-terminated names, each padded to 8 bytes
-        size_t o = 0;
-        while (o + 2 <= b.size) {
-            std::u16string name;
-            size_t n = 0;
-            while (o + 2 * n + 2 <= b.size && ((const char16_t*)(b.data + o))[n]) n++;
-            name.assign((const char16_t*)(b.data + o), n);
-            st->classes.push_back(narrow(name));
-            o += (2 * (n + 1) + 7) & ~(size_t)7;
+    // CMAP: NUL-terminated names, each padded to 8 bytes from 4039 on but packed
+    // in 3683..4029 (G1/G2). Skipping the NULs between names reads both: names are
+    // never empty and the padding is NULs only. (Stepping by the 8-byte padding
+    // over a packed CMAP started every name at the 8-byte boundary at or after
+    // its real start: 4015's "Link" read "ink", "sizevariant.Normal" "zevariant.Normal".)
+    if (blob(m, res::Id("CMAP"), res::Id("CMAP"), b)) {
+        const char16_t* s = (const char16_t*)b.data;
+        size_t n = b.size / 2, o = 0;
+        while (o < n) {
+            if (!s[o]) { o++; continue; }
+            size_t e = o;
+            while (e < n && s[e]) e++;
+            st->classes.push_back(narrow(std::u16string(s + o, e - o)));
+            o = e + 1;
         }
     }
     if (blob(m, res::Id("BCMAP"), res::Id("BCMAP"), b) && b.size >= 4) {
@@ -439,6 +504,7 @@ extern "C" HRESULT FLXP_V4_Open(HMODULE hTheme, LPCWSTR pszColorName, LPCWSTR ps
         st->bases.push_back(b);
     }
     parse_schema(*st);
+    st->premultiplied = bitmaps_premultiplied(m);
     add_records(*st, var);
     if (blob(m, res::Id("RMAP"), res::Id("RMAP"), b)) add_records(*st, b);
 
@@ -467,6 +533,11 @@ extern "C" int FLXP_V4_Records(void* v4, const struct flxp_v4_record** records)
     v4::Style* st = (v4::Style*)v4;
     *records = (const flxp_v4_record*)st->records.data();
     return (int)st->records.size();
+}
+
+extern "C" BOOL FLXP_V4_Premultiplied(void* v4)
+{
+    return ((v4::Style*)v4)->premultiplied;
 }
 
 extern "C" int FLXP_V4_Bases(void* v4, const struct flxp_v4_base** bases)

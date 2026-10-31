@@ -47,6 +47,7 @@ static FT_Library library;
 static int smoothing = SMOOTH_STANDARD;
 static std::vector<std::string> font_dirs;
 static FcConfig* app_config;     // only the add_font_dir directories
+static FcConfig* theme_config;   // only the set_theme_font_dir directory
 
 static bool init_freetype()
 {
@@ -75,6 +76,25 @@ void add_font_dir(const char* dir)
     bool file = stat(dir, &st) == 0 && S_ISREG(st.st_mode);
     if (file ? FcConfigAppFontAddFile(app_config, (const FcChar8*)dir) : FcConfigAppFontAddDir(app_config, (const FcChar8*)dir))
         font_dirs.push_back(dir);
+}
+
+// fontconfig breaks ties between same-family faces by font version, not by
+// directory, so with every build's fonts registered 5112's Segoe UI
+// (segoeui.ttf) would beat 4074's own (seguibk.ttf) under Jade 4074. The
+// theme's directory is therefore a config of its own that is asked first.
+void set_theme_font_dir(const char* dir)
+{
+    if (theme_config) { FcConfigDestroy(theme_config); theme_config = nullptr; }
+    if (!dir || !*dir) return;
+    FcInit();
+    theme_config = FcConfigCreate();
+    FcConfigParseAndLoadFromMemory(theme_config, (const FcChar8*)
+        "<fontconfig><cachedir prefix=\"xdg\">fontconfig</cachedir></fontconfig>", FcFalse);
+    struct stat st;
+    bool file = stat(dir, &st) == 0 && S_ISREG(st.st_mode);
+    if (!(file ? FcConfigAppFontAddFile(theme_config, (const FcChar8*)dir) : FcConfigAppFontAddDir(theme_config, (const FcChar8*)dir))) {
+        FcConfigDestroy(theme_config); theme_config = nullptr;
+    }
 }
 
 void set_font_smoothing(int mode) { smoothing = mode < SMOOTH_OFF || mode > SMOOTH_CLEARTYPE ? SMOOTH_STANDARD : mode; }
@@ -111,16 +131,17 @@ static bool find_face(const char* family, int32_t weight, bool italic, std::stri
     FcPatternAddBool(pat, FC_SCALABLE, FcTrue);
 
     bool ok = false;
-    FcConfig* configs[2] = { app_config, nullptr };
-    for (int c = 0; c < 2 && !ok; c++) {
-        if (c == 0 && !app_config) continue;
+    // the theme's directory, the add_font_dir ones, then the system (only it may fall back to another family)
+    FcConfig* configs[3] = { theme_config, app_config, nullptr };
+    for (int c = 0; c < 3 && !ok; c++) {
+        if (c < 2 && !configs[c]) continue;
         FcPattern* p = FcPatternDuplicate(pat);
         FcConfigSubstitute(configs[c], p, FcMatchPattern);
         FcDefaultSubstitute(p);
         FcResult res;
         FcPattern* m = FcFontMatch(configs[c], p, &res);
         FcChar8* f;
-        if (m && (c == 1 || family_matches(m, family)) &&
+        if (m && (c == 2 || family_matches(m, family)) &&
             FcPatternGetString(m, FC_FILE, 0, &f) == FcResultMatch) {
             file = (const char*)f;
             if (FcPatternGetInteger(m, FC_INDEX, 0, &index) != FcResultMatch) index = 0;

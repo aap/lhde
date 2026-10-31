@@ -146,5 +146,6 @@ int FLXP_V4_Records(void *v4, const struct flxp_v4_record **records);
 struct flxp_v4_base { LPCWSTR app, cls, base_app, base_cls; };   /* BCMAP: class -> base class */
 int FLXP_V4_Bases(void *v4, const struct flxp_v4_base **bases);
 void FLXP_V4_Close(void *v4);
+BOOL FLXP_V4_Premultiplied(void *v4);   /* FALSE: 3683..4029 and 4042 main keep XP's straight alpha */
 
 #endif

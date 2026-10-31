@@ -200,8 +200,9 @@ settings.ini write: `_LH_SETTINGS_CHANGED`, and every client resolves the sessio
 | `metalvision` (?) | jade4074 | - / metalvision | off | 4074-aero | vision | ? |
 | `basic5048` / `aero5048` | aero5048 | aero5048 / jade4074 | off / on (`aero5048: base = basic5048`) | - (classic bar) | vision | 5048's own |
 | `basic5112` / `aero5112` | aero5112 | aero5112 / jade4074 | off / on | - | vision | 5112's own |
+| `plex4042` | plex4042 (4042 main) | - / the style's own | off | 4042-plex | none (XP chrome) | 4042main/Bliss (the M6 picture) |
 | `luna`, `luna-olive`, `luna-silver` | luna-xp | - / luna4051-* | off | - | none (XP chrome) | Bliss (XP) |
 | `lunar`, `modern` (Light), `mizu`, `lautus` | ReactOS's own (build reactos, free) | - / - (the style's own) | off | - | none (XP chrome) | ReactOS's (taste; Mizu's own) |
 | any dropped XP style | itself | - | off | - | none | - |
-Later: plex (various versions), plex vision.
+Later: plex of other builds (4015, 4029, 4039), plex vision.
 

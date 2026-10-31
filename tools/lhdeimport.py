@@ -1200,11 +1200,44 @@ def r_packs_aero5112(data, target, args):
     return [rel, exe, fontf], len(os.listdir(out))
 
 
+
+def r_packs_plexbars(data, target, args):
+    """packs/<build>/imageres/plex-*.png for the 4042-plex pack: the IMAGEDATA PNGs of a Plex msstyles' `Sidebar` class
+    (plex-sidebar-<part>[-<state>].png, unmodified), which skin both of 4042 main's Avalon bars (Microsoft.Windows.Client
+    Application1.Sidebarstylesheet_themed; data/packs/4042-plex/shell.lua), plus three derived images:
+      plex-taskbar.png  Sidebar.BACK (150x4) transposed to 4x150: TaskbarBackground2 = ThemeImage(Sidebar, 2) with Rotate=1 on
+                        the bottom bar (ImageResource.Draw: +90 degrees, BACK's column 0 on the bar's top row), NineGridMargin
+                        5,0,5,0 -> the pack's bg_grid {5, 0, 5, 0}
+      plex-clear.png    a transparent 4x4: the states the stylesheet gives no ThemeImage (TaskItem and StartButton at rest)
+    No font and no text is baked in: the Start button's "start" (Franklin Gothic Medium 14) is drawn live by luxshell."""
+    from PIL import Image
+    style = args[0]
+    rel = style_rel(data, style)
+    ut = tool('ut-dump')
+    if not ut:
+        raise RuntimeError('needs ut-dump (make)')
+    out = os.path.join(data, 'packs', target, 'imageres')
+    os.makedirs(out, exist_ok=True)
+    for old in glob.glob(os.path.join(out, 'plex-*.png')):     # earlier versions of this recipe wrote XP TaskBar renders
+        os.remove(old)
+    n = 0
+    with tempfile.TemporaryDirectory() as t:
+        run([ut, os.path.join(data, rel), '--extract-streams', t])
+        for f in sorted(glob.glob(os.path.join(t, 'Sidebar.*.IMAGEDATA.png'))):
+            name = os.path.basename(f)[len('Sidebar.'):-len('.IMAGEDATA.png')].lower().replace('.', '-')
+            Image.open(f).convert('RGBA').save(os.path.join(out, 'plex-sidebar-%s.png' % name))
+            n += 1
+        back = Image.open(os.path.join(t, 'Sidebar.BACK.IMAGEDATA.png')).convert('RGBA')
+    back.transpose(Image.TRANSPOSE).save(os.path.join(out, 'plex-taskbar.png'))
+    Image.new('RGBA', (4, 4), (0, 0, 0, 0)).save(os.path.join(out, 'plex-clear.png'))
+    return [rel], n + 2
+
+
 RECIPES = {
     ('frames', 'composited'): r_frames_composited, ('frames', 'vision'): r_frames_vision, ('frames', 'classic'): r_frames_classic,
     ('frames', 'udwm'): r_frames_udwm, ('frames', 'dwmwindow'): r_frames_dwmwindow,
     ('packs', 'imageres'): r_packs_imageres, ('packs', 'shell32'): r_packs_shell32,
-    ('packs', 'aero5112'): r_packs_aero5112,
+    ('packs', 'aero5112'): r_packs_aero5112, ('packs', 'plexbars'): r_packs_plexbars,
 }
 
 

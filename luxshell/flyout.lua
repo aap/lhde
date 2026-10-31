@@ -13,9 +13,37 @@ return function(ctx)
   local R, T, sb = ctx.R, ctx.T, ctx.sb
   local fl = { surface = lh.surface{ name = "lhshell-flyout", popup = true, type = "popup_menu", x = 0, y = 0, w = 10, h = 10 } }
   local border, content
+  local chrome_h = 17          -- the chrome's height above and below the content (17: the 4074 options row)
+  -- pack key flyout = { top, top_h, top_grid, content, bottom, bottom_h, bottom_grid, opt_hot, opt_pressed, glyph, glyph_w,
+  -- glyph_h, glyph_pad, font }: 4042 main's FlyoutElement (Microsoft.Windows.Client) under Sidebarstylesheet_themed: FlyoutTop
+  -- Dock Top Height 27 = FLYOUTTOP (NineGridMargin 2,2,0,6) { FlyoutOptions Dock Right (FLYOUTOPTIONSBACK hot / pressed) {
+  -- glyph FLYOUTOPTIONSGLYPH Dock Right Padding 4,0,4,0; "Options" Franklin Gothic Medium 14 white Padding 0,6,4,6 }; FlyoutTitle
+  -- Fill (Padding 6,6,4,6; left empty here) }; FlyoutBottom Dock Bottom Height 26 = FLYOUTBOTTOM (2,2,0,6) { FlyoutLink };
+  -- FlyoutContent Fill = FLYOUTCONTENT stretched, no padding
+  local function plex_chrome(f)
+    border = {0, 0, 0, 0}; chrome_h = f.top_h + f.bottom_h
+    local root = lh.node{ layout = "dock", hoverable = true }
+    local top = root:add(lh.node{ dock = "top", h = f.top_h, layout = "fill" })
+    top:add(lh.node{ kind = "ninegrid", image = R(f.top), grid = f.top_grid })
+    local row = top:add(lh.node{ layout = "dock" })
+    local opts = row:add(lh.node{ kind = "button", dock = "right", layout = "dock", h = f.top_h, images = { hot = R(f.opt_hot), pressed = R(f.opt_pressed) } })
+    local gp = f.glyph_pad
+    local slot = opts:add(lh.node{ dock = "right", w = gp[1] + f.glyph_w + gp[3], layout = "canvas" })
+    slot:add(lh.node{ kind = "image", image = R(f.glyph), x = gp[1], y = math.floor((f.top_h - f.glyph_h) / 2), w = f.glyph_w, h = f.glyph_h })
+    opts:add(lh.node{ kind = "text", text = "Options", color = "#ffffff", font = f.font, dock = "right", margin = {0, 6, 4, 6} })
+    opts.on_click = function() if fl.tile and fl.tile.flyout_options then fl.tile:flyout_options() end end
+    local bottom = root:add(lh.node{ dock = "bottom", h = f.bottom_h, layout = "fill" })
+    bottom:add(lh.node{ kind = "ninegrid", image = R(f.bottom), grid = f.bottom_grid })
+    local body = root:add(lh.node{ dock = "fill", layout = "fill" })
+    body:add(lh.node{ kind = "ninegrid", image = R(f.content) })
+    content = body:add(lh.node{ layout = "fill" })
+    fl.surface:root(root)
+  end
   -- the chrome follows the pack: built at load and again after a theme switch (event "pack", SHELL-DESIGN 6.1); the old tree is
   -- left to the garbage of the switch (it is never shown again)
   local function chrome()
+    if T.flyout then return plex_chrome(T.flyout) end
+    chrome_h = 17
     local slate = T.name == "slate"
     border = slate and {4, 0, 4, 4} or {8, 4, 8, 8}
     local root = lh.node{ layout = "fill", hoverable = true }
@@ -52,7 +80,7 @@ return function(ctx)
     if not node then return end
     content:add(node)
     if not w or not h then local dw, dh = node:desired(ctx.screen_w, ctx.screen_h); w = w or dw; h = h or dh end
-    local fw, fh = math.ceil(w + border[1] + border[3]), math.ceil(h + 17 + border[2] + border[4])
+    local fw, fh = math.ceil(w + border[1] + border[3]), math.ceil(h + chrome_h + border[2] + border[4])
     local x, y
     if tile.place then x, y = tile:place(fw, fh)
     else

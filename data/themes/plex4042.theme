@@ -1,0 +1,36 @@
+; Plex as Longhorn 4042 main shipped it (Resources/Themes/Plex.theme: plex.msstyles, ColorStyle=Blue, Size=Normal, wallpaper
+; Bliss.bmp with WallpaperStyle=2 = stretched; no [Control Panel\Colors], so the desktop colour is the style's [sysmetrics]
+; BACKGROUND). No DWM for users in 4042 main: no glass, no composition. Needs `lhde-import` of 4042 main (data/sources/4042main.ini).
+[Theme]
+name     = Plex (4042)
+build    = 4042main
+
+[VisualStyle]
+style    = plex4042
+color    = Blue
+size     = Normal
+
+[Glass]
+frames         = none
+frames_classic = none          ; the style's own (XP-format) caption and borders
+composition    = off
+animations     = none
+
+[Shell]
+taskbar  = avalon
+pack     = 4042-plex           ; 4042 main's Avalon taskbar + sidebar, skinned by the Plex `Sidebar` class (packs/4042/imageres/plex-*)
+sidebar  = full
+
+[Explorer]
+chrome   = xp                  ; 4042 main's Explorer is the XP one under Plex (no Slate header)
+navbar   = none
+
+[Desktop]
+wallpaper = 4042main/Bliss     ; Bliss.bmp of 4042 main (the wheat field, as 4042-4053)
+mode      = stretch
+color     = 43 82 134          ; plex.msstyles [sysmetrics] BACKGROUND
+icons     = longhorn4074       ; Plex.theme names the stock shell32/explorer icons; no 4042 icon recipe yet
+
+[Fonts]
+fonts     = 4042main           ; Tahoma (the Plex [sysmetrics] fonts), Segoe/Trebuchet of 4042 main
+smoothing = standard

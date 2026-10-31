@@ -1431,7 +1431,8 @@ HBITMAP MSSTYLES_LoadBitmap (PTHEME_CLASS tc, LPCWSTR lpFilename, BOOL* hasAlpha
     /* Not found? Load from resources */
     img = malloc(sizeof(*img));
     img->image = LoadImageW(tc->hTheme, szFile, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
-    prepare_alpha (img->image, hasAlpha, &has_default, tc->tf->v4 != NULL);   /* flxp: v4 premultiplied */
+    prepare_alpha (img->image, hasAlpha, &has_default,   /* flxp: v4 from 4039 Lab06 on premultiplied */
+                   tc->tf->v4 != NULL && FLXP_V4_Premultiplied(tc->tf->v4));
     img->hasAlpha = *hasAlpha;
     img->hasDefaultTransparentColour = has_default;
     if (hasDefaultTransparentColour)

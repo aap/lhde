@@ -113,6 +113,18 @@ function tile:analog(parent, size, x, y)
       parent:add(N{ kind = "image", image = plex and plex_image(R, id) or R(id), x = c - (ox + 0.5) * s, y = c - (oy + 0.5) * s, w = w * s, h = h * s })
       return parent
     end
+    if plex and self.T.clock_layers == "full" then
+      -- 4042 main's 179 px layers (clock4042): full squares, the hands about their image point (89, 86); scaled to `size`
+      local f = size / 179
+      local function full(id, d, ox, oy, rot) return img(id, d * f / s, d * f / s, ox * f / s - 0.5, oy * f / s - 0.5, rot) end
+      full(1074, 179, 89.5, 89.5)
+      hands.hour = full(1077, 179, 89, 86, true)
+      hands.minute = full(1078, 179, 89, 86, true)
+      hands.second = full(1079, 179, 89, 86, true)
+      full(1076, 175, 87.5, 87.5)
+      table.insert(self.analogs, hands)
+      return clock
+    end
     img(1074, 260, 260, 129.5, 129.5)
     hands.hour = img(1077, 4, 95, 1.5, 75.5, true)
     hands.minute = img(1078, 4, 125, 1.5, 105.5, true)
@@ -143,10 +155,64 @@ function tile:digital_time(parent, x, y, bold)
   return w1 + 2 + w2
 end
 
+-- 4042 main (pack key clock_layers = "full"; Microsoft.Windows.Client 6.0.3708 of 4042 main, System.Windows.Desktop.SideBarClock,
+-- BaseSidebarClockSettings, ClockImageResourcePresenter, DigitalDateTimePresenter, System.Windows.Explorer ImageResource.Draw),
+-- checked against the 4042 main desktop screenshots/4042mainwmptile.png (1024x768, sidebar at x 874):
+--  * the clock is the tile's Background (Initialize: set_Background(SidebarPanel())), the whole tile width under the 16 px side
+--    strip; SidebarPanel = BuildClockPanel(analog | digital time): a DockPanel, Padding 2,2,2,2 (PanelInfo 2,2,2,2) { DigitalClockTime
+--    Dock Bottom, Width 100%, Height = DigitalFont measured on "A..Z0..9"; ClockElement Fill };
+--  * AutoSize tile (Administrator TileInfo: fAutoSize 1): the analog part asks for its layers' own size, 179 (the 4029 set
+--    1074/1076-1079 in 4042 main's imageres; BelowHandsLayers [1074], AboveHandsLayers [1076], no hub);
+--  * face and glass: ImageResource SizingMode 2 = true size centred, shrunk uniformly when the panel is smaller; the hands:
+--    scale = min(1, w / 179, h / 179) with the image point (89, 86) on the panel centre (the hands meet 3 px above the face's
+--    centre in the shot too); so face = min(W - 4, 179) for a panel W wide, never magnified, panel height 179;
+--  * the shot: face 141 px opaque (image 175 of 179 at 144/179) centred at x 74 of the 150 px bar: the panel is 148 wide (one
+--    pixel kept free on each side of the tile, not in the code we read); clock tile 117..331 + sizer 332..338: 2 + 179 + 32 + 2,
+--    the text box 32 for Arial 20 pt (26.7 px; our line box 30), its caps 3 rows under the box top;
+--  * the time: DigitalFont Arial 20 (points: the shot's caps are 20 px) white over a black copy at +1,+1 (opaque black in the shot,
+--    AltOpacity 0.65 in the code); the shot shows the short time "8:15 PM" starting 21 px into the bar: OnRender measures with
+--    System.Drawing (advance + 1/6 em each side), centres that box (HorizontalAlignment Left in the element, so the centring is
+--    the presenter's) and draws ShortString at its left. The code reads as LongString first when it fits: the shot wins (it
+--    shows no seconds). ClockFace hover: 1075 (Sidebarstylesheet_themed).
+local ARIAL = "Arial 20"
+local function hm() return nozero(os.date("%I:%M %p")) end
+function tile:clock4042(fg, Wt)
+  local R = self.R
+  local function P(id) return plex_image(R, id) end
+  local em = 20 * 96 / 72
+  local _, lh_ = measure("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", ARIAL)
+  local th = math.ceil(lh_) + 2                     -- 32 for Arial 20 pt: the shot's text box (tile 117..333, sizer from 332)
+  local x0 = 1 + 2                                  -- the tile's 1 px inset (shot) + the panel padding
+  local aw, ah = Wt - 2 - 4, 179
+  local cx, cy = x0 + aw / 2, 2 + ah / 2
+  local fs = math.min(1, aw / 179, ah / 179)
+  local face = fg:add(N{ kind = "button", x = cx - 179 * fs / 2, y = cy - 179 * fs / 2, w = 179 * fs, h = 179 * fs,
+    images = { normal = P(1074), hot = P(1075), pressed = P(1075) } })
+  face.on_click = function(_, button) if button == 1 and self.flyout then lh.toggle_flyout(self) end end   -- the face is the tile body
+  local hands = {}
+  local function hand(id)
+    local g = fg:add(N{ kind = "transform", x = 0, y = 0, w = Wt, h = 2 + ah + 2, origin = {cx, cy}, layout = "canvas" })
+    g:add(N{ kind = "image", image = P(id), x = cx - 89 * fs, y = cy - 86 * fs, w = 179 * fs, h = 179 * fs })
+    return g
+  end
+  hands.hour, hands.minute, hands.second = hand(1077), hand(1078), hand(1079)
+  local gs = math.min(1, aw / 175, ah / 175)
+  fg:add(N{ kind = "image", image = P(1076), x = cx - 175 * gs / 2, y = cy - 175 * gs / 2, w = 175 * gs, h = 175 * gs })
+  table.insert(self.analogs, hands)
+  -- the presenter centres the System.Drawing measure (advance + 1/6 em on each side) and draws the string at that box's left:
+  -- the shot's "8:15 PM" starts 21 px into the bar; one row up from our line box (the shot's caps 3 rows under the box top)
+  local function place(v) return x0 + math.floor((aw - (measure(v, ARIAL) + em / 3)) / 2) end
+  local t = fg:add(N{ kind = "text", text = hm(), font = ARIAL, color = "#ffffff",
+    x = place(hm()), y = 2 + ah - 1, w = aw, h = th, shadow = { dx = 1, dy = 1, color = "#ff000000" } })
+  table.insert(self.texts, { node = t, fmt = function() local v = hm(); t:set{ x = place(v) }; return v end })
+  return 2 + ah + th + 2 + 7
+end
+
 local LINE = 13   -- Tahoma 8 line height
 -- the views; each fills self.fg (a canvas) and returns the tile height (chrome: 3 px top pad + 4 px sizer)
 local views = {}
 function views.default(self, fg, W)
+  if not self.pinned and self.T.clock_layers == "full" then return self:clock4042(fg, self.sb and self.sb.w or 150) end
   if not self.pinned then
     -- 4051, the tile sized by its content (WCPClient 4051, res-clock/il/wcpclient-4051-clock.il.txt):
     --  * SideBarClock.SidebarPanel: DockPanel Margin 0,6,0,6 { DigitalClockTime Dock Bottom, Height = DigitalFont (Tahoma 10)

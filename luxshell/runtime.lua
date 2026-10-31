@@ -287,7 +287,35 @@ tb.surface = lh.surface{ name = "lhshell-taskbar", x = tb.geo.x, y = tb.geo.y, w
 -- the sidebar toggle's 17x17 glyph: centred in its 29x29 slot on the first row (Border 6, TransformDecorator VCenter), the
 -- slot itself centred on a bar of several rows; Taskbar.BarVisible=false (sidebar minimized) → 1167 [Slate 1162]
 local function toggle_y() return math.floor((tb.row_h - 17) / 2) + math.floor((tb.h - tb.row_h) / 2) end
-local function toggle_images() return { normal = R(mode == "minimized" and 1167 or 1170), hot = R(1171), pressed = R(1172) } end
+-- pack key toggle_minimized = { hot = id, pressed = id }: own hot/pressed images while the sidebar is minimized (Plex: BARDOWN,
+-- the bar shown: BARUP); default: 1171/1172 in both modes
+local function toggle_images()
+  local tm = mode == "minimized" and T.toggle_minimized or nil
+  return { normal = R(mode == "minimized" and 1167 or 1170), hot = R(tm and tm.hot or 1171), pressed = R(tm and tm.pressed or 1172) }
+end
+-- pack key toggle = { slot = W, x = X }: the toggle's slot width and the glyph's x in it (default 29 and 5: Border 6, 4074)
+local function toggle_slot_w() return T.toggle and T.toggle.slot or 29 end
+-- pack key start_compose = { flag = id, flag_w, flag_h, text, font, color, text_pad = {l, t, r, b}, hot = id, checked = id }:
+-- a Start button made of parts (4042 main's System.Windows.Desktop.StartButton: StackImageResourcePresenter { Control
+-- StartButtonImage Dock Left, ThemeImage true size at the top left; Text StartButtonText Dock Fill "start" }), its width the
+-- flag plus the measured text; the button's own image only on hover (PointerFocused) and while the menu is open (FakePressed).
+-- Sets tb.start_w.
+local function start_composed(slot)
+  local c = T.start_compose
+  local pad = c.text_pad or {0, 0, 0, 0}
+  local probe = N{ kind = "text", text = c.text, font = c.font }
+  local tw = math.ceil(probe:measure())
+  local w = c.flag_w + pad[1] + tw + pad[3]
+  tb.start_w = w; slot:set{ w = w }
+  local b = slot:add(N{ kind = "button", x = 0, y = 0, w = w, h = tb.row_h, layout = "dock",
+    images = { normal = R(c.normal), hot = R(c.hot), pressed = R(c.checked), checked = R(c.checked), hotchecked = R(c.checked) },
+    on_press = function(self, button) if button == 1 then lh._emit("start-press") end end,
+    on_click = function(self, button) if button == 1 then lh._emit("start-click") end end })
+  local fl = b:add(N{ dock = "left", w = c.flag_w, layout = "canvas" })
+  fl:add(N{ kind = "image", image = R(c.flag), x = 0, y = 0, w = c.flag_w, h = c.flag_h })
+  b:add(N{ kind = "text", text = c.text, font = c.font, color = c.color or "#ffffff", dock = "fill", margin = pad })
+  return b
+end
 local function build_taskbar()          -- the node tree; the surface stays (built again on a pack switch)
   local root = N{ layout = "fill" }
   tb.root = root
@@ -307,6 +335,11 @@ local function build_taskbar()          -- the node tree; the surface stays (bui
   -- StartButton: Width 83, Height 29, Dock Left, Border(0,0,4,0) > HackBorder 1179/1180/1181
   -- StartButton.FakePressed (1181) while the start menu is open: the "checked" state
   -- (in a canvas slot: on a taller bar of several rows it stays 29 high at the top, the first row (inferred, as XP))
+  tb.start_w = T.start.w
+  if T.start_compose then   -- built from parts, not one image per state: see start_composed
+    tb.start_slot = tb.inner:add(N{ dock = "left", w = T.start.w, layout = "canvas" })
+    tb.start = start_composed(tb.start_slot)
+  else
   tb.start_slot = tb.inner:add(N{ dock = "left", w = T.start.w, layout = "canvas" })
   -- pack key start_dy (default 0): the whole button this many px lower, clipped at the bar bottom (the originals leave the bar's
   -- last row below the pill; the user finds it odd). start_alpha (default 1): multiplies the three images' alpha (glass pill).
@@ -315,12 +348,13 @@ local function build_taskbar()          -- the node tree; the surface stays (bui
     images = { normal = R(1179), hot = R(1180), pressed = R(1181), checked = R(1181), hotchecked = R(1181) },
     on_press = function(self, button) if button == 1 then lh._emit("start-press") end end,
     on_click = function(self, button) if button == 1 then lh._emit("start-click") end end })
+  end
   -- TaskbarToggleBar (SidebarButton): Dock Right, 29x29 slot with a 17x17 glyph centred (Border 6)
-  tb.toggle_slot = tb.inner:add(N{ dock = "right", w = 29, layout = "canvas" })
+  tb.toggle_slot = tb.inner:add(N{ dock = "right", w = toggle_slot_w(), layout = "canvas" })
   -- Taskbar.BarVisible=false (sidebar minimized) → 1167 [Slate 1162]
   -- (the images line had slipped into the comment of the line above during the rows work: the glyph was then only drawn
   -- after a sidebar mode change, which set the images through update_toggle; gone again after every pack switch)
-  tb.toggle = tb.toggle_slot:add(N{ kind = "button", x = 5, y = toggle_y(), w = 17, h = 17,   -- TransformDecorator VCenter
+  tb.toggle = tb.toggle_slot:add(N{ kind = "button", x = T.toggle and T.toggle.x or 5, y = toggle_y(), w = 17, h = 17,   -- TransformDecorator VCenter
     images = toggle_images(),
     on_click = function() lh._emit("toggle-sidebar") end })
   -- TBContentHostCollection: the sidebar's pinned tiles while it is minimized (2.4.2 SetMinimized), at the right end
@@ -347,17 +381,24 @@ function lh.taskbar_text_style()
   end
   return { color = "#ffffff" }
 end
+-- the task button's state images; pack key taskbutton.images = { state = id } replaces single states (4042 main: pressed and
+-- hot+active have images of their own)
+local function task_images()
+  local o = T.taskbutton.images or {}
+  local function I(st, id) return R(o[st] or id) end
+  return { normal = I("normal", 1182), hot = I("hot", 1184), pressed = I("pressed", 1185), checked = I("checked", 1185), hotchecked = I("hotchecked", 1185), flash = I("flash", 1183) }
+end
 -- task buttons: TaskButton style = Border(0,2,2,0) > HackBorder 1182/1184/1185 grid 3 > Border(6,5,6,6) > [icon 16 + 2px | text white ellipsis]
 local function task_button(win, width)
   local marg = T.taskbutton.margin or {0, 2, 2, 0}
-  local b = N{ kind = "button", w = width, margin = marg, grid = 3, layout = "fill", icon_geometry_for = win.id,   -- _NET_WM_ICON_GEOMETRY (lhwm's minimise target)
-    images = { normal = R(1182), hot = R(1184), pressed = R(1185), checked = R(1185), hotchecked = R(1185), flash = R(1183) } }
+  local b = N{ kind = "button", w = width, margin = marg, grid = T.taskbutton.grid or 3, layout = "fill", icon_geometry_for = win.id,   -- _NET_WM_ICON_GEOMETRY (lhwm's minimise target)
+    images = task_images() }
   b.win = win
-  local content = b:add(N{ layout = "dock", margin = {6, 5, 6, 6} })
+  local content = b:add(N{ layout = "dock", margin = T.taskbutton.content or {6, 5, 6, 6} })
   local icon = win.icon or T.default_icon   -- _NET_WM_ICON, then WM_HINTS (C side), then the pack's default (an assets path)
-  if icon then content:add(N{ kind = "image", image = icon, w = 16, h = 16, dock = "left", margin = {0, 0, 2, 0} }) end
+  if icon then content:add(N{ kind = "image", image = icon, w = 16, h = 16, dock = "left", margin = T.taskbutton.icon_margin or {0, 0, 2, 0} }) end
   local ts = lh.taskbar_text_style()
-  content:add(N{ kind = "text", text = win.title, color = ts.color, glow = ts.glow, glow_size = ts.glow_size, glow_strength = ts.glow_strength, font = T.font, ellipsis = true, valign = "center", dock = "fill" })
+  content:add(N{ kind = "text", text = win.title, color = ts.color, glow = ts.glow, glow_size = ts.glow_size, glow_strength = ts.glow_strength, font = T.taskbutton.font or T.font, ellipsis = true, valign = "center", dock = "fill" })
   if win.active then b.checked = true; b:set{ state = "checked" } end
   b.on_click = function(self, button)
     if button == 1 then if self.win.active and not self.win.hidden then lh.minimize(self.win.id) else lh.activate(self.win.id) end end
@@ -369,10 +410,16 @@ local function rebuild_tasks()
   if not tb_on() then return end           -- classic / none: no buttons, so no _NET_WM_ICON_GEOMETRY of ours either (lhshell.c drops them)
   local wins = lh.windows(); local n = #wins; if n == 0 then tb.surface:damage() return end
   local hostw = tb.tbhost:desired(screen_w, tb.h)
-  local avail = tb.geo.w - T.start.w - 29 - hostw            -- the task list's width after this layout (bounds() lags one paint)
+  local avail = tb.geo.w - (tb.start_w or T.start.w) - toggle_slot_w() - hostw   -- the task list's width after this layout (bounds() lags one paint)
   -- width rule (2.4.2): rows = the bar's rows; items per row from the count; width = min(140, w / itemsPerRow)
   local per = math.max(1, math.ceil(n / tb.rows))
   local width = math.min(T.taskbutton.max_w or 140, math.floor(avail / per))
+  -- pack key taskbutton.fill_w (4042 main, System.Windows.Desktop.TaskPresenter.OnUpdate): the buttons share the whole width,
+  -- columns = min(items per row, max(1, floor(width / fill_w))), each width / columns (one window: one button over the bar)
+  if T.taskbutton.fill_w then
+    per = math.min(per, math.max(1, math.floor(avail / T.taskbutton.fill_w)))
+    width = math.floor(avail / per)
+  end
   local row
   for i, w in ipairs(wins) do
     if (i - 1) % per == 0 then row = tb.tasks:add(N{ layout = "hbox", h = tb.row_h }) end
@@ -409,6 +456,15 @@ local function build_sidebar()          -- the node tree (tiles: build_tiles); b
     sb.surface:root(sb.root)
     return
   end
+  if T.sidebar.title then   -- a pack's own title band (4042-plex), no separators: see sb.plex_title
+    sb.plex_title()
+    sb.pinned = sb.main:add(N{ dock = "bottom", layout = "vbox" })
+    sb.clocksep = nil
+    sb.tiles = sb.main:add(N{ dock = "fill", layout = "vbox", clip = true })
+    sb.add_sizer()
+    sb.surface:root(sb.root)
+    return
+  end
   -- sidebarTitle: OptionsButton Height 17, glyph Border(4,7,2,2) Dock Right, 9x6 glyph 1176/1177, "Options" text Opacity 0 fades in on hover
   sb.title = sb.main:add(N{ dock = "top", h = 17, layout = "dock" })
   sb.options = sb.title:add(N{ kind = "button", dock = "right", layout = "dock", w = 70, h = 17 })
@@ -425,6 +481,22 @@ local function build_sidebar()          -- the node tree (tiles: build_tiles); b
   sb.tiles = sb.main:add(N{ dock = "fill", layout = "vbox", clip = true })                           -- SBContentHostCollection
   sb.add_sizer()
   sb.surface:root(sb.root)
+end
+-- pack key sidebar.title = { h, image, hot, pressed, glyph, glyph_w, glyph_h, glyph_pad = {l, t, r, b} }: 4042 main's SidebarTitle
+-- (System.Windows.Desktop.SidebarElement + Sidebarstylesheet_themed): a FillImageResourcePresenter band of Height 27 with
+-- ThemeImage(Sidebar, TITLEBACK) stretched, holding the SidebarOptions button over its whole width (no image at rest,
+-- FLYOUTOPTIONSBACK hot / pressed stretched), its text "Options" of Height 0 (never shown) and the glyph FLYOUTOPTIONSGLYPH
+-- (state 1 in every state) Dock Right, Padding 4,0,4,0, true size, centred
+function sb.plex_title()
+  local t = T.sidebar.title
+  sb.title = sb.main:add(N{ dock = "top", h = t.h, layout = "fill" })
+  sb.title:add(N{ kind = "ninegrid", image = R(t.image) })
+  sb.options = sb.title:add(N{ kind = "button", layout = "dock", images = { normal = R(t.normal), hot = R(t.hot), pressed = R(t.pressed) } })
+  local gp = t.glyph_pad or {0, 0, 0, 0}
+  local gw = gp[1] + t.glyph_w + gp[3]
+  local slot = sb.options:add(N{ dock = "right", w = gw, layout = "canvas" })
+  sb.options_glyph = slot:add(N{ kind = "image", image = R(t.glyph), x = gp[1], y = math.floor((t.h - t.glyph_h) / 2), w = t.glyph_w, h = t.glyph_h })
+  sb.options.on_click = function(self, button) if button == 1 then lh._emit("sidebar-options") end end
 end
 -- SidebarSizer (the Appbar's second DockPanel, over everything): TileThumb Width 2 (Aero, image 1201 Hidden: the visible edge
 -- is 1178's columns 0-1) or 6 (Slate, 1108 visible), Dock Left on the right-docked (Flipped) bar, Cursor SizeWE. Dragging it
@@ -444,7 +516,9 @@ build_sidebar()
 -- The right-docked sidebar is Flipped (Appbar.StuckPlace, 2.4.1), so TileSideAreaBack docks Right and TileForegroundPadder Left
 -- (2.3.3): the arrow sits at the tile's top-right as in 4051-vm-now.png, and the foreground starts 7 px in (1 + 6), which is
 -- where the 4074 Slate power tile's battery starts (lh4074-181415.png, x = 1010 on a sidebar at 1003). Foreground 133 x (h - 7).
+local plex_tile_chrome
 local function tile_chrome(tile)
+  if T.tile_chrome then return plex_tile_chrome(tile) end
   local outer = N{ h = tile.height, layout = "dock" }
   local sizer = outer:add(N{ kind = "button", dock = "bottom", h = 4, margin = {0, 2, 0, 0}, images = { normal = R(1199), hot = R(1200) } })  -- OuterContentHostSizer
   local body = outer:add(N{ dock = "fill", layout = "fill", clip = true })
@@ -469,6 +543,33 @@ local function tile_chrome(tile)
   return outer
 end
 
+-- pack key tile_chrome = { sizer, sizer_hot, sizer_h, sizer_grid, back, side_w, side, side_hot, side_pressed, fade_in, fade_out }:
+-- 4042 main's tile (Application1.Tile, System.Windows.Desktop.Tile/OuterTile, Sidebarstylesheet_themed): TileBackgroundImage =
+-- ThemeImage(Sidebar, TILEBACK) stretched under everything; the content over the whole tile; TileFadeButton Width 16, Dock Right on
+-- the Flipped bar, its FillAlphaPresenter opacity animated to 1 in 300 ms when the pointer is within the tile and back to 0 in
+-- 500 ms (Tile._OnPropertyChanged, PointerFocusWithinWorkaround), holding TileSideButton = TILEHEADERBACK normal / hot, pressed
+-- TILECHEVRONBACK pressed (the tile menu); restore / close are 0x0 except for RMA tiles (none here); OuterTile's TileSizer
+-- TileThumb Height 7, Dock Bottom, TILESIZER normal (NineGridMargin 1,0,0,0) / hot. No top or side padding: a tile's own
+-- content keeps clear of the strip (tile:fgw() = width - 16).
+plex_tile_chrome = function(tile)
+  local c = T.tile_chrome
+  local outer = N{ h = tile.height, layout = "dock" }
+  local sizer = outer:add(N{ kind = "button", dock = "bottom", h = c.sizer_h, grid = c.sizer_grid, images = { normal = R(c.sizer), hot = R(c.sizer_hot) } })
+  local body = outer:add(N{ dock = "fill", layout = "fill", clip = true, hoverable = true })
+  body:add(N{ kind = "ninegrid", image = R(c.back) })
+  tile.foreground = body:add(N{ layout = "fill", hoverable = tile.flyout ~= nil })
+  if tile.flyout then tile.foreground.on_click = function(self, button) if button == 1 then lh.toggle_flyout(tile) end end end
+  local over = body:add(N{ layout = "dock" })
+  local side = over:add(N{ kind = "button", dock = "right", w = c.side_w, opacity = 0, layout = "dock", images = { normal = R(c.side), hot = R(c.side_hot), pressed = R(c.side_pressed) } })
+  local icon = c.icons and c.icons[tile.id]                       -- TileHeaderIcon 16x16 Dock Top: BaseTile.Icon (the clock: imageres 1016)
+  if icon then side:add(N{ kind = "image", image = R(icon), dock = "top", w = 16, h = 16 }) end
+  side.on_click = function(self, button) if button == 1 then if tile.flyout then lh.toggle_flyout(tile) else lh._emit("tile-menu", tile) end end end
+  body.on_within = function(self, inside) lh.animate(side, "opacity", inside and 1 or 0, inside and (c.fade_in or 300) or (c.fade_out or 500)) end
+  tile.ui = body; tile.side = side
+  sizer.on_drag = function(self, dx, dy) end
+  tile.node = outer; tile.body = body
+  return outer
+end
 -- Tile API (mirrors BaseTile, SHELL-DESIGN 2.5): Tile{ name, height, pinned, initialize = function(self) ... end }
 Tile = {}; Tile.__index = Tile
 function Tile.new(def) local t = setmetatable(def, Tile); return t end
@@ -958,8 +1059,10 @@ local function tile_menu(t, x, y)
   lh.menu.open(items, x, y, { style = "avalon", grab = true, flip = true })
 end
 lh.on("tile-menu", function(t)   -- a click on the tile's arrow (no flyout): under the arrow
-  if not t.arrow then return end
-  local ax, ay, aw, ah = t.arrow:bounds()
+  local a = t.arrow or t.side             -- the 4074 arrow, or the 4042-plex side strip (its top left corner)
+  if not a then return end
+  local ax, ay, aw, ah = a:bounds()
+  if not t.arrow then aw, ah = 0, 0 end
   tile_menu(t, sb.geo.x + ax + aw, sb.geo.y + ay + ah)
 end)
 lh.on("surface-press", function(x, y, button, win)
