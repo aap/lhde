@@ -1797,6 +1797,10 @@ static void fo_applied(dialogs::FolderOptions& o)
 {
     browser::views::set_default(g.zoomable, o.default_view == browser::views::builtin_default(g.zoomable) ? -1 : o.default_view);
     shell::write_setting("remember_views", o.remember ? "1" : "0");
+    if (o.full_path != (shell::setting("breadcrumb_home", "1") == "0")) {
+        shell::write_setting("breadcrumb_home", o.full_path ? "0" : "1");
+        if (g.header && g.folder) { header::set_folder(g.folder); header_refit(g.frame); }
+    }
     if (o.hidden != g.show_hidden) on_command(ID_VIEW_HIDDEN);   // (writes show_hidden, refreshes)
     if (g.zoomable && o.thumbnails != (shell::setting("thumbnails", "1") != "0")) on_command(ID_VIEW_THUMBNAILS);
 }
@@ -1813,6 +1817,7 @@ static void folder_options()
     for (int z : browser::zoom_levels()) o.zoom_levels.push_back(z);
     o.remember = shell::setting("remember_views", "1") != "0";
     o.hidden = g.show_hidden;
+    o.full_path = shell::setting("breadcrumb_home", "1") == "0";
     o.thumbnails = shell::setting("thumbnails", "1") != "0";
     o.apply_all = fo_apply_all;
     o.reset_all = fo_reset_all;

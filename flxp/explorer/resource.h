@@ -54,6 +54,7 @@
 #define IDC_FO_RESETALL     1507
 #define IDC_FO_REMEMBER     1508
 #define IDC_FO_HIDDEN       1509
+#define IDC_FO_FULLPATH     1510
 
 // file operations (fileopui.cpp): XP's shell32 DLG_REPLACE_FILE, DLG_REPLACE_FOLDER,
 // DLG_MOVE_FILE, DLG_MOVECOPYPROGRESS and a message box for the errors

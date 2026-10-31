@@ -351,6 +351,10 @@ stop used last, so going back to a view brings its size back; the sizes are kept
 (`remember_views`, Tools > Folder Options); a folder never opened gets `default_view_longhorn` (Icons at 48 px unless Folder Options
 says otherwise).
 
+The breadcrumb names your home folder "Home" (Home > Documents), as the namespace places it under the Desktop. Folder Options'
+"Display the full path in the address bar" (`breadcrumb_home = 0` in `flxp.ini`) shows a folder under it by its real path instead,
+My Computer > Local Disk (/) > home > you > Documents; the default is `breadcrumb_home = 1`.
+
 View > Show in Groups (`groups = 1` in `flxp.ini`) groups Tiles and Icons by type, under the theme's group headers (4074's
 GROUPHEADER band with the title and its count, the collapse button at the right end; a click on a header folds the group).
 

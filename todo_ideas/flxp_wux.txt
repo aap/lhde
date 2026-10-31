@@ -28,7 +28,6 @@ not *entirely* sure about the font for all themes though
 
 * see xatttribs.txt idea
 
-* not so sure about "Home" replacing the actual path in the breadcrumb bar
 
 ### details and task pane
 

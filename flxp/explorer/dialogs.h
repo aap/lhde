@@ -42,6 +42,7 @@ struct FolderOptions {
     int current_view = 0;              // the folder's (Apply to All Folders)
     std::vector<int> zoom_levels;      // the Icons view's sizes (0 = the default size first)
     bool remember = true, hidden = false;
+    bool full_path = false;            // flxp.ini breadcrumb_home = 0: the crumbs under the home folder are its real path
     void (*apply_all)(FolderOptions&) = nullptr;   // the current view is the default, every folder's own forgotten
     void (*reset_all)(FolderOptions&) = nullptr;   // the built-in default again, every folder's own forgotten
     void (*applied)(FolderOptions&) = nullptr;     // OK / Apply
