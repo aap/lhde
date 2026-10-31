@@ -8,7 +8,7 @@ lands in $LHDE_WINDOWS (default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows):
   index/      symlinks under the names the programs ask for (styles/jade4074.msstyles, resources/4074, ...)
 
 usage:
-  lhde-import --pack FILE|DIR                 the normal way: a resource pack (lhde-pack; a directory or .tar.zst / .tar.xz)
+  lhde-import --pack FILE|DIR                 the normal way: a resource pack (lhde-pack; a directory, .tar.zst / .tar.xz / .zip)
   lhde-import --iso FILE [--source ID]        a Windows / Longhorn ISO: its build is detected (explorer.exe's version, the
   lhde-import --wim FILE [--source ID]        layout), the files of data/sources/<build>.ini packed into a temporary pack and
   lhde-import --dir PATH [--source ID]        imported from there (one code path with --pack); PATH = a Windows directory
@@ -24,6 +24,9 @@ usage:
                                               three trees without reading any ISO; -n lists what it would do. Run it after
                                               make install; lhde-session runs it once by itself. Idempotent.
   lhde-import --list                          what the Windows tree holds
+  lhde-import --clean [--yes]                 delete the Windows tree (every source, local/, generated/, index/) after asking
+                                              on the terminal, or without asking with --yes: before importing a clean set
+                                              (make install-resources-free / -windows / -full)
 options: --windows DIR (default $LHDE_WINDOWS, else ${XDG_DATA_HOME:-~/.local/share}/lhde-windows; --data DIR is the old
          spelling), --force (replace files that exist), --no-recipes (raw files only), --tmp DIR (scratch for an extracted WIM;
          default beside the Windows tree), --no-annotate (write no extended attributes: the importer annotates what it writes,
@@ -113,6 +116,37 @@ def listing(W):
         print('  %-11s %s' % (k + ':', ' '.join(names) or '(none)'))
 
 
+def clean(W, yes):
+    """delete the Windows tree W (every source, local/, generated/, index/) after confirming on the terminal, or with --yes;
+    only a directory that is one (index/, import.log, a <source>/source.ini) or empty"""
+    if not os.path.lexists(W):
+        L.log('no Windows tree %s: nothing to clean' % W)
+        return 0
+    if not os.path.isdir(W) or os.path.islink(W):
+        L.die('%s is not a directory: not cleaning it' % W)
+    names = os.listdir(W)
+    looks = not names or any(os.path.exists(os.path.join(W, x)) for x in ('index', 'import.log', 'generated')) or \
+        any(os.path.isfile(os.path.join(W, s, 'source.ini')) for s in names)
+    if not looks or os.path.realpath(W) in ('/', os.path.realpath(os.path.expanduser('~'))):
+        L.die('%s does not look like a Windows tree (no index/, import.log or <source>/source.ini): not cleaning it' % W)
+    b, n = T.du(W)
+    srcs = T.sources_in(W)
+    local = sorted(os.listdir(os.path.join(W, 'local'))) if os.path.isdir(os.path.join(W, 'local')) else []
+    print('Windows tree %s: %s in %d files; sources: %s%s' % (W, T.human(b), n, ' '.join(srcs) or '(none)',
+          '; local/: %s (styles and files dropped in by hand go too)' % ' '.join(local) if local else ''), flush=True)
+    if not yes:
+        if not sys.stdin.isatty():
+            L.die('not deleting %s without confirmation: run it on a terminal, or with --yes (make ... CLEAN=1)' % W)
+        sys.stdout.write('Delete it? [y/N] ')
+        sys.stdout.flush()
+        if sys.stdin.readline().strip().lower() not in ('y', 'yes'):
+            L.log('kept %s' % W)
+            return 1
+    shutil.rmtree(W)
+    L.log('deleted %s' % W)
+    return 0
+
+
 def main():
     a = sys.argv[1:]
     o = {'force': False, 'recipes': True, 'copyres': False, 'dry': False}
@@ -140,13 +174,17 @@ def main():
         elif x == '--no-recipes': o['recipes'] = False
         elif x == '--copy-resources': o['copyres'] = True
         elif x == '--list': mode = 'list'
+        elif x == '--clean': mode = 'clean'
+        elif x in ('-y', '--yes'): o['yes'] = True
         elif x in ('--regenerate', '--rebuild-cache'): mode = 'rebuild'
         elif x in ('-h', '--help'): print(__doc__); return 0
-        elif not x.startswith('-') and mode is None: mode, arg = ('pack' if os.path.isdir(x) or '.tar' in x else 'iso' if x.lower().endswith('.iso') else 'wim' if x.lower().endswith('.wim') else 'pack'), x
+        elif not x.startswith('-') and mode is None: mode, arg = ('pack' if os.path.isdir(x) or '.tar' in x or x.lower().endswith('.zip') else 'iso' if x.lower().endswith('.iso') else 'wim' if x.lower().endswith('.wim') else 'pack'), x
         else: L.die('unknown argument %s (--help)' % x)
     data = T.windows_dir(o.get('data'))
     if mode == 'list':
         listing(data); return 0
+    if mode == 'clean':
+        return clean(data, o.get('yes', False))
     if mode == 'migrate':
         T.migrate(os.path.abspath(o.get('old') or T.old_dir()), data, T.config_dir(), o['dry'], o.get('auto', False))
         if not o['dry']:

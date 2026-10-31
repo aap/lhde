@@ -52,7 +52,18 @@ wallpaper, and the theme `aero4074` (`LAB_THEME=jade4074` for the shipped look).
 
 ## Getting the Windows resources (lhde-pack, lhde-import)
 lhde ships no Microsoft files. Everything Windows-made (visual styles, DLLs for icons and art, fonts, wallpapers) comes from the
-user's own copies, in two stages:
+user's own copies, in two stages below. The short way, from the top-level Makefile, to a clean Windows tree (`$LHDE_WINDOWS`,
+else `~/.local/share/lhde-windows`; each target first deletes it through `lhde-import --clean`, which asks on the terminal, or
+without asking with `CLEAN=1`):
+
+| make target | what it imports | what then resolves |
+| --- | --- | --- |
+| `install-resources-free` | the free source alone: ReactOS 0.4.16's boot CD (`LHDE_REACTOS_ISO=FILE`, an ISO or a pack of the reactos source; else the newest `~/lib/windows_isos/ReactOS-*.iso`; without one it names the download and stops) | `classic`, `lunar`, `modern`, `mizu`, `lautus` complete; every other theme as classic with ReactOS's icons, fonts and art (docs/THEME-FORMAT.md section 6) |
+| `install-resources-windows PACK=lhde_winthemes.zip` | the small Windows pack alone (an essentials pack, below) | the shipped Windows themes |
+| `install-resources-full PACK=lhde_wintheme_full.zip` | the ReactOS CD, then the whole Windows pack (a museum pack) | everything (the Windows files win where both have one) |
+
+`lhde_winthemes.zip` and `lhde_wintheme_full.zip` are only default names for packs lhde does not supply: `lhde-pack --zip`
+writes `NAME.zip` beside the tarball; the tarball or the pack directory works the same.
 
 1. **`lhde-pack`** (once, by whoever has the ISOs): the raw, unmodified files each source needs, by the rules in
    `data/sources/<source>.ini`, into a resource pack. Two **profiles**:
@@ -80,7 +91,8 @@ user's own copies, in two stages:
    `lhde-theme explain --files luna` (one real path per line, relative to the Windows tree).
    Output: `lhde-resources-<date>[-essentials]/` with `<source>/{system32,themes,fonts,wallpapers}/`, `<source>/source.ini`, `MANIFEST`
    (sha256, size, pack path, source, medium:in-image path; its `# profile:` and `# themes:` header lines say which profile and
-   themes made it) and the tarball `.tar.zst` (`.tar.xz` without zstd). `lhde-import --pack` takes either profile unchanged.
+   themes made it) and the tarball `.tar.zst` (`.tar.xz` without zstd); with `--zip` also `NAME.zip` (no hard links, no
+   annotations: larger, and lhde-import annotates on import). `lhde-import --pack` takes either profile unchanged.
    **Identical files are stored once** (both profiles): files with the same sha256, within or across builds (Trebuchet,
    Tahoma, comctl32 repeat through the builds), are hard links in the pack directory (relative symlinks where the file system
    has no hard links), `tar` stores them once, and `lhde-import --pack` copies every path as a normal file of its own (the
@@ -115,6 +127,7 @@ user's own copies, in two stages:
    lhde-import --reindex                                       # make index/ again (after moving files by hand)
    lhde-import --migrate -n                                    # what the move from the old ~/.local/share/lhde would do; without -n: do it
    lhde-import --list
+   lhde-import --clean [--yes]                                 # delete the Windows tree (asks first; --yes: does not)
    ```
    Each `<source>/` of the pack is copied as it is to `~/.local/share/lhde-windows/<source>/` (`system32/` with shell32,
    imageres, explorer, browseui, comctl32, themeui, shellstyle, uDWM; `themes/` = the build's Resources/Themes; `fonts/`,

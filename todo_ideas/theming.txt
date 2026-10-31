@@ -21,10 +21,6 @@ imported is the free baseline. Left:
 * Sounds, wallpaper: a generated classic wallpaper (the teal), none for sounds.
 * make check-free tests only-ReactOS; an empty Windows tree (nothing imported at all) is not a test configuration yet.
 
-aap: Makefile targets that install a clean Windows tree of (a) just the free stuff, (b) the small Windows pack, (c) free + all
-of Windows; (b) and (c) refer to files we do not supply, under generic names (lhde_winthemes.zip, lhde_wintheme_full.zip or
-the like); the same import, a different archive.
-
 ## 2. Free visual styles
 * Community XP styles: licences vary; the installer can import any .msstyles the user has (lhde-import --style exists).
 

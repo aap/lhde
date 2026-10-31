@@ -105,7 +105,17 @@ lhde's files live in three places that never mix (docs/LAYOUT.md "The three tree
                                wallpapers}, local/ (dropped in), generated/ (derived PNGs: delete freely), index/ (symlinks)
     ~/.config/lhde/            the user's files: settings.ini, themes/, and any shipped file overridden under its own name
 
-The art comes from the user's own Windows files, imported once (docs/USAGE.md "Getting the Windows resources"):
+The art comes from the user's own files, imported once (docs/USAGE.md "Getting the Windows resources"). Three ways to a
+clean Windows tree (each deletes it first, asking; `CLEAN=1` without asking):
+
+| make target | imports | gives |
+| --- | --- | --- |
+| `install-resources-free` | ReactOS 0.4.16's boot CD (`LHDE_REACTOS_ISO=FILE`, else `~/lib/windows_isos/ReactOS-*.iso`; free, GPL) | classic and ReactOS's four styles complete, every other theme as classic with ReactOS's icons and fonts |
+| `install-resources-windows PACK=lhde_winthemes.zip` | your small Windows pack (`lhde-pack`, essentials) | the shipped Windows themes |
+| `install-resources-full PACK=lhde_wintheme_full.zip` | the ReactOS CD and your whole Windows pack (`lhde-pack --profile museum`) | everything |
+
+The pack names are defaults for files lhde does not supply (`lhde-pack --zip` writes one; a `.tar.zst` / `.tar.xz` or a
+pack directory works too). By hand:
 
     tools/lhde-pack --isos DIR --out PACKS                  a resource pack (raw files) from the ISOs in DIR
     tools/lhde-import --pack PACKS/lhde-resources-DATE.tar.xz   the pack into the Windows tree, recipes run
@@ -114,6 +124,7 @@ The art comes from the user's own Windows files, imported once (docs/USAGE.md "G
     tools/lhde-import --regenerate                          generated/ made again from the imported files
     tools/lhde-import --migrate [-n]                        an old-layout ~/.local/share/lhde into the three trees
     tools/lhde-import --list                                what is there
+    tools/lhde-import --clean [--yes]                       the Windows tree deleted (asks first)
 
 Every program looks a file up by its relative name (`styles/jade4074.msstyles`, `frames/jade4074/close.png`,
 `resources/4074`) in this order: `~/.config/lhde`, the Windows tree's `index/` (`$LHDE_DATA`, a flat directory, instead:

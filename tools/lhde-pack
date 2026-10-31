@@ -4,7 +4,7 @@ data/sources/<source>.ini (docs/USAGE.md "Getting the Windows resources", docs/L
 turns a pack into lhde's Windows tree (~/.local/share/lhde-windows); nobody needs the ISOs after that.
 
 usage: lhde-pack [--profile essentials|museum] [--themes A,B,C] [--isos DIR]... [--sources ID,ID] [--all] [--from-pack PACK]
-                 [--out DIR] [--name NAME] [--no-tar] [--tmp DIR] [--medium ID=PATH]... [--no-annotate] [--list]
+                 [--out DIR] [--name NAME] [--no-tar] [--zip] [--tmp DIR] [--medium ID=PATH]... [--no-annotate] [--list]
   --profile P     essentials (the default): only the files the themes need, from the resolver itself (see --themes);
                   museum: every file of every source (today's complete pack, for archaeology and for making essentials later)
   --themes A,B,C  the themes essentials is made for (default: the shipped ones, data/themes/*.theme without .todo). For each,
@@ -21,6 +21,9 @@ usage: lhde-pack [--profile essentials|museum] [--themes A,B,C] [--isos DIR]... 
                   e.g. 4074r2, 4042main)
   --medium ID=PATH  take source ID from PATH (an ISO, a WIM or an extracted Windows directory) instead of its ISO
   --out DIR       where the pack goes (default .): DIR/NAME/ and DIR/NAME.tar.zst (zstd, else .tar.xz; --no-tar: the directory only)
+  --zip           also DIR/NAME.zip (deflate; for the make install-resources-* targets' lhde_winthemes.zip and the like): a
+                  zip has no hard links and no extended attributes, so identical files are stored once each and lhde-import
+                  annotates them itself; the tarball stays the smaller and more faithful form
   --name NAME     default lhde-resources-<date> (essentials: lhde-resources-<date>-essentials)
   --tmp DIR       scratch space for an extracted WIM (up to 1 GB at a time) and, for essentials from ISOs, the museum pack made
                   on the way (about 400 MB; default a temporary directory beside --out)
@@ -58,6 +61,7 @@ def main():
         elif o == '--out': out = a.pop(0)
         elif o == '--name': name = a.pop(0)
         elif o == '--no-tar': tar = False
+        elif o == '--zip': ZIP['on'] = True
         elif o == '--tmp': tmpd = a.pop(0)
         elif o == '--medium': k, v = a.pop(0).split('=', 1); media[k] = v
         elif o == '--profile': profile = a.pop(0)
@@ -158,6 +162,11 @@ def finish(pack, lines, tar, profile, themes):
     print('  %-10s %4d files %8.1f MB (%.1f MB stored, dedup saved %.1f MB) in %s' % ('total', nf, ap / 1e6, un / 1e6, (ap - un) / 1e6, pack))
     if tar:
         L.write_pack(pack, [], True)
+    if ZIP['on']:
+        L.write_zip(pack)
+
+
+ZIP = {'on': False}   # --zip
 
 
 def from_museum(profile, themes, frompack, sel, want, isos, medium, pack, tmp, tar):

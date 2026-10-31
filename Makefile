@@ -136,12 +136,49 @@ uninstall-data:
 	       $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
 	-rmdir $(DESTDIR)$(PKGLIBDIR)
 
+# A clean Windows tree ($LHDE_WINDOWS, else ~/.local/share/lhde-windows; docs/USAGE.md "Getting the Windows resources"): each
+# target deletes the tree first (lhde-import --clean asks on the terminal; CLEAN=1 deletes without asking), then imports.
+#   make install-resources-free                          only free files: ReactOS's boot CD (LHDE_REACTOS_ISO=FILE, an ISO or a
+#                                                        pack made with lhde-pack --sources reactos; else the newest
+#                                                        ReactOS-*.iso in ~/lib/windows_isos; else the download is named)
+#   make install-resources-windows [PACK=lhde_winthemes.zip]     the small Windows pack (lhde-pack's essentials) alone
+#   make install-resources-full [PACK=lhde_wintheme_full.zip]    the free files and the whole Windows pack (lhde-pack's museum)
+# The packs are the user's (lhde-pack --zip, or its .tar.zst / .tar.xz / a directory); the names are only defaults.
+REACTOS_RELEASE = https://sourceforge.net/projects/reactos/files/ReactOS/0.4.16/
+WINDOWS_PACK ?= lhde_winthemes.zip
+FULL_PACK    ?= lhde_wintheme_full.zip
+free_medium   = $(or $(LHDE_REACTOS_ISO),$(lastword $(sort $(wildcard $(HOME)/lib/windows_isos/ReactOS-*.iso))))
+need_free     = m='$(free_medium)'; if [ -z "$$m" ] || [ ! -e "$$m" ]; then \
+	  echo "No ReactOS medium$${m:+ ($$m not found)}. Download ReactOS 0.4.16's boot CD (ReactOS-0.4.16-i386.iso, in the release's"; \
+	  echo "iso .zip) from $(REACTOS_RELEASE) and run: make $@ LHDE_REACTOS_ISO=/path/to/ReactOS-0.4.16-i386.iso"; exit 1; fi
+need_pack     = p='$(1)'; if [ ! -e "$$p" ]; then \
+	  echo "No pack $$p: name yours with PACK=FILE (lhde-pack makes one from your ISOs, docs/USAGE.md; lhde ships no Windows files)"; exit 1; fi
+clean_tree    = tools/lhde-import --clean $(if $(CLEAN),--yes)
+install-resources-free:
+	@$(need_free)
+	$(clean_tree)
+	tools/lhde-import $(if $(filter %.iso,$(free_medium)),--iso '$(free_medium)' --source reactos,'$(free_medium)')
+	tools/lhde-import --list
+install-resources-windows:
+	@$(call need_pack,$(or $(PACK),$(WINDOWS_PACK)))
+	$(clean_tree)
+	tools/lhde-import --pack '$(or $(PACK),$(WINDOWS_PACK))'
+	tools/lhde-import --list
+install-resources-full:
+	@$(need_free)
+	@$(call need_pack,$(or $(PACK),$(FULL_PACK)))
+	$(clean_tree)
+	tools/lhde-import $(if $(filter %.iso,$(free_medium)),--iso '$(free_medium)' --source reactos,'$(free_medium)')
+	tools/lhde-import --pack '$(or $(PACK),$(FULL_PACK))'
+	tools/lhde-import --list
+
 clean:
 	rm -rf build
 
 install: install-libs install-liblhde install-flxp install-luxnav install-luxwm install-luxshell install-data
 uninstall: uninstall-luxshell uninstall-luxwm uninstall-luxnav uninstall-data uninstall-liblhde uninstall-libs uninstall-flxp
 
-.PHONY: all libs programs tests clean install uninstall check check-lux check-free install-data uninstall-data
+.PHONY: all libs programs tests clean install uninstall check check-lux check-free install-data uninstall-data \
+        install-resources-free install-resources-windows install-resources-full
 .PRECIOUS: $(O)/%.o $(P)/%.o
 .DELETE_ON_ERROR:

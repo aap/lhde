@@ -647,6 +647,23 @@ def write_pack(pack, lines, tarball, head=None):
         return out
 
 
+def write_zip(pack):
+    """pack.zip beside the pack directory (lhde-pack --zip): every path as a file of its own (a hard link or symlink of the
+    deduplicated pack is stored as its content), under the pack's name; returns its path"""
+    import zipfile
+    p = pack.rstrip('/')
+    out = p + '.zip'
+    with zipfile.ZipFile(out + '.part', 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for r, ds, fs in os.walk(p):
+            ds.sort()
+            for f in sorted(fs):
+                q = os.path.join(r, f)
+                z.write(q, os.path.join(os.path.basename(p), os.path.relpath(q, p)))
+    os.replace(out + '.part', out)
+    log('pack archive %s (%.1f MB)' % (out, os.path.getsize(out) / 1e6))
+    return out
+
+
 def dedup_pack(pack, lines):
     """identical files (same sha256 in the MANIFEST lines) stored once: the first path of each stays, the others become hard
     links to it (relative symlinks where the file system refuses hard links). tar keeps hard links as links, so the archive
@@ -773,11 +790,21 @@ def data_dir(arg=None):
 
 
 def unpack(path, tmp):
-    """a pack directory, or a .tar.zst / .tar.xz / .tar of one -> the directory"""
+    """a pack directory, or a .tar.zst / .tar.xz / .tar / .zip of one -> the directory"""
     if os.path.isdir(path):
         return path
     d = os.path.join(tmp, 'pack')
     os.makedirs(d, exist_ok=True)
+    if path.lower().endswith('.zip'):   # lhde-pack --zip: no annotations, identical files stored once each (import annotates)
+        import zipfile
+        with zipfile.ZipFile(path) as z:
+            for m in z.namelist():
+                q = os.path.realpath(os.path.join(d, m))
+                if not q.startswith(os.path.realpath(d) + os.sep):
+                    die('%s: %s points outside the pack' % (path, m))
+            z.extractall(d)
+        subs = [os.path.join(d, x) for x in os.listdir(d)]
+        return subs[0] if len(subs) == 1 and os.path.isdir(subs[0]) and not os.path.exists(os.path.join(subs[0], 'source.ini')) else d
     comp = ['-I', 'zstd -d'] if path.endswith('.zst') else []
     r = subprocess.run(['tar', '-C', d, *_tar_xattrs(), *comp, '-xf', path])   # restores the user.* annotations
     if r.returncode:
