@@ -15,6 +15,10 @@ not *entirely* sure about the font for all themes though
 	contents on every resize, and a glass (ARGB) window's transparent background shows before wux repaints; try NorthWest
 	gravity (and a background of None) and watch a resize under picom
 
+* the start panel looks very wrong with most themes, including Windows Classic: XP's panel under the classic theme is drawn
+	with the system colours (screenshots WinXP-193211.png, WinXP-193221.png in the research workspace: the gradient user band,
+	white left column, light grey right column, raised edges, classic All Programs cascade); check the ReactOS styles too
+
 ## flxp behavior
 
 * copy/move: Cancel rolls the current top-level item back (a folder copied half-way is removed again); XP keeps
