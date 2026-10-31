@@ -27,3 +27,6 @@ navbar_preset = auto
 wallpaper = demos/exec_briefing_chadDesktop.dir_18_1   ; the chadDesktop demo (lhde-import --from-workspace; else 4074's Bliss)
 mode      = fill
 icons     = longhorn4074
+
+[Fonts]
+smoothing = cleartype      ; every 4074 screenshot has ClearType text (Tahoma 8 and Segoe UI alike)

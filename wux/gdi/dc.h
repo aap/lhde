@@ -42,6 +42,8 @@ void stretch_blit(DC* dc, const Rect& dst, const Bitmap* src, const Rect& src_re
 // Composite fg through an 8-bit coverage mask (0 = transparent, 255 = solid)
 // whose top-left lands at pos.
 void blend_mask(DC* dc, Point pos, const uint8_t* mask, int32_t w, int32_t h, int32_t stride, Color fg);
+// The same with a ClearType mask: three coverages (R, G, B) per pixel, stride in bytes; for opaque targets.
+void blend_mask_lcd(DC* dc, Point pos, const uint8_t* mask, int32_t w, int32_t h, int32_t stride, Color fg);
 // A soft halo (Longhorn's TextGlow): the coverage mask (top-left at pos) is
 // widened and blurred by about `radius` pixels and composited in `glow`
 // (glow.a scales it). Draw the text itself afterwards.

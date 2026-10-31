@@ -240,6 +240,32 @@ void blend_mask(DC* dc, Point lp, const uint8_t* mask, int32_t w, int32_t h, int
     }
 }
 
+// ClearType: mask holds three coverages (R, G, B subpixels) per pixel; each channel is blended on its own. Opaque targets only
+// (an alpha-tracking surface takes the grey mask, font.cpp).
+void blend_mask_lcd(DC* dc, Point lp, const uint8_t* mask, int32_t w, int32_t h, int32_t stride, Color fg)
+{
+    Point p = lp + dc->origin;
+    Rect r = rect_xywh(p.x, p.y, w, h);
+    if (r.empty() || !overlaps(r, dc->clip_box)) return;
+    for (const Rect& cr : dc->clip.rects()) {
+        Rect i = intersect(r, cr);
+        if (i.empty()) continue;
+        for (int32_t y = i.top; y < i.bottom; y++) {
+            const uint8_t* mp = mask + (intptr_t)(y - p.y) * stride + (i.left - p.x) * 3;
+            uint32_t* dp = dc->target->row(y) + i.left;
+            for (int32_t x = 0; x < i.width(); x++, mp += 3) {
+                if (!(mp[0] | mp[1] | mp[2])) continue;
+                uint32_t d = dp[x];
+                uint32_t cr_ = (d >> 16 & 0xff), cg = (d >> 8 & 0xff), cb = (d & 0xff);
+                cr_ = div255(fg.r * mp[0] + cr_ * (255 - mp[0]));
+                cg = div255(fg.g * mp[1] + cg * (255 - mp[1]));
+                cb = div255(fg.b * mp[2] + cb * (255 - mp[2]));
+                dp[x] = 0xff000000u | cr_ << 16 | cg << 8 | cb;
+            }
+        }
+    }
+}
+
 // One box-blur pass of radius r along rows (step 1) or columns (step = w).
 static void box_pass(std::vector<uint16_t>& a, int32_t w, int32_t h, int32_t r, bool rows)
 {

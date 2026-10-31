@@ -242,9 +242,9 @@ static Font* new_font(const LOGFONTW& lf, bool is_stock)
     d.italic = lf.lfItalic != 0;
     d.underline = lf.lfUnderline != 0;
     d.strikeout = lf.lfStrikeOut != 0;
-    // ANTIALIASED_QUALITY and the ClearType ones (drawn grey) force smoothing, NONANTIALIASED_QUALITY forbids it
-    d.quality = lf.lfQuality == ANTIALIASED_QUALITY || lf.lfQuality == CLEARTYPE_QUALITY ||
-                lf.lfQuality == CLEARTYPE_NATURAL_QUALITY ? 1 : lf.lfQuality == NONANTIALIASED_QUALITY ? 2 : 0;
+    // ANTIALIASED_QUALITY forces grey smoothing, the ClearType ones ClearType, NONANTIALIASED_QUALITY forbids both
+    d.quality = lf.lfQuality == ANTIALIASED_QUALITY ? 1 : lf.lfQuality == CLEARTYPE_QUALITY ||
+                lf.lfQuality == CLEARTYPE_NATURAL_QUALITY ? 3 : lf.lfQuality == NONANTIALIASED_QUALITY ? 2 : 0;
     f->font = gdi::create_font(d);
     if (!f->font) {
         d.family = "MS Shell Dlg";

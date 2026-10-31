@@ -17,7 +17,7 @@ struct FontDesc {
     int32_t height;                // lfHeight: <0 em height px, >0 cell height px, 0 = default (12px cell)
     int32_t weight;                // 400 normal, 700 bold; 0 = 400
     bool italic, underline, strikeout;
-    uint8_t quality = 0;           // 0 = the system setting (set_font_smoothing, gasp decides), 1 = antialiased, 2 = never
+    uint8_t quality = 0;           // 0 = the system setting (set_font_smoothing, gasp decides), 1 = antialiased, 2 = never, 3 = ClearType
 };
 
 struct TextMetrics {
@@ -52,7 +52,8 @@ void set_theme_font_dir(const char* dir);
 // "Smooth edges of screen fonts" (Display Properties > Appearance > Effects):
 // SPI_SETFONTSMOOTHING / SPI_SETFONTSMOOTHINGTYPE. Standard = grayscale where
 // the font's gasp table allows gray at the ppem (Tahoma 8 stays mono);
-// ClearType is drawn as Standard for now. Default Standard, as on XP.
+// ClearType ignores the gasp table and blends R, G and B subpixel coverages
+// (grey on an alpha-tracking surface). Default Standard, as on XP.
 enum { SMOOTH_OFF = 0, SMOOTH_STANDARD = 1, SMOOTH_CLEARTYPE = 2 };
 void set_font_smoothing(int mode);        // SMOOTH_* (true = Standard, false = off)
 int font_smoothing();

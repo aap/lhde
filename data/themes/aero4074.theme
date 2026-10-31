@@ -27,3 +27,6 @@ navbar   = 4074
 wallpaper = demos/Aero Enmeshed     ; a demo image (not on the ISOs: lhde-import --from-workspace, else the build's Bliss)
 mode      = fill
 icons     = longhorn4074
+
+[Fonts]
+smoothing = cleartype      ; every 4074 screenshot has ClearType text (Tahoma 8 and Segoe UI alike)

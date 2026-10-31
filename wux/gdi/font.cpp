@@ -27,7 +27,8 @@ struct Glyph {
     int16_t left, top;      // gmptGlyphOrigin: offset of the mask from the pen, y up
     int16_t w, h;           // gmBlackBox
     int16_t advance;        // gmCellIncX
-    std::vector<uint8_t> mask;   // w*h, 0..255
+    bool lcd;               // ClearType: mask is w*h*3 (R, G, B subpixel coverages)
+    std::vector<uint8_t> mask;   // w*h, 0..255 (lcd: w*h*3)
 };
 
 struct Font {
@@ -40,7 +41,7 @@ struct Font {
     bool fake_bold, fake_italic;
     bool gasp_mono;         // gasp table exists and says no gray at this ppem
     uint8_t quality;        // FontDesc::quality
-    std::unordered_map<uint32_t, Glyph> cache;  // key: codepoint | mono << 31
+    std::unordered_map<uint64_t, Glyph> cache;  // key: codepoint | mode << 32 (0 grey, 1 mono, 2 ClearType)
 };
 
 static FT_Library library;
@@ -391,8 +392,10 @@ TextMetrics metrics(const Font* f) { return f->tm; }
 static const FT_Matrix slant = { 1 << 16, (1 << 16) >> 2, 0, 1 << 16 };
 
 // freetype_get_glyph_outline + get_mono/antialias_glyph_bitmap, no transform
-// other than the fake-italic slant.
-static bool render_glyph(Font* f, FT_UInt index, bool mono, Glyph& g)
+// other than the fake-italic slant. lcd: ClearType, the outline (hinted as for
+// grey, so the advances stay GDI's) rendered at three times the width and
+// filtered across the subpixels, one pixel wider on each side.
+static bool render_glyph(Font* f, FT_UInt index, bool mono, Glyph& g, bool lcd = false)
 {
     FT_Face face = f->face;
     FT_Int32 load = FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH | (mono ? FT_LOAD_TARGET_MONO : FT_LOAD_TARGET_NORMAL);
@@ -456,14 +459,45 @@ static bool render_glyph(Font* f, FT_UInt index, bool mono, Glyph& g)
     if (f->fake_bold) adv += 1 << 6;
     adv = (adv + 63) & -64;
 
+    if (lcd && slot->format == FT_GLYPH_FORMAT_OUTLINE && bb.xMax > bb.xMin) { bb.xMin -= 64; bb.xMax += 64; }
+    else lcd = false;
+
     // compute_metrics
+    g.lcd = lcd;
     g.advance = (int16_t)(adv >> 6);
     g.left = (int16_t)(bb.xMin >> 6);
     g.top = (int16_t)(bb.yMax >> 6);
     g.w = (int16_t)((bb.xMax - bb.xMin) >> 6);
     g.h = (int16_t)((bb.yMax - bb.yMin) >> 6);
     g.mask.clear();
-    if (g.w <= 0 || g.h <= 0) { g.w = g.h = 0; return true; }
+    if (g.w <= 0 || g.h <= 0) { g.w = g.h = 0; g.lcd = false; return true; }
+    if (lcd) {
+        if (f->fake_italic) FT_Outline_Transform(&slot->outline, &slant);
+        FT_Outline_Translate(&slot->outline, -bb.xMin, -bb.yMin);
+        static const FT_Matrix triple = { 3 << 16, 0, 0, 1 << 16 };
+        FT_Outline_Transform(&slot->outline, &triple);
+        int32_t sw = g.w * 3;
+        std::vector<uint8_t> sub((size_t)sw * g.h, 0);
+        FT_Bitmap bm;
+        memset(&bm, 0, sizeof bm);
+        bm.width = sw; bm.rows = g.h; bm.pitch = sw;
+        bm.pixel_mode = FT_PIXEL_MODE_GRAY; bm.num_grays = 256; bm.buffer = sub.data();
+        FT_Outline_Get_Bitmap(library, &slot->outline, &bm);
+        // FreeType's default LCD filter (FT_LCD_FILTER_DEFAULT): 5 taps over the subpixels
+        static const int fir[5] = { 8, 77, 86, 77, 8 };
+        g.mask.assign((size_t)sw * g.h, 0);
+        for (int32_t y = 0; y < g.h; y++) {
+            const uint8_t* in = sub.data() + (size_t)y * sw;
+            uint8_t* out = g.mask.data() + (size_t)y * sw;
+            for (int32_t x = 0; x < sw; x++) {
+                int v = 0;
+                for (int k = 0; k < 5; k++) { int i = x + k - 2; if (i >= 0 && i < sw) v += fir[k] * in[i]; }
+                v = (v + 128) >> 8;
+                out[x] = (uint8_t)(v > 255 ? 255 : v);
+            }
+        }
+        return true;
+    }
     g.mask.assign((size_t)g.w * g.h, 0);
 
     if (slot->format == FT_GLYPH_FORMAT_OUTLINE) {
@@ -527,11 +561,15 @@ static FT_UInt glyph_index(FT_Face face, uint32_t cp)
     return FT_Get_Char_Index(face, cp);
 }
 
-static const Glyph* get_glyph(const Font* cf, uint32_t cp)
+// opaque: the text goes onto an opaque surface (ClearType needs one; an alpha-tracking surface gets grey instead)
+static const Glyph* get_glyph(const Font* cf, uint32_t cp, bool opaque = false)
 {
     Font* f = (Font*)cf;   // the cache is not part of the font's logical state
-    bool mono = f->quality == 2 ? true : f->quality == 1 ? false : !smoothing || f->gasp_mono;
-    uint32_t key = (cp & 0x7fffffff) | (mono ? 0x80000000u : 0);
+    // ClearType (the system setting, or CLEARTYPE_QUALITY) ignores the gasp table's grey veto, as GDI's ClearType does
+    bool cleartype = f->quality == 3 || (f->quality == 0 && smoothing == SMOOTH_CLEARTYPE);
+    bool mono = f->quality == 2 ? true : f->quality == 1 || cleartype ? false : !smoothing || f->gasp_mono;
+    bool lcd = cleartype && opaque;
+    uint64_t key = (uint64_t)cp | (uint64_t)(lcd ? 2 : mono ? 1 : 0) << 32;
     auto it = f->cache.find(key);
     if (it != f->cache.end()) return &it->second;
 
@@ -539,7 +577,7 @@ static const Glyph* get_glyph(const Font* cf, uint32_t cp)
     // cache_glyph_bitmap: the glyph, else .notdef, else space
     FT_UInt indices[3] = { glyph_index(f->face, cp), 0, glyph_index(f->face, ' ') };
     bool ok = false;
-    for (int i = 0; i < 3 && !ok; i++) ok = render_glyph(f, indices[i], mono, g);
+    for (int i = 0; i < 3 && !ok; i++) ok = render_glyph(f, indices[i], mono, g, lcd);
     if (!ok) g = Glyph{};
     return &(f->cache[key] = std::move(g));
 }
@@ -586,7 +624,8 @@ static void draw_text(DC* dc, Point pos, const Font* f, const char* s, int32_t l
     int32_t baseline = pos.y + f->tm.ascent;
     int32_t x = pos.x;
     std::vector<const Glyph*> glyphs;
-    for_each_cp(s, len, [&](uint32_t cp) { glyphs.push_back(get_glyph(f, cp)); });
+    bool opaque_target = !dc->target->has_alpha;
+    for_each_cp(s, len, [&](uint32_t cp) { glyphs.push_back(get_glyph(f, cp, opaque_target)); });
     int32_t width = 0;
     for (const Glyph* g : glyphs) width += g->advance;
 
@@ -594,7 +633,8 @@ static void draw_text(DC* dc, Point pos, const Font* f, const char* s, int32_t l
     else if (opaque) fill_rect(dc, Rect{pos.x, pos.y, pos.x + width, pos.y + f->tm.height}, bg);
 
     for (const Glyph* g : glyphs) {
-        if (g->w) blend_mask(dc, Point{x + g->left, baseline - g->top}, g->mask.data(), g->w, g->h, g->w, fg);
+        if (g->w && g->lcd) blend_mask_lcd(dc, Point{x + g->left, baseline - g->top}, g->mask.data(), g->w, g->h, g->w * 3, fg);
+        else if (g->w) blend_mask(dc, Point{x + g->left, baseline - g->top}, g->mask.data(), g->w, g->h, g->w, fg);
         x += g->advance;
     }
 

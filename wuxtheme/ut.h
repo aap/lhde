@@ -178,7 +178,8 @@ int ut_draw_caption(uint32_t *pixels, int width, int height, int stride, const u
 /* GradientFill(GRADIENT_FILL_RECT_H) as GDI computes it: c0 (0xRRGGBB) at rect's left edge to c1 at its right */
 int ut_gradient_fill_h(uint32_t *pixels, int width, int height, int stride, const ut_rect *rect, uint32_t c0, uint32_t c1);
 /* the text renderer's "Smooth edges of screen fonts" for every draw call of this process: 0 off, 1 standard (grayscale where the
- * font's gasp table allows it: Tahoma 8 stays crisp), 2 ClearType (drawn as standard for now). Default 1. */
+ * font's gasp table allows it: Tahoma 8 stays crisp), 2 ClearType (RGB subpixel coverage on opaque pixels, ignoring the gasp
+ * table; grey where the target keeps alpha). Default 1. */
 void ut_set_font_smoothing(int mode);
 
 #ifdef UT_WITH_CAIRO

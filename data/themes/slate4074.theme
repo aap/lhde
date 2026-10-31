@@ -26,3 +26,6 @@ navbar   = 4074              ; small | medium | large | xlarge
 wallpaper = 4074/Bliss       ; the green leaves (Bliss of builds 4067-4082)
 mode      = fill
 icons     = longhorn4074
+
+[Fonts]
+smoothing = cleartype      ; every 4074 screenshot has ClearType text (Tahoma 8 and Segoe UI alike)
