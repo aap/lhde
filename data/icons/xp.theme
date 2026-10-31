@@ -35,6 +35,8 @@ trash = pe:shell32.dll#32
 help = pe:shell32.dll#24
 pictures = pe:shell32.dll#236
 control_panel = pe:shell32.dll#137
+; desk.cpl's IDI_DISPLAY (Display Properties' window icon): XP's desk.cpl is not among this build's files, 4074's has XP's art
+display = pe:resources/4074/desk.cpl#100
 run = pe:shell32.dll#25
 recent = pe:shell32.dll#21
 

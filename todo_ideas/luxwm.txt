@@ -22,6 +22,3 @@ looks like Ctrl-n switches desktops. this is very nice
 
 * a full-screen window (_NET_WM_STATE_FULLSCREEN, focused) must be above the taskbar and sidebar; today luxshell's bars stay on top of it
 
-## misc
-
-* better window icons, especially urxvt and "Display Properties"

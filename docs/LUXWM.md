@@ -820,9 +820,11 @@ Fixed (`client_set_icon`, `client_icon`, frame.c `frame_icon_from_netwm`, `frame
 `_NET_WM_ICON` (read up to 16M items) → the smallest image at least the icon size (`icon_size`, msstyles 16), else the largest,
 scaled once to the size with `CAIRO_FILTER_BEST` (aspect kept, centred); else `WM_HINTS` `icon_pixmap` + `icon_mask` (depth 1: black
 on white as the classic X icon box; other depths through the default visual; depth 32 taken as premultiplied ARGB; errors from a
-pixmap the client freed meanwhile are swallowed), scaled the same way; else the theme's default icon. PropertyNotify: `_NET_WM_ICON`
+pixmap the client freed meanwhile are swallowed), scaled the same way; else the generic application icon (`app_icon`: shell32 #3,
+what Windows draws for a window without an icon, from the first imported pack of 4074, 4051, 5112, 4042, `packs/BUILD/shell32/16|32/3.png`;
+urxvt and xterm get it instead of the DWM default's flag); else the theme's default icon. PropertyNotify: `_NET_WM_ICON`
 set, changed or deleted re-reads it; `WM_HINTS` re-reads the icon when its pixmap or mask id changed (urgency updates do not). Theme
-switches re-read at the new size (as before). `LHWM_DEBUG=1` logs `icon 0x...: client | theme default | none`.
+switches re-read at the new size (as before). `LHWM_DEBUG=1` logs `icon 0x...: client | application | theme default | none`.
 Default icons, theme key `default_icon = FILE [FILE...]` (relative to the theme directory; the nearest size at or above is used),
 else `default_icon.png`: aero/jade `default_icon.png` = the CompositedWindow `DEFAULTICON` part (msstyles STREAM 506, a 20x17
 Windows flag; aero from `res/aero/aero.msstyles/`, jade from `res/4074/jade.msstyles/`), drawn 1:1 centred on the 16 px cell (icons

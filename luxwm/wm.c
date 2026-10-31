@@ -79,6 +79,7 @@ static cairo_surface_t *client_icon(struct client *c);
 /* M2: EWMH states, stacking order, struts and work area */
 static void ewmh_update_state(struct client *c);
 static int client_hit(struct client *c, int x, int y);
+static cairo_surface_t *app_icon(int want);
 static void ewmh_update_stacking(void);
 static void client_minimize(struct client *c);
 static void client_restore(struct client *c);
@@ -2922,15 +2923,38 @@ client_set_icon(struct client *c)
         if (!c->icon && c->icon_pm) c->icon = frame_icon_from_pixmap(display, c->icon_pm, c->icon_mask, want);
         XFree(h);
     }
-    if (getenv("LHWM_DEBUG")) fprintf(stderr, "luxwm: icon 0x%lx: %s\n", c->window, c->icon ? "client" : theme_default_icon(&theme, want) ? "theme default" : "none");
+    if (getenv("LHWM_DEBUG")) fprintf(stderr, "luxwm: icon 0x%lx: %s\n", c->window, c->icon ? "client" : app_icon(want) ? "application" : theme_default_icon(&theme, want) ? "theme default" : "none");
 }
 
-/* what the caption shows: the client's icon, else the theme's default icon (DWM DEFAULTICON / the XP application icon) */
+/* the generic application icon (shell32 #3, user32's IDI_APPLICATION art) from an imported build's pack, 16 and 32 px: what a
+   window without an icon of its own shows in Windows' caption (urxvt, xterm and most X programs have none) */
+static cairo_surface_t *
+app_icon(int want)
+{
+    static cairo_surface_t *ic[2]; static bool tried;
+    if (!tried) {
+        tried = true;
+        static const char *builds[] = { "4074", "4051", "5112", "4042" };
+        for (size_t b = 0; b < sizeof builds / sizeof builds[0] && !ic[0] && !ic[1]; b++)
+            for (int k = 0; k < 2; k++) {
+                char rel[64], q[4200]; snprintf(rel, sizeof rel, "packs/%s/shell32/%d/3.png", builds[b], k ? 32 : 16);
+                if (!lhde_data_find(rel, q, sizeof q)) continue;
+                cairo_surface_t *s = cairo_image_surface_create_from_png(q);
+                if (cairo_surface_status(s) == CAIRO_STATUS_SUCCESS) ic[k] = s; else cairo_surface_destroy(s);
+            }
+    }
+    return want > 16 && ic[1] ? ic[1] : ic[0] ? ic[0] : ic[1];
+}
+
+/* what the caption shows: the client's icon, else the generic application icon, else the theme's default icon (DWM
+   DEFAULTICON / the XP application icon of the classic frame set) */
 static cairo_surface_t *
 client_icon(struct client *c)
 {
     if (c->icon) return (cairo_surface_t *)c->icon;
-    return theme_default_icon(&theme, theme.mode == THEME_MSSTYLES ? 16 : theme.icon_size);
+    int want = theme.mode == THEME_MSSTYLES ? 16 : theme.icon_size;
+    cairo_surface_t *a = app_icon(want);
+    return a ? a : theme_default_icon(&theme, want);
 }
 
 static void

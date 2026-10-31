@@ -32,6 +32,7 @@ trash = pe:shell32.dll#32
 help = pe:shell32.dll#24
 pictures = pe:resources/xp/shell32.dll#236   ; not in 2000's shell32 (mydocs.dll, ...): XP's, 4-bit frames
 control_panel = pe:shell32.dll#137
+display = pe:resources/4074/desk.cpl#100
 run = pe:shell32.dll#25
 recent = pe:shell32.dll#21
 
