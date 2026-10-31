@@ -797,9 +797,10 @@ int frame_shape_rects(const struct theme *t, cairo_surface_t *img, int maximized
     }
     /* msstyles: uxtheme builds the window region from the TRANSPARENT caption bitmap with its margin areas kept at their
        source positions (the rounded corners are not stretched with the image), so take the top rows 1:1 from the source */
-    const unsigned char *sd = NULL; int sw = 0, sh = 0, sst = 0, srows = 0;
+    const unsigned char *sd = NULL; int sw = 0, sh = 0, sst = 0, srows = 0, cap_rows = 0;
     if (t->mode == THEME_MSSTYLES) {
         zone = 0;
+        if (!maximized) cap_rows = 3 + t->ms_border + t->ms_cap_h + 1;
         const struct mspart *c = &t->ms[MP_CAPTION];
         if (!maximized && c->img[0][0]) {
             cairo_surface_t *s = c->img[0][0]; cairo_surface_flush(s);
@@ -811,6 +812,14 @@ int frame_shape_rects(const struct theme *t, cairo_surface_t *img, int maximized
     for (int y = 0; y < h; y++) {
         int l = 0, rr = 0;
         const uint32_t *row = NULL; int rw = w;
+        /* a caption row painted transparent across the whole width is outside the region, as GetThemeBackgroundRegion leaves it:
+           the ReactOS styles' CAPTION has transparent top rows, Watercolor Lite's (sizing margins 0 / 23, TILE) is shorter than
+           the band and its empty middle leaves the top rows unpainted; the window starts below them (2k3-205316.png) */
+        if (cap_rows && y < cap_rows) {
+            const uint32_t *pr = (const uint32_t *)(d + y * st); int x = 0;
+            while (x < w && (int)(pr[x] >> 24) < sa) x++;
+            if (x == w) { prev_l = prev_r = -1; continue; }
+        }
         if (y < srows) { row = (const uint32_t *)(sd + y * sst); rw = sw; }
         else if (y < zone || y >= h - zone) row = (const uint32_t *)(d + y * st);
         if (row) {

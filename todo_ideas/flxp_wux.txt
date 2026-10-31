@@ -7,8 +7,8 @@
 	the start button's right-click menu and the start menu's Programs cascade are a third kind: a different font and no Aero
 	highlight. 4074 itself has no Aero highlight on the Avalon bars' context menus (probably an oversight); it should be
 	universal. Reference: lh4074-215101.png (the Jade Programs menu)
-* Watercolor Lite (an XP style, in local/themes): non-full-height title bars get a black bar in luxwm; and flxp-taskbar's
-	start button sits too far to the edge (right in XP: 2k3-205316.png)
+* Watercolor Lite (an XP style, in local/themes): flxp-taskbar's start button sits too far to the edge (right in XP:
+	2k3-205316.png)
 * XP's toolbar has a small/large icons toggle (View > Toolbars > Customize... > Icon options); add it (the whole toolbar
 	customisation can come later)
 

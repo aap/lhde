@@ -31,9 +31,6 @@ imported is the free baseline. Left:
 * Also the place for the migration messages and lhde-theme dirs' view of the three trees.
 
 ## 4. Open smaller points
-* the ReactOS styles' frames show a black edge along the top of the decoration (luxwm msstyles mode with lunar/mizu/lautus):
-	find whether it is the style (a part wuxtheme draws black where XP's uxtheme would skip it: compare with the XP screenshots
-	WinXP-193456/193504/193512.png, which show the real caption) or luxwm's geometry for these styles
 * frame sets that exist only as copied pixels without a recipe (aerovision: "copied in"); every set should be regenerable.
 * Aero vision's resources resolve into the research workspace ([elsewhere] in explain); the import should own them.
 * Slate vision and Metal vision are still .todo theme files.

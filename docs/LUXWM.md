@@ -452,7 +452,10 @@ Geometry and drawing (frame.c `ms_paint`, `ms_btn_rect`, `theme_margins_ex`):
   classic themes change, nothing else.
 - Window shape: the caption's alpha-0 corners, taken 1:1 from the caption bitmap (uxtheme keeps the margin areas of
   the region unscaled; the drawn pixels come from the shrunk image, so row 3 of the 4074 corner differs - matches
-  the screenshots). Frames are opaque; the client area is left transparent (covered by the client), so the mode looks
+  the screenshots). A caption-band row painted transparent across the whole width is left out of the region, as uxtheme's
+  GetThemeBackgroundRegion leaves it: the ReactOS styles' CAPTION has three transparent top rows, and Watercolor Lite's
+  (SIZINGMARGINS top 0, bottom 23, TILE) is shorter than the 25-row band, so its empty middle paints nothing in the top three
+  rows; the window starts below them, as on XP (2k3-205316.png), instead of a black strip without a compositor. Frames are opaque; the client area is left transparent (covered by the client), so the mode looks
   the same with and without picom.
 - frame_hit: buttons exactly their rects, borders cnBorders wide, corners one caption height along each edge.
 
