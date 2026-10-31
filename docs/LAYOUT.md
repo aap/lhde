@@ -78,6 +78,7 @@ USER FILES                           yours; lhde writes only what you change in 
   luxshell-mfu.ini                     launch counts behind the start menu's frequently-used list
   flxp-views, flxp-desktop-positions   the view remembered per folder, the desktop icons' positions
   flxp-view-sizes                      the size each of the Explorer's Longhorn views had last
+  flxp-columns                         the Details columns chosen, their order and widths
   flxp-mfu, flxp-run-history           the start panel's launch counts, the Run box's history
 ```
 

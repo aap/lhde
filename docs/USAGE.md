@@ -490,7 +490,7 @@ What the Explorer says about the folder shown or the selection comes from one mo
 Per kind of item (file, picture, song, folder, drive, a virtual folder such as My Computer) it lists properties from a small
 registry: the derived Type, Attributes, Date Modified, Size, Dimensions, File System, Free Space, Total Size, and the stored
 Description (`user.lux.desc`), Tags (`user.xdg.tags`) and Comment (`user.xdg.comment`), the extended attributes of
-`docs/ANNOTATIONS.md`, read-only for now (set them with `setfattr` or luxfs's `x`).
+`docs/ANNOTATIONS.md` (how to edit them: "Descriptions and tags" below).
 
 **XP frame: the Details section.** The task pane's last section, under Places and Bookmarks, is XP's Details rollout. With nothing
 selected it describes the folder itself (its name in bold, "File Folder", Date Modified; My Computer "System Folder"; a drive "Local
@@ -507,7 +507,8 @@ folder" over it, and the folder's tasks (Make a new folder, Search, Open a termi
 columns, "more" opening the rest of the folder's menu. One item: its thumbnail in a white frame (a picture) or its 128 px icon,
 hanging a little below the band over the left pane, then its name, its values in two columns (size, date, type; a picture's size,
 date and dimensions) with "Add a description", "Add tags", "Add comments" where those attributes are empty, and "all properties..."
-(the Properties dialog). Several items: a stack of up to seven thumbnails, the focused one in front, "N items selected" and each
+(the Properties dialog). The description, tags and comment, or their invitations, are editable: a click opens an edit box in the
+row's place. Several items: a stack of up to seven thumbnails, the focused one in front, "N items selected" and each
 value shared by all or "(multiple values)". The item tasks (Open, Rename, Copy, Delete, Properties) follow when 200 px are left
 right of the details. View > Preview switches between the expanded band (126 rows, its bottom edge drags it up to 246) and the
 compact one (48 rows: the count or the name on one line, a small icon or thumbnail, the tasks side by side); dragging the edge
@@ -516,6 +517,37 @@ above 87 rows expands it, below compacts it (`taskpane_compact`, `taskpane_heigh
 or the bottom (`Explorer.taskpane`): the 5048 and 5112 themes have it under the list and the left pane, across the window's width,
 which comes close to Vista's details pane; there it is the same band mirrored, the picture hanging above it over the left pane
 (whose view button moves up out of its way) and its top edge dragging it.
+
+## Descriptions and tags (flxp)
+
+A file or folder can carry a one-line **description**, **tags** and a **comment**. They are extended attributes on the file
+itself (`user.lux.desc`, `user.xdg.tags`, `user.xdg.comment`; the names luxfs's `x` and `lsx` use, docs/ANNOTATIONS.md), so
+there is no database: they need a file system that keeps user attributes (ext4, btrfs, xfs, zfs, tmpfs; not FAT or many network
+mounts, where editing says so). Tags are stored comma-separated (`reference,4051`); typed, they may be separated by commas or
+semicolons, spaces around them are dropped, a tag given twice is kept once. Emptying a value removes the attribute.
+
+Where they show:
+- **Details view columns.** Right-click the column header for a check per column (Name, Size, Type, Date Modified, Description,
+  Tags, Comment) and More..., or View > Choose Details... (XP's dialog: check, Move Up / Move Down, Show / Hide, the selected
+  column's width). A click on a column header sorts by it (files without a value first). The columns, their order and widths
+  are remembered in `~/.local/state/lhde/flxp-columns`; the attributes are only read while one of their columns is shown or
+  sorted by.
+- **The infotip.** Resting the pointer on an item shows XP's tip: Type, Date Modified and Size, then Description, Tags and
+  Comment when they are set.
+- **The panes.** XP's Details rollout lists them when set (read-only, as XP's did); 4051's task band shows them for one item,
+  with "Add a description", "Add tags", "Add comments" when empty.
+
+How to edit:
+- **The context menu** (Explorer and desktop): Edit Description... (one item), Add Tag... (one or several items: each keeps its
+  tags and gets the new ones; the drop-down offers the tags used in the folder), and Remove Tag (a submenu of the selection's
+  tags, removed from every selected item that has it).
+- **The task band:** click a value or its invitation, type, Enter (or click elsewhere) keeps it, Escape drops it.
+- From a terminal: `x desc FILE "text"`, `x +tag FILE a b`, `lsx -t DIR` (luxfs), or `setfattr` / `getfattr`. The Explorer
+  follows a change made elsewhere (inotify reports attribute changes).
+
+They travel with the file where its attributes travel: a move on the same file system, flxp's own copy and move (also across
+file systems), `cp -a` (or `--preserve=xattr`), `rsync -X`, `tar --xattrs`. They do not travel with `cp` without `-a`, most
+archive and sync tools by default, or git.
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell M6, `SHELL-DESIGN.md` 6.3/6.4)
 

@@ -23,7 +23,8 @@ This section replaces the paths below; the dated sections after it are history (
   `FLXP_<KEY>` for one run), `keys` (luxwm's key bindings), and any shipped file overridden under its own name. What a program
   remembers on its own lives in `~/.local/state/lhde/` (`$XDG_STATE_HOME/lhde`): `luxshell-state.ini` (the tile order),
   `luxshell-mfu.ini` (launch counts), `luxshell-notifications` (the notification history), `flxp-views` (the view remembered
-  per folder), `flxp-view-sizes` (the size each of the Explorer's views had last), `flxp-desktop-positions` (icon positions),
+  per folder), `flxp-view-sizes` (the size each of the Explorer's views had last), `flxp-columns` (the Details columns chosen, their
+  order and widths), `flxp-desktop-positions` (icon positions),
   `flxp-mfu` and `flxp-run-history` (the start panel's launch counts and the Run box's history).
   Losing the state directory costs nothing but convenience. liblhde gives the paths (`lhde_config_file`, `lhde_state_file`;
   luxshell `lh.config_file`, `lh.state_file`; flxp `shell::settings_path`, `shell::state_file`) and `lhde-theme dirs` lists both.
