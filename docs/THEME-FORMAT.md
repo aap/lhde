@@ -40,7 +40,9 @@ A path (absolute or `~/`) is accepted in the user's own theme files only.
 `$PREFIX/share/lhde/themes/NAME.theme` (source: `data/themes/`), the user's in
 `~/.config/lhde/themes/NAME.theme`. A bare style in `styles/` is also a theme (section 5) for the resolver and `lhde-theme`;
 Display Properties lists theme files only and offers the styles on its Appearance tab ("Windows and buttons"), as Windows
-keeps Themes and the visual style apart (2026-10-28).
+keeps Themes and the visual style apart (2026-10-28). That list is the curated set: the styles some theme file (shipped or the
+user's) resolves to, Windows Classic style, and the selected style when it is neither; an imported file no theme names is
+reachable by naming it in a theme file (or as a bare style through `lhde-theme set`).
 
 ## 2. The file
 ```ini
@@ -152,6 +154,14 @@ luxwm and flxp link it, luxshell through a Lua binding. The root property `_LH_T
 that record as `section.key=value` lines plus `theme=NAME` and `serial=` (the `_LH_SETTINGS_SERIAL`
 it was resolved at); a client resolves itself when the property is missing or stale.
 
+Derived keys besides the theme keys: `theme`, `file`, `chain`, `current` (section 3), `style.kind`, `style.format`,
+`style.family`, `style.missing` and `path.*` (`<lhde/theme.h>`). `style.missing = 1` when the visual style the theme names is
+not imported and the theme fell back to classic (section 6; a substitute style such as luna -> luna4051 is a style: `0`).
+A theme with its style missing is not offered: Display Properties' Themes list, luxshell's settings flyout and flxp's start menu
+Theme list leave it out (the selected theme stays listed), and `lhde-theme list` marks it "style missing". `classic` is always
+complete. The lists ask `lhde_theme_has_style(NAME)` (the files only, without the current layer); a record has
+`lhde_theme_style_missing(t)`.
+
 ## 5. Defaults from the style (a bare style, or absent keys)
 | the style (wuxtheme: `ut_format`, classes, version info) | chrome | navbar | taskbar | pack | frames | icons |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -168,7 +178,8 @@ frames missing or no compositor -> `frames_classic`, else the style's decoration
 taskbar classic; navbar `vision` without luxnav -> `4074`; a navbar family whose art the style lacks ->
 drawn buttons; a classic (msstyles) frame set whose style is not imported and that has no pixels -> none (the
 style's own decorations, classic for classic). The free chain, ReactOS last (it keeps Windows' resource ids;
-docs/USAGE.md "Getting the Windows resources"): icons missing -> the first of `xp`, `2k`, `reactos` whose
+docs/USAGE.md "Getting the Windows resources"): a visual style missing -> classic (`style.missing = 1`: section 4, the
+theme is not listed); icons missing -> the first of `xp`, `2k`, `reactos` whose
 recipe and `resources/<source>` are imported, else the built-in Wine set; the build's resources missing ->
 `resources/xp`, `2k`, `reactos`, else drawn art; the build's fonts missing -> `fonts/reactos`, else
 fontconfig's. luxwm registers the first imported `marlett.ttf` of a Windows build, ReactOS's when there is

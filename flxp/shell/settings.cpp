@@ -341,7 +341,7 @@ std::vector<ThemeEntry> theme_list()
 std::vector<ThemeEntry> theme_files()
 {
     std::vector<ThemeEntry> out;
-    for (ThemeEntry& e : theme_list()) if (e.group < 2) out.push_back(e);
+    for (ThemeEntry& e : theme_list()) if (e.group < 2) { e.style_missing = lhde_theme_has_style(e.name.c_str()) == 0; out.push_back(e); }
     return out;
 }
 

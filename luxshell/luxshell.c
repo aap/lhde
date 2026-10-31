@@ -528,7 +528,8 @@ static int l_component_dir(lua_State *L) { char b[4200]; if (lhde_component_dir(
      lh.theme_resolve(name) -> { name =, file =, v = { ["Glass.frames"] = ..., ... }, why = { ... }, record = TEXT (no serial) },
                                or nil, error
      lh.theme_record(name, serial) -> the _LH_THEME_RESOLVED text (theme=, serial=, the record) or nil
-     lh.theme_list() -> { { name =, title =, file =, group = 0 user | 1 shipped | 2 style }, ... }
+     lh.theme_list() -> { { name =, title =, file =, group = 0 user | 1 shipped | 2 style, style_missing = true when the theme's
+                         visual style is not imported (lhde_theme_has_style; the lists leave it out) }, ... }
      lh.theme_lookup(name) -> the theme's name (aliases resolved) and its file ("" for a bare style), or nil
      lh.theme_set_key(name, "Sec.key", value | nil) -> the theme to select now (NAME-modified or NAME), or nil
      lh.theme_user_dir() -> ~/.config/lhde/themes
@@ -566,6 +567,7 @@ static void theme_list_cb(const char *name, const char *title, const char *file,
     lua_State *L = ud; lua_newtable(L);
     lua_pushstring(L, name); lua_setfield(L, -2, "name"); lua_pushstring(L, title); lua_setfield(L, -2, "title");
     lua_pushstring(L, file); lua_setfield(L, -2, "file"); lua_pushinteger(L, group); lua_setfield(L, -2, "group");
+    lua_pushboolean(L, group < 2 && lhde_theme_has_style(name) == 0); lua_setfield(L, -2, "style_missing");
     lua_rawseti(L, -2, (lua_Integer)lua_rawlen(L, -2) + 1);
 }
 static int l_theme_list(lua_State *L) { lua_newtable(L); lhde_theme_list(theme_list_cb, L); return 1; }

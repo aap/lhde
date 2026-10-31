@@ -59,11 +59,11 @@ return function(ctx)
       -- the selected theme with a current layer: "TITLE (Modified)" (docs/history/THEME-FORMAT-status.md section 14); selecting it again keeps the
       -- changes, another theme drops them (liblhde lhde_theme_select)
       local function label(e, t) if e.name == cur and cur_e and cur_e.modified then return t .. " (Modified)" end return t end
-      for _, e in ipairs(S.themes()) do
+      for _, e in ipairs(S.themes(cur)) do
         option("radio", label(e, e.title or e.name), e.name == cur, function() lh.select_theme(e.name); later() end)
       end
       -- the user's theme files (~/.config/lhde/themes: saved ones, and NAME-modified files of the earlier model)
-      local presets = S.presets()
+      local presets = S.presets(cur)
       if #presets > 0 then
         line(); heading("Your themes")
         for _, e in ipairs(presets) do

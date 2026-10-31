@@ -11,9 +11,10 @@
 --                              current layer has keys: Windows' "NAME (Modified)"), display (the title shown: "TITLE (Modified)")
 --                              }; nil, err
 --   S.lookup(name)             the theme's name when NAME is one (a theme file, an alias, a bare style), else nil
---   S.themes()                 the shipped theme files: { name, title, file, group } (group 1; bare styles are not themes: the
+--   S.themes([keep])           the shipped theme files whose visual style is imported (and keep, the selected one, anyway):
+--                              { name, title, file, group } (group 1; bare styles are not themes: the
 --                              Appearance of Display Properties picks them, docs/history/THEME-FORMAT-status.md section 14)
---   S.presets()                the user's theme files (group 0), with .base (their [Theme] base)
+--   S.presets([keep])          the user's theme files (group 0) whose style is imported (keep anyway), with .base ([Theme] base)
 --   S.theme_value(e, key)      taskbar | start | icons | composition | animations | sidebar of the resolved theme e (composition:
 --                              follow | on | off, the theme's auto is follow) and its source (file | base | settings | default |
 --                              fallback)
@@ -77,15 +78,18 @@ function S.lookup(name)
   if not c then c = lh.theme_lookup((name:gsub("/+$", ""):match("([^/]*)$"))) end   -- a path whose last component is one
   return c
 end
-function S.themes()
-  local out = {}
-  for _, t in ipairs(lh.theme_list()) do if t.group == 1 and not t.name:match("%-xp$") then table.insert(out, t) end end
-  return out
-end
-function S.presets()
+-- keep: a name listed even when its style is missing (the selected theme); the others whose style is not imported are left out
+function S.themes(keep)
   local out = {}
   for _, t in ipairs(lh.theme_list()) do
-    if t.group == 0 then
+    if t.group == 1 and not t.name:match("%-xp$") and (not t.style_missing or t.name == keep) then table.insert(out, t) end
+  end
+  return out
+end
+function S.presets(keep)
+  local out = {}
+  for _, t in ipairs(lh.theme_list()) do
+    if t.group == 0 and (not t.style_missing or t.name == keep) then
       for _, sec in ipairs(parse_ini(t.file) or {}) do if sec._name:lower() == "theme" then t.base = sec.base end end
       t.base = t.base or "?"; table.insert(out, t)
     end

@@ -732,7 +732,25 @@ static lhde_theme *resolve_ex(const char *name, int flags, const char *const *kv
     char fmt[8]; snprintf(fmt, sizeof fmt, "%d", si.format);
     put(t, "style.format", fmt, LHDE_FROM_DERIVED, "derived");
     put(t, "style.family", si.family, LHDE_FROM_DERIVED, "derived");
+    /* the style the theme names is not imported and it fell to classic (luna -> luna4051 is a style still): theme lists hide it */
+    { const char *vs = get(t, "VisualStyle.style");
+      int miss = lhde_theme_source(t, "VisualStyle.style") == LHDE_FROM_FALLBACK && vs && !strcasecmp(vs, "classic");
+      put(t, "style.missing", miss ? "1" : "0", LHDE_FROM_DERIVED, miss ? "derived: the theme's style is not imported" : "derived"); }
     return t;
+}
+
+int lhde_theme_style_missing(const lhde_theme *t)
+{
+    const char *v = t ? get(t, "style.missing") : NULL;
+    return v && !strcmp(v, "1");
+}
+int lhde_theme_has_style(const char *name)
+{
+    lhde_theme *t = lhde_theme_resolve_flags(name, LHDE_RESOLVE_FILES, NULL, 0);
+    if (!t) return -1;
+    int r = !lhde_theme_style_missing(t);
+    lhde_theme_free(t);
+    return r;
 }
 
 /* ---------------------------------------------------------------- serialization (_LH_THEME_RESOLVED) */

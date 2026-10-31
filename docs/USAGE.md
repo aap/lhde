@@ -157,7 +157,8 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
 ## lhde-theme
 The resolver from the shell (docs/THEME-FORMAT.md, liblhde):
 ```
-lhde-theme list                         every theme: the user's, the shipped ones, bare styles
+lhde-theme list                         every theme: the user's, the shipped ones, bare styles; "style missing" marks a theme
+                                        whose visual style is not imported (the settings lists leave it out)
 lhde-theme resolve aero5048 --why       the record, each key with where it came from (file, base, default, fallback + reason)
 lhde-theme resolve luna --get path.style
 lhde-theme set jade4074                 settings.ini [theme] name (the current layer dropped), then _LH_THEME on $DISPLAY

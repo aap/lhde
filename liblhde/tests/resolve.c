@@ -193,7 +193,16 @@ int main(void)
     t = R("luna");
     EQ(G(t, "VisualStyle.style"), "luna4051"); HAS(W(t, "VisualStyle.style"), "style luna not imported");
     EQ(G(t, "VisualStyle.color"), "HomeStead"); EQ(G(t, "style.kind"), "longhorn");
+    EQ(G(t, "style.missing"), "0");   /* a fallback style is a style: listed */
     lhde_theme_free(t);
+    /* a style not imported at all: classic, style.missing, left out of the lists */
+    put("data/themes/gone.theme", "[Theme]\nname = Gone\n[VisualStyle]\nstyle = nosuchstyle\n");
+    t = R("gone");
+    EQ(G(t, "VisualStyle.style"), "classic"); EQ(G(t, "style.missing"), "1"); CHECK(lhde_theme_style_missing(t));
+    lhde_theme_free(t);
+    CHECK(lhde_theme_has_style("gone") == 0); CHECK(lhde_theme_has_style("jade") == 1); CHECK(lhde_theme_has_style("nosuch") == -1);
+    put("data/themes/plain.theme", "[Theme]\nname = Plain\n[VisualStyle]\nstyle = classic\n");
+    CHECK(lhde_theme_has_style("plain") == 1);   /* classic is always complete */
     put("data/styles/luna.msstyles", "x");   /* the XP one imported: no fallback, v3 defaults */
     t = R("luna");
     EQ(G(t, "VisualStyle.style"), "luna"); EQ(G(t, "Explorer.chrome"), "xp"); EQ(G(t, "Theme.build"), "xp");

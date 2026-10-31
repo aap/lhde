@@ -28,8 +28,8 @@ imported is the free baseline. Left:
 * Provides the base resources: pick an ISO / WIM / resource pack / Windows directory, see what builds it holds, import with
   progress (lhde-import does the work; the dialog is the face), then what themes became complete (lhde-theme explain per
   theme, "missing -> fallback" shown as what the user would notice).
-* Adds themes: a .msstyles dropped in (+ shellstyle), a theme file, a frame set recipe; shows the subset we curate (the
-  Appearance list question: the "Windows and buttons" combo lists every imported style; aap wants the curated themes visible).
+* Adds themes: a .msstyles dropped in (+ shellstyle), a theme file, a frame set recipe; Appearance's "Windows and buttons"
+  lists only the styles a theme file names, so adding a style means adding a theme for it.
 * Look: 3683's Avalon settings dialog and Vista's Personalization as inspiration; XP's Display Properties stays the classic
   path. Where it lives: Display Properties' Themes tab ("Install theme...") and a standalone `lhde-setup`.
 * Also the place for the migration messages and lhde-theme dirs' view of the three trees.

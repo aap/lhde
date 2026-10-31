@@ -1,5 +1,6 @@
 /* lhde-theme: the theme files from the command line (liblhde; docs/THEME-FORMAT.md, docs/USAGE.md "lhde-theme").
-     lhde-theme list                       every theme: the user's, the shipped ones, the bare styles (name, group, title)
+     lhde-theme list                       every theme: the user's, the shipped ones, the bare styles (name, group,
+                                           "style missing" when its visual style is not imported, title)
      lhde-theme resolve NAME [--why]       the resolved record, one SECTION.KEY=VALUE per line; --why adds where each came from
      lhde-theme resolve NAME --get KEY     one value (scripts: lhde-session, lhwall.sh)
      lhde-theme resolve NAME --shell       the record as shell assignments (lhde_Glass_frames='...')
@@ -59,7 +60,8 @@ static void list_one(const char *name, const char *title, const char *file, int 
 {
     (void)file; (void)ud;
     static const char *g[] = { "user", "shipped", "style" };
-    printf("%-22s %-8s %s\n", name, g[group < 3 ? group : 2], title);
+    int has = group == 2 ? 1 : lhde_theme_has_style(name);   /* a bare style is its own style */
+    printf("%-22s %-8s %-14s %s\n", name, g[group < 3 ? group : 2], has == 0 ? "style missing" : "", title);
 }
 
 static void layer_one(const char *k, const char *v, void *ud) { (void)ud; printf("%s=%s\n", k, v); }
