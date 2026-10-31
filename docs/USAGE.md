@@ -365,8 +365,8 @@ Thumbnails show in every view and are just bigger or smaller images: a picture i
 shadow, a grey line, a mat graded from white to light grey; no frame below 32 px), any other file its own icon at the size, a
 folder 4074's photo standing in the open folder where the build has that art (shell32 #389/#390 of `longhorn_system32`; the
 folder's `folder.jpg` first, else its first picture), else the folder icon with up to four pictures on it. There is no square
-behind them; selection and hover are the theme's `Explorer::ListView` LISTITEM underlay (Slate tan, Jade blue), the classic
-highlight in styles without it. View > Show Thumbnails (and Folder Options) turn them off for every folder (`thumbnails = 0` in
+behind them; selection and hover are the theme's `Explorer::ListView` LISTITEM underlay (Slate tan, Jade blue; in Icons around
+the icon and its label, not the whole cell), the classic highlight in styles without it. View > Show Thumbnails (and Folder Options) turn them off for every folder (`thumbnails = 0` in
 `flxp.ini`); on network mounts (NFS, SMB, sshfs and other FUSE network filesystems) they are off unless `thumbnails_network = 1`,
 since every picture would be read over the network. The thumbnails are cached in `~/.cache/thumbnails` (the freedesktop spec, shared
 with other programs).

@@ -868,7 +868,7 @@
  
      /* now check if we need to update the focus rectangle */
      focus = infoPtr->bFocus && (item->state & LVIS_FOCUSED) ? &infoPtr->rcFocus : 0;
-@@ -4662,7 +5318,61 @@
+@@ -4662,7 +5318,69 @@
      else
          background = &rcSelect;
  
@@ -887,7 +887,15 @@
 +            InflateRect(&rcTheme, -TILE_INSET, -TILE_INSET);
 +        }
 +        else if (infoPtr->uView == LV_VIEW_ICON)
-+            UnionRect(&rcTheme, &rcBox, &rcLabel);
++        {
++            /* the icon's own square and its label, not the whole cell: LISTITEM's 4 px sizing margins
++               around the image, its top padding above, kept inside the cell (4074's Icons view) */
++            RECT icon = rcIcon;
++            InflateRect(&icon, 4, 0);
++            icon.top -= ICON_TOP_PADDING_HITABLE;
++            UnionRect(&rcTheme, &icon, &rcLabel);
++            IntersectRect(&rcTheme, &rcTheme, &rcBox);
++        }
 +        else if (infoPtr->uView == LV_VIEW_DETAILS && (infoPtr->dwLvExStyle & LVS_EX_FULLROWSELECT))
 +        {
 +            rcTheme = rcBox;
@@ -931,7 +939,7 @@
          ExtTextOutW(nmlvcd->nmcd.hdc, background->left, background->top, ETO_OPAQUE, background, NULL, 0, NULL);
  
      if (item->state & LVIS_FOCUSED)
-@@ -4693,6 +5403,17 @@
+@@ -4693,6 +5411,17 @@
          }
          else
              infoPtr->rcFocus = rcLabel;
@@ -949,7 +957,7 @@
      }
  
      /* state icons */
-@@ -4714,20 +5435,89 @@
+@@ -4714,20 +5443,89 @@
  
          TRACE("iImage=%d\n", item->iImage);
  
@@ -1041,7 +1049,7 @@
      /* figure out the text drawing flags */
      format = (infoPtr->uView == LV_VIEW_ICON ? (focus ? LV_FL_DT_FLAGS : LV_ML_DT_FLAGS) : LV_SL_DT_FLAGS);
      if (infoPtr->uView == LV_VIEW_ICON)
-@@ -4752,6 +5542,15 @@
+@@ -4752,6 +5550,15 @@
      if (infoPtr->uView == LV_VIEW_DETAILS && infoPtr->dwLvExStyle & LVS_EX_GRIDLINES)
          rcLabel.bottom--;
  
@@ -1057,7 +1065,7 @@
      DrawTextW(nmlvcd->nmcd.hdc, item->pszText, -1, &rcLabel, format);
  }
  
-@@ -4785,7 +5584,7 @@
+@@ -4785,7 +5592,7 @@
      /* get information needed for drawing the item */
      lvItem.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM | LVIF_STATE;
      if (infoPtr->uView == LV_VIEW_DETAILS) lvItem.mask |= LVIF_INDENT;
@@ -1066,7 +1074,7 @@
      lvItem.iItem = nItem;
      lvItem.iSubItem = 0;
      lvItem.state = 0;
-@@ -5252,6 +6051,9 @@
+@@ -5252,6 +6059,9 @@
      cdmode = notify_customdraw(infoPtr, CDDS_PREPAINT, &nmlvcd);
      if (cdmode & CDRF_SKIPDEFAULT) goto enddraw;
  
@@ -1076,7 +1084,7 @@
      /* nothing to draw */
      if(infoPtr->nItemCount == 0) goto enddraw;
  
-@@ -6065,19 +6867,90 @@
+@@ -6065,19 +6875,90 @@
      return EditLblWndProcT(hwnd, uMsg, wParam, lParam, FALSE);
  }
  
@@ -1171,7 +1179,7 @@
  
      if (!hedit) return 0;
  
-@@ -6096,11 +6969,7 @@
+@@ -6096,11 +6977,7 @@
      WCHAR disptextW[DISP_TEXT_SIZE] = { 0 };
      HWND hwndSelf = infoPtr->hwndSelf;
      NMLVDISPINFOW dispInfo;
@@ -1183,7 +1191,7 @@
  
      TRACE("(nItem=%d, isW=%d)\n", nItem, isW);
  
-@@ -6147,36 +7016,14 @@
+@@ -6147,36 +7024,14 @@
  
      TRACE("disp text=%s\n", debugtext_t(dispInfo.item.pszText, isW));
  
@@ -1226,7 +1234,7 @@
      SendMessageW(infoPtr->hwndEdit, EM_SETSEL, 0, -1);
      return infoPtr->hwndEdit;
  }
-@@ -6208,6 +7055,14 @@
+@@ -6208,6 +7063,14 @@
      rcItem.left = LVIR_BOUNDS;
      if (!LISTVIEW_GetItemRect(infoPtr, nItem, &rcItem)) return FALSE;
  
@@ -1241,7 +1249,7 @@
      if (bPartial && IntersectRect(&rcTemp, &infoPtr->rcList, &rcItem)) return TRUE;
      
      if (rcItem.left < infoPtr->rcList.left || rcItem.right > infoPtr->rcList.right)
-@@ -6781,6 +7636,9 @@
+@@ -6781,6 +7644,9 @@
      else
  	pItemHdr = &lpItem->hdr;
  
@@ -1251,7 +1259,7 @@
      /* Do we need to query the state from the app? */
      if ((lpLVItem->mask & LVIF_STATE) && infoPtr->uCallbackMask && (!lpLVItem->iSubItem || is_subitem_invalid))
      {
-@@ -7800,6 +8658,7 @@
+@@ -7800,6 +8666,7 @@
      if (!is_assignable_item(lpLVItem, infoPtr->dwStyle)) return -1;
  
      if (!(lpItem = Alloc(sizeof(*lpItem)))) return -1;
@@ -1259,7 +1267,7 @@
      
      /* insert item in listview control data structure */
      if ( !(hdpaSubItems = DPA_Create(8)) ) goto fail;
-@@ -7921,6 +8780,7 @@
+@@ -7921,6 +8788,7 @@
  
  	LISTVIEW_MoveIconTo(infoPtr, nItem, &pt, TRUE);
      }
@@ -1267,7 +1275,7 @@
  
      /* now is the invalidation fun */
      LISTVIEW_ScrollOnInsert(infoPtr, nItem, 1);
-@@ -8698,6 +9558,9 @@
+@@ -8698,6 +9566,9 @@
              LISTVIEW_SetBkColor(infoPtr, CLR_NONE);
      }
  
@@ -1277,7 +1285,7 @@
      if((infoPtr->dwLvExStyle ^ old_ex_style) & LVS_EX_HEADERINALLVIEWS)
      {
          if (infoPtr->dwLvExStyle & LVS_EX_HEADERINALLVIEWS)
-@@ -8825,6 +9688,50 @@
+@@ -8825,6 +9696,50 @@
      return oldspacing;
  }
  
@@ -1328,7 +1336,7 @@
  static inline void set_icon_size(SIZE *size, HIMAGELIST himl, BOOL is_small)
  {
      INT cx, cy;
-@@ -8867,7 +9774,9 @@
+@@ -8867,7 +9782,9 @@
          himlOld = infoPtr->himlNormal;
          infoPtr->himlNormal = himl;
          if (infoPtr->uView == LV_VIEW_ICON) set_icon_size(&infoPtr->iconSize, himl, FALSE);
@@ -1339,7 +1347,7 @@
              LISTVIEW_SetIconSpacing(infoPtr, -1, -1);
      break;
  
-@@ -9018,6 +9927,16 @@
+@@ -9018,6 +9935,16 @@
      if (!pt || nItem < 0 || nItem >= infoPtr->nItemCount ||
  	!(infoPtr->uView == LV_VIEW_ICON || infoPtr->uView == LV_VIEW_SMALLICON)) return FALSE;
  
@@ -1356,7 +1364,7 @@
      Pt = *pt;
      LISTVIEW_GetOrigin(infoPtr, &Origin);
  
-@@ -9278,17 +10197,16 @@
+@@ -9278,17 +10205,16 @@
  static INT LISTVIEW_SetView(LISTVIEW_INFO *infoPtr, DWORD nView)
  {
    HIMAGELIST himl;
@@ -1380,7 +1388,7 @@
  
    SendMessageW(infoPtr->hwndEdit, WM_KILLFOCUS, 0, 0);
    ShowWindow(infoPtr->hwndHeader, SW_HIDE);
-@@ -9298,6 +10216,7 @@
+@@ -9298,6 +10224,7 @@
  
    himl = (nView == LV_VIEW_ICON ? infoPtr->himlNormal : infoPtr->himlSmall);
    set_icon_size(&infoPtr->iconSize, himl, nView != LV_VIEW_ICON);
@@ -1388,7 +1396,7 @@
  
    switch (nView)
    {
-@@ -9563,6 +10482,7 @@
+@@ -9563,6 +10490,7 @@
    SetWindowLongPtrW(hwnd, 0, (DWORD_PTR)infoPtr);
  
    infoPtr->hwndSelf = hwnd;
@@ -1396,7 +1404,7 @@
    infoPtr->dwStyle = lpcs->style;    /* Note: may be changed in WM_CREATE */
    map_style_view(infoPtr);
    /* determine the type of structures to use */
-@@ -9573,6 +10493,7 @@
+@@ -9573,6 +10501,7 @@
    infoPtr->clrBk = CLR_NONE;
    infoPtr->clrText = CLR_DEFAULT;
    infoPtr->clrTextBk = CLR_DEFAULT;
@@ -1404,7 +1412,7 @@
    LISTVIEW_SetBkColor(infoPtr, comctl32_color.clrWindow);
  
    /* set default values */
-@@ -9609,6 +10530,7 @@
+@@ -9609,6 +10538,7 @@
    if (!(infoPtr->hdpaItemIds = DPA_Create(10))) goto fail;
    if (!(infoPtr->hdpaPosX  = DPA_Create(10))) goto fail;
    if (!(infoPtr->hdpaPosY  = DPA_Create(10))) goto fail;
@@ -1412,7 +1420,7 @@
    if (!(infoPtr->hdpaColumns = DPA_Create(10))) goto fail;
  
    return DefWindowProcW(hwnd, WM_NCCREATE, wParam, (LPARAM)lpcs);
-@@ -10055,6 +10977,13 @@
+@@ -10055,6 +10985,13 @@
  
    TRACE("(nVirtualKey=%d, lKeyData=%ld)\n", nVirtualKey, lKeyData);
  
@@ -1426,7 +1434,7 @@
    /* send LVN_KEYDOWN notification */
    nmKeyDown.wVKey = nVirtualKey;
    nmKeyDown.flags = 0;
-@@ -10309,6 +11238,24 @@
+@@ -10309,6 +11246,24 @@
    infoPtr->bMarqueeSelect = FALSE;
    infoPtr->bScrolling = FALSE;
  
@@ -1451,7 +1459,7 @@
    lvHitTestInfo.pt.x = x;
    lvHitTestInfo.pt.y = y;
  
-@@ -10495,6 +11442,10 @@
+@@ -10495,6 +11450,10 @@
    DPA_Destroy(infoPtr->hdpaItemIds);
    DPA_Destroy(infoPtr->hdpaPosX);
    DPA_Destroy(infoPtr->hdpaPosY);
@@ -1462,7 +1470,7 @@
    /* columns */
    for (i = 0; i < DPA_GetPtrCount(infoPtr->hdpaColumns); i++)
        Free(DPA_GetPtr(infoPtr->hdpaColumns, i));
-@@ -10790,6 +11741,14 @@
+@@ -10790,6 +11749,14 @@
  	    LISTVIEW_Arrange(infoPtr, LVA_DEFAULT);
  	LISTVIEW_UpdateScroll(infoPtr);
      }
@@ -1477,7 +1485,7 @@
  
      if (infoPtr->hwndHeader)  UpdateWindow(infoPtr->hwndHeader);
  
-@@ -11043,6 +12002,7 @@
+@@ -11043,6 +12010,7 @@
      if (infoPtr->hFont == oldFont) return 0;
      
      LISTVIEW_SaveTextMetrics(infoPtr);
@@ -1485,7 +1493,7 @@
  
      infoPtr->nItemHeight = LISTVIEW_CalculateItemHeight(infoPtr);
  
-@@ -11448,7 +12408,17 @@
+@@ -11448,7 +12416,17 @@
    case LVM_EDITLABELW:
      return (LRESULT)LISTVIEW_EditLabelT(infoPtr, (INT)wParam,
                                          uMsg == LVM_EDITLABELW);
@@ -1504,7 +1512,7 @@
  
    case LVM_ENSUREVISIBLE:
      return LISTVIEW_EnsureVisible(infoPtr, (INT)wParam, (BOOL)lParam);
-@@ -11558,7 +12528,8 @@
+@@ -11558,7 +12536,8 @@
      LISTVIEW_GetOrigin(infoPtr, (LPPOINT)lParam);
      return TRUE;
  
@@ -1514,7 +1522,7 @@
  
    case LVM_GETSELECTEDCOLUMN:
      return infoPtr->selected_column;
-@@ -11583,9 +12554,29 @@
+@@ -11583,9 +12562,29 @@
    case LVM_GETTEXTCOLOR:
      return infoPtr->clrText;
  
@@ -1546,7 +1554,7 @@
  
    case LVM_GETTOOLTIPS:
      if( !infoPtr->hwndToolTip )
-@@ -11599,7 +12590,7 @@
+@@ -11599,7 +12598,7 @@
      return (infoPtr->notifyFormat == NFR_UNICODE);
  
    case LVM_GETVIEW:
@@ -1555,7 +1563,7 @@
  
    case LVM_GETVIEWRECT:
      return LISTVIEW_GetViewRect(infoPtr, (LPRECT)lParam);
-@@ -11618,7 +12609,8 @@
+@@ -11618,7 +12617,8 @@
      return LISTVIEW_InsertColumnT(infoPtr, (INT)wParam, (LPLVCOLUMNW)lParam,
                                    uMsg == LVM_INSERTCOLUMNW);
  
@@ -1565,7 +1573,7 @@
  
    /* case LVM_INSERTGROUPSORTED: */
  
-@@ -11628,7 +12620,33 @@
+@@ -11628,7 +12628,33 @@
  
    /* case LVM_INSERTMARKHITTEST: */
  
@@ -1600,7 +1608,7 @@
  
    case LVM_ISITEMVISIBLE:
      return LISTVIEW_IsItemVisible(infoPtr, (INT)wParam);
-@@ -11734,7 +12752,12 @@
+@@ -11734,7 +12760,12 @@
      return LISTVIEW_SetItemTextT(infoPtr, (INT)wParam, (LPLVITEMW)lParam,
                                   uMsg == LVM_SETITEMTEXTW);
  
@@ -1614,7 +1622,7 @@
  
    case LVM_SETSELECTEDCOLUMN:
      infoPtr->selected_column = (INT)wParam;
-@@ -11749,9 +12772,36 @@
+@@ -11749,9 +12780,36 @@
    case LVM_SETTEXTCOLOR:
      return LISTVIEW_SetTextColor(infoPtr, (COLORREF)lParam);
  
@@ -1653,7 +1661,7 @@
  
    /* case LVM_SETTILEWIDTH: */
  
-@@ -11817,6 +12867,17 @@
+@@ -11817,6 +12875,17 @@
    case WM_KEYDOWN:
      return LISTVIEW_KeyDown(infoPtr, (INT)wParam, (LONG)lParam);
  
@@ -1671,7 +1679,7 @@
    case WM_KILLFOCUS:
      return LISTVIEW_KillFocus(infoPtr);
  
-@@ -11835,6 +12896,15 @@
+@@ -11835,6 +12904,15 @@
    case WM_MOUSEHOVER:
      return LISTVIEW_MouseHover(infoPtr, (SHORT)LOWORD(lParam), (SHORT)HIWORD(lParam));
  
@@ -1687,7 +1695,7 @@
    case WM_NCDESTROY:
      return LISTVIEW_NCDestroy(infoPtr);
  
-@@ -11983,45 +13053,9 @@
+@@ -11983,45 +13061,9 @@
      switch (HIWORD(wParam))
      {
  	case EN_UPDATE:

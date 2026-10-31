@@ -9,9 +9,6 @@ not *entirely* sure about the font for all themes though
 
 * the jade/aero theme in any case does not currently use Segoe UI for everything
 
-* longhorn icon highlights are currently too big.
-	should only take up the actual bounding box of the icon (only for actual icon view, details/tiles seem fine)
-
 * future: put the aurora example into longhorn flxp as an option
 
 * an option to put the Longhorn task pane (the band) at the bottom instead of the top: with the 5048 and 5112 styles that gets
