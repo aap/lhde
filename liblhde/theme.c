@@ -470,8 +470,10 @@ static void apply_fallbacks(lhde_theme *t, const lhde_style_info *si)
         char nm[128], rel[300]; snprintf(nm, sizeof nm, "%s", v); snprintf(rel, sizeof rel, "icons/%s.theme", nm);
         int ok = lhde_data_find(rel, p, sizeof p) != NULL;
         char res[256] = "";
-        if (ok) { lhde_ini *ini = lhde_ini_load(p); lhde_ini_get(ini, "theme", "resources", res, sizeof res); lhde_ini_free(ini);
-                  char o[PATH_MAX]; if (res[0] && !lhde_data_find(res, o, sizeof o)) ok = 0; }
+        if (ok) { lhde_ini *ini = lhde_ini_load(p); lhde_ini_get(ini, "theme", "resources", res, sizeof res);
+                  char req[256] = ""; lhde_ini_get(ini, "theme", "requires", req, sizeof req); lhde_ini_free(ini);
+                  char o[PATH_MAX]; if (res[0] && !lhde_data_find(res, o, sizeof o)) ok = 0;
+                  if (req[0] && !lhde_data_find(req, o, sizeof o)) { ok = 0; snprintf(res, sizeof res, "%s", req); } }   /* an icon pack */
         if (!ok) {
             const char *fb = "wine";
             for (int i = 0; FREE_CHAIN[i]; i++) {

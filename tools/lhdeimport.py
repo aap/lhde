@@ -858,6 +858,76 @@ def copy_tree(src, dst, force, rep):
             copy_file(s, os.path.join(dst, os.path.relpath(s, src)), force, rep)
 
 
+# ---------------------------------------------------------------- an icon pack (lhde-import --icons DIR NAME)
+ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
+
+
+def import_icons(src, W, name, force=False, licence=None):
+    """a directory of icon images (a third-party pack: PNGs of any size, .ico files) into W/local/icons/NAME/, relative paths
+    kept: a .ico is copied as it is, a PNG becomes NAME.ico with the sizes ICON_SIZES (downscaled with Lanczos; a
+    1024 px original is too large to scale for every 16 px icon at run time, and flxp's loader reads icons from .ico).
+    Licence and readme files at the top of src (or beside it, as a git checkout keeps LICENSE next to the release's
+    folder) are copied too, and source.ini says where it came from. Nothing in src is run. Returns the files written."""
+    from PIL import Image
+    if not re.match(r'^[a-z0-9._-]+$', name):
+        die('--icons: NAME must be [a-z0-9._-]+ (%s)' % name)
+    if not os.path.isdir(src):
+        die('--icons: %s is no directory' % src)
+    dst = os.path.join(W, 'local', 'icons', name)
+    os.makedirs(dst, exist_ok=True)
+    n = kept = 0
+    for r, ds, fs in os.walk(src):
+        ds[:] = sorted(d for d in ds if not d.startswith('.') and d != '__MACOSX')
+        for f in sorted(fs):
+            if f.startswith('.'):
+                continue
+            s = os.path.join(r, f)
+            rel = os.path.relpath(s, src)
+            low = f.lower()
+            if low.endswith('.ico'):
+                out = os.path.join(dst, rel)
+                if os.path.exists(out) and not force:
+                    kept += 1
+                    continue
+                os.makedirs(os.path.dirname(out), exist_ok=True)
+                shutil.copyfile(s, out)
+                n += 1
+            elif low.endswith('.png'):
+                out = os.path.join(dst, rel[:-4] + '.ico')
+                if os.path.exists(out) and not force and os.path.getmtime(out) >= os.path.getmtime(s):
+                    kept += 1
+                    continue
+                try:
+                    im = Image.open(s).convert('RGBA')
+                except Exception as e:
+                    log('--icons: %s skipped (%s)' % (rel, e))
+                    continue
+                if im.width != im.height:   # square it: centred on a transparent canvas
+                    m = max(im.width, im.height)
+                    sq = Image.new('RGBA', (m, m))
+                    sq.paste(im, ((m - im.width) // 2, (m - im.height) // 2))
+                    im = sq
+                sizes = [(z, z) for z in ICON_SIZES if z <= im.width] or [(im.width, im.width)]
+                if im.width > 256:
+                    im = im.resize((256, 256), Image.LANCZOS)
+                os.makedirs(os.path.dirname(out), exist_ok=True)
+                im.save(out, format='ICO', sizes=sizes)
+                n += 1
+    for d in (src, os.path.dirname(os.path.abspath(src))):
+        for f in sorted(os.listdir(d)):
+            if re.match(r'^(licen[cs]e|copying|readme)(\.(md|txt))?$', f, re.I) and os.path.isfile(os.path.join(d, f)):
+                if not os.path.exists(os.path.join(dst, f)):
+                    shutil.copyfile(os.path.join(d, f), os.path.join(dst, f))
+    if licence:
+        shutil.copyfile(licence, os.path.join(dst, 'LICENSE'))
+    with open(os.path.join(dst, 'source.ini'), 'w') as fh:
+        fh.write('; an icon pack imported with lhde-import --icons (docs/USAGE.md "Icon packs")\n[icons]\nname = %s\nfrom = %s\n'
+                 'imported = %s\nsizes = %s\n' % (name, os.path.abspath(src), datetime.date.today().isoformat(),
+                                                  ' '.join(str(z) for z in ICON_SIZES)))
+    log('local/icons/%s: %d icons written, %d kept (%s)' % (name, n, kept, os.path.abspath(src)))
+    return n
+
+
 def import_pack(pack, W, force=False, recipes=True):
     """every source of the pack into the Windows tree W: W/<source>/ = the pack's <source>/ (raw files, source.ini), the
     classic schemes into W/generated/schemes, the index, then the recipes into W/generated"""

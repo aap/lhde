@@ -27,7 +27,7 @@ Decisions in force (from that history):
 | frames | `frames/NAME/` (`theme.ini` shipped + pixels in `lhde-windows/generated/frames/NAME`) | luxwm's frame set: glass, or a non-composited reskin (vision buttons) |
 | pack | `packs/NAME/` (`shell.lua` shipped; pixels in `lhde-windows/generated/packs/<build>`) | luxshell's Avalon bars, per build and family: `4051-slate`, `4074-slate`, `4074-aero`, `5112-aero` |
 | navbar | `navbar/NAME.ini` | navigation-bar layout family: `4051`, `4074`, `vision` (later `5048`, `5112`) |
-| icons | `icons/NAME.theme` | an icon set recipe (keys -> `resources/<build>/shell32.dll#id`) |
+| icons | `icons/NAME.theme` | an icon set recipe (keys -> `resources/<build>/shell32.dll#id`, or `file:PACK/PATH` of an icon pack imported with `lhde-import --icons`: docs/USAGE.md "Icon packs") |
 | wallpaper | `wallpapers/[GROUP/]NAME.ext` | one `/` allowed: the build group (`4074/Bliss`) |
 | fonts | `fonts/NAME/` | per build (`4074`, `5112`), then fontconfig |
 | resources | `resources/BUILD/` | the build's DLLs (shell32, imageres, explorer, browseui, Avalon) |

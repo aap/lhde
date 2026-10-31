@@ -148,7 +148,7 @@ def reindex(W, quiet=False):
                 n += _link(p, os.path.join(new, 'styles', f[:-9] + '.msstyles'))
             elif os.path.isdir(p):
                 n += _link(p, os.path.join(new, 'styles', f))
-    for sub, kind in (('resources', 'resources'), ('fonts', 'fonts'), ('wallpapers', 'wallpapers')):
+    for sub, kind in (('resources', 'resources'), ('fonts', 'fonts'), ('wallpapers', 'wallpapers'), ('icons', 'icons')):
         d = os.path.join(L, sub)
         if os.path.isdir(d):
             for x in sorted(os.listdir(d)):

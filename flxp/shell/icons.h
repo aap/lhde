@@ -5,8 +5,11 @@
 // icons= in flxp.ini or FLXP_ICONS; default "xp", falling back to "wine" when
 // its files are not there) maps icon keys to .ico files or to resources inside
 // a PE file ("pe:shell32.dll#4"), resolved against [theme] resources =
-// resources/<build> (lhde-import's copy of that build's DLLs). No win32 here;
-// the explorer does the loading.
+// resources/<build> (lhde-import's copy of that build's DLLs), or to a file of
+// an imported icon pack ("file:xp-hires/My Computer.ico": index/icons/PACK/PATH,
+// lhde-import --icons). [theme] fallback = RECIPE... : the first usable one fills
+// the keys this recipe lacks or whose files are missing, and its toolbar when
+// this one has none. No win32 here; the explorer does the loading.
 #pragma once
 #include <string>
 #include <vector>

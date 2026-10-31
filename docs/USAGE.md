@@ -164,6 +164,26 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    22 schemes (XP, Server 2003 and Windows 2000 have the same ones), the "(large)" / "(extra large)" variants as the font sizes of
    their scheme. Without any, "Windows Standard" is the built-in classic colours.
 
+### Icon packs
+An icon recipe (`data/icons/NAME.theme`, chosen by a theme's `Desktop.icons`) maps flxp's icon keys to sources: `pe:FILE#ID`
+(an icon in an imported DLL) or `file:PACK/PATH` (a file of an icon pack imported with `lhde-import --icons`). A pack is any
+directory of PNGs and `.ico` files under a free licence; `lhde-import --icons DIR NAME [--licence FILE]` writes it into the
+Windows tree's `local/icons/NAME/` (relative paths kept; every PNG becomes a `.ico` with 16, 24, 32, 48, 64, 128 and 256 px
+images, downscaled once there instead of at every start; `.ico` files are copied; the licence and readme beside it and
+`source.ini` go with it) and indexes it as `icons/NAME`. A pack recipe says `requires = icons/NAME` (without the pack the
+resolver falls back like a recipe whose resources are missing) and `fallback = RECIPE...`: the first of those whose files are
+there gives every key the pack has no picture for, any file not imported, and the toolbar strips.
+The one shipped: `xp-hires`, the CC0 "Windows XP High Resolution Icon Pack" by marchmountain (1024 px PNGs redrawn after
+XP's icons; release 02 from github.com/marchmountain/-Windows-XP-High-Resolution-Icon-Pack, 159 MB zip; its folder
+`Windows XP Icons`, 500 pictures named by what they show), mapped key by key to xp.theme's ids (pdf and settings have no
+picture: XP's, 2000's or ReactOS's stand in):
+```
+lhde-import --icons "Windows XP High Resolution Icon Pack/Windows XP Icons" xp-hires --licence LICENSE   # 15 s, 36 MB
+lhde-theme layer-set Desktop.icons xp-hires                                                              # or a theme file's [Desktop] icons
+```
+The 16 px images are the 1024 px pictures scaled down: softer than XP's hand-drawn 16 px icons; at 32 px and up they are
+sharper.
+
 ## lhde-theme
 The resolver from the shell (docs/THEME-FORMAT.md, liblhde):
 ```

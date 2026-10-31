@@ -23,7 +23,7 @@ PROGRAM FILES                        make install; never edited by hand (a later
 $PREFIX/share/lhde/                  shipped data, our text only (DATADIR)
   themes/NAME.theme                    the shipped themes
   navbar/NAME.ini                      navigation bar layouts (4051 4074 vision)
-  icons/NAME.theme                     icon recipes (pe:shell32.dll#ID from resources/<build>)
+  icons/NAME.theme                     icon recipes (pe:shell32.dll#ID from resources/<build>, file:PACK/PATH from an icon pack)
   sources/ID.ini                       what lhde-pack takes from each Windows build, the recipes lhde-import runs
   frames/SET/theme.ini (+ nav.ini)     frame-set tuning; the pixels are generated, below
   packs/PACK/shell.lua                 luxshell's packs
@@ -43,7 +43,8 @@ WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_D
     fonts/  wallpapers/  setup/          (setup/hivedef.inf: the xp and 2k classic schemes)
     source.ini                           the rules it was taken with
   local/                               files that come from no source: themes/ (lhde-import --style: aero-patch, zune, ...),
-                                       schemes/ (lhde-schemes), wallpapers/ resources/ fonts/ (copied by hand, the workspace)
+                                       schemes/ (lhde-schemes), icons/PACK/ (lhde-import --icons: a free icon pack as .ico),
+                                       wallpapers/ resources/ fonts/ (copied by hand, the workspace)
   generated/                           everything derived; deleting it is always safe (lhde-import --regenerate)
     frames/SET/                          PNGs + manifest.ini (recipe, inputs with sha256); theme.ini of a set we do not ship
     packs/<build>/                       imageres/ID.png, shell32/SIZE/ID.png, manifest-*.ini
@@ -52,6 +53,7 @@ WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_D
     styles/NAME.msstyles, styles/NAME/     -> ../../<source>/themes/<Style>/... or ../../local/themes/...
     styles/NAME.scheme                     -> generated/schemes or local/schemes
     resources/<source> fonts/<source> wallpapers/<source>   -> ../../<source>/system32, fonts, wallpapers
+    icons/PACK                             -> ../../local/icons/PACK
     frames -> ../generated/frames,  packs -> ../generated/packs
   import.log
 
