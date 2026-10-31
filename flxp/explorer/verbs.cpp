@@ -7,6 +7,7 @@
 #include "shell/apps.h"
 #include "shell/bookmarks.h"
 #include "shell/config.h"
+#include "shell/details.h"
 #include "shell/settings.h"
 #include "shell/wallpapers.h"
 #include "shell/fileops.h"
@@ -25,6 +26,7 @@ static Host* g_host;
 static std::vector<const shell::App*> g_openwith;    // as last shown in an Open With submenu
 static std::vector<std::string> g_clip;              // Cut/Copy, also offered on the X CLIPBOARD (shell/xclip)
 static bool g_clip_cut;
+static std::vector<std::string> g_tags;               // the Remove Tag submenu's tags, as last shown
 
 static std::u16string W(const std::string& s) { return w32::utf16_of(s.c_str()); }
 #define WS(s) ((LPCWSTR)W(s).c_str())
@@ -227,6 +229,109 @@ void show_properties(const Item& it)
 
 void Host::show_properties_default() { show_properties(folder_item()); }
 
+void Host::stored_changed(const std::vector<std::string>& paths)
+{
+    std::vector<std::string> dirs;
+    for (const std::string& p : paths) {
+        std::string d = shell::dir_of(p);
+        if (std::find(dirs.begin(), dirs.end(), d) == dirs.end()) dirs.push_back(d);
+    }
+    changed(dirs);
+}
+
+// ---- descriptions and tags (shell/details.h: user.lux.desc, user.xdg.tags) ----------------
+
+static HICON item_icon(const std::vector<Item>& items)
+{
+    return uiicons::large_icon(items.size() == 1 ? items[0].icon : "document");
+}
+
+// the tags the selection has (in their order, the first item's first), for Remove Tag
+static std::vector<std::string> selection_tags(const std::vector<Item>& items)
+{
+    std::vector<std::string> out;
+    const shell::details::Property* p = shell::details::property("tags");
+    for (size_t i = 0; i < items.size() && i < 500; i++) {
+        if (!is_fs(items[i])) continue;
+        for (const auto& kv : shell::details::read_stored(items[i].path))
+            if (kv.first == p->xattr)
+                for (const std::string& t : shell::details::split_list(kv.second))
+                    if (std::find(out.begin(), out.end(), t) == out.end()) out.push_back(t);
+    }
+    return out;
+}
+
+static void edit_description(const Item& it)
+{
+    if (!is_fs(it)) { MessageBeep(0); return; }
+    const shell::details::Property* p = shell::details::property("description");
+    dialogs::TextAsk a;
+    a.title = "Edit Description";
+    a.prompt = "Description of '" + it.name + "':";
+    for (const auto& kv : shell::details::read_stored(it.path)) if (kv.first == p->xattr) a.initial = kv.second;
+    a.note = "One line, kept with the file. An empty description removes it.";
+    a.icon = item_icon({ it });
+    std::string text, err;
+    bool ok = dialogs::ask_text(g_host->window(), a, &text);
+    if (a.icon) DestroyIcon(a.icon);
+    if (!ok || text == a.initial) return;
+    if (!shell::details::write(it.path, *p, text, &err)) error_box(err);
+    g_host->stored_changed({ it.path });
+}
+
+static void add_tag(const std::vector<Item>& in)
+{
+    std::vector<Item> items;
+    for (const Item& it : in) if (is_fs(it)) items.push_back(it);
+    if (items.empty()) { MessageBeep(0); return; }
+    dialogs::TextAsk a;
+    a.title = "Add Tag";
+    a.prompt = items.size() == 1 ? "Tags to add to '" + items[0].name + "':"
+                                 : "Tags to add to the " + std::to_string(items.size()) + " selected items:";
+    std::vector<std::string> have = selection_tags(items);
+    a.note = "Separate several with commas. The tags the items have stay";
+    a.note += have.empty() ? "." : " (" + shell::details::tag_list(shell::details::join_list(have)) + ").";
+    // the drop-down offers the tags used in the folder (the items' own first)
+    std::vector<std::string> offer = have;
+    std::string dir = shell::dir_of(items[0].path);
+    if (auto f = shell::folder_for(dir)) {
+        std::vector<Item> all;
+        f->enumerate(all, false);
+        if (all.size() <= 2000) offer = selection_tags(all);
+    }
+    a.suggestions = offer;
+    a.dropdown = true;
+    a.icon = item_icon(items);
+    std::string text;
+    bool ok = dialogs::ask_text(g_host->window(), a, &text);
+    if (a.icon) DestroyIcon(a.icon);
+    std::vector<std::string> tags = shell::details::split_list(text);
+    if (!ok || tags.empty()) return;
+    std::string err;
+    std::vector<std::string> paths;
+    for (const Item& it : items) {
+        std::string e;
+        if (!shell::details::add_tags(it.path, tags, &e)) { if (err.find(e) == std::string::npos) err += (err.empty() ? "" : "\n") + e; continue; }
+        paths.push_back(it.path);
+    }
+    if (!paths.empty()) g_host->stored_changed(paths);
+    if (!err.empty()) error_box(err);
+}
+
+static void remove_tag(const std::vector<Item>& items, const std::string& tag)
+{
+    std::string err;
+    std::vector<std::string> paths;
+    for (const Item& it : items) {
+        if (!is_fs(it)) continue;
+        std::string e;
+        if (!shell::details::remove_tag(it.path, tag, &e)) { if (err.find(e) == std::string::npos) err += (err.empty() ? "" : "\n") + e; continue; }
+        paths.push_back(it.path);
+    }
+    if (!paths.empty()) g_host->stored_changed(paths);
+    if (!err.empty()) error_box(err);
+}
+
 void add_bookmark(const std::string& dir)
 {
     if (dir.empty()) { MessageBeep(0); return; }
@@ -240,6 +345,11 @@ bool run(int id)
     if (id >= ID_OPENWITH_FIRST && id <= ID_OPENWITH_LAST) {
         size_t k = (size_t)(id - ID_OPENWITH_FIRST);
         if (k < g_openwith.size()) open_with(g_openwith[k], items);
+        return true;
+    }
+    if (id >= ID_TAG_REMOVE_FIRST && id <= ID_TAG_REMOVE_LAST) {
+        size_t k = (size_t)(id - ID_TAG_REMOVE_FIRST);
+        if (k < g_tags.size()) remove_tag(items, g_tags[k]);
         return true;
     }
     switch (id) {
@@ -294,6 +404,8 @@ bool run(int id)
     }
     case ID_DELETE: delete_items(items); return true;
     case ID_RENAME: g_host->begin_rename(); return true;
+    case ID_EDIT_DESC: if (items.size() == 1) edit_description(items[0]); return true;
+    case ID_ADD_TAG: add_tag(items); return true;
     case ID_PROPERTIES:
         if (items.empty()) g_host->background_properties();
         else show_properties(items[0]);
@@ -438,6 +550,17 @@ void build_item_menu(HMENU m)
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m, MF_STRING, ID_DELETE, L"&Delete");
     AppendMenuW(m, MF_STRING | single, ID_RENAME, L"Rena&me");
+    AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+    // the stored properties (shell/details.h): a description for one item, tags for all
+    AppendMenuW(m, MF_STRING | single, ID_EDIT_DESC, L"Edit D&escription...");
+    AppendMenuW(m, MF_STRING, ID_ADD_TAG, L"Add Ta&g...");
+    g_tags = selection_tags(items);
+    HMENU rm = CreatePopupMenu();
+    for (size_t k = 0; k < g_tags.size() && (int)k <= ID_TAG_REMOVE_LAST - ID_TAG_REMOVE_FIRST; k++) {
+        std::u16string t = W(g_tags[k]);
+        AppendMenuW(rm, MF_STRING, (UINT_PTR)(ID_TAG_REMOVE_FIRST + (int)k), (LPCWSTR)t.c_str());
+    }
+    AppendMenuW(m, MF_POPUP | (g_tags.empty() ? MF_GRAYED : 0), (UINT_PTR)rm, L"Remo&ve Tag");
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m, MF_STRING | single, ID_PROPERTIES, L"P&roperties");
 }

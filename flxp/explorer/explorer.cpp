@@ -1453,6 +1453,13 @@ struct ExplorerHost : verbs::Host {
             navigate(shell::dir_of(it.path), false);
     }
     void updated() override { update_status(); }
+    // the list's rows again (their columns, the infotip) and the panes' details; the
+    // selection stays
+    void stored_changed(const std::vector<std::string>&) override
+    {
+        browser::update(g);
+        schedule_details();
+    }
 };
 static ExplorerHost g_host;
 

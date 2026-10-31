@@ -3,7 +3,10 @@
 // IContextMenu (Open bold, Explore for folders, Open With, Send To, Cut/Copy,
 // Create Shortcut, Delete, Rename, Properties) and the background menu from its
 // own (View, Arrange Icons By, Refresh, Paste, New, Properties). Ours is the
-// same shape with the unix additions: Open Terminal Here and Add to Bookmarks.
+// same shape with the unix additions: Open Terminal Here and Add to Bookmarks,
+// and the stored properties of shell/details.h: Edit Description... (one item),
+// Add Tag... (every selected item keeps its tags and gets the new ones) and
+// Remove Tag (the selection's tags; from every item that has it).
 // What differs between the views (how a folder opens, how they refresh, how a
 // rename starts) goes through a Host.
 #pragma once
@@ -41,6 +44,9 @@ struct Host {
     virtual void trashed(const Item&) {}                    // before the refill (the explorer leaves a deleted folder)
     virtual void updated() {}                               // a dialog may have changed what the status shows
     virtual void background_properties() { show_properties_default(); }
+    // a description or tags of these files changed (Edit Description, Add Tag, Remove Tag):
+    // by default changed() for their folders
+    virtual void stored_changed(const std::vector<std::string>& paths);
     void show_properties_default();
 };
 
