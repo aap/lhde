@@ -12,3 +12,5 @@
 	* mouse hover over tiles
 	* unclear how quicklaunch icons are chosen
 		* perhaps tie into the grander lhde icon system?
+* menupaint.c copied luxwm's old 4 px menu shadow; the painter now has XP's 5 px one (ut_menu_shadow_alpha, UT_MENU_SHADOW):
+	use it, as luxwm does now, and honour [effects] menu_shadows
