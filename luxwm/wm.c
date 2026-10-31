@@ -4892,7 +4892,7 @@ drag_pred(Display *d, XEvent *ev, XPointer arg)
 {
     (void)d; (void)arg;
     switch (ev->type) {
-    case MotionNotify: case ButtonPress: case ButtonRelease: case KeyPress:
+    case MotionNotify: case ButtonPress: case ButtonRelease: case KeyPress: case KeyRelease:
     case Expose: case MapRequest: case ConfigureRequest:
         return True;
     case ClientMessage:
@@ -5119,6 +5119,14 @@ kb_hit(int kx, int ky)
     return tab[kx + 1][ky + 1];
 }
 
+/* the other way round: the edges of a border hit (HIT_L..HIT_BR) */
+static void
+kb_edges(int hit, int *kx, int *ky)
+{
+    *kx = hit == HIT_L || hit == HIT_TL || hit == HIT_BL ? -1 : hit == HIT_R || hit == HIT_TR || hit == HIT_BR ? 1 : 0;
+    *ky = hit == HIT_T || hit == HIT_TL || hit == HIT_TR ? -1 : hit == HIT_B || hit == HIT_BL || hit == HIT_BR ? 1 : 0;
+}
+
 /* the keyboard move/size step (movesize.c: max(SM_CXSIZE / 2, 1), Ctrl 1 px): half a caption button, at least one size-hint
    increment when sizing */
 static int
@@ -5140,6 +5148,9 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
        picks the edges it moves towards. Keyboard move (Alt+Space, M; ..._MOVE_KEYBOARD) moves at once; the mouse takes over too */
     bool kbsize = keyboard && hit != HIT_CAPTION;
     int kx = 0, ky = 0, rx0 = 0, ry0 = 0, vx = 0, vy = 0;   /* chosen edges; pointer before the mode (put back on Return/Escape); last pointer */
+    int first_ax = 0;           /* size mode: the axis of the edge picked first (1 x, 2 y; 0 none or a corner at once): Shift toggles back to it */
+    bool held[4] = { false };   /* keyboard modes: the arrows held down (Left, Right, Up, Down): two of them move diagonally */
+    Bool repeat_was = False;
     if (kbsize) hit = HIT_NONE;
     Cursor cur = hit == HIT_CAPTION || hit == HIT_NONE ? move_cursor : edge_cursor[hit];
     int grabbed = GrabNotViewable;
@@ -5151,6 +5162,8 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         int kg = GrabNotViewable;
         for (int i = 0; i < 20 && (kg = XGrabKeyboard(display, root, False, GrabModeAsync, GrabModeAsync, CurrentTime)) != GrabSuccess; i++) usleep(5000);
         if (kg != GrabSuccess) { XUngrabPointer(display, CurrentTime); return; }
+        repeat_was = XkbGetDetectableAutoRepeat(display, NULL);
+        XkbSetDetectableAutoRepeat(display, True, NULL);   /* a held arrow repeats as presses only, its release is real */
         Window rw, cw; int wx, wy; unsigned m; XQueryPointer(display, root, &rw, &cw, &rx0, &ry0, &wx, &wy, &m);
         /* movesize.c: the pointer goes to the middle of the caption (move) or of the window (size) */
         int l, r, t, b; margins(c, &l, &r, &t, &b);
@@ -5188,6 +5201,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         if (pend) { DRAG_STEP(); pend = false; } \
         if (nkx) kx = nkx; \
         if (nky) ky = nky; \
+        if (!first_ax) first_ax = kx && !ky ? 1 : ky && !kx ? 2 : 0; \
         hit = kb_hit(kx, ky); ox = c->geom.x; oy = c->geom.y; ow = c->geom.width; oh = c->geom.height; \
         px = vx = (ax); py = vy = (ay); \
         XChangeActivePointerGrab(display, MOUSEMASK, edge_cursor[hit], CurrentTime); } while (0)
@@ -5214,19 +5228,46 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         case ButtonRelease:
             if (!keyboard && (button == 0 || ev.xbutton.button == button)) done = true;
             break;
+        case KeyRelease: {
+            KeySym k = XkbKeycodeToKeysym(display, ev.xkey.keycode, 0, 0);
+            int a = k == XK_Left || k == XK_KP_Left ? 0 : k == XK_Right || k == XK_KP_Right ? 1 : k == XK_Up || k == XK_KP_Up ? 2 : k == XK_Down || k == XK_KP_Down ? 3 : -1;
+            if (a >= 0) held[a] = false;
+            break;
+        }
         case KeyPress: {
             KeySym k = XkbKeycodeToKeysym(display, ev.xkey.keycode, 0, 0);
             if (k == XK_Escape) { cancel = true; done = true; kb_end = keyboard; }
             else if (keyboard && (k == XK_Return || k == XK_KP_Enter)) { done = true; kb_end = true; }
+            else if (kbsize && (k == XK_Shift_L || k == XK_Shift_R)) {
+                /* luxwm's own: Shift toggles between the edge and the corner next to it (the end nearer the pointer), and back to the
+                   edge picked first; the pointer is put on the new edge or corner, and the drag continues from there */
+                if (hit == HIT_NONE) break;
+                if (pend) { DRAG_STEP(); pend = false; }
+                int ax = vx, ay = vy;
+                if (kx && ky) { if (first_ax == 2) kx = 0; else ky = 0; }
+                else if (kx) { ky = vy < c->geom.y + c->geom.height / 2 ? -1 : 1; ay = ky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1; ax = kx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1; }
+                else { kx = vx < c->geom.x + c->geom.width / 2 ? -1 : 1; ax = kx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1; ay = ky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1; }
+                hit = kb_hit(kx, ky); ox = c->geom.x; oy = c->geom.y; ow = c->geom.width; oh = c->geom.height;
+                px = vx = ax; py = vy = ay;
+                XChangeActivePointerGrab(display, MOUSEMASK, edge_cursor[hit], CurrentTime);
+                XWarpPointer(display, None, root, 0, 0, 0, 0, vx, vy);
+                XSync(display, False); while (XCheckTypedEvent(display, MotionNotify, &ev)) ;
+                LOGP("size mode: Shift -> %s", kx && ky ? "corner" : "edge");
+            }
             else if (keyboard) {
                 int dx = k == XK_Left || k == XK_KP_Left ? -1 : k == XK_Right || k == XK_KP_Right ? 1 : 0;
                 int dy = k == XK_Up || k == XK_KP_Up ? -1 : k == XK_Down || k == XK_KP_Down ? 1 : 0;
                 if (!dx && !dy) break;
+                held[dx < 0 ? 0 : dx > 0 ? 1 : dy < 0 ? 2 : 3] = true;
+                /* an arrow of the other axis that is still held joins in: Right and Down held together size (or move) diagonally */
+                if (!dx) dx = held[1] - held[0];
+                if (!dy) dy = held[3] - held[2];
                 bool ctrl = (ev.xkey.state & ControlMask) != 0;
-                if (kbsize && ((dx && !kx) || (dy && !ky))) {   /* a new edge: the pointer onto it, nothing moves yet */
-                    int ax = dx ? (dx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1) : vx;
-                    int ay = dy ? (dy < 0 ? c->geom.y : c->geom.y + c->geom.height - 1) : vy;
-                    KB_PICK(dx, dy, ax, ay);
+                int nkx = kbsize && !kx ? dx : 0, nky = kbsize && !ky ? dy : 0;
+                if (nkx || nky) {   /* a new edge (both: a corner): the pointer onto it, nothing moves yet (movesize.c NoOffset) */
+                    int ax = nkx ? (nkx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1) : vx;
+                    int ay = nky ? (nky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1) : vy;
+                    KB_PICK(nkx, nky, ax, ay);
                 } else {
                     vx += dx * kb_step(c, ctrl, kbsize, true); vy += dy * kb_step(c, ctrl, kbsize, false);
                     pend = true; pend_x = vx; pend_y = vy; pend_time = ev.xkey.time;
@@ -5239,10 +5280,25 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         }
         case MotionNotify:
             p_ev++; while (XCheckTypedEvent(display, MotionNotify, &ev)) p_ev++;   /* only the latest position */
-            if (kbsize && hit == HIT_NONE) {   /* the mouse picks the edges it moves towards, from where it is (no jump) */
-                int mx = ev.xmotion.x_root - px, my = ev.xmotion.y_root - py;
-                int nkx = abs(mx) > DRAG_THRESHOLD ? (mx < 0 ? -1 : 1) : 0, nky = abs(my) > DRAG_THRESHOLD ? (my < 0 ? -1 : 1) : 0;
-                if (nkx || nky) KB_PICK(nkx, nky, ev.xmotion.x_root, ev.xmotion.y_root);
+            if (kbsize && hit == HIT_NONE) {
+                /* the mouse picks the edges: the border or corner it is on (movesize.c: a hit test on every move in WMSZ_KEYSIZE), or
+                   the ones it moves towards, from where it is (no jump): past 3 x DRAG_THRESHOLD, both edges of a corner when the move is
+                   within about 27 degrees of the diagonal (the shorter axis at least half the longer) */
+                int mx = ev.xmotion.x_root - px, my = ev.xmotion.y_root - py, m = MAX(abs(mx), abs(my)), nkx = 0, nky = 0;
+                int fx = ev.xmotion.x_root - c->geom.x, fy = ev.xmotion.y_root - c->geom.y;
+                int on = fx >= 0 && fy >= 0 && fx < c->geom.width && fy < c->geom.height ? client_hit(c, fx, fy) : HIT_NONE;
+                if (on >= HIT_L && on <= HIT_BR) kb_edges(on, &nkx, &nky);
+                else if (m > 3 * DRAG_THRESHOLD) {
+                    if (2 * abs(mx) >= m) nkx = mx < 0 ? -1 : 1;
+                    if (2 * abs(my) >= m) nky = my < 0 ? -1 : 1;
+                }
+                if (nkx || nky) {   /* the pointer onto the picked edge (or corner): the edge follows it from there */
+                    int ax = nkx ? (nkx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1) : ev.xmotion.x_root;
+                    int ay = nky ? (nky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1) : ev.xmotion.y_root;
+                    KB_PICK(nkx, nky, ax, ay);
+                    XWarpPointer(display, None, root, 0, 0, 0, 0, vx, vy);
+                    XSync(display, False); while (XCheckTypedEvent(display, MotionNotify, &ev)) ;
+                }
                 break;
             }
             if (!moved && abs(ev.xmotion.x_root - px) <= DRAG_THRESHOLD && abs(ev.xmotion.y_root - py) <= DRAG_THRESHOLD)
@@ -5277,7 +5333,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
                 now_ms() - p_start, p_ev, p_n, p_step / p_n, p_max, frame_prof_ms[3], frame_prof_ms[0] / frame_prof_ms[3], frame_prof_ms[1] / frame_prof_ms[3], frame_prof_ms[2] / frame_prof_ms[3]);
     if (kb_end) XWarpPointer(display, None, root, 0, 0, 0, 0, rx0, ry0);   /* movesize.c: ptRestore when the keyboard ended it */
     XUngrabPointer(display, CurrentTime);
-    if (keyboard) XUngrabKeyboard(display, CurrentTime);
+    if (keyboard) { XUngrabKeyboard(display, CurrentTime); if (!repeat_was) XkbSetDetectableAutoRepeat(display, False, NULL); }
     if (cancel) {
         LOGN("drag cancelled");
         if (was_max) { if (!c->mono) client_apply_max(c); }

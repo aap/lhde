@@ -259,13 +259,19 @@ while the menu was open is left alone).
 goes to the middle of the caption (Move) or of the window (Size), cursor fleur. Move: arrows move by half a caption button
 (`max(SM_CXSIZE / 2, 1)`: msstyles CAPTIONBARHEIGHT / 2, DWM caption height / 2 = 13 px), Ctrl+arrow 1 px. Size starts with no edge
 (WMSZ_KEYSIZE): the first Left/Right picks the left/right edge, the first Up/Down the top/bottom edge (two of them a corner) and
-puts the pointer on it without changing anything; further arrows move it by the same step (at least one size-hint increment); or
-the mouse picks the edges it moves towards (past `DRAG_THRESHOLD`) and continues from there. In both modes mouse motion takes over;
+puts the pointer on it without changing anything; further arrows move it by the same step (at least one size-hint increment).
+Two arrows held together (Right and Down) step diagonally, in Move as in Size (luxwm's own; X repeats only the last key held).
+**The mouse in Size mode** (luxwm's own, not Windows'): the pointer picks the edges it moves towards once it is 12 px (3 x
+`DRAG_THRESHOLD`) from where the mode started, both edges of the corner when the move is within about 27 degrees of the diagonal
+(the shorter axis at least half the longer), one edge otherwise; a pointer that reaches a border or corner of the frame picks that
+one. The pointer is then put on the picked edge (corner) and the edge follows it. **Shift** toggles between the edge and the
+corner next to it (the end nearer the pointer) and back to the edge picked first, putting the pointer on the new edge or corner;
+the size carries on from there. In both modes mouse motion takes over;
 Enter accepts and puts the pointer back where it was before the mode (ptRestore), a click accepts and leaves it, Esc (or a
 `_NET_WM_MOVERESIZE` cancel) puts the window back to its original rectangle (and the pointer back). Size hints, sync requests and the
 flicker-free resize path are the mouse drag's. Lab (`:3`, aero): Alt+Space, M, Right x3, Down x2, Enter: +39/+26, pointer restored;
-Alt+Space, S, Right x3, Down x2, Enter on an xterm (inc 6x13): +24/+13; Left/Up corner + Esc: unchanged; `_NET_WM_MOVERESIZE` 9 +
-mouse +30 +30: the right edge picked, +30.
+Alt+Space, S, Right x3, Down x2, Enter on an xterm (inc 6x13): +24/+13; Left/Up corner + Esc: unchanged; Size, mouse +15/+1: right edge, pointer on it; Shift: bottom-right corner,
+pointer there, +30/+40 grows both (+30/+39); Shift: the right edge again, +20/+50 widens only; Size, mouse +14/+10: the corner.
 
 ## Live-editing a theme (2026-10-26)
 

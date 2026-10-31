@@ -5,7 +5,6 @@
 * maximize when move-dragging window to top edge,
 	maximize to left/right half when dragging to left/half edge
 
-* alt-space S to resize works really well for one direction, but diagonal is hard to get right. should be easier
 
 ## virtual desktops
 
