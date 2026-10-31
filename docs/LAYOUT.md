@@ -37,7 +37,7 @@ $PREFIX/bin/                         luxwm luxshell flxp* lhde-theme lhde-sessio
 
 WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows
 ~/.local/share/lhde-windows/
-  <source>/                            one build's raw files, exactly as the resource pack has them (2k 4015 ... 5112 xp)
+  <source>/                            one build's raw files, exactly as the resource pack has them (2k 4015 ... 5112 xp reactos)
     system32/                            shell32 imageres explorer browseui comctl32 themeui [shellstyle uDWM shdocvw]
     themes/                              the build's Resources/Themes: Jade/jade.msstyles, Luna/Shell/<Scheme>/shellstyle.dll, ...
     fonts/  wallpapers/  setup/          (setup/hivedef.inf: the xp and 2k classic schemes)

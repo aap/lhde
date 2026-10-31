@@ -88,7 +88,18 @@ user's own copies, in two stages:
    first path, the MANIFEST (one line per path) is the authority, and lhde-import annotates each imported file by its own
    path. Sources: 4015 (pre-release WIM 1.8.1), 4042 (Lab06), 4042main, 4051, 4053, 4066 (I386 layout, `*.XX_` expanded), 4074,
    4074r2 (not default), 4093, 5048, 5112, xp (Windows Server 2003 R2 x64 CD1: XP's Luna with its three schemes' shellstyle.dll,
-   shell32, explorer, fonts, wallpapers) and 2k (Windows 2000). Adding a file or a build is editing or adding an ini.
+   shell32, explorer, fonts, wallpapers), 2k (Windows 2000) and reactos (not default; below). Adding a file or a build is
+   editing or adding an ini.
+   **reactos** is the free source (ReactOS 0.4.16's boot CD, `ReactOS-0.4.16-i386.iso`, GPL/LGPL): its shell32, browseui,
+   comctl32, themeui and explorer.exe keep Windows' resource ids, so the xp and 2k icon recipes and flxp's art by id have a
+   free stand-in; its fonts (Tahoma, Microsoft Sans Serif, Marlett, Trebuchet MS, Verdana, ... under the Windows file names,
+   free faces); four visual styles (`styles/lunar`, `modern`, `mizu`, `lautus`); its wallpapers. The CD carries the live
+   system as a plain `reactos/` directory (layout `live`), read with 7z like a WIM's Windows directory; `explorer.exe` 0.4.x
+   tells it apart. `lhde-import --iso ReactOS-0.4.16-i386.iso` (or `--dir` on an installed or extracted ReactOS) imports it
+   into `lhde-windows/reactos/` (about 31 MB). Not taken: ReactOS's classic schemes (its hive has Vista's `New Schemes`
+   form, which lhde-schemes does not read: the built-in Windows Standard stands in), its cursors (user32 resources; lhde
+   uses X cursors), and Blackshade, which ReactOS's source tree has only as the unbuilt sources of a style
+   (`media/themes/Blackshade`, a placeholder its build skips): there is no blackshade.msstyles to import.
    Sizes with the ISOs here (2026-10-28; the tarball is `tar` + `xz -9e`, as no zstd is installed here): **museum** 418 MB
    raw (377 MB stored once), 57 MB compressed; **essentials** for the 14 shipped themes 169 MB raw (164 MB stored once), 36 MB
    compressed, in 5 builds (4051 4074 5048 5112 xp) and the 2k icon DLLs. About 20 s from the ISOs, 10 s `--from-pack` (the

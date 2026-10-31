@@ -336,8 +336,8 @@ class Seven:
 
 
 class Image:
-    """what a source's [files] rules match against: member paths relative to the Windows directory (wim, wim0108, tree) or to
-    the medium's root (cab), and a way to get them as local files"""
+    """what a source's [files] rules match against: member paths relative to the Windows directory (wim, wim0108, tree, live)
+    or to the medium's root (cab), and a way to get them as local files"""
     def members(self):
         raise NotImplementedError
 
@@ -546,6 +546,11 @@ def image_for(src, medium, tmp, wim_override=None):
     """the Image of src on medium (an ISO, a WIM, a directory)"""
     if src.layout == 'cab':
         return CabImage(medium), medium
+    if src.layout == 'live':   # the Windows directory on the medium itself (ReactOS's boot CD: reactos/), or that directory
+        if os.path.isdir(medium):
+            sub = ci_path(medium, src.windows.strip('/')) if src.windows.strip('/') else medium
+            return TreeImage(sub if os.path.isdir(sub) else medium), medium
+        return WimImage(medium, '', src.windows), medium
     if src.layout == 'tree' or os.path.isdir(medium):
         return TreeImage(medium), medium
     wim = wim_override
@@ -577,7 +582,7 @@ def detect(medium, sources, tmp):
             pass
         try:
             key = (s.layout == 'cab' or os.path.isdir(medium), s.wim.lower(), s.image, s.windows)
-            if not os.path.isdir(medium) and s.layout != 'cab' and not medium.lower().endswith('.wim'):
+            if not os.path.isdir(medium) and s.layout not in ('cab', 'live') and not medium.lower().endswith('.wim'):
                 a = Seven(medium)
                 m = find_member(a.members(), s.wim)
                 if not m:
