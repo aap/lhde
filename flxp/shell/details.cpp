@@ -2,6 +2,7 @@
 // shell32's duiinfo.cpp, prop.cpp and selfreg.inx, shlwapi's
 // StrFormatByteSizeW and SHFormatDateTimeW (XP SP1), and 4051's managed
 // preview pane (taskpane/managed.md in the Longhorn research); written anew.
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -109,14 +110,7 @@ Facts probe(const Item& it)
         }
         return f;
     }
-    // the registry's stored properties that are set on it
-    for (const Property& p : registry()) {
-        if (p.xattr.empty()) continue;
-        char buf[4096];
-        ssize_t n = getxattr(it.path.c_str(), p.xattr.c_str(), buf, sizeof buf);
-        while (n > 0 && (buf[n - 1] == '\0' || buf[n - 1] == '\n')) n--;   // a C string's NUL, echo's newline
-        if (n > 0) f.xattrs.push_back({ p.xattr, std::string(buf, (size_t)n) });
-    }
+    f.xattrs = read_stored(it.path);
     if (it.is_folder()) return f;
     std::string key = icon_key(it.name, false);
     if (key == "audio") f.kind = Facts::Audio;
@@ -152,6 +146,136 @@ Item location_item(const Folder& folder)
     return it;
 }
 
+// ---- the stored properties on disk ----------------------------------------------------
+
+Stored read_stored(const std::string& path)
+{
+    Stored out;
+    if (path.empty() || path[0] != '/') return out;
+    for (const Property& p : registry()) {
+        if (p.xattr.empty()) continue;
+        char buf[4096];
+        ssize_t n = getxattr(path.c_str(), p.xattr.c_str(), buf, sizeof buf);
+        while (n > 0 && (buf[n - 1] == '\0' || buf[n - 1] == '\n')) n--;   // a C string's NUL, echo's newline
+        if (n > 0) out.push_back({ p.xattr, std::string(buf, (size_t)n) });
+    }
+    return out;
+}
+
+void read_stored(Item& it)
+{
+    if (it.flags & (IsVirtual | IsDrive)) { it.xattrs.clear(); return; }
+    it.xattrs = read_stored(it.path);
+}
+
+std::vector<std::string> split_list(const std::string& v)
+{
+    std::vector<std::string> out;
+    std::string cur;
+    auto flush = [&]() {
+        size_t a = cur.find_first_not_of(" \t\r"), b = cur.find_last_not_of(" \t\r");
+        if (a != std::string::npos) {
+            std::string t = cur.substr(a, b - a + 1);
+            if (std::find(out.begin(), out.end(), t) == out.end()) out.push_back(t);
+        }
+        cur.clear();
+    };
+    for (char c : v) { if (c == ',' || c == ';' || c == '\n') flush(); else cur += c; }
+    flush();
+    return out;
+}
+
+std::string join_list(const std::vector<std::string>& items)
+{
+    std::string out;
+    for (const std::string& t : items) out += (out.empty() ? "" : ",") + t;
+    return out;
+}
+
+static std::string base_name(const std::string& path) { return path.substr(path.find_last_of('/') + 1); }
+
+// setxattr, or removexattr for an empty value (not being there is fine then)
+static bool put(const std::string& path, const std::string& xattr, const std::string& value, std::string* err)
+{
+    int rc = value.empty() ? removexattr(path.c_str(), xattr.c_str()) : setxattr(path.c_str(), xattr.c_str(), value.data(), value.size(), 0);
+    if (rc == 0 || (value.empty() && errno == ENODATA)) return true;
+    if (!err) return false;
+    std::string n = "'" + base_name(path) + "'";
+    switch (errno) {
+    case ENOTSUP: *err = "The file system of " + n + " does not keep descriptions and tags (extended attributes)."; break;
+    case EACCES: case EPERM: case EROFS: *err = n + " cannot be changed: it is read-only, or not yours."; break;
+    case E2BIG: case ENOSPC: case ERANGE: *err = "The value is too long to be kept with " + n + "."; break;
+    case ENOENT: *err = n + " is not there any more."; break;
+    default: *err = "The value could not be kept with " + n + ": " + strerror(errno) + "."; break;
+    }
+    return false;
+}
+
+bool write(const std::string& path, const Property& p, const std::string& text, std::string* err)
+{
+    if (p.xattr.empty() || !p.editable) { if (err) *err = "'" + p.label + "' cannot be changed."; return false; }
+    std::string v = text;
+    if (p.type == ValueType::List) v = join_list(split_list(text));
+    else {
+        size_t a = v.find_first_not_of(" \t\r\n"), b = v.find_last_not_of(" \t\r\n");
+        v = a == std::string::npos ? "" : v.substr(a, b - a + 1);
+    }
+    return put(path, p.xattr, v, err);
+}
+
+static std::string current(const std::string& path, const std::string& xattr)
+{
+    for (const auto& kv : read_stored(path)) if (kv.first == xattr) return kv.second;
+    return "";
+}
+
+bool add_tags(const std::string& path, const std::vector<std::string>& tags, std::string* err)
+{
+    const Property* p = property("tags");
+    std::string old = current(path, p->xattr);
+    std::vector<std::string> have = split_list(old);
+    for (const std::string& t : tags)
+        for (const std::string& u : split_list(t))
+            if (std::find(have.begin(), have.end(), u) == have.end()) have.push_back(u);
+    std::string v = join_list(have);
+    if (v == old) return true;
+    return put(path, p->xattr, v, err);
+}
+
+bool remove_tag(const std::string& path, const std::string& tag, std::string* err)
+{
+    const Property* p = property("tags");
+    std::vector<std::string> have = split_list(current(path, p->xattr));
+    auto i = std::find(have.begin(), have.end(), tag);
+    if (i == have.end()) return true;
+    have.erase(i);
+    return put(path, p->xattr, join_list(have), err);
+}
+
+std::string infotip(const Item& it)
+{
+    std::string out;
+    auto line = [&](const std::string& label, const std::string& v) {
+        if (!v.empty()) out += (out.empty() ? "" : "\n") + label + ": " + v;
+    };
+    bool fs = !(it.flags & (IsVirtual | IsDrive));
+    if (!it.is_folder()) {
+        line("Type", it.type);
+        if (it.mtime) line("Date Modified", format_date(it.mtime));
+        if (fs) line("Size", byte_size(it.size));
+    } else if (fs && it.mtime) {
+        line("Date Modified", format_date(it.mtime));
+    }
+    Stored s = it.xattrs;
+    if (s.empty() && fs) s = read_stored(it.path);
+    for (const Property& p : registry()) {
+        if (p.xattr.empty()) continue;
+        for (const auto& kv : s)
+            if (kv.first == p.xattr) line(p.label, p.type == ValueType::List ? tag_list(kv.second) : kv.second);
+    }
+    return out;
+}
+
 // ---- the registry and the item kinds' lists --------------------------------------
 
 const std::vector<Property>& registry()
@@ -178,6 +302,23 @@ const Property* property(const std::string& id)
 {
     for (const Property& p : registry()) if (p.id == id) return &p;
     return nullptr;
+}
+
+// the list's columns beyond the derived four, in SortBy's order
+static const char* const COLUMN_IDS[] = { "description", "tags", "comment" };
+
+const Property* column_property(SortBy col)
+{
+    int k = (int)col - (int)SortBy::Description;
+    return k >= 0 && k < 3 ? property(COLUMN_IDS[k]) : nullptr;
+}
+
+int column_of(const std::string& id)
+{
+    static const char* const DERIVED[] = { "name", "size", "type", "modified" };
+    for (int k = 0; k < 4; k++) if (id == DERIVED[k]) return k;
+    for (int k = 0; k < 3; k++) if (id == COLUMN_IDS[k]) return (int)SortBy::Description + k;
+    return -1;
 }
 
 // Per item kind the properties each presentation lists, in its order
@@ -259,7 +400,8 @@ static std::vector<Row> rows_for(const Item& it, const Facts& f, int64_t now)
         r.label = r.id == "type" ? "" : p->label;
         r.xp = value(*p, it, f, true, now);
         r.lh = value(*p, it, f, false, now);
-        r.editable = p->editable;
+        if (!p->xattr.empty()) r.raw = r.lh;
+        r.editable = p->editable && !p->xattr.empty() && f.kind != Facts::System && f.kind != Facts::Drive;
         r.invitation = p->invitation;
         rows.push_back(r);
         return &rows.back();
@@ -271,14 +413,8 @@ static std::vector<Row> rows_for(const Item& it, const Facts& f, int64_t now)
 
 std::string tag_list(const std::string& v)
 {
-    std::string out, cur;
-    auto flush = [&]() {
-        size_t a = cur.find_first_not_of(" \t"), b = cur.find_last_not_of(" \t");
-        if (a != std::string::npos) out += (out.empty() ? "" : ", ") + cur.substr(a, b - a + 1);
-        cur.clear();
-    };
-    for (char c : v) { if (c == ',' || c == '\n') flush(); else cur += c; }
-    flush();
+    std::string out;
+    for (const std::string& t : split_list(v)) out += (out.empty() ? "" : ", ") + t;
     return out;
 }
 
@@ -318,7 +454,9 @@ std::vector<LhLine> lh_lines(const Info& in)
     std::vector<LhLine> out;
     for (const Row* r : rs) {
         LhLine l;
-        l.editable = r->editable;
+        l.editable = r->editable && in.kind == Kind::One;
+        l.id = r->id;
+        l.raw = r->raw;
         if (!r->lh.empty()) l.text = r->lh;
         else if (r->editable && !r->invitation.empty() && in.kind == Kind::One) { l.text = r->invitation; l.invitation = true; }
         else continue;

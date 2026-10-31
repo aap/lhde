@@ -18,8 +18,9 @@
 //   drive     Type; File System; Free Space; Total Size                     type, free space
 //   virtual   Type ("System Folder")                                        type
 //   files and folders also: Description (user.lux.desc), Tags (user.xdg.tags),
-//   Comment (user.xdg.comment), read-only for now; XP shows them when set,
-//   4051 always, an empty one as its invitation ("Add a description", ...).
+//   Comment (user.xdg.comment); XP shows them when set (read-only there, as
+//   XP's Details were), 4051 always, an empty one as its invitation ("Add a
+//   description", ...), and a click on one edits it (write()).
 //
 // XP: the name in bold above the lines; Type is the value alone, the others
 // "Label: value" (IDS_COLONSEPERATED); an empty value drops its line, as does
@@ -60,11 +61,37 @@ struct Property {
     std::string label;                  // "Tags" (XP's "Label: value")
     ValueType type = ValueType::Text;
     std::string xattr;                  // "user.xdg.tags"; "" = derived
-    bool editable = false;              // the user sets it (4051: a click edits it; not yet)
+    bool editable = false;              // the user sets it (4051: a click on its row edits it)
     std::string invitation;             // shown while it is empty ("Add tags"), 4051 only
 };
 const std::vector<Property>& registry();                // the defaults, in code for now
 const Property* property(const std::string& id);        // null: unknown
+// The list's column of a stored property (SortBy::Description, Tags, Comment;
+// null for the derived columns), and the column of a property id (-1: none)
+const Property* column_property(SortBy col);
+int column_of(const std::string& id);
+
+// ---- the stored properties on disk (extended attributes) -----------------------
+// Values as luxfs's `x` keeps them (docs/ANNOTATIONS.md): a text as given, no
+// NUL or newline added (a trailing NUL or newline someone else wrote is dropped
+// when read); a list's items separated by commas when stored ("a,b"), trimmed,
+// without duplicates (case-sensitive, the first kept), in their order. Writing
+// an empty value removes the attribute, as `x -tag` does with the last tag.
+using Stored = std::vector<std::pair<std::string, std::string>>;
+Stored read_stored(const std::string& path);                         // the registry's attributes that are set
+void read_stored(Item& it);                                          // into it.xattrs (a file-system item)
+std::vector<std::string> split_list(const std::string& text);        // "a, b;c\n" -> a, b, c (commas, semicolons, newlines)
+std::string join_list(const std::vector<std::string>& items);        // -> "a,b,c", as stored
+// The value the user typed for p on path: a list is split and joined again.
+// False with *err a sentence for a message box (the file system keeps no user
+// attributes, the file is not the user's or read-only, ...).
+bool write(const std::string& path, const Property& p, const std::string& text, std::string* err);
+bool add_tags(const std::string& path, const std::vector<std::string>& tags, std::string* err);   // keeping the others
+bool remove_tag(const std::string& path, const std::string& tag, std::string* err);
+// XP's infotip of a list item (defview's InfoTip lines, "Label: value" per
+// line): a file's Type, Date Modified and Size, a folder's Date Modified, then
+// Description, Tags and Comment when set (from it.xattrs, read when empty)
+std::string infotip(const Item& it);
 
 // What the file system says about an item beyond shell::Item (probe() reads it)
 struct Facts {
@@ -74,7 +101,7 @@ struct Facts {
     std::string fs;                     // a drive's file system ("ext4")
     uint64_t free = 0, total = 0;       // a drive's free and total bytes (total 0: unknown)
     bool network = false;               // on a network mount
-    std::vector<std::pair<std::string, std::string>> xattrs;   // the registry's attributes that are set: name, value
+    Stored xattrs;                      // the registry's attributes that are set: name, value
 };
 
 struct Row {
@@ -82,6 +109,7 @@ struct Row {
     std::string label;                  // XP's label; "" = the value alone (the type)
     std::string xp;                     // XP's value ("" = not shown there)
     std::string lh;                     // 4051's value ("" = the invitation, or not shown)
+    std::string raw;                    // a stored property's value for its editor (a list as shown: "a, b")
     bool editable = false;
     std::string invitation;
     int xp_rank = -1, lh_rank = -1;     // the place in each presentation (-1: not there)
@@ -107,7 +135,12 @@ struct Line {
 };
 std::string xp_title(const Info& in);               // the bold line: the name ("" for Many)
 std::vector<Line> xp_lines(const Info& in);         // the lines under it, in XP's order
-struct LhLine { std::string text; bool invitation = false; bool editable = false; };
+struct LhLine {
+    std::string text;
+    bool invitation = false, editable = false;
+    std::string id;                     // the property (the band's editor writes it)
+    std::string raw;                    // its value as typed in the editor ("" for an invitation)
+};
 std::string lh_title(const Info& in);               // the name, "N items selected" ("" for Location)
 std::vector<LhLine> lh_lines(const Info& in);       // the values in 4051's order
 
@@ -116,7 +149,7 @@ std::string byte_size(uint64_t bytes);                  // StrFormatByteSize: "1
 std::string friendly_date(int64_t t, int64_t now);      // "Today, October 31, 2026, 12:45 PM"
 std::string short_date(int64_t t);                      // "8/24/2001"
 std::string attributes(const Item& it);                 // "Read-only, Hidden"; "" for none
-std::string tag_list(const std::string& value);         // a list value: "a,b, c" -> "a, b, c"
+std::string tag_list(const std::string& value);         // a list value as shown: "a,b; c" -> "a, b, c"
 std::string items_selected_xp(size_t n);                // "3 items selected."
 std::string lh_items_word(int n);                       // " item" / " items" (after the number)
 

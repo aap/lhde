@@ -125,11 +125,19 @@ static void test_cross_fs_move()
     std::string t = fresh(A, "xmove"), u = fresh(B, "xmove");
     mk(t + "/tree"); mk(t + "/tree/sub"); put(t + "/tree/a", "aaa"); put(t + "/tree/sub/b", std::string(3 << 20, 'b'));
     symlink("a", (t + "/tree/la").c_str());
+    // the Explorer's tags and description (shell/details.h) travel with the move
+    bool xa = setxattr((t + "/tree/a").c_str(), "user.xdg.tags", "reference,4051", 14, 0) == 0 &&
+              setxattr((t + "/tree/sub").c_str(), "user.lux.desc", "Sub", 3, 0) == 0;
     fileops::Result r = fileops::run(Op::Move, { t + "/tree" }, u);
     CHECK(r.ok);
     CHECK(!exists(t + "/tree"));
     CHECK(get(u + "/tree/a") == "aaa" && get(u + "/tree/sub/b").size() == (3u << 20) && link_of(u + "/tree/la") == "a");
     CHECK(!has_parts(u));
+    if (xa) {
+        char v[32] = {};
+        CHECK(getxattr((u + "/tree/a").c_str(), "user.xdg.tags", v, sizeof v) == 14 && !memcmp(v, "reference,4051", 14));
+        CHECK(getxattr((u + "/tree/sub").c_str(), "user.lux.desc", v, sizeof v) == 3 && !memcmp(v, "Sub", 3));
+    } else fprintf(stderr, "note: no user xattrs on %s: the moved tags are not checked\n", t.c_str());
 
     // a source that cannot be removed: its parent is read-only
     mk(t + "/ro"); put(t + "/ro/f", "fff"); mk(t + "/ro/d"); put(t + "/ro/d/x", "xx");
@@ -269,7 +277,8 @@ static void test_metadata()
     mk(t + "/m/sticky"); chmod((t + "/m/sticky").c_str(), 01777);
     mk(t + "/m/rodir"); put(t + "/m/rodir/in", "in"); chmod((t + "/m/rodir").c_str(), 0555);
     bool xa = setxattr((t + "/m/suid").c_str(), "user.flxp.test", "value", 5, 0) == 0 &&
-              setxattr((t + "/m").c_str(), "user.flxp.dir", "dv", 2, 0) == 0;
+              setxattr((t + "/m").c_str(), "user.flxp.dir", "dv", 2, 0) == 0 &&
+              setxattr((t + "/m/sgid").c_str(), "user.xdg.tags", "a,b", 3, 0) == 0;
     if (!xa) fprintf(stderr, "note: no user xattrs on %s (%s): xattr checks skipped\n", t.c_str(), strerror(errno));
     struct timespec ft[2] = { { 1000000000, 123456789 }, { 1200000000, 987654321 } };
     utimensat(AT_FDCWD, (t + "/m/suid").c_str(), ft, 0);
@@ -302,6 +311,7 @@ static void test_metadata()
             char v[16] = {};
             CHECK(getxattr((c + "/suid").c_str(), "user.flxp.test", v, sizeof v) == 5 && !memcmp(v, "value", 5));
             CHECK(getxattr(c.c_str(), "user.flxp.dir", v, sizeof v) == 2 && !memcmp(v, "dv", 2));
+            CHECK(getxattr((c + "/sgid").c_str(), "user.xdg.tags", v, sizeof v) == 3 && !memcmp(v, "a,b", 3));   // the Explorer's tags
         }
         CHECK(!has_parts(dest));
         nuke(dest);

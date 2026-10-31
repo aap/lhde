@@ -6,6 +6,7 @@
 #pragma once
 #include <stdint.h>
 #include <string>
+#include <utility>
 #include <vector>
 #include <memory>
 
@@ -23,10 +24,17 @@ struct Item {
     int64_t mtime = 0;       // unix seconds
     std::string type;        // "File Folder", "Text Document", ...
     std::string icon;        // icon key: "folder", "document", "drive", "computer", ... (see icons.h)
+    // the stored properties of shell/details.h that are set (attribute name, value);
+    // read only when a view needs them (its Description/Tags/Comment columns or that sort)
+    std::vector<std::pair<std::string, std::string>> xattrs;
     bool is_folder() const { return flags & IsFolder; }
+    const std::string& stored(const std::string& xattr) const;   // "" when not set (or not read)
 };
 
-enum class SortBy { Name, Size, Type, Date };
+// What a list sorts by and what its Details columns are: the first four are
+// derived from the item, the others are stored properties (shell/details.h
+// column_property)
+enum class SortBy { Name, Size, Type, Date, Description, Tags, Comment };
 
 class Folder {
 public:

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <map>
 #include "namespace.h"
+#include "details.h"
 #include "mime.h"
 
 namespace shell {
@@ -115,8 +116,16 @@ static int natural_compare(const std::string& a, const std::string& b)
     return 0;
 }
 
+const std::string& Item::stored(const std::string& xattr) const
+{
+    static const std::string none;
+    for (const auto& kv : xattrs) if (kv.first == xattr) return kv.second;
+    return none;
+}
+
 void sort_items(std::vector<Item>& items, SortBy by, bool ascending)
 {
+    const details::Property* prop = details::column_property(by);   // a stored property's column
     std::stable_sort(items.begin(), items.end(), [&](const Item& a, const Item& b) {
         if (a.is_folder() != b.is_folder()) return a.is_folder();   // folders first, always
         int c = 0;
@@ -125,6 +134,10 @@ void sort_items(std::vector<Item>& items, SortBy by, bool ascending)
         case SortBy::Size: c = a.size < b.size ? -1 : a.size > b.size ? 1 : natural_compare(a.name, b.name); break;
         case SortBy::Type: c = a.type.compare(b.type); if (!c) c = natural_compare(a.name, b.name); break;
         case SortBy::Date: c = a.mtime < b.mtime ? -1 : a.mtime > b.mtime ? 1 : natural_compare(a.name, b.name); break;
+        default:   // a stored property: empty ones first (XP's order for a column without a value), then by name
+            if (prop) c = natural_compare(a.stored(prop->xattr), b.stored(prop->xattr));
+            if (!c) c = natural_compare(a.name, b.name);
+            break;
         }
         return ascending ? c < 0 : c > 0;
     });

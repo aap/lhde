@@ -1,9 +1,12 @@
 // The Explorer's details model (shell/details.h): the property registry, the
 // item kinds' lists, XP's Details lines for the folder, one item and several,
 // its size and date formats, and 4051's band values, invitations, counts and
-// picture stack.
+// picture stack; the stored properties: lists, columns, sorting, the infotip and
+// the write path (setxattr / removexattr on a scratch file).
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/xattr.h>
+#include <unistd.h>
 #include <time.h>
 #include <string>
 #include "shell/details.h"
@@ -200,6 +203,91 @@ int main()
     check("four same", "5 KB|8/24/2001", lh(in));
     check("four title", "4 items selected", lh_title(in));
     check("four icon", "document", in.icon);
+
+    // 4051's editable rows: one item's stored ones carry their id and raw value
+    in = describe({ bak }, { bf }, loc, Facts(), 107, now);
+    std::string ed;
+    for (const LhLine& l : lh_lines(in)) if (l.editable) ed += (ed.empty() ? "" : "|") + l.id + "=" + l.raw;
+    check("editable rows", "description=|tags=boot, backup|comment=", ed);
+    ed.clear();
+    for (const LhLine& l : lh_lines(describe({ a, b }, {}, loc, Facts(), 107, now))) if (l.editable) ed += l.id;
+    check("several: none editable", "", ed);
+    check("drive not editable", 0, (int)describe({ drv }, { df }, comp, sys, 3, now).rows[0].editable);
+
+    // the lists: commas, semicolons and newlines separate; trimmed; no duplicates; stored "a,b"
+    check("split", "a|b c|d", join(split_list(" a ;b c,, d\n")));
+    check("split dup", "x|X", join(split_list("x, X, x")));
+    check("join", "a,b c", join_list({ "a", "b c" }));
+    check("tag list semicolons", "a, b", tag_list("a;b"));
+
+    // the columns of the stored properties
+    check("column desc", "user.lux.desc", column_property(SortBy::Description)->xattr);
+    check("column comment", "user.xdg.comment", column_property(SortBy::Comment)->xattr);
+    check("column derived", 1, column_property(SortBy::Size) == nullptr);
+    check("column of tags", (int)SortBy::Tags, column_of("tags"));
+    check("column of size", (int)SortBy::Size, column_of("size"));
+    check("column of unknown", -1, column_of("rating"));
+
+    // sorting by a stored column: empty first, then by value, folders first always
+    {
+        Item p1 = file("p1", 1, old, "File"), p2 = file("p2", 1, old, "File"), p3 = file("p3", 1, old, "File");
+        p1.xattrs = { { "user.xdg.tags", "zeta" } }; p3.xattrs = { { "user.xdg.tags", "alpha" } };
+        std::vector<Item> v = { p1, p2, p3, sub };
+        sort_items(v, SortBy::Tags, true);
+        check("sort tags", "Fonts|p2|p3|p1", v[0].name + "|" + v[1].name + "|" + v[2].name + "|" + v[3].name);
+        sort_items(v, SortBy::Tags, false);
+        check("sort tags down", "Fonts|p1|p3|p2", v[0].name + "|" + v[1].name + "|" + v[2].name + "|" + v[3].name);
+    }
+
+    // the infotip: XP's Type, Date Modified, Size, then the stored ones that are set
+    Item tip = bak;
+    tip.xattrs = { { "user.xdg.tags", "boot,backup" }, { "user.lux.desc", "The old boot file" } };
+    check("infotip", "Type: BAK File\nDate Modified: 10/23/2026 2:24 PM\nSize: 198 bytes\nDescription: The old boot file\nTags: boot, backup", infotip(tip));
+    Item ftip = sub; ftip.xattrs = { { "user.xdg.comment", "fonts" } };
+    check("infotip folder", "Date Modified: 10/23/2026 2:24 PM\nComment: fonts", infotip(ftip));
+
+    // the write path on a scratch file (skipped where the file system keeps no user attributes)
+    {
+        const char* tmp = getenv("TMPDIR");
+        std::string dir = std::string(tmp && *tmp ? tmp : "/tmp") + "/detailstest.XXXXXX";
+        if (!mkdtemp(&dir[0])) { perror("mkdtemp"); return 2; }
+        std::string f = dir + "/scratch.txt";
+        FILE* fp = fopen(f.c_str(), "w"); if (fp) { fputs("x\n", fp); fclose(fp); }
+        std::string err;
+        const Property* tags = property("tags");
+        const Property* desc = property("description");
+        if (!write(f, *desc, "probe", &err) && err.find("extended attributes") != std::string::npos) {
+            printf("note: no user xattrs in %s: the write checks are skipped\n", dir.c_str());
+        } else {
+            auto value = [&](const std::string& x) { for (const auto& kv : read_stored(f)) if (kv.first == x) return kv.second; return std::string("<none>"); };
+            check("write desc", 1, write(f, *desc, "  A scratch file \n", &err));
+            check("desc trimmed", "A scratch file", value("user.lux.desc"));
+            check("write tags", 1, write(f, *tags, "one; two , one,,three", &err));
+            check("tags stored", "one,two,three", value("user.xdg.tags"));
+            check("add tags", 1, add_tags(f, { "two", "four, five" }, &err));
+            check("tags added", "one,two,three,four,five", value("user.xdg.tags"));
+            check("remove tag", 1, remove_tag(f, "two", &err));
+            check("remove missing tag", 1, remove_tag(f, "zzz", &err));
+            check("tag removed", "one,three,four,five", value("user.xdg.tags"));
+            Item it; it.path = f; it.name = "scratch.txt";
+            read_stored(it);
+            check("item xattrs", "one,three,four,five", it.stored("user.xdg.tags"));
+            check("facts", 2, (int)probe(it).xattrs.size());
+            for (const char* t : { "one", "three", "four", "five" }) remove_tag(f, t, &err);
+            check("last tag removes it", "<none>", value("user.xdg.tags"));
+            check("empty removes", 1, write(f, *desc, "", &err));
+            check("desc removed", "<none>", value("user.lux.desc"));
+            check("remove twice", 1, write(f, *desc, " ", &err));
+            check("derived refused", 0, write(f, *property("size"), "1", &err));
+            // a NUL and a newline someone else wrote are not part of the value
+            setxattr(f.c_str(), "user.xdg.comment", "echoed\n", 7, 0);
+            check("newline dropped", "echoed", value("user.xdg.comment"));
+            check("missing file", 0, write(dir + "/gone", *desc, "x", &err));
+            check("missing file says so", 1, err.find("not there") != std::string::npos);
+        }
+        unlink(f.c_str());
+        rmdir(dir.c_str());
+    }
 
     printf("%d checks, %d failed\n", checks, fails);
     return fails ? 1 : 0;
