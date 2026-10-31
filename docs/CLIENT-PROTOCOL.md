@@ -84,8 +84,8 @@ luxwm deletes them on a clean exit (`luxwmc quit`); `_LH_THEME` stays (it is the
    `_LHWM_COMPOSITED` is 0 paint the header opaque instead: `_LHWM_HEADER_PIXMAP` under the content (below), or a
    gradient of your own when it is missing (another WM).
 4. Input in the header: on ButtonPress 1 where nothing interactive is hit, send
-   `_NET_WM_MOVERESIZE` (move); on double-click send `_NET_WM_STATE` toggle maximised. Right-click
-   can open the window menu later (`_LHWM_WINDOW_MENU`, not yet).
+   `_NET_WM_MOVERESIZE` (move); on double-click send `_NET_WM_STATE` toggle maximised. Right-click: on the release send
+   `_GTK_SHOW_WINDOW_MENU` (next section) for luxwm's window menu at the pointer.
 5. Watch the root for `_LH_THEME`, `_LHWM_COMPOSITED` and `_LHWM_FRAME_METRICS` changes and handle them as a theme change
    (next section).
 
@@ -94,6 +94,15 @@ window with a 60 px glass header holding a big title, an icon placeholder and a 
 opaque white body, drag, double-click and right-edge resize handling, and the opaque fallback. Build
 and run it with `make && DISPLAY=:1 build/examples/extendframe` (any display running
 luxwm; the lab's). Escape or q quits.
+
+## The window menu at a point: `_GTK_SHOW_WINDOW_MENU`
+
+A ClientMessage to the root (SubstructureRedirect | SubstructureNotify), `window` = the client's toplevel, format 32, `data.l[0]`
+the pointer device (ignored), `l[1]`, `l[2]` the root x, y: luxwm opens the window menu ("The window menu" in LUXWM.md) of that
+window with its top-left corner there, flipped left/up where it does not fit, and runs it (it grabs pointer and keyboard: send it
+after the button that asked for it is released). GTK's own name, in `_NET_SUPPORTED`, so GTK's client-side headers use it too. A
+minimised window gets its menu as well (XP's task button menu): Restore (the default item) and Maximize bring it back, Move, Size
+and Minimize are greyed. luxshell's task buttons send it on a right click.
 
 ## Theme changes
 

@@ -106,6 +106,7 @@ enum atoms_net {
     NetWMSyncRequestCounter,
     NetShowingDesktop,     /* _NET_SHOWING_DESKTOP (root property + client message) */
     NetRestackWindow,      /* _NET_RESTACK_WINDOW (client message; README "Restack requests") */
+    NetGtkShowWindowMenu,  /* _GTK_SHOW_WINDOW_MENU (client message: the window menu at a point; CLIENT-PROTOCOL.md) */
     NetLast
 };
 

@@ -1060,6 +1060,11 @@ handle_client_message(XEvent *e)
     } else if (cme->message_type == net_atom[NetCloseWindow]) {
         struct client *c = get_client_from_window(cme->window);
         if (c) client_close(c);
+    } else if (cme->message_type == net_atom[NetGtkShowWindowMenu]) {
+        /* the window menu at a root point (data.l[1], l[2]; l[0] the device): a client's own caption, the taskbar's button of
+           the window (XP's task button menu is the window's system menu; minimised windows too) */
+        struct client *c = get_client_from_window(cme->window);
+        if (c) wmmenu_open(c, (int)cme->data.l[1], (int)cme->data.l[2], WMMENU_FLIP, 0, false);
 
     } else if (cme->message_type == net_atom[NetCurrentDesktop]) {
         if (cme->data.l[0] >= 0 && cme->data.l[0] < WORKSPACE_NUMBER)   /* a pager's or lhshell's request (lh.set_desktop) */
@@ -3131,6 +3136,7 @@ setup(void)
     /* ewmh supported atoms */
     utf8string                       = XInternAtom(display, "UTF8_STRING", False);
     net_atom[NetSupported]           = XInternAtom(display, "_NET_SUPPORTED", False);
+    net_atom[NetGtkShowWindowMenu]   = XInternAtom(display, "_GTK_SHOW_WINDOW_MENU", False);
     net_atom[NetNumberOfDesktops]    = XInternAtom(display, "_NET_NUMBER_OF_DESKTOPS", False);
     net_atom[NetActiveWindow]        = XInternAtom(display, "_NET_ACTIVE_WINDOW", False);
     net_atom[NetWMStateFullscreen]   = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", False);
@@ -4830,6 +4836,11 @@ sysmenu_command(void *arg, int id)
     struct client *c = get_client_from_window(w);
     if (c == NULL || c->window != w) return;
     LOGP("window menu: command %d on 0x%lx", id, w);
+    if (c->minimized && (id == SC_RESTORE_ID || id == SC_MAXIMIZE_ID)) {   /* from the taskbar: back as it was, then maximised */
+        if (c->ws != curr_ws) switch_ws(c->ws);
+        client_restore(c); client_manage_focus(c);
+        if (id == SC_RESTORE_ID) return;
+    }
     switch (id) {
     case SC_RESTORE_ID: if (c->mono) { client_monocle(c); draw_text(c, client_active(c)); } break;
     case SC_MAXIMIZE_ID: if (!c->mono) { client_monocle(c); draw_text(c, client_active(c)); } break;
@@ -4842,23 +4853,24 @@ sysmenu_command(void *arg, int id)
 
 /* open the window menu of c with its top-left corner at x, y (root); flags WMMENU_KEYBOARD / WMMENU_FLIP; button: the button still
    held (0 none); from_icon: a double click on the caption icon closes the window. Greyed as xxxSetSysMenu (mnsys.c) greys: Restore
-   unless maximised; Move, Size and Maximize while maximised; Size for a window whose size hints fix its size. Close is the default
-   item (bold), with its accelerator. */
+   unless maximised; Move, Size and Maximize while maximised; Size for a window whose size hints fix its size; a minimised window
+   (the taskbar's menu): Move, Size and Minimize, Restore the default item. Close is the default item otherwise (bold), with its
+   accelerator. */
 static void
 wmmenu_open(struct client *c, int x, int y, unsigned flags, unsigned button, bool from_icon)
 {
-    if (c == NULL || c->hidden || c->minimized) return;
+    if (c == NULL || (c->hidden && !c->minimized)) return;   /* minimised: hidden too */
     Window w = c->window; void *arg = (void *)(uintptr_t)w;
-    bool fixed = c->max_w > 0 && c->max_h > 0 && c->min_w == c->max_w && c->min_h == c->max_h;
-    unsigned mx = c->mono ? WMMENU_DISABLED : 0;
+    bool fixed = c->max_w > 0 && c->max_h > 0 && c->min_w == c->max_w && c->min_h == c->max_h, mini = c->minimized;
+    unsigned mx = c->mono && !mini ? WMMENU_DISABLED : 0, mn = mini ? WMMENU_DISABLED : 0;
     struct wmmenu_item it[] = {
-        { "&Restore",  NULL,     c->mono ? 0 : WMMENU_DISABLED, WMMENU_GLYPH_RESTORE,  SC_RESTORE_ID,  sysmenu_command, arg },
-        { "&Move",     NULL,     mx,                            WMMENU_GLYPH_NONE,     SC_MOVE_ID,     sysmenu_command, arg },
-        { "&Size",     NULL,     mx | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_NONE, SC_SIZE_ID,    sysmenu_command, arg },
-        { "Mi&nimize", NULL,     0,                             WMMENU_GLYPH_MINIMIZE, SC_MINIMIZE_ID, sysmenu_command, arg },
-        { "Ma&ximize", NULL,     mx | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_MAXIMIZE, SC_MAXIMIZE_ID, sysmenu_command, arg },
+        { "&Restore",  NULL,     mini ? WMMENU_DEFAULT : c->mono ? 0 : WMMENU_DISABLED, WMMENU_GLYPH_RESTORE, SC_RESTORE_ID, sysmenu_command, arg },
+        { "&Move",     NULL,     mx | mn,                       WMMENU_GLYPH_NONE,     SC_MOVE_ID,     sysmenu_command, arg },
+        { "&Size",     NULL,     mx | mn | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_NONE, SC_SIZE_ID, sysmenu_command, arg },
+        { "Mi&nimize", NULL,     mn,                            WMMENU_GLYPH_MINIMIZE, SC_MINIMIZE_ID, sysmenu_command, arg },
+        { "Ma&ximize", NULL,     (mini ? 0 : mx) | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_MAXIMIZE, SC_MAXIMIZE_ID, sysmenu_command, arg },
         { NULL,        NULL,     WMMENU_SEPARATOR,              WMMENU_GLYPH_NONE,     SC_SEP_ID,      NULL, NULL },
-        { "&Close",    "Alt+F4", WMMENU_DEFAULT,                WMMENU_GLYPH_CLOSE,    SC_CLOSE_ID,    sysmenu_command, arg },
+        { "&Close",    "Alt+F4", mini ? 0 : WMMENU_DEFAULT,     WMMENU_GLYPH_CLOSE,    SC_CLOSE_ID,    sysmenu_command, arg },
     };
     struct wmmenu_env e = { .dpy = display, .screen = screen, .root = root, .visual = argb_visual, .cmap = argb_cmap, .depth = argb_depth,
                             .theme = &theme, .composited = compositor && argb_depth == 32, .dispatch = menu_dispatch };

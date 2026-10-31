@@ -207,7 +207,8 @@ XP's system menu, drawn by luxwm. **Opened by** Alt+Space (key action `sysmenu`,
 file where Alt+Space is unbound there), a right click on the caption (on the button release, like `WM_CONTEXTMENU`, at the pointer;
 it flips left/up at the monitor edge) and a click on the caption icon (`frame_icon_rect()`, new in frame.c and used by nothing that
 paints; a double click on the icon, the second press within 500 ms, closes the window as XP's). Alt+Space and the icon put it under
-the caption at the frame's left border. Items, mnemonics and greying as `mnsys.c` `xxxSetSysMenu`: **R**estore (greyed unless
+the caption at the frame's left border; a `_GTK_SHOW_WINDOW_MENU` client message (CLIENT-PROTOCOL.md: luxshell's task buttons, GTK's
+client-side headers) at the point it names, for a minimised window too. Items, mnemonics and greying as `mnsys.c` `xxxSetSysMenu`: **R**estore (greyed unless
 maximised), **M**ove, **S**ize (greyed while maximised; Size also for a window whose size hints fix its size), Mi**n**imize,
 Ma**x**imize (greyed while maximised), separator, **C**lose (the default item, bold) with `Alt+F4` right-aligned. Opened from the
 keyboard the first item is selected (greyed or not, as `MNFindNextValidItem`, which skips only separators) and the mnemonics are
