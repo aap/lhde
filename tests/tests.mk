@@ -27,6 +27,9 @@ build/tests/w32/%: $(O)/tests/w32/%.o $(W32DEPS)
 build/tests/w32/filedlgtest: $(O)/tests/w32/filedlgtest.o $(FILEDLGLIB) $(EXPLSHARED) $(W32DEPS)
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $< $(FILEDLGLIB) $(EXPLSHARED) $(W32LINK) $(LDLIBS) -no-pie
+build/tests/w32/fileopuitest: $(O)/tests/w32/fileopuitest.o $(FILEDLGLIB) $(EXPLSHARED) $(W32DEPS)
+	@mkdir -p $(dir $@)
+	$(CXX) -o $@ $< $(FILEDLGLIB) $(EXPLSHARED) $(W32LINK) $(LDLIBS) -no-pie
 
 # kerneltest's resources: test.res from test.rc, comdlg32.res beside it
 build/tests/w32/test.res: tests/w32/test.rc tests/w32/pal.bmp

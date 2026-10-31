@@ -25,6 +25,9 @@ result gditest $? "$T/gditest.log"
 # the copy/move engine (in fresh directories under $TMPDIR and /dev/shm)
 build/tests/fileops_test > "$T/fileops.log" 2>&1
 result "fileops_test ($(tail -n 1 "$T/fileops.log"))" $? "$T/fileops.log"
+# the copy/move dialogs' texts against XP's (sizes, dates, CopyError's messages)
+build/tests/w32/fileopuitest > "$T/fileopui.log" 2>&1
+result "fileopuitest ($(tail -n 1 "$T/fileopui.log"))" $? "$T/fileopui.log"
 # flxp's lookups in lhde's data directories (shell/lhdata.h) on a fake import
 build/tests/lhdatatest > "$T/lhdata.log" 2>&1
 result "lhdatatest ($(tail -n 1 "$T/lhdata.log"))" $? "$T/lhdata.log"

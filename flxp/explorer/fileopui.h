@@ -18,6 +18,10 @@ namespace fileopui {
 // Runs it and returns when it is done; owner: the window the dialogs belong to
 // (the active window when null).
 shell::fileops::Result run(HWND owner, shell::fileops::Op op, const std::vector<std::string>& sources, const std::string& dest_dir);
+// While run() waits its loop dispatches the program's messages; a program whose
+// own loop handles keys before TranslateMessage (the explorer's Ctrl+C/V, F5)
+// gives that here so they work meanwhile (true: handled).
+void set_message_filter(bool (*filter)(MSG& msg));
 
 // The texts XP shows for an error (exposed for the tests): the message box's
 // title, its text, and whether it offers Retry (a full disk).

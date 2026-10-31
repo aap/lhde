@@ -161,6 +161,7 @@ public:
             if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
             bool hidden = e->d_name[0] == '.';
             if (hidden && !include_hidden) continue;
+            if (strstr(e->d_name, ".flxp-part")) continue;   // a file being copied (fileops): it shows when it is complete
             Item it;
             it.name = e->d_name;
             it.path = path_ == "/" ? "/" + it.name : path_ + "/" + it.name;

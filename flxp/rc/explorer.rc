@@ -133,7 +133,7 @@ END
 /* File operations (fileopui.cpp), XP's shell32 dialogs in their layout:
  * Confirm File Replace (DLG_REPLACE_FILE), Confirm Folder Replace
  * (DLG_REPLACE_FOLDER), Confirm File Move (DLG_MOVE_FILE), the progress
- * dialog (DLG_MOVECOPYPROGRESS) and a message box for the copy errors that is
+ * dialog (DLG_MOVECOPYPROGRESS) and a message box for the copy and rename errors that is
  * sized to its text as user32's MessageBox. The texts are filled in at run
  * time; buttons a case does not offer are removed then (copy.c
  * HideConfirmButtons). */
@@ -204,4 +204,6 @@ BEGIN
     DEFPUSHBUTTON   "OK", IDOK, 95, 41, 50, 14
     PUSHBUTTON      "&Retry", IDRETRY, 66, 41, 50, 14
     PUSHBUTTON      "Cancel", IDCANCEL, 120, 41, 50, 14
+    PUSHBUTTON      "&Yes", IDYES, 66, 41, 50, 14
+    PUSHBUTTON      "&No", IDNO, 120, 41, 50, 14
 END

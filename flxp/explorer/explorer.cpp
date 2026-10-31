@@ -25,6 +25,7 @@
 #include "shell/lhtheme.h"
 #include "commands.h"
 #include "dialogs.h"
+#include "fileopui.h"
 #include "header.h"
 #include "lhbar.h"
 #include "thumbview.h"
@@ -2239,6 +2240,44 @@ static void print_info()
     if (lh) printf("task band    %s; %s\n", taskpane::wanted() ? "on" : "off (taskpane=1, --taskpane or View > Task Band)", taskpane::source().c_str());
 }
 
+// the keys the frame handles before a control sees them (also while a file operation runs: fileopui)
+static bool loop_keys(MSG& msg)
+{
+    HWND focus = GetFocus();
+    bool in_view = focus == g.list || focus == g.tree;
+    if (msg.message == WM_KEYDOWN && msg.wParam == 'A' && (GetKeyState(VK_CONTROL) & 0x8000) && in_view) { on_command(ID_EDIT_SELECTALL); return true; }
+    if (in_view && ((msg.message == WM_KEYDOWN && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
+                    (msg.message == WM_KEYUP && msg.wParam == VK_APPS))) {
+        context_menu(focus, POINT{ -1, -1 });
+        return true;
+    }
+    if (in_view && msg.message == WM_KEYDOWN && msg.wParam == VK_APPS) return true;
+    if (in_view && msg.message == WM_KEYUP && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) return true;   // no menu-bar activation after Shift+F10
+    if (focus == g.list && msg.message == WM_SYSKEYDOWN && msg.wParam == VK_RETURN) {   // Alt+Enter: Properties
+        g_ctx = Ctx(); g_ctx.items = selection(); verb(ID_PROPERTIES);
+        return true;
+    }
+    if (focus == g.list && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000) && (msg.wParam == 'X' || msg.wParam == 'C' || msg.wParam == 'V')) {
+        on_command(msg.wParam == 'X' ? ID_CUT : msg.wParam == 'C' ? ID_COPY : ID_PASTE);
+        return true;
+    }
+    if (msg.message == WM_KEYDOWN && msg.wParam == VK_F5) { refresh(); return true; }
+    if (g.header && msg.message == WM_KEYDOWN && msg.wParam == 'L' && (GetKeyState(VK_CONTROL) & 0x8000)) { header::edit_address(); return true; }
+    if (g.zoomable && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000) && (focus == g.list || focus == g.frame) &&
+        (msg.wParam == VK_OEM_PLUS || msg.wParam == VK_ADD || msg.wParam == VK_OEM_MINUS || msg.wParam == VK_SUBTRACT)) {
+        browser::zoom_step(g, msg.wParam == VK_OEM_PLUS || msg.wParam == VK_ADD ? 1 : -1);
+        return true;
+    }
+    if (msg.message == WM_KEYDOWN && msg.wParam >= '0' && msg.wParam <= '5' && (GetKeyState(VK_CONTROL) & 0x8000) && !(GetKeyState(VK_MENU) & 0x8000)) {
+        // XP: Ctrl+0 default view, 1 Details, 2 Icons, 3 Thumbnails (browser::view_key), 4 List, 5 Small Icons;
+        // Longhorn: 0 default view, 1..5 the slider's stops (Details, Tiles, Large, Medium, Small Icons)
+        static const int keys[] = { ID_VIEW_DEFAULT, ID_VIEW_DETAILS, ID_VIEW_ICONS, ID_VIEW_BIGICONS, ID_VIEW_LIST, ID_VIEW_SMALLICONS };
+        if (!g.zoomable || !browser::view_key(g, (int)msg.wParam)) on_command(keys[msg.wParam - '0']);
+        return true;
+    }
+    return false;
+}
+
 int main(int argc, char** argv)
 {
     // Command line: options become FLXP_<KEY> overrides for this run (children inherit them).
@@ -2350,40 +2389,10 @@ int main(int argc, char** argv)
     SetFocus(g.list);
     if (!open_err.empty()) error_box(open_err);
     if (quit_ms) SetTimer(frame, 1, (UINT)quit_ms, quit_timer);
+    fileopui::set_message_filter(loop_keys);   // the same keys while a copy runs
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
-        HWND focus = GetFocus();
-        bool in_view = focus == g.list || focus == g.tree;
-        if (msg.message == WM_KEYDOWN && msg.wParam == 'A' && (GetKeyState(VK_CONTROL) & 0x8000) && in_view) { on_command(ID_EDIT_SELECTALL); continue; }
-        if (in_view && ((msg.message == WM_KEYDOWN && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
-                        (msg.message == WM_KEYUP && msg.wParam == VK_APPS))) {
-            context_menu(focus, POINT{ -1, -1 });
-            continue;
-        }
-        if (in_view && msg.message == WM_KEYDOWN && msg.wParam == VK_APPS) continue;
-        if (in_view && msg.message == WM_KEYUP && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) continue;   // no menu-bar activation after Shift+F10
-        if (focus == g.list && msg.message == WM_SYSKEYDOWN && msg.wParam == VK_RETURN) {   // Alt+Enter: Properties
-            g_ctx = Ctx(); g_ctx.items = selection(); verb(ID_PROPERTIES);
-            continue;
-        }
-        if (focus == g.list && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000) && (msg.wParam == 'X' || msg.wParam == 'C' || msg.wParam == 'V')) {
-            on_command(msg.wParam == 'X' ? ID_CUT : msg.wParam == 'C' ? ID_COPY : ID_PASTE);
-            continue;
-        }
-        if (msg.message == WM_KEYDOWN && msg.wParam == VK_F5) { refresh(); continue; }
-        if (g.header && msg.message == WM_KEYDOWN && msg.wParam == 'L' && (GetKeyState(VK_CONTROL) & 0x8000)) { header::edit_address(); continue; }
-        if (g.zoomable && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000) && (focus == g.list || focus == g.frame) &&
-            (msg.wParam == VK_OEM_PLUS || msg.wParam == VK_ADD || msg.wParam == VK_OEM_MINUS || msg.wParam == VK_SUBTRACT)) {
-            browser::zoom_step(g, msg.wParam == VK_OEM_PLUS || msg.wParam == VK_ADD ? 1 : -1);
-            continue;
-        }
-        if (msg.message == WM_KEYDOWN && msg.wParam >= '0' && msg.wParam <= '5' && (GetKeyState(VK_CONTROL) & 0x8000) && !(GetKeyState(VK_MENU) & 0x8000)) {
-            // XP: Ctrl+0 default view, 1 Details, 2 Icons, 3 Thumbnails (browser::view_key), 4 List, 5 Small Icons;
-            // Longhorn: 0 default view, 1..5 the slider's stops (Details, Tiles, Large, Medium, Small Icons)
-            static const int keys[] = { ID_VIEW_DEFAULT, ID_VIEW_DETAILS, ID_VIEW_ICONS, ID_VIEW_BIGICONS, ID_VIEW_LIST, ID_VIEW_SMALLICONS };
-            if (!g.zoomable || !browser::view_key(g, (int)msg.wParam)) on_command(keys[msg.wParam - '0']);
-            continue;
-        }
+        if (loop_keys(msg)) continue;
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
