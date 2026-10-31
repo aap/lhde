@@ -25,6 +25,9 @@ Window tray_manager(void);                                   /* our manager wind
 void tray_stop(void);
 void tray_forget(struct node *gone);                         /* gone (or its subtree) is being freed: drop the tray node if it is in there */                                       /* on SIGTERM/SIGINT: icons back to the root, unmapped */
 
+/* menupaint.c: lh.menu_render (wuxtheme's popup menu painter for menu.lua) */
+int l_menu_render(lua_State *L);
+
 /* notify.c */
 int notify_start(void);                                     /* org.freedesktop.Notifications on the session bus; fd or -1 */
 void notify_dispatch(void);
