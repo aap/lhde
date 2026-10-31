@@ -32,8 +32,10 @@ then README.md (build, install, run). docs/README.md lists every document.
 
 ## Working here
 
-- Build: `make -j`; everything runs uninstalled from `build/bin`. Tests: `make check` (wux tests, headless Xvfb scripts, ut-dump
-  over the imported styles, liblhde's resolver, luxshell's Lua, luxwm's frame regression). Keep it green; the frame regression
+- Build: `make -j` (one build at a time on this machine: parallel builds in several worktrees have frozen it); everything runs
+  uninstalled from `build/bin`. Tests: `make check` (wux tests, headless Xvfb scripts, ut-dump over the imported styles, liblhde's
+  resolver, luxshell's Lua, luxwm's frame regression, and `check-free`: every theme resolved against a tree holding only the free
+  ReactOS import, skipped without the ReactOS ISO). Keep it green; the frame regression
   must stay byte-identical unless the change is to frames, and then say so.
 - See it: `LAB=:9 session/lab.sh start` (Xvfb + luxwm + picom), `session/lab.sh shell`, then `DISPLAY=:9 build/bin/flxp-desktop`,
   `build/bin/flxp DIR`, `build/bin/flxp-settings`; `session/lab.sh theme NAME` switches live; `session/lab.sh shot FILE` takes
