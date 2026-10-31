@@ -2,6 +2,9 @@
 
 ## visuals
 
+* the two icon-size options are clumsy: the Longhorn header has View > Header (small/medium/large/xlarge), the XP toolbar has
+	View > Toolbars > Icon Options (small/large); one place that shows only what the current chrome has, in a unified way
+
 * XP's Customize Toolbar dialog (View > Toolbars > Customize...: buttons, text options); the icon size alone is in View >
 	Toolbars > Icon Options
 
