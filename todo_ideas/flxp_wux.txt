@@ -38,4 +38,7 @@ not *entirely* sure about the font for all themes though
 
 ## misc
 
+* tests/headless/*.sh reset HOME and XDG_CONFIG_HOME for their scratch home but not XDG_STATE_HOME (an exported one leaks into
+	the test and filedlg.sh fails); reset it too
+
 * tests/headless/filedlg.sh is flaky under load (make check with a lab running): a different check fails each run (xp multi, longhorn filter index, the view keys), alone it passes; its xdotool waits need to wait for the dialog, not sleep
