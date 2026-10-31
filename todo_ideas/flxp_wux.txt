@@ -14,6 +14,9 @@ not *entirely* sure about the font for all themes though
 
 * future: put the aurora example into longhorn flxp as an option
 
+* an option to put the Longhorn task pane (the band) at the bottom instead of the top: with the 5048 and 5112 styles that gets
+	close to Vista's details pane; a theme key (Explorer section) with the basic/aero 5048 and 5112 themes set to bottom
+
 * lab (picom xrender): an explorer window that loses activation to a dialog soon after it was resized shows parts of
 	itself (toolbar, task pane, status bar) as holes until it is activated again; seen with Properties (Alt+Enter) and
 	with the copy dialogs alike
