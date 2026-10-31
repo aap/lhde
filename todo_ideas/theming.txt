@@ -14,6 +14,12 @@ ISO or live CD, the system32 files, fonts, cursors, themes, wallpapers), and one
 A desktop with only the ReactOS source imported is the free baseline and the enforced test configuration. To verify on the
 way: whether ReactOS's browseui/shell32 bitmaps keep XP's ids for the toolbar strips (214-217, 276-279) and the task pane art;
 the licences of its visual styles.
+Verified 2026-10-31 against the 0.4.16 source (~/lib/reactos-0.4.16, a shallow clone of the release tag) and the ISO
+(~/lib/windows_isos/ReactOS-0.4.16-i386.iso): shell32's icon ids are XP's (document 1, folder 4, drive 9, My Computer 16,
+desktop 35); browseui keeps the Explorer toolbar strips at 214-217 (shell32 has its own IE/edit strips at 204-207 and 225-228,
+so a per-source id table where XP and ReactOS differ); five visual styles are in the tree and the ISO (Lunar, Modern, Mizu,
+Lautus, Blackshade; ReactOS's, GPL); reactos/Fonts has Marlett.ttf, tahoma.ttf, micross.ttf and more; the DLLs are inside
+i386/reactos.cab (cab extraction as for XP's).
 What lhde-theme explain classic says today with an empty Windows tree: style classic (no msstyles needed), the built-in Windows
 Standard colours, classic frames, classic taskbar and the 2000-style start menu, icons -> Wine's set, fonts -> fontconfig,
 resources -> drawn art, wallpaper -> colour. Still to make free:
