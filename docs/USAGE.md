@@ -456,6 +456,12 @@ a song's artist and album, which XP's tiles show, are not read: those files show
 context menu, the Views drop-down, Folder Options' default view and the XP-look file dialog's View Menu (Tiles, Icons, List,
 Details) list it; a folder shown in Tiles keeps it (`tiles` in `flxp-views`, which the Longhorn frame reads as its Tiles).
 
+**Toolbar icon size.** View > Toolbars > Icon Options > Large Icons / Small Icons is XP's "Icon options" of the Customize Toolbar
+dialog (the dialog itself is not there yet): the Standard Buttons toolbar changes at once between the 24 px and the 16 px strip,
+the labels staying on the right of Back, Search and Folders as XP's default "Selective text on right", and the choice is kept
+(`toolbar_icons = large|small` in `flxp.ini`; other open windows take it when they start). The Longhorn frame's toolbar has one
+size, so the item is greyed there.
+
 ## The Explorer's details and task band (flxp)
 
 What the Explorer says about the folder shown or the selection comes from one model (`flxp/shell/details.h`) shown two ways.

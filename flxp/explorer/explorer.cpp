@@ -139,6 +139,9 @@ static bool apply_toolbar_images()
     return true;
 }
 
+static HMENU g_xbar_menu, g_arrange_menu, g_header_menu, g_zoom_menu;   // View's submenus
+static HMENU g_icon_menu;   // View > Toolbars > Icon Options
+
 static void set_toolbar_size(bool large)
 {
     g.large_toolbar = large;
@@ -154,8 +157,7 @@ static void set_toolbar_size(bool large)
     rb.cxMinChild = (UINT)sz.cx; rb.cyMinChild = (UINT)(item.bottom - item.top); rb.cyChild = rb.cyMinChild;
     int band = (int)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_TOOLBAR, 0);
     SendMessageW(g.rebar, RB_SETBANDINFOW, (WPARAM)band, (LPARAM)&rb);
-    HMENU bars = GetSubMenu(GetSubMenu(g.menu, 2), 0);
-    CheckMenuRadioItem(bars, ID_TB_LARGE, ID_TB_SMALL, large ? ID_TB_LARGE : ID_TB_SMALL, MF_BYCOMMAND);
+    if (g_icon_menu) CheckMenuRadioItem(g_icon_menu, ID_TB_LARGE, ID_TB_SMALL, large ? ID_TB_LARGE : ID_TB_SMALL, MF_BYCOMMAND);
     layout();
     InvalidateRect(g.rebar, nullptr, TRUE);
 }
@@ -870,7 +872,6 @@ static void layout()
 
 // ---- creation -----------------------------------------------------------------
 
-static HMENU g_xbar_menu, g_arrange_menu, g_header_menu, g_zoom_menu;   // View's submenus
 
 static HMENU build_menu()
 {
@@ -888,9 +889,12 @@ static HMENU build_menu()
     AppendMenuW(bars, MF_STRING | MF_CHECKED | MF_GRAYED, 0, L"&Standard Buttons");
     AppendMenuW(bars, MF_STRING | MF_CHECKED | MF_GRAYED, 0, L"&Address Bar");
     AppendMenuW(bars, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(bars, MF_STRING, ID_TB_LARGE, L"&Large Icons");
-    AppendMenuW(bars, MF_STRING, ID_TB_SMALL, L"S&mall Icons");
-    CheckMenuRadioItem(bars, ID_TB_LARGE, ID_TB_SMALL, ID_TB_LARGE, MF_BYCOMMAND);
+    // XP's Customize Toolbar dialog's "Icon options" (Large icons / Small icons), here without the dialog
+    g_icon_menu = CreatePopupMenu();
+    AppendMenuW(g_icon_menu, MF_STRING, ID_TB_LARGE, L"&Large Icons");
+    AppendMenuW(g_icon_menu, MF_STRING, ID_TB_SMALL, L"&Small Icons");
+    CheckMenuRadioItem(g_icon_menu, ID_TB_LARGE, ID_TB_SMALL, g.large_toolbar ? ID_TB_LARGE : ID_TB_SMALL, MF_BYCOMMAND);
+    AppendMenuW(bars, MF_POPUP, (UINT_PTR)g_icon_menu, L"&Icon Options");
     AppendMenuW(view, MF_POPUP, (UINT_PTR)bars, L"&Toolbars");
     AppendMenuW(view, MF_STRING | (g.show_status ? MF_CHECKED : 0), ID_VIEW_STATUSBAR, L"Status &Bar");
     AppendMenuW(view, MF_STRING | MF_GRAYED, ID_VIEW_TASKPANE, L"Task Ba&nd");
@@ -1258,8 +1262,7 @@ static void create_children(HWND frame)
         ModifyMenuW(bars, 1, MF_BYPOSITION | MF_STRING | MF_UNCHECKED, ID_TB_ADDRESS, L"&Address Bar");
         // 4051: the menu band and a small toolbar share one coloured row
         lhtool::create();
-        EnableMenuItem(bars, ID_TB_LARGE, MF_BYCOMMAND | MF_GRAYED);
-        EnableMenuItem(bars, ID_TB_SMALL, MF_BYCOMMAND | MF_GRAYED);
+        EnableMenuItem(bars, 3, MF_BYPOSITION | MF_GRAYED);   // Icon Options (the Longhorn frame's toolbar has one size)
         g_viewstrip = viewbutton::create(frame, g);   // 4074: the view button at the bottom of the left pane
     }
     if (getenv("FLXP_DEBUG")) {
@@ -1935,7 +1938,7 @@ static void on_command(int id)
         refresh();
         break;
     case ID_VIEW_REFRESH: refresh(); break;
-    case ID_TB_LARGE: set_toolbar_size(true); break;
+    case ID_TB_LARGE: set_toolbar_size(true); shell::write_setting("toolbar_icons", "large"); break;
     case ID_TB_ADDRESS: {
         HMENU bars = GetSubMenu(GetSubMenu(g.menu, 2), 0);
         bool show = !(GetMenuState(bars, ID_TB_ADDRESS, MF_BYCOMMAND) & MF_CHECKED);
@@ -1944,7 +1947,7 @@ static void on_command(int id)
         layout();
         break;
     }
-    case ID_TB_SMALL: set_toolbar_size(false); break;
+    case ID_TB_SMALL: set_toolbar_size(false); shell::write_setting("toolbar_icons", "small"); break;
     case ID_EDIT_SELECTALL: {
         LVITEMW lvi = {}; lvi.stateMask = LVIS_SELECTED; lvi.state = LVIS_SELECTED;
         SendMessageW(g.list, LVM_SETITEMSTATE, (WPARAM)-1, (LPARAM)&lvi);
@@ -2059,8 +2062,7 @@ static void set_frame_mode(bool lh)
         ModifyMenuW(bars, 1, MF_BYPOSITION | MF_STRING | MF_UNCHECKED, ID_TB_ADDRESS, L"&Address Bar");
         lhtool::create();
         if (!g_viewstrip) g_viewstrip = viewbutton::create(frame, g);
-        EnableMenuItem(bars, ID_TB_LARGE, MF_BYCOMMAND | MF_GRAYED);
-        EnableMenuItem(bars, ID_TB_SMALL, MF_BYCOMMAND | MF_GRAYED);
+        EnableMenuItem(bars, 3, MF_BYPOSITION | MF_GRAYED);   // Icon Options (the Longhorn frame's toolbar has one size)
         header::set_history(!g.back.empty(), !g.forward.empty());
         if (g.folder) header::set_folder(g.folder);
         sync_active();
@@ -2075,8 +2077,7 @@ static void set_frame_mode(bool lh)
         SendMessageW(g.rebar, RB_SHOWBAND, (WPARAM)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_TOOLBAR, 0), TRUE);
         SendMessageW(g.rebar, RB_SHOWBAND, (WPARAM)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_ADDRESS, 0), TRUE);
         ModifyMenuW(bars, 1, MF_BYPOSITION | MF_STRING | MF_CHECKED | MF_GRAYED, 0, L"&Address Bar");
-        EnableMenuItem(bars, ID_TB_LARGE, MF_BYCOMMAND | MF_ENABLED);
-        EnableMenuItem(bars, ID_TB_SMALL, MF_BYCOMMAND | MF_ENABLED);
+        EnableMenuItem(bars, 3, MF_BYPOSITION | MF_ENABLED);   // Icon Options (the Longhorn frame's toolbar has one size)
         brand::create(g.rebar);
     }
     places::set_longhorn(lh);
