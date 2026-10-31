@@ -3,6 +3,11 @@
 * taskbar
 	* window buttons
 		* center buttons mode for plex and concepts
+	* the Avalon bar's context menu (right click on the Start button or the bar; the sidebar's too) is menu.lua's own
+		"avalon" drawing (pango, MENUHILIGHT bars, 19 px rows as lh4074-091929): no Aero/Jade POPUPITEM highlight and
+		not the style's MENUFONT, the one menu left that is not wuxtheme's painter. 4074 has it so too (probably an
+		oversight; aap: should be universal): draw it with ut_menu_layout / ut_menu_draw as luxwm's window menu does
+		(the session style through ut_open, an image node redrawn on selection, hit testing from item_y)
 
 * sidebar
 	* mouse hover over tiles
