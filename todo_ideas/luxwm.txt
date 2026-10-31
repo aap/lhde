@@ -14,3 +14,6 @@ looks like Ctrl-n switches desktops. this is very nice
 * move windows between desks
 	* Ctrl-n switching while in alt-space M move mode should do the right thing (currently nothing happens)
 	* "move to desk" submenu in window menu
+
+* make check-luxwm (frame regression) stops at the first frame set whose style is not imported ("libuxtheme cannot open
+  .../styles/aero-patch.msstyles" with a Windows tree that has no aero-patch): skip such sets with a note, as check-free does
