@@ -40,5 +40,3 @@ not *entirely* sure about the font for all themes though
 	* 4074: (I) icon in the top right to flip between details and "tasks" (but no winfs?)
 
 ## misc
-
-* flxp portal save dialog seems to get stuck on an "Open" button label when changing directories
