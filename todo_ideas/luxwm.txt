@@ -6,22 +6,11 @@
 	maximize to left/right half when dragging to left/half edge
 
 * alt-space S to resize works really well for one direction, but diagonal is hard to get right. should be easier
-* dialogs like "Display Properties" currently resizable. not sure whose fault that is, but at the wm layer this should be handled correctly
 
 ## virtual desktops
 
 looks like Ctrl-n switches desktops. this is very nice
 
-* if not yet the case, need to be able to do this externally (especially luxshell for a sidebar tile)
-* taskbar should only show windows on current desktop
 * move windows between desks
 	* Ctrl-n switching while in alt-space M move mode should do the right thing (currently nothing happens)
 	* "move to desk" submenu in window menu
-
-## stacking
-
-* a full-screen window (_NET_WM_STATE_FULLSCREEN, focused) must be above the taskbar and sidebar; today luxshell's bars stay on top of it
-
-## misc
-
-* better window icons, especially urxvt and "Display Properties"

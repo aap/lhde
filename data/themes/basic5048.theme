@@ -21,6 +21,7 @@ taskbar  = classic
 chrome   = longhorn
 navbar   = vision
 navbar_preset = small
+taskpane = bottom            ; the task band under the list, close to Vista's details pane (a choice, not 5048's/5112's)
 
 [Desktop]
 wallpaper = 5048/Longhorn    ; Windows/web/Wallpaper/Longhorn.jpg: the glass facade

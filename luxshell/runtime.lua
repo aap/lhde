@@ -408,7 +408,11 @@ end
 local function rebuild_tasks()
   tb.tasks:clear(); tb.task_nodes = {}
   if not tb_on() then return end           -- classic / none: no buttons, so no _NET_WM_ICON_GEOMETRY of ours either (lhshell.c drops them)
-  local wins = lh.windows(); local n = #wins; if n == 0 then tb.surface:damage() return end
+  local wins, desk = {}, lh.desktop()
+  for _, w in ipairs(lh.windows()) do   -- the current desktop's windows and the sticky ones (EWMH _NET_WM_DESKTOP 0xFFFFFFFF)
+    if w.desktop == desk or w.desktop == -1 or w.desktop == 0xFFFFFFFF then table.insert(wins, w) end
+  end
+  local n = #wins; if n == 0 then tb.surface:damage() return end
   local hostw = tb.tbhost:desired(screen_w, tb.h)
   local avail = tb.geo.w - (tb.start_w or T.start.w) - toggle_slot_w() - hostw   -- the task list's width after this layout (bounds() lags one paint)
   -- width rule (2.4.2): rows = the bar's rows; items per row from the count; width = min(140, w / itemsPerRow)
@@ -428,7 +432,7 @@ local function rebuild_tasks()
   tb.surface:damage()
   tb.surface:raise()
 end
-lh.on("windows", rebuild_tasks); lh.on("window", rebuild_tasks)
+lh.on("windows", rebuild_tasks); lh.on("window", rebuild_tasks); lh.on("desktop", rebuild_tasks)
 
 ------------------------------------------------------------------ sidebar (SHELL-DESIGN 2.3)
 local sb = { w = sidebar_w }
@@ -713,8 +717,11 @@ lh.publish_clock = publish_clock
 local function build_tb_tiles()
   for _, t in ipairs(tb.tile_list) do if t.dispose then pcall(t.dispose, t) end end
   tb.tile_list = {}; tb.tbhost:clear()
-  if mode ~= "minimized" or not tb.wide or not tb_on() then publish_clock() return end
-  for _, name in ipairs(T.taskbar_tiles or pinned_names()) do   -- pack key taskbar_tiles: 4074 Sidebar\TaskbarTiles
+  -- the sidebar stacked under the windows: its clock may be covered, so the taskbar shows the time at its right end, as 4074's
+  -- taskbar does with no clock of the sidebar's to show (the clock's taskbar view alone; minimized: all the pinned tiles)
+  local names = (mode == "minimized" and tb.wide) and (T.taskbar_tiles or pinned_names()) or (cfg.sb_bottom and { "clock" }) or nil
+  if not names or not tb_on() then tb.surface:damage(); publish_clock() return end
+  for _, name in ipairs(names) do   -- pack key taskbar_tiles: 4074 Sidebar\TaskbarTiles
     local def = load_tile(name)
     if def and def.taskbar then def.id = name; def.tb = tb; def:taskbar(tb.tbhost); table.insert(tb.tile_list, def) end
   end
@@ -1328,6 +1335,13 @@ end
 -- in-between state the compositor might catch invisible: to bottom the taskbar first runs the full width (under the sidebar's
 -- corner), to top the sidebar first runs the full height (under the taskbar); the restack comes last. (A server grab around
 -- it was tried: on the xrender lab it froze picom halfway through a repaint, which showed for ~180 ms.)
+-- switch the virtual desktop through the WM (EWMH _NET_CURRENT_DESKTOP request): a 0-based index, "next" or "prev" (wrapping
+-- at _NET_NUMBER_OF_DESKTOPS); for _LHSHELL_COMMAND "desktop ..." and a future sidebar tile
+function lh.switch_desktop(v)
+  local n, cur = lh.root_prop("_NET_NUMBER_OF_DESKTOPS") or 1, lh.desktop()
+  local d = v == "next" and (cur + 1) % n or v == "prev" and (cur - 1) % n or tonumber(v)
+  if d and d >= 0 and d < n then lh.set_desktop(d) end
+end
 function lh.set_sidebar_stacking(v)
   if v == "toggle" then v = cfg.sb_bottom and "top" or "bottom" end
   if v ~= "top" and v ~= "bottom" then return end
@@ -1339,7 +1353,7 @@ function lh.set_sidebar_stacking(v)
   if sb.anim then lh.cancel(sb.anim); sb.anim = nil end
   sb.yield = sb_yield()
   local function sidebar() build_sidebar(); build_tiles(); after_tiles(); place_sidebar() end
-  local function taskbar() place_taskbar(); rebuild_tasks() end
+  local function taskbar() build_tb_tiles(); place_taskbar(); rebuild_tasks() end
   if on then taskbar(); sidebar() else sidebar(); taskbar() end
   sb.surface:set_layer(sb_layer())
   if mode ~= "minimized" and not sb_hidden() then sb_stack() end   -- top: raised over the taskbar at the corner; bottom: lowered
@@ -1617,6 +1631,7 @@ lh.on("command", function()
   if verb == "taskbar" then lh.set_taskbar(arg) return end            -- second-display.sh taskbar avalon|classic|none (M8)
   if c:match("^%s*settings%s*$") then lh.settings_flyout() return end   -- the settings flyout (e.g. with the classic bar, which has no way to it)
   if verb == "sidebar-stacking" then lh.set_sidebar_stacking(arg) return end   -- Win+S (lhwm "shell sidebar-stacking toggle"): top | bottom | toggle
+  if verb == "desktop" then lh.switch_desktop(arg) return end   -- desktop N (0-based, as _NET_CURRENT_DESKTOP) | next | prev
   if verb == "sidebar-with-classic" then lh.set_sidebar_with_classic(arg == "1") return end   -- second-display.sh taskbar classic+sidebar
   S.run(c)
 end)

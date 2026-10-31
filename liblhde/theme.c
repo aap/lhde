@@ -74,7 +74,7 @@ static const char *const KEYS[] = {
     "VisualStyle.style", "VisualStyle.color", "VisualStyle.size", "VisualStyle.scheme", "VisualStyle.shellstyle",
     "Glass.frames", "Glass.frames_classic", "Glass.composition", "Glass.animations",
     "Shell.taskbar", "Shell.pack", "Shell.sidebar",
-    "Explorer.chrome", "Explorer.navbar", "Explorer.navbar_preset", "Explorer.taskband",
+    "Explorer.chrome", "Explorer.navbar", "Explorer.navbar_preset", "Explorer.taskband", "Explorer.taskpane",
     "Desktop.wallpaper", "Desktop.mode", "Desktop.color", "Desktop.icons",
     "Fonts.fonts", "Fonts.smoothing", NULL };
 int lhde_theme_is_key(const char *key)
@@ -373,6 +373,7 @@ static void apply_defaults(lhde_theme *t, const lhde_style_info *si, const char 
     dflt(t, "Explorer.navbar", k == LHDE_STYLE_DWM ? "vision" : k == LHDE_STYLE_LONGHORN ? (bn && bn < 4060 ? "4051" : "4074") : "none", why);
     dflt(t, "Explorer.navbar_preset", "auto", "default: the navbar family's own");
     dflt(t, "Explorer.taskband", "0", "default");
+    dflt(t, "Explorer.taskpane", "top", "default: under the command bar (4051)");
     dflt(t, "Desktop.icons", lh ? "longhorn4074" : "xp", why);
     /* frames: the glass frame set named like the style (frames/jade4074, frames/aero5048), for 4074-era and DWM styles */
     char fd[PATH_MAX];

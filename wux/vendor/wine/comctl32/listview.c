@@ -5332,7 +5332,15 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
             InflateRect(&rcTheme, -TILE_INSET, -TILE_INSET);
         }
         else if (infoPtr->uView == LV_VIEW_ICON)
-            UnionRect(&rcTheme, &rcBox, &rcLabel);
+        {
+            /* the icon's own square and its label, not the whole cell: LISTITEM's 4 px sizing margins
+               around the image, its top padding above, kept inside the cell (4074's Icons view) */
+            RECT icon = rcIcon;
+            InflateRect(&icon, 4, 0);
+            icon.top -= ICON_TOP_PADDING_HITABLE;
+            UnionRect(&rcTheme, &icon, &rcLabel);
+            IntersectRect(&rcTheme, &rcTheme, &rcBox);
+        }
         else if (infoPtr->uView == LV_VIEW_DETAILS && (infoPtr->dwLvExStyle & LVS_EX_FULLROWSELECT))
         {
             rcTheme = rcBox;

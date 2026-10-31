@@ -176,6 +176,7 @@ void kill_timer(Window* w, uintptr_t id);
 // has_alpha), cleared areas are transparent and show the frame plate when the
 // frame is extended under them. Switching recreates the native window.
 bool set_argb(Window* w, bool on);              // false if not a toplevel or no 32-bit visual
+void style_changed(Window* w);                  // GWL_STYLE set: a toplevel's sizing border (the WM's fixed size) follows
 bool is_argb(Window* w);
 void set_frame_extension(Window* w, const int32_t* ltrb);   // left right top bottom, null = none
 enum : uint32_t { FRAME_NO_TITLE = 1, FRAME_NO_ICON = 2, FRAME_NO_FOG = 4, FRAME_CLIENT_CAPTION = 8 };

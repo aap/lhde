@@ -215,6 +215,7 @@ static void ms_paint(cairo_t *cr, const struct theme *t, int w, int h, const cha
         const struct mspart *b = &t->ms[part]; if (!b->count) continue;
         int bx, by, bw, bh; ms_btn_rect(t, w, slot, maximized, &bx, &by, &bw, &bh); leftmost = bx;
         int hit = ms_slot_hit(slot), st = pressed == hit ? 2 : hover == hit ? 1 : 0;
+        if (slot == 1 && ext && (ext->flags & FRAME_MAX_DISABLED)) st = 3;   /* the strip's disabled image (a dialog's maximise) */
         int idx = (b->count >= 8 ? fs * (b->count / 2) : 0) + st;
         ms_part(cr, t, part, idx, bx, by, bw, bh);
         if (t->ut && b->ut_live) continue;   /* DrawThemeBackground drew the glyph too */
@@ -516,7 +517,8 @@ static void classic_paint(cairo_t *cr, const struct theme *t, int w, int h, cons
         if (bw < 4 || bh < 4 || bx < x) break;
         int which = slot == 0 ? BTN_CLOSE : slot == 2 ? BTN_MIN : maximized ? BTN_RESTORE : BTN_MAX;
         unsigned st = which == BTN_CLOSE ? UT_DFCS_CAPTIONCLOSE : which == BTN_MIN ? UT_DFCS_CAPTIONMIN : which == BTN_MAX ? UT_DFCS_CAPTIONMAX : UT_DFCS_CAPTIONRESTORE;
-        if (pressed == ms_slot_hit(slot)) st |= UT_DFCS_PUSHED;
+        if (slot == 1 && ext && (ext->flags & FRAME_MAX_DISABLED)) st |= UT_DFCS_INACTIVE;   /* greyed, as DrawFrameControl does */
+        else if (pressed == ms_slot_hit(slot)) st |= UT_DFCS_PUSHED;
         ut_rect br = { bx, by, bx + bw, by + bh };
         ut_draw_frame_control(px, W, H, stride, &br, UT_DFC_CAPTION, st, C);
         leftmost = bx;
@@ -1237,7 +1239,10 @@ void frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const cha
     for (int i = 0; i < t->norder; i++) {
         int bx, by, bw, bh; int b = button_rect(t, w, i, maximized, &bx, &by, &bw, &bh);
         int hit = hit_of_slot(t, i); int state = !focused ? 3 : 0;
-        if (pressed == hit) state = 2; else if (hover == hit) state = 1;   /* hot/pressed also on inactive frames */
+        int dis = hit == HIT_MAX && (flags & FRAME_MAX_DISABLED);   /* the sprites have no disabled frame: the inactive one, faded */
+        if (dis) state = 3;
+        else if (pressed == hit) state = 2; else if (hover == hit) state = 1;   /* hot/pressed also on inactive frames */
+        if (dis) cairo_push_group(cr);
         if (state == 1 || state == 2) {
             cairo_surface_t *g = (b == BTN_CLOSE) ? t->glow_close : t->glow_btn;
             if (g) { double gw = cairo_image_surface_get_width(g), gh = cairo_image_surface_get_height(g);
@@ -1260,6 +1265,7 @@ void frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const cha
                 cairo_set_source_surface(cr, t->btn[b], bx + g, by - state * t->btn_h); cairo_paint(cr); cairo_restore(cr);
             }
         }
+        if (dis) { cairo_pop_group_to_source(cr); cairo_paint_with_alpha(cr, 0.45); }
     }
     /* 3. window icon (from _NET_WM_ICON) and caption text with TextGlow */
     if (flags & FRAME_NO_ICON) icon = NULL;

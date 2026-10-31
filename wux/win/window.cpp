@@ -309,6 +309,7 @@ Window* create(const char* clsname, const char* text, uint32_t style, uint32_t e
         t->back = gdi::create_bitmap(r.width(), r.height());
         w->top = t;
         g_toplevels.push_back(w);
+        style_changed(w);   // a caption without a sizing border (a dialog, a message box): the WM may neither resize nor maximize it
     }
 
     if (send(w, WM_NCCREATE, 0, (LParam)param) == 0 && w->w32) { destroy(w); return nullptr; }
@@ -960,6 +961,12 @@ bool set_argb(Window* w, bool on)
     w->nc_invalid = true;
     invalidate(w);
     return true;
+}
+
+void style_changed(Window* w)
+{
+    if (!is_window(w) || !w->top || !w->wm_decorated) return;
+    sys::set_fixed_size(w->top->native, (w->style & WS_CAPTION) == WS_CAPTION && !(w->style & WS_THICKFRAME));
 }
 
 bool is_argb(Window* w) { return is_window(w) && w->top && w->top->argb; }

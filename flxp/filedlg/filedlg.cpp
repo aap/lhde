@@ -365,6 +365,7 @@ struct Dlg : browser::Browser {
     int current_lookin = -1;
     int type_filter = -1;                    // the Files of type entry in effect
     std::string custom;                      // a pattern typed into File name ("*.txt")
+    std::string accept;                      // the default button's own label (Save turns it into Open on a folder)
     WNDPROC edit_proc = nullptr;
     // the Longhorn look
     bool lh = false;
@@ -731,8 +732,11 @@ static void fill_list(Dlg& d, const std::string& select)
 int Dlg::icon(const std::string& key) { return icon_for(icons, key); }
 
 // XP: the first item has the focus (not the selection) unless one was selected
+static void update_ok_label(Dlg& d);
+
 void Dlg::filled()
 {
+    update_ok_label(*this);   // a folder opened from a selection that had turned Save into Open
     if (items.empty() || SendMessageW(list, LVM_GETSELECTEDCOUNT, 0, 0) > 0) return;
     LVITEMW st = {};
     st.stateMask = LVIS_FOCUSED;
@@ -758,6 +762,15 @@ static void set_name(Dlg& d, const std::string& s)
     SetWindowTextW(d.name_edit, WS(s));
 }
 
+// Save: a selection of folders only turns Save into Open (XP); anything else, and a fresh folder, is Save again
+static void update_ok_label(Dlg& d)
+{
+    if (d.o->mode != Mode::Save) return;
+    bool folder = false, file = false;
+    for (int i : selected_indices(d)) (d.items[(size_t)i].is_folder() ? folder : file) = true;
+    SetDlgItemTextW(d.dlg, IDOK, WS(folder && !file ? std::string("&Open") : d.accept));
+}
+
 // XP SelFocusChange: the selected files (not folders) go into File name;
 // several are quoted. Folder mode puts the selected folder there.
 static void selection_to_name(Dlg& d)
@@ -772,20 +785,8 @@ static void selection_to_name(Dlg& d)
         bool here = is_fs_path(it.path) && shell::dir_of(it.path) == cur_dir(d);
         names.push_back(here ? it.name : it.path);
     }
-    if (names.empty()) {
-        // Save: a selected folder turns Save into Open (XP)
-        if (d.o->mode == Mode::Save) {
-            bool folder = false;
-            for (int i : selected_indices(d)) if (d.items[(size_t)i].is_folder()) folder = true;
-            std::string label = d.o->accept_label.empty() ? "&Save" : d.o->accept_label;
-            SetDlgItemTextW(d.dlg, IDOK, WS(folder ? std::string("&Open") : label));
-        }
-        return;
-    }
-    if (d.o->mode == Mode::Save) {
-        std::string label = d.o->accept_label.empty() ? "&Save" : d.o->accept_label;
-        SetDlgItemTextW(d.dlg, IDOK, WS(label));
-    }
+    update_ok_label(d);
+    if (names.empty()) return;
     if (names.size() == 1) { set_name(d, names[0]); return; }
     std::string s;
     for (auto& n : names) { if (!s.empty()) s += ' '; s += '"' + n + '"'; }
@@ -1243,6 +1244,7 @@ static void init_dialog(Dlg& d, HWND owner)
         for (char& c : accept) if (c == '_') { c = '&'; break; }
     }
     SetDlgItemTextW(dlg, IDOK, WS(accept));
+    d.accept = accept;
     if (o.mode == Mode::Save) {
         SetDlgItemTextW(dlg, stc4, L"Save &in:");
         SetDlgItemTextW(dlg, stc2, L"Save as &type:");
@@ -1853,6 +1855,7 @@ static void lh_init(Dlg& d, HWND owner)
         for (char& c : accept) if (c == '_') { c = '&'; break; }
     }
     SetDlgItemTextW(dlg, IDOK, WS(accept));
+    d.accept = accept;
     if (o.mode == Mode::Save) {
         SetDlgItemTextW(dlg, stc3, L"&Name:");
         SetDlgItemTextW(dlg, stc2, L"File &type:");

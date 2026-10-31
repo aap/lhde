@@ -814,10 +814,13 @@ static void layout()
         SetWindowPos(g.rebar, nullptr, 0, top, rc.right, h, SWP_NOZORDER);
         top += h;
     }
+    bool band_bottom = g.taskband && taskpane::bottom();   // Explorer.taskpane = bottom: under the list and the left pane
     if (g.taskband) {
         taskpane::set_room(bottom - top - (g.status && g.show_status ? 22 : 0));
-        SetWindowPos(g.taskband, nullptr, 0, top, rc.right, taskpane::height(), SWP_NOZORDER);
-        top += taskpane::height();
+        if (!band_bottom) {
+            SetWindowPos(g.taskband, nullptr, 0, top, rc.right, taskpane::height(), SWP_NOZORDER);
+            top += taskpane::height();
+        }
     }
     if (g.status) {
         if (g.show_status) {
@@ -831,17 +834,24 @@ static void layout()
             ShowWindow(g.status, SW_HIDE);
         }
     }
+    if (band_bottom) {
+        bottom -= taskpane::height();
+        SetWindowPos(g.taskband, nullptr, 0, bottom, rc.right, taskpane::height(), SWP_NOZORDER);
+    }
     int x = 0;
-    // 4074's view button: a strip at the bottom of the left pane (the tree's or the places pane's)
+    // 4074's view button: a strip at the bottom of the left pane (the tree's or the places pane's); with the band under the
+    // list it stays clear of the 14 rows the band's preview hangs over, and the pane runs on under it to the band
     HWND vb = g_viewstrip;
     bool left = g.show_folders || places::window();
-    int pane_bottom = vb && left ? bottom - viewbutton::STRIP_H : bottom;
+    int hang = band_bottom ? 14 : 0;
+    int pane_bottom = vb && left ? bottom - hang - viewbutton::STRIP_H : bottom;
+    int pane_end = band_bottom ? bottom : pane_bottom;   // where the tree or the places pane ends
     if (vb) {
         if (left) SetWindowPos(vb, HWND_TOP, 0, pane_bottom, g.tree_width, viewbutton::STRIP_H, 0);
         ShowWindow(vb, left ? SW_SHOW : SW_HIDE);
     }
     if (g.show_folders) {
-        SetWindowPos(g.bandsite, nullptr, 0, top, g.tree_width, pane_bottom - top, SWP_NOZORDER);
+        SetWindowPos(g.bandsite, nullptr, 0, top, g.tree_width, pane_end - top, SWP_NOZORDER);
         ShowWindow(g.bandsite, SW_SHOW);
         x = g.tree_width + 4;
     } else {
@@ -849,7 +859,7 @@ static void layout()
     }
     if (HWND pl = places::window()) {   // the places pane takes the tree's slot when it is off (XP: the task pane)
         if (!g.show_folders) {
-            SetWindowPos(pl, nullptr, 0, top, g.tree_width, pane_bottom - top, SWP_NOZORDER);
+            SetWindowPos(pl, nullptr, 0, top, g.tree_width, pane_end - top, SWP_NOZORDER);
             ShowWindow(pl, SW_SHOW);
             x = g.tree_width + 4;
         } else ShowWindow(pl, SW_HIDE);
@@ -1797,6 +1807,10 @@ static void fo_applied(dialogs::FolderOptions& o)
 {
     browser::views::set_default(g.zoomable, o.default_view == browser::views::builtin_default(g.zoomable) ? -1 : o.default_view);
     shell::write_setting("remember_views", o.remember ? "1" : "0");
+    if (o.full_path != (shell::setting("breadcrumb_home", "1") == "0")) {
+        shell::write_setting("breadcrumb_home", o.full_path ? "0" : "1");
+        if (g.header && g.folder) { header::set_folder(g.folder); header_refit(g.frame); }
+    }
     if (o.hidden != g.show_hidden) on_command(ID_VIEW_HIDDEN);   // (writes show_hidden, refreshes)
     if (g.zoomable && o.thumbnails != (shell::setting("thumbnails", "1") != "0")) on_command(ID_VIEW_THUMBNAILS);
 }
@@ -1813,6 +1827,7 @@ static void folder_options()
     for (int z : browser::zoom_levels()) o.zoom_levels.push_back(z);
     o.remember = shell::setting("remember_views", "1") != "0";
     o.hidden = g.show_hidden;
+    o.full_path = shell::setting("breadcrumb_home", "1") == "0";
     o.thumbnails = shell::setting("thumbnails", "1") != "0";
     o.apply_all = fo_apply_all;
     o.reset_all = fo_reset_all;
@@ -1991,7 +2006,7 @@ static void sync_taskpane()
         taskpane::Callbacks cb = { taskpane_command, taskpane_more, taskpane_resized };
         g.taskband = taskpane::create(g.frame, cb);
         if (g.folder) taskpane::set_folder(g.folder);
-        places::set_top_inset(14);           // the band's preview hangs over the left pane
+        places::set_top_inset(taskpane::bottom() ? 0 : 14);   // the band's preview hangs over the left pane's top
         schedule_details();
     } else if (!want && g.taskband) {
         taskpane::destroy();
@@ -2095,7 +2110,8 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_THEMECHANGED:                   // the session theme: the header's images, the command bar
         lhbar::theme_changed();             // before a 4051 command bar is made for this theme
-        taskpane::theme_changed();
+        taskpane::theme_changed();          // (Explorer.taskpane: the band at the top or the bottom)
+        if (g.taskband) { places::set_top_inset(taskpane::bottom() ? 0 : 14); layout(); }
         set_frame_mode(want_longhorn());    // Explorer.chrome (Luna: the XP explorer)
         icons_changed();                    // the theme's icon set (Desktop.icons)
         if (g.header) {
@@ -2282,7 +2298,9 @@ static void print_info()
     else printf("header       (none in the xp frame)\n");
     if (lh) printf("buttons      %s\n", header::buttons_source().c_str());
     if (lh) printf("%s", header::metrics_info().c_str());
-    if (lh) printf("task band    %s; %s\n", taskpane::wanted() ? "on" : "off (taskpane=1, --taskpane or View > Task Band)", taskpane::source().c_str());
+    if (lh) printf("task band    %s, %s; %s\n", taskpane::wanted() ? "on" : "off (taskpane=1, --taskpane or View > Task Band)",
+                   shell::theme_setting("taskpane_position", "top") == "bottom" ? "under the list (Explorer.taskpane = bottom)"
+                                                                               : "under the command bar", taskpane::source().c_str());
 }
 
 // the keys the frame handles before a control sees them (also while a file operation runs: fileopui)

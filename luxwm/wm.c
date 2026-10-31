@@ -79,6 +79,7 @@ static cairo_surface_t *client_icon(struct client *c);
 /* M2: EWMH states, stacking order, struts and work area */
 static void ewmh_update_state(struct client *c);
 static int client_hit(struct client *c, int x, int y);
+static cairo_surface_t *app_icon(int want);
 static void ewmh_update_stacking(void);
 static void client_minimize(struct client *c);
 static void client_restore(struct client *c);
@@ -490,6 +491,15 @@ close_wm(void)
     XCloseDisplay(display);
 }
 
+/* a window whose WM_NORMAL_HINTS fix its size (min == max: a win32 dialog without WS_THICKFRAME, flxp's property sheets): no
+   resize from the frame's edges, Alt+drag or the window menu, no maximise (its button drawn disabled), as Windows treats a
+   window without WS_THICKFRAME and WS_MAXIMIZEBOX */
+static bool
+client_fixed(const struct client *c)
+{
+    return c->max_w > 0 && c->max_h > 0 && c->min_w == c->max_w && c->min_h == c->max_h;
+}
+
 static void
 draw_text(struct client *c, bool focused)
 {
@@ -498,6 +508,7 @@ draw_text(struct client *c, bool focused)
     bool comp = compositor && theme.mode == THEME_DWM, cc = (c->ext_flags & FRAME_CLIENT_CAPTION) != 0;
     unsigned pf = (unsigned)c->ext_flags & ~(unsigned)FRAME_NO_HEADER_PIXMAP;   /* the painter's flags (NO_HEADER_PIXMAP is header_update's) */
     unsigned flags = pf | (cc ? FRAME_NO_TITLE | FRAME_NO_ICON : 0);   /* CLIENT_CAPTION: title and icon are the client's */
+    if (client_fixed(c)) flags |= FRAME_MAX_DISABLED;
     /* extended frame: only while composited (glass); in client pixels, clamped to the client */
     if ((c->has_ext || pf) && comp) {
         int l, r, t, b; margins(c, &l, &r, &t, &b);
@@ -512,8 +523,10 @@ draw_text(struct client *c, bool focused)
         }
         /* CLIENT_CAPTION: the client starts above the normal caption bottom (t < nt); the plate's band is measured from there */
         if (!ext.sheet) ext.t = MAX(ext.t + t - nt, 0);
-    } else if (!comp && (flags & (FRAME_NO_TITLE | FRAME_NO_ICON))) {   /* msstyles: NO_TITLE / NO_ICON only, a normal frame otherwise */
-        memset(&ext, 0, sizeof ext); ext.flags = flags & (FRAME_NO_TITLE | FRAME_NO_ICON); e = &ext;
+    } else if (!comp && (flags & (FRAME_NO_TITLE | FRAME_NO_ICON | FRAME_MAX_DISABLED))) {   /* msstyles: NO_TITLE / NO_ICON only, a normal frame otherwise */
+        memset(&ext, 0, sizeof ext); ext.flags = flags & (FRAME_NO_TITLE | FRAME_NO_ICON | FRAME_MAX_DISABLED); e = &ext;
+    } else if (flags & FRAME_MAX_DISABLED) {   /* glass without an extension: only the disabled maximise */
+        memset(&ext, 0, sizeof ext); ext.flags = FRAME_MAX_DISABLED; e = &ext;
     }
     /* an opaque client hides the plate under it: that part is neither painted nor uploaded (README "Performance") */
     /* the client's rectangle: the hinted size, which may leave part of the frame's client area free (README "Size hints") */
@@ -881,6 +894,8 @@ client_fullscreen(struct client *c, bool toggle, bool fullscreen, bool max)
         client_refresh(c);
     }
 
+    docks_raise();   /* entering fullscreen with the focus: above the docks; leaving it: the docks back on top */
+    ewmh_update_stacking();
     client_set_status(c);
 }
 
@@ -1047,7 +1062,8 @@ handle_client_message(XEvent *e)
         if (c) client_close(c);
 
     } else if (cme->message_type == net_atom[NetCurrentDesktop]) {
-        switch_ws(cme->data.l[0]);
+        if (cme->data.l[0] >= 0 && cme->data.l[0] < WORKSPACE_NUMBER)   /* a pager's or lhshell's request (lh.set_desktop) */
+            switch_ws(cme->data.l[0]);
     } else if (cme->message_type == net_atom[NetRestackWindow]) {
         client_restack(get_client_from_window(cme->window), cme->window, (Window)cme->data.l[1], cme->data.l[2], cme->data.l[0]);
     } else if (cme->message_type == net_atom[NetShowingDesktop]) {
@@ -1075,7 +1091,7 @@ handle_client_message(XEvent *e)
             drag_run(c, HIT_CAPTION, cme->data.l[0], cme->data.l[1], (unsigned)cme->data.l[3], dir == 10);
         else if ((dir >= 0 && dir <= 7) || dir == 9) {
             if (c->mono) return;   /* no resize edges on a maximised frame */
-            drag_run(c, dir == 9 ? HIT_BR : dir_hit[dir], cme->data.l[0], cme->data.l[1], (unsigned)cme->data.l[3], dir == 9);
+            if (!client_fixed(c)) drag_run(c, dir == 9 ? HIT_BR : dir_hit[dir], cme->data.l[0], cme->data.l[1], (unsigned)cme->data.l[3], dir == 9);
         }
     }
 }
@@ -1156,6 +1172,7 @@ handle_button_press(XEvent *e)
         if (bev->button != 1 && hit == HIT_CAPTION) return;
         if (hit == HIT_CLOSE || hit == HIT_MAX || hit == HIT_MIN) { frame_button_press(c, hit, bev); return; }
         if (hit >= HIT_L && hit <= HIT_BR) { frame_resize_drag(c, hit, bev); return; }
+        if (hit == HIT_NONE && client_fixed(c)) return;   /* a fixed frame's border (HTBORDER) neither sizes nor moves */
         if (hit == HIT_CAPTION && bev->button == 1 && conf.last_caption_click + 350 > bev->time && conf.last_caption_win == c->dec) {
             conf.last_caption_click = 0; client_monocle(c); draw_text(c, client_active(c)); return; }
         conf.last_caption_click = bev->time; conf.last_caption_win = c->dec;
@@ -1193,7 +1210,7 @@ handle_button_press(XEvent *e)
                     nx = ocx + (ev.xmotion.x - x);
                     ny = ocy + (ev.xmotion.y - y);
                     drag_move_step(c, nx, ny);
-                } else if (state == (unsigned)conf.resize_mask && bev->button == (unsigned)conf.resize_button) {
+                } else if (state == (unsigned)conf.resize_mask && bev->button == (unsigned)conf.resize_button && !client_fixed(c)) {
                     nw = ev.xmotion.x - x;
                     nh = ev.xmotion.y - y;
                     if (conf.edge_lock)
@@ -1271,6 +1288,7 @@ focus_set_active(bool on)
     if (f_active == on)
         return;
     f_active = on;
+    if (f_client->fullscreen) docks_raise();   /* above the docks only while it has the focus */
     LOGP("focus: 0x%lx %s", f_client->window, on ? "active again" : "inactive (focus outside the managed windows)");
     if (f_client->decorated) draw_text(f_client, on);
     Window a = on ? f_client->window : None;
@@ -2031,6 +2049,7 @@ client_manage_focus(struct client *c)
         if (conf.warp_pointer)
             warp_pointer(c);
         ewmh_set_focus(c);
+        if (c->fullscreen || (old != NULL && old != c && old->fullscreen)) docks_raise();   /* a focused fullscreen window is above the docks */
         c->attention = false;   /* DEMANDS_ATTENTION ends with focus */
         if (old != c) ewmh_update_state(old);
         ewmh_update_state(c);
@@ -2042,6 +2061,7 @@ client_manage_focus(struct client *c)
         LOGN("Giving focus to dummy window");
         f_client = NULL;
         f_active = false;
+        if (old != NULL && old->fullscreen) docks_raise();
         XSetInputFocus(display, nofocus, RevertToPointerRoot, CurrentTime);
         if (net_atom[NetActiveWindow]) {   /* no active window: _NET_ACTIVE_WINDOW = None */
             Window none = None;
@@ -2472,7 +2492,7 @@ client_apply_max(struct client *c)
 static void
 client_maximize(struct client *c)
 {
-    if (c->mono || c->fullscreen)
+    if (c->mono || c->fullscreen || client_fixed(c))
         return;
     c->prev.x = c->hidden ? c->x_hide : c->geom.x;
     c->prev.y = c->geom.y;
@@ -2922,15 +2942,38 @@ client_set_icon(struct client *c)
         if (!c->icon && c->icon_pm) c->icon = frame_icon_from_pixmap(display, c->icon_pm, c->icon_mask, want);
         XFree(h);
     }
-    if (getenv("LHWM_DEBUG")) fprintf(stderr, "luxwm: icon 0x%lx: %s\n", c->window, c->icon ? "client" : theme_default_icon(&theme, want) ? "theme default" : "none");
+    if (getenv("LHWM_DEBUG")) fprintf(stderr, "luxwm: icon 0x%lx: %s\n", c->window, c->icon ? "client" : app_icon(want) ? "application" : theme_default_icon(&theme, want) ? "theme default" : "none");
 }
 
-/* what the caption shows: the client's icon, else the theme's default icon (DWM DEFAULTICON / the XP application icon) */
+/* the generic application icon (shell32 #3, user32's IDI_APPLICATION art) from an imported build's pack, 16 and 32 px: what a
+   window without an icon of its own shows in Windows' caption (urxvt, xterm and most X programs have none) */
+static cairo_surface_t *
+app_icon(int want)
+{
+    static cairo_surface_t *ic[2]; static bool tried;
+    if (!tried) {
+        tried = true;
+        static const char *builds[] = { "4074", "4051", "5112", "4042" };
+        for (size_t b = 0; b < sizeof builds / sizeof builds[0] && !ic[0] && !ic[1]; b++)
+            for (int k = 0; k < 2; k++) {
+                char rel[64], q[4200]; snprintf(rel, sizeof rel, "packs/%s/shell32/%d/3.png", builds[b], k ? 32 : 16);
+                if (!lhde_data_find(rel, q, sizeof q)) continue;
+                cairo_surface_t *s = cairo_image_surface_create_from_png(q);
+                if (cairo_surface_status(s) == CAIRO_STATUS_SUCCESS) ic[k] = s; else cairo_surface_destroy(s);
+            }
+    }
+    return want > 16 && ic[1] ? ic[1] : ic[0] ? ic[0] : ic[1];
+}
+
+/* what the caption shows: the client's icon, else the generic application icon, else the theme's default icon (DWM
+   DEFAULTICON / the XP application icon of the classic frame set) */
 static cairo_surface_t *
 client_icon(struct client *c)
 {
     if (c->icon) return (cairo_surface_t *)c->icon;
-    return theme_default_icon(&theme, theme.mode == THEME_MSSTYLES ? 16 : theme.icon_size);
+    int want = theme.mode == THEME_MSSTYLES ? 16 : theme.icon_size;
+    cairo_surface_t *a = app_icon(want);
+    return a ? a : theme_default_icon(&theme, want);
 }
 
 static void
@@ -3938,6 +3981,13 @@ docks_raise(void)
     qsort(desk, nd, sizeof desk[0], desktop_cmp);
     for (int i = 0; i < nd; i++)
         XLowerWindow(display, desk[i]->w);
+    /* EWMH "_NET_WM_STATE_FULLSCREEN": a focused fullscreen window is above the docks; once it loses the focus or leaves
+       fullscreen, the next call puts the docks back on top of it */
+    struct client *f = f_client;
+    if (f != NULL && f_active && f->fullscreen && f->ws == curr_ws && !f->minimized && !f->unmapped) {
+        if (f->decorated) { Window w[2] = { f->window, f->dec }; XRaiseWindow(display, f->window); XRestackWindows(display, w, 2); }
+        else XRaiseWindow(display, f->window);
+    }
 }
 
 /* a rectangle of the root minus the struts that overlap it, minus the configured gaps */
@@ -4690,6 +4740,7 @@ static int
 client_hit(struct client *c, int x, int y)
 {
     int hit = frame_hit_ex(&theme, c->geom.width, c->geom.height, x, y, c->mono);
+    if (client_fixed(c) && (hit == HIT_MAX || (hit >= HIT_L && hit <= HIT_BR))) return HIT_NONE;   /* HTBORDER: a fixed frame */
     if (hit == HIT_CAPTION && (c->ext_flags & FRAME_CLIENT_CAPTION) && !c->mono) {
         int l, r, t, b; margins(c, &l, &r, &t, &b);
         if (y < t) {
@@ -4785,7 +4836,7 @@ sysmenu_command(void *arg, int id)
     case SC_MINIMIZE_ID: client_minimize(c); break;
     case SC_CLOSE_ID: client_close(c); break;
     case SC_MOVE_ID: drag_run(c, HIT_CAPTION, 0, 0, 0, true); break;
-    case SC_SIZE_ID: if (!c->mono) drag_run(c, HIT_BR, 0, 0, 0, true); break;
+    case SC_SIZE_ID: if (!c->mono && !client_fixed(c)) drag_run(c, HIT_BR, 0, 0, 0, true); break;
     }
 }
 
@@ -4805,7 +4856,7 @@ wmmenu_open(struct client *c, int x, int y, unsigned flags, unsigned button, boo
         { "&Move",     NULL,     mx,                            WMMENU_GLYPH_NONE,     SC_MOVE_ID,     sysmenu_command, arg },
         { "&Size",     NULL,     mx | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_NONE, SC_SIZE_ID,    sysmenu_command, arg },
         { "Mi&nimize", NULL,     0,                             WMMENU_GLYPH_MINIMIZE, SC_MINIMIZE_ID, sysmenu_command, arg },
-        { "Ma&ximize", NULL,     mx,                            WMMENU_GLYPH_MAXIMIZE, SC_MAXIMIZE_ID, sysmenu_command, arg },
+        { "Ma&ximize", NULL,     mx | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_MAXIMIZE, SC_MAXIMIZE_ID, sysmenu_command, arg },
         { NULL,        NULL,     WMMENU_SEPARATOR,              WMMENU_GLYPH_NONE,     SC_SEP_ID,      NULL, NULL },
         { "&Close",    "Alt+F4", WMMENU_DEFAULT,                WMMENU_GLYPH_CLOSE,    SC_CLOSE_ID,    sysmenu_command, arg },
     };
@@ -5247,7 +5298,7 @@ client_read_ext(struct client *c)
         XFree(d); d = NULL;
     }
     if (XGetWindowProperty(display, c->window, lhwm_flags_atom, 0, 1, False, XA_CARDINAL, &ty, &fmt, &n, &after, &d) == Success && d) {
-        if (fmt == 32 && n == 1) c->ext_flags = ((unsigned long *)d)[0] & 0xFFFFFFFFUL;
+        if (fmt == 32 && n == 1) c->ext_flags = ((unsigned long *)d)[0] & 0xFFFFUL;   /* the client's flags (the higher bits are lhwm's) */
         XFree(d);
     }
     LOGP("client 0x%lx extend %lu %lu %lu %lu flags %lu", c->window, c->ext[0], c->ext[1], c->ext[2], c->ext[3], c->ext_flags);

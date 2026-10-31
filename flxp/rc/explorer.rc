@@ -125,9 +125,10 @@ BEGIN
     LTEXT           "You can apply the view (such as Details or Thumbnails) that you are using for this folder to all folders.", -1, 16, 20, 196, 24
     PUSHBUTTON      "Apply to &All Folders", IDC_FO_APPLYALL, 16, 50, 92, 14
     PUSHBUTTON      "&Reset All Folders", IDC_FO_RESETALL, 116, 50, 92, 14
-    GROUPBOX        "Advanced settings", -1, 7, 80, 213, 48
+    GROUPBOX        "Advanced settings", -1, 7, 80, 213, 64
     AUTOCHECKBOX    "&Remember each folder's view settings", IDC_FO_REMEMBER, 16, 94, 194, 10
     AUTOCHECKBOX    "Show &hidden files and folders", IDC_FO_HIDDEN, 16, 110, 194, 10
+    AUTOCHECKBOX    "Display the full &path in the address bar", IDC_FO_FULLPATH, 16, 126, 194, 10
 END
 
 /* File operations (fileopui.cpp), XP's shell32 dialogs in their layout:
