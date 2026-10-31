@@ -171,6 +171,25 @@ void UXMENU_InitLook(UXMENU_LOOK* L, HTHEME theme, const COLORREF* sys, BOOL fla
     L->right_pad = 17;
 }
 
+void UXMENU_SetBand(UXMENU_LOOK* L, HTHEME toolbar, HTHEME menuband)
+{
+    MARGINS m;
+    if (!L->theme || !toolbar) return;
+    HDC dc = CreateCompatibleDC(nullptr);
+    bool ok = SUCCEEDED(GetThemeMargins(toolbar, dc, 0, 0, TMT_SIZINGMARGINS, nullptr, &m)) && m.cxLeftWidth > 0;
+    DeleteDC(dc);
+    if (!ok) return;                        // a Toolbar class without the start menu's plate
+    COLORREF c;
+    L->band = 1;
+    L->band_theme = toolbar;
+    L->band_arrow = menuband && SUCCEEDED(GetThemeColor(menuband, 0, 0, TMT_TEXTCOLOR, &c)) ? c : L->t_norm;
+    L->band_gutter = m.cxLeftWidth;
+    L->pad = 0;
+    L->band_icon_x = 10;                    // lh4074-215101.png: the icon 10 px from the outline, the text 35 (gutter + 3)
+    L->band_text_x = L->band_gutter + 3;
+    L->text_x = L->band_text_x;
+}
+
 void UXMENU_FreeLook(UXMENU_LOOK* L)
 {
     if (L->font) DeleteObject(L->font);
@@ -190,7 +209,11 @@ void UXMENU_MeasureItem(const UXMENU_LOOK* L, HDC dc, const WCHAR* text, int len
 void UXMENU_DrawFrame(const UXMENU_LOOK* L, HDC dc, const RECT* m)
 {
     int x = m->left, y = m->top, W = m->right - m->left, H = m->bottom - m->top;
-    if (L->theme) {
+    if (L->band) {          // the menu band: the StartMenu::Toolbar plate (outline, icon gutter, background) over the whole menu
+        fill(dc, L->menu, x, y, W, H);
+        RECT r = { x, y, x + W, y + H };
+        DrawThemeBackground(L->band_theme, dc, 0, 0, &r, nullptr);
+    } else if (L->theme) {
         fill(dc, L->menu, x, y, W, H);
         if (L->p_borders) part(L, dc, L->p_borders, 0, x, y, W, H);
         else {
@@ -214,6 +237,8 @@ static COLORREF text_color(const UXMENU_LOOK* L, unsigned flags)
     return dis ? (hot ? L->t_dishot : L->t_dis) : hot ? L->t_hot : L->t_norm;
 }
 
+COLORREF UXMENU_TextColor(const UXMENU_LOOK* L, unsigned flags) { return text_color(L, flags); }
+
 // XP greys by embossing when the menu is the 3D face colour (classic), else with GRAYTEXT
 static bool emboss(const UXMENU_LOOK* L, unsigned flags)
 {
@@ -224,6 +249,11 @@ void UXMENU_DrawArrow(const UXMENU_LOOK* L, HDC dc, const RECT* rc, unsigned fla
 {
     int h = rc->bottom - rc->top;
     int cx, cy;
+    if (L->band) {          // lh4074-215101.png: 4x7 in the menu band's text colour, its right column 7 px before the edge
+        int x = rc->right - 10, top = rc->top + (h - 6) / 2;
+        for (int k = 0; k < 4; k++) fill(dc, L->band_arrow, x + k, top + k, 1, 7 - 2 * k);
+        return;
+    }
     // the style's arrow: its right edge 6 px before the item's end (lh4074-195235.png: the 9 x 9 FLYOUTARROW of Slate)
     if (L->theme && part_size(L, dc, L->p_arrow, (flags & UXMENU_DISABLED) ? 2 : 1, &cx, &cy)) {
         part(L, dc, L->p_arrow, (flags & UXMENU_DISABLED) ? 2 : 1, rc->right - 6 - cx, rc->top + (h - cy) / 2, cx, cy);
@@ -238,6 +268,7 @@ void UXMENU_DrawItem(const UXMENU_LOOK* L, HDC dc, const RECT* rc, unsigned flag
 {
     int x = rc->left, y = rc->top, iw = rc->right - rc->left, h = rc->bottom - rc->top;
     if (flags & UXMENU_SEPARATOR) {
+        if (L->band) x += L->band_gutter, iw -= L->band_gutter;   // the band's separator starts after the icon gutter
         if (L->theme && L->p_sep) { part(L, dc, L->p_sep, 0, x, y + L->sep_top, iw, L->sep_ch); return; }
         fill(dc, L->shadow, x + 1, y + L->sep_top, iw - 2, 1); fill(dc, L->hilight, x + 1, y + L->sep_top + 1, iw - 2, 1);   // BDR_SUNKENOUTER
         return;
