@@ -1,0 +1,13 @@
+# Luxshell things
+
+* taskbar
+	* window buttons
+		* context menu
+		* drag to reorder
+		* center buttons mode for plex and concepts
+	* should show time in taskbar when sidebar is stacked below (sidebar clock may be hidden)
+
+* sidebar
+	* mouse hover over tiles
+	* unclear how quicklaunch icons are chosen
+		* perhaps tie into the grander lhde icon system?

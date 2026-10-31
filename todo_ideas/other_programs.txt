@@ -1,0 +1,19 @@
+# some programs that would fit the system and are useful
+
+## text editor
+
+* do something with scintilla?
+
+## image viewer
+
+* roughly XP/longhorn-like (see lh4051-195511.png)
+* open and respond *immediately*, show images when ready
+
+## pdf viewer
+
+* mupdf base with simple GUI for TOC and bookmarks
+* name already decided: mupf
+
+## calendar
+
+* more elaborate calendar to supplement the sidebar one

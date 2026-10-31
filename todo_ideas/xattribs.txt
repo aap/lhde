@@ -1,0 +1,23 @@
+# Extended attributes
+
+WinFS had some good parts, so use it for some inspiration.
+
+ext4 and zfs support xattrs.
+Uses: tagging, metadata, comments/misc annotations
+could be especially useful to easier organize agentic workflows
+
+Initially: xattr support for flxp
+Future: synchronize local metadata catalog with local and remote filesystems
+
+For existing xattr tooling see ~/src/luxfs [note: perhaps move into lhde? or separate repo...]
+
+Initial features for flxp:
+* description, tags columns selectable for details view
+* full metadata on detail-preview and mouse hover
+* edit with options in context menu:
+	* Edit Description
+	* Add Tag
+		* to currently selected
+		* need full control too, perhaps a more elaborate submenu or dialog
+* not necessarily tag-filtering in the first version yet
+* not necessarily tied into the task pane yet

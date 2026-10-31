@@ -1,0 +1,44 @@
+# flxp and wux things
+
+## visuals
+
+* currently two ways to draw context menus?
+luxwm has something for the window menu that looks different from the other wux menus.
+in some respects it looks better because of how the font and (jade/aero) highlights are drawn,
+not *entirely* sure about the font for all themes though
+
+* the jade/aero theme in any case does not currently use Segoe UI for everything
+
+* longhorn icon highlights are currently too big.
+	should only take up the actual bounding box of the icon (only for actual icon view, details/tiles seem fine)
+
+* future: put the aurora example into longhorn flxp as an option
+
+## flxp behavior
+
+* match copy/move behaviour with windows
+	* handle collision with existing files
+	* need to show a progress dialog for bigger operations
+
+* file-rename still feels off, especially on long filenames that show as multi-line
+
+* see xatttribs.txt idea
+
+* not so sure about "Home" replacing the actual path in the breadcrumb bar
+
+### details and task pane
+
+* want details rollout for the XP web-pane
+* also for longhorn flxp, but more complicated:
+	* no selection should show the number of elements in the current location
+	* 4051: left to right: (thumbnailed) icon, details, tasks
+	* 4051 pictures for preview on/off
+		* no selection: lh4051-152854.png / lh4051-152900.png
+		* single selection: lh4051-152336.png / lh4051-152329.png
+		* single selection picture: lh4051-152415.png / lh4051-152354.png
+		* multi selection picture: lh4051-152420.png / lh4051-152358.png
+	* 4074: (I) icon in the top right to flip between details and "tasks" (but no winfs?)
+
+## misc
+
+* flxp portal save dialog seems to get stuck on an "Open" button label when changing directories

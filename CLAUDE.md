@@ -26,6 +26,10 @@ then README.md (build, install, run). docs/README.md lists every document.
   anywhere under `/u/aap/n` (network mounts); the research workspace `~/fun/longhorn` is read by the paths a brief names, not
   crawled. A search of the whole home directory walks the NFS mounts and holds thousands of descriptors for minutes.
 
+- **`todo_ideas/` is the issue tracker**, aap's notes by area (flxp_wux, luxwm, luxshell, other_programs, xattribs, ...). An item
+  that is done leaves the file in the same commit that does it; an item that turns out wrong or decided against is removed with a
+  one-line reason in the commit message. Add what you find (a bug seen twice, a leftover) as a bullet under the right area, briefly.
+
 ## Working here
 
 - Build: `make -j`; everything runs uninstalled from `build/bin`. Tests: `make check` (wux tests, headless Xvfb scripts, ut-dump
