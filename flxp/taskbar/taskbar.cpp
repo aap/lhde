@@ -216,6 +216,15 @@ void measure_start()
         start_size.cy = (ts.cy > flag_size.cy ? ts.cy : flag_size.cy) + m.cyTopHeight + m.cyBottomHeight;
         SIZE ps = {};
         start_image_cy = SUCCEEDED(GetThemePartSize(th_start, nullptr, BP_PUSHBUTTON, PBS_NORMAL, nullptr, TS_TRUE, &ps)) ? ps.cy : 0;
+        // a TRUESIZE button whose image carries the flag and the word (Watercolor Lite, the ReactOS styles: a 1-px FONT and a
+        // negative left content margin) is at least the image's width. Measured, not XP's code: their margins are tuned to
+        // Windows' text extent of "start" in that 1-px font (about 6 px Arial, 10 Tahoma Bold; FreeType's is 2), so on XP
+        // the button holds the whole image (2k3-205316.png: Watercolor Lite's art 4 px in; WinXP-193456/193504/193512.png:
+        // Lautus, Lunar, Mizu 2 px further right than with the bare ideal size, which centred the wider image off the bar)
+        int st = 0;
+        if (SUCCEEDED(GetThemeEnumValue(th_start, BP_PUSHBUTTON, PBS_NORMAL, TMT_SIZINGTYPE, &st)) && st == ST_TRUESIZE &&
+            start_size.cx < ps.cx)
+            start_size.cx = ps.cx;
     } else {
         start_image_cy = 0;
         // the classic push button: flag 4 px in (2 px edge + 2), 3 px to the text, 4 px after it

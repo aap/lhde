@@ -198,7 +198,8 @@ strips, the classic Appearance schemes (ReactOS's hive has them only in Vista's 
 Standard stands in), and the builds' wallpapers. The start button's flag (explorer.exe's start.bmp 143 and startclassic.bmp
 176) is XP's or Windows 2000's; ReactOS's 143 is ReactOS's logo and is not taken: without XP's or 2000's explorer.exe
 flxp-taskbar draws a waving four-pane flag of its own (taste). ReactOS's own styles draw no flag at all (their Start::Button
-image carries their logo and hides the content).
+image carries their logo and hides the content; such a TRUESIZE button, Watercolor Lite's too, is at least its image's
+width, as their content margins give it on XP).
 
 ## 7. Runtime
 `_LH_THEME` = the theme name. Whoever changes it writes `settings.ini [theme] name` first, then the
