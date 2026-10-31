@@ -34,6 +34,10 @@ resources -> drawn art, wallpaper -> colour. Still to make free:
 * A `make check` run and a lab screenshot with LHDE_WINDOWS pointing at an empty directory, kept green: the free baseline is a
   test configuration, not a hope.
 
+aap: Makefile targets that install a clean Windows tree of (a) just the free stuff, (b) the small Windows pack, (c) free + all
+of Windows; (b) and (c) refer to files we do not supply, under generic names (lhde_winthemes.zip, lhde_wintheme_full.zip or
+the like); the same import, a different archive.
+
 ## 2. Free visual styles
 * ReactOS's own msstyles (Lautus, Mizu, ...) are free: candidates to ship or to fetch, as the first non-classic look without
   Microsoft files; check their licences and whether wuxtheme draws them (v3).
