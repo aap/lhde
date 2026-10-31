@@ -199,6 +199,8 @@ void set_session_theme(const SessionTheme& t)
     std::string d = t.value("path.fonts");
     if (!d.empty() && !is_dir(d)) d = dir_of(d);
     if (is_dir(d) && added.insert(d).second) gdi::add_font_dir(d.c_str());
+    // and asked first: Jade 4074's MENUFONT "Segoe UI, 9" is 4074's seguibk.ttf, not 5112's newer segoeui.ttf
+    gdi::set_theme_font_dir(is_dir(d) ? d.c_str() : nullptr);
 }
 
 std::string theme_setting(const std::string& key, const std::string& fallback)

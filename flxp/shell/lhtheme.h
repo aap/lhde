@@ -47,7 +47,8 @@ std::string user_theme_path(const std::string& name);    // that file ("" when N
 // The theme in force for this process (set by setup_theme at start-up and by
 // the shim on a switch); name "" when flxp does not follow one. Setting it
 // also adds the theme's fonts directory (path.fonts: 5112's Segoe UI) to the
-// font path; it stays for the life of the process.
+// font path; it stays for the life of the process. That directory is also the
+// one searched first (gdi::set_theme_font_dir), until the next theme replaces it.
 const SessionTheme& session_theme();
 void set_session_theme(const SessionTheme& t);
 
