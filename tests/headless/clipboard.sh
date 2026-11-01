@@ -9,13 +9,13 @@ B=$(cd "$(dirname "$0")/../.." && pwd)/build/bin/flxp
 mkdir -p $T/home/.config $T/src $T/dst; echo a >$T/src/alpha.txt; echo b >$T/src/beta.txt
 export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config XDG_DATA_HOME=$T/home/.local/share XDG_STATE_HOME=$T/home/.local/state \
        XDG_CACHE_HOME=$T/home/.cache DISPLAY=$D   # the scratch home only: nothing exported from outside leaks in
-Xvfb $D -screen 0 1280x800x24 -nolisten tcp >/dev/null 2>&1 & XP=$!
-sleep 1
+. "$(dirname "$0")/wait.sh"
+start_xvfb $D -screen 0 1280x800x24 -nolisten tcp || { echo "FAIL Xvfb $D did not start"; stop_xvfb; exit 1; }
 $B --geometry 600x500+0+0 $T/src 2>/dev/null & P1=$!
 $B --geometry 600x500+650+0 $T/dst 2>/dev/null & P2=$!
-sleep 3
-W1=$(xdotool search --onlyvisible --name '^src$' | head -1)
-W2=$(xdotool search --onlyvisible --name '^dst$' | head -1)
+W1=$(wait_window 30 --name '^src$')
+W2=$(wait_window 30 --name '^dst$')
+sleep .5   # their lists filled after the map
 xdotool mousemove --window $W1 400 400 click 1; sleep .3
 xdotool mousemove --window $W2 400 400 click 1; sleep .3
 copy() { xdotool windowfocus --sync $W1; sleep .3; xdotool key ctrl+a; sleep .2; xdotool type "$1"; sleep .4; xdotool key ctrl+c; sleep .5
@@ -24,6 +24,6 @@ paste() { rm -f $T/dst/*; xdotool windowfocus --sync $W2; sleep .3; xdotool key 
 ok=1
 copy alpha; paste; [ -e $T/dst/alpha.txt ] || ok=0
 copy beta; paste; [ -e $T/dst/beta.txt ] && [ ! -e $T/dst/alpha.txt ] || ok=0
-kill $P1 $P2 $XP
+kill $P1 $P2; wait $P1 $P2 2>/dev/null; stop_xvfb
 rm -rf $T
 [ $ok = 1 ] && echo PASS || { echo FAIL; exit 1; }

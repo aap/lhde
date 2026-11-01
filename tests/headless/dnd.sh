@@ -13,11 +13,12 @@ mkdir -p $T/home/.config $T/src $T/dst
 for f in alpha beta gamma delta; do echo $f >$T/src/$f.txt; done
 export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config XDG_DATA_HOME=$T/home/.local/share XDG_STATE_HOME=$T/home/.local/state \
        XDG_CACHE_HOME=$T/home/.cache DISPLAY=$D   # the scratch home only: nothing exported from outside leaks in
-Xvfb $D -screen 0 1280x800x24 -nolisten tcp >/dev/null 2>&1 & XP=$!
-sleep 1
+. "$(dirname "$0")/wait.sh"
+start_xvfb $D -screen 0 1280x800x24 -nolisten tcp || { echo "FAIL Xvfb $D did not start"; stop_xvfb; exit 1; }
 $B --geometry 600x500+0+0 $T/src 2>$T/e1.log & P1=$!
 $B --geometry 600x500+650+0 $T/dst 2>$T/e2.log & P2=$!
-sleep 3
+wait_window 30 --name '^src$' >/dev/null && wait_window 30 --name '^dst$' >/dev/null || { echo "note: the explorers did not show within 30 s:"; cat $T/e1.log $T/e2.log; }
+sleep .5   # their lists filled after the map
 # details view: row n of the left list (sorted: alpha beta delta gamma, then without alpha)
 row() { echo $((104 + 17 * $1)); }
 drag() { # x1 y1 x2 y2 [keys held]
@@ -25,10 +26,11 @@ drag() { # x1 y1 x2 y2 [keys held]
     xdotool mousemove $(($1 + 8)) $(($2 + 3)); sleep .1
     [ -n "$5" ] && xdotool keydown $5
     for f in 1 2 3 4 5 6 7 8; do xdotool mousemove $(($1 + ($3 - $1) * f / 8)) $(($2 + ($4 - $2) * f / 8)); sleep .08; done
-    sleep .3; xdotool mouseup 1; [ -n "$5" ] && xdotool keyup $5; sleep .8
+    sleep .3; xdotool mouseup 1; [ -n "$5" ] && xdotool keyup $5; sleep .8   # the source list follows the move (shows nowhere)
 }
 ok=1
-check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; ok=0; fi; }
+_holds() { eval "$1"; }
+check() { if wait_for 10 _holds "$2"; then echo "ok   $1"; else echo "FAIL $1"; ok=0; fi; }   # the drop done: up to 10 s
 drag 265 $(row 0) 1000 300;            check "move to the other window" "[ -e $T/dst/alpha.txt ] && [ ! -e $T/src/alpha.txt ]"
 drag 265 $(row 0) 1000 300 shift;      check "Shift copies" "[ -e $T/dst/beta.txt ] && [ -e $T/src/beta.txt ]"
 drag 265 $(row 1) 1000 300 ctrl+shift; check "Ctrl+Shift links" "[ -L $T/dst/delta.txt ]"
@@ -55,13 +57,13 @@ w.connect("destroy", Gtk.main_quit); w.show_all(); Gtk.main()
 PY
     echo g >$T/gfile.txt
     python3 -I $T/gtkdnd.py $T/gfile.txt >$T/gtk.log 2>/dev/null & G=$!
-    sleep 2
+    wait_window 30 --name "^gtkdnd$" >/dev/null || echo "note: the GTK window did not show within 30 s"
     drag 915 $(row 0) 100 660
     check "flxp -> GTK (text/uri-list)" "grep -q 'DROPPED file://.*/dst/alpha.txt' $T/gtk.log"
     drag 300 660 1000 300
     check "GTK -> flxp" "[ -e $T/dst/gfile.txt ]"
-    kill $G
+    kill $G; wait $G 2>/dev/null
 fi
-kill $P1 $P2 $XP
+kill $P1 $P2; wait $P1 $P2 2>/dev/null; stop_xvfb
 rm -rf $T
 [ $ok = 1 ] && echo PASS || { echo FAIL; exit 1; }

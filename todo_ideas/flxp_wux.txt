@@ -36,8 +36,8 @@
 
 ## misc
 
-
-* tests/headless/filedlg.sh and dnd.sh are flaky under load (make check with a lab running): a different check fails each run (xp multi, longhorn filter index, the view keys), alone it passes; its xdotool waits need to wait for the dialog, not sleep
+* flxp-filedialog: a right click right after the pointer arrives in the list opens the context menu and closes it at once (seen
+	under Xvfb with xdotool mousemove + click 3; tests/headless/filedlg.sh clicks again); a real mouse may never do this, check
 * naming pass leftovers: 105 flxp functions and globals with external linkage that no other object references (nm: header::size,
 	browser::zoom_at, shell::thumbs::md5_hex, ...): API used only in its own file, or dead; make them file-local or remove them
 	component by component. wux converts UTF-16 <-> UTF-8 in three places (gdi_priv.h to_utf8 / to_utf16, res.cpp utf16_to_utf8,
