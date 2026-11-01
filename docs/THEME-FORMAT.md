@@ -185,8 +185,10 @@ none; flxp registers every imported build's fonts with `fonts/reactos` in a tier
 (Tahoma, Marlett, Microsoft Sans Serif) comes from the Windows build. Each substitution is in the resolved record's "came from" (`path.resources` and `path.fonts` keep the
 setting and say "fallback: ..." in their why); `lhde-theme explain` shows `missing -> fallback SOURCE`.
 
-With only the reactos source imported (the free baseline, a test configuration: `make check-free`): `classic` and the four ReactOS
-themes (`lunar`, `modern`, `mizu`, `lautus`) resolve fully; every other theme resolves to Windows Classic with
+With only the free pack imported (the free baseline, a test configuration: `make check-free`; the sources reactos and
+free): `classic` and the four ReactOS themes (`lunar`, `modern`, `mizu`, `lautus`) resolve fully, their wallpapers the free
+source's Pexels photos (`free/timmossholder-9398211`, `free/diva-30887567`, `free/marek-piwnicki-12966762`,
+`free/ian-panelo-8669635`: aap's choice, taste); every other theme resolves to Windows Classic with
 ReactOS's icons, fonts and resources. Microsoft-only by nature, with no free stand-in: the Luna, Longhorn and
 Vista visual styles and everything made from them (the frame sets, the glass, luxshell's packs and imageres
 art, the 4051/4074 navigation headers' art), XP's shellstyle.dll (the task pane's Luna bitmaps), the start
@@ -218,7 +220,7 @@ settings.ini write: `_LH_SETTINGS_CHANGED`, and every client resolves the sessio
 | `basic5112` / `aero5112` | aero5112 | aero5112 / jade4074 | off / on | - | vision | 5112's own |
 | `plex4042` | plex4042 (4042 main) | - / the style's own | off | 4042-plex | none (XP chrome) | 4042main/Bliss (the M6 picture) |
 | `luna`, `luna-olive`, `luna-silver` | luna-xp | - / luna4051-* | off | - | none (XP chrome) | Bliss (XP) |
-| `lunar`, `modern` (Light), `mizu`, `lautus` | ReactOS's own (build reactos, free) | - / - (the style's own) | off | - | none (XP chrome) | ReactOS's (taste; Mizu's own) |
+| `lunar`, `modern` (Light), `mizu`, `lautus` | ReactOS's own (build reactos, free) | - / - (the style's own) | off | - | none (XP chrome) | Pexels photos of the free source (taste: aap's) |
 | any dropped XP style | itself | - | off | - | none | - |
 Later: plex of other builds (4015, 4029, 4039), plex vision.
 

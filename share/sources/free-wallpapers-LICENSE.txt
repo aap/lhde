@@ -1,0 +1,18 @@
+The wallpapers of lhde's free themes (free/wallpapers/ in lhde's free resource pack)
+
+Photos from Pexels (https://www.pexels.com), chosen by aap for lhde's themes of ReactOS's visual styles. Each is under the
+Pexels licence: free to use, also commercially, and to modify; attribution is not required (https://www.pexels.com/license/).
+They are named here all the same. The files are as Pexels serves them, renamed to photographer-id.jpg:
+
+  timmossholder-9398211.jpg    Tim Mossholder (https://www.pexels.com/@timmossholder)
+                               https://www.pexels.com/photo/9398211/
+                               dark water with ripples; the wallpaper of the theme lunar
+  ian-panelo-8669635.jpg       Ian Panelo (https://www.pexels.com/@ian-panelo)
+                               https://www.pexels.com/photo/8669635/
+                               orange streaks of light on black; the theme lautus
+  marek-piwnicki-12966762.jpg  Marek Piwnicki (https://www.pexels.com/@marek-piwnicki-3907296)
+                               https://www.pexels.com/photo/12966762/
+                               blue smoke on dark blue; the theme mizu
+  diva-30887567.jpg            diva (https://www.pexels.com/@diva)
+                               https://www.pexels.com/photo/30887567/
+                               pale green and sand-coloured veils; the theme modern

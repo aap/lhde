@@ -4,9 +4,10 @@
 #                         programs, ut-dump, luxwm, luxwmc, luxshell, the examples and the tests, into build/
 #   make check            the tests that need no Microsoft files (tests/check.sh), luxshell's build
 #                         and Lua, luxwm's frame regression (skips without the user's styles), the free baseline
-#                         (make check-free: only ReactOS imported; skips without its pack or ISO)
-#   make install-resources-free   the free resources (ReactOS's files, GPL): the published pack downloaded and imported into
-#                         the Windows tree, no ISO needed; make free-pack builds that pack (below)
+#                         (make check-free: only the free pack imported; skips without the pack or ReactOS's ISO)
+#   make install-resources-free   the free resources (ReactOS's files, GPL; the free themes' photos, the Pexels licence): the
+#                         published pack downloaded and imported into the Windows tree, no ISO needed; make free-pack builds
+#                         that pack (below)
 #   make check-bare       make check with nothing imported or configured (empty temporary homes): what CI runs
 #   make install          PREFIX=/usr/local DESTDIR= (also BINDIR, LIBDIR, INCLUDEDIR, DATADIR, PKGLIBDIR, MANDIR,
 #                         PORTALDIR, DBUSSERVICEDIR); make uninstall. Program files only: the shipped data (text) into
@@ -28,8 +29,8 @@
 #   liblhde/liblhde.mk    liblhde (lhde/data.h, lhde/theme.h, lhde/settings.h): the data directories, the theme resolver,
 #                         the settings store -> build/lib/liblhde.{a,so.1}, lhde.pc, build/bin/lhde-theme
 #   share/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme, sources/*.ini,
-#                         frames/*/*.ini, packs/*/shell.lua), PKGLIBDIR/session + BINDIR/lhde-session,
-#                         PKGLIBDIR/tools + BINDIR/lhde-import, lhde-pack, lhde-schemes
+#                         sources/free-wallpapers-LICENSE.txt, frames/*/*.ini, packs/*/shell.lua), PKGLIBDIR/session +
+#                         BINDIR/lhde-session, PKGLIBDIR/tools + BINDIR/lhde-import, lhde-pack, lhde-schemes
 #
 # Every object is build/obj/<source path>.o (build/pic/... for the shared
 # library); every program goes to build/bin, so programs that look for each
@@ -103,11 +104,11 @@ check: check-lux
 check-lux: all
 	@$(MAKE) --no-print-directory check-liblhde check-luxshell check-luxwm
 	@$(MAKE) --no-print-directory check-free
-# make check-free: every shipped theme resolves with only the reactos source imported (build/free/windows, from the free pack:
-# FREE_PACK, or ReactOS's ISO: LHDE_REACTOS_ISO or ~/lib/windows_isos, or the pack make fetch-free-pack downloaded; skipped
-# without any), and luxwm's classic frames render from it (tests/check-free.sh)
+# make check-free: every shipped theme resolves with only the free pack's sources imported (build/free/windows, from the free
+# pack: FREE_PACK, or ReactOS's ISO: LHDE_REACTOS_ISO or ~/lib/windows_isos, with the photos of FREE_WALLPAPERS, or the pack make
+# fetch-free-pack downloaded; skipped without any), and luxwm's classic frames render from it (tests/check-free.sh)
 check-free: build/bin/lhde-theme build/luxwm/tests/frametest
-	@FREE_PACK='$(FREE_PACK)' FREE_PACK_CACHE='$(FREE_PACK_CACHE)' tests/check-free.sh
+	@FREE_PACK='$(FREE_PACK)' FREE_PACK_CACHE='$(FREE_PACK_CACHE)' FREE_WALLPAPERS='$(FREE_WALLPAPERS)' tests/check-free.sh
 # make check-bare: the whole make check with an empty Windows tree and empty config, data, state and cache homes (fresh temporary
 # directories, HOME too): every test passes or skips with a message, none fails for lack of resources; what a CI job runs
 check-bare: all
@@ -127,7 +128,7 @@ install-data:
 	install -m 644 share/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
 	install -m 644 share/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
 	install -m 644 share/icons/*.theme $(DESTDIR)$(DATADIR)/icons/
-	install -m 644 share/sources/*.ini $(DESTDIR)$(DATADIR)/sources/
+	install -m 644 share/sources/*.ini share/sources/free-wallpapers-LICENSE.txt $(DESTDIR)$(DATADIR)/sources/
 	for d in share/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
 	for d in share/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done
 	install -m 755 session/lhde-session $(DESTDIR)$(BINDIR)/
@@ -143,37 +144,46 @@ uninstall-data:
 	       $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
 	-rmdir $(DESTDIR)$(PKGLIBDIR)
 
-# The free resources as a pack (docs/BUILDING.md "The free resources"): ReactOS 0.4.16's files, GPL and other free licences,
-# made once from its boot CD by make free-pack and published; make install-resources-free downloads it, and nobody needs the ISO.
+# The free resources as a pack (docs/BUILDING.md "The free resources"): ReactOS 0.4.16's files (GPL and other free licences) and
+# the free themes' wallpapers (Pexels photos, the Pexels licence), made once by make free-pack and published; make
+# install-resources-free downloads it, and nobody needs the ISO or the photos.
 #   make free-pack                 $(FREE_PACK_NAME).zip in the tree root (gitignored; a zip as the Windows packs: lhde-import
-#                                  unpacks it without tar or zstd) from REACTOS_ISO, with a LICENSE note
-#                                  (share/sources/reactos-LICENSE.txt) and the licence texts of REACTOS_SRC (ReactOS's source at
-#                                  tag 0.4.16: COPYING*, CREDITS, media/fonts/doc); reproducible: the same ISO gives the same
-#                                  bytes, so its sha256 is FREE_PACK_SHA256's; prints the sha256 and the size
+#                                  unpacks it without tar or zstd): the source reactos from REACTOS_ISO, the source free
+#                                  (share/sources/free.ini: four photos and their LICENSE.txt) from FREE_WALLPAPERS, with a
+#                                  LICENSE note (share/sources/free-pack-LICENSE.txt) and the licence texts of REACTOS_SRC
+#                                  (ReactOS's source at tag 0.4.16: COPYING*, CREDITS, media/fonts/doc); reproducible: the
+#                                  same ISO and photos give the same bytes, so its sha256 is FREE_PACK_SHA256's; prints the
+#                                  sha256 and the size
 #   make fetch-free-pack           the pack downloaded from FREE_PACK_URL into FREE_PACK_CACHE and checked against FREE_PACK_SHA256
 #                                  (kept there: make check-free and install-resources-free use it; a CI runs this first)
+# FREE_PACK_VERSION counts the free pack's contents (1: ReactOS 0.4.16 and the four photos): a new ReactOS or other photos are
+# a new version, so a new name and sha256.
 REACTOS_VERSION   = 0.4.16
 REACTOS_RELEASE   = https://sourceforge.net/projects/reactos/files/ReactOS/$(REACTOS_VERSION)/
 REACTOS_ISO      ?= $(HOME)/lib/windows_isos/ReactOS-$(REACTOS_VERSION)-i386.iso
 REACTOS_SRC      ?= $(HOME)/lib/reactos-$(REACTOS_VERSION)
-FREE_PACK_NAME    = lhde-resources-reactos-$(REACTOS_VERSION)
+# the directory holding the photos under Pexels's download names (share/sources/free.ini names the four it takes)
+FREE_WALLPAPERS  ?= $(HOME)/cfg/wallpaper
+FREE_PACK_VERSION = 1
+FREE_PACK_NAME    = lhde-resources-free-$(FREE_PACK_VERSION)
 # FREE_PACK_URL is a placeholder until the pack is published (aap: a release asset of the repository); FREE_PACK_SHA256 is the
-# sha256 of the pack make free-pack builds from the release's ISO
+# sha256 of the pack make free-pack builds from the release's ISO and the photos
 FREE_PACK_URL    ?= https://github.com/aap/lhde/releases/download/resources/$(FREE_PACK_NAME).zip
-FREE_PACK_SHA256  = 474cac09b8840a1c222534119463f41a220174fa1e4bee6902a0c93c767b9480
+FREE_PACK_SHA256  = 30556f1ab8c590173e151b2d646cb5a40750044e5b0e647fc99e4de4feb5c724
 FREE_PACK_CACHE  ?= $(or $(XDG_CACHE_HOME),$(HOME)/.cache)/lhde/$(FREE_PACK_NAME).zip
 FREE_FONT_DOCS    = Arial ArialBlack ComicSansMS CourierNew FranklinGothicMedium Georgia LucidaConsole MicrosoftSansSerif \
                     PalatinoLinotype Tahoma TimesNewRoman TrebuchetMS Verdana
 free-pack:
 	@[ -f '$(REACTOS_ISO)' ] || { echo "No $(REACTOS_ISO): ReactOS $(REACTOS_VERSION)'s boot CD (ReactOS-$(REACTOS_VERSION)-i386.iso, in the release's iso .zip, $(REACTOS_RELEASE)); make $@ REACTOS_ISO=FILE"; exit 1; }
+	@[ -d '$(FREE_WALLPAPERS)' ] || { echo "No $(FREE_WALLPAPERS): the directory of the free themes' photos (share/sources/free-wallpapers-LICENSE.txt names their Pexels pages); make $@ FREE_WALLPAPERS=DIR"; exit 1; }
 	@[ -f '$(REACTOS_SRC)/COPYING' ] && [ -d '$(REACTOS_SRC)/media/fonts/doc' ] || { echo "No ReactOS source in $(REACTOS_SRC), where the licence texts come from (its tag $(REACTOS_VERSION): https://github.com/reactos/reactos); make $@ REACTOS_SRC=DIR"; exit 1; }
 	rm -rf build/free-pack-notes $(FREE_PACK_NAME) $(FREE_PACK_NAME).zip
 	mkdir -p build/free-pack-notes/licenses/fonts
-	cp share/sources/reactos-LICENSE.txt build/free-pack-notes/LICENSE
+	cp share/sources/free-pack-LICENSE.txt build/free-pack-notes/LICENSE
 	cd '$(REACTOS_SRC)' && cp COPYING COPYING.LIB COPYING3 COPYING3.LIB CREDITS $(CURDIR)/build/free-pack-notes/
 	cd '$(REACTOS_SRC)/media/fonts/doc' && cp -r $(FREE_FONT_DOCS) $(CURDIR)/build/free-pack-notes/licenses/fonts/
-	tools/lhde-pack --profile museum --sources reactos --medium reactos='$(REACTOS_ISO)' --no-local --reproducible \
-	    --no-tar --zip --notes build/free-pack-notes --name $(FREE_PACK_NAME) --out . --tmp build
+	tools/lhde-pack --profile museum --sources reactos,free --medium reactos='$(REACTOS_ISO)' --medium free='$(FREE_WALLPAPERS)' \
+	    --no-local --reproducible --no-tar --zip --notes build/free-pack-notes --name $(FREE_PACK_NAME) --out . --tmp build
 	rm -rf $(FREE_PACK_NAME) build/free-pack-notes
 	@h=$$(sha256sum < $(FREE_PACK_NAME).zip | cut -d' ' -f1); \
 	echo "$(FREE_PACK_NAME).zip: $$(stat -c %s $(FREE_PACK_NAME).zip) bytes, sha256 $$h"; \
@@ -194,10 +204,11 @@ fetch-free-pack:
 
 # A clean Windows tree ($LHDE_WINDOWS, else ~/.local/share/lhde-windows; docs/USAGE.md "Getting the Windows resources"): each
 # target deletes the tree first (lhde-import --clean asks on the terminal; CLEAN=1 deletes without asking), then imports.
-#   make install-resources-free                          only free files, ReactOS's: FREE_PACK=FILE (a pack of the reactos
-#                                                        source, make free-pack's or lhde-pack's), else LHDE_REACTOS_ISO=FILE
-#                                                        or the newest ReactOS-*.iso in ~/lib/windows_isos, else the pack
-#                                                        downloaded from FREE_PACK_URL (as make fetch-free-pack: sha256 checked)
+#   make install-resources-free                          only free files, ReactOS's and the free themes' photos: FREE_PACK=FILE
+#                                                        (make free-pack's), else LHDE_REACTOS_ISO=FILE or the newest
+#                                                        ReactOS-*.iso in ~/lib/windows_isos (with the photos of
+#                                                        FREE_WALLPAPERS), else the pack downloaded from FREE_PACK_URL (as make
+#                                                        fetch-free-pack: sha256 checked)
 #   make install-resources-windows [PACK=lhde_winthemes.zip]     the small Windows pack (lhde-pack's essentials) alone
 #   make install-resources-full [PACK=lhde_wintheme_full.zip]    the free files and the whole Windows pack (lhde-pack's museum)
 # The Windows packs are the user's (lhde-pack --zip, or its .tar.zst / .tar.xz / a directory); the names are only defaults.
@@ -206,7 +217,11 @@ FULL_PACK    ?= lhde_wintheme_full.zip
 free_iso      = $(or $(LHDE_REACTOS_ISO),$(lastword $(sort $(wildcard $(HOME)/lib/windows_isos/ReactOS-*.iso))))
 free_medium   = $(or $(FREE_PACK),$(free_iso),$(FREE_PACK_CACHE))
 need_free     = $(if $(or $(FREE_PACK),$(free_iso)),m='$(free_medium)'; [ -e "$$m" ] || { echo "No $$m"; exit 1; },$(fetch_free))
-import_free   = tools/lhde-import $(if $(filter %.iso %.ISO,$(free_medium)),--iso '$(free_medium)' --source reactos,--pack '$(free_medium)')
+# from the ISO: the free themes' photos from FREE_WALLPAPERS beside it when that directory is there (the pack has both)
+import_free   = $(if $(filter %.iso %.ISO,$(free_medium)),tools/lhde-import --iso '$(free_medium)' --source reactos && \
+	if [ -d '$(FREE_WALLPAPERS)' ]; then tools/lhde-import --dir '$(FREE_WALLPAPERS)' --source free; \
+	else echo "No $(FREE_WALLPAPERS): the free themes show no wallpaper (FREE_WALLPAPERS=DIR, or the free pack)"; fi,\
+	tools/lhde-import --pack '$(free_medium)')
 need_pack     = p='$(1)'; if [ ! -e "$$p" ]; then \
 	  echo "No pack $$p: name yours with PACK=FILE (lhde-pack makes one from your ISOs, docs/USAGE.md; lhde ships no Windows files)"; exit 1; fi
 clean_tree    = tools/lhde-import --clean $(if $(CLEAN),--yes)

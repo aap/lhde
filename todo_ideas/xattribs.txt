@@ -19,3 +19,5 @@ Tag; docs/USAGE.md "Descriptions and tags"). Next phases (todo_ideas/XATTR-DESIG
 * tasks as data (a task table with experiences and per-selection names; the research's TASKS-SUMMARY)
 * the property registry's defaults in a shipped data file with user overrides (the shape is there, no loading yet)
 * luxfs: move into lhde or keep separate
+* lhde-import annotates every source's files author = microsoft (lhdetree.annotate_original), also ReactOS's and the free
+	source's Pexels photos: a source ini key (author = reactos, ...) would say whose they are

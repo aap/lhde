@@ -35,10 +35,10 @@ installs, the three trees) and [docs/USAGE.md](docs/USAGE.md) is the user guide.
     make check                               the tests (Xvfb, xdotool, ImageMagick; each skips when its tool is missing)
     make install PREFIX=~/.local             or /usr/local; program files only, no Windows file, no setting
 
-The free resources (ReactOS's files, GPL: the fonts, Marlett, the Lunar/Modern/Mizu/Lautus styles, icons) make a complete
-desktop without any Microsoft file:
+The free resources (ReactOS's files, GPL: the fonts, Marlett, the Lunar/Modern/Mizu/Lautus styles, icons; their themes'
+wallpapers, photos from Pexels) make a complete desktop without any Microsoft file:
 
-    make install-resources-free              downloads the free pack (11 MB) into ~/.local/share/lhde-windows
+    make install-resources-free              downloads the free pack (10 MB) into ~/.local/share/lhde-windows
 
 Then a session, from a text console (`startx`, display :1) or nested in a Xephyr window:
 

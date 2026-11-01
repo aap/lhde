@@ -516,11 +516,14 @@ def match_rules(src, members):
 def pack_image(src, image, pack, tmp, origin):
     """the source's files out of image into pack/<id>/; returns MANIFEST lines"""
     import lhdetree
-    pairs = match_rules(src, image.members())
+    # share:FILE: a file of lhde's own beside the source's ini (share/sources/), not the medium's (the free wallpapers' licence)
+    ours = {p: os.path.join(os.path.dirname(os.path.realpath(src.path)), p[6:])
+            for _, ps in src.rules() for p in ps if p.startswith('share:')}
+    pairs = match_rules(src, image.members() + list(ours))
     if not pairs:
         raise RuntimeError('%s: nothing matched (not this source?)' % src.id)
-    import lhdetree
-    got = image.fetch(sorted(set(m for _, m, _ in pairs)), os.path.join(tmp, 'fetch'))
+    got = image.fetch(sorted(set(m for _, m, _ in pairs if m not in ours)), os.path.join(tmp, 'fetch'))
+    got.update({m: q for m, q in ours.items() if os.path.isfile(q)})
     lines, n = [], 0
     root = os.path.join(pack, src.id)
     for dest, m, ddir in pairs:

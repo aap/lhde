@@ -19,18 +19,22 @@ dlls/win32u/dibdrv"); they are not in the MANIFEST.
 
 None of these are in the repository (docs/LAYOUT.md "Asset policy"). `lhde-import` copies them from the user's own media into
 the Windows tree (`~/.local/share/lhde-windows`), and the import is the user's act; lhde does not download or redistribute
-them, but for ReactOS's free files (below).
+them, but for the free pack's files (below).
 
 - **Microsoft's files** (visual styles, DLLs, fonts, wallpapers, from the user's ISOs, WIMs or a Windows directory through
   `lhde-pack` and `lhde-import`): under Microsoft's licence terms.
 - **ReactOS's files** (`make install-resources-free`, `lhde-import --iso` on ReactOS's boot CD): free, so lhde publishes them,
-  outside the repository, as the pack `lhde-resources-reactos-0.4.16.zip`, which `make install-resources-free` downloads
+  outside the repository, in the free pack `lhde-resources-free-1.zip`, which `make install-resources-free` downloads
   (`make free-pack` makes it from the CD). ReactOS is under the GNU GPL version 2 or later, parts under the GNU LGPL 2.1 or
   later (the DLLs it shares with Wine) and a few under version 3; the corresponding source is ReactOS's tag 0.4.16. The fonts
   carry their own free licences (SIL OFL 1.1, Apache 2.0, the Bitstream Vera licence, the GUST Font License, GPL 3 with the
-  font exception for Courier New, LGPL 2.1 for Wine's Symbol and Wingdings, a permissive notice in Marlett), the wallpapers
-  theirs (CC0, CC BY, CC BY-SA, and CC BY-NC-SA 3.0 for Angelus's three). The pack carries ReactOS's `COPYING` files and
-  `CREDITS`, the fonts' licence texts and a `LICENSE` note naming each (share/sources/reactos-LICENSE.txt).
+  font exception for Courier New, LGPL 2.1 for Wine's Symbol and Wingdings, a permissive notice in Marlett). ReactOS's
+  wallpapers are not taken (three of them are CC BY-NC). The pack carries ReactOS's `COPYING` files and `CREDITS`, the
+  fonts' licence texts and a `LICENSE` note naming each (share/sources/free-pack-LICENSE.txt).
+- **The free themes' wallpapers** (the source `free`, share/sources/free.ini, in the same pack): four photos from Pexels,
+  chosen by aap, under the Pexels licence (free to use and modify, also commercially, without attribution:
+  https://www.pexels.com/license/); `free/wallpapers/LICENSE.txt` (share/sources/free-wallpapers-LICENSE.txt) names each
+  photographer and the photo's page.
 - **Icon packs** (`lhde-import --icons DIR NAME --licence FILE`): the pack's own licence, copied beside it into
   `local/icons/NAME/`. The one the shipped recipe `share/icons/xp-hires.theme` names, marchmountain's "Windows XP High
   Resolution Icon Pack", is published under CC0; the recipe (the mapping of icon keys to file names) is lhde's text.
