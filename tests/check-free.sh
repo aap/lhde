@@ -1,8 +1,10 @@
 #!/bin/sh
 # make check-free (part of make check): the free baseline (docs/THEME-FORMAT.md section 6) as a test configuration. A Windows tree
-# that holds only the reactos source, imported once into build/free/windows from ReactOS's boot CD ($LHDE_REACTOS_ISO, else the
-# newest ReactOS-*.iso in ~/lib/windows_isos; skipped with a note when there is none, as ut-dump's test skips without styles) and
-# again when the ISO or share/sources/reactos.ini changes. With that tree alone (own config, data and state homes, no LHDE_DATA):
+# that holds only the reactos source, imported once into build/free/windows from the free pack or ReactOS's boot CD, the first
+# there of: $FREE_PACK (a pack of the reactos source, make free-pack's), $LHDE_REACTOS_ISO, the newest ReactOS-*.iso in
+# ~/lib/windows_isos, the pack make fetch-free-pack downloaded ($FREE_PACK_CACHE, else ~/.cache/lhde/); skipped with a note when
+# there is none, as ut-dump's test skips without styles; imported again when that file or share/sources/reactos.ini changes. The
+# pack and the ISO import the same tree. With that tree alone (own config, data and state homes, no LHDE_DATA):
 #   - every shipped theme resolves: lhde-theme explain and explain --files succeed;
 #   - classic and the themes of build reactos resolve with nothing missing (classic: but its colour scheme, which ReactOS does
 #     not carry: the built-in Windows Standard);
@@ -13,20 +15,25 @@ set -e
 top=$(cd "$(dirname "$0")/.." && pwd)
 cd "$top"
 B=$top/build/free
-iso=${LHDE_REACTOS_ISO:-}
+iso=${FREE_PACK:-${LHDE_REACTOS_ISO:-}}
 if [ -z "$iso" ]; then
 	for f in "$HOME"/lib/windows_isos/ReactOS-*.iso; do [ -f "$f" ] && iso=$f; done
 fi
+if [ -z "$iso" ]; then
+	f=${FREE_PACK_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/lhde/lhde-resources-reactos-0.4.16.zip}
+	[ -f "$f" ] && iso=$f
+fi
 if [ -z "$iso" ] || [ ! -f "$iso" ]; then
-	echo "skip  free baseline: no ReactOS ISO (LHDE_REACTOS_ISO=FILE, or ReactOS-*.iso in ~/lib/windows_isos; make install-resources-free names the download)"
+	echo "skip  free baseline: no free pack or ReactOS ISO (make fetch-free-pack, FREE_PACK=FILE, LHDE_REACTOS_ISO=FILE, or ReactOS-*.iso in ~/lib/windows_isos)"
 	exit 0
 fi
 W=$B/windows
 key="$iso $(stat -c %s.%Y "$iso")"
 if [ ! -f "$W/reactos/source.ini" ] || [ "$(cat "$B/iso" 2>/dev/null)" != "$key" ] || [ share/sources/reactos.ini -nt "$W/reactos/source.ini" ]; then
 	rm -rf "$W"; mkdir -p "$B"
-	if ! tools/lhde-import --iso "$iso" --source reactos --windows "$W" --no-annotate > "$B/import.log" 2>&1; then
-		cat "$B/import.log"; echo "FAIL  free baseline: lhde-import --iso $iso"; exit 1
+	case "$iso" in *.iso|*.ISO) set -- --iso "$iso" --source reactos;; *) set -- --pack "$iso";; esac
+	if ! tools/lhde-import "$@" --windows "$W" --no-annotate > "$B/import.log" 2>&1; then
+		cat "$B/import.log"; echo "FAIL  free baseline: lhde-import $*"; exit 1
 	fi
 	echo "$key" > "$B/iso"
 fi
@@ -45,7 +52,7 @@ for f in share/themes/*.theme; do
 	if [ -n "$bad" ]; then echo "FAIL  free baseline: $t is not complete with only ReactOS imported:"; echo "$bad"; fails=$((fails + 1)); fi
 done
 [ $fails -eq 0 ] || { echo "FAIL  free baseline: $fails of $n themes"; exit 1; }
-echo "ok    free baseline: $n themes resolve with only reactos imported ($W)"
+echo "ok    free baseline: $n themes resolve with only reactos imported ($W, from $(basename "$iso"))"
 R=$top/build/luxwm/regress
 st=0
 FRAMETEST_FONTS="$W/index/fonts/reactos" LUXWM_BASELINE="$R/baseline-free.sha256" luxwm/tests/regress.sh --classic-only "$R/out-free" \

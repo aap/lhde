@@ -1,0 +1,64 @@
+lhde-resources-reactos-0.4.16: ReactOS 0.4.16's files for lhde, the Longhorn desktop environment
+
+WHAT THIS IS
+
+The files lhde takes from ReactOS 0.4.16's boot CD (ReactOS-0.4.16-i386.iso, https://reactos.org; the release:
+https://sourceforge.net/projects/reactos/files/ReactOS/0.4.16/), unmodified, by the rules of lhde's
+share/sources/reactos.ini (here as reactos/source.ini):
+
+  reactos/system32/    shell32.dll, browseui.dll, comctl32.dll, themeui.dll, explorer.exe
+  reactos/themes/      the visual styles Lunar, Modern, Mizu and Lautus
+  reactos/fonts/       40 fonts under the Windows file names (below)
+  reactos/wallpapers/  the CD's wallpapers (.jpg, .png) and their notes
+
+MANIFEST lists every file with its sha256, its size and its path on the CD. `lhde-import --pack` puts them into lhde's
+Windows tree (`make install-resources-free` downloads this pack and does that); `make free-pack` in lhde's source tree makes
+the pack again from the CD (lhde-pack --reproducible --sources reactos), byte for byte.
+
+LICENCES
+
+ReactOS is free software. Its code is under the GNU General Public License version 2 or (at your option) any later version
+(COPYING); parts, among them the DLLs ReactOS shares with Wine (comctl32, much of shell32), are under the GNU Lesser General
+Public License version 2.1 or later (COPYING.LIB); a few under version 3 of either (COPYING3, COPYING3.LIB). Each source file
+says which. CREDITS names ReactOS's authors. The corresponding source of these binaries is ReactOS's tag 0.4.16:
+https://github.com/reactos/reactos/tree/0.4.16 (also the source archive of the release, beside the ISO).
+
+The fonts carry their own licences; the texts are in licenses/fonts/<family>/ (ReactOS's media/fonts/doc):
+
+  Marlett.ttf                          ReactOS's Marlett (Ged Murphy, Wierd_W, TransGaming, Katayama Hirofumi MZ): the
+                                       permission in the font itself (use, copy, modify and distribute for any purpose,
+                                       with the copyright notice)
+  tahoma.ttf tahomabd.ttf              Tahoma: after Bitstream Vera Sans / DejaVu Sans; the Bitstream Vera licence, the
+                                       changes public domain (licenses/fonts/Tahoma; the font itself names the LGPL 2.1)
+  micross.ttf                          Microsoft Sans Serif: after Google's Noto Sans; SIL Open Font License 1.1
+  trebuc.ttf trebucbd.ttf trebucbi.ttf trebucit.ttf
+                                       Trebuchet MS: Open Sans; Apache License 2.0
+  verdana.ttf verdanab.ttf verdanai.ttf verdanaz.ttf
+                                       Verdana: DejaVu Sans; the Bitstream Vera licence, the changes public domain
+  arial.ttf arialbd.ttf arialbi.ttf ariali.ttf
+                                       Arial: Liberation Sans; SIL Open Font License 1.1
+  ariblk.ttf                           Arial Black: Archivo Black; SIL Open Font License 1.1
+  cour.ttf courbd.ttf courbi.ttf couri.ttf
+                                       Courier New: GNU FreeFont's FreeMono; GNU GPL version 3 or later with the font
+                                       exception
+  times.ttf timesbd.ttf timesbi.ttf timesi.ttf
+                                       Times New Roman: Liberation Serif; SIL Open Font License 1.1
+  lucon.ttf                            Lucida Console: DejaVu Sans Mono; the Bitstream Vera licence, the changes public
+                                       domain
+  symbol.ttf                           Symbol: Wine's WineSymbol (CodeWeavers); GNU LGPL 2.1 or later (COPYING.LIB)
+  wingding.ttf                         Wingdings: Wine's (Dmitry Timoshkov); GNU LGPL 2.1 or later (COPYING.LIB)
+  comic.ttf comicbd.ttf                Comic Sans MS: Comic Relief; SIL Open Font License 1.1
+  georgia.ttf georgiab.ttf georgiai.ttf georgiaz.ttf
+                                       Georgia: Gelasio; SIL Open Font License 1.1
+  pala.ttf palab.ttf palabi.ttf palai.ttf
+                                       Palatino Linotype: TeX Gyre Pagella; the GUST Font License
+  framd.ttf framdit.ttf                Franklin Gothic Medium: Libre Franklin; SIL Open Font License 1.1
+
+The wallpapers carry their own licences, in reactos/wallpapers/README.txt and Angelus.txt: Backwoods, Borealis and Borealis
+Dark CC BY-NC(-SA) 3.0 (non-commercial: "Angelus"), Grass and Polarlicht CC0 1.0, Mizu and Mizu (4x3) CC BY-SA 4.0
+("Foxlet"), Silhouette and Silhouette Dark CC BY 4.0 (Jake Collins).
+
+The names Tahoma, Verdana, Arial and the others are the file and family names Windows programs ask for; the faces are the
+free ones named above, not Microsoft's. Nothing in this pack is Microsoft's.
+
+lhde itself (https://github.com/aap/lhde) is under the GNU GPL version 2; this pack is not part of its repository.

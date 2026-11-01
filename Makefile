@@ -4,7 +4,9 @@
 #                         programs, ut-dump, luxwm, luxwmc, luxshell, the examples and the tests, into build/
 #   make check            the tests that need no Microsoft files (tests/check.sh), luxshell's build
 #                         and Lua, luxwm's frame regression (skips without the user's styles), the free baseline
-#                         (make check-free: only ReactOS imported; skips without its ISO)
+#                         (make check-free: only ReactOS imported; skips without its pack or ISO)
+#   make install-resources-free   the free resources (ReactOS's files, GPL): the published pack downloaded and imported into
+#                         the Windows tree, no ISO needed; make free-pack builds that pack (below)
 #   make check-bare       make check with nothing imported or configured (empty temporary homes): what CI runs
 #   make install          PREFIX=/usr/local DESTDIR= (also BINDIR, LIBDIR, INCLUDEDIR, DATADIR, PKGLIBDIR, MANDIR,
 #                         PORTALDIR, DBUSSERVICEDIR); make uninstall. Program files only: the shipped data (text) into
@@ -101,10 +103,11 @@ check: check-lux
 check-lux: all
 	@$(MAKE) --no-print-directory check-liblhde check-luxshell check-luxwm
 	@$(MAKE) --no-print-directory check-free
-# make check-free: every shipped theme resolves with only the reactos source imported (build/free/windows, from ReactOS's ISO:
-# LHDE_REACTOS_ISO or ~/lib/windows_isos; skipped without one), and luxwm's classic frames render from it (tests/check-free.sh)
+# make check-free: every shipped theme resolves with only the reactos source imported (build/free/windows, from the free pack:
+# FREE_PACK, or ReactOS's ISO: LHDE_REACTOS_ISO or ~/lib/windows_isos, or the pack make fetch-free-pack downloaded; skipped
+# without any), and luxwm's classic frames render from it (tests/check-free.sh)
 check-free: build/bin/lhde-theme build/luxwm/tests/frametest
-	@tests/check-free.sh
+	@FREE_PACK='$(FREE_PACK)' FREE_PACK_CACHE='$(FREE_PACK_CACHE)' tests/check-free.sh
 # make check-bare: the whole make check with an empty Windows tree and empty config, data, state and cache homes (fresh temporary
 # directories, HOME too): every test passes or skips with a message, none fails for lack of resources; what a CI job runs
 check-bare: all
@@ -140,28 +143,77 @@ uninstall-data:
 	       $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
 	-rmdir $(DESTDIR)$(PKGLIBDIR)
 
+# The free resources as a pack (docs/BUILDING.md "The free resources"): ReactOS 0.4.16's files, GPL and other free licences,
+# made once from its boot CD by make free-pack and published; make install-resources-free downloads it, and nobody needs the ISO.
+#   make free-pack                 $(FREE_PACK_NAME).zip in the tree root (gitignored; a zip as the Windows packs: lhde-import
+#                                  unpacks it without tar or zstd) from REACTOS_ISO, with a LICENSE note
+#                                  (share/sources/reactos-LICENSE.txt) and the licence texts of REACTOS_SRC (ReactOS's source at
+#                                  tag 0.4.16: COPYING*, CREDITS, media/fonts/doc); reproducible: the same ISO gives the same
+#                                  bytes, so its sha256 is FREE_PACK_SHA256's; prints the sha256 and the size
+#   make fetch-free-pack           the pack downloaded from FREE_PACK_URL into FREE_PACK_CACHE and checked against FREE_PACK_SHA256
+#                                  (kept there: make check-free and install-resources-free use it; a CI runs this first)
+REACTOS_VERSION   = 0.4.16
+REACTOS_RELEASE   = https://sourceforge.net/projects/reactos/files/ReactOS/$(REACTOS_VERSION)/
+REACTOS_ISO      ?= $(HOME)/lib/windows_isos/ReactOS-$(REACTOS_VERSION)-i386.iso
+REACTOS_SRC      ?= $(HOME)/lib/reactos-$(REACTOS_VERSION)
+FREE_PACK_NAME    = lhde-resources-reactos-$(REACTOS_VERSION)
+# FREE_PACK_URL is a placeholder until the pack is published (aap: a release asset of the repository); FREE_PACK_SHA256 is the
+# sha256 of the pack make free-pack builds from the release's ISO
+FREE_PACK_URL    ?= https://github.com/aap/lhde/releases/download/resources/$(FREE_PACK_NAME).zip
+FREE_PACK_SHA256  = 474cac09b8840a1c222534119463f41a220174fa1e4bee6902a0c93c767b9480
+FREE_PACK_CACHE  ?= $(or $(XDG_CACHE_HOME),$(HOME)/.cache)/lhde/$(FREE_PACK_NAME).zip
+FREE_FONT_DOCS    = Arial ArialBlack ComicSansMS CourierNew FranklinGothicMedium Georgia LucidaConsole MicrosoftSansSerif \
+                    PalatinoLinotype Tahoma TimesNewRoman TrebuchetMS Verdana
+free-pack:
+	@[ -f '$(REACTOS_ISO)' ] || { echo "No $(REACTOS_ISO): ReactOS $(REACTOS_VERSION)'s boot CD (ReactOS-$(REACTOS_VERSION)-i386.iso, in the release's iso .zip, $(REACTOS_RELEASE)); make $@ REACTOS_ISO=FILE"; exit 1; }
+	@[ -f '$(REACTOS_SRC)/COPYING' ] && [ -d '$(REACTOS_SRC)/media/fonts/doc' ] || { echo "No ReactOS source in $(REACTOS_SRC), where the licence texts come from (its tag $(REACTOS_VERSION): https://github.com/reactos/reactos); make $@ REACTOS_SRC=DIR"; exit 1; }
+	rm -rf build/free-pack-notes $(FREE_PACK_NAME) $(FREE_PACK_NAME).zip
+	mkdir -p build/free-pack-notes/licenses/fonts
+	cp share/sources/reactos-LICENSE.txt build/free-pack-notes/LICENSE
+	cd '$(REACTOS_SRC)' && cp COPYING COPYING.LIB COPYING3 COPYING3.LIB CREDITS $(CURDIR)/build/free-pack-notes/
+	cd '$(REACTOS_SRC)/media/fonts/doc' && cp -r $(FREE_FONT_DOCS) $(CURDIR)/build/free-pack-notes/licenses/fonts/
+	tools/lhde-pack --profile museum --sources reactos --medium reactos='$(REACTOS_ISO)' --no-local --reproducible \
+	    --no-tar --zip --notes build/free-pack-notes --name $(FREE_PACK_NAME) --out . --tmp build
+	rm -rf $(FREE_PACK_NAME) build/free-pack-notes
+	@h=$$(sha256sum < $(FREE_PACK_NAME).zip | cut -d' ' -f1); \
+	echo "$(FREE_PACK_NAME).zip: $$(stat -c %s $(FREE_PACK_NAME).zip) bytes, sha256 $$h"; \
+	if [ "$$h" = '$(FREE_PACK_SHA256)' ]; then echo "(the pack FREE_PACK_SHA256 names)"; \
+	else echo "(a new pack: FREE_PACK_SHA256 names $(FREE_PACK_SHA256); publish this one and set it)"; fi
+fetch_free = f='$(FREE_PACK_CACHE)'; sum() { sha256sum < "$$1" | cut -d' ' -f1; }; \
+	if [ -f "$$f" ] && [ "$$(sum "$$f")" = '$(FREE_PACK_SHA256)' ]; then echo "$$f (cached, sha256 checked)"; else \
+	  mkdir -p "$$(dirname "$$f")" && rm -f "$$f.part" && echo "downloading $(FREE_PACK_URL) to $$f" && \
+	  if command -v curl > /dev/null; then curl -fL --retry 2 -o "$$f.part" '$(FREE_PACK_URL)'; \
+	  elif command -v wget > /dev/null; then wget -O "$$f.part" '$(FREE_PACK_URL)'; \
+	  else echo "neither curl nor wget: download $(FREE_PACK_URL) to $$f yourself"; false; fi || \
+	    { rm -f "$$f.part"; echo "The download failed. The pack: $(FREE_PACK_URL); or FREE_PACK=FILE, or ReactOS's ISO (LHDE_REACTOS_ISO=FILE)"; exit 1; }; \
+	  h=$$(sum "$$f.part"); [ "$$h" = '$(FREE_PACK_SHA256)' ] || \
+	    { rm -f "$$f.part"; echo "$(FREE_PACK_URL): sha256 $$h, not $(FREE_PACK_SHA256): not imported"; exit 1; }; \
+	  mv "$$f.part" "$$f"; fi
+fetch-free-pack:
+	@$(fetch_free)
+
 # A clean Windows tree ($LHDE_WINDOWS, else ~/.local/share/lhde-windows; docs/USAGE.md "Getting the Windows resources"): each
 # target deletes the tree first (lhde-import --clean asks on the terminal; CLEAN=1 deletes without asking), then imports.
-#   make install-resources-free                          only free files: ReactOS's boot CD (LHDE_REACTOS_ISO=FILE, an ISO or a
-#                                                        pack made with lhde-pack --sources reactos; else the newest
-#                                                        ReactOS-*.iso in ~/lib/windows_isos; else the download is named)
+#   make install-resources-free                          only free files, ReactOS's: FREE_PACK=FILE (a pack of the reactos
+#                                                        source, make free-pack's or lhde-pack's), else LHDE_REACTOS_ISO=FILE
+#                                                        or the newest ReactOS-*.iso in ~/lib/windows_isos, else the pack
+#                                                        downloaded from FREE_PACK_URL (as make fetch-free-pack: sha256 checked)
 #   make install-resources-windows [PACK=lhde_winthemes.zip]     the small Windows pack (lhde-pack's essentials) alone
 #   make install-resources-full [PACK=lhde_wintheme_full.zip]    the free files and the whole Windows pack (lhde-pack's museum)
-# The packs are the user's (lhde-pack --zip, or its .tar.zst / .tar.xz / a directory); the names are only defaults.
-REACTOS_RELEASE = https://sourceforge.net/projects/reactos/files/ReactOS/0.4.16/
+# The Windows packs are the user's (lhde-pack --zip, or its .tar.zst / .tar.xz / a directory); the names are only defaults.
 WINDOWS_PACK ?= lhde_winthemes.zip
 FULL_PACK    ?= lhde_wintheme_full.zip
-free_medium   = $(or $(LHDE_REACTOS_ISO),$(lastword $(sort $(wildcard $(HOME)/lib/windows_isos/ReactOS-*.iso))))
-need_free     = m='$(free_medium)'; if [ -z "$$m" ] || [ ! -e "$$m" ]; then \
-	  echo "No ReactOS medium$${m:+ ($$m not found)}. Download ReactOS 0.4.16's boot CD (ReactOS-0.4.16-i386.iso, in the release's"; \
-	  echo "iso .zip) from $(REACTOS_RELEASE) and run: make $@ LHDE_REACTOS_ISO=/path/to/ReactOS-0.4.16-i386.iso"; exit 1; fi
+free_iso      = $(or $(LHDE_REACTOS_ISO),$(lastword $(sort $(wildcard $(HOME)/lib/windows_isos/ReactOS-*.iso))))
+free_medium   = $(or $(FREE_PACK),$(free_iso),$(FREE_PACK_CACHE))
+need_free     = $(if $(or $(FREE_PACK),$(free_iso)),m='$(free_medium)'; [ -e "$$m" ] || { echo "No $$m"; exit 1; },$(fetch_free))
+import_free   = tools/lhde-import $(if $(filter %.iso %.ISO,$(free_medium)),--iso '$(free_medium)' --source reactos,--pack '$(free_medium)')
 need_pack     = p='$(1)'; if [ ! -e "$$p" ]; then \
 	  echo "No pack $$p: name yours with PACK=FILE (lhde-pack makes one from your ISOs, docs/USAGE.md; lhde ships no Windows files)"; exit 1; fi
 clean_tree    = tools/lhde-import --clean $(if $(CLEAN),--yes)
 install-resources-free:
 	@$(need_free)
 	$(clean_tree)
-	tools/lhde-import $(if $(filter %.iso,$(free_medium)),--iso '$(free_medium)' --source reactos,'$(free_medium)')
+	$(import_free)
 	tools/lhde-import --list
 install-resources-windows:
 	@$(call need_pack,$(or $(PACK),$(WINDOWS_PACK)))
@@ -172,7 +224,7 @@ install-resources-full:
 	@$(need_free)
 	@$(call need_pack,$(or $(PACK),$(FULL_PACK)))
 	$(clean_tree)
-	tools/lhde-import $(if $(filter %.iso,$(free_medium)),--iso '$(free_medium)' --source reactos,'$(free_medium)')
+	$(import_free)
 	tools/lhde-import --pack '$(or $(PACK),$(FULL_PACK))'
 	tools/lhde-import --list
 
@@ -183,6 +235,6 @@ install: install-libs install-liblhde install-flxp install-luxnav install-luxwm 
 uninstall: uninstall-luxshell uninstall-luxwm uninstall-luxnav uninstall-data uninstall-liblhde uninstall-libs uninstall-flxp
 
 .PHONY: all libs programs tests clean install uninstall check check-lux check-free check-bare install-data uninstall-data \
-        install-resources-free install-resources-windows install-resources-full
+        install-resources-free install-resources-windows install-resources-full free-pack fetch-free-pack
 .PRECIOUS: $(O)/%.o $(P)/%.o
 .DELETE_ON_ERROR:

@@ -113,14 +113,16 @@ Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac 
 regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a
 baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the first run); skipped
 without imported styles.
-Last the free baseline (`make check-free`, `tests/check-free.sh`): ReactOS's boot CD (`LHDE_REACTOS_ISO`, else
-`~/lib/windows_isos/ReactOS-*.iso`; skipped without one) imported once into `build/free/windows`, and with that tree
+Last the free baseline (`make check-free`, `tests/check-free.sh`): the free pack or ReactOS's boot CD (`FREE_PACK=FILE`,
+`LHDE_REACTOS_ISO=FILE`, `~/lib/windows_isos/ReactOS-*.iso`, or the pack `make fetch-free-pack` downloaded into
+`~/.cache/lhde`, the first there; skipped without any, so a CI runs `make fetch-free-pack` first) imported once into
+`build/free/windows`, and with that tree
 alone every shipped theme must resolve (`lhde-theme explain`, `explain --files`), classic and the ReactOS themes with
 nothing missing but what ReactOS stands in for, and luxwm's classic frames render against a baseline of their own
 (`build/luxwm/regress/baseline-free.sha256`; ReactOS's Tahoma and Marlett, so they differ from the normal run's).
 Nothing imported at all (`make check-bare`, `tests/check-bare.sh`, what a CI job runs): the whole `make check` with an empty
 Windows tree and empty config, data, state and cache homes and HOME (fresh temporary directories; no `LHDE_DATA`, no ReactOS
-ISO), where every test must pass or skip with a message; a test that fails for lack of resources is a bug. It is not part of
+ISO or free pack), where every test must pass or skip with a message; a test that fails for lack of resources is a bug. It is not part of
 `make check`, being as long (about 3 minutes, most of it the headless scripts).
 
 ## The three trees, lhde-import and lhde-theme explain
@@ -138,9 +140,9 @@ clean Windows tree (each deletes it first, asking; `CLEAN=1` without asking):
 
 | make target | imports | gives |
 | --- | --- | --- |
-| `install-resources-free` | ReactOS 0.4.16's boot CD (`LHDE_REACTOS_ISO=FILE`, else `~/lib/windows_isos/ReactOS-*.iso`; free, GPL) | classic and ReactOS's four styles complete, every other theme as classic with ReactOS's icons and fonts |
+| `install-resources-free` | the free pack, ReactOS 0.4.16's files (downloaded; `FREE_PACK=FILE`, or the boot CD: `LHDE_REACTOS_ISO=FILE`, `~/lib/windows_isos/ReactOS-*.iso`; free, GPL; below) | classic and ReactOS's four styles complete, every other theme as classic with ReactOS's icons and fonts |
 | `install-resources-windows PACK=lhde_winthemes.zip` | your small Windows pack (`lhde-pack`, essentials) | the shipped Windows themes |
-| `install-resources-full PACK=lhde_wintheme_full.zip` | the ReactOS CD and your whole Windows pack (`lhde-pack --profile museum`) | everything |
+| `install-resources-full PACK=lhde_wintheme_full.zip` | the free resources (as above) and your whole Windows pack (`lhde-pack --profile museum`) | everything |
 
 The pack names are defaults for files lhde does not supply (`lhde-pack --zip` writes one; a `.tar.zst` / `.tar.xz` or a
 pack directory works too). By hand:
@@ -153,6 +155,24 @@ pack directory works too). By hand:
     tools/lhde-import --regenerate                          generated/ made again from the imported files
     tools/lhde-import --list                                what is there
     tools/lhde-import --clean [--yes]                       the Windows tree deleted (asks first)
+
+### The free resources
+ReactOS's files (shell32, browseui, comctl32, themeui, explorer.exe, its four visual styles, 40 free fonts under the Windows
+file names, its wallpapers; docs/USAGE.md "Getting the Windows resources") are free, so lhde publishes them as a pack, outside
+the repository: `lhde-resources-reactos-0.4.16.zip` (11 MB), made once from ReactOS 0.4.16's boot CD. `make
+install-resources-free` takes, in this order, `FREE_PACK=FILE`, the ISO (`LHDE_REACTOS_ISO=FILE`, else the newest
+`~/lib/windows_isos/ReactOS-*.iso`), else the pack downloaded from `FREE_PACK_URL` (curl or wget) into
+`~/.cache/lhde/` and checked against `FREE_PACK_SHA256` before the import; both ways give the same Windows tree, byte for byte.
+`make fetch-free-pack` only downloads and checks it (for `make check-free` on a machine without the ISO).
+
+`make free-pack` builds the pack in the tree root (gitignored): `lhde-pack --profile museum --sources reactos --reproducible
+--no-tar --zip` from `REACTOS_ISO` (default `~/lib/windows_isos/ReactOS-0.4.16-i386.iso`), with `--notes` adding a `LICENSE`
+(share/sources/reactos-LICENSE.txt: what the pack holds, ReactOS's GPL 2 or later and LGPL 2.1 or later, each font's
+licence, the wallpapers') and the licence texts from ReactOS's source at tag 0.4.16 (`REACTOS_SRC`, default
+`~/lib/reactos-0.4.16`: `COPYING`, `COPYING.LIB`, `COPYING3`, `COPYING3.LIB`, `CREDITS`, `media/fonts/doc` as
+`licenses/fonts/`); it prints the size and the sha256. `--reproducible` dates every entry the same and writes no
+annotations, so the same CD (and the same `share/sources/reactos.ini`, which the pack carries) gives the same sha256 as the
+published pack; a new pack is published under `FREE_PACK_URL` and its sha256 set in `FREE_PACK_SHA256`.
 
 Every program looks a file up by its relative name (`styles/jade4074.msstyles`, `frames/jade4074/close.png`,
 `resources/4074`) in this order: `~/.config/lhde`, the Windows tree's `index/` (`$LHDE_DATA`, a flat directory, instead:

@@ -4,7 +4,8 @@ share/sources/<source>.ini (docs/USAGE.md "Getting the Windows resources", docs/
 turns a pack into lhde's Windows tree (~/.local/share/lhde-windows); nobody needs the ISOs after that.
 
 usage: lhde-pack [--profile essentials|museum] [--themes A,B,C] [--isos DIR]... [--sources ID,ID] [--all] [--from-pack PACK]
-                 [--from-tree [DIR]] [--local DIR | --no-local] [--out DIR] [--name NAME] [--no-tar] [--zip] [--tmp DIR] [--medium ID=PATH]... [--no-annotate] [--list]
+                 [--from-tree [DIR]] [--local DIR | --no-local] [--out DIR] [--name NAME] [--no-tar] [--zip] [--tmp DIR] [--medium ID=PATH]...
+                 [--notes DIR] [--reproducible] [--no-annotate] [--list]
   --profile P     essentials (the default): only the files the themes need, from the resolver itself (see --themes);
                   museum: every file of every source (today's complete pack, for archaeology and for making essentials later)
   --themes A,B,C  the themes essentials is made for (default: the shipped ones, share/themes/*.theme without .todo). For each,
@@ -35,6 +36,11 @@ usage: lhde-pack [--profile essentials|museum] [--themes A,B,C] [--isos DIR]... 
   --name NAME     default lhde-resources-<date> (essentials: lhde-resources-<date>-essentials)
   --tmp DIR       scratch space for an extracted WIM (up to 1 GB at a time) and, for essentials from ISOs, the museum pack made
                   on the way (about 400 MB; default a temporary directory beside --out)
+  --notes DIR     the files of DIR copied into the pack's root as they are (a LICENSE note and the licence texts of a pack that
+                  gets published: make free-pack); lhde-import reads only the pack's sources and local/, so they stay in the pack
+  --reproducible  the same archive from the same files: no annotations (--no-annotate); the tarball's names sorted, owner root,
+                  every mtime $SOURCE_DATE_EPOCH (else 0), compressed single-threaded; the zip's entries dated $SOURCE_DATE_EPOCH
+                  (at least 1980), mode 644. A pack made again has the published one's sha256 (make free-pack)
   --no-annotate   write no file annotations (extended attributes user.lux.*, user.xdg.tags; docs/ANNOTATIONS.md). Without it the
                   files, the source directories and the pack carry author/build/source/desc/tags, and the tarball is made with
                   tar --xattrs so that lhde-import --pack restores them
@@ -81,6 +87,8 @@ def main():
         elif o == '--no-local': nolocal = True
         elif o == '--list': listing = True
         elif o == '--no-annotate': T.set_annotate(False)
+        elif o == '--notes': NOTES['dir'] = a.pop(0)
+        elif o == '--reproducible': T.set_annotate(False); L.REPRODUCIBLE['on'] = True
         elif o in ('-h', '--help'): print(__doc__); return 0
         else: L.die('unknown argument %s (--help)' % o)
     if profile not in ('essentials', 'museum'):
@@ -91,6 +99,8 @@ def main():
         L.die('--from-pack or --from-tree, not both')
     if local and not os.path.isdir(local):
         L.die('--local %s is no directory' % local)
+    if NOTES['dir'] and not os.path.isdir(NOTES['dir']):
+        L.die('--notes %s is no directory' % NOTES['dir'])
     explicit = bool(local)
     if not local and not nolocal:   # the Windows tree's local/ (the one --from-tree reads, else the user's)
         d = os.path.join(os.path.realpath(fromtree or T.windows_dir()), 'local')
@@ -173,6 +183,14 @@ def pack_media(sel, medium, isos, pack, tmp, tar, profile, themes, local):
 
 def finish(pack, lines, tar, profile, themes):
     """dedup, MANIFEST, the sizes, the tarball"""
+    if NOTES['dir']:   # the notes beside the sources (no MANIFEST lines: they are no Windows files and are not imported)
+        for r, ds, fs in os.walk(NOTES['dir']):
+            for f in fs:
+                q = os.path.join(r, f)
+                d = os.path.join(pack, os.path.relpath(q, NOTES['dir']))
+                os.makedirs(os.path.dirname(d), exist_ok=True)
+                shutil.copyfile(q, d)
+        L.log('notes: %s copied into %s' % (NOTES['dir'], pack))
     n, saved = L.dedup_pack(pack, lines)
     L.log('dedup: %d identical files linked, %.1f MB stored once' % (n, saved / 1e6))
     mf = os.path.join(pack, 'MANIFEST')
@@ -191,6 +209,7 @@ def finish(pack, lines, tar, profile, themes):
 
 
 ZIP = {'on': False}   # --zip
+NOTES = {'dir': None}   # --notes
 
 
 def from_museum(profile, themes, frompack, fromtree, local, explicit, sel, want, isos, medium, pack, tmp, tar):

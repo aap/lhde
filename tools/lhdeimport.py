@@ -645,6 +645,9 @@ def manifest_head(profile='museum', themes=None):
     return h
 
 
+REPRODUCIBLE = {'on': False}   # lhde-pack --reproducible
+
+
 def write_pack(pack, lines, tarball, head=None):
     with open(os.path.join(pack, 'MANIFEST'), 'a') as f:
         if f.tell() == 0:
@@ -652,12 +655,15 @@ def write_pack(pack, lines, tarball, head=None):
         for l in lines:
             f.write(l + '\n')
     if tarball:
+        rep = REPRODUCIBLE['on']   # lhde-pack --reproducible: the same bytes from the same files
+        same = ['--sort=name', '--owner=0', '--group=0', '--numeric-owner', '--format=gnu',
+                '--mtime=@%d' % int(os.environ.get('SOURCE_DATE_EPOCH') or 0)] if rep else []
         if shutil.which('zstd'):
             out = pack.rstrip('/') + '.tar.zst'
-            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), '-I', 'zstd -19 -T0', '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
+            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), *same, '-I', 'zstd -19 -T%d' % (1 if rep else 0), '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
         else:
             out = pack.rstrip('/') + '.tar.xz'
-            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), '-I', 'xz -9e -T0', '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
+            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), *same, '-I', 'xz -9e -T%d' % (1 if rep else 0), '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
         log('pack archive %s (%.1f MB)' % (out, os.path.getsize(out) / 1e6))
         return out
 
@@ -668,12 +674,22 @@ def write_zip(pack):
     import zipfile
     p = pack.rstrip('/')
     out = p + '.zip'
+    rep = REPRODUCIBLE['on']   # lhde-pack --reproducible: every entry dated $SOURCE_DATE_EPOCH (at least 1980), mode 644
+    when = datetime.datetime.fromtimestamp(max(int(os.environ.get('SOURCE_DATE_EPOCH') or 0), 315532800), datetime.timezone.utc).timetuple()[:6]
     with zipfile.ZipFile(out + '.part', 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for r, ds, fs in os.walk(p):
             ds.sort()
             for f in sorted(fs):
                 q = os.path.join(r, f)
-                z.write(q, os.path.join(os.path.basename(p), os.path.relpath(q, p)))
+                name = os.path.join(os.path.basename(p), os.path.relpath(q, p))
+                if rep:
+                    zi = zipfile.ZipInfo(name, date_time=when)
+                    zi.external_attr = 0o100644 << 16
+                    zi.compress_type = zipfile.ZIP_DEFLATED
+                    with open(q, 'rb') as fh:
+                        z.writestr(zi, fh.read(), compresslevel=9)
+                else:
+                    z.write(q, name)
     os.replace(out + '.part', out)
     log('pack archive %s (%.1f MB)' % (out, os.path.getsize(out) / 1e6))
     return out

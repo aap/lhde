@@ -70,9 +70,9 @@ target first deletes it through `lhde-import --clean`, which asks on the termina
 
 | make target | what it imports | what then resolves |
 | --- | --- | --- |
-| `install-resources-free` | the free source alone: ReactOS 0.4.16's boot CD (`LHDE_REACTOS_ISO=FILE`, an ISO or a pack of the reactos source; else the newest `~/lib/windows_isos/ReactOS-*.iso`; without one it names the download and stops) | `classic`, `lunar`, `modern`, `mizu`, `lautus` complete; every other theme as classic with ReactOS's icons, fonts and art (docs/THEME-FORMAT.md section 6) |
+| `install-resources-free` | the free source alone: ReactOS 0.4.16's files, from the free pack lhde publishes (downloaded into `~/.cache/lhde` and checked by its sha256; `FREE_PACK=FILE` names a copy), or from ReactOS's boot CD when there is one (`LHDE_REACTOS_ISO=FILE`, else the newest `~/lib/windows_isos/ReactOS-*.iso`); docs/BUILDING.md "The free resources" | `classic`, `lunar`, `modern`, `mizu`, `lautus` complete; every other theme as classic with ReactOS's icons, fonts and art (docs/THEME-FORMAT.md section 6) |
 | `install-resources-windows PACK=lhde_winthemes.zip` | the small Windows pack alone (an essentials pack, below) | the shipped Windows themes |
-| `install-resources-full PACK=lhde_wintheme_full.zip` | the ReactOS CD, then the whole Windows pack (a museum pack) | everything (the Windows files win where both have one) |
+| `install-resources-full PACK=lhde_wintheme_full.zip` | the free resources (as above), then the whole Windows pack (a museum pack) | everything (the Windows files win where both have one) |
 
 `lhde_winthemes.zip` and `lhde_wintheme_full.zip` are only default names for packs lhde does not supply: `lhde-pack --zip`
 writes `NAME.zip` beside the tarball; the tarball or the pack directory works the same.
@@ -130,7 +130,10 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    free faces); four visual styles (`styles/lunar`, `modern`, `mizu`, `lautus`); its wallpapers. The CD carries the live
    system as a plain `reactos/` directory (layout `live`), read with 7z like a WIM's Windows directory; `explorer.exe` 0.4.x
    tells it apart. `lhde-import --iso ReactOS-0.4.16-i386.iso` (or `--dir` on an installed or extracted ReactOS) imports it
-   into `lhde-windows/reactos/` (about 31 MB). Not taken: ReactOS's classic schemes (its hive has Vista's `New Schemes`
+   into `lhde-windows/reactos/` (about 31 MB). Nobody needs the ISO for it: these files are free, and lhde publishes them as
+   the free pack `lhde-resources-reactos-0.4.16.zip` (11 MB, with ReactOS's licence texts and a LICENSE note; `make
+   free-pack` builds it from the CD, reproducibly), which `make install-resources-free` downloads and imports
+   (`lhde-import --pack` on it gives the same tree as `--iso` on the CD). Not taken: ReactOS's classic schemes (its hive has Vista's `New Schemes`
    form, which lhde-schemes does not read: the built-in Windows Standard stands in), its cursors (user32 resources; lhde
    uses X cursors), and Blackshade, which ReactOS's source tree has only as the unbuilt sources of a style
    (`media/themes/Blackshade`, a placeholder its build skips): there is no blackshade.msstyles to import.
