@@ -382,7 +382,7 @@ Default keys, override in `~/.config/lhde/keys` (one binding per line; docs/LUXW
 | Super+e | flxp Explorer (ROX-Filer when flxp is not installed) |
 | Super+d | show desktop, as Windows' Win+D: minimises the visible windows (they stay minimised); Super+d again brings exactly those back, but only if nothing changed in between (no window restored, activated, opened or closed); otherwise it is a new "show desktop" |
 | Super+r | Run box (luxshell's own, via `_LHSHELL_COMMAND run`; or `Mod4+r exec rofi -show run` in your keys file) |
-| Print, Alt+Print, Shift+Print | a screenshot of the screen, of the active window with its frame, of a rectangle dragged with the mouse (luxshot, "Screenshots" below; `_LHSHELL_COMMAND screenshot`, `screenshot_window`, `screenshot_region`, settings.ini `[commands]` of those names to run something else) |
+| Super+Shift+S, Super+Shift+F, Super+Shift+W | a screenshot of a rectangle dragged with the mouse (Windows 10's snip key), of the full screen, of the active window with its frame (luxshot, "Screenshots" below; `_LHSHELL_COMMAND screenshot_region`, `screenshot`, `screenshot_window`, settings.ini `[commands]` of those names to run something else). Print is not bound, it may be your compose key: `Print shell screenshot` in the keys file binds it (`Mod1+Print shell screenshot_window`, `Shift+Print shell screenshot_region` likewise) |
 | Super+s | sidebar under the windows (part of the desktop) ⇄ on top of them, at once (`_LHSHELL_COMMAND sidebar-stacking toggle`; saved as `[sidebar] stacking`) |
 | Super+q or Alt+F4 | close window |
 | Alt+Space | the window menu (Restore, Move, Size, Minimize, Maximize, Close; arrows, mnemonics, Enter, Esc); also a right click on the caption or a click on the caption icon (double click there: close) |
@@ -606,9 +606,10 @@ archive and sync tools by default, or git.
 
 ## Screenshots (luxshot)
 
-Print takes the whole screen, Alt+Print the active window with its frame (luxwm's frame, from the window's
-`_NET_FRAME_EXTENTS`), Shift+Print a rectangle: the screen freezes, the pointer becomes a crosshair, drag the rectangle (Escape
-or the right button cancel). A window comes up at once with the picture scaled to fit and its size, and:
+Super+Shift+F takes the whole screen, Super+Shift+W the active window with its frame (luxwm's frame, from the window's
+`_NET_FRAME_EXTENTS`), Super+Shift+S a rectangle (Windows 10's snip key): the screen freezes, the pointer becomes a
+crosshair, drag the rectangle (Escape or the right button cancel). Print is left free (it may be your compose key); the keys
+file can bind it ("Keys in the session" above). A window comes up at once with the picture scaled to fit and its size, and:
 
 - **File name** `Screenshot YYYY-MM-DD HHMMSS.png` (" (2)" when that second has one already) and **Save in** your pictures
   folder (`XDG_PICTURES_DIR`, from `~/.config/user-dirs.dirs`, else `~/Pictures`; made when missing); **Browse...** is the Save As
