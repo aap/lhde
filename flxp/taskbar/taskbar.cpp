@@ -751,11 +751,11 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         open_themes();
         band::theme_changed();
         layout();
-        update_menu_provider();     // start_menu may be set per theme (flxp_start_menu)
+        update_menu_provider();     // claims _LH_STARTMENU_S if we do not hold it yet
         InvalidateRect(h, nullptr, TRUE);
         return 0;
     case WM_FLXP_ROOTPROPERTY:
-        if ((UINT)wp == w_settings) update_menu_provider();   // start_menu is per theme (Display Properties)
+        if ((UINT)wp == w_settings) update_menu_provider();   // claims _LH_STARTMENU_S if we do not hold it yet
         if ((UINT)wp == w_clock_visible) {
             bool was = clock_hidden;
             read_clock_visible();

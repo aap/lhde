@@ -42,7 +42,7 @@ extern Bar g;
 
 std::u16string W(const std::string& s);
 std::string U(const WCHAR* s);
-std::string setting(const char* key, const char* fallback = "");   // flxp.ini / FLXP_<KEY> / the theme's flxp_<key>
+std::string setting(const char* key, const char* fallback = "");   // shell::theme_setting: FLXP_<KEY>, the theme, flxp.ini
 
 // The pixels under a child: the bar background (WM_ERASEBKGND of the bar)
 void paint_bar_background(HDC hdc, const RECT& client);

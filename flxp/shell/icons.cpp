@@ -51,7 +51,7 @@ static std::string expand(const std::string& v)
             if (var.rfind("FLXP_", 0) == 0) {   // flxp settings: $FLXP_LONGHORN_SYSTEM32 is longhorn_system32=
                 std::string key = var.substr(5);
                 for (char& c : key) if (c >= 'A' && c <= 'Z') c += 32;
-                out += theme_setting(key);   // or the session theme's flxp_<key>
+                out += theme_setting(key);   // or what the session theme decides for it
             } else {
                 const char* e = getenv(var.c_str());
                 out += e ? e : "";
