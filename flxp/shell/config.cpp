@@ -122,7 +122,7 @@ bool write_setting(const std::string& key, const std::string& value)
 {
     std::string path = settings_path(), text;
     if (!read_file(path, text)) text = "[flxp]\n";
-    std::string line_out = key + " = " + value;
+    std::string line_out = value.empty() ? key + " =" : key + " = " + value;   // "key =": automatic, as the template writes it
     size_t i = 0;
     while (i < text.size()) {
         size_t j = text.find('\n', i);
