@@ -17,7 +17,7 @@ return function(ctx)
   -- read from the pack per toast (T is swapped in place on a theme switch, SHELL-DESIGN 6.1)
   local glass, hfont, bfont
   local function pack_style()
-    glass = T.name ~= "slate"                                         -- IsAeroRunning → ToastBackground opacity 0
+    glass = T.family ~= "slate"                                       -- IsAeroRunning → ToastBackground opacity 0
     hfont = T.toast_header_font or "ITC Franklin Gothic Std Medium 15px"   -- Franklin Gothic Medium 15 (ITC Std Medium is installed here)
     bfont = T.toast_body_font or "ITC Franklin Gothic Std Medium 12px"
   end

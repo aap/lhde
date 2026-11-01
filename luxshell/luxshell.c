@@ -793,8 +793,8 @@ static void handle_event(XEvent *e) {
         if (p->atom == atom[A_NET_WM_NAME] || p->atom == XA_WM_NAME) client_update_title(c); else if (p->atom == atom[A_NET_WM_ICON] || p->atom == XA_WM_HINTS) client_update_icon(c); else if (p->atom == atom[A_NET_WM_STATE] || p->atom == atom[A_WM_STATE] || p->atom == atom[A_NET_WM_DESKTOP]) client_update_state(c); else return;
         lua_pushinteger(L, (lua_Integer)c->w); emit("window", 1); return;
     }
-    /* _LHSHELL_START on the root: luxwm's Super key (l[0] = timestamp, no rect) or a classic Start button (flxp-taskbar with
-       start_menu = luxshell: l[0] = flags, l[1..4] = the button's rect); the Lua side decides (the start-menu provider protocol) */
+    /* _LHSHELL_START on the root: luxwm's Super key (l[0] = timestamp, no rect; a sender with an anchor gives l[0] = flags,
+       l[1..4] = its rect); the Lua side forwards it to the start-menu provider's owner window (runtime.lua forward_start) */
     if (e->type == ClientMessage && e->xclient.window == root) {
         if (e->xclient.message_type == atom[A_LHSHELL_START]) { for (int i = 0; i < 5; i++) lua_pushinteger(L, e->xclient.data.l[i]); emit("start-key", 5); }
         /* SETTINGS.md: a writer saved settings.ini (l[0] = serial, l[1] = 0 or a section hint atom); ours come back too */

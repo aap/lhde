@@ -201,7 +201,7 @@ width, as their content margins give it on XP).
 
 ## 7. Runtime
 `_LH_THEME` = the theme name. Whoever changes it writes `settings.ini [theme] name` first, then the
-property, then `_LH_SETTINGS_CHANGED`. `_FLXP_WALLPAPER` is retired: picking a picture is an Apply into the
+property, then `_LH_SETTINGS_CHANGED`. Picking a picture is an Apply into the
 current layer (section 3), and flxp-desktop reads the resolved record like everyone else. A change of the current layer is a
 settings.ini write: `_LH_SETTINGS_CHANGED`, and every client resolves the session theme again (its record now has the layer).
 

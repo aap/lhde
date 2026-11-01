@@ -110,14 +110,12 @@ function S.resolve(name)
   e.display = e.modified and (e.title .. " (Modified)") or e.title
   return e
 end
--- a pack: a directory, or a name looked up in the data directories (packs/NAME with its shell.lua); the short names
--- (LHSHELL_THEME=slate) are aliases
-S.pack_aliases = { aero = "4074-aero", slate = "4074-slate", slate4051 = "4051-slate", aero5112 = "5112-aero", aerovision = "4074-aerovision" }
+-- a pack: a directory, or a name looked up in the data directories (packs/NAME with its shell.lua, LHSHELL_THEME=4074-slate)
 function S.pack_dir(v)
   if not v or v == "" then return v end
   if v:sub(1, 1) == "/" or v:sub(1, 2) == "~/" then return lh.data_resolve(v) end
   local n = v:match("^packs/([^/]+)/*$") or v
-  if not n:find("/", 1, true) then n = S.pack_aliases[n] or n; return lh.data_resolve_dir("packs/" .. n, "shell.lua") end
+  if not n:find("/", 1, true) then return lh.data_resolve_dir("packs/" .. n, "shell.lua") end
   return lh.data_resolve_dir(v, "shell.lua")
 end
 -- the theme keys the flyout and runtime.lua use, by their old names

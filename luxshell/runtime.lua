@@ -89,12 +89,7 @@ local function publish_resolved(e)
   local cur = lh.root_prop("_LH_THEME_RESOLVED")
   local body = type(cur) == "string" and cur:gsub("serial=[^\n]*\n", "", 1) or nil
   if body ~= mine then lh.set_root_prop("_LH_THEME_RESOLVED", "theme=" .. e.name .. "\nserial=" .. serial .. "\n" .. (e.record or "")) end
-  local v = effective(e)
-  -- bridge for the unchanged flxp-desktop (SETTINGS.md "Resolved theme"; retired once it reads the record): its root property
-  -- _FLXP_WALLPAPER ("MODE PATH", or none) beats its other sources and it watches it
-  local fw = v.wallpaper == "none" and "none" or v.wallpaper ~= "" and (v.mode .. " " .. v.wallpaper) or nil
-  if fw and lh.root_prop("_FLXP_WALLPAPER") ~= fw then lh.set_root_prop("_FLXP_WALLPAPER", fw) end
-  if (os.getenv("LHSHELL_DEBUG") or "") ~= "" then io.stderr:write(string.format("luxshell: wallpaper %s (%s) from %s\n", v.wallpaper, v.mode, v.wallpaper_src or "?")) end
+  if (os.getenv("LHSHELL_DEBUG") or "") ~= "" then local v = effective(e); io.stderr:write(string.format("luxshell: wallpaper %s (%s) from %s\n", v.wallpaper, v.mode, v.wallpaper_src or "?")) end
 end
 -- our own writes of _LH_THEME come back as PropertyNotify: counted here so the handler below ignores exactly those
 local theme_echo = {}
@@ -136,23 +131,11 @@ apply_fonts(theme_entry)
 --   stacking = top|bottom (top: 4074, the sidebar is above the windows (_NET_WM_STATE_ABOVE) with its strut, runs full height and
 --   the taskbar yields to it; bottom: part of the desktop, under the windows (_NET_WM_STATE_BELOW) with no strut, the taskbar runs
 --   the full width over it and the sidebar ends at its top; Win+S = _LHSHELL_COMMAND "sidebar-stacking toggle" flips it at once).
---   A [sidebar] layer key is folded into it (layer = below = stacking = bottom) and removed from settings.ini
 --   [clock] pinned = 1|0 with pinned_pack = the pack it was chosen in (other packs use their own default, T.clock_pinned), layout
---   [theme] composition = follow|on|off   [desktop] wallpaper = (empty: the theme's) | none (solid #3a6ea5) | PATH, mode = fill|fit|
---   center|tile|stretch, desktop_black = 0|1 (0 = maximised mode only switches the bars' black layers; 1 = also the
+--   [desktop] wallpaper = none (the picture off in every theme; else the theme's), desktop_black = 0|1 (0 = maximised mode only switches the bars' black layers; 1 = also the
 --   full-screen black of the desktop layer)   [shell] max_fade_ms = 0 (the black layers switch at once) or the fade in ms
 --   (LHSHELL_WALLPAPER=0 forces the wallpaper off). Runtime state (the tile order) stays in state.ini.
--- [sidebar] layer = above|below (the sidebar over or under the windows), an earlier key: layer = below means stacking = bottom;
--- the key is dropped (here, and again when another writer brings it back)
-local function fold_sidebar_layer()
-  if not S.has("sidebar", "layer") then return end
-  if S.get("sidebar", "layer") == "below" then S.set("sidebar", "stacking", "bottom") end
-  S.unset("sidebar", "layer")
-  io.stderr:write("luxshell: settings: [sidebar] layer folded into [sidebar] stacking = " .. tostring(S.get("sidebar", "stacking")) .. "\n")
-end
-fold_sidebar_layer()
-for _, d in ipairs{ { "theme", "composition", "follow" }, { "desktop", "mode", "fill" }, { "desktop", "desktop_black", "0" },
-                    { "taskbar", "kind", "avalon" }, { "taskbar", "autohide", "0" }, { "taskbar", "rows", "1" },
+for _, d in ipairs{ { "desktop", "desktop_black", "0" }, { "taskbar", "autohide", "0" }, { "taskbar", "rows", "1" },
                     { "sidebar", "width", "150" }, { "sidebar", "with_classic", "0" }, { "sidebar", "stacking", "top" },
                     { "clock", "layout", "default" }, { "shell", "max_fade_ms", "0" } } do
   if not S.has(d[1], d[2]) then S.set(d[1], d[2], d[3]) end
@@ -174,12 +157,10 @@ local cfg = {
   max_fade_ms = math.max(0, math.floor(tonumber(S.get("shell", "max_fade_ms") or "") or 0)),
 }
 -- [taskbar] kind: avalon = luxshell's taskbar; classic = no taskbar surface, struts or _NET_WM_ICON_GEOMETRY of ours, the
--- classic flxp-taskbar runs instead (started and stopped by us); none = neither. 1/0 (an earlier spelling) mean avalon/none.
+-- classic flxp-taskbar runs instead (started and stopped by us); none = neither.
 local function taskbar_kind(v)
   v = (v or ""):lower()
   if v == "classic" or v == "none" or v == "avalon" then return v end
-  if v == "0" or v == "off" or v == "no" or v == "false" then return "none" end
-  if v == "1" or v == "on" or v == "yes" or v == "true" then return "avalon" end
   return nil
 end
 -- taskbar kind, start menu and the compositor switch are per theme (SETTINGS.md "Per-theme settings" / "Per-theme overrides"):
@@ -208,7 +189,7 @@ lh.sidebar_hidden = sb_hidden
 if cfg.sidebar_w then cfg.sidebar_w = clamp(math.floor(cfg.sidebar_w), SB_MIN, SB_MAX) end
 -- [clock] pinned: the user's choice (the clock's menu) holds for the pack it was made in ([clock] pinned_pack); any other pack
 -- (and a state.ini from before pinned_pack existed) uses the pack's default T.clock_pinned (nil = pinned, the 4074 look)
-local function pack_key() return T.clock_pack or (pack_dir or ""):match("([^/]+)/*$") or "" end   -- T.clock_pack: a pack that shares another's choice (aerovision: aero)
+local function pack_key() return T.clock_pack or (pack_dir or ""):match("([^/]+)/*$") or "" end   -- T.clock_pack: a pack that shares another's choice (4074-aerovision: 4074-aero)
 local function clock_pinned()
   local v, at = S.get("clock", "pinned"), S.get("clock", "pinned_pack")
   if (v == "0" or v == "1") and at == pack_key() then return v == "1" end
@@ -710,7 +691,7 @@ end)
 lua("settings.lua")(ctx)            -- settings flyout ("Control Panel"), run / search box
 
 ------------------------------------------------------------------ tiles
-local tiles_dir = os.getenv("LHSHELL_TILES") or (lh.lua_dir .. "/tiles")
+local tiles_dir = lh.lua_dir .. "/tiles"
 local function load_tile(name)
   local ok, def = pcall(dofile, tiles_dir .. "/" .. name .. ".lua")
   if ok and type(def) == "table" then def.R = R; def.T = T; def.sb = sb; return def end
@@ -1609,7 +1590,6 @@ local function reload_settings()
   if m ~= mode then set_mode(m) end
   local w = tonumber(S.get("sidebar", "width") or "")
   if w and clamp(math.floor(w), SB_MIN, SB_MAX) ~= sb.w then lh.sidebar_set_width(w) end
-  fold_sidebar_layer()                                   -- a writer's [sidebar] layer = below means stacking = bottom
   local lay = S.get("sidebar", "stacking") == "bottom" and "bottom" or "top"
   if lay ~= lh.shell_get("sidebar_stacking") then lh.set_sidebar_stacking(lay) end
   local wc = S.get("sidebar", "with_classic") == "1"

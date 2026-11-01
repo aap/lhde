@@ -2,7 +2,7 @@
 -- Selected by the session theme: a theme's `[Shell] pack = 4074-slate`, SHELL-DESIGN 6.1;
 -- slate4051 has its own pack (packs/4051-slate: this table with the 4051 differences).
 return {
-  name = "slate", font = "Tahoma 8",
+  name = "4074-slate", family = "slate", font = "Tahoma 8",   -- family slate: Slate's opaque flyouts, toasts and borders
   -- the task buttons' icon for a window without _NET_WM_ICON or WM_HINTS icon: Explorer falls back to the application icon
   -- (IDI_APPLICATION, shell32 #3: packs/4074/shell32, lhde-import / shellpack.sh); luxwm's DWM captions use CompositedWindow DEFAULTICON instead
   default_icon = "4074/shell32/16/3.png",

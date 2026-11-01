@@ -44,7 +44,7 @@ return function(ctx)
   local function chrome()
     if T.flyout then return plex_chrome(T.flyout) end
     chrome_h = 17
-    local slate = T.name == "slate"
+    local slate = T.family == "slate"
     border = slate and {4, 0, 4, 4} or {8, 4, 8, 8}
     local root = lh.node{ layout = "fill", hoverable = true }
     -- grid order of our nine-grid nodes is top,right,bottom,left (HackNineGrid is left,top,right,bottom)

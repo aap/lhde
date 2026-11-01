@@ -89,7 +89,7 @@ end
 ------------------------------------------------------------------ launching and the MFU list (~/.local/state/lhde/luxshell-mfu.ini)
 -- one line per entry: "<id> = <count> <last launch, epoch s>". XP keeps a decaying usage count per shortcut (proglist.cpp
 -- UEM data); here the list is ordered by count, ties by the most recent launch.
-local mfu_path = os.getenv("LHSHELL_MFU") or lh.state_file("luxshell-mfu.ini")   -- LHSHELL_MFU: another file (tests)
+local mfu_path = lh.state_file("luxshell-mfu.ini")
 A.mfu_path = mfu_path
 local function mfu_read()
   local t = {}; local f = io.open(mfu_path, "r"); if not f then return t end

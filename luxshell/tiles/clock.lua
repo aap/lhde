@@ -512,7 +512,7 @@ end
 
 function tile:flyout()
   local me, R = self, self.R
-  local slate = self.T.name == "slate"
+  local slate = self.T.family == "slate"
   local H = slate and FLY.h or FLY.h_aero
   local root = N{ layout = "canvas", w = FLY.w, h = H }
   -- TimePanel: the 260 PolarCanvas with the AnalogClock at its full 260 (lh4074-181714.png: the face's grey 646..898 x 548..800,

@@ -5,7 +5,7 @@
 -- replaces_id updates an entry in place. An entry is *viewed* (4074 _fViewed: the grey bubble 4013 instead of the yellow 4014)
 -- once the user dismissed or clicked its toast, re-showed it from the history, or saw it in the history flyout; a toast that just
 -- timed out stays unviewed.
--- Kept in ~/.local/state/lhde/luxshell-notifications (LHSHELL_NOTIFICATIONS overrides the path), newest last, at most 100
+-- Kept in ~/.local/state/lhde/luxshell-notifications, newest last, at most 100
 -- entries: one line per entry, tab-separated: time (epoch s), viewed (0/1), app name, app icon (name or path), summary, body;
 -- backslash, tab and newline escaped as \\ \t \n.
 --   lh.notifylog.list()            entries oldest first: { key, id (this session's server id or nil), t, viewed, app, icon, summary, body }
@@ -15,7 +15,7 @@
 -- Every change emits "notifylog".
 return function(ctx)
   local MAX = 100
-  local path = os.getenv("LHSHELL_NOTIFICATIONS") or lh.state_file("luxshell-notifications")
+  local path = lh.state_file("luxshell-notifications")
   local L = { path = path }
   local entries, serial = {}, 0
   local function esc(s) return (tostring(s or ""):gsub("\\", "\\\\"):gsub("\t", "\\t"):gsub("\n", "\\n"):gsub("\r", "")) end
