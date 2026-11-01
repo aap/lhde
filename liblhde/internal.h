@@ -11,7 +11,6 @@ long long lhde__mtime(const char *p);                        /* ns, -1 when miss
 const char *lhde__config_home(char *out, size_t n);          /* ${XDG_CONFIG_HOME:-~/.config} */
 /* the first 4-digit run of s ("slate4051" -> "4051") into out; "" when none */
 const char *lhde__build_of(const char *s, char *out, size_t n);
-const char *lhde__src_name(int src);                         /* file base settings default fallback derived */
 /* the current layer (lhde/theme.h): key/value pairs, kv[2i] = "Section.key", kv[2i+1] = value */
 struct lhde__layer { char **kv; int n, cap; };
 void lhde__layer_add(struct lhde__layer *l, const char *k, const char *v);

@@ -72,8 +72,8 @@ void lhde_settings_reload(void);
        [theme] animations go (per theme now), [desktop] icons / mode too when nothing else uses them
      - each preset themes/NAME.theme becomes lhde/themes/NAME.theme in the new format (base mapped, [VisualStyle] msstyles ->
        style, [Composition] -> [Glass], [Frames] frame -> frames, [Shell] shell -> pack, [Desktop] icons longhorn -> longhorn4074)
-     - lhshell/state.ini: the user-facing keys its own migration left there (before 2026-10-25) move into settings.ini
-       (lux's old rules), the runtime state (tile order) stays
+     - lhshell/state.ini: the user-facing keys an earlier luxshell kept there move into settings.ini, the runtime state
+       (tile order) stays
      - then longhorn/settings.ini is kept as settings.ini.pre-lhde
    That part runs once: nothing happens when lhde/settings.ini exists (force = 1: again, keeping what lhde/ has).
    Every time, lhde/settings.ini's own legacy sections are converted the same way ([override:NAME], [override]; nothing

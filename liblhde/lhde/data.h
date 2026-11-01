@@ -62,7 +62,7 @@ long long lhde_du(const char *dir, long long *files);
 /* the first data directory that has REL (a file or a directory; also REL's cache/ form) -> out (dir/REL); NULL (out = the
    user dir's dir/REL) when none */
 const char *lhde_data_find(const char *rel, char *out, size_t n);
-/* a value of a theme or registry file: absolute stays, ~/... is the home, anything else is looked up with lhde_data_find
+/* a value of a theme file: absolute stays, ~/... is the home, anything else is looked up with lhde_data_find
    (not found: the user dir's path, so error messages show where it was expected) */
 const char *lhde_data_resolve(const char *v, char *out, size_t n);
 /* a directory named by a value (frames/jade4074, packs/4074-aero): the first data directory whose copy has MARKER (theme.ini,

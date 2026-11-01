@@ -18,12 +18,12 @@ static int ndirs = -1;
 static int is_dir(const char *p) { struct stat st; return p && p[0] && stat(p, &st) == 0 && S_ISDIR(st.st_mode); }
 static int exists(const char *p) { struct stat st; return p && p[0] && stat(p, &st) == 0; }
 
-/* a source tree: data/themes/ (step 4) or data/themes.ini (before), and luxwm/wm.c */
+/* a source tree: data/themes/ and luxwm/wm.c */
 static int is_tree(const char *p)
 {
-    char t[PATH_MAX + 32], u[PATH_MAX + 32], w[PATH_MAX + 32];
-    snprintf(t, sizeof t, "%s/data/themes", p); snprintf(u, sizeof u, "%s/data/themes.ini", p); snprintf(w, sizeof w, "%s/luxwm/wm.c", p);
-    return (is_dir(t) || exists(u)) && exists(w);
+    char t[PATH_MAX + 32], w[PATH_MAX + 32];
+    snprintf(t, sizeof t, "%s/data/themes", p); snprintf(w, sizeof w, "%s/luxwm/wm.c", p);
+    return is_dir(t) && exists(w);
 }
 
 static void find_exe_and_tree(void)

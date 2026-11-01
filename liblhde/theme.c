@@ -289,8 +289,6 @@ static int wallpaper_find(const char *v, char *out, size_t n)
 }
 
 /* ---------------------------------------------------------------- resolution */
-static const char *src_name[] = { "file", "base", "settings", "default", "fallback", "derived", "current", "scheme" };
-
 /* the theme files' keys into t (absent ones only): depth 0 = the theme's own file */
 struct take_ctx { lhde_theme *t; int depth; const char *who, *path, *sec; const lhde_ini *ini; };
 static void take_key(const char *k, const char *v, void *ud)
@@ -855,4 +853,3 @@ int lhde_theme_set_key(const char *name, const char *key, const char *value, cha
     return r ? -1 : 1;
 }
 
-const char *lhde__src_name(int s) { return s >= 0 && s <= 7 ? src_name[s] : "?"; }

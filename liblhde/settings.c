@@ -114,7 +114,7 @@ static void say(struct rep *r, const char *fmt, ...)
     if (r->buf && r->n) { size_t l = strlen(line); if (r->len + l + 2 < r->n) { memcpy(r->buf + r->len, line, l); r->len += l; r->buf[r->len++] = '\n'; r->buf[r->len] = 0; } }
 }
 
-/* an old theme name (registry section, alias, preset) -> the theme it is now; out = name when unknown */
+/* an old theme name (x11-era theme, alias, preset) -> the theme it is now; out = name when unknown */
 static void new_name(const char *old, char *out, size_t n)
 {
     char canon[256], file[PATH_MAX];
@@ -407,7 +407,7 @@ static int migrate_settings(int force, struct rep *r)
         say(r, "  [%s] %s = %s removed: %s", gone[i][0], gone[i][1], v, gone[i][2]);
     }
     if (lhde_ini_get(dst, "desktop", "wallpaper", v, sizeof v) && !v[0]) { lhde_ini_set(dst, "desktop", "wallpaper", NULL); say(r, "  [desktop] wallpaper (empty) removed: the theme's"); }
-    /* 5. state.ini: user-facing keys left there by a lux from before the settings store */
+    /* 5. state.ini: user-facing keys left there by a luxshell from before the settings store */
     if (lhde__exists(state)) {
         lhde_ini *st = lhde_ini_load(state);
         struct stctx c; memset(&c, 0, sizeof c); c.st = st; c.dst = dst; c.r = r;
