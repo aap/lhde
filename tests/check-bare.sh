@@ -8,7 +8,7 @@ B=$(mktemp -d "${TMPDIR:-/tmp}/lhde-check-bare.XXXXXX") || exit 1
 trap 'rm -rf "$B"' EXIT
 mkdir -p "$B/windows" "$B/home/.config" "$B/home/.local/share" "$B/home/.local/state" "$B/home/.cache" "$B/runtime"
 chmod 700 "$B/runtime"
-unset LHDE_DATA LHDE_STYLES LHDE_REACTOS_ISO FREE_PACK FREE_PACK_CACHE LUXWM_BASELINE FRAMETEST_FONTS XDG_DATA_DIRS XDG_CONFIG_DIRS
+unset LHDE_DATA LHDE_STYLES LHDE_REACTOS_ISO FREE_PACK FREE_PACK_CACHE FREE_WALLPAPERS LUXWM_BASELINE FRAMETEST_FONTS XDG_DATA_DIRS XDG_CONFIG_DIRS
 export LHDE_WINDOWS="$B/windows" HOME="$B/home" XDG_CONFIG_HOME="$B/home/.config" XDG_DATA_HOME="$B/home/.local/share" \
        XDG_STATE_HOME="$B/home/.local/state" XDG_CACHE_HOME="$B/home/.cache" XDG_RUNTIME_DIR="$B/runtime"
 make --no-print-directory check > "$B/check.log" 2>&1

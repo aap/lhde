@@ -70,7 +70,7 @@ target first deletes it through `lhde-import --clean`, which asks on the termina
 
 | make target | what it imports | what then resolves |
 | --- | --- | --- |
-| `install-resources-free` | the free source alone: ReactOS 0.4.16's files, from the free pack lhde publishes (downloaded into `~/.cache/lhde` and checked by its sha256; `FREE_PACK=FILE` names a copy), or from ReactOS's boot CD when there is one (`LHDE_REACTOS_ISO=FILE`, else the newest `~/lib/windows_isos/ReactOS-*.iso`); docs/BUILDING.md "The free resources" | `classic`, `lunar`, `modern`, `mizu`, `lautus` complete; every other theme as classic with ReactOS's icons, fonts and art (docs/THEME-FORMAT.md section 6) |
+| `install-resources-free` | the free sources alone: ReactOS 0.4.16's files and the free themes' photos, from the free pack lhde publishes (downloaded into `~/.cache/lhde` and checked by its sha256; `FREE_PACK=FILE` names a copy), or from ReactOS's boot CD when there is one (`LHDE_REACTOS_ISO=FILE`, else the newest `~/lib/windows_isos/ReactOS-*.iso`; the photos then from `FREE_WALLPAPERS=DIR`); docs/BUILDING.md "The free resources" | `classic`, `lunar`, `modern`, `mizu`, `lautus` complete; every other theme as classic with ReactOS's icons, fonts and art (docs/THEME-FORMAT.md section 6) |
 | `install-resources-windows PACK=lhde_winthemes.zip` | the small Windows pack alone (an essentials pack, below) | the shipped Windows themes |
 | `install-resources-full PACK=lhde_wintheme_full.zip` | the free resources (as above), then the whole Windows pack (a museum pack) | everything (the Windows files win where both have one) |
 
@@ -122,18 +122,25 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    first path, the MANIFEST (one line per path) is the authority, and lhde-import annotates each imported file by its own
    path. Sources: 4015 (pre-release WIM 1.8.1), 4042 (Lab06), 4042main, 4051, 4053, 4066 (I386 layout, `*.XX_` expanded), 4074,
    4074r2 (not default), 4093, 5048, 5112, xp (Windows Server 2003 R2 x64 CD1: XP's Luna with its three schemes' shellstyle.dll,
-   shell32, explorer, fonts, wallpapers), 2k (Windows 2000) and reactos (not default; below). Adding a file or a build is
-   editing or adding an ini.
+   shell32, explorer, fonts, wallpapers), 2k (Windows 2000), reactos and free (neither default; below). Adding a file or a
+   build is editing or adding an ini.
    **reactos** is the free source (ReactOS 0.4.16's boot CD, `ReactOS-0.4.16-i386.iso`, GPL/LGPL): its shell32, browseui,
    comctl32, themeui and explorer.exe keep Windows' resource ids, so the xp and 2k icon recipes and flxp's art by id have a
    free stand-in; its fonts (Tahoma, Microsoft Sans Serif, Marlett, Trebuchet MS, Verdana, ... under the Windows file names,
-   free faces); four visual styles (`styles/lunar`, `modern`, `mizu`, `lautus`); its wallpapers. The CD carries the live
+   free faces); four visual styles (`styles/lunar`, `modern`, `mizu`, `lautus`). The CD carries the live
    system as a plain `reactos/` directory (layout `live`), read with 7z like a WIM's Windows directory; `explorer.exe` 0.4.x
    tells it apart. `lhde-import --iso ReactOS-0.4.16-i386.iso` (or `--dir` on an installed or extracted ReactOS) imports it
-   into `lhde-windows/reactos/` (about 31 MB). Nobody needs the ISO for it: these files are free, and lhde publishes them as
-   the free pack `lhde-resources-reactos-0.4.16.zip` (11 MB, with ReactOS's licence texts and a LICENSE note; `make
-   free-pack` builds it from the CD, reproducibly), which `make install-resources-free` downloads and imports
-   (`lhde-import --pack` on it gives the same tree as `--iso` on the CD). Not taken: ReactOS's classic schemes (its hive has Vista's `New Schemes`
+   into `lhde-windows/reactos/` (about 31 MB). **free** is no Windows build: the wallpapers of the four ReactOS themes, photos
+   from Pexels under the Pexels licence (free to use, pexels.com/license), chosen by aap, with a `LICENSE.txt` naming each
+   photographer and page (share/sources/free-wallpapers-LICENSE.txt, an in-image path `share:FILE` being lhde's own file
+   beside the ini); its medium is a directory holding the downloads (layout `tree`: `lhde-pack --medium free=DIR`,
+   `lhde-import --dir DIR --source free`), of which only the four files the ini names are taken, into
+   `lhde-windows/free/wallpapers/`. Nobody needs the ISO or the photos: these files are free, and lhde publishes both
+   sources as the free pack `lhde-resources-free-1.zip` (10 MB, with ReactOS's licence texts and a LICENSE note; `make
+   free-pack` builds it from the CD and the photos, reproducibly), which `make install-resources-free` downloads and imports
+   (`lhde-import --pack` on it gives the same tree as `--iso` on the CD and `--dir` on the photos). Not taken: ReactOS's
+   wallpapers (three of them are CC BY-NC; a tree imported from an earlier pack or the CD keeps its `reactos/wallpapers/`,
+   as an import deletes nothing), its classic schemes (its hive has Vista's `New Schemes`
    form, which lhde-schemes does not read: the built-in Windows Standard stands in), its cursors (user32 resources; lhde
    uses X cursors), and Blackshade, which ReactOS's source tree has only as the unbuilt sources of a style
    (`media/themes/Blackshade`, a placeholder its build skips): there is no blackshade.msstyles to import.
@@ -319,7 +326,9 @@ in the Windows tree is also a bare theme (an XP style imported with `lhde-import
 `wallpapers/GROUP/NAME` resolved through the Windows tree (`index/wallpapers/<source>`, `local/wallpapers/`): the 4074 themes
 get 4074's Bliss (the green leaves), slate4051 4051's (the wheat field), plex4042 4042 main's, aero4074 and aerovision a demo
 image of the workspace (`lhde-import --from-workspace`; without it the build's Bliss), basic/aero5048 5048's glass facade,
-basic/aero5112 5112's grass blades, luna XP's Bliss, luna-olive and luna-silver XP stock pictures, the ReactOS themes ReactOS's.
+basic/aero5112 5112's grass blades, luna XP's Bliss, luna-olive and luna-silver XP stock pictures, the ReactOS themes Pexels photos
+chosen by aap (the free source: `free/timmossholder-9398211` and three more; filled, cropped to the screen rather than
+stretched as XP's Stretch would).
 Your own choice wins: Display Properties' Desktop tab and Set as Desktop Background write it into the current layer
 (`settings.ini [current]`), your own theme file's `[Desktop] wallpaper`, or `settings.ini [desktop] wallpaper = none` for no
 picture in any theme (docs/THEME-FORMAT.md section 3).

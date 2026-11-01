@@ -1,4 +1,4 @@
-lhde-resources-reactos-0.4.16: ReactOS 0.4.16's files for lhde, the Longhorn desktop environment
+lhde-resources-free-1: the free files of lhde, the Longhorn desktop environment: ReactOS 0.4.16's and four wallpapers
 
 WHAT THIS IS
 
@@ -9,11 +9,15 @@ share/sources/reactos.ini (here as reactos/source.ini):
   reactos/system32/    shell32.dll, browseui.dll, comctl32.dll, themeui.dll, explorer.exe
   reactos/themes/      the visual styles Lunar, Modern, Mizu and Lautus
   reactos/fonts/       40 fonts under the Windows file names (below)
-  reactos/wallpapers/  the CD's wallpapers (.jpg, .png) and their notes
 
-MANIFEST lists every file with its sha256, its size and its path on the CD. `lhde-import --pack` puts them into lhde's
-Windows tree (`make install-resources-free` downloads this pack and does that); `make free-pack` in lhde's source tree makes
-the pack again from the CD (lhde-pack --reproducible --sources reactos), byte for byte.
+and the wallpapers of lhde's themes for those styles, four photos from Pexels, by share/sources/free.ini (free/source.ini):
+
+  free/wallpapers/     the photos and LICENSE.txt, which names each one's photographer and Pexels page
+
+MANIFEST lists every file with its sha256, its size and its path on the CD (the photos: their Pexels file names).
+`lhde-import --pack` puts them into lhde's Windows tree (`make install-resources-free` downloads this pack and does that);
+`make free-pack` in lhde's source tree makes the pack again from the CD and the photos (lhde-pack --reproducible --sources
+reactos,free), byte for byte.
 
 LICENCES
 
@@ -54,9 +58,8 @@ The fonts carry their own licences; the texts are in licenses/fonts/<family>/ (R
                                        Palatino Linotype: TeX Gyre Pagella; the GUST Font License
   framd.ttf framdit.ttf                Franklin Gothic Medium: Libre Franklin; SIL Open Font License 1.1
 
-The wallpapers carry their own licences, in reactos/wallpapers/README.txt and Angelus.txt: Backwoods, Borealis and Borealis
-Dark CC BY-NC(-SA) 3.0 (non-commercial: "Angelus"), Grass and Polarlicht CC0 1.0, Mizu and Mizu (4x3) CC BY-SA 4.0
-("Foxlet"), Silhouette and Silhouette Dark CC BY 4.0 (Jake Collins).
+The photos in free/wallpapers/ are under the Pexels licence (https://www.pexels.com/license/): free to use, also
+commercially, and to modify, without attribution; free/wallpapers/LICENSE.txt names the photographers all the same.
 
 The names Tahoma, Verdana, Arial and the others are the file and family names Windows programs ask for; the faces are the
 free ones named above, not Microsoft's. Nothing in this pack is Microsoft's.

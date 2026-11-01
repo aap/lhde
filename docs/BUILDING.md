@@ -115,8 +115,9 @@ baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the 
 without imported styles.
 Last the free baseline (`make check-free`, `tests/check-free.sh`): the free pack or ReactOS's boot CD (`FREE_PACK=FILE`,
 `LHDE_REACTOS_ISO=FILE`, `~/lib/windows_isos/ReactOS-*.iso`, or the pack `make fetch-free-pack` downloaded into
-`~/.cache/lhde`, the first there; skipped without any, so a CI runs `make fetch-free-pack` first) imported once into
-`build/free/windows`, and with that tree
+`~/.cache/lhde`, the first there; skipped without any, so a CI runs `make fetch-free-pack` first; beside the ISO the free
+themes' photos from `FREE_WALLPAPERS`, and without that directory their missing wallpaper is reported, not failed) imported
+once into `build/free/windows`, and with that tree
 alone every shipped theme must resolve (`lhde-theme explain`, `explain --files`), classic and the ReactOS themes with
 nothing missing but what ReactOS stands in for, and luxwm's classic frames render against a baseline of their own
 (`build/luxwm/regress/baseline-free.sha256`; ReactOS's Tahoma and Marlett, so they differ from the normal run's).
@@ -158,21 +159,27 @@ pack directory works too). By hand:
 
 ### The free resources
 ReactOS's files (shell32, browseui, comctl32, themeui, explorer.exe, its four visual styles, 40 free fonts under the Windows
-file names, its wallpapers; docs/USAGE.md "Getting the Windows resources") are free, so lhde publishes them as a pack, outside
-the repository: `lhde-resources-reactos-0.4.16.zip` (11 MB), made once from ReactOS 0.4.16's boot CD. `make
+file names; docs/USAGE.md "Getting the Windows resources") are free, and so are the wallpapers of the four ReactOS themes
+(photos from Pexels, the Pexels licence, chosen by aap: the source `free`, share/sources/free.ini), so lhde publishes them as
+one pack, outside the repository: `lhde-resources-free-1.zip` (10 MB), made once from ReactOS 0.4.16's boot CD and the
+photos. Its version (`FREE_PACK_VERSION`) counts its contents, a new ReactOS or other photos being the next. `make
 install-resources-free` takes, in this order, `FREE_PACK=FILE`, the ISO (`LHDE_REACTOS_ISO=FILE`, else the newest
-`~/lib/windows_isos/ReactOS-*.iso`), else the pack downloaded from `FREE_PACK_URL` (curl or wget) into
-`~/.cache/lhde/` and checked against `FREE_PACK_SHA256` before the import; both ways give the same Windows tree, byte for byte.
-`make fetch-free-pack` only downloads and checks it (for `make check-free` on a machine without the ISO).
+`~/lib/windows_isos/ReactOS-*.iso`, with the photos from `FREE_WALLPAPERS` when that directory is there), else the pack
+downloaded from `FREE_PACK_URL` (curl or wget) into `~/.cache/lhde/` and checked against `FREE_PACK_SHA256` before the import;
+both ways give the same Windows tree, byte for byte. `make fetch-free-pack` only downloads and checks it (for `make
+check-free` on a machine without the ISO).
 
-`make free-pack` builds the pack in the tree root (gitignored): `lhde-pack --profile museum --sources reactos --reproducible
---no-tar --zip` from `REACTOS_ISO` (default `~/lib/windows_isos/ReactOS-0.4.16-i386.iso`), with `--notes` adding a `LICENSE`
-(share/sources/reactos-LICENSE.txt: what the pack holds, ReactOS's GPL 2 or later and LGPL 2.1 or later, each font's
-licence, the wallpapers') and the licence texts from ReactOS's source at tag 0.4.16 (`REACTOS_SRC`, default
+`make free-pack` builds the pack in the tree root (gitignored): `lhde-pack --profile museum --sources reactos,free
+--reproducible --no-tar --zip` from `REACTOS_ISO` (default `~/lib/windows_isos/ReactOS-0.4.16-i386.iso`) and
+`FREE_WALLPAPERS` (default `~/cfg/wallpaper`, aap's downloads under Pexels's names; the ini takes only the four it names, as
+`free/wallpapers/<photographer>-<photo id>.jpg`, with `LICENSE.txt` from share/sources/free-wallpapers-LICENSE.txt), with
+`--notes` adding a `LICENSE` (share/sources/free-pack-LICENSE.txt: what the pack holds, ReactOS's GPL 2 or later and LGPL 2.1
+or later, each font's licence, the photos') and the licence texts from ReactOS's source at tag 0.4.16 (`REACTOS_SRC`, default
 `~/lib/reactos-0.4.16`: `COPYING`, `COPYING.LIB`, `COPYING3`, `COPYING3.LIB`, `CREDITS`, `media/fonts/doc` as
 `licenses/fonts/`); it prints the size and the sha256. `--reproducible` dates every entry the same and writes no
-annotations, so the same CD (and the same `share/sources/reactos.ini`, which the pack carries) gives the same sha256 as the
-published pack; a new pack is published under `FREE_PACK_URL` and its sha256 set in `FREE_PACK_SHA256`.
+annotations, so the same CD and photos (and the same `share/sources/reactos.ini` and `free.ini`, which the pack carries)
+give the same sha256 as the published pack; a new pack is published under `FREE_PACK_URL` and its sha256 set in
+`FREE_PACK_SHA256`.
 
 Every program looks a file up by its relative name (`styles/jade4074.msstyles`, `frames/jade4074/close.png`,
 `resources/4074`) in this order: `~/.config/lhde`, the Windows tree's `index/` (`$LHDE_DATA`, a flat directory, instead:
