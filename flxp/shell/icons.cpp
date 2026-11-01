@@ -83,7 +83,7 @@ static std::string resolve(const IconTheme& t, const std::string& src)
 std::string icon_theme_file(const std::string& name)
 {
     if (name.find('/') != std::string::npos) return name;
-    // lhde's recipes first (data/icons: xp, 2k, longhorn4074), then flxp's own (wine); the
+    // lhde's recipes first (share/icons: xp, 2k, longhorn4074), then flxp's own (wine); the
     // older name "longhorn" is longhorn4074
     std::string n = name == "longhorn" ? "longhorn4074" : name;
     std::string f = lhde_find("icons/" + n + ".theme");
@@ -266,7 +266,7 @@ std::string resource_file(const std::string& build, const std::string& file)
 // Where a source keeps XP's art under another file or id (the rest are XP's own), or has a picture of its own under XP's id
 // (to_id 0: not taken from it): ReactOS's explorer.exe IDB_START 143 is ReactOS's logo, so neither start button takes it
 // (flxp-taskbar draws its own flag); its toolbar strips, Go button and brand are browseui's (the icon recipe
-// data/icons/reactos.theme). What no source but XP has (the Log Off buttons 7010/7011, the chess tile logonui.exe 114,
+// share/icons/reactos.theme). What no source but XP has (the Log Off buttons 7010/7011, the chess tile logonui.exe 114,
 // shellstyle.dll) stays "" and its caller draws without it.
 struct ArtMap { const char* source; const char* file; int id; const char* to_file; int to_id; };
 static const ArtMap art_map[] = {

@@ -522,7 +522,7 @@ int lhde_dirs_report(void)
     printf("Program files (make install; never edited by hand):\n");
     const char *tree = lhde_tree();
     for (int i = 0; i < n; i++) if (lhde_data_dir_kind(i) == LHDE_TREE_SHIPPED) tree_line("shipped data", dirs[i], NULL);
-    if (tree) { snprintf(buf, sizeof buf, "%s/data", tree); tree_line("source tree", buf, "(this program runs from a build tree: data/ and the code)"); }
+    if (tree) { snprintf(buf, sizeof buf, "%s/share", tree); tree_line("source tree", buf, "(this program runs from a build tree: share/ and the code)"); }
     else if (lhde_code_dir(c, sizeof c)) tree_line("code", c, "(luxshell/ session/ tools/)");
     printf("Windows files (lhde-import; $LHDE_WINDOWS):\n");
     const char *wd = lhde_windows_dir();

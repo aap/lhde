@@ -635,7 +635,7 @@ nothing (animation, timer, tile) holds it. Image names: pack-relative paths (`40
 
 ## 5. Packs
 
-A pack is `data/packs/NAME/shell.lua` (text only); its images are under `packs/<build>/` of the imported Windows tree
+A pack is `share/packs/NAME/shell.lua` (text only); its images are under `packs/<build>/` of the imported Windows tree
 (`~/.local/share/lhde-windows/generated/packs`, written by lhde-import; `lh.data_find`). The theme's `Shell.pack` names it.
 
 | Pack | Build, look |
@@ -1010,7 +1010,7 @@ none until the settings change); stopped by its pid (comm + DISPLAY checked) on 
 
 ## 14. Theme, settings, compositor, reload
 
-**The theme.** Root `_LH_THEME` (UTF8_STRING) holds the selected theme's name: a theme file of `data/themes/` or
+**The theme.** Root `_LH_THEME` (UTF8_STRING) holds the selected theme's name: a theme file of `share/themes/` or
 `~/.config/lhde/themes/`, or a bare style, resolved by liblhde (docs/THEME-FORMAT.md; an alias is replaced on the root by its
 theme's name). At startup the root wins, else settings.ini `[theme] name`; the first one up publishes it and brings `[theme]
 name` in line. The record's `Shell.pack` names the pack (`LHSHELL_THEME`, a pack name or directory, only when no theme names

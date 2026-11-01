@@ -17,7 +17,7 @@
      1. user        ~/.config/lhde
      2. windows     $LHDE_WINDOWS/index; with $LHDE_DATA set (tests, scratch): that one flat directory instead
      3. shipped     <exe>/../share/lhde (the program's own prefix), then $XDG_DATA_DIRS/lhde (default /usr/local/share:/usr/share)
-     4. source tree <top>/data when the program runs from a build tree (<top>/build/...; LHDE_TREE=0 leaves it out: tests)
+     4. source tree <top>/share when the program runs from a build tree (<top>/build/...; LHDE_TREE=0 leaves it out: tests)
    A frame set or pack is split: its text (theme.ini, shell.lua) is shipped, its pixels are generated; lhde_data_find_in finds a
    file of the same relative directory in any tree. A lookup of DIR/NAME that misses also tries DIR/cache/NAME (the caches of
    a $LHDE_DATA directory). Paths come back as found (through index/); lhde_data_origin tells which tree

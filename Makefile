@@ -24,7 +24,7 @@
 #   examples/examples.mk  extendframe, navdemo, glassdemo -> build/examples
 #   liblhde/liblhde.mk    liblhde (lhde/data.h, lhde/theme.h, lhde/settings.h): the data directories, the theme resolver,
 #                         the settings store -> build/lib/liblhde.{a,so.1}, lhde.pc, build/bin/lhde-theme
-#   data/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme, sources/*.ini,
+#   share/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme, sources/*.ini,
 #                         frames/*/*.ini, packs/*/shell.lua), PKGLIBDIR/session + BINDIR/lhde-session,
 #                         PKGLIBDIR/tools + BINDIR/lhde-import, lhde-pack, lhde-schemes
 #
@@ -102,7 +102,7 @@ check-lux: all
 check-free: build/bin/lhde-theme build/luxwm/tests/frametest
 	@tests/check-free.sh
 
-# data/ (text only: the theme files, navbar layouts, icon recipes, import sources, the frame sets' theme.ini/nav.ini, the packs'
+# share/ (text only: the theme files, navbar layouts, icon recipes, import sources, the frame sets' theme.ini/nav.ini, the packs'
 # shell.lua) into DATADIR; session/ (lhde-session's helpers) and tools/ (lhde-import's Python) into PKGLIBDIR; the commands into
 # BINDIR.
 SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh \
@@ -113,12 +113,12 @@ install-data:
 	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(BINDIR) \
 	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \
 	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
-	install -m 644 data/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
-	install -m 644 data/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
-	install -m 644 data/icons/*.theme $(DESTDIR)$(DATADIR)/icons/
-	install -m 644 data/sources/*.ini $(DESTDIR)$(DATADIR)/sources/
-	for d in data/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
-	for d in data/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done
+	install -m 644 share/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
+	install -m 644 share/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
+	install -m 644 share/icons/*.theme $(DESTDIR)$(DATADIR)/icons/
+	install -m 644 share/sources/*.ini $(DESTDIR)$(DATADIR)/sources/
+	for d in share/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
+	for d in share/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done
 	install -m 755 session/lhde-session $(DESTDIR)$(BINDIR)/
 	install -m 755 tools/lhde-import tools/lhde-pack tools/lhde-schemes $(DESTDIR)$(BINDIR)/
 	cd session && install -m 644 $(SESSION_FILES) $(DESTDIR)$(PKGLIBDIR)/session/

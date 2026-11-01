@@ -2,7 +2,7 @@
 // policy"): where the art the user imported with lhde-import is found, so that
 // flxp.ini has no paths. The search order is lhde_data's: $LHDE_DATA (else
 // ${XDG_DATA_HOME:-~/.local/share}/lhde), the install's share/lhde,
-// $XDG_DATA_DIRS/lhde, the source tree's data/.
+// $XDG_DATA_DIRS/lhde, the source tree's share/.
 //
 //   styles/NAME.msstyles  visual styles by name (--theme / FLXP_THEME)
 //   resources/<build>     a build's system32 (the session theme's path.resources:

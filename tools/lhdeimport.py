@@ -1,7 +1,7 @@
 """lhde's import of Windows resources (docs/USAGE.md "Getting the Windows resources", docs/LAYOUT.md "Asset policy").
 
 Two stages, one code path:
-  lhde-pack    ISO / WIM / Windows directory  --(data/sources/<source>.ini: which files, from where)-->  a resource pack:
+  lhde-pack    ISO / WIM / Windows directory  --(share/sources/<source>.ini: which files, from where)-->  a resource pack:
                the raw, unmodified Windows files as <source>/{system32,themes,fonts,wallpapers,...}, source.ini, and MANIFEST
                (sha256, size, pack path, source, in-image path); a directory and lhde-resources-<date>.tar.zst (or .tar.xz)
   lhde-import  a pack (or an ISO / WIM / directory: packed into a temporary pack first)  -->  the Windows tree
@@ -40,13 +40,13 @@ def die(msg):
     sys.exit(2)
 
 
-# ---------------------------------------------------------------- the sources (data/sources/*.ini)
+# ---------------------------------------------------------------- the sources (share/sources/*.ini)
 def source_dirs():
     out = []
     e = os.environ.get('LHDE_SOURCES')
     if e:
         out.append(e)
-    for d in (os.path.join(HERE, '..', 'data', 'sources'), os.path.join(HERE, '..', '..', '..', 'share', 'lhde', 'sources')):   # the tree / installed: <prefix>/lib/lhde/tools
+    for d in (os.path.join(HERE, '..', 'share', 'sources'), os.path.join(HERE, '..', '..', '..', 'share', 'lhde', 'sources')):   # the tree / installed: <prefix>/lib/lhde/tools
         if os.path.isdir(d):
             out.append(os.path.realpath(d))
     return out
@@ -734,7 +734,7 @@ def pack_sizes(pack):
 
 
 def shipped_themes():
-    """the shipped themes' names: data/themes/*.theme (not .theme.todo) of the tree or the install"""
+    """the shipped themes' names: share/themes/*.theme (not .theme.todo) of the tree or the install"""
     import lhdetree
     names = set()
     for d in lhdetree.shipped_dirs():
@@ -1066,7 +1066,7 @@ def run_recipes(W, sid, ini, force):
 
 # ---------------------------------------------------------------- recipes (derived data: generated/ + manifest.ini)
 # Every recipe gets `data` = the Windows tree's index/: it reads its inputs by their index names (styles/NAME.msstyles,
-# resources/<build>/imageres.dll) and writes below data/frames/<set>/, data/packs/<build>/ or data/aurora/, i.e. into
+# resources/<build>/imageres.dll) and writes below share/frames/<set>/, share/packs/<build>/ or share/aurora/, i.e. into
 # generated/.
 def tool(name):
     """lhde's programs: the build tree's build/bin, beside an installed tools/ (<prefix>/bin), PATH"""
@@ -1163,7 +1163,7 @@ def r_frames_vision(data, target, args):
 
 def r_frames_classic(data, target, args):
     """a classic (msstyles-mode) frame set's PNGs from its style (tools/msstyles2theme.py); the tuning keys ship in
-    data/frames/<target>/theme.ini, written into generated/ only when the set is not shipped"""
+    share/frames/<target>/theme.ini, written into generated/ only when the set is not shipped"""
     style = args[0]
     color = args[1] if len(args) > 1 else None
     out = os.path.join(data, 'frames', target)
@@ -1353,7 +1353,7 @@ def r_packs_aero5112(data, target, args):
 def r_packs_plexbars(data, target, args):
     """packs/<build>/imageres/plex-*.png for the 4042-plex pack: the IMAGEDATA PNGs of a Plex msstyles' `Sidebar` class
     (plex-sidebar-<part>[-<state>].png, unmodified), which skin both of 4042 main's Avalon bars (Microsoft.Windows.Client
-    Application1.Sidebarstylesheet_themed; data/packs/4042-plex/shell.lua), plus three derived images:
+    Application1.Sidebarstylesheet_themed; share/packs/4042-plex/shell.lua), plus three derived images:
       plex-taskbar.png  Sidebar.BACK (150x4) transposed to 4x150: TaskbarBackground2 = ThemeImage(Sidebar, 2) with Rotate=1 on
                         the bottom bar (ImageResource.Draw: +90 degrees, BACK's column 0 on the bar's top row), NineGridMargin
                         5,0,5,0 -> the pack's bg_grid {5, 0, 5, 0}

@@ -220,7 +220,7 @@ leaving only the caption buttons to the frame. With the bit set:
 
 ## Vision header
 
-The "Aero vision" frame set (`data/frames/aerovision`, theme `aerovision`) frames the concept-art navigation bar that luxnav
+The "Aero vision" frame set (`share/frames/aerovision`, theme `aerovision`) frames the concept-art navigation bar that luxnav
 draws (docs/NAVBAR.md; reference client `examples/navdemo.c`). Three frame-set keys change what a CLIENT_CAPTION client gets;
 sets without them behave (and render) as above:
 

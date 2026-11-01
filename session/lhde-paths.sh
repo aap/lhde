@@ -3,7 +3,7 @@
 # layout. Set LHDE_SELF to the sourcing script's real path first (lhde_self below does it).
 #   lhde_data_dirs       the search order, one directory per line (lhde-theme dirs --list): ~/.config/lhde, the Windows tree's
 #                        index ($LHDE_WINDOWS/index, or $LHDE_DATA), an old-layout ~/.local/share/lhde, the install's
-#                        <prefix>/share/lhde, $XDG_DATA_DIRS/lhde, the source tree's data/
+#                        <prefix>/share/lhde, $XDG_DATA_DIRS/lhde, the source tree's share/
 #   lhde_find REL        the first directory's DIR/REL that exists (nothing when none has it): lhde-theme find REL
 #   lhde_resolve VALUE   a theme value as a path: absolute or ~/ as it is, else lhde_find (else where it would be)
 #   lhde_bin NAME        a program: the build tree's build/bin or build/examples, else beside this script's install, else PATH
@@ -18,7 +18,7 @@ lhde_self() { # SCRIPT -> LHDE_SELF_DIR (its directory, symlinks resolved)
 lhde_setup_paths() {
 	LHDE_TOP= LHDE_SHARE= LHDE_LIB= LHDE_BINDIR=
 	d=$LHDE_SELF_DIR
-	if [ -d "$d/../data/themes" ] && [ -f "$d/../luxwm/wm.c" ]; then LHDE_TOP=$(cd "$d/.." && pwd)
+	if [ -d "$d/../share/themes" ] && [ -f "$d/../luxwm/wm.c" ]; then LHDE_TOP=$(cd "$d/.." && pwd)
 	elif [ -f "$d/../lib/lhde/session/lhde-paths.sh" ]; then LHDE_LIB=$(cd "$d/../lib/lhde" && pwd); LHDE_BINDIR=$d
 	elif [ -f "$d/lhde-paths.sh" ] && [ "$(basename "$d")" = session ] && [ "$(basename "$(dirname "$d")")" = lhde ]; then
 		LHDE_LIB=$(cd "$d/.." && pwd); LHDE_BINDIR=$(cd "$d/../../../bin" 2>/dev/null && pwd)

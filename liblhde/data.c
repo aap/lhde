@@ -18,11 +18,11 @@ static int ndirs = -1;
 static int is_dir(const char *p) { struct stat st; return p && p[0] && stat(p, &st) == 0 && S_ISDIR(st.st_mode); }
 static int exists(const char *p) { struct stat st; return p && p[0] && stat(p, &st) == 0; }
 
-/* a source tree: data/themes/ and luxwm/wm.c */
+/* a source tree: share/themes/ and luxwm/wm.c */
 static int is_tree(const char *p)
 {
     char t[PATH_MAX + 32], w[PATH_MAX + 32];
-    snprintf(t, sizeof t, "%s/data/themes", p); snprintf(w, sizeof w, "%s/luxwm/wm.c", p);
+    snprintf(t, sizeof t, "%s/share/themes", p); snprintf(w, sizeof w, "%s/luxwm/wm.c", p);
     return is_dir(t) && exists(w);
 }
 
@@ -86,9 +86,9 @@ static void init(void)
     for (char *save = NULL, *t = strtok_r(list, ":", &save); t; t = strtok_r(NULL, ":", &save)) {
         char p[PATH_MAX + 16]; snprintf(p, sizeof p, "%s/lhde", t); add_dir(p, LHDE_TREE_SHIPPED);
     }
-    /* 4. the source tree's data/ (an uninstalled build); LHDE_TREE=0 leaves it out (tests on fake files) */
+    /* 4. the source tree's share/ (an uninstalled build); LHDE_TREE=0 leaves it out (tests on fake files) */
     const char *nt = getenv("LHDE_TREE");
-    if (tree_dir[0] && !(nt && !strcmp(nt, "0"))) { char p[PATH_MAX + 16]; snprintf(p, sizeof p, "%s/data", tree_dir); add_dir(p, LHDE_TREE_SOURCE); }
+    if (tree_dir[0] && !(nt && !strcmp(nt, "0"))) { char p[PATH_MAX + 16]; snprintf(p, sizeof p, "%s/share", tree_dir); add_dir(p, LHDE_TREE_SOURCE); }
 }
 
 void lhde_data_reset(void) { ndirs = -1; }

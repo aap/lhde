@@ -20,7 +20,7 @@ pack     = 4074-aerovision   ; the aero table with glowing taskbar text
 
 [Explorer]
 chrome   = longhorn
-navbar   = vision            ; small | big (data/navbar/vision.ini)
+navbar   = vision            ; small | big (share/navbar/vision.ini)
 navbar_preset = auto
 
 [Desktop]

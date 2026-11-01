@@ -15,7 +15,7 @@ then README.md (build, install, run). docs/README.md lists every document.
 - **Fidelity is the point.** Measurements against the real builds beat taste; when a choice is taste (the "vision" themes), say
   so where it is made. Reference material (VM screenshots, extracted builds, COMPOSITION.md) is in `~/fun/longhorn`, outside the
   repo.
-- **Ownership.** The wux side owns `wux/ wuxtheme/ flxp/`, the lux side `luxwm/ luxnav/ luxshell/ session/`; `liblhde/ data/
+- **Ownership.** The wux side owns `wux/ wuxtheme/ flxp/`, the lux side `luxwm/ luxnav/ luxshell/ session/`; `liblhde/ share/
   docs/ tools/` are shared and change by agreement. Two sessions may be working in this tree at once: keep commits small and
   do not move files another side owns.
 
@@ -44,6 +44,7 @@ then README.md (build, install, run). docs/README.md lists every document.
 - Where does this pixel come from: `build/bin/lhde-theme explain THEME`; `lhde-theme resolve THEME --why`; `lhde-theme dirs`.
 - Files: `~/.config/lhde` (what the user chose: settings.ini, themes/, flxp.ini, keys), `~/.local/state/lhde` (what programs
   remember on their own), `~/.local/share/lhde-windows` (imported Windows files; `lhde-import` is its only writer), the install's
-  `share/lhde` (ours). No other directory is read; liblhde gives every path. Never write into the Windows tree by hand.
+  `share/lhde` (ours; the source tree's `share/` when run uninstalled). No other directory is read; liblhde gives every path.
+  Never write into the Windows tree by hand.
 - Names: X atoms (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the WM name "lhwm" and the C prefixes (`ut_`, `lhnav_`, `lhde_`) are
   stable; do not rename them.

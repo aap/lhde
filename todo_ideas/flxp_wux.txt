@@ -22,7 +22,7 @@
 	ampersand), about 6 px further right than ours in every style (WinXP-193504.png, Lunar); kept so the Luna and Longhorn
 	panels stay as they are. XP's pinned items have a second line (the program's description) that ours lack
 
-* 5048 and 5112 use the `concept` luxnav preset for now (set in their themes); presets of their own in data/navbar/vision.ini
+* 5048 and 5112 use the `concept` luxnav preset for now (set in their themes); presets of their own in share/navbar/vision.ini
 	when they diverge; Display Properties still offers Small/Big/Concept for them although the Vista era has no header sizes
 
 ## flxp behavior

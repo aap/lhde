@@ -2,7 +2,7 @@
 # make check-free (part of make check): the free baseline (docs/THEME-FORMAT.md section 6) as a test configuration. A Windows tree
 # that holds only the reactos source, imported once into build/free/windows from ReactOS's boot CD ($LHDE_REACTOS_ISO, else the
 # newest ReactOS-*.iso in ~/lib/windows_isos; skipped with a note when there is none, as ut-dump's test skips without styles) and
-# again when the ISO or data/sources/reactos.ini changes. With that tree alone (own config, data and state homes, no LHDE_DATA):
+# again when the ISO or share/sources/reactos.ini changes. With that tree alone (own config, data and state homes, no LHDE_DATA):
 #   - every shipped theme resolves: lhde-theme explain and explain --files succeed;
 #   - classic and the themes of build reactos resolve with nothing missing (classic: but its colour scheme, which ReactOS does
 #     not carry: the built-in Windows Standard);
@@ -23,7 +23,7 @@ if [ -z "$iso" ] || [ ! -f "$iso" ]; then
 fi
 W=$B/windows
 key="$iso $(stat -c %s.%Y "$iso")"
-if [ ! -f "$W/reactos/source.ini" ] || [ "$(cat "$B/iso" 2>/dev/null)" != "$key" ] || [ data/sources/reactos.ini -nt "$W/reactos/source.ini" ]; then
+if [ ! -f "$W/reactos/source.ini" ] || [ "$(cat "$B/iso" 2>/dev/null)" != "$key" ] || [ share/sources/reactos.ini -nt "$W/reactos/source.ini" ]; then
 	rm -rf "$W"; mkdir -p "$B"
 	if ! tools/lhde-import --iso "$iso" --source reactos --windows "$W" --no-annotate > "$B/import.log" 2>&1; then
 		cat "$B/import.log"; echo "FAIL  free baseline: lhde-import --iso $iso"; exit 1
@@ -35,7 +35,7 @@ unset LHDE_DATA
 mkdir -p "$B/config" "$B/data" "$B/state"
 lt=$top/build/bin/lhde-theme
 fails=0 n=0
-for f in data/themes/*.theme; do
+for f in share/themes/*.theme; do
 	t=$(basename "$f" .theme); n=$((n + 1))
 	if ! "$lt" explain --files "$t" > "$B/files-$t.txt" 2>&1; then echo "FAIL  free baseline: lhde-theme explain --files $t"; cat "$B/files-$t.txt"; fails=$((fails + 1)); continue; fi
 	if ! "$lt" explain "$t" > "$B/explain-$t.txt" 2>&1; then echo "FAIL  free baseline: lhde-theme explain $t"; cat "$B/explain-$t.txt"; fails=$((fails + 1)); continue; fi

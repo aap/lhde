@@ -64,7 +64,7 @@ hit-test probes and the shape. THEMEDIR may be a theme spec (`DIR|STYLE.msstyles
 maximise crossfade at weight t, `FRAMETEST_FONTS="DIR[;DIR]"` registers font directories as a theme's `path.fonts` does,
 `FRAMETEST_SOURCE=dir|lib` picks the PNG cache or the library. `build/luxwm/tests/menutest THEMESPEC out.png [SEL [MAXIMIZED
 [KEYBOARD]]]` renders the window menu (`MENUTEST_FONTS` likewise). `luxwm/tests/regress.sh` (`make check-luxwm`, part of `make check`)
-renders, for every frame set in `data/frames`, the strip, `normal`, `unfocused`, `max`, `ext60` (`0 0 60 0`) and the Explorer cases
+renders, for every frame set in `share/frames`, the strip, `normal`, `unfocused`, `max`, `ext60` (`0 0 60 0`) and the Explorer cases
 `ext46`/`ext46u`/`ext46max` (`0 0 46 0` with `NO_TITLE`) at 640x480 with frametest's text output; `vision49`/`vision49max` for
 `header_mode = crop` sets; `NAME.classic/` for the glass sets whose style has a non-composited look of its own (aero5048, aero5112);
 and `classic/`, `classic.xl/` (Extra Large metrics 24/24, Tahoma -19 bold), `classic.hc/` (High Contrast Black colours, borderwidth
@@ -81,7 +81,7 @@ grabbing override-redirect menu on a right click), `strutdock` (a dock with a bo
 the shipped theme files, aliases, bare styles, the current layer). luxwm resolves it itself (`lh_theme_apply`) and maps the record:
 - `VisualStyle.style = classic`, or neither a frame set nor a visual style: Windows Classic frames ("Windows Classic frames"), always,
   composited or not;
-- `[Glass] frames = SET`: the glass set with the theme's style, spec `data/frames/SET|STYLE|COLOR|SIZE`; its classic frame (no
+- `[Glass] frames = SET`: the glass set with the theme's style, spec `share/frames/SET|STYLE|COLOR|SIZE`; its classic frame (no
   compositor, or `[Glass] composition = 0`) is `frames_classic`, or with `frames_classic = none` the style's own ("Classic fallback");
 - `frames = none`: the classic set `frames_classic` with the style, or the style alone (`|STYLE|COLOR|SIZE`), always.
 
@@ -105,7 +105,7 @@ shifts the restore geometry the same way, refits maximised frames, reloads icons
 unchanged, so clients get one PropertyNotify of each per switch (`composited_publish()`, `theme_announce`). Log: `luxwm: theme SPEC
 (msstyles|dwm, SOURCE) margins t=.. r=.. b=.. l=.. font=...`.
 
-**Frame sets** are `data/frames/NAME/theme.ini` (and `nav.ini` for aerovision): the tuning keys and, as `msstyles`/`color`/`size`, the
+**Frame sets** are `share/frames/NAME/theme.ini` (and `nav.ini` for aerovision): the tuning keys and, as `msstyles`/`color`/`size`, the
 style they belong to. Their PNG caches lie in the Windows tree (`generated/frames/NAME`, written by `lhde-import`: the DWM sets'
 textures from the style's streams, the classic sets through `tools/msstyles2theme.py`), found through liblhde. Two modes, `mode = dwm`
 (glass) and `mode = msstyles` (classic). Shipped: `aero-patch` (the patched 4074 Aero plates), `jade4074` (4074's Jade plates, blended

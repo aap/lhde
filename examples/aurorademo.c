@@ -2,7 +2,7 @@
    the Explorer preview-pane aurora "APPA" (jade.msstyles STREAM 481, 4074/4082) recoloured for a folder type over the pane's
    band gradient, and the desktop aurora (desktopaurora.baml, MILDesktop=1). Spec: aurora.md in the research workspace.
    build: make examples (build/examples/aurorademo). The tables are read from the user's Windows tree: lhde-import's [aurora]
-   recipes (data/sources/4074.ini) write generated/aurora/{previewpane,desktop}-4074.json, make turns them into the header
+   recipes (share/sources/4074.ini) write generated/aurora/{previewpane,desktop}-4074.json, make turns them into the header
    (tools/lhdeaurora.py); a scene not imported is left out and asking for it says so.
    usage: aurorademo [pane [FOLDER] | desktop] [-s SPEED] [-w WxH] [-f] [-t SECONDS] [-j THREADS] [-b FRAMES]
      pane     1000x148 (the aurora cell of a ~1000 px Explorer pane); FOLDER document music picture video contact message game
@@ -203,7 +203,7 @@ int main(int argc, char **argv) {
     const struct au_scene *s = pane ? PANE_SCENE : DESKTOP_SCENE;
     if (!s) {
         fprintf(stderr, "aurorademo: this build has no %s aurora: the Windows tree held no generated/aurora/%s-4074.json when it was made.\n"
-                "  lhde-import makes it from %s (data/sources/4074.ini [aurora]); import that, then make examples again.\n",
+                "  lhde-import makes it from %s (share/sources/4074.ini [aurora]); import that, then make examples again.\n",
                 pane ? "preview-pane" : "desktop", pane ? "previewpane" : "desktop",
                 pane ? "build 4074's jade.msstyles" : "build 4074's Microsoft.Windows.WCPClient.dll");
         return 1;

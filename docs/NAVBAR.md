@@ -10,7 +10,7 @@ and header `lhnav.h` are stable.
 
 | Piece | Where | Why |
 | --- | --- | --- |
-| Frame: cropped header plate, 15 px top deco, vision caption buttons | luxwm (`data/frames/aerovision`, `frame.c`; CLIENT-PROTOCOL.md "Vision header") | it is decoration |
+| Frame: cropped header plate, 15 px top deco, vision caption buttons | luxwm (`share/frames/aerovision`, `frame.c`; CLIENT-PROTOCOL.md "Vision header") | it is decoration |
 | Back/forward orb, breadcrumb, address and search box rects, toolbar, title text: **layout, painting, hit-testing, visual state** | **luxnav** (`luxnav/`), plain C, toolkit-independent | iconic Longhorn component; must look identical in every client |
 | Behaviour: history, the path model, what a click does, the address and search text fields, the drop-down lists | the client (flxp's header, navdemo) | real functionality belongs to the explorer |
 | Reference integration | `examples/navdemo.c` | a small file browser with the vision header |
@@ -131,7 +131,7 @@ the pill is baked into the plate texture.
 
 ## Presets
 
-nav.ini: `data/frames/aerovision/nav.ini` beside the frame set's theme.ini, and `data/navbar/vision.ini` (the same file, the
+nav.ini: `share/frames/aerovision/nav.ini` beside the frame set's theme.ini, and `share/navbar/vision.ini` (the same file, the
 theme's `path.navbar`). Every key is commented there with its automatic value at 720 px. `preset = NAME` at the top picks a
 `[preset NAME]` section; each section has all keys, so a new size is a copied section. Keys before the first section apply to
 every preset (a section's keys win); no `preset` key = the first section; other `[...]` sections are skipped. Shipped presets:
@@ -353,7 +353,7 @@ the theme reload (`lhnav_set_style`/`lhnav_set_metrics`).
 ## Missing
 
 - flxp's 4074 Medium/Large/Extra-Large layout (title on its own row above the breadcrumb, 4074-dwm.png, the right items at the
-  band's places or the bottom): luxnav has the vision rows only (title in the deco, boxes beside the orb); `data/navbar/4051.ini`
+  band's places or the bottom): luxnav has the vision rows only (title in the deco, boxes beside the orb); `share/navbar/4051.ini`
   and `4074.ini` wait for it.
 - The even small travel art (`SmallTravelBack/Fwd::AnimationButton`) and flxp's uneven shrink (the drop-down rows kept 1:1):
   luxnav scales the full art's orb rows and synthesizes orb-only hot/pressed images instead.
@@ -363,7 +363,7 @@ the theme reload (`lhnav_set_style`/`lhnav_set_metrics`).
 - A generic icon item for arbitrary host buttons (flxp's `set_tools` takes any `{id, icon, dropdown}`), and a disabled state for
   tool items.
 - An icon before the first segment (the concept's Windows flag).
-- Slate vision (`data/themes/slatevision.theme.todo`: Aero's buttons on Slate, as the WinHEC 2004 Slate concepts show, a
+- Slate vision (`share/themes/slatevision.theme.todo`: Aero's buttons on Slate, as the WinHEC 2004 Slate concepts show, a
   non-composited reskin); a size between small and big for the concept's orb (`variant = big`, `orb_h` ~40, or `small` with `orb_h`
   37) and the concept's toolbar size (`tool_size = 32` with `orb_h = 37`); the 4074 shell32 16 px folder is the tall Longhorn
   folder, `tool_icon = 24` uses the 24 px strip and folder.

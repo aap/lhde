@@ -10,7 +10,7 @@ tiles/*.lua. Design: docs/SHELL-DESIGN.md; use: docs/USAGE.md.
 
 - The Lua code is found beside the binary: luxshell/ in a build tree, `$PREFIX/lib/lhde/luxshell` installed (`LUXSHELL_LUA`
   overrides). It runs from any directory.
-- Packs: the text in data/packs/NAME/shell.lua (4042-plex, 4051-slate, 4074-aero, 4074-aerovision, 4074-slate, 5112-aero),
+- Packs: the text in share/packs/NAME/shell.lua (4042-plex, 4051-slate, 4074-aero, 4074-aerovision, 4074-slate, 5112-aero),
   the images under packs/<build>/ of the Windows tree (`~/.local/share/lhde-windows/generated/packs`; lhde-import; `lh.data_find`).
 - shellpack.sh, shellpack-aero5112.sh: the research tools that extracted the pack images from the extracted builds (they need
   the workspace's res/ and wim/; lhde-import copies their output). luxshell's windows have the X class `luxshell` (names

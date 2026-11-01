@@ -1,9 +1,5 @@
 # Repository and docs
 
-* rename data/ to share/ at a quiet time (it is installed as share/lhde; "data" reads as the Windows data directory)
-	* paths in Makefile, liblhde/data.c (the source-tree lookup), session/lhde-paths.sh, tests, docs/LAYOUT.md, README, CLAUDE.md
-	* do it when no other session has uncommitted work under data/
-
 ## before the first push
 * a LICENSE for our own code (the vendored Wine code is LGPL with its MANIFEST and patches; ReactOS is only imported, never
 	vendored); the licence of the xattr/ReactOS/icon-pack material we read is theirs

@@ -1,4 +1,4 @@
-# data: text only (no pixels; docs/LAYOUT.md "Asset policy")
+# share: text only (no pixels; docs/LAYOUT.md "Asset policy")
 
 Installed to `$PREFIX/share/lhde` (program files: docs/LAYOUT.md "The three trees"); an uninstalled build reads this directory
 as the last data directory (liblhde, lhde/data.h). `~/.config/lhde` comes first, so a copy of a file there under the same

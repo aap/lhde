@@ -42,10 +42,10 @@ def windows_dir(arg=None):
 
 
 def shipped_dirs():
-    """the shipped data, text only: the source tree's data/ (tools/ runs from the tree), the install's <prefix>/share/lhde
+    """the shipped data, text only: the source tree's share/ (tools/ runs from the tree), the install's <prefix>/share/lhde
     (tools/ installed as <prefix>/lib/lhde/tools)"""
     out = []
-    for d in (os.path.join(HERE, '..', 'data'), os.path.join(HERE, '..', '..', '..', 'share', 'lhde')):
+    for d in (os.path.join(HERE, '..', 'share'), os.path.join(HERE, '..', '..', '..', 'share', 'lhde')):
         if os.path.isdir(os.path.join(d, 'themes')):
             out.append(os.path.realpath(d))
     return out

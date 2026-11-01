@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """lhde-schemes: the classic Appearance schemes (Windows Standard, Brick, High Contrast, ...) from the user's own Windows
 2000 / XP / Server 2003 install medium into lhde's Windows tree as local/schemes/NAME.scheme, looked up as styles/NAME.scheme
-(docs/THEME-FORMAT.md section 2a). lhde-import runs the same code for the xp and 2k sources ([schemes] in data/sources/*.ini,
+(docs/THEME-FORMAT.md section 2a). lhde-import runs the same code for the xp and 2k sources ([schemes] in share/sources/*.ini,
 into generated/schemes); this is the stand-alone way.
 
 usage:

@@ -15,11 +15,11 @@ Windows files (docs/LAYOUT.md).
 | `flxp/` | `flxp`, `flxp-desktop`, `flxp-taskbar` (as `flxp-startmenu`: the start panel alone), `flxp-settings`, `flxp-filedialog`, `flxp-portal` | the Explorer (`explorer/`: the browser, the faithful 4051/4074 headers, task pane, views), the shell layer (`shell/`: namespace, file operations, icons, thumbnails, the liblhde adapter), the desktop (wallpaper and icons), the classic taskbar with XP's start panel and the classic start menu, Display Properties, the Open/Save dialog and its xdg-desktop-portal backend |
 | `luxnav/` | `libluxnav.{a,so}` (`lhnav_*`) | the Longhorn navigation bar as the concept art had it (the "vision" header): layout, painting, hit testing; art from the style through wuxtheme; linked into flxp and `examples/navdemo` |
 | `luxwm/` | `luxwm`, `luxwmc` | the window manager: non-reparenting, EWMH, frames in three modes (DWM glass from the style's CompositedWindow streams or a generated frame set; non-composited msstyles frames through wuxtheme; Windows Classic from a scheme's colours and metrics), the XP window menu, animations, the extended-frame protocol for the Explorer's tall caption (docs/CLIENT-PROTOCOL.md), a frame regression (`tests/regress.sh`) |
-| `luxshell/` | `luxshell` (C core + Lua) | the Avalon reinterpretation: taskbar, sidebar, tiles (clock, notifications, power), tray, toasts, context menus, settings flyout and a Lua start menu; C scene nodes with the behaviour in `*.lua`; packs (`data/packs/*/shell.lua`) name the imageres art it draws |
+| `luxshell/` | `luxshell` (C core + Lua) | the Avalon reinterpretation: taskbar, sidebar, tiles (clock, notifications, power), tray, toasts, context menus, settings flyout and a Lua start menu; C scene nodes with the behaviour in `*.lua`; packs (`share/packs/*/shell.lua`) name the imageres art it draws |
 | `liblhde/` | `liblhde.{a,so}`, `lhde-theme` | `<lhde/data.h>` the three trees and every lookup by relative name; `<lhde/theme.h>` the theme resolver (theme files, inheritance, the current layer, style probe, defaults, fallbacks, "where did this come from"); `<lhde/settings.h>` the settings store with change notification, the user's config and state directories |
 | `session/` | `lhde-session`, `lab.sh`, `lhwall.sh`, `theme-*.sh`, picom configs | starting and controlling a session, and the headless bench |
 | `tools/` | `lhde-pack`, `lhde-import`, `lhde-schemes`, Python modules, recipe builders | the resource pack from ISOs, the import into the Windows tree, the recipes that derive frame sets, pack images and classic schemes from the imported files |
-| `data/` | text only | the shipped themes, navbar layouts, icon recipes, import sources, frame-set tuning, shell packs |
+| `share/` | text only | the shipped themes, navbar layouts, icon recipes, import sources, frame-set tuning, shell packs |
 | `tests/`, `examples/` | | toolkit and w32 tests, headless Xvfb scripts, `check.sh`; `extendframe`, `navdemo`, `glassdemo`, `aurorademo` as reference clients |
 
 Builds: one top-level Makefile (`make`, `make check`, `make install`; README.md). `make check` runs the wux tests, the headless
@@ -36,7 +36,7 @@ when the Avalon taskbar is up. `session/lab.sh` does the same on an Xvfb display
 screenshots and scripted tests (`lab.sh start; lab.sh shell; lab.sh theme NAME; lab.sh shot FILE`).
 
 Everything a program needs is looked up by a relative name through liblhde (docs/LAYOUT.md "The three trees"):
-`~/.config/lhde` first, then the Windows tree's `index/`, then the install's `share/lhde` (the source tree's `data/` when run
+`~/.config/lhde` first, then the Windows tree's `index/`, then the install's `share/lhde` (the source tree's `share/` when run
 from a build tree). `lhde-theme explain [THEME]` prints every visible component of a theme, the file behind it, its tree and
 whether it fell back; this is the first thing to run when something looks wrong.
 

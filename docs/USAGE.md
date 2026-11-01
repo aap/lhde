@@ -27,7 +27,7 @@ the shell pack (+ the imageres it was cut from), the start menu, the navigation 
 | `[shipped]` | `$PREFIX/share/lhde` (code: `$PREFIX/lib/lhde`) | our text: theme files, navbar layouts, icon recipes, frame-set `theme.ini`, pack `shell.lua` | no: `make install` overwrites it; copy the file into `~/.config/lhde/<same path>` and edit that |
 | `[windows]` | `~/.local/share/lhde-windows` | the Windows files of each build (`<build>/system32, themes, fonts, wallpapers`), `local/` (dropped in), `generated/` (frame and pack PNGs) | no: `lhde-import` fills it; `generated/` may be deleted (`lhde-import --regenerate`) |
 | `[user]` | `~/.config/lhde` | `settings.ini`, your `themes/`, and any shipped file you override under its own name | yes |
-| `[source tree]` | `<tree>/data` | the shipped text when running from a build tree | yes (it is the repository) |
+| `[source tree]` | `<tree>/share` | the shipped text when running from a build tree | yes (it is the repository) |
 
 Typical answers: a wrong frame -> the `frames` rows (which set, its `theme.ini`, its PNGs and the recipe that made them; glass
 sets of the 4042-4093 styles are read live from the `.msstyles`); a wrong taskbar or start orb -> `shell pack` (the pack's
@@ -71,9 +71,9 @@ without asking with `CLEAN=1`):
 writes `NAME.zip` beside the tarball; the tarball or the pack directory works the same.
 
 1. **`lhde-pack`** (once, by whoever has the ISOs): the raw, unmodified files each source needs, by the rules in
-   `data/sources/<source>.ini`, into a resource pack. Two **profiles**:
+   `share/sources/<source>.ini`, into a resource pack. Two **profiles**:
    - `--profile essentials` (the default): only what a list of themes needs, small enough to hand to others. The themes are the
-     shipped ones (`data/themes/*.theme`, not `.todo`) or `--themes a,b,c`. The file set is not a list kept by hand: the pack is
+     shipped ones (`share/themes/*.theme`, not `.todo`) or `--themes a,b,c`. The file set is not a list kept by hand: the pack is
      imported into a scratch tree and, for each theme, `lhde-theme explain --files NAME` names the Windows files the resolver
      reads (its visual style with Luna's `Shell/` colour schemes, the styles and DLLs its frame sets and pack images are made
      from (the recipes' manifests name them), the DLLs of the icon recipe's `pe:` references, the wallpaper, the build's fonts
@@ -193,7 +193,7 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    their scheme. Without any, "Windows Standard" is the built-in classic colours.
 
 ### Icon packs
-An icon recipe (`data/icons/NAME.theme`, chosen by a theme's `Desktop.icons`) maps flxp's icon keys to sources: `pe:FILE#ID`
+An icon recipe (`share/icons/NAME.theme`, chosen by a theme's `Desktop.icons`) maps flxp's icon keys to sources: `pe:FILE#ID`
 (an icon in an imported DLL) or `file:PACK/PATH` (a file of an icon pack imported with `lhde-import --icons`). A pack is any
 directory of PNGs and `.ico` files under a free licence; `lhde-import --icons DIR NAME [--licence FILE]` writes it into the
 Windows tree's `local/icons/NAME/` (relative paths kept; every PNG becomes a `.ico` with 16, 24, 32, 48, 64, 128 and 256 px
@@ -240,7 +240,7 @@ One setting for everything (docs/SHELL-DESIGN.md 14): the root property `_LH_THE
 alias or a bare style; docs/THEME-FORMAT.md), its resolved record is `_LH_THEME_RESOLVED`. luxwm picks its frames from it,
 luxshell its taskbar/sidebar pack, flxp-desktop the wallpaper, and clients (extendframe, flxp) their visual style and glass; all
 of them follow a change live, nothing restarts. The choice is kept in `~/.config/lhde/settings.ini` (`[theme] name`) and
-published when a session starts without one. The theme files are `data/themes/NAME.theme` (shipped, installed as
+published when a session starts without one. The theme files are `share/themes/NAME.theme` (shipped, installed as
 `$PREFIX/share/lhde/themes/`) and `~/.config/lhde/themes/NAME.theme` (yours: "Settings and your themes" below); any visual style
 in the Windows tree is also a bare theme (an XP style imported with `lhde-import --style`, e.g. Royale, Zune, Embedded).
 
@@ -271,7 +271,7 @@ picture in any theme (docs/THEME-FORMAT.md section 3).
 button (imageres 1156, 74x23, drawn 79x29) has the blocky flag; 4051 scaled bilinear (the smooth flag). `slate4051` has its own
 pack for that and for 4051's other differences: a 29 px bar, the images of 4051's own imageres.dll (the right-angled tile
 arrows), the clock as a tile in the list with the 96 px face, no power tile. 4051 really ran the classic Win32 taskbar there; the
-Avalon taskbar with the 4051 start button stands in for it (`data/packs/4051-slate/shell.lua`).
+Avalon taskbar with the 4051 start button stands in for it (`share/packs/4051-slate/shell.lua`).
 
 **Fonts.** Each theme names its font directory (`Fonts.fonts`, default the theme's build: `fonts/<build>` in the Windows tree,
 then fontconfig; docs/THEME-FORMAT.md); luxwm, luxshell and flxp load it while the theme is active, so captions, taskbar and menus
@@ -402,7 +402,7 @@ restores a maximised window instead of dragging it.
 (an Explorer-style 60 px glass header; drag it, double-click to maximise, drag the right edge, Escape or q quits). Without glass
 (Slate, Luna, Jade, no picom) its header shows luxwm's `_LHWM_HEADER_PIXMAP`, the theme's caption band continued down. Under a
 glass frame set (aero4074, aerovision, aero5048, aero5112) the glass header is the set's Explorer plate (`plate_explorer` in
-`data/frames/*/theme.ini`); `glass_alpha` there sets how see-through the frame glass is (0.5 matches 4074's screenshots, 1.0 is
+`share/frames/*/theme.ini`); `glass_alpha` there sets how see-through the frame glass is (0.5 matches 4074's screenshots, 1.0 is
 the texture as stored), `glass_alpha_mode = square` the alternative 2005 weighting. `extendframe -c` also takes the caption rows
 (experimental `CLIENT_CAPTION`: it draws its own title there, luxwm's caption buttons stay clickable through a hole in its input
 shape).
@@ -415,8 +415,8 @@ that filters the listing (Ctrl+F, or just type), back/forward (also Alt+Left/Rig
 double-click a folder line to open it; drag the header to move, double-click it to maximise, the top 3 rows resize. Escape
 (outside a field) or Ctrl+Q quits. `-r ROOT` starts the breadcrumb at ROOT instead of "File System" (`/`); `NAVDEMO_DEBUG=1` prints
 luxnav's layout. It works under every theme (glass or luxwm's header pixmap); the vision geometry needs `aerovision`. Tuning:
-navdemo reads the frame set's `nav.ini` (`data/frames/aerovision/nav.ini`), else the theme's navbar layout
-(`data/navbar/vision.ini`, which flxp's Explorer reads); orb size, boxes, fonts, colours, the text glow (comments there); live
+navdemo reads the frame set's `nav.ini` (`share/frames/aerovision/nav.ini`), else the theme's navbar layout
+(`share/navbar/vision.ini`, which flxp's Explorer reads); orb size, boxes, fonts, colours, the text glow (comments there); live
 with `session/theme-reload.sh` or `session/theme-watch.sh`. Installed, copy the file to `~/.config/lhde/<same path>` to edit it.
 
 Experimenting with the header (docs/NAVBAR.md "Presets"): run `session/theme-watch.sh :2` in one terminal and
@@ -742,12 +742,12 @@ Edit a theme and see it at once, without restarting luxshell or luxwm:
   `luxwmc reload-theme` (`build/bin/luxwmc` when luxwmc is not on `PATH`), or, when luxwmc is missing or does not know that command,
   the root ClientMessage `_LHWM_RELOAD` (sent with python3-xlib). A missing luxwm side is reported, not an error.
 - `session/theme-watch.sh [DISPLAY]` watches, in every data directory (`lhde-theme dirs --list`: `~/.config/lhde`, the install's
-  `share/lhde` or the source tree's `data/`, the Windows tree's index), `themes/*.theme` (with `~/.config/lhde/themes/`),
+  `share/lhde` or the source tree's `share/`, the Windows tree's index), `themes/*.theme` (with `~/.config/lhde/themes/`),
   `navbar/*.ini`, `frames/*/theme.ini` and `frames/*/nav.ini` (luxnav's tuning; luxnav clients such as navdemo re-read it when
   luxwm announces the reload), `packs/*/shell.lua`, and luxshell's `tiles/*.lua`, and runs `theme-reload.sh` after every save (a
   burst of writes within 0.3 s counts once). It uses `inotifywait` (inotify-tools) when installed, watching the directories so
   editors that replace the file are seen; otherwise it polls the files' mtime and size every second. Ctrl-C stops it. Example:
-  `session/theme-watch.sh :2 &`, then edit `data/packs/4074-slate/shell.lua`.
+  `session/theme-watch.sh :2 &`, then edit `share/packs/4074-slate/shell.lua`.
 
 What luxshell's reload does (`runtime.lua`): it resolves the current theme again (liblhde; theme file edits count), reads the
 pack's `shell.lua` again even when the directory did not change, applies the theme's fonts again, drops the cached PNGs whose file
@@ -761,7 +761,7 @@ requests within 150 ms make one reload. luxshell's own Lua (`runtime.lua`, `menu
 What luxwm's reload does (`luxwmc reload-theme`, the root ClientMessage or property `_LHWM_RELOAD`, or `_LH_THEME` set to the name it
 already has): it resolves the current `_LH_THEME` again and loads the frame theme anew from disk, even though the spec did not
 change: the frame set's `theme.ini` and PNGs, or the `.msstyles` through wuxtheme (so a number edited in
-`data/frames/jade4074/theme.ini`, e.g. `margins = 27 9 9 9`, or a re-saved style shows at once). Every frame is re-placed around
+`share/frames/jade4074/theme.ini`, e.g. `margins = 27 9 9 9`, or a re-saved style shows at once). Every frame is re-placed around
 its client with the new margins (the client stays where it is, `_NET_FRAME_EXTENTS` follows), repainted, and
 `_LHWM_FRAME_METRICS` / `_LHWM_COMPOSITED` are announced again; the log says `luxwm: theme reloaded (...)`. A theme that no longer
 loads (a broken `theme.ini`) keeps the running one. luxwm's C code and `config.h` are not reloaded (`session/lab.sh restart-wm`).
@@ -858,7 +858,7 @@ toasts). Give the lab its own bus and start luxshell and the clients with it:
 
 (A bus started by hand is yours to stop: `kill $DBUS_SESSION_BUS_PID`.) Without `DBUS_SESSION_BUS_ADDRESS` luxshell does not
 autolaunch a bus; toasts are simply off. Toasts appear above the taskbar, left of the sidebar (Longhorn's placement);
-`toast_place = "sidebar"` in a pack's `shell.lua` (`data/packs/*/shell.lua`) puts them over the sidebar's top.
+`toast_place = "sidebar"` in a pack's `shell.lua` (`share/packs/*/shell.lua`) puts them over the sidebar's top.
 
 **Tray icons** go into the sidebar's "Notifications" tile (XEmbed system tray, `_NET_SYSTEM_TRAY_S0`). Start tray apps after
 luxshell, on the same display (most also want the same session bus): any XEmbed tray app, e.g. `blueman-applet` (needs bluetoothd

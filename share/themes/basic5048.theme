@@ -20,7 +20,7 @@ taskbar  = classic
 [Explorer]
 chrome   = longhorn
 navbar   = vision
-navbar_preset = concept     ; a named luxnav preset (data/navbar/vision.ini); the Vista era has no header sizes
+navbar_preset = concept     ; a named luxnav preset (share/navbar/vision.ini); the Vista era has no header sizes
 taskpane = bottom            ; the task band under the list, close to Vista's details pane (a choice, not 5048's/5112's)
 
 [Desktop]

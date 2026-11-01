@@ -1,5 +1,5 @@
 -- Session state and settings (SHELL-DESIGN 14, SETTINGS.md, THEME-FORMAT.md): the theme through liblhde's resolver (the
--- Lua binding lh.theme_*: theme files in data/themes/ and ~/.config/lhde/themes/, bare styles, aliases), the shared desktop
+-- Lua binding lh.theme_*: theme files in share/themes/ and ~/.config/lhde/themes/, bare styles, aliases), the shared desktop
 -- settings (~/.config/lhde/settings.ini through liblhde's store: lh.settings_set; read here, cached), luxshell's private runtime
 -- state (~/.local/state/lhde/luxshell-state.ini: tile order) and the session commands (log off, stand by, shut down, restart, lock).
 --   local S = dofile("session.lua")

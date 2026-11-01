@@ -93,7 +93,7 @@ build/bin/flxp-startmenu: build/bin/flxp-taskbar
 # ---- install ------------------------------------------------------------------------------
 # bin/flxp and its helpers, the run-time data in $(DATADIR) (res/icons), the
 # .desktop file, the portal backend's .portal and D-Bus activation files.
-# The xp/2k/longhorn4074 icon recipes are data/icons (installed with data/); their
+# The xp/2k/longhorn4074 icon recipes are share/icons (installed with share/); their
 # art is read by resource id from lhde-import's resources/<build>.
 install-flxp: flxp
 	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(DATADIR)/res/icons $(DESTDIR)$(APPDIR) $(DESTDIR)$(PORTALDIR) $(DESTDIR)$(DBUSSERVICEDIR)

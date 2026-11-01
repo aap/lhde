@@ -1954,7 +1954,7 @@ std::string prefixed_setting(const std::string& key)
 bool vision_children_menu() { return prefixed_setting("header_crumb_menu") == "children"; }
 
 // Which header draws: flxp.ini's header_engine = lhnav | flxp when set (a developer's choice), else the session
-// theme's Explorer.navbar (docs/THEME-FORMAT.md): vision = luxnav with path.navbar (data/navbar/vision.ini),
+// theme's Explorer.navbar (docs/THEME-FORMAT.md): vision = luxnav with path.navbar (share/navbar/vision.ini),
 // 4051 | 4074 = flxp's own header. Without a session theme: luxnav when luxwm's frame set has a nav.ini.
 bool vision_wanted(std::string* ini, std::string* why)
 {

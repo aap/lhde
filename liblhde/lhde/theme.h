@@ -1,7 +1,7 @@
 /* liblhde: theme files and their resolver (docs/THEME-FORMAT.md sections 2-6).
 
    A theme is a name: a theme file (the user's ${XDG_CONFIG_HOME:-~/.config}/lhde/themes/NAME.theme first, then themes/NAME.theme
-   of the data directories, i.e. the shipped data/themes/), a bare visual style (styles/NAME.msstyles or styles/NAME/<name>.msstyles:
+   of the data directories, i.e. the shipped share/themes/), a bare visual style (styles/NAME.msstyles or styles/NAME/<name>.msstyles:
    a theme of its own with every key from its defaults), or an alias a theme file lists ([Theme] aliases, an lhde addition for
    the x11-era names: aero-patch -> aero4074).
 

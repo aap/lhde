@@ -3,7 +3,7 @@
 # (runtime.lua and its modules, tiles/): system Lua 5.4 (pkg-config lua5.4) and libdbus.
 #   build/bin/luxshell                    finds its Lua in luxshell/ (build tree) or $(PKGLIBDIR)/luxshell (installed)
 #   build/luxshell/tests/trayicon         an XEmbed tray icon for the notification area tile
-# The packs' text (data/packs/NAME/shell.lua) installs with data/; their images come from lhde-import (packs/<build>/...).
+# The packs' text (share/packs/NAME/shell.lua) installs with share/; their images come from lhde-import (packs/<build>/...).
 
 LUXSHELL_PKGS   = x11 xext xfixes cairo cairo-xlib fontconfig freetype2 lua5.4 dbus-1
 LUXSHELL_CFLAGS = -std=gnu11 -O2 -g -Wall -Wextra -Wno-unused-parameter -Wno-misleading-indentation -MMD -MP -DHAVE_UXTHEME \
@@ -26,7 +26,7 @@ luxshell: build/bin/luxshell build/luxshell/tests/trayicon
 # make check-luxshell: it builds, and every Lua file at least compiles (luac -p when there is one)
 check-luxshell: build/bin/luxshell
 	@if command -v luac5.4 >/dev/null 2>&1; then L=luac5.4; elif command -v luac >/dev/null 2>&1; then L=luac; else L=; fi; \
-	if [ -n "$$L" ]; then $$L -p $(LUXSHELL_LUA) data/packs/*/shell.lua && echo "ok    luxshell (built, Lua parses: $$L -p)"; \
+	if [ -n "$$L" ]; then $$L -p $(LUXSHELL_LUA) share/packs/*/shell.lua && echo "ok    luxshell (built, Lua parses: $$L -p)"; \
 	else echo "ok    luxshell (built; no luac to check the Lua)"; fi
 
 install-luxshell: build/bin/luxshell

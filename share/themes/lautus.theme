@@ -1,4 +1,4 @@
-; ReactOS's Lautus (free, GPL: the reactos source, data/sources/reactos.ini): an XP-format style, drawn live by wuxtheme
+; ReactOS's Lautus (free, GPL: the reactos source, share/sources/reactos.ini): an XP-format style, drawn live by wuxtheme
 ; (luxwm's msstyles mode, no frame set). Build reactos: ReactOS's icons, fonts and wallpapers. The XP explorer chrome, the
 ; classic taskbar. The wallpaper is taste (ReactOS sets none).
 [Theme]

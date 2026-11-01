@@ -1,5 +1,5 @@
 // Icon themes: which files supply the shell's icons and toolbar images.
-// A theme is a small ini file, a recipe: lhde's icons/<name>.theme (data/icons,
+// A theme is a small ini file, a recipe: lhde's icons/<name>.theme (share/icons,
 // found in the data directories) or flxp's res/icons/<name>.theme (wine, the
 // fallback); the one the theme names (Desktop.icons, shell::theme_icons;
 // default "xp", falling back to "wine" when

@@ -1,6 +1,6 @@
 ; Plex as Longhorn 4042 main shipped it (Resources/Themes/Plex.theme: plex.msstyles, ColorStyle=Blue, Size=Normal, wallpaper
 ; Bliss.bmp with WallpaperStyle=2 = stretched; no [Control Panel\Colors], so the desktop colour is the style's [sysmetrics]
-; BACKGROUND). No DWM for users in 4042 main: no glass, no composition. Needs `lhde-import` of 4042 main (data/sources/4042main.ini).
+; BACKGROUND). No DWM for users in 4042 main: no glass, no composition. Needs `lhde-import` of 4042 main (share/sources/4042main.ini).
 [Theme]
 name     = Plex (4042)
 build    = 4042main

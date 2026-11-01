@@ -1,5 +1,5 @@
 #!/bin/sh
-# luxwm's frame painter regression (make check-luxwm): render the frametest set of every frame set in data/frames (text from the
+# luxwm's frame painter regression (make check-luxwm): render the frametest set of every frame set in share/frames (text from the
 # tree, pixels and styles from lhde's data directories: the Windows tree ~/.local/share/lhde-windows or LHDE_WINDOWS, LHDE_DATA) and compare the SHA-256 of every
 # render with a baseline made on this machine. No reference images are in the repository (docs/LAYOUT.md "Asset policy"): the
 # first run writes the baseline, later runs compare against it.
@@ -77,7 +77,7 @@ render_one() { # SPEC OUTDIR [vision]
 # the glass frame sets whose style has a non-composited look of its own: 5048's and 5112's Window class (the basic5048/basic5112
 # themes, frames_classic = none) -- the style is v4 without CompositedWindow (lhde-theme style: kind = dwm)
 classic_own() {
-	for td in "$top"/data/frames/*/; do
+	for td in "$top"/share/frames/*/; do
 		grep -q '^mode *= *dwm' "$td/theme.ini" 2>/dev/null || continue
 		st=$(ini "$td/theme.ini" msstyles); st=${st#styles/}; st=${st%.msstyles}
 		[ -n "$st" ] && "$top/build/bin/lhde-theme" style "$st" 2>/dev/null | grep -qx 'kind=dwm' && basename "$td"
@@ -87,7 +87,7 @@ ini() { sed -n "s/^$2 *= *//p" "$1" | head -1; }
 
 export FRAMETEST_SOURCE=$source
 n=0
-for td in "$top"/data/frames/*/; do
+for td in "$top"/share/frames/*/; do
 	[ -n "$classic_only" ] && break
 	set_=$(basename "$td"); d=$out/$set_
 	if [ "$source" = dir ] && [ -z "$(ls "$(lhde_find "frames/$set_")"/*.png 2>/dev/null)" ]; then continue; fi
@@ -97,7 +97,7 @@ for td in "$top"/data/frames/*/; do
 done
 if [ "$source" = lib ] && [ -z "$classic_only" ]; then
 	for set_ in $(classic_own); do
-		td=$top/data/frames/$set_; d=$out/$set_.classic
+		td=$top/share/frames/$set_; d=$out/$set_.classic
 		st=$(ini "$td/theme.ini" msstyles); [ -n "$st" ] || continue
 		spec="|$(lhde_resolve "$st")|$(ini "$td/theme.ini" color)|$(ini "$td/theme.ini" size)"; mkdir -p "$d"
 		render_one "$spec" "$d"; n=$((n + 1))

@@ -89,7 +89,7 @@ USER FILES                           yours; lhde writes only what you change in 
 `frames/jade4074/close.png`, `resources/4074`, `wallpapers/4074/Bliss.jpg`), and liblhde (`liblhde/data.c`, `<lhde/data.h>`)
 answers from the first of: 1. `~/.config/lhde`; 2. `~/.local/share/lhde-windows/index` (or `$LHDE_DATA`, a flat directory:
 tests, scratch imports); 3. `$PREFIX/share/lhde` of the running program, then `$XDG_DATA_DIRS/lhde`; 4. the source tree's
-`data/` when the program runs from a build tree. Code is found by `lhde_component_dir`: `<tree>/luxshell` or `<prefix>/lib/lhde/luxshell`. Scripts use the
+`share/` when the program runs from a build tree. Code is found by `lhde_component_dir`: `<tree>/luxshell` or `<prefix>/lib/lhde/luxshell`. Scripts use the
 same lookup through `lhde-theme find REL` / `find KIND NAME` / `dirs --list` (session/lhde-paths.sh); lhde-import is the only
 writer of the Windows tree and the only code that knows its inside (`tools/lhdetree.py`). A frame set or pack is split by
 design: its text is shipped, its pixels are generated; `lhde_data_find_in` joins them.

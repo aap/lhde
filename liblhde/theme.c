@@ -444,7 +444,7 @@ static void apply_fallbacks(lhde_theme *t, const lhde_style_info *si)
     put(t, "path.pack", p, LHDE_FROM_DERIVED, "derived");
     v = get(t, "Shell.taskbar");
     if (v && !strcasecmp(v, "avalon") && is_none(get(t, "Shell.pack"))) fallback(t, "Shell.taskbar", "classic", "taskbar avalon needs a pack (none): the classic taskbar");
-    /* navbar: the layout file (vision: data/navbar/vision.ini; 4051/4074 name flxp's header) */
+    /* navbar: the layout file (vision: share/navbar/vision.ini; 4051/4074 name flxp's header) */
     v = get(t, "Explorer.navbar"); p[0] = 0;
     if (!is_none(v)) { char rel[300]; snprintf(rel, sizeof rel, "navbar/%s.ini", v);
         if (!lhde_data_find(rel, p, sizeof p)) { if (!strcasecmp(v, "vision")) fallback(t, "Explorer.navbar", "4074", "navbar/vision.ini missing: luxnav cannot lay it out"); p[0] = 0; } }

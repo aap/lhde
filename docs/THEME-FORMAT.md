@@ -20,7 +20,7 @@ Decisions in force (from that history):
 ## 1. Two layers
 **Components**, each chosen independently and referenced by **name**:
 
-| kind | where (relative names, looked up in `~/.config/lhde`, the Windows tree's `index/`, `$PREFIX/share/lhde`, the build tree's `data/`: docs/LAYOUT.md "The three trees") | what it is |
+| kind | where (relative names, looked up in `~/.config/lhde`, the Windows tree's `index/`, `$PREFIX/share/lhde`, the build tree's `share/`: docs/LAYOUT.md "The three trees") | what it is |
 | --- | --- | --- |
 | style | `styles/NAME.msstyles` (or `styles/NAME/*.msstyles`), shellstyle.dll beside it | the visual style: controls, classic decorations, menus, start panel |
 | scheme | `styles/NAME.scheme` | a classic Appearance scheme (Windows Standard, Brick, ...) for `style = classic` |
@@ -37,7 +37,7 @@ Names: `[a-z0-9._-]+` (wallpapers: plus one `/`). Importers name by build (`aero
 A path (absolute or `~/`) is accepted in the user's own theme files only.
 
 **Theme files** tie them together, like Windows `.theme` files: shipped in
-`$PREFIX/share/lhde/themes/NAME.theme` (source: `data/themes/`), the user's in
+`$PREFIX/share/lhde/themes/NAME.theme` (source: `share/themes/`), the user's in
 `~/.config/lhde/themes/NAME.theme`. A bare style in `styles/` is also a theme (section 5) for the resolver and `lhde-theme`;
 Display Properties lists theme files only and offers the styles on its Appearance tab ("Windows and buttons"), as Windows
 keeps Themes and the visual style apart (2026-10-28). That list is the curated set: the styles some theme file (shipped or the

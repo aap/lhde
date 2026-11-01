@@ -9,8 +9,8 @@ drawn live from the visual style through libwuxtheme (Window.CAPTION & co.) with
 - Sources: wm.c (window management, EWMH, the session theme, animations, keys), frame.c (frame sets and painting),
   frame_ut.c (frames from a .msstyles through libwuxtheme), menu.c (the window menu), client.c (luxwmc), config.h (build
   configuration). `luxwm.mk` is its part of the top-level build.
-- Themes: the theme files data/themes/NAME.theme, resolved by liblhde (`[Glass] frames = NAME`), frame sets in
-  data/frames/NAME (theme.ini, nav.ini) with their pixels in the Windows tree (`~/.local/share/lhde-windows/generated/frames`,
+- Themes: the theme files share/themes/NAME.theme, resolved by liblhde (`[Glass] frames = NAME`), frame sets in
+  share/frames/NAME (theme.ini, nav.ini) with their pixels in the Windows tree (`~/.local/share/lhde-windows/generated/frames`,
   tools/lhde-import), found through liblhde/data.c.
 - Names kept from lhwm: the X atoms (`_LHWM_*`), the window manager's `_NET_WM_NAME` "lhwm" (luxshell and flxp's log-off know
   it by that), `LHWM_*` environment variables, `~/.config/lhde/keys`. `make install` adds `lhwm` and `lhwmc` symlinks.

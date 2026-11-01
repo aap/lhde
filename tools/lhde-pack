@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """lhde-pack: a resource pack of raw, unmodified Windows files, made from ISOs (or WIMs, or Windows directories) by the rules in
-data/sources/<source>.ini (docs/USAGE.md "Getting the Windows resources", docs/LAYOUT.md "Asset policy"). lhde-import --pack
+share/sources/<source>.ini (docs/USAGE.md "Getting the Windows resources", docs/LAYOUT.md "Asset policy"). lhde-import --pack
 turns a pack into lhde's Windows tree (~/.local/share/lhde-windows); nobody needs the ISOs after that.
 
 usage: lhde-pack [--profile essentials|museum] [--themes A,B,C] [--isos DIR]... [--sources ID,ID] [--all] [--from-pack PACK]
                  [--from-tree [DIR]] [--local DIR | --no-local] [--out DIR] [--name NAME] [--no-tar] [--zip] [--tmp DIR] [--medium ID=PATH]... [--no-annotate] [--list]
   --profile P     essentials (the default): only the files the themes need, from the resolver itself (see --themes);
                   museum: every file of every source (today's complete pack, for archaeology and for making essentials later)
-  --themes A,B,C  the themes essentials is made for (default: the shipped ones, data/themes/*.theme without .todo). For each,
+  --themes A,B,C  the themes essentials is made for (default: the shipped ones, share/themes/*.theme without .todo). For each,
                   `lhde-theme explain --files NAME` names the Windows files it reads: its visual style (+ shellstyles), the
                   styles/DLLs its frame sets and pack images are made from, the icon recipe's DLLs, the wallpaper, the fonts
                   directory, the build's shell32/browseui/explorer/shellstyle/comctl32/themeui/imageres/logonui, and
@@ -45,7 +45,7 @@ lhde-import --pack copies every path as a normal file. The MANIFEST stays the au
 Pack layout: NAME/<source>/{system32,themes,fonts,wallpapers}/..., NAME/<source>/source.ini (the rules it was made with, and
 the recipes lhde-import runs), NAME/local/{themes,schemes,resources,fonts,wallpapers,icons}/... (the tree's local/, source
 `local` in the MANIFEST), NAME/MANIFEST (sha256, size, pack path, source, medium:in-image path). Adding a file or a source
-is editing or adding an ini in data/sources/.
+is editing or adding an ini in share/sources/.
 """
 import os
 import shutil
@@ -101,7 +101,7 @@ def main():
         isos = [x for x in os.environ.get('LHDE_ISOS', '.').split(':') if x]
     sources = L.load_sources()
     if not sources:
-        L.die('no data/sources/*.ini found')
+        L.die('no share/sources/*.ini found')
 
     def medium(s):
         if s.id in media:
@@ -125,7 +125,7 @@ def main():
     if profile == 'essentials':
         themes = themes or L.shipped_themes()
         if not themes:
-            L.die('no shipped themes found (data/themes/*.theme); name some with --themes')
+            L.die('no shipped themes found (share/themes/*.theme); name some with --themes')
     name = name or 'lhde-resources-%s%s' % (datetime.date.today().isoformat(), '-essentials' if profile == 'essentials' else '')
     os.makedirs(out, exist_ok=True)
     pack = os.path.join(os.path.realpath(out), name)

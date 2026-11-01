@@ -1,7 +1,7 @@
 # tools
 
 - `lhde-pack`: a resource pack of raw, unmodified Windows files, from ISOs (or WIMs, Windows directories) by the rules in
-  `data/sources/<source>.ini`; `<source>/{system32,themes,fonts,wallpapers}` + `MANIFEST`, as a directory and a `.tar.zst`.
+  `share/sources/<source>.ini`; `<source>/{system32,themes,fonts,wallpapers}` + `MANIFEST`, as a directory and a `.tar.zst`.
 - `lhde-import`: fills the Windows tree (`$LHDE_WINDOWS`, else `~/.local/share/lhde-windows`: `<source>/` as in the pack,
   `local/`, `generated/`, `index/`; docs/LAYOUT.md "The three trees") from a pack (`--pack`), or from an ISO, WIM or Windows
   directory (`--iso`, `--wim`, `--dir`: packed into a temporary pack first, the build detected), a dropped-in style (`--style`),

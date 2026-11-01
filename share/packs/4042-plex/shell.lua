@@ -8,7 +8,7 @@
 -- used by default (no StartBar\Taskbar key; StuckRects2's 30 px rect is the unused classic tray's). Both bars are skinned only by
 -- ThemeImage('Sidebar', part, state) of the msstyles (4042 main's Sidebar BLOBs are bare PNGs; the margins are the stylesheet's
 -- NineGridMargin values) and Franklin Gothic Medium text (framd.ttf, imported from 4042 main).
--- Images: packs/4042/imageres (data/sources/4042main.ini [packs]): plex-sidebar-<part>[-<state>].png = the Sidebar parts unmodified
+-- Images: packs/4042/imageres (share/sources/4042main.ini [packs]): plex-sidebar-<part>[-<state>].png = the Sidebar parts unmodified
 -- (recipe plexbars), plex-taskbar.png = BACK transposed, plex-clear.png = nothing; NNNN.png = 4042 main's imageres (clock, tray).
 -- Sizes in px: the stylesheet's BoxUnits are pixels (unit 0). Font descriptions name Franklin Gothic Medium with a fallback after a
 -- comma: text.c would otherwise read "Medium" as the weight (family "Franklin Gothic", not found).

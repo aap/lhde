@@ -6,7 +6,7 @@ usage: lhdeaurora.py layers FILE.baml|FILE.xaml OUT.json [SOURCE]   flatten one 
        lhdeaurora.py header OUT.h [PANE.json] [DESKTOP.json]          examples/aurorademo's tables (an empty or missing path:
                                                                        that scene is left out, and the header says so)
 
-The scenes (the files lhde-import reads them from: data/sources/<build>.ini [aurora]; the JSON lands in the Windows tree's
+The scenes (the files lhde-import reads them from: share/sources/<build>.ini [aurora]; the JSON lands in the Windows tree's
 generated/aurora/):
   preview pane  jade.msstyles PreviewPane.AURORA (STREAM 481 in 4074, 479 in 4066), 2003 BAML: 50 paths in 9 canvases,
                 12 animations, design space 1080x160 stretched non-uniformly to the pane; one hue (#5190DA) recoloured per
@@ -432,7 +432,7 @@ def header(pane, desktop):
 
 HINT = {'pane': 'jade.msstyles of build 4074 (lhde-import of the 4074 source)',
         'desktop': 'Microsoft.Windows.WCPClient.dll of build 4074 (lhde-import --iso longhorn4074.iso, or a pack made since '
-                   'data/sources/4074.ini names it)'}
+                   'share/sources/4074.ini names it)'}
 
 
 def main(argv):

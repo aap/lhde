@@ -6,7 +6,7 @@
 # Not installed: run them from build/examples.
 #
 # aurora_data.h is made at every make from the Windows tree's generated/aurora/{previewpane,desktop}-4074.json (lhde-import's
-# [aurora] recipes of data/sources/4074.ini; found through liblhde's lookup, lhde-theme find) by tools/lhdeaurora.py, which
+# [aurora] recipes of share/sources/4074.ini; found through liblhde's lookup, lhde-theme find) by tools/lhdeaurora.py, which
 # rewrites it only when it changes. A scene that is not imported is left out of the header with a message, and aurorademo
 # says so when asked for it.
 

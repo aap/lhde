@@ -17,7 +17,7 @@ one build, for the parts that were separate projects:
 | `session/`  | `lhde-session` (start, theme, taskbar, shell, picom, desktop, stop), `lab.sh` (the headless bench), `lhwall.sh`, theme-reload/-watch, picom configs | x11 `xinitrc.lab`, `second-display.sh`, `lab.sh`, ... |
 | `examples/` | extendframe, navdemo, glassdemo, aurorademo (its tables made at build time from the Windows tree) | x11 `examples/`, `glassdemo.c` |
 | `tools/`    | `lhde-pack` (a resource pack of raw Windows files from ISOs), `lhde-import` (a pack, ISO, WIM or Windows directory into the Windows tree, the recipes), `lhdeimport.py`, `lhdetree.py` (the Windows tree, its index, the migration), `wim0108.py`, `lhdebaml.py` + `lhdeaurora.py` (the aurora: BAML decoders, layer lists, aurorademo's tables), recipe builders (`msstyles2theme.py`, `build_aerovision.py`, `build_aero5112.py`) | x11 `lhwm/tools/` |
-| `data/`     | text only: `themes/*.theme` (the shipped themes), `navbar/*.ini`, `icons/*.theme`, `sources/*.ini` (what lhde-pack takes from each Windows build), `frames/*/theme.ini`, `packs/*/shell.lua` | x11 `themes.ini`, `wallpapers.ini`, `lhwm/themes/*/*.ini`, `lhshell/themes/` |
+| `share/`    | text only: `themes/*.theme` (the shipped themes), `navbar/*.ini`, `icons/*.theme`, `sources/*.ini` (what lhde-pack takes from each Windows build), `frames/*/theme.ini`, `packs/*/shell.lua` | x11 `themes.ini`, `wallpapers.ini`, `lhwm/themes/*/*.ini`, `lhshell/themes/` |
 | `docs/`     | `ARCHITECTURE.md` (the map), `LAYOUT.md` (asset policy, the three trees), `THEME-FORMAT.md`, `SETTINGS.md`, `CLIENT-PROTOCOL.md`, `USAGE.md`, `LUXWM.md`, `NAVBAR.md`, `SHELL-DESIGN.md`, `MSSTYLES-FORMAT.md`, `ANNOTATIONS.md`; `docs/README.md` lists them; `history/` holds the journals (flxp-NOTES, THEMES, the merge plan, the theme-format status) | |
 
 No Microsoft files are in this repository, and none may be added (docs/LAYOUT.md,
@@ -54,7 +54,7 @@ What `make` builds:
     build/tests/..., build/tests/w32/... test programs and demos (tests/demo.sh runs some)
     build/luxwm/tests/frametest menutest desktopwin dockorder strutdock, build/luxshell/tests/trayicon
 
-The programs run uninstalled from `build/bin` (they find `flxp/res`, `luxshell/` and `data/` in the source
+The programs run uninstalled from `build/bin` (they find `flxp/res`, `luxshell/` and `share/` in the source
 tree). Per component: `make wux`, `make wuxtheme`, `make flxp`, `make tests`, `make luxnav`, `make luxwm`,
 `make luxshell`, `make examples`.
 
@@ -127,7 +127,7 @@ pack directory works too). By hand:
 Every program looks a file up by its relative name (`styles/jade4074.msstyles`, `frames/jade4074/close.png`,
 `resources/4074`) in this order: `~/.config/lhde`, the Windows tree's `index/` (`$LHDE_DATA`, a flat directory, instead:
 tests), the install's `share/lhde`, `$XDG_DATA_DIRS/lhde`, the
-source tree's `data/` (liblhde/data.c, lhde/data.h; scripts through `lhde-theme find`). **When something looks wrong:**
+source tree's `share/` (liblhde/data.c, lhde/data.h; scripts through `lhde-theme find`). **When something looks wrong:**
 `lhde-theme explain [THEME]` prints every visible component of the theme, the file it comes from, its tree and whether it
 fell back; `lhde-theme dirs` shows the trees with their sizes.
 
@@ -160,7 +160,7 @@ store `~/.config/lhde/settings.ini`; what flxp remembers on its own (views, icon
 | the fonts | `fonts/<build>` with tahoma.ttf (4074's); the session theme's `fonts` (registry) are added too |
 | Display Properties' wallpaper list | flxp.ini `wallpaper_dirs` (`:`-separated), default `~/Pictures/Wallpapers` and every `wallpapers/<build>`; the theme's wallpaper from `wallpapers.ini` (root `wallpapers/`) |
 | the task band's aurora (flxp.ini `taskpane_background = aurora`) | `resources/demo` (needs the demo's `docLib/`, `search/` images; the import has only `aurora_strip.png` so far) |
-| (XP/2000 art) | no setting: the xp/2k/longhorn4074 icon recipes (`data/icons/*.theme`), the toolbar strips, the task pane's shellstyle bitmaps, the start flag, the Log Off buttons, the user tile and the Folders bar's close glyph are read by resource id from `resources/xp`, `resources/2k` (lhde-import; docs/history/flxp-NOTES.md "XP and 2000 art by resource id"). Without them: Wine's icons and drawn lookalikes. |
+| (XP/2000 art) | no setting: the xp/2k/longhorn4074 icon recipes (`share/icons/*.theme`), the toolbar strips, the task pane's shellstyle bitmaps, the start flag, the Log Off buttons, the user tile and the Folders bar's close glyph are read by resource id from `resources/xp`, `resources/2k` (lhde-import; docs/history/flxp-NOTES.md "XP and 2000 art by resource id"). Without them: Wine's icons and drawn lookalikes. |
 
 `LHDE_WINDOWS` (environment) is another Windows tree, `LHDE_DATA` a flat data directory used instead of it (tests, scratch
 imports), for every lhde program and script.
