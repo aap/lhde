@@ -8,3 +8,6 @@ __pycache__/
 
 # resource packs built by tools/lhde-pack: Microsoft files, never committed (docs/LAYOUT.md asset policy)
 /lhde-resources-*
+
+# the agents' worktrees and session files
+.claude/
