@@ -29,6 +29,29 @@ std::string config_home() { return env_or("XDG_CONFIG_HOME", home_dir() + "/.con
 std::string data_home() { return env_or("XDG_DATA_HOME", home_dir() + "/.local/share"); }
 std::string state_home() { return env_or("XDG_STATE_HOME", home_dir() + "/.local/state"); }
 
+std::string user_dir(const std::string& name, const std::string& fallback)
+{
+    std::string var = "XDG_" + name + "_DIR", home = home_dir(), value;
+    if (const char* e = getenv(var.c_str())) value = e;
+    if (value.empty()) {
+        std::string text;
+        if (read_file(config_home() + "/user-dirs.dirs", text)) {
+            size_t at = 0;
+            while (at < text.size()) {   // XDG_PICTURES_DIR="$HOME/Pictures" lines (the format xdg-user-dirs-update writes)
+                size_t nl = text.find('\n', at);
+                std::string line = trim(text.substr(at, nl == std::string::npos ? std::string::npos : nl - at));
+                at = nl == std::string::npos ? text.size() : nl + 1;
+                if (line.compare(0, var.size() + 1, var + "=") != 0) continue;
+                value = trim(line.substr(var.size() + 1));
+                if (value.size() >= 2 && value.front() == '"' && value.back() == '"') value = value.substr(1, value.size() - 2);
+            }
+        }
+    }
+    if (value.compare(0, 5, "$HOME") == 0) value = home + value.substr(5);
+    if (value.empty() || value[0] != '/' || value == home || value == home + "/") return home + "/" + fallback;
+    return value;
+}
+
 static std::string lhde_dir(const std::string& base)
 {
     std::string d = base + "/lhde";

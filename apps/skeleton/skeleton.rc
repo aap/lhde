@@ -1,0 +1,17 @@
+/* skeleton's dialog templates, in dialog units for "MS Shell Dlg" 8 like flxp's (flxp/rc/explorer.rc).
+ * Build: make apps/skeleton/skeleton.res (mingw windres; the .res is checked in); embedded by skeleton.cpp. */
+#include <windows.h>
+#include "resource.h"
+
+LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
+
+/* Help > About: the layout of flxp's message box (IDD_MESSAGE) */
+IDD_ABOUT DIALOGEX 0, 0, 220, 62
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About Skeleton"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            "", IDC_ABOUT_ICON, 7, 7, 21, 20
+    LTEXT           "Skeleton: the start of an lhde application.\nCopy apps/skeleton, rename it, build.", IDC_ABOUT_TEXT, 41, 11, 172, 26, SS_NOPREFIX
+    DEFPUSHBUTTON   "OK", IDOK, 163, 41, 50, 14
+END

@@ -86,6 +86,8 @@ include tests/tests.mk
 include luxwm/luxwm.mk
 include luxshell/luxshell.mk
 include examples/examples.mk
+include apps/app.mk            # after wux.mk and flxp.mk: the recipe an application includes (docs/APPLICATIONS.md)
+include apps/skeleton/skeleton.mk
 
 all: libs programs tests liblhde luxwm luxshell examples
 libs: $(WUXA) $(UTA) $(UTSO) $(UTPC) $(LHDEA) $(LHDESO) $(LHDEPC) $(LUXNAVA) $(LUXNAVSO) $(LUXNAVPC)
