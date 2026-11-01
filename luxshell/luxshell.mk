@@ -6,7 +6,7 @@
 # The packs' text (data/packs/NAME/shell.lua) installs with data/; their images come from lhde-import (packs/<build>/...).
 
 LUXSHELL_PKGS   = x11 xext xfixes cairo cairo-xlib fontconfig freetype2 lua5.4 dbus-1
-LUXSHELL_CFLAGS = -std=gnu11 -O2 -g -Wall -Wextra -Wno-unused-parameter -Wno-misleading-indentation -MMD -MP -DHAVE_UXTHEME -DUT_HAVE_TEXT_EXTENT \
+LUXSHELL_CFLAGS = -std=gnu11 -O2 -g -Wall -Wextra -Wno-unused-parameter -Wno-misleading-indentation -MMD -MP -DHAVE_UXTHEME \
                   -Iluxshell -Iliblhde -idirafter . $(shell pkg-config --cflags $(LUXSHELL_PKGS))
 LUXSHELL_OBJS   = $(addprefix $(O)/luxshell/,luxshell.o scene.o text.o tray.o notify.o menupaint.o)
 LUXSHELL_LUA    = $(wildcard luxshell/*.lua) $(wildcard luxshell/tiles/*.lua)

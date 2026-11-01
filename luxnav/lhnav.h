@@ -15,20 +15,20 @@
      (lhnav_add_font_dir for the theme's font directories); with no style there is no text;
    - a header-only cairo helper (define LHNAV_WITH_CAIRO before including) for cairo clients.
 
-   Coordinates are the client window's. The geometry (NAVBAR.md, aap 2026-10-27) is measured from the frame's top edge:
+   Coordinates are the client window's. The geometry (NAVBAR.md, aap's measurements) is measured from the frame's top edge:
      rows [0, deco_h)                    the frame's decoration (caption buttons); the title is drawn here, baseline on deco_h
      rows [deco_h, deco_h + orb_h)       the back/forward orb (no drop-down arrows), the breadcrumb box and the search box,
                                          both boxes box_h high and centred in the row (the big variant: the whole travel art
                                          with its drop-down arrow part, the boxes centred against the orb part)
      rows [.., + gap)                    spacing; 15 + 30 + 2 = 47 rows of header
    A CLIENT_CAPTION client's row 0 is the frame's row border_t (_LHWM_FRAME_METRICS 12), so in client rows everything is
-   border_t higher; lhnav_height() is the header in client rows (47 - border_t). Below it the client asks lhwm for `lines` more
-   rows of glass (lhnav_extend_top): lhwm draws the plate's inner light/dark line pair there (header_mode = crop), the body starts
+   border_t higher; lhnav_height() is the header in client rows (47 - border_t). Below it the client asks luxwm for `lines` more
+   rows of glass (lhnav_extend_top): luxwm draws the plate's inner light/dark line pair there (header_mode = crop), the body starts
    after them.
 
    Usage:
      lhnav_metrics m; lhnav_metrics_default(&m); lhnav_metrics_load(&m, "THEME_DIR/nav.ini");   (tuning, optional)
-     m.border_t = ...; m.caption_x = ...;          (from lhwm: _LHWM_FRAME_METRICS, _LHWM_CAPTION_RECT)
+     m.border_t = ...; m.caption_x = ...;          (from luxwm: _LHWM_FRAME_METRICS, _LHWM_CAPTION_RECT)
      lhnav *n = lhnav_new(style, &m);              (style: ut_open of the session's msstyles, may be NULL)
      lhnav_set_title / _path / _history; lhnav_layout(n, width); lhnav_paint(n, px, w, h, stride, composited);
      pointer: lhnav_pointer(n, x, y, buttons) -> repaint?; lhnav_hit(n, x, y) -> what is there
@@ -50,7 +50,7 @@ enum {
     LHNAV_NONE = 0,     /* not in the header */
     LHNAV_CAPTION,      /* empty header area: the client sends _NET_WM_MOVERESIZE (move) / double-click maximise */
     LHNAV_RESIZE_TOP,   /* the top `resize_rows` rows outside the caption buttons: _NET_WM_MOVERESIZE direction 1 */
-    LHNAV_BUTTONS,      /* lhwm's caption buttons (_LHWM_CAPTION_RECT): the client keeps it out of its input shape */
+    LHNAV_BUTTONS,      /* luxwm's caption buttons (_LHWM_CAPTION_RECT): the client keeps it out of its input shape */
     LHNAV_TITLE,        /* the title text (behaves as caption) */
     LHNAV_BACK,
     LHNAV_FWD,
@@ -100,7 +100,7 @@ enum {
 typedef struct lhnav_place { int x, y, dx, dy, w, h; } lhnav_place;
 
 typedef struct lhnav_metrics {
-    /* where the client lies in the frame (lhwm: _LHWM_FRAME_METRICS 12 border_t, 1 border_l; 0 0 for a frameless window) */
+    /* where the client lies in the frame (luxwm: _LHWM_FRAME_METRICS 12 border_t, 1 border_l; 0 0 for a frameless window) */
     int border_t, border_l;
     /* the caption buttons' rectangle in client coordinates (_LHWM_CAPTION_RECT), w = 0: none */
     int caption_x, caption_y, caption_w, caption_h;
@@ -119,9 +119,9 @@ typedef struct lhnav_metrics {
     int crumb_x;        /* first segment's offset inside the box */
     int title_dy;       /* baseline correction, rows (+ = down) */
     int crumb_dy;       /* breadcrumb text correction, rows */
-    /* fonts: "" = the style's CompositedBreadcrumbBar::Toolbar FONT (else its theme font closest to Segoe UI 12 px); else a
-       description "Family[, Family2] [Bold] [Italic] SIZE[px]" (pango's form; SIZE without px = points at 96 dpi), drawn in the
-       style's theme font closest to it (libuxtheme draws theme fonts only: a log line says which; docs/history/THEMES.md wux request 2) */
+    /* fonts: "" = the style's CompositedBreadcrumbBar::Toolbar FONT (else Segoe UI 12 px); else a
+       description "Family[, Family2] [Bold] [Italic] SIZE[px]" (pango's form; SIZE without px = points at 96 dpi), drawn
+       as an explicit font (ut_font) */
     char title_font[96], crumb_font[96];
     /* colours 0xRRGGBB; 0xFFFFFFFF = from the style (crumbs: TEXTCOLOR; glow: GLOWCOLOR) or the built-in default */
     uint32_t title_rgb, crumb_rgb, glow_rgb, plain_rgb;   /* plain_rgb: all text when not composited (no glow), e.g. the caption text colour */
@@ -175,7 +175,7 @@ void lhnav_add_font_dir(const char *dir);
 
 lhnav *lhnav_new(struct ut_theme *style, const lhnav_metrics *m);
 void   lhnav_free(lhnav *n);
-/* new metrics or a new style (theme change, maximise: the caller re-reads lhwm's properties); call lhnav_layout afterwards.
+/* new metrics or a new style (theme change, maximise: the caller re-reads luxwm's properties); call lhnav_layout afterwards.
    lhnav_set_metrics also rebuilds the toolbar from m->tools (a client with its own list puts it there, or calls lhnav_set_tools
    after it) */
 void   lhnav_set_metrics(lhnav *n, const lhnav_metrics *m);

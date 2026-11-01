@@ -38,11 +38,9 @@ void     px_stop(px_paint *p, double off, double r, double g, double b, double a
 /* compositing (OVER) */
 void px_over(uint32_t *d, uint32_t s);
 void px_blit(px_cv *c, const px_img *im, int x, int y, double alpha);                 /* 1:1 at (x, y) */
-void px_blit_part(px_cv *c, const px_img *im, int sx, int sy, int w, int h, int x, int y);   /* source rect */
 /* scaled by k with its top-left at (x, y): k < 0.75 box-filtered (the area each pixel covers), else bilinear (cairo's GOOD
    filter makes the same choice); k = 1 at integer x, y: px_blit */
 void px_blit_scaled(px_cv *c, const px_img *im, double x, double y, double k, double alpha);
-px_img *px_img_scaled(const px_img *im, int w, int h);                      /* a new image of im drawn into w x h */
 /* an A8 coverage mask (stride mw) at (x, y) in a colour (0xRRGGBB) at opacity alpha */
 void px_mask(px_cv *c, const unsigned char *m, int mw, int mh, int x, int y, uint32_t rgb, double alpha);
 
@@ -56,8 +54,6 @@ void px_stroke_circle(px_cv *c, double cx, double cy, double r, double lw, const
 void px_fill_poly(px_cv *c, const double *xy, int n, const px_paint *p);          /* n points, nonzero winding */
 /* a polyline (closed: back to the first point) of width lw; round: round caps and joins, else butt caps (joins rounded) */
 void px_stroke_poly(px_cv *c, const double *xy, int n, int closed, double lw, int round, const px_paint *p);
-/* a whole area painted (cairo_paint through a clip): the paint over the clip rectangle */
-void px_paint_all(px_cv *c, const px_paint *p);
 
 /* box blur of an A8 image, radius r, in place (one pass horizontally, one vertically) */
 void px_blur_a8(unsigned char *d, int w, int h, int stride, int r);

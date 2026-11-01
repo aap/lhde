@@ -211,9 +211,8 @@ struct tfont {
 #else
     struct { int italic; } uf;
 #endif
-    int italic;                        /* slanted by lhnav (older libuxtheme: the theme font being upright) */
+    int italic;                        /* slanted by lhnav */
     int asc, height;                   /* baseline below the cell top and the cell height (tmAscent, tmHeight) */
-    int h_right;                       /* older libuxtheme: where an "H" drawn at x 0 ends (measuring by drawing) */
     unsigned gen;                      /* font_gen when measured */
 };
 /* measured widths, per (font, text) (lhnav_text_width) */
@@ -363,7 +362,7 @@ static uint32_t *sub_cols(const uint32_t *px, int w, int x, int cw, int h)
     return o;
 }
 
-/* Vista's TravelBand (5048, 5112, Vista; aap 2026-10-28). TRAVELBACKGROUNDS is the plate behind both buttons with the history
+/* Vista's TravelBand (5048, 5112, Vista). TRAVELBACKGROUNDS is the plate behind both buttons with the history
    chevron at its right end (5048 61x28: one long well; 5112 70x27: two round wells; NORMAL, HOT / PRESSED = the chevron's box lit,
    DISABLED = no chevron: neither direction possible); TRAVELBUTTONS the two glyph orbs side by side, back in the left half,
    forward in the right one (5048 36x24, 5112 54x27), one image per state. Composed as browseui does: the plate in the chevron's
@@ -688,7 +687,7 @@ static void load_art(lhnav *n)
         }
     }
 #endif
-    if (n->m.art_dir[0]) {   /* tuning override (lhwm/tools/build_aerovision.py writes these) */
+    if (n->m.art_dir[0]) {   /* tuning override (tools/build_aerovision.py writes these) */
         struct art b = { { 0 }, { 0 } }, f = { { 0 }, { 0 } };
         if (load_strip(&b, n->m.art_dir, "nav_back.png") && load_strip(&f, n->m.art_dir, "nav_fwd.png")) {
             for (int v = 0; v < 4; v++) { art_clear(&n->back[v]); art_clear(&n->fwd[v]); }
@@ -743,7 +742,7 @@ static void load_art(lhnav *n)
         if (!i && x1 > n->fwd_x) x1 = n->fwd_x;   /* back's box ends where forward's starts */
         n->menu_x[i][0] = x0; n->menu_x[i][1] = x1;
     }
-    if (getenv("LHNAV_DEBUG")) fprintf(stderr, "lhnav: art sources\n%s", lhnav_art_sources(n));
+    if (getenv("LHNAV_DEBUG")) fprintf(stderr, "luxnav: art sources\n%s", lhnav_art_sources(n));
 }
 
 static void tools_free(lhnav *n)
@@ -924,9 +923,7 @@ void lhnav_set_field(lhnav *n, int part, const char *s, int caret, int editing)
    Every string is rendered once as an 8-bit coverage mask (ut_draw_text_mask: the glyphs DrawThemeText / the font calls draw);
    lhnav composites it in its own colour (nav.ini, the style's breadcrumb colour) and builds the white halo on glass from the same
    mask. Fonts: the breadcrumb's is the style's part font (CompositedBreadcrumbBar::Toolbar), nav.ini's crumb_font / title_font
-   are explicit fonts (ut_font). Widths: ut_text_extent (GetThemeTextExtent), cached per (font, text); cell: ut_get_text_metrics.
-   UT_HAVE_TEXT_EXTENT (the Makefile defines it when ut.h has these calls, flxp 2026-10-27): without it (an older libuxtheme)
-   lhnav falls back to ut_draw_text into a scratch buffer, measuring by drawing, and the closest theme part for nav.ini fonts. */
+   are explicit fonts (ut_font). Widths: ut_text_extent (GetThemeTextExtent), cached per (font, text); cell: ut_get_text_metrics. */
 
 enum { LH_DT_BOTTOM = 0x8, LH_DT_SINGLELINE = 0x20, LH_DT_NOCLIP = 0x100, LH_DT_NOPREFIX = 0x800, LH_DT_END_ELLIPSIS = 0x8000 };
 
@@ -936,11 +933,10 @@ static void note(const char *msg)   /* a log line, once per distinct message */
     static int k;
     for (int i = 0; i < 16; i++) if (seen[i][0] && !strncmp(seen[i], msg, sizeof seen[i] - 1)) return;   /* long ones: their start */
     snprintf(seen[k], sizeof seen[k], "%s", msg); k = (k + 1) % 16;
-    fprintf(stderr, "lhnav: %s\n", msg);
+    fprintf(stderr, "luxnav: %s\n", msg);
 }
 
 #ifdef HAVE_UXTHEME
-static __attribute__((unused)) int font_px(const ut_font *f) { return f->height < 0 ? -f->height : (f->height * 4 + 2) / 5; }   /* + = cell height */
 static void face_of(const char *in, char *out, size_t n, int *bold)   /* "Segoe UI Bold" -> "Segoe UI", bold */
 {
     snprintf(out, n, "%s", in);
@@ -983,7 +979,7 @@ static int font_of(lhnav *n, const struct tfont *f, ut_font *out)
 }
 #endif
 
-#if defined HAVE_UXTHEME && defined UT_HAVE_TEXT_EXTENT
+#ifdef HAVE_UXTHEME
 static const ut_font *xfont(const struct tfont *f) { return f->explicit_font ? &f->uf : NULL; }
 
 /* s's coverage into a new W x H mask, the text cell's top-left at (ox, oy), single line; maxw > 0: DT_END_ELLIPSIS within it */
@@ -1000,7 +996,7 @@ static unsigned char *text_mask(lhnav *n, const struct tfont *f, const char *s, 
 static void font_measure(lhnav *n, struct tfont *f)
 {
     ut_text_metrics tm;
-    f->asc = f->height = f->h_right = 0;
+    f->asc = f->height = 0;
     f->gen = font_gen;
     if (!f->cls[0] && !f->explicit_font) return;
     if (!ut_get_text_metrics(n->ut, f->cls, f->part, f->state, xfont(f), &tm) || tm.height <= 0) {
@@ -1044,178 +1040,6 @@ static struct tfont font_variant(lhnav *n, const struct tfont *f, int bold, int 
     r.uf = u; r.explicit_font = 1; r.italic = 0;
     return r;
 }
-#elif defined HAVE_UXTHEME
-/* ---- the fallback for a libuxtheme without the text calls: ut_draw_text into a scratch buffer (its alpha = the coverage), widths
-   by drawing, nav.ini fonts as the closest theme part ---- */
-
-/* s in font f into a new transparent W x H buffer, the text cell's top-left at (ox, oy), single line, not clipped; maxw > 0:
-   DT_END_ELLIPSIS within maxw */
-static uint32_t *text_raster(lhnav *n, const struct tfont *f, const char *s, unsigned flags, int ox, int oy, int maxw, int W, int H)
-{
-    uint32_t *px = calloc((size_t)W * H, 4);
-    if (!px) return NULL;
-    ut_rect r = { ox, oy, maxw > 0 ? ox + maxw : W, H };
-    ut_draw_text(n->ut, f->cls, f->part, f->state, px, W, H, W * 4, s,
-                 LH_DT_SINGLELINE | LH_DT_NOPREFIX | LH_DT_NOCLIP | flags | (maxw > 0 ? LH_DT_END_ELLIPSIS : 0), &r);
-    return px;
-}
-
-/* the last column and row with alpha >= thr (-1: none) */
-static void ink_end(const uint32_t *px, int W, int H, unsigned thr, int *xr, int *yb)
-{
-    int x1 = -1, y1 = -1;
-    for (int y = 0; px && y < H; y++) for (int x = 0; x < W; x++)
-        if ((px[(size_t)y * W + x] >> 24) >= thr) { if (x > x1) x1 = x; y1 = y; }
-    if (xr) *xr = x1;
-    if (yb) *yb = y1;
-}
-
-/* GDI's synthesized oblique (FreeType's slant 0.2126) of a coverage mask, about row `base` */
-static void slant(unsigned char *m, int W, int H, int base)
-{
-    unsigned char *row = malloc((size_t)W);
-    if (!row) return;
-    for (int y = 0; y < H; y++) {
-        double s = (base - 0.5 - y) * 0.2126;
-        unsigned char *r = m + (size_t)y * W;
-        memcpy(row, r, (size_t)W);
-        for (int x = 0; x < W; x++) {
-            double u = x - s; int i0 = (int)floor(u); double f = u - i0;
-            double a = i0 >= 0 && i0 < W ? row[i0] : 0, b = i0 + 1 >= 0 && i0 + 1 < W ? row[i0 + 1] : 0;
-            r[x] = (unsigned char)(a * (1 - f) + b * f + 0.5);
-        }
-    }
-    free(row);
-}
-
-static unsigned char *text_mask(lhnav *n, const struct tfont *f, const char *s, int ox, int oy, int maxw, int W, int H)
-{
-    uint32_t *px = text_raster(n, f, s, 0, ox, oy, maxw, W, H);
-    unsigned char *m = px ? malloc((size_t)W * H) : NULL;
-    if (m) for (size_t i = 0; i < (size_t)W * H; i++) m[i] = (unsigned char)(px[i] >> 24);
-    free(px);
-    if (m && f->italic) slant(m, W, H, oy + f->asc);
-    return m;
-}
-
-/* the font's cell: "H" drawn at the top (its last row is the baseline's) and at the bottom (DT_BOTTOM: the cell ends there) */
-static void font_measure(lhnav *n, struct tfont *f)
-{
-    f->asc = f->height = f->h_right = 0;
-    f->gen = font_gen;
-    if (!f->cls[0] || !n->ut) return;
-    int W = 200, H = 200, xr, yb, yb2;
-    uint32_t *a = text_raster(n, f, "H", 0, 0, 0, 0, W, H), *b = text_raster(n, f, "H", LH_DT_BOTTOM, 0, 0, 0, W, H);
-    ink_end(a, W, H, 128, NULL, &yb); ink_end(b, W, H, 128, NULL, &yb2);
-    ink_end(a, W, H, 1, &xr, NULL);
-    free(a); free(b);
-    if (yb < 0 || yb2 < 0) { note("libuxtheme drew no text (fonts missing? lhnav_add_font_dir / the theme's `fonts`)"); return; }
-    f->asc = yb + 1; f->height = H - (yb2 - yb); f->h_right = xr + 1;
-}
-
-/* the advance of s, measured: "sH" and "H" drawn from x 0, the H's right edges differ by the advance */
-static int measure(lhnav *n, const struct tfont *f, const char *s)
-{
-    size_t len = strlen(s);
-    char *sh = malloc(len + 2);
-    if (!sh) return 0;
-    memcpy(sh, s, len); sh[len] = 'H'; sh[len + 1] = 0;
-    int chars = 0, w = 0;
-    for (const char *p = s; *p; p++) chars += (*p & 0xC0) != 0x80;
-    int W = (chars + 2) * (f->height + 4) + 8, H = f->height + 2;
-    for (int tries = 0; tries < 4; tries++, W *= 2) {
-        uint32_t *px = text_raster(n, f, sh, 0, 0, 0, 0, W, H);
-        int xr; ink_end(px, W, H, 1, &xr, NULL); free(px);
-        if (xr < W - 2) { w = xr + 1 - f->h_right; break; }
-    }
-    free(sh);
-    return w > 0 ? w : 0;
-}
-
-/* every distinct theme font of the style (class, part, state where its FONT is defined) */
-struct fcand { char cls[96]; int part, state; ut_font f; };
-static int font_cands(struct ut_theme *t, struct fcand *out, int max)
-{
-    int nc = ut_list_classes(t, NULL, 0), n = 0, fprop = ut_prop(t, "FONT");
-    if (nc <= 0 || fprop < 0) return 0;
-    const char **names = calloc((size_t)nc, sizeof *names);
-    if (!names) return 0;
-    ut_list_classes(t, names, nc);
-    for (int c = 0; c < nc && n < max; c++) {
-        if (!strcasecmp(names[c], "sysmetrics") || !strcasecmp(names[c], "globals")) continue;
-        int parts[65], np = ut_list_parts(t, names[c], parts + 1, 64);
-        parts[0] = 0; np = (np > 64 ? 64 : np < 0 ? 0 : np) + 1;
-        for (int p = 0; p < np && n < max; p++) {
-            if (p && !parts[p]) continue;
-            int states[65], ns = ut_list_states(t, names[c], parts[p], states + 1, 64);
-            states[0] = 0; ns = (ns > 64 ? 64 : ns < 0 ? 0 : ns) + 1;
-            for (int s = 0; s < ns && n < max; s++) {
-                if (s && !states[s]) continue;
-                ut_font f;
-                if (!ut_get_font(t, names[c], parts[p], states[s], fprop, &f) || !f.face[0]) continue;
-                int dup = 0;
-                for (int i = 0; i < n && !dup; i++)
-                    dup = !strcasecmp(out[i].f.face, f.face) && out[i].f.height == f.height && out[i].f.weight == f.weight && out[i].f.italic == f.italic;
-                if (dup) continue;
-                snprintf(out[n].cls, sizeof out[n].cls, "%s", names[c]); out[n].part = parts[p]; out[n].state = states[s]; out[n].f = f;
-                n++;
-            }
-        }
-    }
-    free(names);
-    return n;
-}
-
-/* how far theme font f is from the wanted one (0 = the same) */
-static int font_dist(const ut_font *f, const char *face, int px, int bold)
-{
-    char ff[96]; int fb = f->weight >= 600;
-    face_of(f->face, ff, sizeof ff, &fb);
-    return (strcasecmp(ff, face) ? 1000 : 0) + 10 * abs(font_px(f) - px) + (fb != bold ? 40 : 0);
-}
-
-/* nav.ini's `key = desc` as a theme font: fb when that is the font asked for, else the closest of the style's (logged) */
-static struct tfont pick_font(lhnav *n, const char *key, const char *desc, const struct tfont *fb)
-{
-    struct ut_theme *t = n->ut;
-    struct tfont r = *fb;
-    char face[96], msg[320]; int px, bold, italic;
-    if (!parse_font(desc, face, sizeof face, &px, &bold, &italic)) {
-        snprintf(msg, sizeof msg, "%s \"%s\": no family or size; using the style's breadcrumb font", key, desc); note(msg);
-        return r;
-    }
-    ut_font f;
-    if (font_of(n, fb, &f) && font_dist(&f, face, px, bold) == 0) { r.italic = italic; return r; }
-    enum { MAXC = 96 };
-    struct fcand *c = calloc(MAXC, sizeof *c);
-    int nc = c ? font_cands(t, c, MAXC) : 0, best = -1, bd = 1 << 30;
-    for (int i = 0; i < nc; i++) { int d = font_dist(&c[i].f, face, px, bold); if (d < bd) { bd = d; best = i; } }
-    if (best >= 0) {
-        snprintf(r.cls, sizeof r.cls, "%s", c[best].cls); r.part = c[best].part; r.state = c[best].state;
-        r.italic = italic && !c[best].f.italic;
-        if (bd) {
-            snprintf(msg, sizeof msg, "%s \"%s\" (%s %d px%s): this libuxtheme draws theme fonts only; using %s %d px%s (%s part %d)",
-                     key, desc, face, px, bold ? " bold" : "", c[best].f.face, font_px(&c[best].f), c[best].f.weight >= 600 ? " bold" : "",
-                     c[best].cls, c[best].part);
-            note(msg);
-        }
-    } else { snprintf(msg, sizeof msg, "%s \"%s\": the style has no theme fonts; using the breadcrumb's", key, desc); note(msg); r.italic = italic; }
-    free(c);
-    return r;
-}
-
-static struct tfont font_variant(lhnav *n, const struct tfont *f, int bold, int italic)
-{
-    struct tfont r = *f;
-    ut_font u;
-    if (bold && font_of(n, f, &u) && u.weight < 600) {
-        char face[96], desc[128]; face_of(u.face, face, sizeof face, NULL);
-        snprintf(desc, sizeof desc, "%s Bold %dpx", face, font_px(&u));
-        r = pick_font(n, "bold text", desc, f);
-    }
-    if (italic) r.italic = 1;
-    return r;
-}
 #endif
 
 static void fonts_load(lhnav *n)
@@ -1225,8 +1049,7 @@ static void fonts_load(lhnav *n)
 #ifdef HAVE_UXTHEME
     struct ut_theme *t = n->ut;
     if (!t) { note("no visual style: no text is drawn (lhnav's text comes from libuxtheme's theme fonts)"); return; }
-    /* the breadcrumb's: the composited toolbar's FONT (aero-patch: Segoe UI -12), else Segoe UI 12 px (an explicit font; with an
-       older libuxtheme the closest theme font) */
+    /* the breadcrumb's: the composited toolbar's FONT (aero-patch: Segoe UI -12), else Segoe UI 12 px (an explicit font) */
     static const char *const fcs[3] = { "CompositedBreadcrumbBar::Toolbar", "BreadcrumbBarToolbar::Toolbar", "BB::Toolbar" };
     struct tfont base; memset(&base, 0, sizeof base);
     const char *fc = NULL;
@@ -1286,9 +1109,6 @@ static int text_width(lhnav *n, int fid, const char *s)
    clamped, in the glow colour */
 static void draw_text(lhnav *n, px_cv *c, int fid, const char *s, int x, int y, int maxw, uint32_t rgb, double alpha, int glow)
 {
-#ifdef LHNAV_TEST_HOOKS
-    if (getenv("LHNAV_NOTEXT")) return;
-#endif
 #ifdef HAVE_UXTHEME
     if (!s || !*s) return;
     struct tfont *f = font_get(n, fid);

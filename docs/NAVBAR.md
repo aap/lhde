@@ -294,7 +294,7 @@ flxp can link libluxnav directly and its text looks exactly like flxp's.
 - **Dependencies**: `libluxnav.so` needs `libuxtheme.so.1` and `libpng16` (plus libc/libm); `make -C luxnav flags` prints the client
   flags. `(gone: the top-level build)` picks libuxtheme: flxp's build tree `~/src/flxp` (`src/uxtheme/ut.h` via `-idirafter`,
   `build/uxtheme/libuxtheme.so.1` with rpath) when it is there (`UT_TREE=DIR` for another), else what luxwm's `uxtheme-flags.sh`
-  finds (`~/.local` ...); it defines `UT_HAVE_TEXT_EXTENT` when that `ut.h` has the text calls. `UXTHEME=no`: drawn art, no text.
+  finds (`~/.local` ...). `UXTHEME=no`: drawn art, no text.
 - **Text path**: every string (title, segments, "«", the fields, the placeholder, and the client's tooltips / lists through the
   new `lhnav_text` / `lhnav_text_size`) is rendered once as an 8-bit coverage mask with `ut_draw_text_mask`, composited in luxnav's
   colour (nav.ini / the style's breadcrumb colour); on glass the same mask is box-blurred twice (glow size), times
@@ -306,11 +306,6 @@ flxp can link libluxnav directly and its text looks exactly like flxp's.
   text) in a 512-entry table; the cell: `ut_get_text_metrics` (ascent, height): a text cell is centred in its box with floor, as
   the pango layout was, the title's baseline is `title_base`. Ellipsis: `DT_END_ELLIPSIS` (GDI's "...") in the segment / title
   width. Caret positions: the advance of the prefix.
-- **Interim fallback** (an installed libuxtheme without the text calls, i.e. `~/.local` before the wux library is installed): text
-  drawn with `ut_draw_text` into a scratch ARGB buffer (its alpha is the coverage); widths by drawing `text + "H"` and `"H"` and
-  taking the difference of the H's right edges (exact GDI advances, trailing blanks included); the cell from "H" drawn with
-  `DT_TOP` and `DT_BOTTOM`; nav.ini fonts mapped to the closest theme part font (a log line names it; `Segoe UI, 14` -> the style's
-  `Start::Button` Segoe UI -19, exact), the placeholder slanted by luxnav. One `#ifdef UT_HAVE_TEXT_EXTENT` in `lhnav.c`.
 - **Pixels** (`lhnav_px.c`, plain C): images, OVER with pixman's rounding (`x*a + 0x80`...), blits 1:1 / from a source rect / with
   opacity, scaling (box filter below 0.75, bilinear above: cairo's GOOD filter makes the same choice), A8 masks in a colour, solid,
   linear and radial (two-circle, PAD) paints, and shapes from a signed distance: rounded rectangles, circles, polygons (nonzero),
@@ -345,7 +340,7 @@ aap under the 5048/5112 themes (navbar `vision`): "travel buttons with the arrow
 even come from". They were luxnav's drawn orbs: 5048's and 5112's `aero.msstyles` have no `TravelBack/TravelFwd::AnimationButton`,
 they have Vista's `TravelBand`, which luxnav did not read; and the drawn orbs had their arrows mirrored. Now luxnav reads TravelBand,
 the drawn arrows point the Windows way (back left, forward right), a style without travel art is logged once
-(`lhnav: STYLE has no travel art: no TravelBack::AnimationButton, TravelFwd::AnimationButton (4051-4074, aero patch) / no TravelBand
+(`luxnav: STYLE has no travel art: no TravelBack::AnimationButton, TravelFwd::AnimationButton (4051-4074, aero patch) / no TravelBand
 (Vista 5048, 5112); drawn orbs ...`), and every piece's source can be listed: `LHNAV_DEBUG=1` (any client, on every art load) or
 `NAVDEMO_DEBUG=1 examples/navdemo` (with the layout), through `lhnav_art_sources()`, e.g.
 

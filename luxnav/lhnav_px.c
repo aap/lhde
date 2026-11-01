@@ -171,11 +171,6 @@ static void blit_part_a(px_cv *c, const px_img *im, int sx, int sy, int w, int h
     }
 }
 
-void px_blit_part(px_cv *c, const px_img *im, int sx, int sy, int w, int h, int x, int y)
-{
-    if (im) blit_part_a(c, im, sx, sy, w, h, x, y, 255);
-}
-
 /* weights of the source pixels for destination pixel i (box: the overlap of [i, i+1) mapped into the source, over its length;
    bilinear: the two neighbours of the mapped centre); returns the first source index and fills wt[0..*n) */
 static int weights(int i, double x, double k, int box, double *wt, int *n, int max)
@@ -234,15 +229,6 @@ void px_blit_scaled(px_cv *c, const px_img *im, double x, double y, double k, do
             px_over(at(c, dx, dy), s);
         }
     }
-}
-
-px_img *px_img_scaled(const px_img *im, int w, int h)
-{
-    px_img *d = px_img_new(w > 0 ? w : 1, h > 0 ? h : 1);
-    if (!d || !im) return d;
-    px_cv c = px_cv_img(d);
-    px_blit_scaled(&c, im, 0, 0, (double)w / im->w, 1);   /* the aspect is kept by the callers */
-    return d;
 }
 
 void px_mask(px_cv *c, const unsigned char *m, int mw, int mh, int x, int y, uint32_t rgb, double alpha)
@@ -344,7 +330,6 @@ void px_fill_rect(px_cv *c, int x, int y, int w, int h, const px_paint *p)
     for (int j = y0; j < y1; j++) for (int i = x0; i < x1; i++) px_over(at(c, i, j), p->type == PX_SOLID ? s : paint_at(p, i + 0.5, j + 0.5));
 }
 
-void px_paint_all(px_cv *c, const px_paint *p) { px_fill_rect(c, c->x0, c->y0, c->x1 - c->x0, c->y1 - c->y0, p); }
 
 /* ---- shapes from a signed distance (< 0 inside): pixels farther than 0.75 from the edge are whole, the others are sampled
    16 x 16 ---- */
