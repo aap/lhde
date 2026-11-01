@@ -4,7 +4,8 @@ docs/LAYOUT.md "The three trees"). The repository holds no Microsoft files; ever
 lands in $LHDE_WINDOWS (default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows):
   <source>/   the raw files of one build, as the resource pack has them (system32/ themes/ fonts/ wallpapers/ source.ini)
   local/      styles dropped in by hand (--style) and other files that come from no source
-  generated/  what the recipes derive (frame sets, luxshell's pack images, classic schemes): delete freely, --regenerate
+  generated/  what the recipes derive (frame sets, luxshell's pack images, classic schemes, the aurora scenes as layer
+              lists for examples/aurorademo): delete freely, --regenerate
   index/      symlinks under the names the programs ask for (styles/jade4074.msstyles, resources/4074, ...)
 
 usage:
@@ -114,9 +115,10 @@ def listing(W):
         L.die('no Windows tree %s (lhde-import --pack FILE; lhde-import --migrate for an old ~/.local/share/lhde)' % W)
     print('%s:' % W)
     print('  sources:    %s' % (' '.join(T.sources_in(W)) or '(none)'))
-    for k in ('styles', 'frames', 'packs', 'resources', 'fonts', 'wallpapers'):
+    for k in ('styles', 'frames', 'packs', 'aurora', 'resources', 'fonts', 'wallpapers'):
         p = os.path.join(W, 'index', k)
-        names = sorted({x[:-9] if x.endswith('.msstyles') else x for x in os.listdir(p)}) if os.path.isdir(p) else []
+        names = sorted({x[:-9] if x.endswith('.msstyles') else x[:-5] if x.endswith('.json') else x
+                        for x in os.listdir(p) if not x.startswith('manifest-')}) if os.path.isdir(p) else []
         print('  %-11s %s' % (k + ':', ' '.join(names) or '(none)'))
 
 

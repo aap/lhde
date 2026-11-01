@@ -1,7 +1,9 @@
-/* aurorademo: Longhorn's two "Aurora" effects, played from their original numbers (examples/aurora_data.h):
+/* aurorademo: Longhorn's two "Aurora" effects, played from their original numbers (build/examples/aurora_data.h):
    the Explorer preview-pane aurora "APPA" (jade.msstyles STREAM 481, 4074/4082) recoloured for a folder type over the pane's
    band gradient, and the desktop aurora (desktopaurora.baml, MILDesktop=1). Spec: aurora.md in the research workspace.
-   build: make examples (build/examples/aurorademo)     regenerate the tables: examples/aurora_data.py [AURORA_DIR]
+   build: make examples (build/examples/aurorademo). The tables are read from the user's Windows tree: lhde-import's [aurora]
+   recipes (data/sources/4074.ini) write generated/aurora/{previewpane,desktop}-4074.json, make turns them into the header
+   (tools/lhdeaurora.py); a scene not imported is left out and asking for it says so.
    usage: aurorademo [pane [FOLDER] | desktop] [-s SPEED] [-w WxH] [-f] [-t SECONDS] [-j THREADS] [-b FRAMES]
      pane     1000x148 (the aurora cell of a ~1000 px Explorer pane); FOLDER document music picture video contact message game
               default (default: picture). The 1080x160 scene is stretched non-uniformly to the window, as Explorer did.
@@ -26,7 +28,17 @@
 #include <sys/select.h>
 #include <unistd.h>
 #include <time.h>
-#include "aurora_data.h"
+#include "aurora_data.h"   /* build/examples/: made by make from the Windows tree (tools/lhdeaurora.py) */
+#ifdef AURORA_NO_PANE
+#define PANE_SCENE NULL
+#else
+#define PANE_SCENE (&pane_scene)
+#endif
+#ifdef AURORA_NO_DESKTOP
+#define DESKTOP_SCENE NULL
+#else
+#define DESKTOP_SCENE (&desktop_scene)
+#endif
 
 /* Aurora.c_rgColorMap by ShellView.FolderType, and the pane band (edge, centre, edge) behind it (taskpane/managed.md) */
 static const struct folder { const char *name; unsigned aurora, edge, centre; } folders[] = {
@@ -170,10 +182,10 @@ static void render(cairo_surface_t *back, const struct au_scene *s, const struct
 }
 
 int main(int argc, char **argv) {
-    const struct au_scene *s = &pane_scene; int fi = 2, W = 0, H = 0, full = 0, bench = 0, nt = sysconf(_SC_NPROCESSORS_ONLN); double speed = 1, t0 = 0;
+    int pane = 1, fi = 2, W = 0, H = 0, full = 0, bench = 0, nt = sysconf(_SC_NPROCESSORS_ONLN); double speed = 1, t0 = 0;
     for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "pane")) s = &pane_scene;
-        else if (!strcmp(argv[i], "desktop")) s = &desktop_scene;
+        if (!strcmp(argv[i], "pane")) pane = 1;
+        else if (!strcmp(argv[i], "desktop")) pane = 0;
         else if (!strcmp(argv[i], "-s") && i + 1 < argc) speed = atof(argv[++i]);
         else if (!strcmp(argv[i], "-t") && i + 1 < argc) t0 = atof(argv[++i]);
         else if (!strcmp(argv[i], "-b") && i + 1 < argc) bench = atoi(argv[++i]);
@@ -188,7 +200,14 @@ int main(int argc, char **argv) {
     }
     if (nt < 1) nt = 1;
     if (nt > 16) nt = 16;
-    int pane = s == &pane_scene;
+    const struct au_scene *s = pane ? PANE_SCENE : DESKTOP_SCENE;
+    if (!s) {
+        fprintf(stderr, "aurorademo: this build has no %s aurora: the Windows tree held no generated/aurora/%s-4074.json when it was made.\n"
+                "  lhde-import makes it from %s (data/sources/4074.ini [aurora]); import that, then make examples again.\n",
+                pane ? "preview-pane" : "desktop", pane ? "previewpane" : "desktop",
+                pane ? "build 4074's jade.msstyles" : "build 4074's Microsoft.Windows.WCPClient.dll");
+        return 1;
+    }
     if (W <= 0 || H <= 0) { W = pane ? 1000 : 800; H = pane ? 148 : 600; }
     if (bench) {           /* offscreen: the drawing cost alone */
         cairo_surface_t *img = cairo_image_surface_create(CAIRO_FORMAT_RGB24, W, H);

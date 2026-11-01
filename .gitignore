@@ -11,3 +11,7 @@ __pycache__/
 
 # the agents' worktrees and session files
 .claude/
+
+# aurorademo's tables: Microsoft-derived numbers, made by make examples into build/examples/ from the Windows tree
+# (tools/lhdeaurora.py), never committed
+examples/aurora_data.h

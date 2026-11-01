@@ -15,8 +15,8 @@ one build, for the parts that were separate projects:
 | `luxshell/` | the Avalon bars, sidebar, tiles, toasts, start menu: C core + Lua (`*.lua`, `tiles/`), `shellpack*.sh` | x11 `lhshell/` (without `assets/`) |
 | `liblhde/`  | liblhde (`<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`): the three trees and every lookup in them, the theme resolver, the settings store and its migration; `lhde-theme` (with `explain` and `dirs`); `tests/resolve.c` | new (was `lhtheme/`) |
 | `session/`  | `lhde-session` (start, theme, taskbar, shell, picom, desktop, stop), `lab.sh` (the headless bench), `lhwall.sh`, theme-reload/-watch, picom configs | x11 `xinitrc.lab`, `second-display.sh`, `lab.sh`, ... |
-| `examples/` | extendframe, navdemo, glassdemo | x11 `examples/`, `glassdemo.c` |
-| `tools/`    | `lhde-pack` (a resource pack of raw Windows files from ISOs), `lhde-import` (a pack, ISO, WIM or Windows directory into the Windows tree, the recipes, `--migrate`), `lhdeimport.py`, `lhdetree.py` (the Windows tree, its index, the migration), `wim0108.py`, recipe builders (`msstyles2theme.py`, `build_aerovision.py`, `build_aero5112.py`) | x11 `lhwm/tools/` |
+| `examples/` | extendframe, navdemo, glassdemo, aurorademo (its tables made at build time from the Windows tree) | x11 `examples/`, `glassdemo.c` |
+| `tools/`    | `lhde-pack` (a resource pack of raw Windows files from ISOs), `lhde-import` (a pack, ISO, WIM or Windows directory into the Windows tree, the recipes, `--migrate`), `lhdeimport.py`, `lhdetree.py` (the Windows tree, its index, the migration), `wim0108.py`, `lhdebaml.py` + `lhdeaurora.py` (the aurora: BAML decoders, layer lists, aurorademo's tables), recipe builders (`msstyles2theme.py`, `build_aerovision.py`, `build_aero5112.py`) | x11 `lhwm/tools/` |
 | `data/`     | text only: `themes/*.theme` (the shipped themes), `navbar/*.ini`, `icons/*.theme`, `sources/*.ini` (what lhde-pack takes from each Windows build), `frames/*/theme.ini`, `packs/*/shell.lua` | x11 `themes.ini`, `wallpapers.ini`, `lhwm/themes/*/*.ini`, `lhshell/themes/` |
 | `docs/`     | `ARCHITECTURE.md` (the map), `LAYOUT.md` (asset policy, the three trees), `THEME-FORMAT.md`, `SETTINGS.md`, `CLIENT-PROTOCOL.md`, `USAGE.md`, `LUXWM.md`, `NAVBAR.md`, `SHELL-DESIGN.md`, `MSSTYLES-FORMAT.md`, `ANNOTATIONS.md`; `docs/README.md` lists them; `history/` holds the journals (flxp-NOTES, THEMES, the merge plan, the theme-format status) | |
 
@@ -50,7 +50,7 @@ What `make` builds:
     build/lib/libluxnav.a, libluxnav.so.1 (+ .so), pkgconfig/luxnav.pc   luxnav (flxp links the .a)
     build/bin/flxp flxp-desktop flxp-taskbar flxp-settings flxp-filedialog flxp-portal ut-dump
     build/bin/luxwm luxwmc luxshell
-    build/examples/extendframe navdemo glassdemo
+    build/examples/extendframe navdemo glassdemo aurorademo
     build/tests/..., build/tests/w32/... test programs and demos (tests/demo.sh runs some)
     build/luxwm/tests/frametest menutest desktopwin dockorder strutdock, build/luxshell/tests/trayicon
 

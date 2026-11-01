@@ -2,8 +2,13 @@
 #   extendframe  luxwm's extended glass frame client (docs/CLIENT-PROTOCOL.md): an Explorer-style 60 px glass header
 #   navdemo      luxnav's reference client (docs/NAVBAR.md): a small file browser with the vision header
 #   glassdemo    an ARGB client that is its own glass frame (the frame set aero-patch's plate from the data directories)
-#   aurorademo   Longhorn's preview-pane and desktop aurora, played from examples/aurora_data.h (made by aurora_data.py)
+#   aurorademo   Longhorn's preview-pane and desktop aurora, played from build/examples/aurora_data.h
 # Not installed: run them from build/examples.
+#
+# aurora_data.h is made at every make from the Windows tree's generated/aurora/{previewpane,desktop}-4074.json (lhde-import's
+# [aurora] recipes of data/sources/4074.ini; found through liblhde's lookup, lhde-theme find) by tools/lhdeaurora.py, which
+# rewrites it only when it changes. A scene that is not imported is left out of the header with a message, and aurorademo
+# says so when asked for it.
 
 EXAMPLES_PKGS = x11 xext cairo cairo-xlib pangocairo
 EXAMPLES      = $(addprefix build/examples/,extendframe navdemo glassdemo aurorademo)
@@ -19,9 +24,14 @@ build/examples/navdemo: examples/navdemo.c luxnav/lhnav.h $(LUXNAVA) $(LHDEA) $(
 build/examples/glassdemo: examples/glassdemo.c $(O)/liblhde/data.o
 	@mkdir -p $(dir $@)
 	$(CC) -std=gnu11 -O2 -g -Wall -Iliblhde $(shell pkg-config --cflags cairo-xlib x11) -o $@ $< $(O)/liblhde/data.o $(shell pkg-config --libs cairo-xlib x11) -lm
-build/examples/aurorademo: examples/aurorademo.c examples/aurora_data.h
+build/examples/aurora_data.h: tools/lhdeaurora.py build/bin/lhde-theme aurora-data-always
 	@mkdir -p $(dir $@)
-	$(CC) -std=gnu11 -O2 -g -Wall -Wextra -pthread $(shell pkg-config --cflags cairo-xlib x11) -o $@ $< $(shell pkg-config --libs cairo-xlib x11) -lm
+	@python3 -I tools/lhdeaurora.py header $@ "$$(build/bin/lhde-theme find aurora/previewpane-4074.json)" \
+	    "$$(build/bin/lhde-theme find aurora/desktop-4074.json)"
+build/examples/aurorademo: examples/aurorademo.c build/examples/aurora_data.h
+	@mkdir -p $(dir $@)
+	$(CC) -std=gnu11 -O2 -g -Wall -Wextra -pthread -Ibuild/examples $(shell pkg-config --cflags cairo-xlib x11) -o $@ $< $(shell pkg-config --libs cairo-xlib x11) -lm
 
+aurora-data-always:
 examples: $(EXAMPLES)
-.PHONY: examples
+.PHONY: examples aurora-data-always

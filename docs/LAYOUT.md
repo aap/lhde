@@ -9,7 +9,9 @@ Nothing Microsoft-derived is in the repository: no `.msstyles`, DLLs, fonts, wal
 reference renders or screenshots of them. The repository holds code, configuration and recipes (numbers, presets, scripts that
 derive art). Windows art is read at run time from the user's own files, imported once into the Windows tree below by
 `lhde-import` (from a resource pack made by `lhde-pack`, an ISO, a WIM or a Windows directory; docs/USAGE.md "Getting the
-Windows resources"). The icons in `flxp/res/icons` are Wine's (LGPL), the `.res` files in `wux/rc` are built from Wine's `.rc`
+Windows resources"). Data extracted from Windows files is derived there too, never committed: the aurora scenes' numbers come
+from the user's jade.msstyles and WCPClient.dll at import (`generated/aurora/`) and reach `build/examples/aurora_data.h` at
+build time. The icons in `flxp/res/icons` are Wine's (LGPL), the `.res` files in `wux/rc` are built from Wine's `.rc`
 sources, and Wine's vendored code stays in `wux/vendor/wine` with its MANIFEST and patches. Tests compare against checksums of
 local renders, never against reference images. Resource packs built in the tree (`lhde-resources-*`) are gitignored.
 
@@ -50,12 +52,14 @@ WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_D
     frames/SET/                          PNGs + manifest.ini (recipe, inputs with sha256); theme.ini of a set we do not ship
     packs/<build>/                       imageres/ID.png, shell32/SIZE/ID.png, manifest-*.ini
     schemes/NAME.scheme                  from a source's HIVEDEF.INF
+    aurora/SCENE-<source>.json           the aurora scenes as layer lists (previewpane, desktop), manifest-*.ini; make examples
+                                         turns them into aurorademo's tables
   index/                               relative symlinks under the names programs ask for (lhde-import --reindex):
     styles/NAME.msstyles, styles/NAME/     -> ../../<source>/themes/<Style>/... or ../../local/themes/...
     styles/NAME.scheme                     -> generated/schemes or local/schemes
     resources/<source> fonts/<source> wallpapers/<source>   -> ../../<source>/system32, fonts, wallpapers
     icons/PACK                             -> ../../local/icons/PACK
-    frames -> ../generated/frames,  packs -> ../generated/packs
+    frames -> ../generated/frames,  packs -> ../generated/packs,  aurora -> ../generated/aurora
   import.log
 
 A RESOURCE PACK                      lhde-pack; lhde-import --pack makes the Windows tree from it (docs/USAGE.md)
