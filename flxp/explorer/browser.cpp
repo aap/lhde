@@ -1,6 +1,5 @@
-// The browsing widget shared by the explorer and the file dialog (browser.h).
-// Moved out of explorer.cpp (2026-10-25) without changes to what the
-// explorer does; the hooks carry what differs between the hosts.
+// The browsing widget shared by the explorer and the file dialog (browser.h);
+// the hooks carry what differs between the hosts.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

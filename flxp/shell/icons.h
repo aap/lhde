@@ -43,15 +43,14 @@ bool load_icon_theme(const std::string& name_or_path);   // selects the theme; f
 // warning on stderr; missing toolbar strips are dropped. False on fallback.
 bool select_icon_theme(const std::string& name);
 const IconTheme& icon_theme();
-// The icons setting again (it is per theme: x11/SETTINGS.md "Per-theme settings"):
+// The icons setting again (it is per theme: docs/SETTINGS.md "Per-theme settings"):
 // selects that theme when it names another one. True if it did.
 bool refresh_icon_theme();
 int icon_theme_generation();                             // + 1 on every selection
 std::string icon_file(const std::string& key);           // resolved source for a key ("" if unknown)
 std::string icon_theme_file(const std::string& name);    // the recipe a name selects ("" if none)
 
-// Windows art by resource id from lhde-import's resources/<build> (docs/history/flxp-NOTES.md
-// "XP and 2000 art by resource id"): resource_file("xp", "explorer.exe") is that file in
+// Windows art by resource id from lhde-import's resources/<build>: resource_file("xp", "explorer.exe") is that file in
 // the first data directory that has it, "" when the build is not imported.
 std::string resource_file(const std::string& build, const std::string& file);
 // XP's art by resource id, named as XP has it (file, id, the resource type: RT_BITMAP 2, RT_GROUP_ICON 14, 0 for "AVI"),

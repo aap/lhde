@@ -35,8 +35,8 @@ void set_host(Host* h) { g_host = h; }
 Host* host() { return g_host; }
 const std::vector<std::string>& clip() { return g_clip; }
 // the X CLIPBOARD's files unless our own Cut/Copy is what it holds: a list read
-// from another owner on an earlier Paste is never reused (it was: a process that
-// never owned the clipboard had nothing marking that list stale)
+// from another owner on an earlier Paste is never reused (a process that never
+// owned the clipboard has nothing marking that list stale)
 const std::vector<std::string>& clipboard_files()
 {
     if (!shell::xclip::ours()) {

@@ -8,8 +8,8 @@
 // $XDG_STATE_HOME/lhde/flxp-desktop-positions. Folders open in an explorer window
 // (a new flxp process, as the explorer itself does for every further folder),
 // files with their default application, and the context menus are the
-// explorer's (src/explorer/verbs). The desktop never fades: lhwm's maximised
-// mode (M5b, x11/SHELL-DESIGN.md) switches only the window's plate and the bars.
+// explorer's (flxp/explorer/verbs). The desktop never fades: lhwm's maximised
+// mode (docs/SHELL-DESIGN.md M5b) switches only the window's plate and the bars.
 //
 //   flxp-desktop [--wallpaper FILE] [--wallpaper-mode center|stretch|tile|fill] [--quit-after MS]
 #include <stdio.h>
@@ -909,7 +909,6 @@ int main(int argc, char** argv)
     g.width = GetSystemMetrics(SM_CXSCREEN);
     g.height = GetSystemMetrics(SM_CYSCREEN);
     make_wallpaper();
-    // desktop_fade_ms (the fade to black in lhwm's maximised mode) is gone with M5b: ignored
     g.w_workarea = FlxpWatchRootProperty("_NET_WORKAREA");
     g.w_theme = FlxpWatchRootProperty("_LH_THEME");
     g.w_settings = FlxpWatchRootProperty("_LH_SETTINGS_CHANGED");

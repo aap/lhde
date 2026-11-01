@@ -2,7 +2,7 @@
 // round Back and Forward buttons, the folder's name in a large font, the
 // breadcrumb of the path and the search box. Under lhwm with a compositor it
 // lies on the window manager's glass (the frame extended into the client,
-// lhwm/CLIENT-PROTOCOL.md: transparent with glowing text). Without
+// docs/CLIENT-PROTOCOL.md: transparent with glowing text). Without
 // composition it is opaque: the navigation bar of the session theme's
 // Longhorn msstyles (navbar.h, COMPOSITION.md 16.4: Navbar::Rebar,
 // splitter, travel/favorites buttons, fonts and colours by focus and
@@ -10,10 +10,10 @@
 // continued, e.g. Luna) under the glass layout, else (no lhwm) the 4074
 // Slate gradient. The empty parts answer HTTRANSPARENT so the frame's
 // WM_NCHITTEST makes them a caption.
-// Vision mode (NOTES "The vision header"): when lhwm's frame theme has a
-// nav.ini (header_engine = auto | lhnav | flxp), the contents are lhnav's
-// (~/fun/longhorn/x11/NAVBAR.md): the concept art's orb, title in lhwm's deco,
-// breadcrumb, search box and toolbar; the behaviour stays flxp's.
+// Vision mode: when lhwm's frame theme has a nav.ini (header_engine = auto |
+// lhnav | flxp), the contents are lhnav's (docs/NAVBAR.md): the concept art's
+// orb, title in lhwm's deco, breadcrumb, search box and toolbar; the behaviour
+// stays flxp's.
 #pragma once
 #include <string>
 #include <memory>

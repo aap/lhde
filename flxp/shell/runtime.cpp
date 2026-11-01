@@ -314,11 +314,11 @@ std::string find_msstyles(const std::string& name)
         }
         std::string f = d + "/" + lower + ".msstyles";
         if (exists(f)) return f;
-        // lhde's styles/NAME/ with one style of another name (styles/slate4074-xp/slate.msstyles)
+        // lhde's styles/NAME/ with one style of another name (styles/NAME/OTHER.msstyles)
         f = only_msstyles(d + "/" + name);
         if (!f.empty()) return f;
     }
-    return "";   // no -xp backport fallback: every component uses the real style (THEME-FORMAT section 10)
+    return "";
 }
 
 static void export_env(const char* var, const std::string& v)

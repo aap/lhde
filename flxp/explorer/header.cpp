@@ -160,8 +160,8 @@ HBITMAP g_mag_icon;                  // shell32's Search icon (32x32), premultip
 bool g_mag_looked;
 const int MAG_W = 30, MAG_H = 32, MAG_CX = 19, MAG_CY = 12;   // the lens centre in the cell
 
-// The vision mode: the header's contents through lhnav (NAVBAR.md "Porting
-// lhnav into flxp", NOTES "The vision header"), when the frame theme has a
+// The vision mode: the header's contents through lhnav (docs/NAVBAR.md "Porting
+// lhnav into flxp"), when the frame theme has a
 // nav.ini (header_engine = auto | lhnav | flxp). Its code is below ("vision").
 struct Vision {
     bool on = false;
@@ -1080,7 +1080,7 @@ void load_look()
     if (!set_ma) l.max_text[0] = l.text[0];
     if (!set_mi) l.max_text[1] = l.text[1];
     if (!set_mg) { l.max_glow = l.glow; l.max_glow_rgb = l.glow_rgb; }
-    if (m.bMaxValid) {        // _LHWM_FRAME_METRICS 14..16 (lhwm since 2026-10-25)
+    if (m.bMaxValid) {        // _LHWM_FRAME_METRICS 14..16
         l.max_text[0] = m.crMaxText; l.max_text[1] = m.crMaxInactiveText;
         if (l.glow || set_mg) { l.max_glow = !m.bMaxGlowNone; if (l.max_glow) l.max_glow_rgb = m.crMaxGlow; }
     }
@@ -1956,7 +1956,7 @@ void set_nav_hot(int part)
 }
 
 // ---- vision: the header through lhnav --------------------------------------------------
-// NAVBAR.md "Porting lhnav into flxp": lhnav lays out, paints and hit-tests the
+// docs/NAVBAR.md "Porting lhnav into flxp": lhnav lays out, paints and hit-tests the
 // travel orb, the title in lhwm's 15-row deco, the breadcrumb, the search box
 // and the right-hand items (nav.ini `tools`); flxp keeps what a click does (the
 // history and its menus, the crumbs' drop-down menus, the bookmarks, New Folder,

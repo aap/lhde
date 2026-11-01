@@ -373,8 +373,7 @@ static void load_look(HWND h)
         // the groups look: 4051's white pane (lh4051-194203/195027.png) with
         // the pre-reset concepts' groups - link-blue names, the +/- expanders
         // of Media Player's "Music Links" tree, the Save File concept's group
-        // names with 16 px icons under them (the light blue of Media Player's
-        // pane, 240,245,255 -> 219,232,251, until 2026-10-25)
+        // names with 16 px icons under them
         g_look.kind = Groups;
         g_look.pane1 = g_look.pane2 = RGB(255, 255, 255);
         g_look.body = g_look.pane2;

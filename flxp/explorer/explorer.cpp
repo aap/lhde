@@ -2298,7 +2298,7 @@ static void usage(FILE* f)
         "  --icons NAME|PATH   icon theme: xp, 2k, longhorn, wine or a .theme file\n"
         "  --small-toolbar     small toolbar buttons\n"
         "  --frame xp|longhorn|auto  window frame: XP (the window manager's), the Longhorn\n"
-        "                      4074 header on lhwm's glass, or longhorn when lhwm composites\n"
+        "                      4074 header on luxwm's glass, or longhorn when luxwm composites\n"
         "  --longhorn          the same as --frame longhorn\n"
         "  --taskpane          Longhorn: the task band under the command bar (taskpane=1)\n"
         "  --geometry WxH+X+Y  window client size and position\n"
