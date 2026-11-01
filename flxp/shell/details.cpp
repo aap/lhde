@@ -148,18 +148,58 @@ Item location_item(const Folder& folder)
 
 // ---- the stored properties on disk ----------------------------------------------------
 
+static std::string base_name(const std::string& path) { return path.substr(path.find_last_of('/') + 1); }
+
+// the size first, then a buffer of that size; ERANGE: it grew in between, ask again
+Read read_attr(const std::string& path, const std::string& xattr, std::string* value, int* error)
+{
+    value->clear();
+    if (error) *error = 0;
+    for (int tries = 0; tries < 8; tries++) {
+        ssize_t n = getxattr(path.c_str(), xattr.c_str(), nullptr, 0);
+        if (n > 0) {
+            value->resize((size_t)n);
+            n = getxattr(path.c_str(), xattr.c_str(), &(*value)[0], value->size());
+            if (n < 0 && errno == ERANGE) continue;
+        }
+        if (n < 0) {
+            int e = errno;
+            value->clear();
+            if (e == ENODATA || e == ENOTSUP || e == ENOENT) return Read::Missing;
+            if (error) *error = e;
+            return Read::Failed;
+        }
+        value->resize((size_t)n);
+        while (!value->empty() && (value->back() == '\0' || value->back() == '\n')) value->pop_back();   // a C string's NUL, echo's newline
+        return value->empty() ? Read::Missing : Read::Value;
+    }
+    value->clear();
+    if (error) *error = ERANGE;
+    return Read::Failed;
+}
+
 Stored read_stored(const std::string& path)
 {
     Stored out;
     if (path.empty() || path[0] != '/') return out;
     for (const Property& p : registry()) {
         if (p.xattr.empty()) continue;
-        char buf[4096];
-        ssize_t n = getxattr(path.c_str(), p.xattr.c_str(), buf, sizeof buf);
-        while (n > 0 && (buf[n - 1] == '\0' || buf[n - 1] == '\n')) n--;   // a C string's NUL, echo's newline
-        if (n > 0) out.push_back({ p.xattr, std::string(buf, (size_t)n) });
+        std::string v;
+        if (read_attr(path, p.xattr, &v) == Read::Value) out.push_back({ p.xattr, v });
     }
     return out;
+}
+
+bool read_current(const std::string& path, const Property& p, std::string* value, std::string* err)
+{
+    int e = 0;
+    if (read_attr(path, p.xattr, value, &e) != Read::Failed) return true;
+    if (err) {
+        std::string what = p.label;
+        for (char& c : what) c = (char)tolower((unsigned char)c);
+        *err = "The " + what + " of '" + base_name(path) + "' could not be read (" + strerror(e) + "), so nothing was changed.";
+    }
+    return false;
 }
 
 void read_stored(Item& it)
@@ -192,8 +232,6 @@ std::string join_list(const std::vector<std::string>& items)
     return out;
 }
 
-static std::string base_name(const std::string& path) { return path.substr(path.find_last_of('/') + 1); }
-
 // setxattr, or removexattr for an empty value (not being there is fine then)
 static bool put(const std::string& path, const std::string& xattr, const std::string& value, std::string* err)
 {
@@ -220,19 +258,16 @@ bool write(const std::string& path, const Property& p, const std::string& text, 
         size_t a = v.find_first_not_of(" \t\r\n"), b = v.find_last_not_of(" \t\r\n");
         v = a == std::string::npos ? "" : v.substr(a, b - a + 1);
     }
+    std::string old;
+    if (!read_current(path, p, &old, err)) return false;   // the value it replaces was not seen
     return put(path, p.xattr, v, err);
-}
-
-static std::string current(const std::string& path, const std::string& xattr)
-{
-    for (const auto& kv : read_stored(path)) if (kv.first == xattr) return kv.second;
-    return "";
 }
 
 bool add_tags(const std::string& path, const std::vector<std::string>& tags, std::string* err)
 {
     const Property* p = property("tags");
-    std::string old = current(path, p->xattr);
+    std::string old;
+    if (!read_current(path, *p, &old, err)) return false;
     std::vector<std::string> have = split_list(old);
     for (const std::string& t : tags)
         for (const std::string& u : split_list(t))
@@ -245,7 +280,9 @@ bool add_tags(const std::string& path, const std::vector<std::string>& tags, std
 bool remove_tag(const std::string& path, const std::string& tag, std::string* err)
 {
     const Property* p = property("tags");
-    std::vector<std::string> have = split_list(current(path, p->xattr));
+    std::string old;
+    if (!read_current(path, *p, &old, err)) return false;
+    std::vector<std::string> have = split_list(old);
     auto i = std::find(have.begin(), have.end(), tag);
     if (i == have.end()) return true;
     have.erase(i);

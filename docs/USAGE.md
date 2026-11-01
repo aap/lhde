@@ -562,7 +562,9 @@ A file or folder can carry a one-line **description**, **tags** and a **comment*
 itself (`user.lux.desc`, `user.xdg.tags`, `user.xdg.comment`; the names luxfs's `x` and `lsx` use, docs/ANNOTATIONS.md), so
 there is no database: they need a file system that keeps user attributes (ext4, btrfs, xfs, zfs, tmpfs; not FAT or many network
 mounts, where editing says so). Tags are stored comma-separated (`reference,4051`); typed, they may be separated by commas or
-semicolons, spaces around them are dropped, a tag given twice is kept once. Emptying a value removes the attribute.
+semicolons, spaces around them are dropped, a tag given twice is kept once. Emptying a value removes the attribute. A value
+of any length is read whole; when an item's current value cannot be read (not readable by you, an I/O error), Edit
+Description, Add Tag, Remove Tag and the task band's editor change nothing and say so, rather than replace what they did not see.
 
 Where they show:
 - **Details view columns.** Right-click the column header for a check per column (Name, Size, Type, Date Modified, Description,

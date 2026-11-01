@@ -267,10 +267,10 @@ static void edit_description(const Item& it)
     dialogs::TextAsk a;
     a.title = "Edit Description";
     a.prompt = "Description of '" + it.name + "':";
-    for (const auto& kv : shell::details::read_stored(it.path)) if (kv.first == p->xattr) a.initial = kv.second;
+    std::string text, err;
+    if (!shell::details::read_current(it.path, *p, &a.initial, &err)) { error_box(err); return; }   // not shown: not replaced
     a.note = "One line, kept with the file. An empty description removes it.";
     a.icon = item_icon({ it });
-    std::string text, err;
     bool ok = dialogs::ask_text(g_host->window(), a, &text);
     if (a.icon) DestroyIcon(a.icon);
     if (!ok || text == a.initial) return;

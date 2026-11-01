@@ -78,13 +78,24 @@ int column_of(const std::string& id);
 // without duplicates (case-sensitive, the first kept), in their order. Writing
 // an empty value removes the attribute, as `x -tag` does with the last tag.
 using Stored = std::vector<std::pair<std::string, std::string>>;
-Stored read_stored(const std::string& path);                         // the registry's attributes that are set
+// One attribute, whatever its length (its size asked first, asked again when it
+// grew in between). Missing: not set, or no user attributes on that file system
+// (ENODATA, ENOTSUP, ENOENT); Failed: there may be a value that could not be
+// read (EACCES, EIO, ...), *error the errno. A change that replaces or merges a
+// value must not go ahead on Failed: it would drop what it did not see.
+enum class Read { Value, Missing, Failed };
+Read read_attr(const std::string& path, const std::string& xattr, std::string* value, int* error = nullptr);
+// The current value of p before a change ("" when missing), or false with *err
+// a sentence for the message box ("The tags of 'a' could not be read ...")
+bool read_current(const std::string& path, const Property& p, std::string* value, std::string* err);
+Stored read_stored(const std::string& path);                         // the registry's attributes that are set (Value only)
 void read_stored(Item& it);                                          // into it.xattrs (a file-system item)
 std::vector<std::string> split_list(const std::string& text);        // "a, b;c\n" -> a, b, c (commas, semicolons, newlines)
 std::string join_list(const std::vector<std::string>& items);        // -> "a,b,c", as stored
 // The value the user typed for p on path: a list is split and joined again.
 // False with *err a sentence for a message box (the file system keeps no user
-// attributes, the file is not the user's or read-only, ...).
+// attributes, the file is not the user's or read-only, its current value could
+// not be read, ...). add_tags and remove_tag refuse the same way.
 bool write(const std::string& path, const Property& p, const std::string& text, std::string* err);
 bool add_tags(const std::string& path, const std::vector<std::string>& tags, std::string* err);   // keeping the others
 bool remove_tag(const std::string& path, const std::string& tag, std::string* err);

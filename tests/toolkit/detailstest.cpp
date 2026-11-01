@@ -3,8 +3,11 @@
 // its size and date formats, and 4051's band values, invitations, counts and
 // picture stack; the stored properties: lists, columns, sorting, the infotip and
 // the write path (setxattr / removexattr on a scratch file).
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <sys/xattr.h>
 #include <unistd.h>
 #include <time.h>
@@ -57,7 +60,7 @@ static Item file(const std::string& name, uint64_t size, int64_t mtime, const st
     return it;
 }
 
-int main()
+int main(int, char** argv)
 {
     setenv("TZ", "UTC", 1);
     tzset();
@@ -249,16 +252,27 @@ int main()
 
     // the write path on a scratch file (skipped where the file system keeps no user attributes)
     {
+        // $TMPDIR or /tmp (tmpfs keeps user attributes on current kernels), else beside this program (the build tree)
         const char* tmp = getenv("TMPDIR");
-        std::string dir = std::string(tmp && *tmp ? tmp : "/tmp") + "/detailstest.XXXXXX";
-        if (!mkdtemp(&dir[0])) { perror("mkdtemp"); return 2; }
-        std::string f = dir + "/scratch.txt";
-        FILE* fp = fopen(f.c_str(), "w"); if (fp) { fputs("x\n", fp); fclose(fp); }
-        std::string err;
+        char* self = realpath(argv[0], nullptr);   // absolute: read_stored takes file-system paths only
+        std::string here = self ? self : "/tmp";
+        free(self);
+        here = here.substr(0, here.find_last_of('/'));
+        std::string dir, f, err;
         const Property* tags = property("tags");
         const Property* desc = property("description");
-        if (!write(f, *desc, "probe", &err) && err.find("extended attributes") != std::string::npos) {
-            printf("note: no user xattrs in %s: the write checks are skipped\n", dir.c_str());
+        bool xattrs = false;
+        for (const std::string& base : { std::string(tmp && *tmp ? tmp : "/tmp"), here }) {
+            if (!dir.empty()) { unlink(f.c_str()); rmdir(dir.c_str()); }
+            dir = base + "/detailstest.XXXXXX";
+            if (!mkdtemp(&dir[0])) { printf("note: cannot make %s: %s\n", dir.c_str(), strerror(errno)); dir.clear(); continue; }
+            f = dir + "/scratch.txt";
+            FILE* fp = fopen(f.c_str(), "w"); if (fp) { fputs("x\n", fp); fclose(fp); }
+            if (write(f, *desc, "probe", &err) || err.find("extended attributes") == std::string::npos) { xattrs = true; break; }
+            printf("note: no user xattrs in %s\n", base.c_str());
+        }
+        if (!xattrs) {
+            printf("note: no user xattrs in a scratch directory: the write checks are skipped\n");
         } else {
             auto value = [&](const std::string& x) { for (const auto& kv : read_stored(f)) if (kv.first == x) return kv.second; return std::string("<none>"); };
             check("write desc", 1, write(f, *desc, "  A scratch file \n", &err));
@@ -285,6 +299,38 @@ int main()
             check("newline dropped", "echoed", value("user.xdg.comment"));
             check("missing file", 0, write(dir + "/gone", *desc, "x", &err));
             check("missing file says so", 1, err.find("not there") != std::string::npos);
+            // a value longer than any fixed buffer (the reviewer's 5000-byte tag list): read whole, and Add Tag keeps every old tag
+            std::string many;
+            for (int i = 0; i < 625; i++) many += (i ? "," : "") + std::string("tag") + std::to_string(1000 + i);   // 4999 bytes
+            if (setxattr(f.c_str(), "user.xdg.tags", many.data(), many.size(), 0) != 0) {
+                printf("note: %s keeps no %zu-byte attribute (%s; ext4 keeps one block): the long-value checks are skipped\n",
+                       dir.c_str(), many.size(), strerror(errno));
+            } else {
+                check("long tags read", many, value("user.xdg.tags"));
+                check("add to long tags", 1, add_tags(f, { "new" }, &err));
+                check("long tags kept", many + ",new", value("user.xdg.tags"));
+                check("remove from long tags", 1, remove_tag(f, "tag1000", &err));
+                check("long tags less one", many.substr(8) + ",new", value("user.xdg.tags"));
+            }
+            // a value that cannot be read (a write-only file: user attributes need read permission to read, write to set)
+            // is not "no value": the changes refuse and say so instead of replacing what they did not see
+            std::string before = value("user.xdg.tags"), got;
+            chmod(f.c_str(), 0200);
+            int e = 0;
+            if (getuid() == 0 || read_attr(f, "user.xdg.tags", &got, &e) != Read::Failed) {
+                printf("note: a write-only file's attributes can be read here (root?): the unreadable checks are skipped\n");
+            } else {
+                check("unreadable errno", EACCES, e);
+                err.clear();
+                check("add refused", 0, add_tags(f, { "lost" }, &err));
+                check("add says so", 1, err.find("could not be read") != std::string::npos);
+                check("remove refused", 0, remove_tag(f, "tag1001", &err));
+                check("write refused", 0, write(f, *tags, "only", &err));
+                check("desc write refused", 0, write(f, *desc, "only", &err));
+            }
+            chmod(f.c_str(), 0644);
+            check("unreadable kept", before, value("user.xdg.tags"));
+            check("missing is not failed", (int)Read::Missing, (int)read_attr(f, "user.lux.desc", &got, &e));
         }
         unlink(f.c_str());
         rmdir(dir.c_str());

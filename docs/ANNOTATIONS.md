@@ -24,7 +24,9 @@ Tags in use (extend freely): `reference` (real Windows screenshots and originals
 columns, the infotip, XP's Details rollout, 4051's task band, the context menu's Edit Description... / Add Tag... / Remove Tag;
 docs/USAGE.md "Descriptions and tags"); its property registry (`flxp/shell/details.cpp`) maps each property to its attribute.
 flxp writes them as `x` does: a description trimmed, without a trailing newline; tags split at commas (flxp also takes
-semicolons), trimmed, without duplicates, in their order; an emptied value removes the attribute. `author`, `build`, `source`,
+semicolons), trimmed, without duplicates, in their order; an emptied value removes the attribute. It reads a value whatever
+its length (its size first), and takes only "not set" (`ENODATA`) or "no user attributes here" (`ENOTSUP`) as no value: on any
+other read error a change (a new tag merged in, an edited description) is refused, not written over the unseen value. `author`, `build`, `source`,
 `notes` and `todo` are this research's own and flxp does not show them.
 
 ## Where they are set
