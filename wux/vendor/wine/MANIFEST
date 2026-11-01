@@ -56,3 +56,11 @@ comctl32/taskdialog.c                    wine-10.0  2e9cb99369e
 user32/menu.c                            wine-7.0   2cb237a53c7
 include/commdlg.h                        master     840a939ee52
 include/dwmapi.h                         master     840a939ee52
+
+# Compiled resources and icons from Wine's sources, kept outside this directory (not patched). Each reproduces byte for byte
+# from wine-11.18 (7b3fff76fa5) with GNU windres 2.43 (mingw-w64); none of these sources differ between wine-11.18 and
+# 840a939ee52 above. Columns: our file, Wine tag and commit, the Wine sources, how it is built.
+wux/rc/comctl32.res                      wine-11.18 7b3fff76fa5  dlls/comctl32/comctl32.rc + the .bmp/.cur/.ico it names    wux/rc/build.sh WINE/dlls/comctl32 comctl32
+wux/rc/comdlg32.res                      wine-11.18 7b3fff76fa5  dlls/comdlg32/comdlg32.rc + cdlg.h colordlg.h filedlgbrowser.h + the .ico/.bmp it names    wux/rc/build.sh WINE/dlls/comdlg32 comdlg32 -DNEWFILEOPENV3ORD=1553 (mingw's dlgs.h lacks it)
+wux/w32/stdres.res                       wine-11.18 7b3fff76fa5  dlls/user32/resources/obm_*.bmp ocr_*.cur oic_*.ico (icons cut to 16+32 px, cursors to 32 px, 32 bpp)    python3 -I wux/w32/mkstdres.py WINE
+flxp/res/icons/*.ico, *.bmp (47 files)   wine-11.18 7b3fff76fa5  dlls/shell32/resources/<same name>, copied unchanged

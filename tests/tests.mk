@@ -31,10 +31,13 @@ build/tests/w32/fileopuitest: $(O)/tests/w32/fileopuitest.o $(FILEDLGLIB) $(EXPL
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $< $(FILEDLGLIB) $(EXPLSHARED) $(W32LINK) $(LDLIBS) -no-pie
 
-# kerneltest's resources: test.res from test.rc, comdlg32.res beside it
-build/tests/w32/test.res: tests/w32/test.rc tests/w32/pal.bmp
-	@mkdir -p $(dir $@)
+# kerneltest's resources beside it: test.res and comdlg32.res. tests/w32/test.res is checked in like every .res in the tree
+# (windres only when test.rc or pal.bmp changes)
+tests/w32/test.res: tests/w32/test.rc tests/w32/pal.bmp
 	$(WINDRES) -O res -I tests/w32 -o $@ $<
+build/tests/w32/test.res: tests/w32/test.res
+	@mkdir -p $(dir $@)
+	cp $< $@
 build/tests/w32/comdlg32.res: wux/rc/comdlg32.res
 	@mkdir -p $(dir $@)
 	cp $< $@

@@ -6,7 +6,7 @@ one build, for the parts that were separate projects:
 
 | directory   | what                                                                 | was |
 |-------------|----------------------------------------------------------------------|-----|
-| `wux/`      | the win32 UI layer: `gdi/` `sys/` `win/` `res/` (native toolkit), `w32/` (the win32 shim), `vendor/wine/` (Wine's comctl32/user32/uxtheme, LGPL, with MANIFEST and patches), `rc/` (Wine's comctl32/comdlg32 resources) | flxp `src/{gdi,sys,win,res,w32}`, `vendor/wine` |
+| `wux/`      | the win32 UI layer that lhde's own programs are built against from source (it runs no Windows executables): `gdi/` `sys/` `win/` `res/` (native toolkit), `w32/` (the win32 shim), `vendor/wine/` (Wine's comctl32/user32/uxtheme, LGPL, with MANIFEST and patches), `rc/` (Wine's comctl32/comdlg32 resources) | flxp `src/{gdi,sys,win,res,w32}`, `vendor/wine` |
 | `wuxtheme/` | libwuxtheme, the uxtheme library: `.msstyles` read and drawn without Windows (`<wuxtheme/ut.h>`, C API `ut_*`), and `ut-dump` | flxp `src/uxtheme` (libuxtheme) |
 | `flxp/`     | the explorer and shell: `shell/` `explorer/` `desktop/` `taskbar/` `filedlg/` `settings/`, `rc/` (its dialogs), `res/` (icon themes, .desktop, portal files, tools) | flxp |
 | `tests/`    | `toolkit/` and `w32/` test programs, `headless/` Xvfb scripts, `check.sh`, `demo.sh` | flxp `src/test`, `src/w32test` |
@@ -18,22 +18,45 @@ one build, for the parts that were separate projects:
 | `examples/` | extendframe, navdemo, glassdemo, aurorademo (its tables made at build time from the Windows tree) | x11 `examples/`, `glassdemo.c` |
 | `tools/`    | `lhde-pack` (a resource pack of raw Windows files from ISOs), `lhde-import` (a pack, ISO, WIM or Windows directory into the Windows tree, the recipes), `lhdeimport.py`, `lhdetree.py` (the Windows tree, its index, the migration), `wim0108.py`, `lhdebaml.py` + `lhdeaurora.py` (the aurora: BAML decoders, layer lists, aurorademo's tables), recipe builders (`msstyles2theme.py`, `build_aerovision.py`, `build_aero5112.py`) | x11 `lhwm/tools/` |
 | `share/`    | text only: `themes/*.theme` (the shipped themes), `navbar/*.ini`, `icons/*.theme`, `sources/*.ini` (what lhde-pack takes from each Windows build), `frames/*/theme.ini`, `packs/*/shell.lua` | x11 `themes.ini`, `wallpapers.ini`, `lhwm/themes/*/*.ini`, `lhshell/themes/` |
-| `docs/`     | `ARCHITECTURE.md` (the map), `LAYOUT.md` (asset policy, the three trees), `THEME-FORMAT.md`, `SETTINGS.md`, `CLIENT-PROTOCOL.md`, `USAGE.md`, `LUXWM.md`, `NAVBAR.md`, `SHELL-DESIGN.md`, `MSSTYLES-FORMAT.md`, `ANNOTATIONS.md`; `docs/README.md` lists them; `history/` holds the journals (flxp-NOTES, THEMES, the merge plan, the theme-format status) | |
+| `docs/`     | `ARCHITECTURE.md` (the map), `LAYOUT.md` (asset policy, the three trees), `THEME-FORMAT.md`, `SETTINGS.md`, `CLIENT-PROTOCOL.md`, `USAGE.md`, `LUXWM.md`, `NAVBAR.md`, `SHELL-DESIGN.md`, `MSSTYLES-FORMAT.md`, `ANNOTATIONS.md`, `LICENSING.md`; `docs/README.md` lists them; `history/` holds the journals (flxp-NOTES, THEMES, the merge plan, the theme-format status) | |
 
-No Microsoft files are in this repository, and none may be added (docs/LAYOUT.md,
-"Asset policy"): no `.msstyles`, DLLs, fonts, wallpapers, extracted bitmaps or
-screenshots of them. The icons in `flxp/res/icons` are Wine's (LGPL), the `.res`
-files in `wux/rc` are built from Wine's `.rc` sources, `wux/w32/stdres.res` from
-Wine's user32 resources (`wux/w32/mkstdres.py WINE-SRC`). Windows art is read at
-run time from the user's own files (settings below).
+No Microsoft files are in this repository, and none may be added
+(docs/LAYOUT.md, "Asset policy"): no `.msstyles`, DLLs, fonts, wallpapers,
+extracted bitmaps, Microsoft concept art or screenshots of the real Windows
+builds. Screenshots of lhde itself are fine and live in `screenshots/`. The
+icons in `flxp/res/icons` are Wine's (LGPL), the `.res` files in `wux/rc` are
+built from Wine's `.rc` sources, `wux/w32/stdres.res` from Wine's user32
+resources (`wux/w32/mkstdres.py WINE-SRC`). Windows art is read at run time from
+the user's own files (settings below).
 
 ## Building
 
-Needs a C++17 compiler and pkg-config with x11, xext, freetype2, fontconfig,
+Needs a C and C++17 compiler, GNU make, Python 3 (the standard library: every `make` runs
+`tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, xext, freetype2, fontconfig,
 libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, luxshell);
-for the lux side also xfixes, xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4);
-`x86_64-w64-mingw32-windres` only to rebuild a changed `.rc`. At run time the session
-uses picom, feh and xprop (xdotool, ImageMagick's import for the lab).
+for the lux side also xfixes, xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4).
+Every `.res` is checked in (`wux/rc/`, `wux/w32/stdres.res`, `flxp/rc/`, `tests/w32/test.res`):
+the mingw-w64 cross toolchain (`x86_64-w64-mingw32-windres`, which preprocesses with its gcc) is needed
+only when a `.rc` or a header it includes changes, and Wine's sources only to rebuild Wine's resources
+(`wux/vendor/wine/MANIFEST`).
+
+Importing the Windows resources (`lhde-import`, `lhde-pack`, `lhde-schemes`; docs/USAGE.md "Getting the
+Windows resources") needs Python 3 with Pillow, 7z (ISOs, WIMs, the compressed files of an I386 layout;
+cabextract also does those), and tar with xz (zstd when installed) for resource packs.
+At run time the session uses picom, feh, xprop, xsetroot and dbus-daemon; `lhde-session start` also
+startx (xinit), `--nested` Xephyr; the lab and `make check` Xvfb, xdotool, ImageMagick's import, xclip and
+luac5.4 (each test is skipped when its tool is missing).
+
+On Void Linux, everything above in one command:
+
+    xbps-install -S gcc make pkg-config python3 libX11-devel libXext-devel libXfixes-devel \
+        libXinerama-devel libXft-devel freetype-devel fontconfig-devel libpng-devel libjpeg-turbo-devel \
+        libwebp-devel dbus-devel cairo-devel pango-devel lua54-devel \
+        python3-Pillow 7zip cabextract xz tar \
+        dbus picom feh xprop xsetroot xinit xorg-server-xephyr xorg-server-xvfb xdotool ImageMagick xclip lua54
+
+(python3-pillow-simd works in place of python3-Pillow; `cross-x86_64-w64-mingw32` is the windres above).
+Other distributions need the equivalent packages. Then:
 
     make -j                      libs, programs and tests into build/
     make check                   tests/check.sh (below)

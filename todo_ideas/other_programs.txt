@@ -17,3 +17,16 @@
 ## calendar
 
 * more elaborate calendar to supplement the sidebar one
+## what other opinionated desktops ship (Enlightenment's modules, Haiku's apps; a survey, 2026-11-01)
+* neither ships an image viewer, PDF viewer or editor in the core: E leaves them to separate EFL apps (ephoto, rage, ecrire,
+	terminology); Haiku's are ShowImage, StyledEdit, Terminal, BePDF (small single-window programs, no toolbar clutter: the
+	closest models for an XP-era image viewer, Notepad-class editor and mupf)
+* what lhde lacks that both have and a user misses first: a launcher with search (E's "everything": apps, files, settings,
+	calculator, clipboard history; flxp-startmenu's search box is the seed), a volume mixer and a notification history, a
+	screenshot tool (E's shot: small, and the lab wants one), a clipboard manager, a screen lock and logout/suspend menu,
+	a themed terminal; Haiku's Expander (archives), ActivityMonitor (Task Manager), DiskProbe
+* Haiku's lesson for the annotations: People, Mail and bookmarks are attributed files that Tracker and Find query; keep the
+	catalogue idea aimed at that (data as attributed files), not only at speed
+* E's theming, as a concept: one theme skins WM, shell and every app; an app may add or override a few parts
+	(elm_theme_extension/overlay) and pick a per-widget style name. The entry point to copy: one macro (ELM_MAIN) and a
+	runnable one-file example per widget

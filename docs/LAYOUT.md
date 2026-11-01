@@ -6,14 +6,15 @@ What lhde reads at run time, where it lives, and who is allowed to write it. The
 ## Asset policy
 
 Nothing Microsoft-derived is in the repository: no `.msstyles`, DLLs, fonts, wallpapers, extracted or rendered bitmaps, no
-reference renders or screenshots of them. The repository holds code, configuration and recipes (numbers, presets, scripts that
-derive art). Windows art is read at run time from the user's own files, imported once into the Windows tree below by
-`lhde-import` (from a resource pack made by `lhde-pack`, an ISO, a WIM or a Windows directory; docs/USAGE.md "Getting the
-Windows resources"). Data extracted from Windows files is derived there too, never committed: the aurora scenes' numbers come
-from the user's jade.msstyles and WCPClient.dll at import (`generated/aurora/`) and reach `build/examples/aurora_data.h` at
-build time. The icons in `flxp/res/icons` are Wine's (LGPL), the `.res` files in `wux/rc` are built from Wine's `.rc`
-sources, and Wine's vendored code stays in `wux/vendor/wine` with its MANIFEST and patches. Tests compare against checksums of
-local renders, never against reference images. Resource packs built in the tree (`lhde-resources-*`) are gitignored.
+Microsoft concept art and no screenshots or reference renders of the real Windows builds. The repository holds code,
+configuration and recipes (numbers, presets, scripts that derive art), and screenshots of lhde itself in `screenshots/`. Windows
+art is read at run time from the user's own files, imported once into the Windows tree below by `lhde-import` (from a resource
+pack made by `lhde-pack`, an ISO, a WIM or a Windows directory; docs/USAGE.md "Getting the Windows resources"). Data extracted
+from Windows files is derived there too, never committed: the aurora scenes' numbers come from the user's jade.msstyles and
+WCPClient.dll at import (`generated/aurora/`) and reach `build/examples/aurora_data.h` at build time. The icons in
+`flxp/res/icons` are Wine's (LGPL), the `.res` files in `wux/rc` are built from Wine's `.rc` sources, and Wine's vendored code
+stays in `wux/vendor/wine` with its MANIFEST and patches (docs/LICENSING.md). Tests compare against checksums of local renders, never against
+reference images. Resource packs built in the tree (`lhde-resources-*`) are gitignored.
 
 ## The three trees (on disk)
 

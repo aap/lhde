@@ -12,6 +12,10 @@ drawn live from the visual style through libwuxtheme (Window.CAPTION & co.) with
 - Themes: the theme files share/themes/NAME.theme, resolved by liblhde (`[Glass] frames = NAME`), frame sets in
   share/frames/NAME (theme.ini, nav.ini) with their pixels in the Windows tree (`~/.local/share/lhde-windows/generated/frames`,
   tools/lhde-import), found through liblhde/data.c.
+- From berry (MIT, Joshua L Ervin; its notice is luxwm/LICENSE, docs/LICENSING.md): wm.c and client.c (they carry berry's
+  copyright line), config.h, globals.h, ipc.h, types.h, utils.c, utils.h, the man pages luxwm.1 and luxwmc.1 (berry's
+  berry.1 and berryc.1) and examples/. Written for lhde: frame.c, frame.h, frame_ut.c, frame_ut.h, menu.c, menu.h, luxwm.mk
+  and tests/.
 - Names kept from lhwm: the X atoms (`_LHWM_*`), the window manager's `_NET_WM_NAME` "lhwm" (luxshell and flxp's log-off know
   it by that), `LHWM_*` environment variables, `~/.config/lhde/keys`. `make install` adds `lhwm` and `lhwmc` symlinks.
 - tests/: frametest (renders frames offline), menutest, regress.sh, and small X clients for the lab (desktopwin, dockorder,
