@@ -334,8 +334,8 @@ void log_off()
     std::string wm = xwm::wm_name();
     if (wm.find("lhwm") != std::string::npos || wm.find("berry") != std::string::npos) {
         std::string exe = xwm::wm_executable();
-        std::string ctl = exe.empty() ? "" : exe.substr(0, exe.rfind('/')) + "/lhwmc";
-        if (ctl.empty() || !executable(ctl)) ctl = find_in_path("lhwmc");
+        std::string ctl = exe.empty() ? "" : exe.substr(0, exe.rfind('/')) + "/luxwmc";
+        if (ctl.empty() || !executable(ctl)) ctl = find_in_path("luxwmc");
         if (!ctl.empty()) {
             std::string err;
             if (shell::spawn({ ctl, "quit" }, home(), &err)) { PostQuitMessage(0); return; }
