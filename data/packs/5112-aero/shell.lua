@@ -1,5 +1,5 @@
--- aero5112 pack: the Aero pack (copied from themes/aero/shell.lua, 2026-10-25) with the taskbar of Windows Vista build 5112
--- (Beta 1, July 2005; COMPOSITION.md 21). themes.ini `shell = packs/5112-aero` ([aero5112]).
+-- 5112-aero pack: a copy of the Aero pack (packs/4074-aero) with the taskbar of Windows Vista build 5112
+-- (Beta 1, July 2005; COMPOSITION.md 21); a theme's `[Shell] pack = 5112-aero` (basic5112).
 -- The 5112 art lives in packs/5112/imageres under the Aero imageres ids it replaces (shellpack-aero5112.sh): runtime.lua R() takes an
 -- id from the pack's `imageres` directory when the file is there, else from packs/4074/imageres. Replaced: the Start button
 -- (1179/1180/1181 = aero.msstyles 5112 Start::Button bitmap#502 + flag + "Start"), the bar (1187 = TaskBar.BACKGROUNDBOTTOM
@@ -14,7 +14,7 @@ return {
   -- magnified images; shrinking (clock layers, icons) stays smooth.
   filter = "nearest",
   -- the task buttons' icon for a window without _NET_WM_ICON or WM_HINTS icon: Explorer falls back to the application icon
-  -- (IDI_APPLICATION, shell32 #3: packs/4074/shell32, lhde-import / shellpack.sh); lhwm's DWM captions use CompositedWindow DEFAULTICON instead
+  -- (IDI_APPLICATION, shell32 #3: packs/4074/shell32, lhde-import / shellpack.sh); luxwm's DWM captions use CompositedWindow DEFAULTICON instead
   default_icon = "4074/shell32/16/3.png",
   -- grid = {top, right, bottom, left} (scene.c order); HackNineGrid is a XAML Thickness (left, top, right, bottom)
   -- 5112: TaskBar.BACKGROUNDBOTTOM SIZINGMARGINS 1 1 14 15 (l r t b) → grid {14, 1, 15, 1}; the 30 px of the bitmap
@@ -28,7 +28,7 @@ return {
   -- SidebarSizer: TileThumb Width 2, Dock Left (Flipped), its 1201 image Visibility=Hidden (the edge is 1178's columns 0-1)
   sidebar = { width = 150, bg_grid = {0, 0, 0, 36}, sizer = { w = 2, image = nil } },
   tile_bg = nil,                                          -- Aero tiles are transparent over the glass
-  tiles = { "notifications", "power", "clock" },     -- M4b: tray tile, power tile (lh4074-181415.png order: tray/QL above power), pinned clock
+  tiles = { "notifications", "power", "clock" },     -- tray tile, power tile (lh4074-181415.png order: tray/QL above power), pinned clock
   pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 6.4)
   -- popup menus: the 4074 Jade [sysmetrics] FLATMENUS colours (MENU, MENUTEXT, MENUHILIGHT, MENUBAR, GRAYTEXT)
   menu = { bg = "#f4f4f4", text = "#00025c", hot = "#c5e7f6", hot_text = "#000000", border = "#929497", gray = "#b0b1b3" },

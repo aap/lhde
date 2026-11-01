@@ -1,10 +1,10 @@
 -- Slate_*Resources pack: same styles, Slate imageres ids (resmap aero_to_slate), SHELL-DESIGN 2.2.2 (ids in brackets)
--- Selected by the session theme: themes.ini `shell = packs/4074-slate` (slate4074, and the Luna themes' bars), SHELL-DESIGN 6.1;
--- slate4051 has its own pack (themes/slate4051: this table with the 4051 differences).
+-- Selected by the session theme: a theme's `[Shell] pack = 4074-slate`, SHELL-DESIGN 6.1;
+-- slate4051 has its own pack (packs/4051-slate: this table with the 4051 differences).
 return {
   name = "slate", font = "Tahoma 8",
   -- the task buttons' icon for a window without _NET_WM_ICON or WM_HINTS icon: Explorer falls back to the application icon
-  -- (IDI_APPLICATION, shell32 #3: packs/4074/shell32, lhde-import / shellpack.sh); lhwm's DWM captions use CompositedWindow DEFAULTICON instead
+  -- (IDI_APPLICATION, shell32 #3: packs/4074/shell32, lhde-import / shellpack.sh); luxwm's DWM captions use CompositedWindow DEFAULTICON instead
   default_icon = "4074/shell32/16/3.png",
   ids = { [1178]=1000, [1187]=1155, [1176]=1103, [1177]=1104, [1199]=1028, [1200]=1030, [1201]=1108, [1173]=1105, [1174]=1106, [1175]=1109,
           [1179]=1156, [1180]=1157, [1181]=1158, [1182]=1150, [1183]=1154, [1184]=1151, [1185]=1152, [1170]=1159, [1171]=1160, [1172]=1161, [1167]=1162 },
@@ -22,7 +22,7 @@ return {
   sidebar = { width = 150, bg_grid = {0, 0, 0, 0}, sizer = { w = 6, image = 1108 } },
   tile_bg = 1000,                                         -- Slate repaints 1000 under each tile
   -- 4074 Administrator SidebarTiles: Search, Notification History, Quick Launch, Classic Tray (+ the transient Power, the pinned
-  -- Clock): lh4074-193747.png top to bottom (no Search tile in lux yet)
+  -- Clock): lh4074-193747.png top to bottom (no Search tile in luxshell yet)
   tiles = { "notifyhistory", "quicklaunch", "notifications", "power", "clock" },
   pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 6.4)
   taskbar_tiles = { "notifyhistory", "quicklaunch", "notifications", "clock" },   -- minimized: 4074 TaskbarTiles (all five)

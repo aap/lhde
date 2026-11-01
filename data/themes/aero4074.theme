@@ -1,5 +1,5 @@
 ; The longhorn.ms "Aero" patch style for 4074 (not a Microsoft file; styles/aero-patch.msstyles) with 4074's glass, as the
-; x11 lab tuned it (was the registry's [aero-patch], alias aero4074)
+; x11 lab tuned it (alias aero-patch)
 [Theme]
 name     = Aero (4074)
 build    = 4074

@@ -1,5 +1,5 @@
 -- Aero_*Resources pack (imageres ids 1167-1201), SHELL-DESIGN 2.2.2 / 2.3.2
--- Selected by the session theme: themes.ini `shell = packs/4074-aero` (aero-patch, jade4074, jade4074-classic, aero5048), SHELL-DESIGN 6.1;
+-- Selected by the session theme: a theme's `[Shell] pack = 4074-aero`, SHELL-DESIGN 6.1;
 -- swapped live on a _LH_THEME change (runtime.lua rebuild_shell), so keep everything the pack decides in this table.
 return {
   name = "aero", font = "Segoe UI 9",
@@ -8,7 +8,7 @@ return {
   -- magnified images; shrinking (clock layers, icons) stays smooth.
   filter = "nearest",
   -- the task buttons' icon for a window without _NET_WM_ICON or WM_HINTS icon: Explorer falls back to the application icon
-  -- (IDI_APPLICATION, shell32 #3: packs/4074/shell32, lhde-import / shellpack.sh); lhwm's DWM captions use CompositedWindow DEFAULTICON instead
+  -- (IDI_APPLICATION, shell32 #3: packs/4074/shell32, lhde-import / shellpack.sh); luxwm's DWM captions use CompositedWindow DEFAULTICON instead
   default_icon = "4074/shell32/16/3.png",
   -- grid = {top, right, bottom, left} (scene.c order); HackNineGrid is a XAML Thickness (left, top, right, bottom)
   taskbar = { height = 30, bg_grid = {7, 0, 0, 0} },      -- 1187 1038x30, HackNineGrid 0,7,0,0 = top 7 (row 1 highlight kept on taller bars); height per row
@@ -23,7 +23,7 @@ return {
   sidebar = { width = 150, bg_grid = {0, 0, 0, 36}, sizer = { w = 2, image = nil } },
   tile_bg = nil,                                          -- Aero tiles are transparent over the glass
   -- 4074 Administrator SidebarTiles: Search, Notification History, Quick Launch, Classic Tray (+ the transient Power, the pinned
-  -- Clock): lh4074-193747.png top to bottom (no Search tile in lux yet)
+  -- Clock): lh4074-193747.png top to bottom (no Search tile in luxshell yet)
   tiles = { "notifyhistory", "quicklaunch", "notifications", "power", "clock" },
   pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 6.4)
   taskbar_tiles = { "notifyhistory", "quicklaunch", "notifications", "clock" },   -- minimized: 4074 TaskbarTiles (all five)

@@ -50,7 +50,7 @@ local P = {
                  images = { normal = "plex-clear", hot = S("taskback-hot"), pressed = S("tileheaderback-normal"), checked = S("taskback-selected"),
                             hotchecked = S("taskback-selectedhot"), flash = S("taskback-flash") } },
   -- the sidebar: Administrator StartBar\Sidebar Width = 150. No sizer element in SidebarElement (the width changes through the
-  -- appbar edge); lux keeps its invisible 2 px drag strip.
+  -- appbar edge); luxshell keeps its invisible 2 px drag strip.
   sidebar = { width = 150, bg_grid = {0, 5, 0, 5}, sizer = { w = 2, image = nil },
               -- SidebarTitle Height 27 (TITLEBACK) with the SidebarOptions button (FLYOUTOPTIONSBACK 2/3) and its glyph
               title = { h = 27, image = S("titleback"), normal = "plex-clear", hot = S("flyoutoptionsback-hot"), pressed = S("flyoutoptionsback-pressed"),
@@ -69,10 +69,10 @@ local P = {
              font = "Franklin Gothic Medium,Tahoma 14px" },
   -- Classic Tray (NotificationArea): NotifyButtonIcon 28x24, Padding 6,4,6,4 (the buttons' Franklin Gothic text has no XEmbed source)
   tray = { icon = 16, pitch = {28, 24}, origin = {6, 4} },
-  -- the Administrator's tiles (NTUSER StartBar\Sidebar Module0000..0003): Search, Quick Launch, Clock, Classic Tray; lux has no
+  -- the Administrator's tiles (NTUSER StartBar\Sidebar Module0000..0003): Search, Quick Launch, Clock, Classic Tray; luxshell has no
   -- Search tile. The clock is a tile in the list (SideBarClock, 4029-era 179 px set): tiles/clock.lua clock4042.
   tiles = { "quicklaunch", "clock", "notifications" },
-  pinned_tiles = { "notifications", "clock" },        -- lux's pinned/minimized modes (no 4042 counterpart)
+  pinned_tiles = { "notifications", "clock" },        -- luxshell's pinned/minimized modes (no 4042 counterpart)
   taskbar_tiles = nil,
   clock_pinned = false, clock_face = "plex", clock_layers = "full",
   -- popup menus: plex.msstyles [sysmetrics] FLATMENUS colours (MENU 58,106,170, MENUTEXT white, MENUHILIGHT 131,182,234, GRAYTEXT
