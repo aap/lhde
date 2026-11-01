@@ -4,9 +4,6 @@
 	* paths in Makefile, liblhde/data.c (the source-tree lookup), session/lhde-paths.sh, tests, docs/LAYOUT.md, README, CLAUDE.md
 	* do it when no other session has uncommitted work under data/
 
-* docs still carrying dated journal sections under current headings: SETTINGS.md, CLIENT-PROTOCOL.md, SHELL-DESIGN.md, NAVBAR.md
-	(docs/README.md names them); one pass each that keeps the description and drops the diary
-
 ## before the first push
 * a LICENSE for our own code (the vendored Wine code is LGPL with its MANIFEST and patches; ReactOS is only imported, never
 	vendored); the licence of the xattr/ReactOS/icon-pack material we read is theirs

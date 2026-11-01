@@ -18,6 +18,4 @@ the design journals of the merge and before are in `history/` (kept unchanged, n
 | `ANNOTATIONS.md` | file annotations as extended attributes (lhde-import, lhde-pack) |
 | `history/` | journals: `flxp-NOTES.md` (flxp's implementation notes), `THEMES.md` (the registry before theme files), `LAYOUT-draft.md` (the merge plan and the step reports), `THEME-FORMAT-status.md` (open points, decisions, status of the theme format), `CLASSIC-DECO-NOTES.md` |
 
-Still to do in this spirit: `SETTINGS.md`, `CLIENT-PROTOCOL.md`, `SHELL-DESIGN.md` and `NAVBAR.md` carry current content under
-dated headers ("Additions 2026-10-24", "M8 ... status"); each wants one pass that keeps the description and drops the diary.
 Per-component READMEs (`luxwm/README.md`, ...) say what a directory holds and how to build it; the docs here say how it works.
