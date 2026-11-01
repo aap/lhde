@@ -6,8 +6,9 @@ then README.md (build, install, run). docs/README.md lists every document.
 ## Rules
 
 - **No Microsoft files in the tree, ever** (docs/LAYOUT.md "Asset policy"): no `.msstyles`, DLLs, fonts, wallpapers, extracted
-  or rendered bitmaps, no screenshots of them, not in tests either. Art is read at run time from the user's imported Windows
-  tree. `lhde-resources-*` packs built in the tree are gitignored and stay that way.
+  or rendered bitmaps, no Microsoft concept art or screenshots of the real builds, not in tests either. Art is read at run time
+  from the user's imported Windows tree. `lhde-resources-*` packs built in the tree are gitignored and stay that way.
+  Screenshots of lhde itself (`screenshots/`) are fine, as the many screenshots of Windows around are.
 - **Docs describe, they do not journal.** A current document says how things are now, with no dated status blocks; what
   changed goes in the commit message. Design journals live in `docs/history/` and are never updated. When you change a shared
   surface (liblhde's API, a theme-file key, an X property in docs/CLIENT-PROTOCOL.md or docs/SETTINGS.md), update the doc in the
