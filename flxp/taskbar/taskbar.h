@@ -35,14 +35,14 @@ struct Bar {
     HFONT font_caption = nullptr, font_caption_bold = nullptr;   // the caption font, normal and bold weight
     int button_top = 0, button_height = 30;   // task buttons across the bar (horizontal)
     uint64_t own = 0;               // our X window
-    bool menu_only = false;         // --start-menu-only: no bar, just the start menu (next to lhshell's Avalon taskbar)
+    bool menu_only = false;         // --start-menu-only: no bar, just the start menu (next to luxshell's Avalon taskbar)
     bool horizontal() const { return edge == EdgeTop || edge == EdgeBottom; }
 };
 extern Bar g;
 
 std::u16string W(const std::string& s);
 std::string U(const WCHAR* s);
-std::string setting(const char* key, const char* fallback = "");   // flxp.ini / FLXP_<KEY> / the theme's flxp_<key>
+std::string setting(const char* key, const char* fallback = "");   // shell::theme_setting: FLXP_<KEY>, the theme, flxp.ini
 
 // The pixels under a child: the bar background (WM_ERASEBKGND of the bar)
 void paint_bar_background(HDC hdc, const RECT& client);

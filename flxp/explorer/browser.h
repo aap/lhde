@@ -176,8 +176,6 @@ int menu_view(const Browser& b);       // LVS_*, VIEW_THUMBNAILS, VIEW_TILES (XP
 // what is remembered for the folder: menu_view, in the Longhorn hosts with
 // VIEW_NONAMES_FLAG and the size above ZOOM_SHIFT
 int view_code(const Browser& b);
-// XP: the Thumbnails view on, or off (the view before it); the Longhorn hosts: the thumbnails setting
-void set_thumbnails(Browser& b, bool on);
 // view: a view code (LVS_*, VIEW_THUMBNAILS, VIEW_TILES; the Longhorn hosts'
 // VIEW_NONAMES_FLAG, the size above ZOOM_SHIFT, none: the one the view remembers;
 // earlier codes are read as the nearest view). navigating: the folder's remembered

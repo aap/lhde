@@ -1,7 +1,7 @@
 /* libuxtheme: Windows visual styles (.msstyles) without a window system.
  *
- * One reader and renderer for XP styles (PACKTHEM_VERSION 3: luna.msstyles,
- * the Slate/Jade XP backports) and Longhorn-compiled ones (version 4: the
+ * One reader and renderer for XP styles (PACKTHEM_VERSION 3: luna.msstyles)
+ * and Longhorn-compiled ones (version 4: the
  * 4042-4074 Luna/Slate/Jade, 5048's aero.msstyles). Inside it is Wine's
  * uxtheme (msstyles.c, draw.c) drawing through flxp's GDI, so parts look as
  * DrawThemeBackground draws them.

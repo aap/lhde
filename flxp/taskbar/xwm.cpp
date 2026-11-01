@@ -316,9 +316,9 @@ std::vector<Icon> icons;
 Atom tray_selection;
 bool tray_wanted, tray_takeover;   // tray_start was called: claim the selection whenever it is free
 bool tray_waiting_logged;
-Atom lhshell_selection;         // _LHSHELL_S<screen>: lhshell runs (it forwards _LHSHELL_START, it may own the tray)
-// The start-menu provider (SHELL-DESIGN "Start menu ownership, revised"): we own _LH_STARTMENU_S<screen>
-// with this window while our menu is the display's start menu; lhshell sends _LHSHELL_START to it.
+Atom luxshell_selection;         // _LHSHELL_S<screen>: luxshell runs (it forwards _LHSHELL_START, it may own the tray)
+// The start-menu provider (docs/SHELL-DESIGN.md "Start menu ownership, revised"): we own _LH_STARTMENU_S<screen>
+// with this window while our menu is the display's start menu; luxshell sends _LHSHELL_START to it.
 ::Window menu_owner;
 Atom menu_selection;
 bool menu_wanted;
@@ -443,7 +443,7 @@ void tray_forget(::Window w)
         }
 }
 
-// The icons go back to the root as lhshell's tray_stop does: unmapped (a mapped toplevel would be managed by
+// The icons go back to the root as luxshell's tray_stop does: unmapped (a mapped toplevel would be managed by
 // the window manager as a window until the next tray docks it), without our ParentRelative background, out of
 // our save-set; the next tray's MANAGER message makes them dock again
 void tray_release_icons()
@@ -471,7 +471,7 @@ void tray_release_icons()
 
 // A ReparentNotify for one of our icons. Events can be stale: when we take an icon over from another tray,
 // that tray's hand-back (reparent to the root) may reach the server after our XSelectInput but before our
-// reparent (SHELL-DESIGN M8, lhshell's note 4), so the notify says "root" while the icon sits in our container.
+// reparent (docs/SHELL-DESIGN.md M8), so the notify says "root" while the icon sits in our container.
 // Ask the server; an icon the old tray moved out again right after we docked it is taken back once.
 void tray_reparented(::Window w, ::Window to)
 {
@@ -496,7 +496,7 @@ void tray_reparented(::Window w, ::Window to)
 bool owned(Atom selection) { return selection && XGetSelectionOwner(xd, selection) != None; }
 
 // Claim _NET_SYSTEM_TRAY_S<screen> (System Tray Protocol 0.3: owner window with a real timestamp, then MANAGER on
-// the root). Never from lhshell: while lhshell runs (_LHSHELL_S<screen>) and holds the tray we wait until it hands it
+// the root). Never from luxshell: while luxshell runs (_LHSHELL_S<screen>) and holds the tray we wait until it hands it
 // over (it does before starting us as its classic bar); from another tray only with takeover; else we wait too
 // (run() retries every 2 s) and take it when it is free.
 void do_tray_start(bool takeover)
@@ -508,10 +508,10 @@ void do_tray_start(bool takeover)
     tray_takeover = takeover;
     if (tray_owner) return;
     ::Window holder = XGetSelectionOwner(xd, tray_selection);
-    if (holder != None && (!takeover || owned(lhshell_selection))) {
+    if (holder != None && (!takeover || owned(luxshell_selection))) {
         if (!tray_waiting_logged)
             fprintf(stderr, "flxp-taskbar: %s is owned by 0x%lx (%s); no notification icons until it is free%s\n", name, holder,
-                    owned(lhshell_selection) ? "lhshell runs" : "another tray", owned(lhshell_selection) ? "" : " (tray_takeover = 1 takes it)");
+                    owned(luxshell_selection) ? "luxshell runs" : "another tray", owned(luxshell_selection) ? "" : " (tray_takeover = 1 takes it)");
         tray_waiting_logged = true;
         return;
     }
@@ -646,9 +646,9 @@ void handle(XEvent& e)
     case ClientMessage:
         if (e.xclient.message_type == atoms[A_LHSHELL_START]) {
             if (menu_owner && e.xclient.window == menu_owner) start_message(e.xclient, false);
-            // the root broadcast (lhwm's Super key, or a classic button leaving the menu to lhshell): lhshell answers it
+            // the root broadcast (lhwm's Super key, or a classic button leaving the menu to luxshell): luxshell answers it
             // or forwards it to the provider while it runs; another provider owns the menu: theirs
-            else if (e.xclient.window == root && !owned(lhshell_selection) && (menu_owner || !owned(menu_selection)))
+            else if (e.xclient.window == root && !owned(luxshell_selection) && (menu_owner || !owned(menu_selection)))
                 start_message(e.xclient, true);
             return;
         }
@@ -705,7 +705,7 @@ void run()
         if (XPending(xd)) continue;
         bool waiting = tray_wanted && !tray_owner;
         if (poll(p, 2, waiting ? 2000 : -1) < 0 && errno != EINTR) break;
-        if (waiting) {      // the tray selection was taken: claim it once it is free (lhshell yields, another tray quits)
+        if (waiting) {      // the tray selection was taken: claim it once it is free (luxshell yields, another tray quits)
             std::lock_guard<std::mutex> l(model_lock);
             if (XGetSelectionOwner(xd, tray_selection) == None) do_tray_start(tray_takeover);
         }
@@ -738,7 +738,7 @@ bool start(uint64_t own_window, Notify notify)
     XInternAtoms(xd, (char**)atom_names, A_COUNT, False, atoms);
     char name[64];
     snprintf(name, sizeof name, "_LHSHELL_S%d", scr);
-    lhshell_selection = XInternAtom(xd, name, False);
+    luxshell_selection = XInternAtom(xd, name, False);
     snprintf(name, sizeof name, "_LH_STARTMENU_S%d", scr);
     menu_selection = XInternAtom(xd, name, False);
     if (pipe(wake_fds) == 0)

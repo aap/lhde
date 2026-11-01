@@ -1,7 +1,7 @@
 #!/bin/sh
 # Run a demo on the current display (from anywhere; builds what it needs first).
 #   tests/demo.sh                 classic controls window
-#   tests/demo.sh theme           same under the Slate (Longhorn 4074 backport) theme
+#   tests/demo.sh theme           same under the Slate theme
 #   tests/demo.sh dialog [NAME]   a comdlg32 dialog template (CHOOSE_FONT, CHOOSE_COLOR, OPEN_FILE, PRINT32, ...)
 #   tests/demo.sh tdialog [NAME]  the same, themed
 #   tests/demo.sh jade            controls under the Jade theme

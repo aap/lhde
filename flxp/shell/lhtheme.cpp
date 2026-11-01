@@ -227,7 +227,7 @@ std::string theme_setting(const std::string& key, const std::string& fallback)
     if (key == "taskbar_kind") return or_fallback(t.value("Shell.taskbar"));
     if (key == "start_menu") {
         std::string v = setting(key);               // the user's style: panel | classic
-        return v.empty() || v == "lhshell" ? fallback : v;
+        return v.empty() ? fallback : v;
     }
     if (key == "font_smoothing") {
         std::string v = setting(key);               // settings.ini [fonts] smoothing (the store), the user's

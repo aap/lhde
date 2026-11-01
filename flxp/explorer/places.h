@@ -74,7 +74,6 @@ GroupSpec computer_group();                     // My Computer and the drives
 bool icons();                                   // the groups look's icons (places_icons)
 void set_icons(bool on);                        // and remembered
 void destroy();                         // the host goes (the dialog: the statics are free again)
-void set_group(const std::string& title, const std::vector<Place>& places);   // a Custom group's places
 void folder_changed();                  // the host shows another folder (the bold entry)
 // An XDG user directory ($XDG_CONFIG_HOME/user-dirs.dirs, e.g. XDG_DOCUMENTS_DIR,
 // else ~/<fallback>) when it exists and is not $HOME, else ""

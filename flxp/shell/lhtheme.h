@@ -53,7 +53,7 @@ const SessionTheme& session_theme();
 void set_session_theme(const SessionTheme& t);
 
 // flxp's keys that the theme decides, from the session theme's record (FLXP_<KEY> in the environment still wins: a run's
-// option). The mapping (docs/history/flxp-NOTES.md "flxp on liblhde"):
+// option). The mapping:
 //   icons              Desktop.icons (longhorn4074 -> longhorn while flxp's res/icons has no file of that name)
 //   frame              Explorer.chrome (auto | xp | longhorn; navbar none -> xp)
 //   taskbar_kind       Shell.taskbar
@@ -64,7 +64,7 @@ void set_session_theme(const SessionTheme& t);
 //   header_preset      flxp.ini, else Explorer.navbar_preset for navbar = vision
 //   taskpane_position  flxp.ini, else Explorer.taskpane (top | bottom: the Longhorn task band under the list)
 //   font_smoothing     settings.ini [fonts] smoothing (the user's), else Fonts.smoothing
-// any other key: setting(key, fallback) (flxp.ini, the settings store), as before; the registry's flxp_<key> are gone.
+// any other key: setting(key, fallback) (flxp.ini, the settings store).
 std::string theme_setting(const std::string& key, const std::string& fallback = "");
 
 // True if flxp follows the session theme: theme_follow (default 1) and no

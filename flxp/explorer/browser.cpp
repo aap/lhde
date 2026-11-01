@@ -1,6 +1,5 @@
-// The browsing widget shared by the explorer and the file dialog (browser.h).
-// Moved out of explorer.cpp (2026-10-25) without changes to what the
-// explorer does; the hooks carry what differs between the hosts.
+// The browsing widget shared by the explorer and the file dialog (browser.h);
+// the hooks carry what differs between the hosts.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1407,17 +1406,6 @@ void set_view(Browser& b, int view, bool navigating)
     InvalidateRect(b.list, nullptr, TRUE);
     b.view_changed();
     for (auto fn : g_view_listeners) fn(b);
-}
-
-void set_thumbnails(Browser& b, bool on)
-{
-    if (b.zoomable) {   // the thumbnails setting (every view, every folder)
-        if (on != (shell::setting("thumbnails", "1") != "0")) view_command(b, VC_THUMBNAILS);
-        return;
-    }
-    if (on) { set_view(b, VIEW_THUMBNAILS); return; }
-    b.thumbs = false;
-    set_view(b, b.view);
 }
 
 bool view_key(Browser& b, int key)

@@ -13,7 +13,6 @@ namespace shell {
 bool trash(const std::string& path, std::string* err = nullptr);
 std::string trash_dir_for(const std::string& path);   // which Trash a path would go to
 
-bool rename_item(const std::string& path, const std::string& new_name, std::string* new_path, std::string* err = nullptr);
 std::string unique_name(const std::string& dir, const std::string& base, const std::string& ext);   // "New Folder", "New Folder (2)", ...
 bool new_folder(const std::string& dir, std::string* path, std::string* err = nullptr);
 bool new_text_file(const std::string& dir, std::string* path, std::string* err = nullptr);

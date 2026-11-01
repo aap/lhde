@@ -106,21 +106,6 @@ bool trash(const std::string& path_in, std::string* err)
     return true;
 }
 
-bool rename_item(const std::string& path, const std::string& new_name, std::string* new_path, std::string* err)
-{
-    if (new_name.empty() || new_name.find('/') != std::string::npos || new_name == "." || new_name == "..") {
-        if (err) *err = "A file name cannot be empty or contain a slash.";
-        return false;
-    }
-    std::string to = dir_of(path) + "/" + new_name;
-    if (to == path) { if (new_path) *new_path = to; return true; }
-    struct stat st;
-    if (lstat(to.c_str(), &st) == 0) { if (err) *err = "A file named \"" + new_name + "\" already exists."; return false; }
-    if (rename(path.c_str(), to.c_str()) != 0) { set_err(err, "cannot rename " + base_of(path)); return false; }
-    if (new_path) *new_path = to;
-    return true;
-}
-
 std::string unique_name(const std::string& dir, const std::string& base, const std::string& ext)
 {
     struct stat st;

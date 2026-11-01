@@ -1,5 +1,5 @@
 // Dialog manager basics against win32 behaviour, driven from outside with
-// xdotool (NOTES.md, Status: "win32 dialog behaviour"):
+// xdotool:
 // - child z-order = creation order (GW_CHILD/GW_HWNDNEXT), so Tab runs in
 //   template order;
 // - Alt+letter mnemonics (WM_SYSCHAR -> IsDialogMessage);

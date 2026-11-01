@@ -549,7 +549,7 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_CANCELMODE:
         // Wine's DefWindowProc: MENU_EndMenu ends tracking when h is the menu's
-        // popup or its owner (the old test only matched the popup)
+        // popup or its owner
         if (MENU_IsMenuActive()) MENU_EndMenu(h);
         if (GetCapture() == h) ReleaseCapture();
         return 0;

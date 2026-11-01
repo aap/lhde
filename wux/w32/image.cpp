@@ -115,20 +115,6 @@ gdi::Bitmap* copy_bitmap(const gdi::Bitmap* b)
     return o;
 }
 
-static gdi::Bitmap* sub_bitmap(const gdi::Bitmap* b, const gdi::Rect& r)
-{
-    gdi::Bitmap* o = gdi::create_bitmap(r.width(), r.height());
-    for (int y = 0; y < r.height(); y++) {
-        uint32_t* d = o->row(y);
-        int sy = r.top + y;
-        for (int x = 0; x < r.width(); x++) {
-            int sx = r.left + x;
-            d[x] = (sx >= 0 && sy >= 0 && sx < b->width && sy < b->height) ? b->row(sy)[sx] : 0;
-        }
-    }
-    return o;
-}
-
 static gdi::Bitmap* scale_rect(const gdi::Bitmap* b, const gdi::Rect& sr, int w, int h)
 {
     if (w <= 0) w = 1;
@@ -184,12 +170,6 @@ static bool any_alpha(const gdi::Bitmap* b)
         for (int x = 0; x < b->width; x++)
             if (b->row(y)[x] >> 24) return true;
     return false;
-}
-
-static void set_opaque(gdi::Bitmap* b)
-{
-    for (int y = 0; y < b->height; y++)
-        for (int x = 0; x < b->width; x++) b->row(y)[x] |= 0xff000000;
 }
 
 // Maps a logical point of a w32::DC onto its gdi::DC for the duration of a

@@ -75,7 +75,7 @@ void set_title(NativeWindow* w, const char* title);
 void set_window_rect(NativeWindow* w, const gdi::Rect& screen_rect);
 gdi::Rect window_rect(NativeWindow* w);
 
-// Frame protocol of the lhwm window manager (lhwm/CLIENT-PROTOCOL.md): the
+// Frame protocol of the lhwm window manager (docs/CLIENT-PROTOCOL.md): the
 // frame plate extends into the client (left, right, top, bottom; 0xFFFFFFFF
 // in all four = sheet of glass; null removes it), flags as _LHWM_FRAME_FLAGS.
 enum : uint32_t { FrameNoTitle = 1, FrameNoIcon = 2, FrameNoFog = 4, FrameClientCaption = 8 };
@@ -87,7 +87,7 @@ struct FrameInfo {
     bool have_metrics = false;      // _LHWM_FRAME_METRICS present
     int32_t caption_h = 0, border_l = 0, border_r = 0, border_b = 0;
     uint32_t text_rgb = 0, glow_rgb = 0, inactive_text_rgb = 0;   // 0xRRGGBB
-    // items 14..16 (lhwm since 2026-10-25): the maximised caption text
+    // items 14..16: the maximised caption text
     bool have_max = false;
     uint32_t max_text_rgb = 0, max_inactive_text_rgb = 0, max_glow_rgb = 0;   // max_glow 0xFFFFFFFF = none
     std::string theme;              // _LHWM_THEME

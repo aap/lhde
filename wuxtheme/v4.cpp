@@ -396,12 +396,6 @@ std::string enum_name(const Style& st, const std::string& prop, int value)
     return v == e->second.end() ? "" : v->second;
 }
 
-std::string type_of(const Style& st, int id)
-{
-    auto p = st.props.find(id);
-    return p == st.props.end() ? "" : p->second.type;
-}
-
 bool stream(const Style& st, const std::u16string& value, const uint8_t** data, size_t* size)
 {
     if (value.size() < 2) return false;

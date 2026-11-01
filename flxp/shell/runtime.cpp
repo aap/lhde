@@ -45,8 +45,8 @@ static const char template_text[] =
     "# Smooth edges of screen fonts (XP's Display Properties > Appearance >\n"
     "# Effects): off, standard or cleartype (auto: standard, XP's default).\n"
     "# Standard is grayscale where the font's gasp table allows it: Tahoma 8 stays\n"
-    "# crisp, the Luna start button and captions are smoothed. cleartype is drawn\n"
-    "# as standard for now.\n"
+    "# crisp, the Luna start button and captions are smoothed. cleartype is sub-\n"
+    "# pixel on opaque surfaces and ignores the gasp table, as GDI's ClearType.\n"
     "font_smoothing =\n"
     "# The theme decides the icon set, the Explorer frame and navigation bar, the\n"
     "# taskbar, the start menu and the wallpaper (Desktop.icons, Explorer.chrome,\n"
@@ -314,11 +314,11 @@ std::string find_msstyles(const std::string& name)
         }
         std::string f = d + "/" + lower + ".msstyles";
         if (exists(f)) return f;
-        // lhde's styles/NAME/ with one style of another name (styles/slate4074-xp/slate.msstyles)
+        // lhde's styles/NAME/ with one style of another name (styles/NAME/OTHER.msstyles)
         f = only_msstyles(d + "/" + name);
         if (!f.empty()) return f;
     }
-    return "";   // no -xp backport fallback: every component uses the real style (THEME-FORMAT section 10)
+    return "";
 }
 
 static void export_env(const char* var, const std::string& v)

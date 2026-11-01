@@ -1,5 +1,5 @@
-// glassframe: the flxp port of lhwm's reference client x11/examples/extendframe.c
-// (lhwm/CLIENT-PROTOCOL.md), written as a plain win32 program against the
+// glassframe: the flxp port of lhwm's reference client examples/extendframe.c
+// (docs/CLIENT-PROTOCOL.md), written as a plain win32 program against the
 // shim's dwmapi: a 640x420 window whose top 60 px are the window manager's
 // glass (DwmExtendFrameIntoClientArea + NO_TITLE), holding a big folder
 // title, an icon and a fake breadcrumb with TextGlow, above an opaque white

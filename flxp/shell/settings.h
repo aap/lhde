@@ -1,4 +1,4 @@
-// lhde's settings store for flxp (docs/SETTINGS.md "lhde (step 4)"): liblhde's
+// lhde's settings store for flxp (docs/SETTINGS.md): liblhde's
 // ~/.config/lhde/settings.ini (lhde/settings.h) with the per-user keys, the
 // theme keys written into theme files (lhde_theme_set_key), the theme list, and
 // the _LH_SETTINGS_CHANGED root message. Shared by luxwm, luxshell and the flxp
@@ -33,7 +33,7 @@ struct Ini {
 std::string dir();                                // liblhde's lhde_config_dir(): ~/.config/lhde
 std::string path();                               // lhde_settings_path(): dir()/settings.ini ($LHDE_SETTINGS)
 
-// settings.ini now (re-read when the file changed); "" = unset -> fallback
+// settings.ini's value (re-read when the file changed); "" = unset -> fallback
 std::string get(const std::string& section, const std::string& key, const std::string& fallback = "");
 struct Edit { std::string section, key, value; };   // value "" removes the key
 // through liblhde's store (lhde_settings_set: unknown keys, comments, order kept)
@@ -46,7 +46,7 @@ bool set_shared(const std::vector<Edit>& edits);
 
 // settings.ini's value for a flxp.ini key, the per-user ones only: font_smoothing ([fonts] smoothing),
 // pinned ([start] pinned). "" if not mapped or not set. The theme keys (icons, frame, taskbar_kind,
-// start_menu, wallpaper) are the theme's now: shell::theme_setting, the session theme's record.
+// start_menu, wallpaper) are the theme's: shell::theme_setting, the session theme's record.
 std::string value_for(const std::string& flxp_key);
 // the (section, key) a flxp key maps to; false if none
 bool mapping(const std::string& flxp_key, std::string& section, std::string& key);
@@ -91,7 +91,7 @@ bool notify(const std::string& section_hint = "");
 // theme is dropped), _LH_THEME, notify(hint).
 bool apply_theme(const std::string& name, const std::string& hint = "theme");
 
-// lux (lhshell) runs: _LHSHELL_S<screen> is owned
+// luxshell runs: _LHSHELL_S<screen> is owned
 bool lux_running();
 
 // The Display Properties program: flxp-settings next to this one (installed, or build/bin

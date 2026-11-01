@@ -1,4 +1,4 @@
-// dwmapi over the lhwm frame protocol (lhwm/CLIENT-PROTOCOL.md): the X11
+// dwmapi over the lhwm frame protocol (docs/CLIENT-PROTOCOL.md): the X11
 // equivalent of DwmExtendFrameIntoClientArea is an ARGB toplevel plus the
 // _LHWM_EXTEND_FRAME / _LHWM_FRAME_FLAGS properties; composition is the
 // root's _LHWM_COMPOSITED. The flxp extensions are in flxp_dwmapi.h.

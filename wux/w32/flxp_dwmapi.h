@@ -1,5 +1,5 @@
 /* flxp extensions to dwmapi for the lhwm window manager's glass frames
-   (lhwm/CLIENT-PROTOCOL.md). Include after windows.h; pulls in dwmapi.h.
+   (docs/CLIENT-PROTOCOL.md). Include after windows.h; pulls in dwmapi.h.
 
    DwmExtendFrameIntoClientArea turns the toplevel into a 32-bit ARGB window
    (recreating its X window if needed: call it in WM_CREATE, before the window

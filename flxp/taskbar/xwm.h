@@ -26,15 +26,15 @@ struct Task {
 enum Change : uint32_t {
     ChangeList = 1, ChangeActive = 2, ChangeTitle = 4, ChangeIcon = 8, ChangeState = 16,
     ChangeDesktop = 32, ChangeTray = 64,
-    ChangeStartKey = 128,           // _LHSHELL_START: lhwm's root broadcast (Super) or lhshell's to our owner window
+    ChangeStartKey = 128,           // _LHSHELL_START: lhwm's root broadcast (Super) or luxshell's to our owner window
 };
 
-// _LHSHELL_START (SHELL-DESIGN "Start menu ownership, revised"): l[0] bit 0 = toggle, l[1..4] = the anchor
+// _LHSHELL_START (docs/SHELL-DESIGN.md "Start menu ownership, revised"): l[0] bit 0 = toggle, l[1..4] = the anchor
 // rectangle in root coordinates (0 x 0: none). lhwm's root broadcast (no rect) always toggles.
 struct StartRequest {
     bool toggle = false;
     int x = 0, y = 0, w = 0, h = 0;
-    bool from_root = false;         // the root broadcast (else lhshell's message to our owner window)
+    bool from_root = false;         // the root broadcast (else luxshell's message to our owner window)
     uint32_t serial = 0;
 };
 
@@ -77,15 +77,15 @@ std::string wm_name();
 std::string wm_executable();
 
 // The start-menu provider: own _LH_STARTMENU_S<screen> (on) or give it up;
-// lhshell then sends _LHSHELL_START to our owner window instead of opening
-// its own menu, and root broadcasts are ignored while lhshell runs.
+// luxshell then sends _LHSHELL_START to our owner window instead of opening
+// its own menu, and root broadcasts are ignored while luxshell runs.
 void provide_start_menu(bool on);
 // _LH_STARTMENU_OPEN = 1/0 (CARDINAL) on the _LH_STARTMENU_S owner window (when we have one) and
 // on the root: our start panel or classic menu is open (set before it shows, cleared after it closed).
 void set_start_menu_open(bool open);
 
 // System tray. tray_start: claim the selection when it is free, else wait
-// for it (takeover: take it from another manager, but never from lhshell). The icons live in a child window of the taskbar at
+// for it (takeover: take it from another manager, but never from luxshell). The icons live in a child window of the taskbar at
 // area (taskbar coordinates), in slots of slot x slot pixels, icon_size
 // centred in each; vertical lays them out top to bottom.
 bool tray_start(bool takeover, bool vertical);

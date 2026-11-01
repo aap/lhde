@@ -41,7 +41,7 @@ static void usage(FILE* f)
           "  --print-filter                  first output record: filter=<index of the filter in effect>\n"
           "  --uri                           print file:// URIs instead of paths\n"
           "  --look xp|longhorn|auto         the dialog's look (default: filedlg= in flxp.ini, else the\n"
-          "                                  explorer's frame style: Longhorn under lhwm's Longhorn themes)\n"
+          "                                  explorer's frame style: Longhorn under luxwm's Longhorn themes)\n"
           "Exit status: 0 chosen, 1 cancelled, 2 usage error.\n", f);
 }
 

@@ -108,7 +108,6 @@ Point client_to_screen(Window* w, Point p);
 Point screen_to_client(Window* w, Point p);
 Point map_point(Window* from, Window* to, Point p);   // null = screen
 Window* toplevel_of(Window* w);
-Window* child_from_point(Window* w, Point client);   // direct child whose window rect contains it
 Window* window_from_point(Point screen);               // deepest window
 
 void set_text(Window* w, const char* text);
@@ -126,7 +125,6 @@ void end_paint(Window* w, PaintInfo& pi);
 gdi::DC* get_dc(Window* w);            // client area, origin at client top-left
 gdi::DC* get_window_dc(Window* w);     // whole window, origin at window top-left
 void release_dc(Window* w, gdi::DC* dc);
-gdi::Region visible_client_region(Window* w);   // device coords of the toplevel backbuffer
 Point device_origin(Window* w);                 // client origin in backbuffer coords
 // Scroll the backbuffer contents of w's client area; returns the area that needs repainting.
 void scroll_window(Window* w, int32_t dx, int32_t dy, const Rect* scroll, const Rect* clip,
@@ -223,7 +221,7 @@ void set_root_string(const char* prop, const std::string& value);   // UTF8_STRI
 // publishes no _NET_ACTIVE_WINDOW (no EWMH WM: use the focus instead).
 int wm_active(Window* w);
 // fn runs once after changes of the watched root property, when the pending X
-// events have been handled (a burst of changes is one call; docs/history/THEMES.md step 2)
+// events have been handled (a burst of changes is one call)
 void on_root_property_change(const char* prop, void (*fn)());
 Rect work_area();
 

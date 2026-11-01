@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <string.h>
 #include "netres.h"
-#include "config.h"
 
 namespace shell {
 
@@ -96,12 +95,6 @@ bool net_resource_in(const std::string& data, const std::string& name, std::stri
     for (size_t i = data.find(magic, 0, 4); i != std::string::npos; i = data.find(magic, i + 4, 4))
         if (lookup(data, i, wname, out)) return true;
     return false;
-}
-
-bool net_resource(const std::string& file, const std::string& name, std::string& out)
-{
-    std::string data;
-    return read_file(file, data) && net_resource_in(data, name, out);
 }
 
 } // namespace shell

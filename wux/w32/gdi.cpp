@@ -135,7 +135,6 @@ HGDIOBJ stock(int i)
 }
 
 Bitmap* stock_bitmap() { init_gdi(); return stock_bmp; }
-Font* stock_font() { return (Font*)stock(DEFAULT_GUI_FONT); }
 
 // ---------------------------------------------------------------------------
 // Pens, brushes

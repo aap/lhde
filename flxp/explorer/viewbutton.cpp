@@ -47,8 +47,6 @@ static const int k_band[6] = { SL_TOP + THUMB_H / 2, 37, 68, 104, 145, SL_BOTTOM
 
 // ---- pictures -------------------------------------------------------------------------
 
-static void free_pic(Pic& p) { if (p.bmp) DeleteObject(p.bmp); p = Pic(); }
-
 // imageres <id> of the 4074 pack, scaled to w x h (0: as it is), as a premultiplied DIB
 static Pic load(int id, int w = 0, int h = 0)
 {

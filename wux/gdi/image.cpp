@@ -261,13 +261,6 @@ static bool is_ico(const uint8_t* d, size_t n)
     return off >= 6u + 16u * count && off < n;
 }
 
-bool is_image_data(const uint8_t* d, size_t n)
-{
-    if (n < 8) return false;
-    return !memcmp(d, "\x89PNG", 4) || (d[0] == 0xff && d[1] == 0xd8) || (d[0] == 'B' && d[1] == 'M') || is_ico(d, n)
-        || (webp_supported() && is_webp(d, n));
-}
-
 // Header dimensions of a PNG or BMP without decoding it; 0,0 if unknown.
 static void header_size(const uint8_t* d, size_t n, int* w, int* h)
 {

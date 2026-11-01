@@ -112,7 +112,7 @@ static void test_same_fs_move()
     // moving onto itself: nothing happens, no error
     r = fileops::run(Op::Move, { d + "/g" }, d);
     CHECK(r.ok && get(d + "/g") == "g" && entries(d) == 2);
-    // the old wrapper, copy onto itself: "Copy of g"
+    // paste_items, copy onto itself: "Copy of g"
     std::string err;
     CHECK(paste_items({ d + "/g" }, d, false, &err));
     CHECK(get(d + "/Copy of g") == "g");

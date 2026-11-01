@@ -33,8 +33,6 @@ static const std::string& icon_dir()
     return g_dir;
 }
 
-void set_icon_dir(const std::string& dir) { g_dir = dir; }
-
 static std::string trim(const std::string& s)
 {
     size_t a = s.find_first_not_of(" \t\r\n"), b = s.find_last_not_of(" \t\r\n");
@@ -53,7 +51,7 @@ static std::string expand(const std::string& v)
             if (var.rfind("FLXP_", 0) == 0) {   // flxp settings: $FLXP_LONGHORN_SYSTEM32 is longhorn_system32=
                 std::string key = var.substr(5);
                 for (char& c : key) if (c >= 'A' && c <= 'Z') c += 32;
-                out += theme_setting(key);   // or the session theme's flxp_<key>
+                out += theme_setting(key);   // or what the session theme decides for it
             } else {
                 const char* e = getenv(var.c_str());
                 out += e ? e : "";
@@ -276,12 +274,6 @@ std::string icon_file(const std::string& key)
 std::string resource_file(const std::string& build, const std::string& file)
 {
     return lhde_find("resources/" + build + "/" + file);
-}
-
-std::string resource_src(const std::string& build, const std::string& file, int id)
-{
-    std::string f = resource_file(build, file);
-    return f.empty() ? "" : "pe:" + f + "#" + std::to_string(id);
 }
 
 // Where a source keeps XP's art under another file or id (the rest are XP's own), or has a picture of its own under XP's id

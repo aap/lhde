@@ -1314,20 +1314,6 @@ LONG reg_set_string(HKEY root, const char* path, const char* name, const char* v
     return ERROR_SUCCESS;
 }
 
-LONG reg_set_dword(HKEY root, const char* path, const char* name, DWORD value)
-{
-    Key* k = key_of(root);
-    if (!k) return ERROR_INVALID_HANDLE;
-    k = walk(k, path ? path : "", true);
-    set_value(k, name ? name : "", REG_DWORD, &value, sizeof value);
-    return ERROR_SUCCESS;
-}
-
-void reg_clear()
-{
-    for (Key*& r : roots) if (r) { free_key(r); r = nullptr; }
-}
-
 } // namespace w32
 
 extern "C" {
