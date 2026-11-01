@@ -19,6 +19,12 @@ usage:
                                               sets aero-patch and aerovision). Without NAME the file's stem is used and printed;
                                               a stem that is already a source's style (aero.msstyles: Vista's aero) is
                                               refused: give the NAME
+  lhde-import --styles DIR [-n]               every visual style below DIR (a downloaded themes folder), also inside .zip, .rar,
+                                              .7z and .exe files (theme installers, unpacked with 7z or unrar, never run), as --style
+                                              does it, NAME from the file's stem; the same file twice is taken once, two styles
+                                              with one stem get their folder's name; a .theme beside a style gives the wallpaper
+                                              it names; a summary at the end (docs/USAGE.md "Adding a directory of styles").
+                                              -n (--dry-run): only list what it would do
   lhde-import --icons DIR NAME [--licence FILE]   an icon pack (PNGs, .ico; e.g. the CC0 Windows XP High Resolution Icon
                                               Pack) into local/icons/NAME/ as .ico files (16-256 px), for icon recipes that
                                               name files (file:NAME/PATH.ico; share/icons/xp-hires.theme)
@@ -162,6 +168,8 @@ def main():
         x = a.pop(0)
         if x in ('--pack', '--iso', '--wim', '--dir', '--from-workspace'):
             mode, arg = x[2:], a.pop(0)
+        elif x == '--styles': mode, arg = 'styles', a.pop(0)
+        elif x in ('-n', '--dry-run'): o['dry'] = True
         elif x == '--style':
             mode, arg = 'style', a.pop(0)
             if a and not a[0].startswith('--'):
@@ -201,6 +209,14 @@ def main():
         return 0
     if mode is None:
         L.die('nothing to import from (--help)')
+    if o.get('dry') and mode != 'styles':
+        L.die('-n (--dry-run) belongs to --styles')
+    if mode == 'styles':
+        import lhdestyles
+        if not o.get('dry'):
+            os.makedirs(data, exist_ok=True)
+        L.log('Windows tree %s' % data)
+        return lhdestyles.import_styles(arg, data, o['force'], o['recipes'], o.get('dry', False), o.get('tmp'))
     os.makedirs(data, exist_ok=True)
     L.log('Windows tree %s' % data)
     if mode == 'reindex':

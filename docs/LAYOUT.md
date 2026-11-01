@@ -44,9 +44,10 @@ WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_D
     themes/                              the build's Resources/Themes: Jade/jade.msstyles, Luna/Shell/<Scheme>/shellstyle.dll, ...
     fonts/  wallpapers/  setup/          (setup/hivedef.inf: the xp and 2k classic schemes)
     source.ini                           the rules it was taken with
-  local/                               files that come from no source: themes/ (lhde-import --style: aero-patch, zune, ...),
-                                       schemes/ (lhde-schemes), icons/PACK/ (lhde-import --icons: a free icon pack as .ico),
-                                       wallpapers/ resources/ fonts/ (copied by hand, the workspace); a resource pack carries
+  local/                               files that come from no source: themes/ (lhde-import --style: aero-patch, zune, ...;
+                                       --styles: a downloaded folder's), schemes/ (lhde-schemes), icons/PACK/ (lhde-import
+                                       --icons: a free icon pack as .ico), wallpapers/ (a --styles style's .theme wallpaper)
+                                       resources/ fonts/ (copied by hand, the workspace); a resource pack carries
                                        it as its local/ (below)
   generated/                           everything derived; deleting it is always safe (lhde-import --regenerate)
     frames/SET/                          PNGs + manifest.ini (recipe, inputs with sha256); theme.ini of a set we do not ship

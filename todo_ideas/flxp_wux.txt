@@ -2,6 +2,9 @@
 
 ## visuals
 
+* Appearance's style list shows a style's DisplayName outside Latin-1 as '?' (zxbiyao, from lhde-import --styles: its
+	themes.ini says 诛仙主题之碧瑶版(绿色), the list shows ????????(??)): style_label goes through narrow strings
+
 * XP's Customize Toolbar dialog (View > Toolbars > Customize...: buttons, text options); the icon size alone is in View >
 	Toolbars > Icon Options
 

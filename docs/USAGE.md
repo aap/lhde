@@ -158,6 +158,7 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
                                                                # NAME is the style's name for the themes; without it the file's stem
                                                                # is used and printed, and a stem that is a source's style is refused
    lhde-import --style ~/styles/Royale/Royale.msstyles royale  # an XP style with its Shell/ directory beside the file: both go in
+   lhde-import --styles ~/Downloads/xp-themes [-n]             # every style of a downloaded folder ("Adding a directory of styles")
    lhde-import --icons DIR NAME [--licence FILE]               # a free icon pack ("Icon packs" below)
    lhde-import --regenerate                                    # delete generated/ and make it again from the imported files
    lhde-import --reindex                                       # make index/ again (after moving files by hand)
@@ -205,6 +206,45 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    ```
    22 schemes (XP, Server 2003 and Windows 2000 have the same ones), the "(large)" / "(extra large)" variants as the font sizes of
    their scheme. Without any, "Windows Standard" is the built-in classic colours.
+
+### Adding a directory of styles
+Third-party XP visual styles usually come as a folder per style (`NAME.msstyles`, a `Shell/` directory with the task pane's
+`shellstyle.dll` per colour scheme, a `.theme` file, wallpapers, icons, fonts) or as a self-extracting installer (`NAME.exe`:
+7-Zip, RAR, zip or NSIS archives). `lhde-import --styles DIR` takes every style below a downloaded folder of them into the
+Windows tree, each as `lhde-import --style FILE NAME` would:
+```
+lhde-import --styles ~/Downloads/xp-themes -n       # the dry run: what it would import, under which names, and what it skips
+lhde-import --styles ~/Downloads/xp-themes          # then for real (into $LHDE_WINDOWS, else ~/.local/share/lhde-windows)
+```
+- **What it reads.** Every `*.msstyles` below DIR, and the ones inside `.zip`, `.rar`, `.7z`, `.exe` and `.cab` files: 7z
+  unpacks each archive into a fresh scratch directory (unrar the RAR ones when it is installed: 7-Zip builds without the RAR
+  codec, Void's among them, cannot unpack RAR 2.9's method), and archives inside archives are opened too, three deep. Nothing
+  from DIR is ever run, and DIR is not written. An `.exe` that 7z opens only as a program (an installer of another kind) is
+  reported as one that would not open.
+- **What it takes.** The style as `local/themes/NAME.msstyles`; its `Shell/` directory when one lies beside the file (as
+  `local/themes/NAME/Shell/`, the colour folders spelled as the style spells its colour schemes, `shellstyle.dll` in lower
+  case); the recipes that read NAME (only `aero-patch` has some). From a `.theme` file beside the style (in its folder or the
+  one above) whose `[VisualStyles] Path` names it, the wallpaper it names, when the download has that file: into
+  `local/wallpapers/NAME/`, which the Desktop tab lists under the style's name.
+- **What it ignores.** Everything else: what a `.theme` says besides the wallpaper (the colour scheme and size, chosen on the
+  Appearance tab instead; icons, cursors, sounds, screen saver), fonts, icons, logon screens, `uxtheme.dll` patchers and other
+  programs, screenshots. A file named `.msstyles` that is no visual style (no `TEXTFILE` resource), or that `ut-dump` cannot
+  open, is listed and left out.
+- **Names.** NAME is the file's stem made a name: lower case, every run of other characters one `-` (`Aero Style
+  (Glass).msstyles` is `aero-style-glass`; letters of other scripts are kept). Two different styles with the same stem, or a
+  stem the Windows tree already has for another style (a source's `luna`), each get the name of the nearest folder they came
+  from that says more than the stem (`Sentinel_A/Sentinel.msstyles` and `Sentinel_B/...` are `sentinel-a` and `sentinel-b`),
+  else `-2`, `-3`. A name ending in `-xp` gets `-vs` (the style list hides `-xp` names, the retired backports). The Appearance
+  list shows a style's own display name, not NAME.
+- **Duplicates.** The same file (sha256) is taken once: a second copy in DIR is skipped, and so is a style the tree has
+  already, a source's or one imported before, so a second run imports nothing new (with `--force` the files of the styles
+  imported before are written again).
+- **The summary** at the end counts the styles imported (with a `Shell/`, with a wallpaper), those already in the tree, the
+  duplicates, the files not taken, the archives that would not open, and the directories and archives without a style
+  (reported per item of DIR, and per item of a folder that only collects several).
+- **Licences.** The styles are their authors' work under their own terms (often "personal use only", sometimes naming a
+  patched `uxtheme.dll`); importing them is the user's act, as with the Windows files, and nothing of them belongs in a resource
+  pack meant for others (`lhde-pack --from-tree` packs `local/` too: `--no-local` leaves it out).
 
 ### Icon packs
 An icon recipe (`share/icons/NAME.theme`, chosen by a theme's `Desktop.icons`) maps flxp's icon keys to sources: `pe:FILE#ID`

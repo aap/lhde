@@ -63,7 +63,8 @@ the frame sets and shell images from them:
     lhde-theme explain aero4074              where every part of a theme comes from, and what is missing
 
 Themes whose style is not imported are hidden from the lists; `lhde-import --style FILE.msstyles NAME` adds a single
-style as a theme of its own. docs/USAGE.md "Getting the Windows resources" has the details, docs/LICENSING.md says which
+style as a theme of its own, and `lhde-import --styles DIR` every style of a downloaded themes folder (also inside the theme
+installers' .exe files, which are unpacked, never run; `-n` lists first). docs/USAGE.md "Getting the Windows resources" has the details, docs/LICENSING.md says which
 licence covers what.
 
 ## About the project
