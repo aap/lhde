@@ -49,7 +49,7 @@ checksums() { # DIR -> "sha256  set/file" lines, sorted
 		printf '%s  %s\n' "$(sha256sum < "$f" | cut -d' ' -f1)" "$f"; done)
 }
 
-styles=$(lhde_find styles)
+styles=$(lhde_find styles) || styles=   # nothing imported: lhde_find fails, and set -e would end the script before the skip
 if [ -z "$classic_only" ] && { [ -z "$styles" ] || [ -z "$(ls "$styles" 2>/dev/null)" ]; }; then
 	echo "skip  luxwm regress: no visual styles in $LHDE_USER_DATA/styles (tools/lhde-import)"; exit 0
 fi
