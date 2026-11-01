@@ -97,7 +97,6 @@ bool set_wallpaper(const std::string& path, const std::string& mode);
 // read from its owner now (and kept in clip()).
 const std::vector<std::string>& clip();
 const std::vector<std::string>& clipboard_files();
-bool clip_cut();
 bool can_paste();                                    // our files, or another client owns the X CLIPBOARD
 bool is_cut(const std::string& path);
 void clip_renamed(const std::string& from, const std::string& to);

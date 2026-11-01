@@ -98,10 +98,4 @@ bool net_resource_in(const std::string& data, const std::string& name, std::stri
     return false;
 }
 
-bool net_resource(const std::string& file, const std::string& name, std::string& out)
-{
-    std::string data;
-    return read_file(file, data) && net_resource_in(data, name, out);
-}
-
 } // namespace shell

@@ -7,10 +7,8 @@
 
 namespace shell {
 
-// Reads `file` and looks for `name` (e.g. "framelet_back_rest.png") in every
-// .resources stream in it (0xBEEFCACE). True with the entry's bytes in `out`.
-bool net_resource(const std::string& file, const std::string& name, std::string& out);
-// The same on a file already in memory.
+// Looks for `name` (e.g. "framelet_back_rest.png") in every .resources stream
+// (0xBEEFCACE) in a file's bytes. True with the entry's bytes in `out`.
 bool net_resource_in(const std::string& data, const std::string& name, std::string& out);
 
 }

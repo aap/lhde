@@ -33,8 +33,6 @@ static const std::string& icon_dir()
     return g_dir;
 }
 
-void set_icon_dir(const std::string& dir) { g_dir = dir; }
-
 static std::string trim(const std::string& s)
 {
     size_t a = s.find_first_not_of(" \t\r\n"), b = s.find_last_not_of(" \t\r\n");
@@ -276,12 +274,6 @@ std::string icon_file(const std::string& key)
 std::string resource_file(const std::string& build, const std::string& file)
 {
     return lhde_find("resources/" + build + "/" + file);
-}
-
-std::string resource_src(const std::string& build, const std::string& file, int id)
-{
-    std::string f = resource_file(build, file);
-    return f.empty() ? "" : "pe:" + f + "#" + std::to_string(id);
 }
 
 // Where a source keeps XP's art under another file or id (the rest are XP's own), or has a picture of its own under XP's id

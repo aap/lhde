@@ -221,8 +221,6 @@ HWND create(HWND rebar, HWND owner, HMENU menu, int band_id)
     return g_tb;
 }
 
-void set_menu(HMENU menu) { g_menu = menu; rebuild(); }
-
 void fonts_changed()
 {
     if (!g_tb) return;

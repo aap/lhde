@@ -1409,17 +1409,6 @@ void set_view(Browser& b, int view, bool navigating)
     for (auto fn : g_view_listeners) fn(b);
 }
 
-void set_thumbnails(Browser& b, bool on)
-{
-    if (b.zoomable) {   // the thumbnails setting (every view, every folder)
-        if (on != (shell::setting("thumbnails", "1") != "0")) view_command(b, VC_THUMBNAILS);
-        return;
-    }
-    if (on) { set_view(b, VIEW_THUMBNAILS); return; }
-    b.thumbs = false;
-    set_view(b, b.view);
-}
-
 bool view_key(Browser& b, int key)
 {
     if (b.zoomable) {

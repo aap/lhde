@@ -47,7 +47,6 @@ const std::vector<std::string>& clipboard_files()
     }
     return g_clip;
 }
-bool clip_cut() { return g_clip_cut; }
 bool is_cut(const std::string& path)
 {
     if (!g_clip_cut || !shell::xclip::ours()) return false;   // another client took the clipboard

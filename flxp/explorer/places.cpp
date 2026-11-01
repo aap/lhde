@@ -1503,16 +1503,6 @@ HWND create(HWND parent, int id, const Callbacks& cb, const Options& o)
     return g_wnd;
 }
 
-void set_group(const std::string& title, const std::vector<Place>& list)
-{
-    for (Group& g : g_groups)
-        if (g.kind == GroupSpec::Custom && g.title == title) { g.custom = list; fill_custom(g); }
-    if (!g_wnd) return;
-    g_hot_group = g_hot_item = -1;
-    layout();
-    InvalidateRect(g_wnd, nullptr, FALSE);
-}
-
 bool icons() { return g_icons; }
 
 void set_icons(bool on)

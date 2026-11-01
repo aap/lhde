@@ -11,7 +11,6 @@ extern "C" {
 namespace menuband {
 
 HWND create(HWND rebar, HWND owner, HMENU menu, int band_id);   // inserts the band at the top
-void set_menu(HMENU menu);                                      // rebuilds the buttons
 void fonts_changed();                                           // the style's menu font again (WM_THEMECHANGED)
 LRESULT on_notify(NMHDR* nm, bool* handled);                    // call from the owner's WM_NOTIFY
 void on_menuselect(WPARAM wp, LPARAM lp);                       // call from the owner's WM_MENUSELECT

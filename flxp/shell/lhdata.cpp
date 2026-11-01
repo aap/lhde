@@ -32,13 +32,6 @@ std::string digits4(const std::string& s)
     return "";
 }
 
-// "resources/4074" -> "4074" (the component after PREFIX/), "" when the value is not one
-std::string build_of(const std::string& v, const char* prefix)
-{
-    size_t p = v.find(prefix);
-    if (p == std::string::npos || (p && v[p - 1] != '/')) return "";
-    return digits4(v.substr(p + strlen(prefix)));
-}
 
 } // namespace
 

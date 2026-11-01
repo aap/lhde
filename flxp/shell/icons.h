@@ -48,15 +48,12 @@ const IconTheme& icon_theme();
 bool refresh_icon_theme();
 int icon_theme_generation();                             // + 1 on every selection
 std::string icon_file(const std::string& key);           // resolved source for a key ("" if unknown)
-void set_icon_dir(const std::string& dir);               // where <name>.theme files and the wine icons live
 std::string icon_theme_file(const std::string& name);    // the recipe a name selects ("" if none)
 
 // Windows art by resource id from lhde-import's resources/<build> (docs/history/flxp-NOTES.md
 // "XP and 2000 art by resource id"): resource_file("xp", "explorer.exe") is that file in
 // the first data directory that has it, "" when the build is not imported.
 std::string resource_file(const std::string& build, const std::string& file);
-// "pe:PATH#ID" for that file's resource ID, "" when the file is not imported
-std::string resource_src(const std::string& build, const std::string& file, int id);
 // XP's art by resource id, named as XP has it (file, id, the resource type: RT_BITMAP 2, RT_GROUP_ICON 14, 0 for "AVI"),
 // from the first imported source that has that resource: xp, then 2k, then reactos (the free baseline: ReactOS keeps XP's
 // ids, and where it does not, the per-source table in icons.cpp maps them). "pe:PATH#ID" or "" when none has it.
