@@ -68,7 +68,7 @@ int start_image_cy;                     // Start::Button's own image height (Lun
 int clock_width;
 std::string clock_text, clock_tip;
 HWND clock_tip_wnd;
-bool clock_hidden;                      // _LHSHELL_CLOCK_VISIBLE = 1 (lhshell's sidebar shows one)
+bool clock_hidden;                      // _LHSHELL_CLOCK_VISIBLE = 1 (luxshell's sidebar shows one)
 bool tray_on = true;
 int tray_icons;                         // icons shown in the tray
 UINT w_clock_visible;
@@ -533,7 +533,7 @@ std::string start_menu_mode() { return setting("start_menu", "panel"); }   // pa
 // the Super key to us
 void update_menu_provider() { xwm::provide_start_menu(true); }
 
-// anchor: a Start button elsewhere (lhshell's Avalon one, from _LHSHELL_START) or null for ours
+// anchor: a Start button elsewhere (luxshell's Avalon one, from _LHSHELL_START) or null for ours
 void open_start_menu(const RECT* anchor = nullptr)
 {
     if (start_down) return;
@@ -662,8 +662,8 @@ void set_clock_tip()
     SendMessageW(clock_tip_wnd, TTM_UPDATETIPTEXTW, 0, (LPARAM)&ti);
 }
 
-// _LHSHELL_START for us: lhwm's root broadcast (only while lhshell does not run; start_key = 0 ignores it) or
-// lhshell's message to our _LH_STARTMENU_S owner window (its Avalon Start button, the Super key it received)
+// _LHSHELL_START for us: lhwm's root broadcast (only while luxshell does not run; start_key = 0 ignores it) or
+// luxshell's message to our _LH_STARTMENU_S owner window (its Avalon Start button, the Super key it received)
 void start_request(const xwm::StartRequest& q)
 {
     static uint32_t done;
@@ -695,7 +695,7 @@ void on_x_changed()
 {
     xwm::Snapshot s;
     xwm::snapshot(s);
-    if (!g.menu_only) band::update(s);      // menu only: no buttons, no _NET_WM_ICON_GEOMETRY next to lhshell's bar
+    if (!g.menu_only) band::update(s);      // menu only: no buttons, no _NET_WM_ICON_GEOMETRY next to luxshell's bar
     if ((s.changes & xwm::ChangeTray) && xwm::tray_count() != tray_icons) layout();
     if (s.changes & xwm::ChangeStartKey) start_request(s.start);
 }
