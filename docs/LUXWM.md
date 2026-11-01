@@ -78,6 +78,9 @@ and `classic/`, `classic.xl/` (Extra Large metrics 24/24, Tahoma -19 bold), `cla
 6, 31/31, Tahoma -24 bold) for Windows Classic. It compares their SHA-256 with a baseline made on this machine
 (`build/luxwm/regress/baseline.sha256`, written by the first run, `LUXWM_BASELINE=` another file; `--rebaseline` after an intended
 change; `--source dir|lib`). No reference images are in the repository; it skips without the user's imported styles.
+`build/luxwm/tests/shapetest` (run first by `make check-luxwm`) checks the msstyles window shape against synthetic captions with
+rounded alpha-0 corners (SIZINGMARGINS top 0, a top margin covering the corner, one shallower than it, transparent top rows): no
+style file, so it runs everywhere.
 Lab helpers in `luxwm/tests`: `desktopwin` (an ARGB `_NET_WM_WINDOW_TYPE_DESKTOP` window that focuses itself on a click and pops a
 grabbing override-redirect menu on a right click), `strutdock` (a dock with a bottom `_NET_WM_STRUT_PARTIAL`), `dockorder`
 (`raise|lower|above|below` between docks).
@@ -440,8 +443,11 @@ Geometry and drawing (frame.c `ms_paint`, `ms_btn_rect`, `wm_theme_margins_ex`):
   x (caption_height + 1)` at 0,0, as nctheme.cpp's `NcPaintCaption` insets the background rect by cnBorders on top, left and right when
   `fFullMaxed` (and `CreateCompositeRgn` the region); the bitmaps carry their outline at the outer edge (Slate rows/columns 0..1). The
   window shape is one rectangle; restore brings the rounded corners back.
-- Window shape: the caption's alpha-0 corners, taken 1:1 from the caption bitmap at its true size (uxtheme keeps the margin areas of the
-  region unscaled; the drawn pixels come from the shrunk image, so row 3 of the 4074 corner differs, as in the screenshots). A
+- Window shape: the caption's alpha-0 corners, taken 1:1 from the caption bitmap at its true size within its SIZINGMARGINS top (uxtheme
+  keeps the margin areas of the region unscaled; the drawn pixels come from the shrunk image, so row 3 of the 4074 corner differs, as
+  in the screenshots); below that margin the caption rows are cut as painted (many XP styles, Slate Athens among them, have
+  SIZINGMARGINS top 0 with the rounded corner in the stretched middle; a corner deeper than the margin continues there). Only leading
+  and trailing alpha-0 runs (up to 40 px) are cut, not holes inside a row (`luxwm/tests/shapetest`, `make check-luxwm`). A
   caption-band row painted transparent across the whole width is left out of the region, as `GetThemeBackgroundRegion` does (the
   ReactOS styles' CAPTION has three transparent top rows; Watercolor Lite's tiled CAPTION is shorter than the band): the window starts
   below them, as on XP (`2k3-205316.png`). Frames are opaque and the client area left transparent, so the mode looks the same with and

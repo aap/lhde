@@ -5,3 +5,7 @@
 
 * luxwm does not reap the programs it starts: four `flxp <defunct>` zombies hang under the live luxwm on :1 (started from
 	the shell's Run or a key binding); a SIGCHLD handler with waitpid(-1, WNOHANG)
+
+* msstyles window shape: only leading/trailing alpha-0 runs of a caption row are cut, so a caption with holes or a step wider than
+  40 px keeps black pixels inside the shape (community styles chaninja, mxmqj, octane); XP's region is every opaque pixel of the
+  CAPTION bitmap (GetThemeBackgroundRegion), so these want several rectangles per row

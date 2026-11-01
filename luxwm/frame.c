@@ -818,8 +818,10 @@ int wm_frame_shape_rects(const struct theme *t, cairo_surface_t *img, int maximi
             while (x < w && (int)(pr[x] >> 24) < sa) x++;
             if (x == w) { prev_l = prev_r = -1; continue; }
         }
+        /* below the source's top margin (or with none: SIZINGMARGINS top 0, as Slate Athens and many XP styles have it, their
+           rounded corner in the stretched middle) the caption rows are cut as painted, so no alpha-0 corner pixel stays inside */
         if (y < srows) { row = (const uint32_t *)(sd + y * sst); rw = sw; }
-        else if (y < zone || y >= h - zone) row = (const uint32_t *)(d + y * st);
+        else if (y < zone || y >= h - zone || y < cap_rows) row = (const uint32_t *)(d + y * st);
         if (row) {
             while (l < lim && l < rw && (int)(row[l] >> 24) < sa) l++;
             while (rr < lim && rr < rw - l && (int)(row[rw - 1 - rr] >> 24) < sa) rr++;
