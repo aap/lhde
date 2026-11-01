@@ -1,4 +1,4 @@
-/* lhshell internals shared by lhshell.c (X11 core + Lua), tray.c (XEmbed system tray) and notify.c (D-Bus toasts) */
+/* luxshell internals shared by luxshell.c (X11 core + Lua), tray.c (XEmbed system tray) and notify.c (D-Bus toasts) */
 #ifndef LHSHELL_H
 #define LHSHELL_H
 #include "scene.h"

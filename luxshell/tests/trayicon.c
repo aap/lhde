@@ -1,4 +1,4 @@
-/* trayicon: minimal XEmbed system-tray icon for testing lhshell's notification-area tile.
+/* trayicon: minimal XEmbed system-tray icon for testing luxshell's notification-area tile.
    Uses the tray's _NET_SYSTEM_TRAY_VISUAL (32-bit ARGB) when offered, paints an anti-aliased circle with a transparent
    surround, docks with SYSTEM_TRAY_REQUEST_DOCK, re-docks when a new tray announces MANAGER, cycles colour on click.
    usage: trayicon [#rrggbb] [seconds]   (seconds > 0: exit after that long, which tests undocking on destroy) */

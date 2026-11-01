@@ -1,5 +1,5 @@
--- lhshell runtime: event bus, animation, theme pack loading, the Avalon taskbar + sidebar builders, tiles.
--- Facts (sizes, ids, triggers) come from ../SHELL-DESIGN.md sections 2.2-2.4; comments cite them.
+-- luxshell runtime: event bus, animation, theme pack loading, the Avalon taskbar + sidebar builders, tiles.
+-- Facts (sizes, ids, triggers) come from docs/SHELL-DESIGN.md sections 2.2-2.4; comments cite them.
 local lh = lh
 lh._handlers = {}
 function lh.on(ev, fn) lh._handlers[ev] = lh._handlers[ev] or {}; table.insert(lh._handlers[ev], fn) end
@@ -32,7 +32,7 @@ local function img(id) return "4074/imageres/" .. id .. ".png" end
 local function N(t) return lh.node(t) end
 local screen_w, screen_h, screen_no = lh.screen()
 
------------------------------------------------------------------- theme (SHELL-DESIGN 6.1): session theme name → registry → pack
+------------------------------------------------------------------ theme (SHELL-DESIGN 6.1): session theme name → resolved theme → pack
 -- The session theme is the root property _LH_THEME, a theme name liblhde resolves (docs/THEME-FORMAT.md); its Shell.pack
 -- names the pack. At startup: _LH_THEME if someone (luxwm, a script) set it, else settings.ini [theme] name, which is then
 -- published; LHSHELL_THEME (a pack directory) only when neither names a theme. A change of _LH_THEME
@@ -66,8 +66,7 @@ local function R(id)
   end
   return img(id)
 end
--- ~/.config/lhde/settings.ini (SETTINGS.md) holds the per-user keys; the one-time move from ~/.config/longhorn and ~/.config/lhshell
--- (liblhde: presets and [override:NAME] become theme files)
+-- ~/.config/lhde/settings.ini (SETTINGS.md) holds the per-user keys; liblhde's one-time migration of the pre-lhde files
 S.migrate()
 -- the effective values of a resolved theme (S.resolve: liblhde's record, docs/THEME-FORMAT.md): the theme files, their base
 -- chain, the style's defaults and the fallbacks, with settings.ini's per-user [desktop] wallpaper = none (the flyout's "Show the
@@ -97,7 +96,7 @@ local function publish_resolved(e)
   -- _FLXP_WALLPAPER ("MODE PATH", or none) beats its other sources and it watches it
   local fw = v.wallpaper == "none" and "none" or v.wallpaper ~= "" and (v.mode .. " " .. v.wallpaper) or nil
   if fw and lh.root_prop("_FLXP_WALLPAPER") ~= fw then lh.set_root_prop("_FLXP_WALLPAPER", fw) end
-  if (os.getenv("LHSHELL_DEBUG") or "") ~= "" then io.stderr:write(string.format("lux: wallpaper %s (%s) from %s\n", v.wallpaper, v.mode, v.wallpaper_src or "?")) end
+  if (os.getenv("LHSHELL_DEBUG") or "") ~= "" then io.stderr:write(string.format("luxshell: wallpaper %s (%s) from %s\n", v.wallpaper, v.mode, v.wallpaper_src or "?")) end
 end
 -- our own writes of _LH_THEME come back as PropertyNotify: counted here so the handler below ignores exactly those
 local theme_echo = {}
@@ -116,14 +115,14 @@ do
     publish_resolved(theme_entry)
     if root ~= theme_entry.name then set_theme_prop(theme_entry.name) end    -- first one up publishes; an alias: the theme's name
     S.set("theme", "name", theme_name)                                       -- the first writer brings the file in line
-  elseif want then io.stderr:write("lux: theme " .. want .. ": " .. tostring(err) .. " (lhde-theme list)\n") end
+  elseif want then io.stderr:write("luxshell: theme " .. want .. ": " .. tostring(err) .. " (lhde-theme list)\n") end
 end
 -- the selected theme's name and resolved entry (settings flyout; the clock tile reads the visual style); defined before the
 -- first build_tiles
 function lh.theme_name() return theme_name, theme_entry end
 if not (theme_entry and theme_entry.shell and load_pack(theme_entry.shell)) then load_pack(S.pack_dir(os.getenv("LHSHELL_THEME") or "4074-aero")) end
--- themes.ini `fonts` (docs/history/THEMES.md "Fonts"): the theme's font directories as fontconfig application fonts, so the packs' "Segoe UI 9"
--- is 4074's Segoe UI 0.7 (lhshell.c lh.fonts; the set is replaced on every theme switch). Returns true when the set changed.
+-- the theme's path.fonts: its font directories as fontconfig application fonts, so the packs' "Segoe UI 9"
+-- is 4074's Segoe UI 0.7 (luxshell.c lh.fonts; the set is replaced on every theme switch). Returns true when the set changed.
 local function apply_fonts(e)
   local fam, file, changed = lh.fonts(e and e.fonts or "", T.font)
   if debug_events or changed then io.stderr:write(string.format("luxshell: fonts %s: \"%s\" -> %s (%s)\n", e and e.fonts or "(none)", tostring(T.font), fam, file)) end
@@ -131,28 +130,27 @@ local function apply_fonts(e)
 end
 apply_fonts(theme_entry)
 ------------------------------------------------------------------ shell settings (SHELL-DESIGN 6.4; settings.ini, SETTINGS.md; defaults written on first run)
---   [taskbar] kind = avalon|classic|none (M8: classic = flxp-taskbar, started from [commands] taskbar; LHSHELL_TASKBAR overrides it
---   for one run), autohide = 0|1, rows = 1..3 (Taskbar\RowCount, 2.4.2; the top-edge drag), classic_start_menu = flxp|flxp-classic|
---   lhshell (whose menu the classic bar's Start button opens; default from [start] menu: flxp -> flxp, lux -> lhshell)
+--   [taskbar] kind = avalon|classic|none (classic = flxp-taskbar, started from [commands] taskbar; LHSHELL_TASKBAR overrides it
+--   for one run), autohide = 0|1, rows = 1..3 (Taskbar\RowCount, 2.4.2; the top-edge drag), classic_start_menu = flxp|flxp-classic
+--   (the menu the classic bar's Start button opens)
 --   [sidebar] mode = full|minimized|pinned, width = 100..600 (Sidebar\Width, default 150; the SidebarSizer drag),
 --   with_classic = 0|1 (0, default: no sidebar with the classic taskbar; 1: the 4051 layout), yield_bottom = auto|0,
 --   stacking = top|bottom (top: 4074, the sidebar is above the windows (_NET_WM_STATE_ABOVE) with its strut, runs full height and
 --   the taskbar yields to it; bottom: part of the desktop, under the windows (_NET_WM_STATE_BELOW) with no strut, the taskbar runs
 --   the full width over it and the sidebar ends at its top; Win+S = _LHSHELL_COMMAND "sidebar-stacking toggle" flips it at once).
---   The old [sidebar] layer is folded into it (layer = below = stacking = bottom) and removed from settings.ini
+--   A [sidebar] layer key is folded into it (layer = below = stacking = bottom) and removed from settings.ini
 --   [clock] pinned = 1|0 with pinned_pack = the pack it was chosen in (other packs use their own default, T.clock_pinned), layout
 --   [theme] composition = follow|on|off   [desktop] wallpaper = (empty: the theme's) | none (solid #3a6ea5) | PATH, mode = fill|fit|
---   center|tile|stretch, desktop_black = 0|1 (M5b: 0 = maximised mode only switches the bars' black layers; 1 = also the M5a
---   full-screen black)   [start] menu = flxp|lux (flxp: flxp-taskbar's start panel is the provider, --start-menu-only next to the
---   Avalon taskbar; lux: our StartPanel)   [shell] max_fade_ms = 0 (the black layers switch at once) or the fade in ms
+--   center|tile|stretch, desktop_black = 0|1 (0 = maximised mode only switches the bars' black layers; 1 = also the
+--   full-screen black of the desktop layer)   [shell] max_fade_ms = 0 (the black layers switch at once) or the fade in ms
 --   (LHSHELL_WALLPAPER=0 forces the wallpaper off). Runtime state (the tile order) stays in state.ini.
--- [sidebar] layer (before 2026-10-25: above|below, the sidebar over or under the windows) is now part of [sidebar] stacking:
--- layer = below means stacking = bottom; the key is dropped (here, and again when another writer brings it back)
+-- [sidebar] layer = above|below (the sidebar over or under the windows), an earlier key: layer = below means stacking = bottom;
+-- the key is dropped (here, and again when another writer brings it back)
 local function fold_sidebar_layer()
   if not S.has("sidebar", "layer") then return end
   if S.get("sidebar", "layer") == "below" then S.set("sidebar", "stacking", "bottom") end
   S.unset("sidebar", "layer")
-  io.stderr:write("lux: settings: [sidebar] layer folded into [sidebar] stacking = " .. tostring(S.get("sidebar", "stacking")) .. "\n")
+  io.stderr:write("luxshell: settings: [sidebar] layer folded into [sidebar] stacking = " .. tostring(S.get("sidebar", "stacking")) .. "\n")
 end
 fold_sidebar_layer()
 for _, d in ipairs{ { "theme", "composition", "follow" }, { "desktop", "mode", "fill" }, { "desktop", "desktop_black", "0" },
@@ -171,14 +169,14 @@ local cfg = {
   sidebar_w = tonumber(S.get("sidebar", "width") or ""),
   sb_bottom = S.get("sidebar", "stacking") == "bottom",   -- [sidebar] stacking = bottom: the sidebar under the windows
   composition = "follow",                                 -- set below from the per-theme chain
-  -- M5b: maximised windows no longer black out the whole desktop (lhwm crossfades the frame to its dark maximised plate; only
-  -- the bars' black layers fade). desktop_black = 1 restores the M5a full-screen black of the desktop layer
+  -- maximised windows do not black out the whole desktop (luxwm crossfades the frame to its dark maximised plate; only
+  -- the bars' black layers fade). desktop_black = 1: the full-screen black of the desktop layer too
   desktop_black = S.get("desktop", "desktop_black") == "1",
   -- [shell] max_fade_ms: the black layers' fade in maximised mode; 0 (default) = switched in the same repaint, no fade
   max_fade_ms = math.max(0, math.floor(tonumber(S.get("shell", "max_fade_ms") or "") or 0)),
 }
--- [taskbar] enabled (M8): avalon = lhshell's taskbar; classic = no taskbar surface, struts or _NET_WM_ICON_GEOMETRY of ours, the
--- classic flxp-taskbar runs instead (started and stopped by us); none = neither. 1/0 (the first M8 draft) mean avalon/none.
+-- [taskbar] kind: avalon = luxshell's taskbar; classic = no taskbar surface, struts or _NET_WM_ICON_GEOMETRY of ours, the
+-- classic flxp-taskbar runs instead (started and stopped by us); none = neither. 1/0 (an earlier spelling) mean avalon/none.
 local function taskbar_kind(v)
   v = (v or ""):lower()
   if v == "classic" or v == "none" or v == "avalon" then return v end
@@ -189,7 +187,7 @@ end
 -- taskbar kind, start menu and the compositor switch are per theme (SETTINGS.md "Per-theme settings" / "Per-theme overrides"):
 -- S.theme_value(theme_entry, ...) = the resolved record's key (the current layer, the theme file, its base chain, the default); they
 -- are applied at startup, on every theme change and on _LH_SETTINGS_CHANGED. LHSHELL_TASKBAR / LHSHELL_COMPOSITION (on|off|follow;
--- xinitrc.lab sets it from LAB_PICOM=0/1) force one for this run.
+-- lhde-session sets it from LHDE_PICOM=0/1) force one for this run.
 local taskbar_env = taskbar_kind(os.getenv("LHSHELL_TASKBAR"))
 local comp_env = os.getenv("LHSHELL_COMPOSITION"); if comp_env ~= "on" and comp_env ~= "off" and comp_env ~= "follow" then comp_env = nil end
 local function theme_taskbar(e) return taskbar_env or taskbar_kind(S.theme_value(e, "taskbar")) or "avalon" end
@@ -222,9 +220,9 @@ cfg.clock_pinned = clock_pinned()
 if cfg.sidebar ~= "full" and cfg.sidebar ~= "minimized" and cfg.sidebar ~= "pinned" then cfg.sidebar = "full" end
 local feh_mode = { fill = "--bg-fill", fit = "--bg-max", center = "--bg-center", tile = "--bg-tile", stretch = "--bg-scale" }
 local wp_applied        -- wallpaper|mode last put on the root (a settings reload only repaints when it changed)
--- Another program owns the desktop (flxp-desktop: the session sets LHSHELL_DESKTOP=0 while it runs, see below, and xinitrc.lab /
--- second-display.sh already put the same wallpaper on the root once): lux then never runs feh/xsetroot itself. Also when a
--- _NET_WM_WINDOW_TYPE_DESKTOP window of another client exists (flxp-desktop started by hand next to a lux with its own layer).
+-- Another program owns the desktop (flxp-desktop: the session sets LHSHELL_DESKTOP=0 while it runs, see below, and
+-- lhde-session already put the same wallpaper on the root once): luxshell then never runs feh/xsetroot itself. Also when a
+-- _NET_WM_WINDOW_TYPE_DESKTOP window of another client exists (flxp-desktop started by hand next to a luxshell with its own layer).
 local function desktop_elsewhere()
   local e = (os.getenv("LHSHELL_DESKTOP") or ""):lower()
   if e == "0" or e == "off" or e == "no" or e == "false" then return true end
@@ -250,15 +248,15 @@ local function set_wallpaper(e)
 end
 if theme_entry and not lh.root_prop("_XROOTPMAP_ID") then set_wallpaper(theme_entry) end   -- startup: only when nobody set one
 local black_on = false  -- maximised mode (set_maximized below); new black layers start in its state
--- (no deferred free of the previous pack's node trees any more: nodes are reference counted (scene.h), a replaced tree is
--- freed by the GC once nothing (an animation, a timer, a tile) holds a node of it, and a node someone holds stays valid)
+-- (nodes are reference counted (scene.h): a replaced pack's tree is freed by the GC once nothing (an animation, a timer, a
+-- tile) holds a node of it, and a node someone holds stays valid)
 
 ------------------------------------------------------------------ desktop layer (SHELL-DESIGN "M5a design")
 -- full screen, _NET_WM_WINDOW_TYPE_DESKTOP, sticky + below, no struts, at the bottom of the stack. Unmapped normally (the
--- wallpaper is the root background); with [shell] desktop_black = 1 it is mapped black at once in maximised mode (no fade, M5a
--- status) and unmapped at once on restore; the default (0, M5b) leaves it unmapped. Future home of the Aurora.
+-- wallpaper is the root background); with [shell] desktop_black = 1 it is mapped black at once in maximised mode (no fade)
+-- and unmapped at once on restore; the default (0) leaves it unmapped. Future home of the Aurora.
 -- LHSHELL_DESKTOP=0 (or off/no/false) leaves it out entirely, for when another program owns the desktop (flxp-desktop draws
--- the wallpaper and icons and does the maximised-mode black fade itself; second-display.sh sets it while flxp-desktop runs).
+-- the wallpaper and icons and does the maximised-mode black fade itself; lhde-session sets it while flxp-desktop runs).
 -- lh.desktop_layer is then nil; the taskbar and sidebar black layers still switch.
 local dk = nil
 local dk_env = (os.getenv("LHSHELL_DESKTOP") or ""):lower()
@@ -352,8 +350,6 @@ local function build_taskbar()          -- the node tree; the surface stays (bui
   -- TaskbarToggleBar (SidebarButton): Dock Right, 29x29 slot with a 17x17 glyph centred (Border 6)
   tb.toggle_slot = tb.inner:add(N{ dock = "right", w = toggle_slot_w(), layout = "canvas" })
   -- Taskbar.BarVisible=false (sidebar minimized) → 1167 [Slate 1162]
-  -- (the images line had slipped into the comment of the line above during the rows work: the glyph was then only drawn
-  -- after a sidebar mode change, which set the images through update_toggle; gone again after every pack switch)
   tb.toggle = tb.toggle_slot:add(N{ kind = "button", x = T.toggle and T.toggle.x or 5, y = toggle_y(), w = 17, h = 17,   -- TransformDecorator VCenter
     images = toggle_images(),
     on_click = function() lh._emit("toggle-sidebar") end })
@@ -391,7 +387,7 @@ end
 -- task buttons: TaskButton style = Border(0,2,2,0) > HackBorder 1182/1184/1185 grid 3 > Border(6,5,6,6) > [icon 16 + 2px | text white ellipsis]
 local function task_button(win, width)
   local marg = T.taskbutton.margin or {0, 2, 2, 0}
-  local b = N{ kind = "button", w = width, margin = marg, grid = T.taskbutton.grid or 3, layout = "fill", icon_geometry_for = win.id,   -- _NET_WM_ICON_GEOMETRY (lhwm's minimise target)
+  local b = N{ kind = "button", w = width, margin = marg, grid = T.taskbutton.grid or 3, layout = "fill", icon_geometry_for = win.id,   -- _NET_WM_ICON_GEOMETRY (luxwm's minimise target)
     images = task_images() }
   b.win = win
   local content = b:add(N{ layout = "dock", margin = T.taskbutton.content or {6, 5, 6, 6} })
@@ -461,7 +457,7 @@ function tb.move_task(id, target)
 end
 local function rebuild_tasks()
   tb.tasks:clear(); tb.task_nodes = {}
-  if not tb_on() then return end           -- classic / none: no buttons, so no _NET_WM_ICON_GEOMETRY of ours either (lhshell.c drops them)
+  if not tb_on() then return end           -- classic / none: no buttons, so no _NET_WM_ICON_GEOMETRY of ours either (luxshell.c drops them)
   local wins, desk = {}, lh.desktop()
   for _, w in ipairs(lh.windows()) do   -- the current desktop's windows and the sticky ones (EWMH _NET_WM_DESKTOP 0xFFFFFFFF)
     if w.desktop == desk or w.desktop == -1 or w.desktop == 0xFFFFFFFF then table.insert(wins, w) end
@@ -494,11 +490,11 @@ lh.on("windows", rebuild_tasks); lh.on("window", rebuild_tasks); lh.on("desktop"
 local sb = { w = sidebar_w }
 sb.geo = { x = screen_w - sb.w, y = 0, w = sb.w, h = screen_h }
 -- [sidebar] stacking: top = above the windows (_NET_WM_STATE_ABOVE, like the taskbar), with its strut, full height, over the
--- (shortened) taskbar at the corner (4074); bottom = a desktop-level layer: _NET_WM_STATE_BELOW (lhwm keeps BELOW docks under the
+-- (shortened) taskbar at the corner (4074); bottom = a desktop-level layer: _NET_WM_STATE_BELOW (luxwm keeps BELOW docks under the
 -- clients), no strut (windows and maximised windows cover it), ending at the top of the full-width taskbar, which stays above it.
 local function sb_layer() return cfg.sb_bottom and "below" or "above" end
 sb.surface = lh.surface{ name = "lhshell-sidebar", x = sb.geo.x, y = 0, w = sb.w, h = screen_h, dock = "right", strut = cfg.sb_bottom and 0 or sb.w, layer = sb_layer() }
--- top: raised (lhwm keeps the docks' order among themselves, docks_raise() raises them as a group in the server's order, so a
+-- top: raised (luxwm keeps the docks' order among themselves, docks_raise() raises them as a group in the server's order, so a
 -- plain raise puts the sidebar over the taskbar); bottom: lowered under every window (the desktop layer goes below it again)
 local function sb_stack()
   if cfg.sb_bottom then sb.surface:lower() else sb.surface:raise() end
@@ -653,14 +649,14 @@ end
 function sb.tile_rect(tile) local x, y, w, h = tile.node:bounds(); return sb.geo.x + x, sb.geo.y + y, w, h end
 
 -- maximised-window black layers: SetMaximizedWindow animates the taskbar and sidebar layers to 1 / 0 in 400 ms (2.4.3).
--- The desktop layer switches at once both ways (SHELL-DESIGN M5a status): on = the X window background is set to opaque
+-- The desktop layer switches at once both ways: on = the X window background is set to opaque
 -- black before the map, so the server paints it black in the same request stream as the map (no transparent first frame,
--- no fade), off = unmapped at once. A 400 ms fade of a full-screen surface is also what made the old fade late: every
--- frame re-composited and re-blurred the whole screen in picom (xrender), ~230 ms per frame on the lab.
+-- no fade), off = unmapped at once. A 400 ms fade of a full-screen surface comes late: every frame re-composites and
+-- re-blurs the whole screen in picom (xrender), ~230 ms per frame on the lab.
 function lh.set_maximized(on)
   if on == black_on then return end
   black_on = on
-  if not dk or not cfg.desktop_black then   -- M5b default: the desktop layer stays unmapped (its future Aurora role only)
+  if not dk or not cfg.desktop_black then   -- default: the desktop layer stays unmapped (its future Aurora role only)
   elseif on then
     dk.black.opacity = 1; dk.black:set{ opacity = 1 }
     dk.surface:background("#ff000000"); dk.surface:lower(); dk.surface:show()   -- lower first: mapping keeps the stacking position
@@ -668,11 +664,11 @@ function lh.set_maximized(on)
     dk.surface:hide(); dk.surface:background(nil); dk.black.opacity = 0; dk.black:set{ opacity = 0 }
   end
   -- [shell] max_fade_ms (default 0): 0 = the layers switch in the same repaint (lh.animate with 0 ms cancels a running fade and
-  -- sets the value at once); otherwise the old SetMaximizedWindow fade (400 ms in 4074)
+  -- sets the value at once); otherwise SetMaximizedWindow's fade (400 ms in 4074)
   lh.animate(tb.black, "opacity", on and 1 or 0, cfg.max_fade_ms); lh.animate(sb.black, "opacity", on and 1 or 0, cfg.max_fade_ms)
 end
 -- the native trigger is the foreground window being maximised (CTray::HandleFullScreenApp / _FindRudeApp): the active
--- window when there is one, otherwise any visible window on the current desktop. lhwm computes exactly this and publishes
+-- window when there is one, otherwise any visible window on the current desktop. luxwm computes exactly this and publishes
 -- it as _LHWM_MAXIMIZED_MODE (so its square-cornered frames and these layers switch together); the EWMH rule below is the
 -- fallback under another WM (single monitor; _NET_WM_STATE_MAXIMIZED_VERT+HORZ while a window fills the work area)
 local function update_black()
@@ -687,7 +683,7 @@ local function update_black()
 end
 lh.on("windows", update_black); lh.on("window", update_black); lh.on("desktop", update_black); lh.on("maxmode", update_black)
 
------------------------------------------------------------------- flyouts (flyout.lua) and toasts (toast.lua), SHELL-DESIGN M4b
+------------------------------------------------------------------ flyouts (flyout.lua) and toasts (toast.lua), SHELL-DESIGN 2.3.3 / 2.4.5
 local ctx = { R = R, T = T, sb = sb, tb = tb, screen_w = screen_w, screen_h = screen_h, img = img }
 lua("flyout.lua")(ctx)
 lua("toast.lua")(ctx)
@@ -759,9 +755,9 @@ local function build_tiles()
   end
 end
 tb.tile_list = {}
--- M8 clock coordination (_ToggleClock, COMPOSITION.md 11): root _LHSHELL_CLOCK_VISIBLE (CARDINAL) = 1 while a clock tile of ours
+-- clock coordination (_ToggleClock, COMPOSITION.md 11): root _LHSHELL_CLOCK_VISIBLE (CARDINAL) = 1 while a clock tile of ours
 -- is on screen (the sidebar's, or the minimized sidebar's compact clock in the Avalon taskbar), else 0; the classic taskbar hides
--- its own clock while it is 1. Deleted on exit (lhshell.c).
+-- its own clock while it is 1. Deleted on exit (luxshell.c).
 local clock_vis
 local function publish_clock()
   local vis = false
@@ -792,7 +788,7 @@ build_tiles(); after_tiles()
 
 ------------------------------------------------------------------ live theme switch (SHELL-DESIGN 6.1)
 -- New node trees for the taskbar and the sidebar on the same windows (the tray icons stay docked in the sidebar window and
--- move to the new tray node), surfaces resized when the pack's bar sizes differ (the struts follow, lhwm refits), tiles
+-- move to the new tray node), surfaces resized when the pack's bar sizes differ (the struts follow, luxwm refits), tiles
 -- disposed and created again, flyout chrome rebuilt (event "pack"). A toast on screen keeps its look until it closes.
 local place_taskbar, place_sidebar
 local function rebuild_shell()
@@ -812,7 +808,7 @@ end
 -- within" (pointer over the bar, the start menu, a menu or flyout of ours) moves pct by 20 every 20 ms (100 ms, linear); the
 -- strut is the 2 px sliver while autohide is on, so the work area grows; switching autohide on jumps straight to 0/100.
 -- _NET_WM_ICON_GEOMETRY keeps reporting the buttons where they are when the bar is shown (icon_offset).
--- M8: another dock's bottom strut over these columns (the classic flxp-taskbar runs the full width at the bottom; 4051 layout:
+-- another dock's bottom strut over these columns (the classic flxp-taskbar runs the full width at the bottom; 4051 layout:
 -- the sidebar sits above it). Our own surfaces are not counted (lh.struts skips them), so in the avalon mode this is 0 and the
 -- Avalon taskbar keeps yielding to the sidebar as before. [sidebar] yield_bottom = 0 turns it off.
 local function foreign_bottom(x0, x1)
@@ -851,7 +847,7 @@ place_taskbar = function()
     if resized then rebuild_tasks() end
   end
   tb.surface:icon_offset(0, y - ny)
-  if lh.yield_soon then lh.yield_soon(0) end   -- M4 layout: the sidebar follows the taskbar's strut
+  if lh.yield_soon then lh.yield_soon(0) end   -- the sidebar follows the taskbar's strut
 end
 local function ui_open() return (lh.menu and lh.menu.is_open()) or lh.flyout_tile ~= nil end
 local function pointer_in_taskbar()
@@ -967,7 +963,7 @@ local function set_mode(m, instant)
   local function fin() sb_move(x, y, w, h); io.stderr:write(string.format("luxshell: sidebar %s -> %s, %d ms\n", old, m, lh.now() - t0)) end
   if instant then fin() else animate_sidebar({ x, y, w, h }, fin) end
 end
--- live sidebar width (SidebarSizer drag): applied at most every 25 ms (one Animator2 tick); lhwm refits maximised windows to
+-- live sidebar width (SidebarSizer drag): applied at most every 25 ms (one Animator2 tick); luxwm refits maximised windows to
 -- the new _NET_WORKAREA on each strut change, so fewer steps are kinder to it
 function lh.sidebar_set_width(w)
   w = clamp(math.floor(w + 0.5), SB_MIN, SB_MAX)
@@ -1051,7 +1047,7 @@ local function set_tile_shown(id, on)
   save_tile_names(names)
   if lh.flyout_tile and lh.flyout_tile.id == id then lh.close_flyout() end
   if mode == "full" then build_sidebar(); build_tiles(); after_tiles(); place_sidebar() end
-  io.stderr:write(string.format("lux: sidebar: %s tile %s (%s)\n", on and "added" or "removed", id, table.concat(names, ";")))
+  io.stderr:write(string.format("luxshell: sidebar: %s tile %s (%s)\n", on and "added" or "removed", id, table.concat(names, ";")))
 end
 function lh.sidebar_set_locked(on)
   cfg.sb_locked = on and true or false; S.set("sidebar", "locked", cfg.sb_locked and "1" or "0")
@@ -1172,7 +1168,7 @@ end
 -- sidebar's base items ("Minimize bar"/"Restore bar", "Properties"), separator, "Task Manager", separator, "Show Desktop" /
 -- "Hide Desktop" (_fDesktopVisible), "Cascade", "Tile Vertically", "Tile Horizontally" (enabled with windows open). No screenshot
 -- of it exists; the wording is the IL's. 4074 passes constants to the base items, so its taskbar always said "Restore bar";
--- ours follows the sidebar's state. Then lux's own group: autohide and the sidebar mode.
+-- ours follows the sidebar's state. Then luxshell's own group: autohide and the sidebar mode.
 local function work_rect()   -- the area the windows get (our struts; another dock's bottom strut in the classic mode)
   local r = screen_w
   if not sb_hidden() and mode ~= "minimized" and not cfg.sb_bottom and sb.geo then r = sb.geo.x end
@@ -1212,7 +1208,7 @@ local taskmgr_cmd
 local function task_manager()
   if taskmgr_cmd == nil then
     taskmgr_cmd = false
-    -- io.popen, not os.execute: SIGCHLD is ignored in lux, so system()'s status is -1 whatever the command did
+    -- io.popen, not os.execute: SIGCHLD is ignored in luxshell, so system()'s status is -1 whatever the command did
     local function have(c) local f = io.popen("command -v " .. c .. " 2>/dev/null"); if not f then return false end local o = f:read("*l"); f:close(); return o ~= nil and o ~= "" end
     for _, c in ipairs{ "xfce4-taskmanager", "lxtask", "gnome-system-monitor", "mate-system-monitor", "qps" } do
       if have(c) then taskmgr_cmd = c break end
@@ -1253,7 +1249,7 @@ lh.on("surface-press", function(x, y, button, win)
   taskbar_menu(tb.geo.x + x, tb.geo.y + y)
 end)
 
------------------------------------------------------------------- M8: the classic taskbar, tray and start-menu coordination
+------------------------------------------------------------------ the classic taskbar, tray and start-menu coordination
 -- Processes of this display by name: /proc/PID/comm is NAME and its environment has our DISPLAY (nothing else is touched).
 local function display_pids(name)
   local out, me = {}, os.getenv("DISPLAY") or ""
@@ -1340,19 +1336,19 @@ local function provider_wanted() return cfg.taskbar ~= "classic" end
 local function provider_running() return provider.pid and pid_is(provider.pid, provider.name or PROVIDER) end
 local function provider_stop()
   local pid, name = provider.pid, provider.name or PROVIDER; provider.pid = nil
-  if pid and pid_is(pid, name) then io.stderr:write("lux: start menu: stopping " .. name .. " " .. pid .. "\n"); lh.kill(pid) end
+  if pid and pid_is(pid, name) then io.stderr:write("luxshell: start menu: stopping " .. name .. " " .. pid .. "\n"); lh.kill(pid) end
 end
 local function provider_start()
   if provider_running() or provider.pending then return end
   local name = PROVIDER
   local running = display_pids(PROVIDER)
   if #running == 0 then running = flxp_pids(true, classic_name()); if #running > 0 then name = classic_name() end end
-  if #running > 0 then provider.pid, provider.name = running[1], name; io.stderr:write("lux: start menu: " .. name .. " already runs (" .. running[1] .. ")\n") return end
+  if #running > 0 then provider.pid, provider.name = running[1], name; io.stderr:write("luxshell: start menu: " .. name .. " already runs (" .. running[1] .. ")\n") return end
   local now = lh.now(); local recent = {}
   for _, t in ipairs(provider.starts) do if now - t < 60000 then table.insert(recent, t) end end
   provider.starts = recent
   if #recent >= 5 then
-    if not provider.gave_up then provider.gave_up = true; io.stderr:write("lux: start menu: " .. name .. " died 5 times in a minute; no start menu until the settings change\n") end
+    if not provider.gave_up then provider.gave_up = true; io.stderr:write("luxshell: start menu: " .. name .. " died 5 times in a minute; no start menu until the settings change\n") end
     return
   end
   provider.pending = true
@@ -1363,14 +1359,14 @@ local function provider_start()
     local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/lux-startmenu" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
     provider.pid = lh.spawn_pid(lh.prog(PROVIDER) .. " >" .. S.quote(log) .. " 2>&1 </dev/null", { FLXP_START_MENU = "panel", FLXP_START_KEY = "1" })
     provider.name = PROVIDER
-    io.stderr:write(string.format("lux: start menu: started %s (pid %s, log %s)\n", lh.prog(PROVIDER), tostring(provider.pid), log))
+    io.stderr:write(string.format("luxshell: start menu: started %s (pid %s, log %s)\n", lh.prog(PROVIDER), tostring(provider.pid), log))
   end)
 end
 function lh.start_provider_check()
   if provider_wanted() then provider_start() elseif provider.pid then provider_stop() end
-  -- the classic bar was started with the other start menu (a theme change, [start] menu): start it again with this one
+  -- the classic bar was started with the other start menu ([taskbar] classic_start_menu): start it again with this one
   if cfg.taskbar == "classic" and classic.pid and classic.menu and classic.menu ~= classic_menu() and pid_is(classic.pid, classic.name or classic_name()) then
-    io.stderr:write("lux: taskbar: start menu " .. classic.menu .. " -> " .. classic_menu() .. ", restarting " .. (classic.name or classic_name()) .. "\n")
+    io.stderr:write("luxshell: taskbar: start menu " .. classic.menu .. " -> " .. classic_menu() .. ", restarting " .. (classic.name or classic_name()) .. "\n")
     classic_stop()
     when_provider_free(function() if cfg.taskbar == "classic" then classic_start() end end)
   end
@@ -1386,7 +1382,7 @@ function lh.set_sidebar_with_classic(on)
 end
 -- [sidebar] stacking live (Win+S = _LHSHELL_COMMAND "sidebar-stacking toggle|top|bottom", the settings flyout, settings.ini):
 -- top | bottom | toggle. Instant, no animation: the sidebar's strut, geometry, _NET_WM_STATE (ABOVE/BELOW) and place in the stack
--- and the taskbar's width change in this one callback, painted in the same pass; windows are not moved (lhwm refits maximised
+-- and the taskbar's width change in this one callback, painted in the same pass; windows are not moved (luxwm refits maximised
 -- ones to the new work area as for any strut change). A running mode animation is finished at once. The order keeps every
 -- in-between state the compositor might catch invisible: to bottom the taskbar first runs the full width (under the sidebar's
 -- corner), to top the sidebar first runs the full height (under the taskbar); the restack comes last. (A server grab around
@@ -1414,7 +1410,7 @@ function lh.set_sidebar_stacking(v)
   sb.surface:set_layer(sb_layer())
   if mode ~= "minimized" and not sb_hidden() then sb_stack() end   -- top: raised over the taskbar at the corner; bottom: lowered
   publish_clock()
-  io.stderr:write(string.format("lux: sidebar stacking %s (%s), %d ms\n", v, on and "under the windows, no strut" or "above the windows, strut", lh.now() - t0))
+  io.stderr:write(string.format("luxshell: sidebar stacking %s (%s), %d ms\n", v, on and "under the windows, no strut" or "above the windows, strut", lh.now() - t0))
 end
 -- apply_taskbar(avalon | classic | none): the live switch; lh.set_taskbar(kind) (settings flyout, _LHSHELL_COMMAND "taskbar KIND")
 -- also stores it for the current theme like Display Properties: Shell.taskbar in the current layer (settings.ini [current],
@@ -1442,7 +1438,7 @@ function lh.set_taskbar(kind)
   apply_taskbar(kind)
   if sel then lh.select_theme(sel, true) end
 end
--- the sidebar follows other docks' bottom struts live (lhwm rewrites _NET_WORKAREA on every strut change: the classic bar
+-- the sidebar follows other docks' bottom struts live (luxwm rewrites _NET_WORKAREA on every strut change: the classic bar
 -- appearing, going away, autohiding)
 local function yield_check()
   local y = sb_yield()
@@ -1501,13 +1497,13 @@ function lh.start_anchor()
 end
 
 ------------------------------------------------------------------ the compositor follows the theme
--- On a theme change lhshell applies the registry's `composition`: off → stop the picom of this display (only processes named
+-- On a theme change luxshell applies the theme's `composition`: off → stop the picom of this display (only processes named
 -- picom whose environment has our DISPLAY; nothing else is touched), auto → start one when no compositor owns
--- _NET_WM_CM_S<screen>. lhwm already follows the compositor's presence (glass ⇄ frame_classic, _LHWM_COMPOSITED), so this is
+-- _NET_WM_CM_S<screen>. luxwm already follows the compositor's presence (glass ⇄ frame_classic, _LHWM_COMPOSITED), so this is
 -- the whole chain. The switch (per theme: the resolved Glass.composition, auto = follow) is
--- follow (the theme's `composition` decides) | on | off; it is applied at startup (1.5 s in: stops the picom xinitrc.lab may
+-- follow (the theme's `composition` decides) | on | off; it is applied at startup (1.5 s in: stops the picom the session may
 -- have started for a classic theme, starts one for a glass theme when none runs), on every theme change and when it changes.
--- Command: settings.ini [commands] picom, else $LHSHELL_PICOM_CMD, else picom --config <x11>/picom-glass.conf --backend glx.
+-- Command: settings.ini [commands] picom, else $LHSHELL_PICOM_CMD, else picom --config session/picom-glass.conf --backend glx.
 local function picom_pids()
   local out, me = {}, os.getenv("DISPLAY") or ""
   for _, d in ipairs(lh.list_dir("/proc") or {}) do
@@ -1551,10 +1547,10 @@ function lh.set_composition_mode(m)
 end
 
 -- a theme switch (SETTINGS.md order: write settings.ini, set _LH_THEME, send _LH_SETTINGS_CHANGED; the message goes out from
--- S.set's 0 ms timer, after this). e = S.resolve(name): a registry entry or a preset. _LH_THEME_RESOLVED is written before
+-- S.set's 0 ms timer, after this). e = S.resolve(name): a theme file or a bare style. _LH_THEME_RESOLVED is written before
 -- _LH_THEME, so a client reacting to _LH_THEME already finds the resolved view current. _LH_THEME gets the selected name itself,
--- a preset's too (SETTINGS.md "Preset names on _LH_THEME": lhwm and flxp resolve presets; only an alias is replaced by its
--- registry name). root_set: the value somebody else just wrote to _LH_THEME (not written again: no bounce)
+-- a preset's too (SETTINGS.md "Preset names on _LH_THEME": luxwm and flxp resolve presets; only an alias is replaced by its
+-- theme's name). root_set: the value somebody else just wrote to _LH_THEME (not written again: no bounce)
 local function apply_theme(e, root_set)
   local t0 = lh.now()
   theme_name, theme_entry = e.name, e
@@ -1577,7 +1573,7 @@ end
 -- luxwm and flxp follow the republished _LH_THEME_RESOLVED and _LH_SETTINGS_CHANGED)
 function lh.select_theme(name, force)
   local e = S.resolve(name)
-  if not e then io.stderr:write("lux: theme " .. tostring(name) .. " is no theme\n") return false end
+  if not e then io.stderr:write("luxshell: theme " .. tostring(name) .. " is no theme\n") return false end
   if e.name ~= theme_name then apply_theme(e) elseif force then apply_theme(e, e.name) end
   return true
 end
@@ -1586,7 +1582,7 @@ lh.on("lh-theme", function()
   if not want then return end
   if (theme_echo[want] or 0) > 0 then theme_echo[want] = theme_echo[want] - 1 return end   -- our own write
   if want == theme_name then lh.reload_pack("_LH_THEME " .. want .. " set again") return end   -- the same name again: reload the pack
-  local e = S.resolve(want)                              -- registry first, then themes/NAME.theme
+  local e = S.resolve(want)
   if not e then io.stderr:write("luxshell: _LH_THEME " .. want .. " is no theme (lhde-theme list)\n") return end
   if e.name == theme_name then if want ~= e.name then set_theme_prop(e.name) end return end   -- an alias of the current one
   apply_theme(e, want)
@@ -1615,7 +1611,7 @@ local function reload_settings()
   if m ~= mode then set_mode(m) end
   local w = tonumber(S.get("sidebar", "width") or "")
   if w and clamp(math.floor(w), SB_MIN, SB_MAX) ~= sb.w then lh.sidebar_set_width(w) end
-  fold_sidebar_layer()                                   -- an old writer's [sidebar] layer = below means stacking = bottom
+  fold_sidebar_layer()                                   -- a writer's [sidebar] layer = below means stacking = bottom
   local lay = S.get("sidebar", "stacking") == "bottom" and "bottom" or "top"
   if lay ~= lh.shell_get("sidebar_stacking") then lh.set_sidebar_stacking(lay) end
   local wc = S.get("sidebar", "with_classic") == "1"
@@ -1638,14 +1634,14 @@ if not wp_applied then local v = effective(theme_entry); wp_applied = v.wallpape
 local reload_timer
 lh.on("settings-changed", function(serial, hint)
   S.seen_serial(serial)
-  if debug_events then io.stderr:write(string.format("lux: settings: _LH_SETTINGS_CHANGED %d %s\n", serial, tostring(hint))) end
+  if debug_events then io.stderr:write(string.format("luxshell: settings: _LH_SETTINGS_CHANGED %d %s\n", serial, tostring(hint))) end
   if reload_timer then return end
   reload_timer = lh.timer(function() reload_timer = nil; reload_settings() end, 50)   -- one reload per burst
 end)
 -- session commands from outside (6.2; the start menu calls lh.session.run directly):
 --   xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND logoff
 -- Pack reload (live editing, USAGE.md "Live-editing a theme"): _LHSHELL_COMMAND "reload", or _LH_THEME set again to the name it
--- already has (x11/theme-reload.sh sends the first). The registry entry is resolved again (themes.ini edits count), the pack's
+-- already has (session/theme-reload.sh sends the first). The theme is resolved again (theme file edits count), the pack's
 -- shell.lua is read again even when the directory is the same, the theme's fonts are
 -- applied again, changed PNGs leave the image cache (lh.image_flush: mtime/size), and the bars, tiles (tiles/*.lua are read
 -- again by build_tiles), flyout chrome, start menu and menus are rebuilt in place (rebuild_shell: same windows, no restart).
@@ -1657,7 +1653,7 @@ local function reload_pack_now(why)
   S.reload()
   local e = (theme_name and S.resolve(theme_name)) or theme_entry
   local dir = (e and e.shell) or pack_dir
-  if not load_pack(dir) then io.stderr:write("lux: reload (" .. why .. "): pack " .. tostring(dir) .. " failed, keeping the old one\n") return end
+  if not load_pack(dir) then io.stderr:write("luxshell: reload (" .. why .. "): pack " .. tostring(dir) .. " failed, keeping the old one\n") return end
   for k in pairs(own_res) do own_res[k] = nil end
   pack_own = {}
   local flushed = lh.image_flush()
@@ -1672,7 +1668,7 @@ local function reload_pack_now(why)
     lh.start_provider_check()
     publish_resolved(theme_entry)
   end
-  io.stderr:write(string.format("lux: reload (%s): theme %s, pack %s, %d image(s) re-read, %d ms\n", why, tostring(theme_name), tostring(pack_dir), flushed, lh.now() - t0))
+  io.stderr:write(string.format("luxshell: reload (%s): theme %s, pack %s, %d image(s) re-read, %d ms\n", why, tostring(theme_name), tostring(pack_dir), flushed, lh.now() - t0))
 end
 function lh.reload_pack(why)
   if reload_pending then return end
@@ -1682,13 +1678,13 @@ lh.on("command", function()
   local c = lh.root_prop("_LHSHELL_COMMAND"); lh.set_root_prop("_LHSHELL_COMMAND", nil)
   if not c or c == "" then return end
   local verb, arg = c:match("^%s*(%S+)%s+(%S+)%s*$")
-  if c:match("^%s*run%s*$") then lh.run_box("run") return end          -- Super+r (lhwm "shell run"): lux's own Run box
+  if c:match("^%s*run%s*$") then lh.run_box("run") return end          -- Super+r (luxwm "shell run"): luxshell's own Run box
   if c:match("^%s*reload%s*$") then lh.reload_pack("_LHSHELL_COMMAND reload") return end   -- x11/theme-reload.sh: re-read the pack
-  if verb == "taskbar" then lh.set_taskbar(arg) return end            -- second-display.sh taskbar avalon|classic|none (M8)
+  if verb == "taskbar" then lh.set_taskbar(arg) return end            -- _LHSHELL_COMMAND "taskbar avalon|classic|none"
   if c:match("^%s*settings%s*$") then lh.settings_flyout() return end   -- the settings flyout (e.g. with the classic bar, which has no way to it)
-  if verb == "sidebar-stacking" then lh.set_sidebar_stacking(arg) return end   -- Win+S (lhwm "shell sidebar-stacking toggle"): top | bottom | toggle
+  if verb == "sidebar-stacking" then lh.set_sidebar_stacking(arg) return end   -- Win+S (luxwm "shell sidebar-stacking toggle"): top | bottom | toggle
   if verb == "desktop" then lh.switch_desktop(arg) return end   -- desktop N (0-based, as _NET_CURRENT_DESKTOP) | next | prev
-  if verb == "sidebar-with-classic" then lh.set_sidebar_with_classic(arg == "1") return end   -- second-display.sh taskbar classic+sidebar
+  if verb == "sidebar-with-classic" then lh.set_sidebar_with_classic(arg == "1") return end   -- _LHSHELL_COMMAND "sidebar-with-classic 0|1"
   S.run(c)
 end)
 
@@ -1702,10 +1698,10 @@ lh.start_provider_check()
 rebuild_tasks()
 lh.taskbar, lh.sidebar, lh.desktop_layer, lh.theme = tb, sb, dk, T
 update_black()
--- the compositor rule at startup too (follow included): a session that starts on a classic theme stops the picom xinitrc.lab
+-- the compositor rule at startup too (follow included): a session that starts on a classic theme stops the picom the session
 -- (or anyone) started on this display; a glass theme gets one when none runs
 lh.timer(function()
-  io.stderr:write(string.format("lux: compositor at startup: %s (theme %s, frame %s) -> %s\n", cfg.composition, tostring(theme_name),
+  io.stderr:write(string.format("luxshell: compositor at startup: %s (theme %s, frame %s) -> %s\n", cfg.composition, tostring(theme_name),
     tostring(theme_entry and theme_entry.composition), composition_wanted(theme_entry) and "on" or "off"))
   apply_composition(theme_entry)
 end, 1500)

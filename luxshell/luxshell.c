@@ -1,5 +1,5 @@
-/* lhshell: Longhorn taskbar + sidebar runtime. C core (X11 ARGB dock windows, EWMH window model, cairo painting,
-   input, timers) scripted by Lua (runtime.lua + theme packs + tiles). See ../SHELL-DESIGN.md section 4. */
+/* luxshell: Longhorn taskbar + sidebar runtime. C core (X11 ARGB dock windows, EWMH window model, cairo painting,
+   input, timers) scripted by Lua (runtime.lua + theme packs + tiles). See docs/SHELL-DESIGN.md section 4. */
 #include "luxshell.h"
 #include <lhde/data.h>
 #include <lhde/theme.h>
@@ -287,13 +287,7 @@ static void apply_round(struct surface *s) {
 }
 static int l_surface_round(lua_State *L) { struct surface *s = check_surface(L, 1); s->radius = luaL_checkinteger(L, 2); apply_round(s); return 0; }
 static int l_surface_raise(lua_State *L) { struct surface *s = check_surface(L, 1); XRaiseWindow(dpy, s->win); return 0; }
-/* surface:stackpos(): index among the root's children, 0 = bottom (-1 when not found); XQueryTree lists bottom to top */
-static int l_surface_stackpos(lua_State *L) {
-    struct surface *s = check_surface(L, 1); Window r, p, *kids = NULL; unsigned int n = 0; int pos = -1;
-    if (XQueryTree(dpy, DefaultRootWindow(dpy), &r, &p, &kids, &n)) { for (unsigned int i = 0; i < n; i++) if (kids[i] == s->win) pos = (int)i; if (kids) XFree(kids); }
-    lua_pushinteger(L, pos); return 1;
-}
-/* surface:set_layer("above" | "below" | nil): rewrite _NET_WM_STATE of a mapped dock (sticky + ABOVE or BELOW) in place; lhwm
+/* surface:set_layer("above" | "below" | nil): rewrite _NET_WM_STATE of a mapped dock (sticky + ABOVE or BELOW) in place; luxwm
    re-reads the state of a tracked dock on PropertyNotify (dock_property) and restacks the docks at once */
 static int l_surface_layer(lua_State *L) { struct surface *s = check_surface(L, 1); const char *layer = luaL_optstring(L, 2, "");
     Atom st[2]; int ns = 0; st[ns++] = atom[A_NET_WM_STATE_STICKY];
@@ -314,7 +308,7 @@ static int l_surface_id(lua_State *L) { lua_pushinteger(L, (lua_Integer)check_su
 static int l_surface_background(lua_State *L) { struct surface *s = check_surface(L, 1); double c[4] = {0, 0, 0, 0}; if (lua_isstring(L, 2)) parse_color(lua_tostring(L, 2), c);
     unsigned long px = ((unsigned long)(c[3] * 255) << 24) | ((unsigned long)(c[0] * c[3] * 255) << 16) | ((unsigned long)(c[1] * c[3] * 255) << 8) | (unsigned long)(c[2] * c[3] * 255);
     XSetWindowBackground(dpy, s->win, px); return 0; }
-/* surface:grab([keyboard]) / :ungrab(): pointer grab with owner events; a press outside every lhshell surface calls
+/* surface:grab([keyboard]) / :ungrab(): pointer grab with owner events; a press outside every luxshell surface calls
    surface.on_outside. keyboard = true also grabs the keyboard (menus: every key goes to this surface's on_key, wherever
    the focus is); returns pointer_ok, keyboard_ok. Without a keyboard grab, keys reach a surface only when it has the focus. */
 static struct surface *kb_surface;   /* the surface holding the keyboard grab */
@@ -497,8 +491,8 @@ static int l_spawn(lua_State *L) { const char *cmd = luaL_checkstring(L, 1); if 
 /* lh.set_desktop(n): ask the WM to switch to desktop n (EWMH _NET_CURRENT_DESKTOP client message to the root) */
 static int l_set_desktop(lua_State *L) { long n = (long)luaL_checkinteger(L, 1); send_root_message(root, atom[A_NET_CURRENT_DESKTOP], n, CurrentTime, 0); return 0; }
 static int l_desktop(lua_State *L) { unsigned long n; int fmt; unsigned char *d = get_prop(root, atom[A_NET_CURRENT_DESKTOP], XA_CARDINAL, &n, &fmt); lua_pushinteger(L, d ? ((long *)d)[0] : 0); if (d) XFree(d); return 1; }
-/* lh.maxmode([desktop]): lhwm's _LHWM_MAXIMIZED_MODE for that desktop (default: the current one) as a boolean, or nil when
-   lhwm is not the running WM (no _NET_SUPPORTING_WM_CHECK window named lhwm: the caller falls back to its own EWMH rule) */
+/* lh.maxmode([desktop]): luxwm's _LHWM_MAXIMIZED_MODE for that desktop (default: the current one) as a boolean, or nil when
+   luxwm is not the running WM (no _NET_SUPPORTING_WM_CHECK window named "lhwm": the caller falls back to its own EWMH rule) */
 static int l_maxmode(lua_State *L) {
     unsigned long n; int fmt; unsigned char *d = get_prop(root, atom[A_NET_SUPPORTING_WM_CHECK], XA_WINDOW, &n, &fmt); bool lhwm = false;
     if (d) { Window chk = ((Window *)d)[0]; XFree(d); unsigned char *nm = get_prop(chk, atom[A_NET_WM_NAME], atom[A_UTF8], &n, &fmt);
@@ -527,32 +521,25 @@ static int l_set_root_prop(lua_State *L) {
     XFlush(dpy); return 0;
 }
 /* lhde's data directories (liblhde, lhde/data.h): lh.data_find(rel) -> the first dir/rel that exists, or nil;
-   lh.data_resolve(value) -> a registry value as a path; lh.data_resolve_dir(value, marker) -> the directory of value that has
-   marker (frames/x + theme.ini, packs/x + shell.lua); lh.data_dirs() -> the list; lh.data_user() -> the user's data directory;
+   lh.data_resolve(value) -> a theme value as a path; lh.data_resolve_dir(value, marker) -> the directory of value that has
+   marker (frames/x + theme.ini, packs/x + shell.lua);
    lh.component_dir(name) -> luxshell/ or session/ (tree or <prefix>/lib/lhde), or nil */
 static int l_data_find(lua_State *L) { char b[4200]; if (lhde_data_find(luaL_checkstring(L, 1), b, sizeof b)) lua_pushstring(L, b); else lua_pushnil(L); return 1; }
 static int l_data_resolve(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_data_resolve(luaL_checkstring(L, 1), b, sizeof b)); return 1; }
 static int l_data_resolve_dir(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_data_resolve_dir(luaL_checkstring(L, 1), luaL_checkstring(L, 2), b, sizeof b)); return 1; }
-static int l_data_dirs(lua_State *L) { const char *d[LHDE_DATA_MAX]; int n = lhde_data_dirs(d, LHDE_DATA_MAX); lua_createtable(L, n, 0);
-    for (int i = 0; i < n; i++) { lua_pushstring(L, d[i]); lua_rawseti(L, -2, i + 1); } return 1; }
-static int l_data_user(lua_State *L) { lua_pushstring(L, lhde_data_user()); return 1; }
 static int l_component_dir(lua_State *L) { char b[4200]; if (lhde_component_dir(luaL_checkstring(L, 1), b, sizeof b)) lua_pushstring(L, b); else lua_pushnil(L); return 1; }
 /* liblhde's theme resolver and settings store (docs/THEME-FORMAT.md, docs/SETTINGS.md):
      lh.theme_resolve(name) -> { name =, file =, v = { ["Glass.frames"] = ..., ... }, why = { ... }, record = TEXT (no serial) },
                                or nil, error
-     lh.theme_record(name, serial) -> the _LH_THEME_RESOLVED text (theme=, serial=, the record) or nil
      lh.theme_list() -> { { name =, title =, file =, group = 0 user | 1 shipped | 2 style, style_missing = true when the theme's
                          visual style is not imported (lhde_theme_has_style; the lists leave it out) }, ... }
      lh.theme_lookup(name) -> the theme's name (aliases resolved) and its file ("" for a bare style), or nil
-     lh.theme_set_key(name, "Sec.key", value | nil) -> the theme to select now (NAME-modified or NAME), or nil
      lh.theme_user_dir() -> ~/.config/lhde/themes
      the current layer (THEME-FORMAT.md sections 3 and 14, Windows' "NAME (Modified)"; settings.ini [current]):
      lh.current_set_key("Sec.key", value | nil) -> true when settings.ini changed, false when not, nil on an error (no theme
-     selected, not a theme key); lh.current_keys() -> { { key =, value = }, ... } of the selected theme; lh.current_theme() -> the
-     theme the layer belongs to ("" without one); lh.theme_select(name) -> true when settings.ini changed (the [theme] name, another
+     selected, not a theme key); lh.theme_select(name) -> true when settings.ini changed (the [theme] name, another
      theme's layer dropped), false when not, nil on an error; lh.theme_save_as(file, title) -> true, or nil, error
-     lh.settings_get(sec, key) -> value ("" when empty) or nil when absent; lh.settings_set(sec, key, value | nil) -> true when the
-     file changed; lh.settings_path(); lh.config_file(NAME), lh.state_file(NAME) -> path; lh.settings_reload();
+     lh.settings_set(sec, key, value | nil) -> true when the file changed; lh.settings_path(); lh.config_file(NAME), lh.state_file(NAME) -> path; lh.settings_reload();
      lh.settings_migrate() -> count, report */
 static int l_theme_resolve(lua_State *L) {
     char err[600]; lhde_theme *t = lhde_theme_resolve(luaL_checkstring(L, 1), err, sizeof err);
@@ -570,12 +557,6 @@ static int l_theme_resolve(lua_State *L) {
     lhde_theme_free(t);
     return 1;
 }
-static int l_theme_record(lua_State *L) {
-    lhde_theme *t = lhde_theme_resolve(luaL_checkstring(L, 1), NULL, 0);
-    if (!t) { lua_pushnil(L); return 1; }
-    char *rec = lhde_theme_serialize(t, (unsigned long)luaL_optinteger(L, 2, 0));
-    lua_pushstring(L, rec ? rec : ""); free(rec); lhde_theme_free(t); return 1;
-}
 static void theme_list_cb(const char *name, const char *title, const char *file, int group, void *ud) {
     lua_State *L = ud; lua_newtable(L);
     lua_pushstring(L, name); lua_setfield(L, -2, "name"); lua_pushstring(L, title); lua_setfield(L, -2, "title");
@@ -589,24 +570,11 @@ static int l_theme_lookup(lua_State *L) {
     if (!lhde_theme_lookup(luaL_checkstring(L, 1), c, sizeof c, f, sizeof f)) { lua_pushnil(L); return 1; }
     lua_pushstring(L, c); lua_pushstring(L, f); return 2;
 }
-static int l_theme_set_key(lua_State *L) {
-    char sel[300];
-    int r = lhde_theme_set_key(luaL_checkstring(L, 1), luaL_checkstring(L, 2), luaL_optstring(L, 3, NULL), sel, sizeof sel);
-    if (r < 0) { lua_pushnil(L); return 1; }
-    lua_pushstring(L, sel); lua_pushboolean(L, r > 0); return 2;
-}
 static int l_current_set_key(lua_State *L) {
     int r = lhde_current_set_key(luaL_checkstring(L, 1), luaL_optstring(L, 2, NULL));
     if (r < 0) lua_pushnil(L); else lua_pushboolean(L, r > 0);
     return 1;
 }
-static void current_key_cb(const char *k, const char *v, void *ud) {
-    lua_State *L = ud; lua_newtable(L);
-    lua_pushstring(L, k); lua_setfield(L, -2, "key"); lua_pushstring(L, v ? v : ""); lua_setfield(L, -2, "value");
-    lua_rawseti(L, -2, (lua_Integer)lua_rawlen(L, -2) + 1);
-}
-static int l_current_keys(lua_State *L) { lua_newtable(L); lhde_current_keys(current_key_cb, L); return 1; }
-static int l_current_theme(lua_State *L) { char b[300]; lua_pushstring(L, lhde_current_theme(b, sizeof b)); return 1; }
 static int l_theme_select(lua_State *L) {
     int r = lhde_theme_select(luaL_checkstring(L, 1));
     if (r < 0) lua_pushnil(L); else lua_pushboolean(L, r > 0);
@@ -618,13 +586,6 @@ static int l_theme_save_as(lua_State *L) {
     lua_pushboolean(L, 1); return 1;
 }
 static int l_theme_user_dir(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_theme_user_dir(b, sizeof b)); return 1; }
-static int l_settings_get(lua_State *L) {
-    char b[4096]; char p[4200]; lhde_settings_path(p, sizeof p);
-    lhde_ini *ini = lhde_ini_load(p);
-    const char *v = lhde_ini_get(ini, luaL_checkstring(L, 1), luaL_checkstring(L, 2), b, sizeof b);
-    if (v) lua_pushstring(L, v); else lua_pushnil(L);
-    lhde_ini_free(ini); return 1;
-}
 static int l_settings_set(lua_State *L) {
     int r = lhde_settings_set(luaL_checkstring(L, 1), luaL_checkstring(L, 2), luaL_optstring(L, 3, NULL));
     lua_pushboolean(L, r > 0); return 1;
@@ -639,21 +600,17 @@ static int l_settings_migrate(lua_State *L) {
     static char rep[65536]; int n = lhde_settings_migrate(0, rep, sizeof rep);
     lua_pushinteger(L, n); lua_pushstring(L, rep); return 2;
 }
-static int l_realpath(lua_State *L) { char buf[4096]; if (realpath(luaL_checkstring(L, 1), buf)) lua_pushstring(L, buf); else lua_pushnil(L); return 1; }
 /* lh.list_dir(path): file names in a directory (no . and ..), nil when it cannot be read; lh.mtime(path): modification time
    in seconds or nil (desktop-entry and icon caches of the start menu) */
 static int l_list_dir(lua_State *L) { DIR *d = opendir(luaL_checkstring(L, 1)); if (!d) { lua_pushnil(L); return 1; }
     lua_newtable(L); int k = 1; struct dirent *e; while ((e = readdir(d))) { if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue; lua_pushstring(L, e->d_name); lua_rawseti(L, -2, k++); }
     closedir(d); return 1; }
 static int l_mtime(lua_State *L) { struct stat st; if (stat(luaL_checkstring(L, 1), &st)) { lua_pushnil(L); return 1; } lua_pushinteger(L, (lua_Integer)st.st_mtime); return 1; }
-static int l_quit(lua_State *L) { (void)L; running = false; return 0; }
 /* lh.cm_owner(): whether a compositing manager owns _NET_WM_CM_S<screen> (picom or any other) */
 static int l_cm_owner(lua_State *L) { char name[32]; snprintf(name, sizeof name, "_NET_WM_CM_S%d", screen); lua_pushboolean(L, XGetSelectionOwner(dpy, XInternAtom(dpy, name, False)) != None); return 1; }
 /* lh.kill(pid): SIGTERM to one process (the compositor rule in runtime.lua picks the pid: a `picom` with our DISPLAY) */
 static int l_kill(lua_State *L) { lua_pushboolean(L, kill((pid_t)luaL_checkinteger(L, 1), SIGTERM) == 0); return 1; }
-/* lh.image_alpha(path, [strips, strip]): the highest alpha (0..255) in an image or in one of its vertical state strips
-   (the start menu's cascade highlight: Slate's StartMenu::Toolbar.BUTTON hot strip is empty) */
-/* lh.fonts("DIR[;DIR...]"): the theme's font directories (themes.ini `fonts`, docs/history/THEMES.md "Fonts") become the process's fontconfig
+/* lh.fonts("DIR[;DIR...]"): the theme's font directories (path.fonts) become the process's fontconfig
    application fonts, replacing the previous set (FcConfigAppFontClear; the fallback lookups of text.c), and libuxtheme's font
    directories (ut_add_font_dir, text.c: libuxtheme only adds, so a directory of an earlier theme stays known to it). Returns the
    face and file the given description (default: "Segoe UI 9") now resolves to, and whether the set changed. Called at pack load
@@ -677,17 +634,9 @@ static int l_fonts(lua_State *L) {
     char fam[256], file[512]; text_resolve(desc, fam, sizeof fam, file, sizeof file);
     lua_pushstring(L, fam); lua_pushstring(L, file); lua_pushboolean(L, changed); return 3;
 }
-static int l_image_alpha(lua_State *L) {
-    cairo_surface_t *im = img_from_lua(L, 1); if (!im || cairo_image_surface_get_format(im) != CAIRO_FORMAT_ARGB32) { lua_pushinteger(L, im ? 255 : 0); return 1; }
-    int strips = (int)luaL_optinteger(L, 2, 1), strip = (int)luaL_optinteger(L, 3, 0); if (strips < 1) strips = 1;
-    int w = cairo_image_surface_get_width(im), h = cairo_image_surface_get_height(im) / strips, st = cairo_image_surface_get_stride(im); cairo_surface_flush(im);
-    const unsigned char *d = cairo_image_surface_get_data(im); int m = 0;
-    for (int y = strip * h; y < (strip + 1) * h && y < cairo_image_surface_get_height(im); y++) for (int x = 0; x < w; x++) { int a = ((const uint32_t *)(d + y * st))[x] >> 24; if (a > m) m = a; }
-    lua_pushinteger(L, m); return 1;
-}
 static int l_now(lua_State *L) { lua_pushinteger(L, now_ms()); return 1; }
 
-/* ---- M8: the classic taskbar next to lhshell (SHELL-DESIGN "M8 lhshell side") ---- */
+/* ---- the classic taskbar next to luxshell (SHELL-DESIGN "M8 luxshell side") ---- */
 /* lh.selection_owner(name): the owner window of a selection (e.g. _NET_SYSTEM_TRAY_S0, _LH_STARTMENU_S0) or nil */
 static int l_selection_owner(lua_State *L) { Window w = XGetSelectionOwner(dpy, XInternAtom(dpy, luaL_checkstring(L, 1), False)); if (w == None) lua_pushnil(L); else lua_pushinteger(L, (lua_Integer)w); return 1; }
 /* lh.watch_selection(name): XFixes owner-change notification for a selection (event "selection"(name, owner or 0));
@@ -734,7 +683,7 @@ static int l_set_root_cardinal(lua_State *L) {
     if (lua_isnoneornil(L, 2)) XDeleteProperty(dpy, root, a); else { long v = (long)luaL_checkinteger(L, 2); XChangeProperty(dpy, root, a, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&v, 1); }
     XFlush(dpy); return 0;
 }
-/* lh.struts(): the struts of every mapped top-level window that is not ours (and of the clients inside lhwm's frames), as
+/* lh.struts(): the struts of every mapped top-level window that is not ours (and of the clients inside luxwm's frames), as
    { win, left, right, top, bottom, left_start_y, left_end_y, right_start_y, right_end_y, top_start_x, top_end_x,
    bottom_start_x, bottom_end_x } (_NET_WM_STRUT_PARTIAL; a plain _NET_WM_STRUT spans the whole edge) */
 static void strut_of(lua_State *L, Window w, int *k) {
@@ -842,15 +791,15 @@ static void handle_event(XEvent *e) {
         if (p->window == root) { if (p->atom == atom[A_NET_CLIENT_LIST] || p->atom == atom[A_NET_ACTIVE_WINDOW]) clients_refresh(); else if (p->atom == atom[A_NET_CLIENT_LIST_STACKING]) { if (stacking_refresh()) emit("windows", 0); } else if (p->atom == atom[A_NET_CURRENT_DESKTOP]) emit("desktop", 0); else if (p->atom == atom[A_LHWM_MAXIMIZED_MODE] || p->atom == atom[A_NET_SUPPORTING_WM_CHECK]) emit("maxmode", 0);
             else if (p->atom == atom[A_LH_THEME] && p->state == PropertyNewValue) emit("lh-theme", 0);          /* the session theme (6.1) */
             else if (p->atom == atom[A_LHSHELL_COMMAND] && p->state == PropertyNewValue) emit("command", 0);   /* a session command (6.2) */
-            else if (p->atom == atom[A_NET_WORKAREA]) emit("workarea", 0);                                       /* struts changed (M8: the sidebar yields to a foreign bottom dock) */
+            else if (p->atom == atom[A_NET_WORKAREA]) emit("workarea", 0);                                       /* struts changed (the sidebar yields to a foreign bottom dock) */
             else if (p->atom == atom[A_LH_STARTMENU_OPEN]) emit("startmenu-open", 0);                           /* the provider's menu state (CLIENT-PROTOCOL "Requests to the wux side") */
             return; }
         struct client *c = client_find(p->window); if (!c) return;
         if (p->atom == atom[A_NET_WM_NAME] || p->atom == XA_WM_NAME) client_update_title(c); else if (p->atom == atom[A_NET_WM_ICON] || p->atom == XA_WM_HINTS) client_update_icon(c); else if (p->atom == atom[A_NET_WM_STATE] || p->atom == atom[A_WM_STATE] || p->atom == atom[A_NET_WM_DESKTOP]) client_update_state(c); else return;
         lua_pushinteger(L, (lua_Integer)c->w); emit("window", 1); return;
     }
-    /* _LHSHELL_START on the root: lhwm's Super key (l[0] = timestamp, no rect) or a classic Start button (flxp-taskbar with
-       start_menu = lhshell: l[0] = flags, l[1..4] = the button's rect); the Lua side decides (M8 start-menu provider protocol) */
+    /* _LHSHELL_START on the root: luxwm's Super key (l[0] = timestamp, no rect) or a classic Start button (flxp-taskbar with
+       start_menu = luxshell: l[0] = flags, l[1..4] = the button's rect); the Lua side decides (the start-menu provider protocol) */
     if (e->type == ClientMessage && e->xclient.window == root) {
         if (e->xclient.message_type == atom[A_LHSHELL_START]) { for (int i = 0; i < 5; i++) lua_pushinteger(L, e->xclient.data.l[i]); emit("start-key", 5); }
         /* SETTINGS.md: a writer saved settings.ini (l[0] = serial, l[1] = 0 or a section hint atom); ours come back too */
@@ -867,7 +816,7 @@ static void handle_event(XEvent *e) {
         emit("selection", 2); return;
     }
     /* top-level windows mapped / unmapped / destroyed (root SubstructureNotify): a dock with a strut may have come or gone even
-       when _NET_WORKAREA keeps its value (M8: the sidebar's yield to the classic taskbar) */
+       when _NET_WORKAREA keeps its value (the sidebar's yield to the classic taskbar) */
     /* (the window and "map" / "unmap" / "destroy": runtime.lua's start button follows a start-menu provider's popup by them) */
     if ((e->type == MapNotify && e->xmap.event == root && !surface_from_window(e->xmap.window)) || (e->type == UnmapNotify && e->xunmap.event == root && !surface_from_window(e->xunmap.window))
         || (e->type == DestroyNotify && e->xdestroywindow.event == root)) {
@@ -909,7 +858,7 @@ static void handle_event(XEvent *e) {
 }
 
 /* _NET_WM_ICON_GEOMETRY (EWMH): every node tagged icon_geometry_for = <client> (the task buttons) publishes its rect in root
-   coordinates on that client after each layout; lhwm reads it for the minimise animation. Deleted when the node goes away. */
+   coordinates on that client after each layout; luxwm reads it for the minimise animation. Deleted when the node goes away. */
 struct icongeo { Window w; struct surface *s; long r[4]; bool seen; };
 static struct icongeo geos[512]; static int ngeos;
 static void geo_walk(struct surface *s, struct node *n) {
@@ -944,7 +893,7 @@ static int l_notification_action(lua_State *L) { notify_action((unsigned)luaL_ch
    `filter`); the caller repaints. Returns the filter now in force. */
 /* lh.image_flush(): re-read changed PNGs on their next use (scene.c image_flush; the pack reload); returns the count */
 static int l_image_flush(lua_State *L) { lua_pushinteger(L, image_flush()); return 1; }
-/* lh.wm_moveresize(win, x, y, w, h): EWMH _NET_MOVERESIZE_WINDOW for a client (the taskbar menu's Cascade / Tile; lhwm applies
+/* lh.wm_moveresize(win, x, y, w, h): EWMH _NET_MOVERESIZE_WINDOW for a client (the taskbar menu's Cascade / Tile; luxwm applies
    x,y,w,h as client_move_absolute / client_resize_absolute) */
 static int l_wm_moveresize(lua_State *L) {
     XEvent e = {0}; e.xclient.type = ClientMessage; e.xclient.window = (Window)luaL_checkinteger(L, 1);
@@ -964,16 +913,16 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"tray_start", l_tray_start}, {"tray_count", l_tray_count}, {"tray_manager", l_tray_manager}, {"tray_stop", l_tray_stop},
     {"selection_owner", l_selection_owner}, {"watch_selection", l_watch_selection}, {"own_selection", l_own_selection}, {"send_message", l_send_message}, {"send_root_message", l_send_root_message}, {"atom", l_atom},
     {"set_root_cardinal", l_set_root_cardinal}, {"struts", l_struts}, {"spawn_pid", l_spawn_pid}, {"notification_closed", l_notification_closed}, {"notification_action", l_notification_action},
-    {"spawn", l_spawn}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"realpath", l_realpath}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"quit", l_quit}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"mtime", l_mtime},
-    {"data_find", l_data_find}, {"data_resolve", l_data_resolve}, {"data_resolve_dir", l_data_resolve_dir}, {"data_dirs", l_data_dirs}, {"data_user", l_data_user},
+    {"spawn", l_spawn}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"mtime", l_mtime},
+    {"data_find", l_data_find}, {"data_resolve", l_data_resolve}, {"data_resolve_dir", l_data_resolve_dir},
     {"component_dir", l_component_dir},
-    {"theme_resolve", l_theme_resolve}, {"theme_record", l_theme_record}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},
-    {"theme_set_key", l_theme_set_key}, {"theme_user_dir", l_theme_user_dir}, {"current_set_key", l_current_set_key},
-    {"current_keys", l_current_keys}, {"current_theme", l_current_theme}, {"theme_select", l_theme_select}, {"theme_save_as", l_theme_save_as}, {"settings_get", l_settings_get}, {"settings_set", l_settings_set},
+    {"theme_resolve", l_theme_resolve}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},
+    {"theme_user_dir", l_theme_user_dir}, {"current_set_key", l_current_set_key},
+    {"theme_select", l_theme_select}, {"theme_save_as", l_theme_save_as}, {"settings_set", l_settings_set},
     {"settings_path", l_settings_path}, {"config_file", l_config_file}, {"state_file", l_state_file}, {"settings_reload", l_settings_reload}, {"settings_migrate", l_settings_migrate},
-    {"cm_owner", l_cm_owner}, {"kill", l_kill}, {"image_alpha", l_image_alpha}, {"fonts", l_fonts}, {"image_filter", l_image_filter}, {"image_flush", l_image_flush}, {"wm_moveresize", l_wm_moveresize}, {"menu_render", l_menu_render}, {NULL, NULL} };
+    {"cm_owner", l_cm_owner}, {"kill", l_kill}, {"fonts", l_fonts}, {"image_filter", l_image_filter}, {"image_flush", l_image_flush}, {"wm_moveresize", l_wm_moveresize}, {"menu_render", l_menu_render}, {NULL, NULL} };
 static const luaL_Reg nodemeth[] = { {"add", l_node_add}, {"remove", l_node_remove}, {"clear", l_node_clear}, {"set", l_node_set}, {"bounds", l_node_bounds}, {"measure", l_node_measure}, {"desired", l_node_desired}, {NULL, NULL} };
-static const luaL_Reg surfmeth[] = { {"root", l_surface_root}, {"show", l_surface_show}, {"hide", l_surface_hide}, {"move", l_surface_move}, {"raise", l_surface_raise}, {"lower", l_surface_lower}, {"set_layer", l_surface_layer}, {"stackpos", l_surface_stackpos}, {"damage", l_surface_damage}, {"id", l_surface_id}, {"press", l_surface_press},
+static const luaL_Reg surfmeth[] = { {"root", l_surface_root}, {"show", l_surface_show}, {"hide", l_surface_hide}, {"move", l_surface_move}, {"raise", l_surface_raise}, {"lower", l_surface_lower}, {"set_layer", l_surface_layer}, {"damage", l_surface_damage}, {"id", l_surface_id}, {"press", l_surface_press},
     {"background", l_surface_background}, {"round", l_surface_round}, {"grab", l_surface_grab}, {"ungrab", l_surface_ungrab}, {"icon_offset", l_surface_icon_offset}, {NULL, NULL} };
 
 int xerror_quiet;   /* > 0: expected errors (freeing an icon's Picture after the icon window died) are not logged */
@@ -994,7 +943,7 @@ int main(int argc, char **argv) {
     XSetErrorHandler(xerror); screen = DefaultScreen(dpy); root = RootWindow(dpy, screen); scr_w = DisplayWidth(dpy, screen); scr_h = DisplayHeight(dpy, screen);
     XVisualInfo vi; if (!XMatchVisualInfo(dpy, screen, 32, TrueColor, &vi)) { fprintf(stderr, "luxshell: no ARGB visual\n"); return 1; } argb = vi.visual; cmap = XCreateColormap(dpy, root, argb, AllocNone);
     for (int i = 0; i < A_LAST; i++) atom[i] = XInternAtom(dpy, atom_names[i], False);
-    XSelectInput(dpy, root, PropertyChangeMask | SubstructureNotifyMask);   /* Substructure: lhwm's _LHSHELL_START root message */
+    XSelectInput(dpy, root, PropertyChangeMask | SubstructureNotifyMask);   /* Substructure: luxwm's _LHSHELL_START root message */
     debug = getenv("LHSHELL_DEBUG") && *getenv("LHSHELL_DEBUG");
     L = luaL_newstate(); luaL_openlibs(L); scene_custom_paint = tray_paint;
     luaL_newmetatable(L, "lh.node"); lua_pushvalue(L, -1); lua_setfield(L, -2, "__index"); luaL_setfuncs(L, nodemeth, 0); lua_pop(L, 1);
@@ -1015,12 +964,12 @@ int main(int argc, char **argv) {
         long long d = next_deadline(); int timeout = d < 0 ? 1000 : (int)(d - now_ms()); if (timeout < 0) timeout = 0;
         /* round trips made by Lua handlers, timers and cairo (XGetWindowProperty, XRender queries) can pull events into
            Xlib's queue; poll() on the socket would then sleep on events already read, up to the next timer (the clock's
-           1 s), which made the maximise black layers start late (SHELL-DESIGN M5a status) */
+           1 s), which would start the maximise black layers late */
         if (XEventsQueued(dpy, QueuedAlready) > 0 || notify_pending()) timeout = 0;
         struct pollfd p[2] = { { xfd, POLLIN, 0 }, { dfd, POLLIN, 0 } }; poll(p, dfd >= 0 ? 2 : 1, timeout);
     }
     emit("exit", 0);                                                  /* runtime.lua: stops the classic taskbar it started */
     tray_stop();
-    XDeleteProperty(dpy, root, atom[A_LHSHELL_CLOCK_VISIBLE]); XSync(dpy, False);   /* M8: nobody shows a sidebar clock any more */
+    XDeleteProperty(dpy, root, atom[A_LHSHELL_CLOCK_VISIBLE]); XSync(dpy, False);   /* nobody shows a sidebar clock any more */
     return 0;
 }

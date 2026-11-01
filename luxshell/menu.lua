@@ -218,7 +218,7 @@ return function(ctx)
     paint_sel(L)
     return true
   end
-  -- a press on another lhshell surface (owner events of the root level's grab) closes context menus
+  -- a press on another luxshell surface (owner events of the root level's grab) closes context menus
   lh.on("surface-press", function(x, y, button, win)
     if #M.levels > 0 and M.levels[1].grabbed and not M.owns(win) then M.close() end
   end)

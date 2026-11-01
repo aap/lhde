@@ -11,7 +11,7 @@
 -- Verified on lh4074-193747.png (Slate, 1152x864, bar at x 1002, tile y 62..98 = 3 + 30 + 4): one bubble at the left edge (its
 -- element 4 px left of the foreground), a stack of three at offset 29, one at the right edge (offset 119 = 134 - 15).
 -- Element: tooltip = arrival time + newline + header (or body); a click shows the toast again (_IconClicked → _Show, _fReshow).
--- A click on the tile elsewhere opens the flyout. Tile menu (_OnContextMenu): "Go to rules and alerts" (greyed: lux has no rules
+-- A click on the tile elsewhere opens the flyout. Tile menu (_OnContextMenu): "Go to rules and alerts" (greyed: luxshell has no rules
 -- engine) and our "Delete All Notifications". Empty: 4074 drew nothing; we write "No notifications" dimly (ours).
 local tile = { name = "Notification History", height = 37, tooltip = "Notification History" }
 local MAXN, JOIN, STACK = 8, 20, 4
@@ -142,7 +142,7 @@ end
 --   DockPanel (Fill) { Image 4007 (Left), "Go to Rules and Alerts" (Left, Segoe UI 8 white) } }
 -- right click: ContextMenu "Delete All Notifications", "Go to Rules and Alerts".
 -- Ours: newest first; a 16 px app icon before the header when the notification named one; the full text in the row tooltip;
--- the white link at the bottom deletes all (4074's linked to the rules pages, which lux does not have; its context menu entry
+-- the white link at the bottom deletes all (4074's linked to the rules pages, which luxshell does not have; its context menu entry
 -- "Delete All Notifications" did nothing in 4074 and works here); the mouse wheel scrolls by three rows (no scroll bar drawn).
 -- Closing the flyout marks everything viewed.
 local FW, FH, ROW = 400, 300, 17

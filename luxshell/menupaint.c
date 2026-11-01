@@ -1,4 +1,4 @@
-/* lhshell popup menus: wuxtheme's popup menu painter (ut_menu_layout / ut_menu_draw, the code that draws flxp's user32 menus and
+/* luxshell popup menus: wuxtheme's popup menu painter (ut_menu_layout / ut_menu_draw, the code that draws flxp's user32 menus and
    luxwm's window menu) for menu.lua. luxwm/menu.c is the model: the session theme's visual style (its Menu class, [SysMetrics]
    colours, FLATMENUS, MENUFONT), or Windows Classic from the record's Colors.* and Metrics.menufont; the text smoothed as the
    system's ([fonts] smoothing, else the theme's Fonts.smoothing). The pixels go into an image registered as an "@..." key (an

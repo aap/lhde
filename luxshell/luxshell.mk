@@ -1,4 +1,4 @@
-# luxshell, the Avalon bars, sidebar, tiles, toasts and start menu (was lhshell / "lux"; docs/SHELL-DESIGN.md). Included by
+# luxshell, the Avalon bars, sidebar, tiles, toasts and start menu (docs/SHELL-DESIGN.md). Included by
 # the top-level Makefile. A C core (scene graph, X surfaces, tray, notifications, GDI text through libwuxtheme) running Lua
 # (runtime.lua and its modules, tiles/): system Lua 5.4 (pkg-config lua5.4) and libdbus.
 #   build/bin/luxshell                    finds its Lua in luxshell/ (build tree) or $(PKGLIBDIR)/luxshell (installed)

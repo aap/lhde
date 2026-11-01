@@ -1,6 +1,6 @@
 -- Session state and settings (SHELL-DESIGN 6.1 / 6.2, SETTINGS.md, THEME-FORMAT.md): the theme through liblhde's resolver (the
 -- Lua binding lh.theme_*: theme files in data/themes/ and ~/.config/lhde/themes/, bare styles, aliases), the shared desktop
--- settings (~/.config/lhde/settings.ini through liblhde's store: lh.settings_set; read here, cached), lux's private runtime
+-- settings (~/.config/lhde/settings.ini through liblhde's store: lh.settings_set; read here, cached), luxshell's private runtime
 -- state (~/.local/state/lhde/luxshell-state.ini: tile order) and the session commands (log off, stand by, shut down, restart, lock).
 --   local S = dofile("session.lua")
 --   S.resolve(name)            the theme NAME resolved (an alias gives its theme): an entry { name, title, file, user (its file is
@@ -13,7 +13,7 @@
 --   S.lookup(name)             the theme's name when NAME is one (a theme file, an alias, a bare style), else nil
 --   S.themes([keep])           the shipped theme files whose visual style is imported (and keep, the selected one, anyway):
 --                              { name, title, file, group } (group 1; bare styles are not themes: the
---                              Appearance of Display Properties picks them, docs/history/THEME-FORMAT-status.md section 14)
+--                              Appearance of Display Properties picks them)
 --   S.presets([keep])          the user's theme files (group 0) whose style is imported (keep anyway), with .base ([Theme] base)
 --   S.theme_value(e, key)      taskbar | start | icons | composition | animations | sidebar of the resolved theme e (composition:
 --                              follow | on | off, the theme's auto is follow) and its source (file | base | settings | default |
@@ -59,16 +59,6 @@ S.quote = q
 local function have(cmd) return os.execute("command -v " .. cmd .. " >/dev/null 2>&1") == true end
 -- lhde: the session's scripts and files (picom-glass.conf, lhde-session): session/ of the tree or <prefix>/lib/lhde/session
 S.session_dir = lh.component_dir("session") or "."
--- luxshell's packs by their x11-era names (presets written before lhde say `shell = slate`)
-S.pack_aliases = { aero = "4074-aero", slate = "4074-slate", slate4051 = "4051-slate", aero5112 = "5112-aero", aerovision = "4074-aerovision" }
--- a pack: a directory, or a name looked up in the data directories (packs/NAME with its shell.lua)
-function S.pack_dir(v)
-  if not v or v == "" then return v end
-  if v:sub(1, 1) == "/" or v:sub(1, 2) == "~/" then return lh.data_resolve(v) end
-  local n = v:match("^packs/([^/]+)/*$") or v:match("^lhshell/themes/([^/]+)/*$") or v
-  if not n:find("/", 1, true) then n = S.pack_aliases[n] or n; return lh.data_resolve_dir("packs/" .. n, "shell.lua") end
-  return lh.data_resolve_dir(v, "shell.lua")
-end
 
 ------------------------------------------------------------------ themes (liblhde, THEME-FORMAT.md)
 local touched, cache, cache_stamp   -- below (settings.ini: the message, the cached file)
@@ -121,7 +111,8 @@ function S.resolve(name)
   e.display = e.modified and (e.title .. " (Modified)") or e.title
   return e
 end
--- luxshell's packs by their x11-era names (LHSHELL_THEME=slate)
+-- a pack: a directory, or a name looked up in the data directories (packs/NAME with its shell.lua); the short names
+-- (LHSHELL_THEME=slate) are aliases
 S.pack_aliases = { aero = "4074-aero", slate = "4074-slate", slate4051 = "4051-slate", aero5112 = "5112-aero", aerovision = "4074-aerovision" }
 function S.pack_dir(v)
   if not v or v == "" then return v end
@@ -149,7 +140,7 @@ function S.set_theme_value(e, key, value)
   local k = S.theme_keys[key]; if not (k and e) then return nil end
   if key == "composition" and value == "follow" then value = "auto" end
   local changed = lh.current_set_key(k, value)
-  io.stderr:write(string.format("lux: theme %s: %s = %s into the current layer%s\n", e.name, k, tostring(value),
+  io.stderr:write(string.format("luxshell: theme %s: %s = %s into the current layer%s\n", e.name, k, tostring(value),
     changed == nil and " failed" or changed and "" or " (unchanged)"))
   if not changed then return nil end
   cache = nil
@@ -171,7 +162,7 @@ function S.save_as(title, e)
   if file == "" then file = "theme" end
   if S.lookup(file) and S.lookup(file) ~= e.name then file = file .. "-custom" end
   local ok, err = lh.theme_save_as(file, title)
-  if not ok then io.stderr:write("lux: save as " .. file .. ": " .. tostring(err) .. "\n") return nil end
+  if not ok then io.stderr:write("luxshell: save as " .. file .. ": " .. tostring(err) .. "\n") return nil end
   cache = nil
   touched("theme")
   return file
@@ -186,7 +177,7 @@ end
 local function write_lines(path, lines)
   os.execute("mkdir -p " .. q(dirname(path)))
   local tmp = path .. ".tmp"; local f = io.open(tmp, "w")
-  if not f then io.stderr:write("lux: cannot write " .. path .. "\n") return false end
+  if not f then io.stderr:write("luxshell: cannot write " .. path .. "\n") return false end
   f:write(table.concat(lines, "\n"), "\n"); f:close(); os.rename(tmp, path); return true
 end
 -- set one key in a line list in place, keeping every other line (comments, other sections, unknown keys); returns the old
@@ -230,7 +221,7 @@ local function lines_drop(lines, drop)
   return out
 end
 
------------------------------------------------------------------- luxshell-state.ini (lux's runtime state: tile order)
+------------------------------------------------------------------ luxshell-state.ini (luxshell's runtime state: tile order)
 -- ~/.local/state/lhde/luxshell-state.ini (docs/SETTINGS.md "Files"; LHSHELL_STATE overrides the path)
 local state_path = os.getenv("LHSHELL_STATE") or lh.state_file("luxshell-state.ini")
 S.state_path = state_path
@@ -264,8 +255,8 @@ function S.has(sec, key) local t = settings()[sec]; return t ~= nil and t[key] ~
 function S.get(sec, key) local t = settings()[sec]; local v = t and t[key]; if v == nil or v == "" then return nil end return v end
 -- _LH_SETTINGS_CHANGED: data[0] a serial, data[1] the section when only one changed. The serial is the root CARDINAL
 -- _LH_SETTINGS_SERIAL + 1 (flxp's shell::store does the same: read, add one, write the property, send), and never below the highest
--- serial seen in a message or our clock seed, so it keeps increasing over lux restarts and between writers
-S.serial = os.time() % 0x40000000     -- seeded from the clock: still increasing after a lux restart
+-- serial seen in a message or our clock seed, so it keeps increasing over luxshell restarts and between writers
+S.serial = os.time() % 0x40000000     -- seeded from the clock: still increasing after a luxshell restart
 local dirty, flush_timer = {}, nil
 function S.seen_serial(n) if n and n > S.serial and n < 0x7fffffff then S.serial = n end end
 function S.notify()
@@ -278,7 +269,7 @@ function S.notify()
   S.serial = (S.serial + 1) & 0x7fffffff
   lh.set_root_cardinal("_LH_SETTINGS_SERIAL", S.serial)
   lh.send_root_message("_LH_SETTINGS_CHANGED", S.serial, #secs == 1 and lh.atom(secs[1]) or 0)
-  if (os.getenv("LHSHELL_DEBUG") or "") ~= "" then io.stderr:write(string.format("lux: settings: sent _LH_SETTINGS_CHANGED %d (%s)\n", S.serial, table.concat(secs, " "))) end
+  if (os.getenv("LHSHELL_DEBUG") or "") ~= "" then io.stderr:write(string.format("luxshell: settings: sent _LH_SETTINGS_CHANGED %d (%s)\n", S.serial, table.concat(secs, " "))) end
 end
 touched = function(sec)   -- one message for every section changed while the current event is handled
   dirty[sec] = true
@@ -326,8 +317,8 @@ end
 function S.command(name) return S.get("commands", name) or S.default_command(name) end
 function S.run(name)
   local cmd = S.command(name)
-  if not cmd then io.stderr:write("lux: no command for " .. tostring(name) .. "\n") return false end
-  io.stderr:write("lux: session " .. name .. ": " .. cmd .. "\n"); lh.spawn(cmd); return true
+  if not cmd then io.stderr:write("luxshell: no command for " .. tostring(name) .. "\n") return false end
+  io.stderr:write("luxshell: session " .. name .. ": " .. cmd .. "\n"); lh.spawn(cmd); return true
 end
 
 return S

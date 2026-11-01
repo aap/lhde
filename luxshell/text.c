@@ -1,4 +1,4 @@
-/* lhshell text: libuxtheme's GDI-faithful text (flxp's renderer, the same glyphs lhnav and flxp draw) for every N_TEXT node.
+/* luxshell text: libuxtheme's GDI-faithful text (flxp's renderer, the same glyphs luxnav and flxp draw) for every N_TEXT node.
    SHELL-DESIGN 4.2 "Text"; the approach is lhnav's (NAVBAR.md "Text and pixels without pango and cairo"):
    - a node's font is its pango-style description ("Segoe UI 9", "Segoe UI,Tahoma Bold 14px", "ITC Franklin Gothic Std Medium
      15px"): the first family that exists (the theme's font directories first, as libuxtheme looks them up, then the system), the
@@ -449,7 +449,6 @@ void text_add_font_dir(const char *dir)
     ut_add_font_dir(dir);
     gen++;
 }
-void text_fonts_changed(void) { gen++; }
 
 /* what desc resolves to for plain text: the face libuxtheme draws with and its file */
 void text_resolve(const char *desc, char *face, size_t fn, char *file, size_t fl)

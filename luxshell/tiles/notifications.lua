@@ -18,7 +18,7 @@ function tile:initialize()
   lh.on("tray", relayout); self.relayout = relayout
   relayout(lh.tray_count())
 end
--- M8 tray coordination: one tray per display. While another client owns _NET_SYSTEM_TRAY_S<screen> (flxp-taskbar in the classic
+-- tray coordination: one tray per display. While another client owns _NET_SYSTEM_TRAY_S<screen> (flxp-taskbar in the classic
 -- mode) the tile is hidden and the selection left alone; when that owner goes away (runtime.lua: "tray-owner"(false)) the tile
 -- claims it again (lh.tray_start announces MANAGER, the icons re-dock here) and shows itself.
 function tile:set_hidden(h)

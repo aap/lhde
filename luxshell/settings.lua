@@ -2,7 +2,7 @@
 -- run / search box, both in the generic flyout chrome (flyout.lua: 1175 frame, Options row, white body like powerflyout.xaml).
 --   lh.settings_flyout([x])  two columns: the theme list (the shipped theme files, then the user's; the selected one with unsaved
 --                            changes, the current layer, reads "NAME (Modified)" as in Windows; Save as...), composition
---                            (follow / on / off), taskbar (avalon / classic / none, M8) and its autohide, (lux),
+--                            (follow / on / off), taskbar (avalon / classic / none) and its autohide,
 --                            sidebar mode, wallpaper
 --   lh.save_preset_box()     name box for "Save as...": the current theme with its current layer under a name of its own
 --                            (~/.config/lhde/themes/NAME.theme, liblhde lhde_theme_save_as) and selects it
@@ -56,13 +56,13 @@ return function(ctx)
       heading("Theme")
       local cur, cur_e = nil, nil
       if lh.theme_name then cur, cur_e = lh.theme_name() end
-      -- the selected theme with a current layer: "TITLE (Modified)" (docs/history/THEME-FORMAT-status.md section 14); selecting it again keeps the
+      -- the selected theme with a current layer: "TITLE (Modified)"; selecting it again keeps the
       -- changes, another theme drops them (liblhde lhde_theme_select)
       local function label(e, t) if e.name == cur and cur_e and cur_e.modified then return t .. " (Modified)" end return t end
       for _, e in ipairs(S.themes(cur)) do
         option("radio", label(e, e.title or e.name), e.name == cur, function() lh.select_theme(e.name); later() end)
       end
-      -- the user's theme files (~/.config/lhde/themes: saved ones, and NAME-modified files of the earlier model)
+      -- the user's theme files (~/.config/lhde/themes: saved ones, and NAME-modified files lhde_theme_set_key writes)
       local presets = S.presets(cur)
       if #presets > 0 then
         line(); heading("Your themes")
@@ -81,7 +81,7 @@ return function(ctx)
         option("radio", m[2], lh.composition_mode() == m[1], function() lh.set_composition_mode(m[1]); refresh() end)
       end
       line(); heading("Taskbar")
-      -- M8: which bottom bar runs (settings.ini [taskbar] kind); classic = flxp-taskbar, started and stopped by lux
+      -- which bottom bar runs (settings.ini [taskbar] kind); classic = flxp-taskbar, started and stopped by luxshell
       for _, m in ipairs{ { "avalon", "Longhorn (Avalon) taskbar" }, { "classic", "Classic taskbar (flxp)" }, { "none", "No taskbar" } } do
         option("radio", m[2], lh.shell_get("taskbar") == m[1], function() lh.shell_set("taskbar", m[1]); later() end)
       end
@@ -91,7 +91,7 @@ return function(ctx)
         option("radio", m[2], lh.shell_get("sidebar") == m[1], function() lh.shell_set("sidebar", m[1]); refresh() end)
       end
       -- [sidebar] stacking (Win+S toggles it): top = above the windows with its strut, full height, the taskbar yields (4074);
-      -- bottom = part of the desktop: under the windows, no strut, ending at the full-width taskbar's top (M4)
+      -- bottom = part of the desktop: under the windows, no strut, ending at the full-width taskbar's top
       for _, m in ipairs{ { "top", "Sidebar on top of windows" }, { "bottom", "Sidebar under windows (desktop)" } } do
         option("radio", m[2], lh.shell_get("sidebar_stacking") == m[1], function() lh.shell_set("sidebar_stacking", m[1]); later() end)
       end
@@ -148,8 +148,8 @@ return function(ctx)
         local _, e = lh.theme_name(); if not e then return end
         local file = S.save_as(title, e)
         lh.close_flyout()
-        if not file then io.stderr:write("lux: cannot save the theme " .. title .. "\n") return end
-        io.stderr:write("lux: saved theme " .. file .. " (" .. title .. ")\n")
+        if not file then io.stderr:write("luxshell: cannot save the theme " .. title .. "\n") return end
+        io.stderr:write("luxshell: saved theme " .. file .. " (" .. title .. ")\n")
         lh.select_theme(file, true)
         return
       elseif text ~= "" then owner.text = owner.text .. text end

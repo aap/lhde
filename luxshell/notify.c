@@ -1,6 +1,6 @@
-/* lhshell notify: the org.freedesktop.Notifications server (Desktop Notifications spec 1.2) on the session bus, libdbus-1.
+/* luxshell notify: the org.freedesktop.Notifications server (Desktop Notifications spec 1.2) on the session bus, libdbus-1.
    Each Notify call becomes a Lua "notification" event; runtime.lua renders it as a Longhorn toast (notification.xaml,
-   SHELL-DESIGN 2.4.5 / M4b) and reports back through lh.notification_closed / lh.notification_action. */
+   SHELL-DESIGN 2.4.5) and reports back through lh.notification_closed / lh.notification_action. */
 #include "luxshell.h"
 #include <dbus/dbus.h>
 #include <lua5.4/lauxlib.h>

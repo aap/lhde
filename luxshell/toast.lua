@@ -153,7 +153,7 @@ return function(ctx)
     surf:root(t.root)
     -- placement (2.4.5): the work area = screen minus the taskbar strut (bottom) and the sidebar strut (right)
     local sbw = ((lh.sidebar_hidden and lh.sidebar_hidden()) or (lh.shell_get and lh.shell_get("sidebar") ~= "full")) and 0 or sb.w      -- minimized / pinned sidebar (6.4): the work area's right edge
-    local work_r, work_b = ctx.screen_w - sbw, lh.taskbar_shown_top and lh.taskbar_shown_top() or (ctx.screen_h - tb.h)   -- M8: above the classic bar too
+    local work_r, work_b = ctx.screen_w - sbw, lh.taskbar_shown_top and lh.taskbar_shown_top() or (ctx.screen_h - tb.h)   -- above the classic bar too
     if T.toast_place == "sidebar" then t.x, t.y = ctx.screen_w - t.w - 6, 20
     else t.x, t.y = work_r - t.w - 10, work_b - t.expand_h - t.h - 10 end
     t.cur_h = t.h; t.expanded = 0; t.remaining = 1

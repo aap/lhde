@@ -1,4 +1,4 @@
-/* lhshell tray: freedesktop System Tray (XEmbed) manager hosted in a sidebar tile (SHELL-DESIGN "M4b").
+/* luxshell tray: freedesktop System Tray (XEmbed) manager hosted in a sidebar tile (SHELL-DESIGN "M4b: notification area, toasts, power tile").
    Owns _NET_SYSTEM_TRAY_S<screen>, announces MANAGER on the root, docks icon windows on REQUEST_DOCK by reparenting them
    into the surface that holds the N_TRAY node, and lays them out in rows (icon_size, pitch_x, pitch_y of the node).
    Alpha: we advertise our 32-bit visual (_NET_SYSTEM_TRAY_VISUAL). An ARGB child of an ARGB window would simply replace
@@ -80,7 +80,7 @@ static void dock(Window w) {
     struct icon *ic = &icons[nicons++]; memset(ic, 0, sizeof *ic);
     ic->w = w; ic->size = tray_node ? tray_node->icon_size : 16; ic->vis = wa.visual; ic->x = -100; ic->y = -100;
     XSelectInput(dpy, w, StructureNotifyMask | PropertyChangeMask);
-    XAddToSaveSet(dpy, w);                                     /* back to the root if lhshell goes away */
+    XAddToSaveSet(dpy, w);                                     /* back to the root if luxshell goes away */
     if (wa.map_state == IsViewable) ic->ignore_unmap = 1;      /* the reparent below unmaps it once */
     /* an icon that sat in another tray may have a ParentRelative background (flxp-taskbar sets it on default-depth icons):
        reparenting that into our 32-bit window is a BadMatch and the icon would stay on the root. We paint it ourselves. */
@@ -126,7 +126,7 @@ bool tray_start(struct node *n) {
     a_sel = XInternAtom(dpy, name, False); a_opcode = XInternAtom(dpy, "_NET_SYSTEM_TRAY_OPCODE", False); a_manager = XInternAtom(dpy, "MANAGER", False);
     a_xembed = XInternAtom(dpy, "_XEMBED", False); a_xembed_info = XInternAtom(dpy, "_XEMBED_INFO", False); a_orient = XInternAtom(dpy, "_NET_SYSTEM_TRAY_ORIENTATION", False);
     a_visual = XInternAtom(dpy, "_NET_SYSTEM_TRAY_VISUAL", False); a_iconsize = XInternAtom(dpy, "_NET_SYSTEM_TRAY_ICON_SIZE", False); a_data = XInternAtom(dpy, "_LHSHELL_TIMESTAMP", False);
-    /* M8: one tray per display. Another client's tray (flxp-taskbar in the classic mode) is left alone: the notifications
+    /* one tray per display. Another client's tray (flxp-taskbar in the classic mode) is left alone: the notifications
        tile hides itself and calls tray_start again when that owner goes away (runtime.lua watches the selection) */
     Window prev = XGetSelectionOwner(dpy, a_sel);
     if (prev != None) { fprintf(stderr, "luxshell: tray: %s is owned by 0x%lx, not taking it\n", name, prev); return false; }

@@ -145,7 +145,7 @@ static void nine(cairo_t *cr, cairo_surface_t *img, int strip_count, int strip_i
             cairo_pattern_set_extend(cairo_get_source(cr), CAIRO_EXTEND_REPEAT);   /* crude tiling of the middle pieces */
         } else {
             /* each piece samples only its own source rectangle (a sub-surface, PAD at its edges): a 1 px middle row
-               stretched over 400 px no longer blends in the neighbouring row (the Slate StartPanel strips) */
+               stretched over 400 px does not blend in the neighbouring row (the Slate StartPanel strips) */
             cairo_surface_t *piece = cairo_surface_create_for_rectangle(img, sx[i], sy[j], sw, sh);
             cairo_translate(cr, dx[i], dy[j]); cairo_scale(cr, dw / sw, dh / sh);
             /* stretched pieces: the pack's filter (nearest: pixman's 16.16 fixed-point stepping, which reproduces 4074's

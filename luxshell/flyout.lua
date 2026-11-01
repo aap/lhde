@@ -5,7 +5,7 @@
 -- A Popup at the tile rect on the free side (placement 2 = left of a Flipped bar), CloseMode 2: closes on a click outside,
 -- a second click on the tile, or Escape-less here (no keyboard). One flyout at a time; it sets SidebarControl.ShowingFlyout.
 -- A tile opts in with `flyout = function(self) return content_node, width, height end` (width/height optional: measured).
--- Any other owner (the start menu's settings, run and session flyouts, M6) works the same and may add
+-- Any other owner (the settings, run and session flyouts) works the same and may add
 -- `place = function(self, fw, fh) return x, y end` (default: left of the tile) and `on_key = function(self, name, text)`
 -- (the flyout then grabs the keyboard; Escape always closes) and `stay_open = true` (no grab at all: an outside click leaves it
 -- open and only the tile closes it).
@@ -91,7 +91,7 @@ return function(ctx)
     fl.surface:move(x, y, fw, fh); fl.surface:show(); fl.surface:raise()
     local ok, kb = true, true
     if not tile.stay_open then ok, kb = fl.surface:grab(tile.on_key ~= nil) end
-    if tile.on_key and not kb then   -- the keyboard may still be held by whoever opened us (lhwm's Super grab, a menu): retry
+    if tile.on_key and not kb then   -- the keyboard may still be held by whoever opened us (luxwm's Super grab, a menu): retry
       local tries = 0
       local function retry() tries = tries + 1; if fl.tile ~= tile then return end local _, k = fl.surface:grab(true); if not k and tries < 20 then lh.timer(retry, 50) end end
       lh.timer(retry, 50)
@@ -99,7 +99,7 @@ return function(ctx)
     fl.tile = tile; lh.flyout_tile = tile
   end
   function lh.toggle_flyout(tile) if fl.tile == tile then lh.close_flyout() else lh.open_flyout(tile) end end
-  -- a press on another lhshell surface (owner events of the grab go there) also closes it, except on the tile itself
+  -- a press on another luxshell surface (owner events of the grab go there) also closes it, except on the tile itself
   lh.on("surface-press", function(x, y, button, win)
     if fl.tile and not fl.tile.stay_open and win ~= fl.surface:id() and not (win == sb.surface:id() and fl.tile.node and (function()
         local nx, ny, nw, nh = fl.tile.node:bounds(); return x >= nx and x < nx + nw and y >= ny and y < ny + nh end)()) then lh.close_flyout() end
