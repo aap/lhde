@@ -188,13 +188,10 @@ BOOL WINAPI SystemParametersInfoW(UINT action, UINT param, void* pv, UINT)
         // (uxtheme passes the theme's "Tahoma, 8" unconverted)
         for (LOGFONTW* f : { &g_ncm.lfCaptionFont, &g_ncm.lfSmCaptionFont, &g_ncm.lfMenuFont, &g_ncm.lfStatusFont, &g_ncm.lfMessageFont })
             if (f->lfHeight > 0) f->lfHeight = -MulDiv(f->lfHeight, 96, 72);
-        // MS Shell Dlg: Tahoma, as XP's FontSubstitutes, except under a Longhorn style whose message font is Segoe UI
-        // (MSGBOXFONT): 4074's dialogs are in Segoe UI at the template's size (4074-dwm.png's About box: 8 pt, its
-        // lines 221 px wide where Segoe UI 8 makes 226 and 9 makes 247). Classic sets Tahoma again after this (theme.cpp)
-        static const char16_t segoe[] = u"Segoe UI";
-        bool seg = true;
-        for (int i = 0; i < 9; i++) if (g_ncm.lfMessageFont.lfFaceName[i] != (WCHAR)segoe[i]) { seg = false; break; }
-        w32::set_shell_dlg(seg && gdi::have_family("Segoe UI") ? "Segoe UI" : "Tahoma");
+        // MS Shell Dlg stays Tahoma under every style, as XP's and 4074's FontSubstitutes: 4074's Display Properties under
+        // Jade is Tahoma 8 (lh4074-205951.png: OK 73x21, Effects... 82x21), whatever the style's MSGBOXFONT says; a 4074 dialog
+        // shown in Segoe UI (its About box) names the face in its template
+        w32::set_shell_dlg("Tahoma");
         return TRUE;
     }
     case SPI_GETICONTITLELOGFONT: if (!pv) return FALSE; *(LOGFONTW*)pv = g_icon_font; return TRUE;

@@ -424,10 +424,9 @@ with wuxtheme's GDI text, the glyphs flxp and luxnav draw (whole-pixel stems ins
 vision the task buttons' text is black on a white halo (pack `4074-aerovision`, `taskbar_text`).
 
 **Dialog fonts (wux).** "MS Shell Dlg" and "MS Shell Dlg 2", the face of dialog templates and of `DEFAULT_GUI_FONT`, stand for
-Tahoma as in XP's FontSubstitutes, under XP's styles and Windows Classic. Under a style whose `[SysMetrics] MSGBOXFONT` is Segoe
-UI (the 4074 and later Longhorn styles) they stand for Segoe UI at the size asked for, as 4074's dialogs show it (its About box:
-Segoe UI 8, from a template of 8 pt); without a Segoe UI among the font directories they stay Tahoma. The Explorer's Filter box is
-in the pane's own font (the icon title font: Segoe UI 9 under Jade, as 4074's).
+Tahoma under every style, as XP's and 4074's FontSubstitutes have it: 4074's Display Properties under Jade is Tahoma 8 (its OK
+button 73x21). A 4074 dialog shown in Segoe UI (its About box) names the face in its template; so does ours. The Explorer's Filter
+box is in the pane's own font (the icon title font: Segoe UI 9 under Jade, as 4074's).
 
 **Keyboard cues (wux).** As in XP, mnemonics are not underlined until the keyboard is used (Display Properties > Appearance >
 Effects..., "Hide underlined letters for keyboard navigation until I press the Alt key", `[effects] keyboard_cues`): a popup menu

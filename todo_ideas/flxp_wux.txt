@@ -45,3 +45,6 @@
 	browser::zoom_at, shell::thumbs::md5_hex, ...): API used only in its own file, or dead; make them file-local or remove them
 	component by component. wux converts UTF-16 <-> UTF-8 in three places (gdi_priv.h to_utf8 / to_utf16, res.cpp utf16_to_utf8,
 	w32::utf8_of): one header inside wux
+
+* 4074's About box is Segoe UI 8 under Jade (4074-dwm.png) while MS Shell Dlg is Tahoma: our About box should name Segoe UI in
+	its template under the Longhorn styles (the one dialog that does)
