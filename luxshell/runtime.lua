@@ -605,7 +605,7 @@ plex_tile_chrome = function(tile)
   return outer
 end
 -- Tile API (mirrors BaseTile, SHELL-DESIGN 2.5): Tile{ name, height, pinned, initialize = function(self) ... end }
-Tile = {}; Tile.__index = Tile
+local Tile = {}; Tile.__index = Tile
 function Tile.new(def) local t = setmetatable(def, Tile); return t end
 sb.tile_list = {}
 function sb.add_tile(def)
@@ -1524,7 +1524,6 @@ local function apply_theme(e, root_set)
   local t0 = lh.now()
   theme_name, theme_entry = e.name, e
   local swapped = e.shell and e.shell ~= pack_dir and load_pack(e.shell)
-  if swapped then pack_own = {} end
   local fonts_changed = apply_fonts(e)
   if swapped or fonts_changed then rebuild_shell() else lh._emit("pack") end   -- "pack": the start menu and the menus drop their cached look
   set_wallpaper(e)
@@ -1623,7 +1622,6 @@ local function reload_pack_now(why)
   local dir = (e and e.shell) or pack_dir
   if not load_pack(dir) then io.stderr:write("luxshell: reload (" .. why .. "): pack " .. tostring(dir) .. " failed, keeping the old one\n") return end
   for k in pairs(own_res) do own_res[k] = nil end
-  pack_own = {}
   local flushed = lh.image_flush()
   if e then theme_entry = e end
   apply_fonts(theme_entry)

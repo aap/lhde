@@ -644,7 +644,7 @@ static int l_watch_selection(lua_State *L) {
     XFixesSelectSelectionInput(dpy, root, XInternAtom(dpy, luaL_checkstring(L, 1), False), XFixesSetSelectionOwnerNotifyMask | XFixesSelectionWindowDestroyNotifyMask | XFixesSelectionClientCloseNotifyMask);
     XFlush(dpy); lua_pushboolean(L, 1); return 1;
 }
-/* lh.own_selection(name): own a selection with a hidden window of ours (manager-style, e.g. _LHSHELL_S0 = "lhshell runs here");
+/* lh.own_selection(name): own a selection with a hidden window of ours (manager-style, e.g. _LHSHELL_S0 = "luxshell runs here");
    returns the window or nil */
 static int l_own_selection(lua_State *L) {
     Atom sel = XInternAtom(dpy, luaL_checkstring(L, 1), False), ts = XInternAtom(dpy, "_LHSHELL_TIMESTAMP", False);
