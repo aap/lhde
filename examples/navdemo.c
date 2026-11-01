@@ -1,9 +1,9 @@
-/* navdemo: the reference client for the Longhorn navigation bar (../NAVBAR.md, ../lhnav/lhnav.h) on lhwm's extended frames
-   (../lhwm/CLIENT-PROTOCOL.md). The successor of extendframe.c: everything that file shows about the protocol is here too,
-   with the header drawn by lhnav instead of by hand.
+/* navdemo: the reference client for the Longhorn navigation bar (docs/NAVBAR.md, luxnav/lhnav.h) on luxwm's extended frames
+   (docs/CLIENT-PROTOCOL.md). The successor of extendframe.c: everything that file shows about the protocol is here too,
+   with the header drawn by luxnav instead of by hand.
 
    A tiny file browser: a header with the window title in the frame's deco row, the back/forward orb, a breadcrumb of the
-   current directory and a search box, on lhwm's glass; below it the directory's entries as plain text lines.
+   current directory and a search box, on luxwm's glass; below it the directory's entries as plain text lines.
      - click a breadcrumb segment: go there; "«" (the collapsed leftmost segments): go to the last hidden one;
      - click the empty part of the breadcrumb box (or Ctrl+L): the box becomes a plain text field with the path; Enter goes
        there, Escape (or a click elsewhere) cancels;
@@ -29,21 +29,21 @@
    The protocol steps, in the order the code does them:
      1. a 32-bit ARGB toplevel (the header must be transparent over the glass);
      2. _LHWM_FRAME_FLAGS = CLIENT_CAPTION | NO_TITLE | NO_ICON and _LHWM_EXTEND_FRAME = 0 0 TOP 0 before mapping, where
-        TOP = lhnav_extend_top(): the header in client rows plus the 2 rows on which lhwm draws the plate's inner line pair.
-        With CLIENT_CAPTION lhwm grows the window up to the frame's top border (border_t, _LHWM_FRAME_METRICS 12: 2 under Aero
+        TOP = lhnav_extend_top(): the header in client rows plus the 2 rows on which luxwm draws the plate's inner line pair.
+        With CLIENT_CAPTION luxwm grows the window up to the frame's top border (border_t, _LHWM_FRAME_METRICS 12: 2 under Aero
         vision, whose frame keeps only the plate's outer edge rows), so client row 0 is frame row border_t;
-     3. _LHWM_CAPTION_RECT (on our window): lhwm's caption buttons; we leave it empty and cut it out of our input shape so clicks
-        reach the buttons on lhwm's decoration window below;
-     4. paint: everything transparent, then the header with lhnav (over glass: lhnav's text halo; not composited: lhwm's
+     3. _LHWM_CAPTION_RECT (on our window): luxwm's caption buttons; we leave it empty and cut it out of our input shape so clicks
+        reach the buttons on luxwm's decoration window below;
+     4. paint: everything transparent, then the header with luxnav (over glass: luxnav's text halo; not composited: luxwm's
         _LHWM_HEADER_PIXMAP under it and plain text), then the body opaque;
      5. caption behaviour through _NET_WM_MOVERESIZE (move 8, top resize 1) and _NET_WM_STATE (maximise toggle);
      6. relayout and repaint on PropertyNotify: root _LH_THEME / _LH_THEME_RESOLVED / _LHWM_COMPOSITED / _LHWM_FRAME_METRICS / _LHWM_THEME (theme
         change or reload: reopen the visual style, re-read nav.ini), our _LHWM_CAPTION_RECT and _NET_WM_STATE (maximise), our
         _LHWM_HEADER_PIXMAP (a new opaque header background).
 
-   Build: make navdemo (builds ../lhnav first). Run: DISPLAY=:3 ./navdemo [-r ROOT] [DIRECTORY]; -r: the breadcrumb starts at
+   Build: make navdemo (builds luxnav first). Run: DISPLAY=:3 ./navdemo [-r ROOT] [DIRECTORY]; -r: the breadcrumb starts at
    ROOT (named by its last component) instead of "/" ("File System"). The toolbar's icons come from the session theme's
-   path.resources (shell32.dll) unless nav.ini sets icon_dir. NAVDEMO_DEBUG=1 prints lhnav's final layout on every relayout:
+   path.resources (shell32.dll) unless nav.ini sets icon_dir. NAVDEMO_DEBUG=1 prints luxnav's final layout on every relayout:
    every part's rect in client coordinates and the frame rows (y + border_t) that nav.ini's *_y keys use. */
 #define LHNAV_WITH_CAIRO
 #include "lhnav.h"
@@ -87,7 +87,7 @@ static Atom a_moveresize, a_state, a_max_v, a_max_h, a_delete, a_name, a_utf8;
 static int W = 720, H = 480, composited, maximized, focused = 1, x_error;
 static long cap_rect[4];
 static lhnav *nav;
-static lhnav_metrics base_metrics;   /* nav.ini + defaults, before lhwm's numbers are filled in */
+static lhnav_metrics base_metrics;   /* nav.ini + defaults, before luxwm's numbers are filled in */
 static void *style;                  /* ut_theme * of the session's msstyles (NULL without libuxtheme) */
 static unsigned long text_rgb = 0x1e1e1e;   /* _LHWM_FRAME_METRICS 4: the caption text colour (opaque header) */
 static char nav_path[1300];          /* the frame theme's nav.ini */
@@ -101,7 +101,7 @@ static char **hist; static int nhist, hpos;          /* hist[hpos] is cwd */
 static char **ent; static int nent, *isdir;          /* sorted: directories first */
 static long long *ent_size; static time_t *ent_mtime;  /* for the Details view */
 static int view_mode;                                /* the `views` tool: 0 List, 1 Details */
-static char icon_dir_reg[512];                       /* the theme's path.resources (lhnav's icon_dir unless nav.ini sets one) */
+static char icon_dir_reg[512];                       /* the theme's path.resources (luxnav's icon_dir unless nav.ini sets one) */
 static int *vis_idx, nvis, sel = -1, scroll;         /* the entries matching the search text */
 static char address[PATH_MAX], search[256];          /* the two edit fields' text */
 static int editing;                                  /* 0 none, 1 address, 2 search */
@@ -129,7 +129,7 @@ static void send_root_message(Atom type, long l0, long l1, long l2, long l3, lon
     e.xclient.data.l[0] = l0; e.xclient.data.l[1] = l1; e.xclient.data.l[2] = l2; e.xclient.data.l[3] = l3; e.xclient.data.l[4] = l4;
     XSendEvent(dpy, root, False, SubstructureRedirectMask | SubstructureNotifyMask, &e); XFlush(dpy);
 }
-/* the press gave us an implicit grab: release it, then lhwm runs the drag (8 move, 1 resize from the top) */
+/* the press gave us an implicit grab: release it, then luxwm runs the drag (8 move, 1 resize from the top) */
 static void start_moveresize(XButtonEvent *b, int dir) {
     XUngrabPointer(dpy, b->time);
     send_root_message(a_moveresize, b->x_root, b->y_root, dir, b->button, 1);
@@ -183,7 +183,7 @@ static void load_theme(void) {
 #ifdef HAVE_UXTHEME
     void *old = style; style = ms[0] ? ut_open(ms, NULL, NULL) : NULL;
 #endif
-    /* nav.ini of the frame theme (_LHWM_THEME = "DIR|STYLE|COLOR|SIZE"): lhnav's tuning, re-read on every theme reload */
+    /* nav.ini of the frame theme (_LHWM_THEME = "DIR|STYLE|COLOR|SIZE"): luxnav's tuning, re-read on every theme reload */
     lhnav_metrics_default(&base_metrics);
     read_string(root, a_theme, frame, sizeof frame);
     char *bar = strchr(frame, '|'); if (bar) *bar = 0;
@@ -199,18 +199,18 @@ static void load_theme(void) {
         lhnav_metrics_load_preset(&base_metrics, nav_path, preset_sel);
     }
     if (!nav) nav = lhnav_new(style, &base_metrics);
-    lhnav_set_style_name(nav, ms[0] ? ms : NULL);   /* for lhnav's log and art sources */
+    lhnav_set_style_name(nav, ms[0] ? ms : NULL);   /* for luxnav's log and art sources */
     lhnav_set_style(nav, style);
 #ifdef HAVE_UXTHEME
-    if (old) ut_close(old);   /* after lhnav let go of it */
+    if (old) ut_close(old);   /* after luxnav let go of it */
 #endif
     fprintf(stderr, "navdemo: theme %s, style %s, frame %s, preset %s\n", name, ms[0] ? ms : "(none)", frame[0] ? frame : "(none)",
             base_metrics.preset[0] ? base_metrics.preset : "(none)");
     update_title();
 }
 
-/* lhwm's numbers into lhnav's metrics: where our row 0 is in the frame (border_t, field 12/13), where the deco ends (deco_h,
-   field 18; an older lhwm or a theme without a vision deco: the caption), the caption buttons (_LHWM_CAPTION_RECT); then the
+/* luxwm's numbers into luxnav's metrics: where our row 0 is in the frame (border_t, field 12/13), where the deco ends (deco_h,
+   field 18; no such field or a theme without a vision deco: the caption), the caption buttons (_LHWM_CAPTION_RECT); then the
    extension and the input shape follow */
 static void apply_metrics(void) {
     int n; long *m = read_cardinals(root, a_metrics, 32, &n);
@@ -224,7 +224,7 @@ static void apply_metrics(void) {
     if (maximized) lm.resize_rows = 0;
     text_rgb = n > 4 ? (unsigned long)(maximized && n > 14 ? m[14] : m[4]) : 0x1e1e1e;
     lm.plain_rgb = (uint32_t)text_rgb;
-    /* maximised: lhwm's maximised caption look (fields 14 and 16: aero/aero vision white text, no glow, on the dark MAXEXPLORER
+    /* maximised: luxwm's maximised caption look (fields 14 and 16: aero/aero vision white text, no glow, on the dark MAXEXPLORER
        plate) for all header text */
     if (maximized && n > 16 && (uint32_t)m[16] == 0xFFFFFFFFu) { lm.title_rgb = lm.crumb_rgb = (uint32_t)m[14]; lm.glow_strength = 0; }
     free(m);
@@ -271,7 +271,7 @@ static void apply_metrics(void) {
     }
 }
 
-/* root _LHWM_COMPOSITED: 1 = glass (lhwm paints the plate under our transparent header); missing = 0 */
+/* root _LHWM_COMPOSITED: 1 = glass (luxwm paints the plate under our transparent header); missing = 0 */
 static int read_composited(void) {
     int n; long *v = read_cardinals(root, a_composited, 1, &n); int c = v && n == 1 && v[0]; free(v);
     return c;
@@ -390,7 +390,7 @@ static void crumb_path(int i, char *out, size_t n) {
     if (!out[0]) snprintf(out, n, "/");
 }
 
-/* ---- edit fields (the text is ours, lhnav paints it) ---- */
+/* ---- edit fields (the text is ours, luxnav paints it) ---- */
 static char *field_buf(void) { return editing == 1 ? address : search; }
 static size_t field_cap(void) { return editing == 1 ? sizeof address : sizeof search; }
 static void field_sync(void) {
@@ -462,7 +462,7 @@ static void path_label(const char *s, char *out, size_t n) {
     const char *b = strrchr(s, '/');
     snprintf(out, n, "%s", !strcmp(s, "/") ? "File System" : b && b[1] ? b + 1 : s);
 }
-/* the client's text drawn as lhnav draws its own (libuxtheme's GDI text: the drop-down lists and the tooltip look like flxp's) */
+/* the client's text drawn as luxnav draws its own (libuxtheme's GDI text: the drop-down lists and the tooltip look like flxp's) */
 static void ui_text(cairo_surface_t *img, int x, int y, const char *t, int bold, uint32_t rgb) {
     cairo_surface_flush(img);
     lhnav_text(nav, (uint32_t *)cairo_image_surface_get_data(img), cairo_image_surface_get_width(img), cairo_image_surface_get_height(img),
@@ -505,7 +505,7 @@ static void popup_close(void) {
     lhnav_pointer(nav, -1, -1, 0);   /* the pressed / open look ends with the list */
     XFlush(dpy);
 }
-/* show the items collected with pop_add under lhnav's part `part` (anchor: that part's rect, or `alt` when it is not shown);
+/* show the items collected with pop_add under luxnav's part `part` (anchor: that part's rect, or `alt` when it is not shown);
    right: align the list's right edge with the anchor's (the toolbar); hot: the item selected first (-1 none) */
 static void popup_show(int kind, int part, int alt, int right, int hot) {
     if (pop_n <= 0) { XBell(dpy, 0); return; }
@@ -801,7 +801,7 @@ static void expand_home(const char *in, char *out, size_t n) {
 }
 
 /* ---- painting ---- */
-/* without composition: the bottom `top` rows of lhwm's header pixmap (the frame's caption band continued down) */
+/* without composition: the bottom `top` rows of luxwm's header pixmap (the frame's caption band continued down) */
 static int paint_header_pixmap(cairo_t *cr, int top) {
     int n; long *v = read_cardinals(win, a_header_pixmap, 1, &n); Pixmap pix = v && n == 1 ? (Pixmap)v[0] : None; free(v);
     if (pix == None) return 0;
@@ -826,11 +826,11 @@ static void paint(cairo_surface_t *xs) {
     int top = lhnav_extend_top(nav);
     cairo_surface_t *img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, W, H);   /* offscreen: no flicker */
     cairo_t *cr = cairo_create(img);
-    /* 1. transparent (premultiplied 0,0,0,0): lhwm's glass shows through wherever we draw nothing */
+    /* 1. transparent (premultiplied 0,0,0,0): luxwm's glass shows through wherever we draw nothing */
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE); cairo_set_source_rgba(cr, 0, 0, 0, 0); cairo_paint(cr);
     cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
     cairo_surface_flush(img);
-    /* 2. the header: glass, or opaque from lhwm's pixmap (a gradient of our own without one), then lhnav */
+    /* 2. the header: glass, or opaque from luxwm's pixmap (a gradient of our own without one), then lhnav */
     if (!composited && !paint_header_pixmap(cr, top)) {
         cairo_pattern_t *g = cairo_pattern_create_linear(0, 0, 0, top);
         cairo_pattern_add_color_stop_rgb(g, 0, 0.93, 0.95, 0.98); cairo_pattern_add_color_stop_rgb(g, 1, 0.78, 0.84, 0.92);
@@ -839,7 +839,7 @@ static void paint(cairo_surface_t *xs) {
     cairo_surface_flush(img);
     lhnav_paint(nav, (uint32_t *)cairo_image_surface_get_data(img), W, H, cairo_image_surface_get_stride(img), composited);
     cairo_surface_mark_dirty(img);
-    /* the caption buttons' rect stays empty (transparent: lhwm's buttons are under it) */
+    /* the caption buttons' rect stays empty (transparent: luxwm's buttons are under it) */
     if (cap_rect[2] > 0) { cairo_save(cr); cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);
         cairo_rectangle(cr, cap_rect[0], cap_rect[1], cap_rect[2], cap_rect[3]); cairo_fill(cr); cairo_restore(cr); }
     /* 3. the body: opaque white, one line per entry */
@@ -970,7 +970,7 @@ int main(int argc, char **argv) {
         case PropertyNotify: {
             Atom at = e.xproperty.atom;
             if (e.xproperty.window == root && (at == a_composited || at == a_theme || at == a_lh_theme || at == a_lh_resolved || at == a_metrics)) {
-                /* WM_THEMECHANGED (and lhwm's theme reload): style, fonts, nav.ini, composition, metrics */
+                /* WM_THEMECHANGED (and luxwm's theme reload): style, fonts, nav.ini, composition, metrics */
                 composited = argb && read_composited();
                 if (at == a_lh_theme || at == a_lh_resolved || at == a_theme || at == a_metrics) load_theme();
                 relayout = 1;

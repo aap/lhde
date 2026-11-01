@@ -1,33 +1,33 @@
-/* extendframe: the reference client for lhwm's extended glass frames (lhwm/CLIENT-PROTOCOL.md).
+/* extendframe: the reference client for luxwm's extended glass frames (docs/CLIENT-PROTOCOL.md).
 
    A Longhorn-Explorer-style window: a 60 px header on the window manager's glass (big folder title, icon placeholder, fake
    breadcrumb) above an opaque white body. Read it as the spec for porting to another toolkit; every X call that the protocol
    needs is here and commented. The rules in short:
 
      1. 32-bit ARGB toplevel (so the header can be transparent);
-     2. _LHWM_EXTEND_FRAME = 0 0 HEADER 0 and _LHWM_FRAME_FLAGS = NO_TITLE before mapping (lhwm paints its plate under the header);
+     2. _LHWM_EXTEND_FRAME = 0 0 HEADER 0 and _LHWM_FRAME_FLAGS = NO_TITLE before mapping (luxwm paints its plate under the header);
      3. paint the header fully transparent and draw only text/icons on it; paint the body opaque;
-     4. while root _LHWM_COMPOSITED is 0 (no compositor, classic theme) paint the header opaque instead: copy lhwm's
+     4. while root _LHWM_COMPOSITED is 0 (no compositor, classic theme) paint the header opaque instead: copy luxwm's
         _LHWM_HEADER_PIXMAP (the theme's caption band, continued down over the header) under the header content, or, when
-        there is none (another WM), a gradient of our own; keep the extension set, it is what asks lhwm for the pixmap;
+        there is none (another WM), a gradient of our own; keep the extension set, it is what asks luxwm for the pixmap;
      5. caption behaviour in the header comes from _NET_WM_MOVERESIZE (drag) and _NET_WM_STATE (double-click maximise);
      6. a PropertyNotify on the root for _LH_THEME, _LH_THEME_RESOLVED, _LHWM_COMPOSITED or _LHWM_FRAME_METRICS is
         WM_THEMECHANGED: take the session theme's record (_LH_THEME_RESOLVED when it is current, else liblhde resolves
         _LH_THEME itself; docs/THEME-FORMAT.md section 4; a uxtheme client loads its path.style), re-read _LHWM_COMPOSITED
         and repaint (glass or the header pixmap); the extension stays set.
 
-   -c (experimental, CLIENT-PROTOCOL.md "CLIENT_CAPTION"): the window also takes the caption rows. lhwm grows it up to the frame's
+   -c (experimental, CLIENT-PROTOCOL.md "CLIENT_CAPTION"): the window also takes the caption rows. luxwm grows it up to the frame's
    top border and publishes _LHWM_CAPTION_RECT (the caption buttons, client coordinates); we leave that rectangle empty and cut it
-   out of our input shape, so clicks there reach lhwm's buttons on the decoration window below, and draw the title ourselves.
+   out of our input shape, so clicks there reach luxwm's buttons on the decoration window below, and draw the title ourselves.
    The caption rows are caption_h - border_t of _LHWM_FRAME_METRICS, or max_caption_h - max_border_t while maximised
-   (_NET_WM_STATE); lhwm republishes _LHWM_CAPTION_RECT on every maximise/restore, so we relayout on it (and on _NET_WM_STATE
+   (_NET_WM_STATE); luxwm republishes _LHWM_CAPTION_RECT on every maximise/restore, so we relayout on it (and on _NET_WM_STATE
    and theme changes). The top TOP_EDGE rows outside the caption rect start a resize from the top (_NET_WM_MOVERESIZE direction 1):
    above us the frame keeps only its border rows, which resize too.
 
-   -n: _LHWM_FRAME_FLAGS NO_HEADER_PIXMAP (16): without composition lhwm publishes no _LHWM_HEADER_PIXMAP and we draw the header
-   gradient ourselves (flxp draws its own navbar for Slate/Jade). The key n toggles the flag live (lhwm frees the pixmap and
+   -n: _LHWM_FRAME_FLAGS NO_HEADER_PIXMAP (16): without composition luxwm publishes no _LHWM_HEADER_PIXMAP and we draw the header
+   gradient ourselves (flxp draws its own navbar for Slate/Jade). The key n toggles the flag live (luxwm frees the pixmap and
    deletes the property when it is set, renders one again when it is cleared). With -c the caption buttons were part of that
-   pixmap; without it they are only on lhwm's decoration window, so we cut _LHWM_CAPTION_RECT out of our bounding shape as well
+   pixmap; without it they are only on luxwm's decoration window, so we cut _LHWM_CAPTION_RECT out of our bounding shape as well
    (not only the input shape) and they show through.
 
    Build: make (Xlib + Xext + cairo + pangocairo, liblhde). Run: DISPLAY=:3 ./extendframe [-c] [-n]. Escape or q quits. */
@@ -50,7 +50,7 @@
 #define NO_TITLE 1         /* _LHWM_FRAME_FLAGS bits */
 #define NO_ICON  2
 #define NO_FOG   4
-#define CLIENT_CAPTION 8   /* experimental: the client covers the caption rows too, lhwm keeps only the buttons */
+#define CLIENT_CAPTION 8   /* experimental: the client covers the caption rows too, luxwm keeps only the buttons */
 #define NO_HEADER_PIXMAP 16 /* no _LHWM_HEADER_PIXMAP: we draw the opaque header ourselves */
 
 static Display *dpy;
@@ -60,14 +60,14 @@ static Atom a_lh_theme, a_lh_resolved, a_lh_serial, a_metrics, a_extend, a_flags
 static int client_caption;     /* -c */
 static int no_header_pixmap;   /* -n, toggled with the key n */
 static int maximized;          /* _NET_WM_STATE has MAXIMIZED_VERT and MAXIMIZED_HORZ */
-static int bounding_hole;      /* -c with NO_HEADER_PIXMAP and no composition: lhwm's buttons are only on its decoration window, so
+static int bounding_hole;      /* -c with NO_HEADER_PIXMAP and no composition: luxwm's buttons are only on its decoration window, so
                                   the caption rect is cut out of our bounding shape too and they show through */
 static long cap_rect[4];       /* _LHWM_CAPTION_RECT x y w h (client coordinates), all 0 while there is none */
 static int top_rows;           /* header rows in client pixels: HEADER, plus the caption zone with -c */
 static int x_error;            /* set by the error handler (a header pixmap freed under our feet) */
 static char theme_name[64], theme_msstyles[1024];   /* _LH_THEME and its path.style (what a uxtheme client would load) */
 
-/* root CARDINAL _LHWM_COMPOSITED: 1 = lhwm draws glass and honours the extension. Missing (another WM, or lhwm not running) = 0. */
+/* root CARDINAL _LHWM_COMPOSITED: 1 = luxwm draws glass and honours the extension. Missing (another WM, or luxwm not running) = 0. */
 static int read_composited(void) {
     Atom type; int format; unsigned long n, after; unsigned char *data = NULL; int v = 0;
     if (XGetWindowProperty(dpy, root, a_composited, 0, 1, False, XA_CARDINAL, &type, &format, &n, &after, &data) == Success && data) {
@@ -78,7 +78,7 @@ static int read_composited(void) {
 }
 
 /* root CARDINAL[14] _LHWM_FRAME_METRICS: caption_h border_l border_r border_b text_rgb glow_rgb inactive_text_rgb 0, then
-   max_caption_h max_border_l max_border_r max_border_b border_t max_border_t (lhwm before 2026-10-24: only the first 8; dflt then) */
+   max_caption_h max_border_l max_border_r max_border_b border_t max_border_t (a field the property lacks: dflt) */
 static unsigned long read_metric(int i, unsigned long dflt) {
     Atom type; int format; unsigned long n, after; unsigned char *data = NULL; unsigned long v = dflt;
     if (XGetWindowProperty(dpy, root, a_metrics, 0, 32, False, XA_CARDINAL, &type, &format, &n, &after, &data) == Success && data) {
@@ -129,15 +129,15 @@ static void read_theme(void) {
     lhde_theme_free(t);
 }
 
-/* rule 2: the extension and the flags. Kept in both modes: composited, lhwm paints glass under the header; not composited it
+/* rule 2: the extension and the flags. Kept in both modes: composited, luxwm paints glass under the header; not composited it
    paints the frame as usual (no title: NO_TITLE is honoured in every mode, our header carries the title) and hands us the header
    background as _LHWM_HEADER_PIXMAP. -c: the caption rows are ours too (CLIENT_CAPTION), so the header grows by them. */
 static void set_extension(void) {
-    int zone = 0;   /* -c: the caption rows lhwm grew us by: caption_h - border_t (maximised: max_caption_h - max_border_t) */
+    int zone = 0;   /* -c: the caption rows luxwm grew us by: caption_h - border_t (maximised: max_caption_h - max_border_t) */
     if (client_caption) {
         long ch = (long)read_metric(maximized ? 8 : 0, 0), bt = (long)read_metric(maximized ? 13 : 12, 9999);
         if (ch > 0 && bt != 9999 && ch > bt) zone = (int)(ch - bt);
-        else if (cap_rect[3]) { zone = (int)(cap_rect[1] + cap_rect[3]) + 2; if (zone < 18) zone = 18; }   /* older lhwm: below the buttons */
+        else if (cap_rect[3]) { zone = (int)(cap_rect[1] + cap_rect[3]) + 2; if (zone < 18) zone = 18; }   /* no metrics: below the buttons */
     }
     top_rows = zone + HEADER;
     long extend[4] = { 0, 0, top_rows, 0 },
@@ -146,7 +146,7 @@ static void set_extension(void) {
     XChangeProperty(dpy, win, a_flags, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&flags, 1);
 }
 
-/* -c: _LHWM_CAPTION_RECT, and the input shape without it (clicks there go through to lhwm's caption buttons) */
+/* -c: _LHWM_CAPTION_RECT, and the input shape without it (clicks there go through to luxwm's caption buttons) */
 static void read_caption_rect(int w, int h) {
     Atom type; int format; unsigned long n, after; unsigned char *data = NULL;
     memset(cap_rect, 0, sizeof cap_rect);
@@ -174,11 +174,11 @@ static int read_maximized(void) {
     return v && h;
 }
 
-/* lhwm replaces _LHWM_HEADER_PIXMAP with a new pixmap and frees the old one: a copy from an id we read a moment earlier can fail
+/* luxwm replaces _LHWM_HEADER_PIXMAP with a new pixmap and frees the old one: a copy from an id we read a moment earlier can fail
    with BadDrawable/BadPixmap. Ignore those; the PropertyNotify for the new pixmap repaints. */
 static int on_x_error(Display *d, XErrorEvent *e) { (void)d; (void)e; x_error = 1; return 0; }
 
-/* the header background without composition: the bottom top_rows rows of lhwm's pixmap (its last row lies against the bottom
+/* the header background without composition: the bottom top_rows rows of luxwm's pixmap (its last row lies against the bottom
    of our header), or 0 when there is none */
 static int paint_header_pixmap(cairo_t *cr, Visual *vis, int w) {
     Atom type; int format; unsigned long n, after; unsigned char *data = NULL; Pixmap pix = None;
@@ -240,18 +240,18 @@ static void text_at(cairo_t *cr, const char *font, const char *s, double x, doub
 static void paint(cairo_surface_t *xs, Visual *vis, int w, int h, int composited) {
     cairo_t *cr = cairo_create(xs);
     int zone = top_rows - HEADER;   /* -c: the caption rows at the top of the window */
-    /* 1. everything transparent first (premultiplied 0,0,0,0): where we draw nothing, lhwm's plate shows through */
+    /* 1. everything transparent first (premultiplied 0,0,0,0): where we draw nothing, luxwm's plate shows through */
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE); cairo_set_source_rgba(cr, 0, 0, 0, 0); cairo_paint(cr);
     cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
-    /* 2. the header. Composited: leave it transparent (the glass is lhwm's). Not composited: the X server would show the
-          transparent pixels as black, so paint it opaque: lhwm's header pixmap (the theme's caption band, so the header
+    /* 2. the header. Composited: leave it transparent (the glass is luxwm's). Not composited: the X server would show the
+          transparent pixels as black, so paint it opaque: luxwm's header pixmap (the theme's caption band, so the header
           continues the frame like the 4074 Slate Explorer's), else a gradient of our own */
     if (!composited && (no_header_pixmap || !paint_header_pixmap(cr, vis, w))) {
         cairo_pattern_t *g = cairo_pattern_create_linear(0, 0, 0, top_rows);
         cairo_pattern_add_color_stop_rgb(g, 0, 0.93, 0.95, 0.98); cairo_pattern_add_color_stop_rgb(g, 1, 0.78, 0.84, 0.92);
         cairo_set_source(cr, g); cairo_rectangle(cr, 0, 0, w, top_rows); cairo_fill(cr); cairo_pattern_destroy(g);
     }
-    /* -c: the window title in the caption row, left of lhwm's buttons (whose rectangle we leave empty); without glass in the
+    /* -c: the window title in the caption row, left of luxwm's buttons (whose rectangle we leave empty); without glass in the
        theme's caption text colour (_LHWM_FRAME_METRICS text_rgb) */
     if (zone > 0) {
         PangoLayout *lay = pango_cairo_create_layout(cr); PangoFontDescription *fd = pango_font_description_from_string("Tahoma Bold 8");
@@ -279,12 +279,12 @@ static void paint(cairo_surface_t *xs, Visual *vis, int w, int h, int composited
     text_at(cr, "Segoe UI, Tahoma, Sans 9", "Documents", 166, 37, composited);
     /* 3. the body: ordinary opaque content */
     cairo_set_source_rgb(cr, 1, 1, 1); cairo_rectangle(cr, 0, HEADER, w, h - top_rows); cairo_fill(cr);
-    const char *lines[] = { "The header above is lhwm's frame plate, extended 60 px into this window.",
+    const char *lines[] = { "The header above is luxwm's frame plate, extended 60 px into this window.",
                             "Drag the header to move, double-click it to maximise or restore,",
                             client_caption ? "drag the right or the top edge to resize. Escape or q quits." : "drag the right edge to resize. Escape or q quits.",
                             composited ? "Composited: the header is glass (_LHWM_COMPOSITED = 1)."
                             : no_header_pixmap ? "Not composited, NO_HEADER_PIXMAP: our own header gradient (n toggles)."
-                                               : "Not composited: the header is lhwm's _LHWM_HEADER_PIXMAP (n: NO_HEADER_PIXMAP)." };
+                                               : "Not composited: the header is luxwm's _LHWM_HEADER_PIXMAP (n: NO_HEADER_PIXMAP)." };
     for (int i = 0; i < 4; i++) text_at(cr, "Segoe UI, Tahoma, Sans 9", lines[i], 16, HEADER + 14 + i * 20, 0);
     char th[1200]; const char *ms = strrchr(theme_msstyles, '/');
     snprintf(th, sizeof th, "Theme (_LH_THEME): %s%s%s%s", theme_name[0] ? theme_name : "(none)", ms ? ", msstyles " : "", ms ? ms + 1 : "",
@@ -295,7 +295,7 @@ static void paint(cairo_surface_t *xs, Visual *vis, int w, int h, int composited
 }
 
 /* -c: the top resize zone inside our window (the frame above us is only its border): TOP_EDGE rows, not in the caption buttons'
-   hole, not while maximised (lhwm ignores resizes then) */
+   hole, not while maximised (luxwm ignores resizes then) */
 static int in_top_edge(int x, int y) {
     if (!client_caption || maximized || y >= TOP_EDGE) return 0;
     return !(cap_rect[2] > 0 && x >= cap_rect[0] && x < cap_rect[0] + cap_rect[2] && y >= cap_rect[1] && y < cap_rect[1] + cap_rect[3]);
@@ -329,7 +329,7 @@ int main(int argc, char **argv) {
     int w = 640, h = 420;
     win = XCreateWindow(dpy, root, 120, 90, w, h, 0, depth, InputOutput, vis, CWColormap | CWBorderPixel | CWBackPixel | CWEventMask, &a);
 
-    /* ordinary hints: the title still matters (taskbar, Alt+Tab) even though lhwm does not draw it in the caption */
+    /* ordinary hints: the title still matters (taskbar, Alt+Tab) even though luxwm does not draw it in the caption */
     XStoreName(dpy, win, "Documents");
     XChangeProperty(dpy, win, XInternAtom(dpy, "_NET_WM_NAME", False), XInternAtom(dpy, "UTF8_STRING", False), 8,
                     PropModeReplace, (unsigned char *)"Documents", 9);
@@ -343,7 +343,7 @@ int main(int argc, char **argv) {
     bounding_hole = no_header_pixmap && !composited;
     read_theme();
 
-    /* rule 2: where the frame extends into us (left right top bottom, CARDINAL[4]) and what lhwm should leave out: _LHWM_EXTEND_FRAME
+    /* rule 2: where the frame extends into us (left right top bottom, CARDINAL[4]) and what luxwm should leave out: _LHWM_EXTEND_FRAME
        = 0 0 HEADER 0, _LHWM_FRAME_FLAGS = NO_TITLE (-c: | CLIENT_CAPTION | NO_ICON); set in both modes */
     set_extension();
 

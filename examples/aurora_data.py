@@ -10,7 +10,7 @@ The header is checked in, so the build does not need Python. Per scene it holds:
   paints   StartPoint/EndPoint in bounding-box space, the 2003 GradientTransform folded to a matrix
            (bbox space), stops as offset + 0xAARRGGBB (not premultiplied), and where the isolines are
            perpendicular: bbox space (pane) or path space (desktop, the JSON's "gradientIsolines": "path";
-           2026-10-30 gradient-space fix, aurora.md 3.3)
+           aurora.md 3.3)
   groups   the canvases with an opacity animation (none of them nest)
   anims    one entry per animation of the XAML (12 / 30): property, from, to (or key frames), duration,
            auto-reverse, begin; translate steps and opacities refer to them by index
