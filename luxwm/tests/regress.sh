@@ -8,11 +8,6 @@
 #   luxwm/tests/regress.sh --rebaseline [OUTDIR]           render and replace the baseline (after an intended change)
 #   luxwm/tests/regress.sh --classic-only [OUTDIR]         only the Windows Classic renders (classic/ classic.xl/ classic.hc/), which
 #                                                          need no visual style: the free baseline (tests/check-free.sh)
-#   luxwm/tests/regress.sh --baseline-from-x11 X11DIR      the baseline from the x11 lab's own build: runs X11DIR/lhwm/tests/regress.sh
-#                                                          (it compiles its frametest from X11DIR's frame.c into a scratch dir and
-#                                                          renders X11DIR/lhwm/themes; X11DIR is not written) and takes the
-#                                                          checksums of its renders under the lhde names (aero -> aero-patch, ...),
-#                                                          so the next run proves equality with the old tree
 # The baseline is build/luxwm/regress/baseline.sha256 (LUXWM_BASELINE= another file). Skips (exit 0) when the data directory
 # has no styles/ (nothing imported: tools/lhde-import). Sources (docs/LUXWM.md "libuxtheme source"): lib = the visual style named
 # in theme.ini read live through libwuxtheme (default), dir = the frame set's PNG cache.
@@ -33,11 +28,10 @@ set -e
 here=$(cd "$(dirname "$0")" && pwd)
 top=$(cd "$here/../.." && pwd)
 LHDE_SELF_DIR=$top/session; . "$top/session/lhde-paths.sh"; lhde_setup_paths
-mode=compare source=lib x11= classic_only=
+mode=compare source=lib classic_only=
 while :; do
 	case "$1" in
 	--rebaseline) mode=rebaseline; shift ;;
-	--baseline-from-x11) mode=x11; x11=$2; shift 2 ;;
 	--source) source=$2; shift 2 ;;
 	--classic-only) classic_only=1; shift ;;
 	*) break ;;
@@ -50,36 +44,17 @@ base=${LUXWM_BASELINE:-$R/baseline.sha256}
 ft=$top/build/luxwm/tests/frametest
 mkdir -p "$R"
 
-# the lhde names of the x11 lab's frame directories (tools/lhde-import uses the same table)
-x11name() {
-	case $1 in
-	aero) echo aero-patch ;; jade) echo jade4074 ;; luna-blue) echo luna4051-blue ;; luna-olive) echo luna4051-olive ;;
-	luna-silver) echo luna4051-silver ;; aero.classic) echo aero-patch.classic ;; jade.classic) echo jade4074.classic ;;
-	*) echo "$1" ;;
-	esac
-}
 checksums() { # DIR -> "sha256  set/file" lines, sorted
 	(cd "$1" && find . -mindepth 2 -maxdepth 2 -type f ! -name '.*' | sed 's|^\./||' | sort | while IFS= read -r f; do
 		printf '%s  %s\n' "$(sha256sum < "$f" | cut -d' ' -f1)" "$f"; done)
 }
-
-if [ $mode = x11 ]; then
-	[ -x "$x11/lhwm/tests/regress.sh" ] || { echo "regress: no $x11/lhwm/tests/regress.sh" >&2; exit 2; }
-	xo=$R/x11-renders; rm -rf "$xo"; mkdir -p "$xo"
-	echo "regress: rendering with the x11 build ($x11, its own frame.c and libuxtheme) into $xo"
-	"$x11/lhwm/tests/regress.sh" "$xo" > "$R/x11-regress.log" 2>&1 || true
-	tail -n 1 "$R/x11-regress.log"
-	checksums "$xo" | while read -r sum f; do echo "$sum  $(x11name "${f%%/*}")/${f#*/}"; done | sort -k2 > "$base"
-	echo "regress: baseline from the x11 build: $(wc -l < "$base") renders -> $base"
-	exit 0
-fi
 
 styles=$(lhde_find styles)
 if [ -z "$classic_only" ] && { [ -z "$styles" ] || [ -z "$(ls "$styles" 2>/dev/null)" ]; }; then
 	echo "skip  luxwm regress: no visual styles in $LHDE_USER_DATA/styles (tools/lhde-import)"; exit 0
 fi
 [ -x "$ft" ] || { echo "regress: build $ft first (make)" >&2; exit 2; }
-# the session's fonts (themes.ini `fonts =`, docs/history/THEMES.md): the 4074 Fonts directory, so "Segoe UI 9" is Segoe UI 0.7 as in luxwm
+# the session's fonts (a theme's path.fonts): the 4074 Fonts directory, so "Segoe UI 9" is Segoe UI 0.7 as in luxwm
 export FRAMETEST_FONTS=${FRAMETEST_FONTS-$(lhde_find fonts/4074)}
 rm -rf "$out"; mkdir -p "$out"
 

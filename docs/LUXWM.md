@@ -37,8 +37,7 @@ picks the PNG cache or the style through libuxtheme; THEMEDIR may also be a them
 whole set (every frame set in data/frames: strip, normal, unfocused, maximised, `ext60` = `0 0 60 0`, and the Explorer case
 `ext46`/`ext46u`/`ext46max` = `0 0 46 0` with `NO_TITLE`; 640x480, plus frametest's margin/shape output) and compares their SHA-256
 with a baseline made on this machine (`build/luxwm/regress/baseline.sha256`, written by the first run; `--rebaseline` after an
-intended change; `--baseline-from-x11 DIR` takes it from the x11 lab's own build, which proved the import byte-identical: 212
-renders). No reference images are in the repository; the x11 tree's tests/ref stays in the research workspace. It skips without
+intended change). No reference images are in the repository; the x11 tree's tests/ref stays in the research workspace. It skips without
 the user's styles (tools/lhde-import). It renders from the source luxwm uses (libuxtheme when built in, else the PNG
 caches; `--source dir|lib` forces one; the x11 script's `--compare-sources` is not carried over).
 
@@ -351,7 +350,7 @@ library) reloads the same way. `tests/regress.sh`: 160 identical (frame.c only g
 
 ## Window shape (both modes)
 
-`frame_paint()` paints into an image surface, copies it to the decoration window and derives an X Shape
+`frame_paint_ex4()` paints into an image surface, copies it to the decoration window and derives an X Shape
 bounding region from its alpha: in the top and bottom 24 rows, leading/trailing pixels with alpha below
 `shape_alpha` (theme.ini; default 32 for DWM themes, 1 for msstyles) are cut out. This fixed the "pixels sticking
 out" at the DWM corners: the plate is rounded (its corner pixels have alpha 0..0x30), but the window was a full
@@ -936,7 +935,7 @@ A cooperating ARGB client sets `_LHWM_EXTEND_FRAME` (`left right top bottom`, cl
 (`NO_TITLE`, `NO_ICON`, `NO_FOG`). luxwm then paints the plate further in under the client, and the client leaves that part
 transparent. The reference client is `../examples/extendframe.c`, and `compare_extend.png` shows it next to the 4074 Documents window.
 
-- `frame_paint_ex`/`frame_paint_cr_ex` take a `struct frame_ext`. NULL, or all zero with no flags, is the old code path,
+- `frame_paint_ex4`/`frame_paint_cr3` take a `struct frame_ext`. NULL, or all zero with no flags, is the old code path,
   untouched: frametest output stays byte-identical for aero, jade and the three classic themes, normal and maximised,
   focused and not.
   `plate_ext` paints the plate on a 7x7 grid: per axis, outer edge | band (stretched by the extension) | inner lines |

@@ -1,4 +1,4 @@
-/* lhwm: frames from the .msstyles itself through libuxtheme (~/src/flxp/src/uxtheme, ut.h; README "libuxtheme source").
+/* luxwm: frames from the .msstyles itself through libuxtheme (wuxtheme/ut.h; README "libuxtheme source").
    Classic msstyles mode: the Window parts (CAPTION, MAXCAPTION, FRAMELEFT/RIGHT/BOTTOM, the caption buttons with their glyphs) are
    drawn at paint time with ut_draw_background (Wine's DrawThemeBackground: nine-grid, TRUESIZE, transparency, IMAGEGLYPH selection),
    the metrics, caption font and colours come from [SysMetrics]; text, shadows, geometry and hit testing stay in frame.c.
@@ -30,7 +30,7 @@ int fut_open(struct theme *t, const char *path, const char *color, const char *s
     fut_close(t);
     ut_theme *u = ut_open(path, color && *color ? color : NULL, size && *size ? size : NULL);
     if (!u) { fprintf(stderr, "luxwm: libuxtheme cannot open %s\n", path); return 0; }
-    /* ut_open takes an unknown scheme/size as the style's first: say so, a typo in themes.ini should not go unnoticed */
+    /* ut_open takes an unknown scheme/size as the style's first: say so, a typo in a theme file should not go unnoticed */
     if (color && *color && strcasecmp(color, ut_color(u))) fprintf(stderr, "luxwm: %s has no colour %s, using %s\n", path, color, ut_color(u));
     if (size && *size && strcasecmp(size, ut_size(u))) fprintf(stderr, "luxwm: %s has no size %s, using %s\n", path, size, ut_size(u));
     t->ut = u; t->ut_fmt = ut_format(u);
@@ -169,7 +169,7 @@ void fut_ms_draw(cairo_t *cr, const struct theme *t, int p, int state, int x, in
     if (!t->ut || w <= 0 || h <= 0 || m->ut_part <= 0) return;
     int sh = m->vh[0], top = m->sm[2], bot = m->sm[3];
     if (h > sh && sh > 0 && top + bot >= sh && top < sh) {
-        /* taller than the bitmap, but its SIZINGMARGINS cover every row (Luna Silver's MAXCAPTION: 26 rows, 9 + 17): only lhwm's
+        /* taller than the bitmap, but its SIZINGMARGINS cover every row (Luna Silver's MAXCAPTION: 26 rows, 9 + 17): only luxwm's
            header continuation of a maximised caption asks for that (XP draws MAXCAPTION exactly CAPTIONBARHEIGHT + 1 high; its
            ninegrid2.cpp has no middle to stretch, Wine leaves the rows empty). As frame.c's nine-grid: the part at its own height,
            the rows between the margins repeat source row `top` */

@@ -1,4 +1,4 @@
-/* lhwm: popup menus shown by the window manager (menu.h; docs/LUXWM.md "The window menu"). The pixels are wuxtheme's popup menu
+/* luxwm: popup menus shown by the window manager (menu.h; docs/LUXWM.md "The window menu"). The pixels are wuxtheme's popup menu
    painter (ut_menu_draw: the same code draws wux's user32 menus); this file keeps the geometry on screen, the shadow and input. */
 #include "config.h"
 #include "menu.h"
@@ -188,7 +188,7 @@ static bool menu_next(Display *dpy, XEvent *ev, int timeout) {
 
 static bool menu_grab(Display *dpy, Window w, Window root, bool keyboard) {
     int gp = GrabNotViewable, gk = keyboard ? GrabNotViewable : GrabSuccess;
-    for (int i = 0; i < 50; i++) {   /* a client's own grab (or lhwm's passive key grab) may be ending */
+    for (int i = 0; i < 50; i++) {   /* a client's own grab (or luxwm's passive key grab) may be ending */
         if (gp != GrabSuccess) gp = XGrabPointer(dpy, w, False, ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
         if (gk != GrabSuccess) gk = XGrabKeyboard(dpy, root, False, GrabModeAsync, GrabModeAsync, CurrentTime);
         if (gp == GrabSuccess && gk == GrabSuccess) return true;

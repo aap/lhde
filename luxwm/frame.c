@@ -180,7 +180,7 @@ static void ms_part(cairo_t *cr, const struct theme *t, int p, int idx, int x, i
 }
 
 /* ext (may be NULL): flags NO_TITLE / NO_ICON (honoured in every mode), and ext->t > 0 continues the caption band that many rows
-   further down (the header pixmap, CLIENT-PROTOCOL.md "Additions 2026-10-24"): the caption bitmap is nine-gridded into the taller
+   further down (the header pixmap, CLIENT-PROTOCOL.md "Header background without composition"): the caption bitmap is nine-gridded into the taller
    rect with its own sizing margins, the side frames start below it */
 static void ms_paint(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized,
                      const struct frame_ext *ext) {
@@ -265,7 +265,7 @@ static void ms_paint(cairo_t *cr, const struct theme *t, int w, int h, const cha
     #undef MSIMG
 }
 
-/* fonts: the registry's `fonts` (frame_fonts_set: directories or files, ';' separated) plus the theme.ini `font_files` (files,
+/* fonts: the theme's `path.fonts` (frame_fonts_set: directories or files, ';' separated) plus the theme.ini `font_files` (files,
    space separated; Luna's Trebuchet MS) are the process's fontconfig application fonts. The set is replaced whenever it changes
    (FcConfigAppFontClear, then add each), so switching to a theme without the 4074 Fonts directory gives the stock fallback again;
    afterwards pango's default font map is dropped so the next layout sees the new set. */
@@ -649,7 +649,7 @@ int theme_load(struct theme *t, const char *spec) {
         if (!fut_open(t, style, color, size) && (frame_theme_source == FRAME_SRC_LIB || !dir[0])) return 0;
         if (!t->ut) fprintf(stderr, "luxwm: %s: using the PNG cache in %s\n", style, dir);
     } else if (frame_theme_source == FRAME_SRC_LIB || !dir[0]) {
-        fprintf(stderr, "luxwm: %s: %s\n", spec, !style[0] ? "no msstyles named" : !fut_available() ? "lhwm was built without libuxtheme" : "library source disabled");
+        fprintf(stderr, "luxwm: %s: %s\n", spec, !style[0] ? "no msstyles named" : !fut_available() ? "luxwm was built without libuxtheme" : "library source disabled");
         return 0;
     }
     if (t->ut && t->mode == THEME_MSSTYLES && !fut_ms_load(t, ms_aa_set, ms_hint_set)) {
@@ -736,12 +736,10 @@ void theme_margins_ex(const struct theme *t, int maximized, int *l, int *r, int 
     *l = t->m_l; *r = t->m_r; *top = t->m_t; *b = t->m_b;
 }
 
-/* (the registry lookup and user presets moved to liblhde's resolver: luxwm/wm.c lh_theme_apply, docs/THEME-FORMAT.md) */
-
 /* one grid cell: the source rectangle (sx,sy,sw,sh) of img onto the destination (dx,dy,dw,dh), bilinear. The cell samples only
-   its own source rectangle (a sub-surface, PAD at its edges): before 2026-10-27 the whole texture was the source, so a stretched
-   cell blended its neighbour's first row or column into its own edge (aero at w = 1280: the column left of the 1:1 right 100 px
-   carried up to 19 levels of the pill's left edge, the pill looked a pixel wider; lhshell's nine() had the same fix for its strips).
+   its own source rectangle (a sub-surface, PAD at its edges): with the whole texture as the source a stretched cell blends its
+   neighbour's first row or column into its own edge (aero at w = 1280: the column left of the 1:1 right 100 px took up to 19
+   levels of the pill's left edge, the pill looked a pixel wider; luxshell's nine() does the same for its strips).
    1:1 cells are unchanged (integer offsets) */
 static void cell_paint(cairo_t *cr, cairo_surface_t *img, double sx, double sy, double sw, double sh, double dx, double dy, double dw, double dh) {
     if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
@@ -858,7 +856,7 @@ static void plate_ext(cairo_t *cr, const struct theme *t, cairo_surface_t *img, 
 static void plate_explorer(cairo_t *cr, const struct theme *t, cairo_surface_t *img, double w, double h, const struct frame_ext *e);
 static void plate_max(cairo_t *cr, const struct theme *t, cairo_surface_t *img, double w, double h, const struct frame_ext *e, int explorer);
 
-/* M5b crossfade: the three layers that only change in weight between the frames of a fade (normal plate, maximised plate, overlay
+/* the maximise crossfade: the three layers that only change in weight between the frames of a fade (normal plate, maximised plate, overlay
    masked by the normal plate) are rendered once into w x h images and kept here; freed by the next paint outside a fade */
 static struct fcache { unsigned gen; int w, h, foc, max, l, r, tp, b, sheet; cairo_pattern_t *p; } fade_cache[3];
 static void fade_cache_clear(void) {
@@ -899,9 +897,9 @@ static cairo_pattern_t *fade_layer(const struct theme *t, int which, int w, int 
    The near side's outer [0,o0), inner lines [a0,l0) and inset [l0,p0) stay 1:1, its band [o0,a0) is stretched by e0 extra pixels
    (lines and inset move in with it); the far side is mirrored (o1, a1, l1, p1 measured from the far edge). The lines are the frame
    margin's last two pixels (a = margin - 2, l = margin); the inset is the rest of the 9-slice inset, which may be wider than the
-   margin: aero's right 100 px (the pill) against a 9 px margin. Until 2026-10-27 the inset counted as "inner lines", so a sheet of
-   glass dropped the pill's 91 columns and stretched the 5 px band over the right 100 px. sheet: no inner lines, the bands absorb
-   them (the whole client is glass). s and d hold 10 boundaries. */
+   margin: aero's right 100 px (the pill) against a 9 px margin (counted as "inner lines", a sheet of glass would drop the pill's
+   91 columns and stretch the 5 px band over the right 100 px). sheet: no inner lines, the bands absorb them (the whole client
+   is glass). s and d hold 10 boundaries. */
 static void ext_axis(double *s, double *d, double S, double D, int o0, int a0, int l0, int p0, int e0, int o1, int a1, int l1, int p1, int e1, int sheet) {
     if (l0 > p0) l0 = p0;
     if (a0 > l0) a0 = l0;
@@ -917,8 +915,8 @@ static void ext_axis(double *s, double *d, double S, double D, int o0, int a0, i
 /* the columns of an extended plate: x (the side extensions, the rows below the caption band) and x0 (no side extension: the caption
    band's rows). The caption band keeps the layout of a normal frame, so its right inset (aero: the pill) stays 1:1 under the caption
    buttons, which do not move with an extension; the side bands, their inner lines and the inset move in only below it (the
-   vertical inner lines of the side bands start below the header, as on the reference). Before 2026-10-27 a right extension of e px
-   moved the pill e px left of the buttons and stretched the 5 px band beside it by e. */
+   vertical inner lines of the side bands start below the header, as on the reference); otherwise a right extension of e px would
+   move the pill e px left of the buttons and stretch the 5 px band beside it by e. */
 static void ext_columns(const struct theme *t, double iw, double w, int pl, int pr, const struct frame_ext *e, double *sx, double *dx, double *sx0, double *dx0) {
     ext_axis(sx, dx, iw, w, 2, t->m_l - 2, t->m_l, pl, e->l, 2, t->m_r - 2, t->m_r, pr, e->r, e->sheet);
     ext_axis(sx0, dx0, iw, w, 2, t->m_l - 2, t->m_l, pl, 0, 2, t->m_r - 2, t->m_r, pr, 0, 0);
@@ -1033,31 +1031,16 @@ static void fog_band(cairo_t *cr, cairo_surface_t *fog, double x, double y, doub
 
 static struct { Window win; int w, h, n; unsigned long sum; } shape_cache[256];
 
-/* profiling (LHWM_PROF): accumulated milliseconds of the last frame_paint_ex calls: [0] cairo paint, [1] shape, [2] upload */
+/* profiling (LHWM_PROF): accumulated milliseconds of the last frame_paint_ex4 calls: [0] cairo paint, [1] shape, [2] upload */
 unsigned long frame_upload_serial;
 void (*frame_pre_upload)(void *); void *frame_pre_upload_arg;
 double frame_prof_ms[4];   /* [3]: number of paints */
 #include <time.h>
 static double prof_now(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6; }
 
-void frame_paint(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h,
-                 const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized) {
-    frame_paint_ex(dpy, vis, t, dec, w, h, title, icon, focused, hover, pressed, maximized, NULL);
-}
-
-void frame_paint_ex(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
-                    int focused, int hover, int pressed, int maximized, const struct frame_ext *ext) {
-    frame_paint_ex2(dpy, vis, t, dec, w, h, title, icon, focused, hover, pressed, maximized, ext, NULL);
-}
-
 /* upload rows/columns of a painted ARGB32 image to the window with XPutImage (the image data wrapped, not copied) */
 static void put_rect(Display *dpy, Drawable win, GC gc, XImage *xi, int x, int y, int w, int h) {
     if (w > 0 && h > 0) XPutImage(dpy, win, gc, xi, x, y, x, y, (unsigned)w, (unsigned)h);
-}
-
-void frame_paint_ex2(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
-                     int focused, int hover, int pressed, int maximized, const struct frame_ext *ext, const XRectangle *hole) {
-    frame_paint_ex3(dpy, vis, t, dec, w, h, title, icon, focused, hover, pressed, maximized, ext, hole, -1);
 }
 
 void frame_paint_ex3(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
@@ -1182,8 +1165,6 @@ void frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window de
 }
 
 void frame_paint_cr(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized) { frame_paint_cr2(cr, t, w, h, title, icon, focused, hover, pressed, maximized, NULL); }
-void frame_paint_cr_ex(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover,
-                       int pressed, int maximized, const struct frame_ext *ext) { frame_paint_cr2(cr, t, w, h, title, icon, focused, hover, pressed, maximized, ext); }
 
 void frame_paint_cr2(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized, const struct frame_ext *ext) {
     frame_paint_cr3(cr, t, w, h, title, icon, focused, hover, pressed, maximized, ext, -1);
@@ -1202,7 +1183,7 @@ void frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const cha
     /* 1. plate (LGFRAME active / inactive half); kept as a pattern: its alpha is the frame's shape and masks the overlay below.
        Maximised (the frame fills the work area): the bottom border lies below the window, the side borders under the client
        (margins 0), the caption keeps its height and button layout, and the two top corners are squared (square_corners) */
-    /* M5b: the maximised plate (plate_max) at weight mf, cross-dissolved with the normal plate while a maximise/restore fades */
+    /* the maximised plate (plate_max) at weight mf, cross-dissolved with the normal plate while a maximise/restore fades */
     double mf = !t->plate_m[0] ? 0 : maxfade < 0 ? (maximized ? 1 : 0) : maxfade > 1 ? 1 : maxfade;
     int fading = mf > 0 && mf < 1;
     cairo_pattern_t *shape = NULL, *opat = NULL;
@@ -1220,7 +1201,7 @@ void frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const cha
             cairo_surface_t *ps = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h); cairo_t *c2 = cairo_create(ps);
             plate_max(c2, t, mexp ? t->plate_mx[focused ? 0 : 1] : t->plate_m[focused ? 0 : 1], w, h, ext, mexp);
             cairo_destroy(c2);
-            if (maximized) square_corners(ps, 6);   /* Jade's LGFRAMEMAX is the normal plate again: square its corners as in M5a */
+            if (maximized) square_corners(ps, 6);   /* Jade's LGFRAMEMAX is the normal plate again: square its corners as the normal plate's */
             cairo_pattern_t *mshape = cairo_pattern_create_for_surface(ps); cairo_surface_destroy(ps);
             plate_draw(cr, t, mshape, 1); cairo_pattern_destroy(mshape);
         } else {
@@ -1290,7 +1271,7 @@ void frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const cha
         pango_layout_set_width(lay, (bx - t->title_x - 8) * PANGO_SCALE); pango_layout_set_ellipsize(lay, PANGO_ELLIPSIZE_END);
         int tw, th; pango_layout_get_pixel_size(lay, &tw, &th);
         double tx = icon ? t->title_x : t->icon_x + 2, ty = (t->m_t - th) / 2.0;
-        /* maximised text colours (text_max_*, glow_max), weighted like the plate: the M5b crossfade fades them with it */
+        /* maximised text colours (text_max_*, glow_max), weighted like the plate: the crossfade fades them with it */
         double xw = maxfade < 0 ? (maximized ? 1 : 0) : maxfade > 1 ? 1 : maxfade, ga = t->glow_m_none ? 0.22 * (1 - xw) : 0.22, gc[3], tc[3];
         const double *tn = focused ? t->text_a : t->text_i, *tm = focused ? t->text_ma : t->text_mi, *gm = t->glow_m_none ? t->glow : t->glow_m;
         for (int i = 0; i < 3; i++) { tc[i] = tn[i] + (tm[i] - tn[i]) * xw; gc[i] = t->glow[i] + (gm[i] - t->glow[i]) * xw; }
@@ -1319,7 +1300,7 @@ void frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const cha
     cairo_pop_group_to_source(cr); cairo_mask(cr, shape); cairo_pattern_destroy(shape);
 }
 
-/* ---- CLIENT_CAPTION and the header pixmap (CLIENT-PROTOCOL.md "Additions 2026-10-24") ---- */
+/* ---- CLIENT_CAPTION and the header pixmap (CLIENT-PROTOCOL.md "Client content over the caption rows") ---- */
 int theme_caption_border(const struct theme *t, int maximized) {
     if (maximized) return 0;   /* the borders of a maximised frame lie off-screen (msstyles) or are dropped (DWM) */
     if (t->cap_border >= 0) return t->cap_border;   /* caption_border (vision: the plate's 2 outer rows) */

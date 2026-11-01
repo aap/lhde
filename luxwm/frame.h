@@ -1,4 +1,4 @@
-/* lhwm: Longhorn-style frame plates painted into ARGB decoration windows */
+/* luxwm: Longhorn-style frame plates painted into ARGB decoration windows */
 #ifndef LHWM_FRAME_H
 #define LHWM_FRAME_H
 #include <X11/Xlib.h>
@@ -55,8 +55,8 @@ struct theme {
                                         /* glass_alpha: plate alpha factor (plates only; 1 = as the texture says) */
     int fog_on;                         /* theme key fog = 1: draw captionfog.png over extended headers (COMPOSITION.md 15: 4074 has no fog band; default 0) */
     int glass_square;                   /* glass_alpha_mode = square: plate alpha a -> a * a (5048's double application), then * glass_alpha */
-    /* maximised plates (M5b, README "Maximised mode"): LGFRAMEMAX / MAXEXPLORER (msstyles STREAM 493 / 494) drawn instead of the
-       squared normal plate while maximised. NULL = none (the M5a squared plate) */
+    /* maximised plates (README "Maximised mode"): LGFRAMEMAX / MAXEXPLORER (msstyles STREAM 493 / 494) drawn instead of the
+       squared normal plate while maximised. NULL = none (the squared normal plate) */
     cairo_surface_t *plate_m[2], *plate_mx[2];   /* active, inactive */
     int mi_t, mi_r, mi_b, mi_l;         /* max_insets (default: plate_insets) */
     int mxi_t, mxi_r, mxi_b, mxi_l;     /* max_explorer_insets (default: max_insets) */
@@ -71,7 +71,7 @@ struct theme {
     int x_crop, deco_h, cap_border;
     unsigned gen;                       /* load count (frame.c: identifies the theme in the crossfade cache) */
     /* maximised caption text (README "Maximised caption text"): text_max_active / text_max_inactive / glow_max (default: the
-       normal colours; glow_max = none: no TextGlow while maximised). DWM themes fade them with the M5b plate crossfade */
+       normal colours; glow_max = none: no TextGlow while maximised). DWM themes fade them with the plate crossfade */
     double text_ma[3], text_mi[3], glow_m[3];
     int glow_m_none;
     /* default window icon for clients without one (default_icon = FILE..., or default_icon.png): DWM CompositedWindow DEFAULTICON,
@@ -83,7 +83,7 @@ struct theme {
     int ut_fmt;                         /* 3 XP, 4 Longhorn-compiled */
     char ut_src[1200];                  /* "PATH (colour, size, vN)" for the logs */
     /* the visual style the theme names (the spec's, else theme.ini's msstyles/color/size; "" = none): a DWM theme's own classic frame
-       is this style in msstyles mode, "|style|color|size" (registry frame_classic empty or "style", README "Classic fallback") */
+       is this style in msstyles mode, "|style|color|size" (path.frames_classic empty or "style", README "Classic fallback") */
     char style[1024], style_color[64], style_size[64];
     /* Windows Classic (README "Windows Classic frames"; theme spec "|classic|KEY=VALUE;..."): no visual style, the frame drawn
        like user32's non-client painting from the classic system colours and metrics. mode is THEME_MSSTYLES (its geometry:
@@ -100,7 +100,7 @@ struct theme {
    _LHWM_FRAME_FLAGS. sheet: the whole client is glass (all four 0xFFFFFFFF). NULL or all zero = the normal frame. */
 /* FRAME_NO_HEADER_PIXMAP is wm.c's only (no _LHWM_HEADER_PIXMAP for the client); the painter never sees it */
 enum { FRAME_NO_TITLE = 1, FRAME_NO_ICON = 2, FRAME_NO_FOG = 4, FRAME_CLIENT_CAPTION = 8, FRAME_NO_HEADER_PIXMAP = 16,
-       FRAME_MAX_DISABLED = 1 << 16 };   /* lhwm's own (not a client flag): a fixed-size window's maximise button drawn disabled */
+       FRAME_MAX_DISABLED = 1 << 16 };   /* luxwm's own (not a client flag): a fixed-size window's maximise button drawn disabled */
 struct frame_ext { int l, r, t, b, sheet; unsigned flags; };
 
 /* spec: a theme directory (theme.ini + PNG cache), optionally followed by a visual style: "DIR|STYLE.msstyles|COLOR|SIZE"; or the
@@ -114,16 +114,8 @@ int  frame_uxtheme_available(void);
 void theme_free(struct theme *t);
 void theme_margins(const struct theme *t, int *l, int *r, int *top, int *b);
 void theme_margins_ex(const struct theme *t, int maximized, int *l, int *r, int *top, int *b);
-void frame_paint(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h,
-                 const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized);
-void frame_paint_ex(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
-                    int focused, int hover, int pressed, int maximized, const struct frame_ext *ext);
-/* hole (dec-relative, may be NULL): the area an opaque client covers; it is not painted or uploaded */
-void frame_paint_ex2(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
-                     int focused, int hover, int pressed, int maximized, const struct frame_ext *ext, const XRectangle *hole);
-void frame_paint_cr_ex(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover,
-                       int pressed, int maximized, const struct frame_ext *ext);
-/* maxfade (M5b crossfade): weight of the maximised plate, 0 = the normal plate, 1 = the maximised one, in between a cross-dissolve of
+/* hole (dec-relative, may be NULL): the area an opaque client covers; it is not painted or uploaded.
+   maxfade (the maximise crossfade): weight of the maximised plate, 0 = the normal plate, 1 = the maximised one, in between a cross-dissolve of
    the two; < 0 = by state (maximized). Painted over the geometry given by maximized. */
 void frame_paint_ex3(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
                      int focused, int hover, int pressed, int maximized, const struct frame_ext *ext, const XRectangle *hole, double maxfade);
@@ -141,7 +133,7 @@ cairo_surface_t *frame_icon_from_netwm(const unsigned long *data, unsigned long 
 cairo_surface_t *frame_icon_from_pixmap(Display *dpy, Pixmap icon, Pixmap mask, int want);
 /* the theme's default icon nearest >= want (not a new reference; NULL when the theme has none) */
 cairo_surface_t *theme_default_icon(const struct theme *t, int want);
-/* fonts (docs/history/THEMES.md "fonts"): the registry's font directories/files (';' separated, absolute), registered as fontconfig application
+/* fonts: the theme's path.fonts, font directories/files (';' separated, absolute), registered as fontconfig application
    fonts together with the next theme_load's font_files (the set is replaced, so a theme without them does not see them) */
 void frame_fonts_set(const char *list);
 /* LHWM_DEBUG: log the face fontconfig/pango resolve the theme's caption font to */
@@ -153,7 +145,7 @@ int  frame_hit(const struct theme *t, int w, int h, int x, int y);
 int  frame_hit_ex(const struct theme *t, int w, int h, int x, int y, int maximized);
 /* window shape from the painted alpha (corners): fills up to max rects, returns the count */
 int  frame_shape_rects(const struct theme *t, cairo_surface_t *img, int maximized, XRectangle *r, int max);
-/* CLIENT_CAPTION (experimental, CLIENT-PROTOCOL.md "Additions 2026-10-24"): the frame rows left above a client that grows up into
+/* CLIENT_CAPTION (experimental, CLIENT-PROTOCOL.md "Client content over the caption rows"): the frame rows left above a client that grows up into
    the caption (msstyles: cnBorders; DWM: the side border width; maximised: 0) */
 int  theme_caption_border(const struct theme *t, int maximized);
 /* the union of the caption buttons' hit rectangles, frame coordinates (_LHWM_CAPTION_RECT before the client offset) */
@@ -162,7 +154,7 @@ void frame_buttons_rect(const struct theme *t, int w, int maximized, int *x, int
    and icon left out), cropped to columns [x0, x0 + cw) and rows [0, band_h). Caller destroys it. */
 cairo_surface_t *frame_header_image(const struct theme *t, int w, int h, int x0, int cw, int band_h, int focused, int hover, int pressed,
                                     int maximized, const struct frame_ext *ext);
-extern unsigned long frame_upload_serial;   /* request serial of the last frame_paint_ex2 upload (first request of it) */
+extern unsigned long frame_upload_serial;   /* request serial of the last frame_paint_ex4 upload (first request of it) */
 /* when set, the next frame_paint_ex3 uploads to an offscreen pixmap, calls frame_pre_upload(frame_pre_upload_arg) (the caller's
    window resize), then sets the shape and copies the pixels into the window; reset by that paint (README "Resize without flicker") */
 extern void (*frame_pre_upload)(void *); extern void *frame_pre_upload_arg;

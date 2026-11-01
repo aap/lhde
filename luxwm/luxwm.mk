@@ -1,11 +1,11 @@
-# luxwm, the window manager (was lhwm, a berry fork; docs/LUXWM.md), and luxwmc, its command client (was lhwmc / berryc).
+# luxwm, the window manager (a berry fork; docs/LUXWM.md), and luxwmc, its command client.
 # Included by the top-level Makefile. Frames come from the visual style through libwuxtheme (build/lib/libwuxtheme.so.1,
 # rpath $ORIGIN/../lib) and from the frame sets in lhde's data directories, the theme from liblhde's resolver (liblhde/liblhde.mk).
 #   build/bin/luxwm build/bin/luxwmc
 #   build/luxwm/tests/frametest menutest desktopwin dockorder strutdock   (tests/regress.sh: make check-luxwm)
 
 LUXWM_PKGS   = x11 xext xfixes xinerama fontconfig xft cairo cairo-xlib pangocairo
-# berry's warnings; -Os as lhwm's configure chose (the regress baseline from the x11 build used the same)
+# berry's warnings; -Os as berry's configure chose
 LUX_COPT    ?= -Os -g -DNDEBUG
 LUXWM_CFLAGS = -std=c99 $(LUX_COPT) -Wall -Wextra -Wredundant-decls -Wshadow -Wno-deprecated-declarations -MMD -MP \
                -DHAVE_UXTHEME -Iluxwm -Iliblhde -idirafter . $(shell pkg-config --cflags $(LUXWM_PKGS))

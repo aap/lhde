@@ -1,7 +1,7 @@
 #ifndef _BERRY_CONFIG_H_
 #define _BERRY_CONFIG_H_
 
-/* luxwm's build configuration (was berry's configure output from config.h.in; lhde builds it from the top-level Makefile).
+/* luxwm's build configuration (berry's configure output once; lhde builds it from the top-level Makefile).
    The window manager's _NET_WM_NAME stays "lhwm", like the X atoms (_LHWM_*): luxshell and flxp's log-off recognise it by
    that name (docs/LAYOUT.md "Names and tree"). */
 #define LUXWM_NAME	"lhwm"
@@ -64,7 +64,7 @@
 #define FOCUS_BUTTON 1
 #define MOVE_BUTTON 1
 #define MOVE_MASK Mod4Mask
-/* lhwm: no modifier drag resizes by default (berry's Alt+drag took Alt+clicks from every client; Alt+Space S sizes with the mouse);
+/* luxwm: no modifier drag resizes by default (berry's Alt+drag took Alt+clicks from every client; Alt+Space S sizes with the mouse);
    `luxwmc resize_button N` turns it on with RESIZE_MASK */
 #define RESIZE_BUTTON 0
 #define RESIZE_MASK Mod1Mask
@@ -73,33 +73,33 @@
 #define FOCUS_ON_CLICK true
 #define WARP_POINTER false
 
-/* lhwm: interactive move/resize applies the pointer position at most every DRAG_INTERVAL ms (README "Performance") */
+/* luxwm: interactive move/resize applies the pointer position at most every DRAG_INTERVAL ms (README "Performance") */
 #define DRAG_INTERVAL 16
-/* lhwm: a caption press becomes a move only once the pointer has left a DRAG_THRESHOLD px square around the press (Windows'
+/* luxwm: a caption press becomes a move only once the pointer has left a DRAG_THRESHOLD px square around the press (Windows'
    SM_CXDRAG/SM_CYDRAG = 4): hand jitter in a double-click must not move, and so un-maximise, a maximised window */
 #define DRAG_THRESHOLD 4
-/* lhwm: minimise/restore/maximise animations (README "Animations"). With a compositor picom animates (picom-glass.conf);
-   without one lhwm flies the caption to/from the taskbar button like XP's DrawAnimatedRects (IDANI_CAPTION, 250 ms),
+/* luxwm: minimise/restore/maximise animations (README "Animations"). With a compositor picom animates (picom-glass.conf);
+   without one luxwm flies the caption to/from the taskbar button like XP's DrawAnimatedRects (IDANI_CAPTION, 250 ms),
    or draws XOR zoom rectangles when ANIMATE_WIREFRAME is true */
 #ifndef ANIMATE
 #define ANIMATE true
 #endif
-/* lhwm: the M5b maximise/restore plate crossfade of DWM themes with plate_max (README "Maximised mode"), in ms. 0 (default since
-   2026-10-25, user decision): no fade, the plate switches in the same paint as the geometry change, no timer; e.g. 400 restores the
-   fade in step with lux's black layers (which are instant now too) */
+/* luxwm: the maximise/restore plate crossfade of DWM themes with plate_max (README "Maximised mode"), in ms. 0 (the default, aap's
+   choice): no fade, the plate switches in the same paint as the geometry change, no timer; e.g. 400 fades in step with
+   luxshell's black layers (which are instant too) */
 #ifndef MAX_FADE_MS
 #define MAX_FADE_MS 0
 #endif
 #ifndef ANIMATE_WIREFRAME
 #define ANIMATE_WIREFRAME false
 #endif
-/* lhwm: which compositor animation set picom-glass.conf applies (the value lhwm writes to _LHWM_ANIMATE; README "Animations",
+/* luxwm: which compositor animation set picom-glass.conf applies (the value luxwm writes to _LHWM_ANIMATE; README "Animations",
    COMPOSITION.md 14): ANIM_4074 = Longhorn 4074's DWM (open and restore from minimised fade in over 350 ms with a slight scale-in
    standing in for the 3D swing; minimise, close, maximise instant), ANIM_5048 = the April 2005 uDWM curve (266 ms, sqrt progress),
-   ANIM_INVENTED = lhwm's earlier 250 ms shrink to the bottom edge on minimise and picom's geometry animation on maximise (not
+   ANIM_INVENTED = luxwm's own 250 ms shrink to the bottom edge on minimise and picom's geometry animation on maximise (not
    Longhorn), ANIM_4074PLUS = 4074's fade + gentle centre zoom on open, the invented grow on restore from minimised and shrink on minimise, no picom
    animation on maximise/restore (default). Without a compositor the XP caption flight is used whatever this says.
-   Runtime (2026-10-25): this is only the default. lhwm reads [theme] animations = 4074plus | 4074 | invented | 5048 | none from
+   This is only the default. luxwm reads [theme] animations = 4074plus | 4074 | invented | 5048 | none from
    lhde's settings store (~/.config/lhde/settings.ini, liblhde; docs/SETTINGS.md) at startup and on the root ClientMessage _LH_SETTINGS_CHANGED, and
    LHWM_ANIMATIONS=<name> overrides the file; "none" (value 0) sets no _LHWM_ANIMATE at all and turns off the XP caption flight too. */
 #define ANIM_4074 1

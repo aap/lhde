@@ -41,7 +41,7 @@
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 
-static struct client *f_client = NULL; /* focused client (the last one lhwm focused: Alt+Tab, key actions start from it) */
+static struct client *f_client = NULL; /* focused client (the last one luxwm focused: Alt+Tab, key actions start from it) */
 static bool f_active = false;          /* f_client really holds the X input focus; false while an unmanaged window (the desktop,
                                           a dock) has it: no frame is painted active, _NET_ACTIVE_WINDOW is None (focus_sync) */
 #define client_active(c) ((c) != NULL && (c) == f_client && f_active)
@@ -76,7 +76,7 @@ static void focus_next(struct client *c);
 static void handle_leave_notify(XEvent *e);
 static void client_set_icon(struct client *c);
 static cairo_surface_t *client_icon(struct client *c);
-/* M2: EWMH states, stacking order, struts and work area */
+/* EWMH states, stacking order, struts and work area */
 static void ewmh_update_state(struct client *c);
 static int client_hit(struct client *c, int x, int y);
 static cairo_surface_t *app_icon(int want);
@@ -97,7 +97,7 @@ static bool dock_property(Window w, Atom a);
 static void docks_raise(void);
 static void handle_map_notify(XEvent *e);
 static void handle_destroy_notify(XEvent *e);
-/* M5a: maximised mode, compositor detection, runtime theme switching */
+/* maximised mode, compositor detection, runtime theme switching */
 static void maxmode_update(void);
 static bool theme_select(void);
 static void theme_property(void);
@@ -106,7 +106,7 @@ static char theme_req[2200], theme_cur[2200], theme_written[2200];   /* requeste
 static bool compositor = false;
 static int xfixes_ev = -1;
 static Atom cm_atom, lhwm_theme_atom, lhwm_maxmode_atom, lhwm_max_atom;
-/* M6 (SHELL-DESIGN 6.1): the session theme is the root _LH_THEME, a theme name that liblhde resolves (docs/THEME-FORMAT.md:
+/* the session theme (SHELL-DESIGN 6.1) is the root _LH_THEME, a theme name that liblhde resolves (docs/THEME-FORMAT.md:
    theme files, bare styles, aliases); luxwm maps the record to frames / frames_classic / composition. _LHWM_THEME is the derived
    frame directory. */
 static char theme_req_classic[1024];   /* the resolved frames_classic directory ("style" = the style's own decorations) */
@@ -115,7 +115,7 @@ static bool theme_announce = false;    /* a switch was asked for: republish _LHW
 static char lh_theme_cur[256];   /* the _LH_THEME name applied last */
 static Atom lh_theme_atom;
 static Atom lhwm_reload_atom;          /* _LHWM_RELOAD: root ClientMessage or property, re-read the current theme (README "Live-editing a theme") */
-static int lh_theme_selfwrite;         /* _LH_THEME writes of lhwm's own (alias -> name) whose PropertyNotify is not a reload request */
+static int lh_theme_selfwrite;         /* _LH_THEME writes of luxwm's own (alias -> name) whose PropertyNotify is not a reload request */
 static bool theme_force;               /* theme_select: load and apply even when the spec is the one in use (reload) */
 static void theme_reload(const char *why);
 /* _LH_THEME_RESOLVED (docs/THEME-FORMAT.md section 4): the record of the theme in effect, "key=value" lines with theme= and
@@ -134,15 +134,14 @@ static char *root_string_alloc(Atom a);
 static const char *theme_opt = NULL;   /* -t THEME */
 /* extended frames (CLIENT-PROTOCOL.md): client properties, and the root properties clients read */
 static Atom lhwm_ext_atom, lhwm_flags_atom, lhwm_comp_atom, lhwm_metrics_atom, lhwm_deco_atom;
-/* _LHWM_ANIMATE value while a maximise/restore geometry animation runs (picom-glass.conf): ANIM_INVENTED only (2026-10-25: ANIM_4074PLUS
-   no longer animates the geometry, its value 8 is gone; README "Animations") */
+/* _LHWM_ANIMATE value while a maximise/restore geometry animation runs (picom-glass.conf): ANIM_INVENTED only (README "Animations") */
 #define ANIM_BUSY 2
-/* M5b: maximise/restore crossfade of the DWM frame plate, as lhshell's black layers (SHELL-DESIGN.md 2.4.3: 400 ms, 25 ms tick) */
+/* maximise/restore crossfade of the DWM frame plate, as luxshell's black layers (SHELL-DESIGN.md 2.4.3: 400 ms, 25 ms tick) */
 #define XFADE_MS (MAX_FADE_MS > 0 ? (double)MAX_FADE_MS : 400.0)   /* config.h MAX_FADE_MS; 0 = no fade at all (max_transition) */
 #define XFADE_TICK 25
 static Atom lhwm_anim_atom, net_icon_geom_atom;   /* _LHWM_ANIMATE (picom-glass.conf animation rules), _NET_WM_ICON_GEOMETRY */
 /* the animation style in use (README "Animations"): ../SETTINGS.md [theme] animations, LHWM_ANIMATIONS, else config.h ANIMATE_STYLE;
-   ANIM_NONE: no _LHWM_ANIMATE property and no animation of lhwm's own. Reloaded on the root ClientMessage _LH_SETTINGS_CHANGED. */
+   ANIM_NONE: no _LHWM_ANIMATE property and no animation of luxwm's own. Reloaded on the root ClientMessage _LH_SETTINGS_CHANGED. */
 #define ANIM_NONE 0
 static long anim_style = ANIMATE_STYLE;
 static Atom lh_settings_atom;   /* _LH_SETTINGS_CHANGED */
@@ -163,7 +162,7 @@ static double xfade_weight(struct client *c);
 static int xfade_tick(void);
 static void max_transition(struct client *c, bool to_max, int x, int y, int w, int h);
 static int comp_written = -1;   /* _LHWM_COMPOSITED last written */
-static Atom lhwm_hdrpix_atom, lhwm_caprect_atom;   /* _LHWM_HEADER_PIXMAP, _LHWM_CAPTION_RECT (CLIENT-PROTOCOL.md "Additions 2026-10-24") */
+static Atom lhwm_hdrpix_atom, lhwm_caprect_atom;   /* _LHWM_HEADER_PIXMAP, _LHWM_CAPTION_RECT (CLIENT-PROTOCOL.md) */
 static unsigned theme_gen;      /* bumped on every theme load: header pixmaps are rendered again */
 static void margins_for(struct client *c, const struct theme *th, int max, int *l, int *r, int *t, int *b);
 static void header_update(struct client *c, bool focused);
@@ -177,7 +176,7 @@ static unsigned long next_seq = 1;
 static bool adopting = false;
 static int prof = 0;   /* LHWM_PROF=1: per-drag timing summary on stderr */
 static int sync_ev = -1;   /* XSync extension event base (-1: none) */
-static double now_ms(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6; }   /* managing windows that existed before lhwm started (restart) */
+static double now_ms(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6; }   /* managing windows that existed before luxwm started (restart) */
 static Display *display = NULL;
 static Atom net_atom[NetLast], wm_atom[WMLast], net_berry[BerryLast];
 static Window root, check, nofocus;
@@ -457,8 +456,8 @@ close_wm(void)
 {
     LOGN("Shutting down window manager");
 
-    /* clean exit (lhwmc quit, SHELL-DESIGN 6.2): clients stay where they are and mapped; windows parked off screen on other
-       workspaces come back; minimised ones stay unmapped with WM_STATE Iconic, so the next lhwm adopts them minimised again
+    /* clean exit (luxwmc quit, SHELL-DESIGN 6.2): clients stay where they are and mapped; windows parked off screen on other
+       workspaces come back; minimised ones stay unmapped with WM_STATE Iconic, so the next luxwm adopts them minimised again
        (berry set every client Withdrawn here, which made a restarted WM lose the minimised ones). Frames go away. */
     for (int i = 0; i < WORKSPACE_NUMBER; i++)
         for (struct client *c = c_list[i]; c != NULL; c = c->next) {
@@ -481,10 +480,10 @@ close_wm(void)
     XDeleteProperty(display, root, lhwm_theme_atom);
     XDeleteProperty(display, root, lhwm_comp_atom);
     XDeleteProperty(display, root, lhwm_metrics_atom);
-    XDeleteProperty(display, root, net_atom[NetWMCheck]);   /* lhshell then falls back to its EWMH rules (maxmode) */
+    XDeleteProperty(display, root, net_atom[NetWMCheck]);   /* luxshell then falls back to its EWMH rules (maxmode) */
     XDeleteProperty(display, root, net_atom[NetWorkarea]);
-    /* kept on purpose: _LH_THEME (the session's setting, not lhwm's), and _NET_CLIENT_LIST,
-       _NET_CLIENT_LIST_STACKING, _NET_ACTIVE_WINDOW, which a restarted lhwm uses to restore order and focus */
+    /* kept on purpose: _LH_THEME (the session's setting, not luxwm's), and _NET_CLIENT_LIST,
+       _NET_CLIENT_LIST_STACKING, _NET_ACTIVE_WINDOW, which a restarted luxwm uses to restore order and focus */
     fprintf(stderr, "luxwm: clean exit\n");
 
     LOGN("Closing display...");
@@ -544,7 +543,7 @@ draw_text(struct client *c, bool focused)
     XFlush(display);   /* XNextEvent will not flush while events keep arriving */
 }
 
-/* _LHWM_HEADER_PIXMAP and _LHWM_CAPTION_RECT on a client (CLIENT-PROTOCOL.md "Additions 2026-10-24").
+/* _LHWM_HEADER_PIXMAP and _LHWM_CAPTION_RECT on a client (CLIENT-PROTOCOL.md "Header background without composition").
    Header pixmap: while not composited, a client with _LHWM_EXTEND_FRAME (or CLIENT_CAPTION) gets the frame's caption band as a
    pixmap of its own depth and visual: client width x (top frame margin + header rows), from the frame's top edge down to the
    bottom of the client's header (the caption bitmap nine-gridded into the taller band); its last rows lie under the header.
@@ -984,7 +983,7 @@ handle_client_message(XEvent *e)
     XClientMessageEvent *cme = &e->xclient;
     long cmd, *data;
 
-    if (cme->message_type == lhwm_reload_atom && lhwm_reload_atom != None) {   /* lhwmc reload-theme (README "Live-editing a theme") */
+    if (cme->message_type == lhwm_reload_atom && lhwm_reload_atom != None) {   /* luxwmc reload-theme (README "Live-editing a theme") */
         theme_reload("_LHWM_RELOAD message");
     } else if (cme->message_type == lh_settings_atom && lh_settings_atom != None) {   /* ../SETTINGS.md "Change notification" */
         LOGP("_LH_SETTINGS_CHANGED serial %ld", cme->data.l[0]);
@@ -1073,7 +1072,7 @@ handle_client_message(XEvent *e)
         long d = cme->data.l[0];
         if (c && d >= 0 && d < WORKSPACE_NUMBER && d != c->ws) { LOGP("_NET_WM_DESKTOP: 0x%lx to desktop %ld", c->window, d); client_send_to_ws(c, (int)d); }
     } else if (cme->message_type == net_atom[NetCurrentDesktop]) {
-        if (cme->data.l[0] >= 0 && cme->data.l[0] < WORKSPACE_NUMBER)   /* a pager's or lhshell's request (lh.set_desktop) */
+        if (cme->data.l[0] >= 0 && cme->data.l[0] < WORKSPACE_NUMBER)   /* a pager's or luxshell's request (lh.set_desktop) */
             switch_ws(cme->data.l[0]);
     } else if (cme->message_type == net_atom[NetRestackWindow]) {
         client_restack(get_client_from_window(cme->window), cme->window, (Window)cme->data.l[1], cme->data.l[2], cme->data.l[0]);
@@ -1090,7 +1089,7 @@ handle_client_message(XEvent *e)
         client_resize_absolute(c, data[3], data[4]);
     } else if (cme->message_type == net_atom[NetWMMoveResizeDrag]) {
         /* EWMH _NET_WM_MOVERESIZE: l[0], l[1] pointer root position, l[2] direction (0..7 resize from the top-left corner clockwise,
-           8 move, 9 size with the keyboard, 10 move with the keyboard, 11 cancel), l[3] button. The drag itself is lhwm's own
+           8 move, 9 size with the keyboard, 10 move with the keyboard, 11 cancel), l[3] button. The drag itself is luxwm's own
            caption/edge drag (drag_run), so moving a maximised window and EDGE_LOCK behave as with the frame. */
         static const int dir_hit[8] = { HIT_TL, HIT_T, HIT_TR, HIT_R, HIT_BR, HIT_B, HIT_BL, HIT_L };
         struct client *c = get_client_from_window(cme->window);
@@ -1312,8 +1311,8 @@ focus_set_active(bool on)
     ewmh_update_state(f_client);
 }
 
-/* lhwm only sets the focus itself, but an unmanaged window can take it (flxp-desktop on a click, a dock for its menus):
-   follow the real input focus (README "Focus and the desktop"). Focus on f_client (or inside it): active; on a window lhwm
+/* luxwm only sets the focus itself, but an unmanaged window can take it (flxp-desktop on a click, a dock for its menus):
+   follow the real input focus (README "Focus and the desktop"). Focus on f_client (or inside it): active; on a window luxwm
    does not manage, the root, PointerRoot or None: inactive; on another managed client (one that focused itself) or inside
    an override-redirect window (menus, tooltips): unchanged. */
 static void
@@ -1334,7 +1333,7 @@ static void
 handle_focus(XEvent *e)
 {
     XFocusChangeEvent *ev = &e->xfocus;
-    /* keyboard grabs (menus, lhwm's own key bindings) and the PointerRoot pointer events do not move the focus */
+    /* keyboard grabs (menus, luxwm's own key bindings) and the PointerRoot pointer events do not move the focus */
     if (ev->mode == NotifyGrab || ev->mode == NotifyUngrab || ev->detail == NotifyPointer)
         return;
     focus_sync();
@@ -1468,7 +1467,7 @@ handle_configure_request(XEvent *e)
             return;
 
         /* only the fields the request has: the others hold the geometry the window had when the request was made, which may be
-           stale (a client asking for a size before lhwm placed it moved back to 0,0: emacs; urxvt after a font change) */
+           stale (a client asking for a size before luxwm placed it moved back to 0,0: emacs; urxvt after a font change) */
         int l, r, t, b; margins(c, &l, &r, &t, &b);
         if (ev->value_mask & (CWX|CWY))
             client_move_relative(c, (ev->value_mask & CWX) ? wc.x - l - c->geom.x : 0, (ev->value_mask & CWY) ? wc.y - t - c->geom.y : 0);
@@ -2159,7 +2158,7 @@ manage_new_window(Window w, XWindowAttributes *wa)
     c->ws = curr_ws;
     c->decorated = decorate;
     c->hover = c->pressed = 0;
-    /* property changes from here on: a client answering what lhwm publishes during the setup below (_LHWM_CAPTION_RECT ->
+    /* property changes from here on: a client answering what luxwm publishes during the setup below (_LHWM_CAPTION_RECT ->
        a new _LHWM_EXTEND_FRAME) must not slip through before the full event mask is selected after mapping */
     XSelectInput(display, w, PropertyChangeMask);
     client_read_ext(c);
@@ -2446,7 +2445,7 @@ max_transition(struct client *c, bool to_max, int x, int y, int w, int h)
     if (!ANIMATE || c->hidden || c->ws != curr_ws)
         return;
     if (compositor && c->decorated && theme.mode == THEME_DWM && theme.plate_m[0]) {
-        /* M5b: the frame jumps to the new rectangle and crossfades its plate there (xfade_tick, 400 ms); picom's geometry animation is
+        /* the frame jumps to the new rectangle and crossfades its plate there (xfade_tick, 400 ms); picom's geometry animation is
            not used for it. A fade still running is reversed from where it is. */
         if (MAX_FADE_MS <= 0) { c->xfade_t0 = 0; return; }   /* config.h: no fade, the plate switches in the geometry change's own paint */
         double w0 = xfade_weight(c), now = now_ms();
@@ -2458,7 +2457,7 @@ max_transition(struct client *c, bool to_max, int x, int y, int w, int h)
         return;
     }
     if (compositor) {
-        if (anim_style == ANIM_INVENTED) {   /* only there: picom's 250 ms geometry animation (not with ANIM_4074PLUS, 2026-10-25) */
+        if (anim_style == ANIM_INVENTED) {   /* only there: picom's 250 ms geometry animation (not with ANIM_4074PLUS) */
             anim_mark(c, ANIM_BUSY);
             c->anim_until = now_ms() + 400;
         }
@@ -2468,9 +2467,8 @@ max_transition(struct client *c, bool to_max, int x, int y, int w, int h)
 
 /* the geometry change of a maximise or restore in one step: frame and client go straight to their final rectangles (with the final
    margins: to_max is the state they are for) in one batch, and the frame is painted once, there. With a compositor the batch and the
-   paint run under a server grab, so picom cannot compose a frame in between; before (2026-10-25) a maximise was a move at the old size,
-   a resize with the normal margins, a paint, the client re-placed into the maximised margins and a second paint, and picom on the lab
-   showed the steps (windows missing or at the old size for 60..80 ms, then the maximised window) */
+   paint run under a server grab, so picom cannot compose a frame in between (done as steps, a move at the old size, a resize, a
+   paint, the client re-placed and a second paint, picom on the lab showed windows missing or at the old size for 60..80 ms) */
 static void
 client_geom_max(struct client *c, int x, int y, int w, int h, bool to_max)
 {
@@ -3081,7 +3079,7 @@ setup(void)
         if (XMatchVisualInfo(display, screen, 32, TrueColor, &vi)) { argb_visual = vi.visual; argb_depth = 32; }
         else { argb_visual = DefaultVisual(display, screen); argb_depth = DefaultDepth(display, screen); LOGN("no ARGB visual, frames will be opaque"); }
         argb_cmap = XCreateColormap(display, root, argb_visual, AllocNone);
-        /* -t / LHWM_THEME: a registry name, an alias or a theme directory; only used when the session has no _LH_THEME yet */
+        /* -t / LHWM_THEME: a theme name, an alias or a theme directory; only used when the session has no _LH_THEME yet */
         const char *td = theme_opt ? theme_opt : getenv("LHWM_THEME"); if (!td || !*td) td = "aero-patch";
         /* LHWM_THEME_SOURCE=dir: the theme directories' PNG caches even with libuxtheme; lib: the styles only (README "libuxtheme
            source"); default: the style through the library when it is built in and the theme names one */
@@ -3242,7 +3240,7 @@ setup(void)
                 XWindowAttributes kwa;
                 if (kids[i] == check || kids[i] == nofocus) continue;
                 if (!XGetWindowAttributes(display, kids[i], &kwa) || kwa.override_redirect || kwa.class == InputOnly) continue;
-                if (kwa.map_state != IsViewable) {   /* minimised under a previous lhwm: unmapped, WM_STATE Iconic */
+                if (kwa.map_state != IsViewable) {   /* minimised under a previous luxwm: unmapped, WM_STATE Iconic */
                     Atom ty; int fmt; unsigned long n = 0, after; unsigned char *d = NULL; bool iconic = false;
                     if (XGetWindowProperty(display, kids[i], wm_atom[WMState], 0, 2, False, wm_atom[WMState], &ty, &fmt, &n, &after, &d) == Success && d) {
                         iconic = n >= 1 && ((unsigned long *)d)[0] == IconicState; XFree(d); }
@@ -3710,8 +3708,8 @@ ewmh_set_active_desktop(int ws)
 static void
 usage(void)
 {
-    printf("Usage: lhwm [-h|-v|-d|-c CONFIG_PATH|-t THEME]\n"
-           "  -t THEME  theme name from ../themes.ini, an alias, a theme directory or a spec DIR|STYLE.msstyles|COLOR|SIZE\n"
+    printf("Usage: luxwm [-h|-v|-d|-c CONFIG_PATH|-t THEME]\n"
+           "  -t THEME  a theme name, an alias, a theme directory or a spec DIR|STYLE.msstyles|COLOR|SIZE\n"
            "            (also LHWM_THEME; LHWM_THEME_SOURCE=dir|lib picks the PNG cache or libuxtheme);\n"
            "            used only when the root has no _LH_THEME yet\n");
     exit(EXIT_SUCCESS);
@@ -3747,11 +3745,11 @@ xerror(Display *dpy, XErrorEvent *e)
     return xerrorxlib(dpy, e);
 }
 
-/* ---- M2: EWMH window states, stacking order, struts and the work area ---- */
+/* ---- EWMH window states, stacking order, struts and the work area ---- */
 
 enum { ST_VALID = 1 << 30, ST_HIDDEN = 1, ST_MAXV = 2, ST_MAXH = 4, ST_ATTN = 8, ST_FOCUSED = 16, ST_FS = 32, ST_BELOW = 64 };
 
-/* write _NET_WM_STATE from the client's flags; atoms lhwm does not own (SKIP_TASKBAR, ABOVE, STICKY, ...) are kept */
+/* write _NET_WM_STATE from the client's flags; atoms luxwm does not own (SKIP_TASKBAR, ABOVE, STICKY, ...) are kept */
 static void
 ewmh_update_state(struct client *c)
 {
@@ -3973,7 +3971,7 @@ client_initial_place(struct client *c, int req_x, int req_y)
 }
 
 /* ---- docks: unmanaged windows (MANAGE_DOCK is false) whose struts define the work area ---- */
-/* seq: when lhwm started tracking the window (= its map; an unmap forgets it, a new map gets a new seq); layer: the
+/* seq: when luxwm started tracking the window (= its map; an unmap forgets it, a new map gets a new seq); layer: the
    window's _LHWM_DESKTOP_LAYER (0 without one). Both order the desktop windows, see docks_raise() */
 struct dock { Window w; long strut[12]; bool is_dock, below, is_desktop; long layer; unsigned long seq; };
 static struct dock docks[64];
@@ -4079,8 +4077,8 @@ desktop_cmp(const void *a, const void *b)
     return x->seq > y->seq ? -1 : x->seq < y->seq ? 1 : 0;
 }
 
-/* dock windows are above the clients unless they asked to be below (lhshell's sidebar); desktop windows (flxp-desktop,
-   lhshell's desktop layer) go to the very bottom in a defined order (CLIENT-PROTOCOL.md "Desktop windows"): by
+/* dock windows are above the clients unless they asked to be below (luxshell's sidebar); desktop windows (flxp-desktop,
+   luxshell's desktop layer) go to the very bottom in a defined order (CLIENT-PROTOCOL.md "Desktop windows"): by
    _LHWM_DESKTOP_LAYER (higher above lower, default 0), equal layers in map order with the first-mapped one lowest.
    They are lowered from the top one down, so the last lowered (lowest layer, mapped first) ends at the bottom. */
 static void
@@ -4120,7 +4118,7 @@ strut_area(int mx, int my, int mw, int mh, int *ox, int *oy, int *ow, int *oh)
 {
     int x0 = mx, y0 = my, x1 = mx + mw, y1 = my + mh;
     /* per edge the largest strut wins (MAX/MIN), struts never add up: each is a distance from the screen edge, so one stacked
-       above another (lhshell's pinned sidebar above the taskbar) already includes it. A partial strut cuts the whole rect. */
+       above another (luxshell's pinned sidebar above the taskbar) already includes it. A partial strut cuts the whole rect. */
     for (int i = 0; i < ndocks; i++) {
         long *s = docks[i].strut;
         if (s[0] > 0 && mx < s[0] && s[5] >= my && s[4] < my + mh) x0 = MAX(x0, (int)s[0]);                                   /* left */
@@ -4182,11 +4180,11 @@ handle_destroy_notify(XEvent *e)
     dock_forget(e->xdestroywindow.window);
 }
 
-/* ---- M5a: maximised mode, compositor detection, runtime theme switching (../SHELL-DESIGN.md "M5a design") ---- */
+/* ---- maximised mode, compositor detection, runtime theme switching (SHELL-DESIGN.md "M5a design") ---- */
 
 /* _LHWM_MAXIMIZED_MODE (root, CARDINAL per desktop, like _NET_WORKAREA): 1 while the desktop's active window is maximised or
    fullscreen, or, with no active window there, any window on it that is not minimised is. On the current desktop the active
-   window is the focused one; on the others the most recently focused one that is not minimised. lhshell fades its black
+   window is the focused one; on the others the most recently focused one that is not minimised. luxshell fades its black
    layers and its desktop layer on it. Each decoration window also carries _LHWM_MAXIMIZED (CARDINAL 0/1) so picom leaves
    maximised frames without a shadow. Only the frame: the client's own shadow falls under the bars (docks,
    clip-shadow-above), and the frame is the window that spans the whole work area. */
@@ -4240,9 +4238,9 @@ theme_publish(void)
    The logical rectangle is the client without the CLIENT_CAPTION extension, i.e. the frame minus the theme's normal margins
    (theme_margins_ex, not margins_for): the frame is computed from it with the new theme's normal margins, and only then is the
    client window placed with margins() (CLIENT_CAPTION: up into the caption by the new theme's caption_h - border, once).
-   Until 2026-10-24 the client window's own rectangle (caption rows included) was kept: the logical rectangle then moved by the
-   difference of the two themes' caption_h - border on every switch, and together with the CLIENT_CAPTION toggle path (which
-   keeps the frame, i.e. the logical rectangle) the client's height drifted (flxp: 418, 398, 416, 390, 408). */
+   Keeping the client window's own rectangle (caption rows included) instead would move the logical rectangle by the difference
+   of the two themes' caption_h - border on every switch, and with the CLIENT_CAPTION toggle path (which keeps the frame, i.e. the
+   logical rectangle) the client's height would drift (flxp: 418, 398, 416, 390, 408). */
 static void
 client_retheme(struct client *c, const struct theme *old)
 {
@@ -4292,7 +4290,7 @@ theme_select(void)
         fprintf(stderr, "luxwm: could not load theme from %s\n", eff);
         if (theme_cur[0]) { theme_free(&nt); theme_publish(); composited_publish(); return false; }   /* keep what is there */
     }
-    /* the classic frame (README "Classic fallback"): a registry frame_classic directory; registry frame_classic empty or "style": the
+    /* the classic frame (README "Classic fallback"): a path.frames_classic directory; frames_classic empty or "style": the
        theme's own visual style in msstyles mode ("|STYLE|COLOR|SIZE", drawn live through libuxtheme), and if that does not load (no
        Window class, no library) the theme.ini fallback_theme; _LHWM_THEME set directly (theme_req_classic ""): fallback_theme, where
        "style" is the own style too */
@@ -4339,7 +4337,7 @@ theme_select(void)
 }
 
 /* _LHWM_THEME changed on the root: xprop -root -f _LHWM_THEME 8s -set _LHWM_THEME <dir|name> asks for another theme
-   (lhwm's own writes come back here too and are ignored) */
+   (luxwm's own writes come back here too and are ignored) */
 static void
 theme_property(void)
 {
@@ -4457,7 +4455,7 @@ lh_theme_apply(const char *arg, char *canon, size_t n)
         theme_comp_off = true;
     }
     wmmenu_set_theme_smoothing(TV("Fonts.smoothing"));   /* the menus' text, with settings.ini [fonts] smoothing over it */
-    frame_fonts_set(TV("path.fonts"));   /* registered by the theme_load that follows (docs/history/THEMES.md "fonts") */
+    frame_fonts_set(TV("path.fonts"));   /* registered by the theme_load that follows */
     snprintf(theme_anim, sizeof theme_anim, "%s", TV("Glass.animations"));
     if (canon) snprintf(canon, n, "%s", TV("theme"));
     if (!strncmp(theme_req, "|classic|", 9))
@@ -4488,7 +4486,7 @@ lh_theme_property(void)
     char want[256], canon[256], prev[2200], prev_c[1024], prev_anim[64]; bool prev_off = theme_comp_off;
     if (!root_string(lh_theme_atom, want, sizeof want))
         return;
-    if (!strcmp(want, lh_theme_cur)) {   /* the name in use set again: a reload (unless it is lhwm's own alias rewrite coming back) */
+    if (!strcmp(want, lh_theme_cur)) {   /* the name in use set again: a reload (unless it is luxwm's own alias rewrite coming back) */
         if (lh_theme_selfwrite > 0) { lh_theme_selfwrite--; return; }
         theme_reload("_LH_THEME set to the theme in use");
         return;
@@ -4547,7 +4545,7 @@ lh_resolved_property(void)
     if (differs && !strcmp(name, lh_theme_cur)) theme_recheck("_LH_THEME_RESOLVED republished");
 }
 
-/* re-read the theme in use from disk, in place (README "Live-editing a theme"): the registry entry (or preset) of _LH_THEME again,
+/* re-read the theme in use from disk, in place (README "Live-editing a theme"): _LH_THEME resolved again,
    then theme_select with the same spec forced: theme.ini and its PNGs, or the .msstyles through libuxtheme, are loaded anew; every
    frame is re-placed around its client with the new margins (client_retheme keeps the client rectangle) and repainted, the
    header pixmaps are rendered again (new theme generation), _LHWM_FRAME_METRICS and _LHWM_COMPOSITED are republished. */
@@ -4612,7 +4610,7 @@ static void keys_add(const char *line) {
     if (k->sym != NoSymbol) nkeys++;
 }
 static void keys_setup(void) {
-    /* the one-time move of ~/.config/{longhorn,lhshell,flxp,lhwm} into lhde's directories (lhde-session does it before us; a
+    /* the one-time move of ~/.config/{longhorn,luxshell,flxp,luxwm} into lhde's directories (lhde-session does it before us; a
        luxwm started by hand does it here, so ~/.config/lhde/keys is where the file is by the time we read it) */
     { static char rep[16384]; if (lhde_settings_migrate(0, rep, sizeof rep) > 0 && rep[0]) fputs(rep, stderr); }
     char path[MAXLEN]; lhde_config_file("keys", path, sizeof path);
@@ -4643,7 +4641,7 @@ static void keys_setup(void) {
 static void spawn(const char *cmd) {
     if (fork() == 0) { const char *h = getenv("HOME"); if (h && *h && chdir(h)) {} setsid(); execl("/bin/sh", "sh", "-c", cmd, NULL); _exit(1); }
 }
-/* "shell CMD": a session command for the shell, the root property _LHSHELL_COMMAND (lhshell's runtime.lua handles it) */
+/* "shell CMD": a session command for the shell, the root property _LHSHELL_COMMAND (luxshell's runtime.lua handles it) */
 static void shell_command(const char *cmd) {
     Atom p = XInternAtom(display, "_LHSHELL_COMMAND", False), u = XInternAtom(display, "UTF8_STRING", False);
     XChangeProperty(display, root, p, u, 8, PropModeReplace, (const unsigned char *)cmd, (int)strlen(cmd)); XFlush(display);
@@ -4661,7 +4659,7 @@ static void showing_set_prop(void) {
     long v = sd_on; XChangeProperty(display, root, net_atom[NetShowingDesktop], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&v, 1);
 }
 static void showing_forget(void) { if (!sd_on) return; sd_on = false; sd_n = 0; sd_focus = None; showing_set_prop(); LOGN("showing desktop: forgotten"); }
-/* something the user did changed the desktop while it was shown (why: for the debug log); not lhwm's own restore of the set */
+/* something the user did changed the desktop while it was shown (why: for the debug log); not luxwm's own restore of the set */
 static void showing_changed(const char *why) {
     if (!sd_on || sd_restoring) return;
     LOGP("showing desktop: %s, the remembered windows stay minimised", why);
@@ -4714,7 +4712,7 @@ static void showing_desktop(int mode) {
 
 static bool super_down; bool super_other;
 /* ---- Alt+Tab as Windows' (README "Alt+Tab"): while the binding's modifier (Alt, or Super for Mod4+Tab) is held the keyboard is
-   lhwm's; the candidates are the current desktop's windows in stacking order (top first), then the minimised ones. Each Tab
+   luxwm's; the candidates are the current desktop's windows in stacking order (top first), then the minimised ones. Each Tab
    (Shift+Tab: backwards, wrapping) previews the next candidate by raising it, client and frame, over the others without focusing
    it; the previous candidate goes back to where it was (the whole set is restacked to the order from before Alt+Tab, then the new
    candidate put on top of it). A minimised candidate is not shown (it is restored only if it is chosen). Releasing the modifier
@@ -4813,9 +4811,9 @@ static void cycle_run(XKeyEvent *kev, unsigned mods, bool reverse) {
     LOGP("alt+tab: %s 0x%lx", cancel ? "cancelled at" : "chose", cand[idx]);
 }
 
-/* Super alone: the "start" binding grabs the bare Super key (the keyboard is then lhwm's until Super is released, so the
+/* Super alone: the "start" binding grabs the bare Super key (the keyboard is then luxwm's until Super is released, so the
    Mod4 bindings still arrive here); any other key or a button press in between cancels it; the release sends the
-   _LHSHELL_START client message to the root (lhshell toggles its start menu). Unbound Super+key combinations are swallowed
+   _LHSHELL_START client message to the root (luxshell toggles its start menu). Unbound Super+key combinations are swallowed
    while Super is held (they never reached clients through the old Mod4 grabs either when bound). */
 static void handle_key_release(XEvent *e) {
     XKeyEvent *ev = &e->xkey; KeySym sym = XkbKeycodeToKeysym(display, ev->keycode, 0, 0);
@@ -5110,7 +5108,7 @@ drag_resize_step(struct client *c, struct drag_cl *d, int hit, int ox, int oy, i
    (GTK 3, Qt 5) use None, which under Composite means a copy of whatever the screen showed there (the old frame border, the
    desktop): that strip is the flicker. The first growing step finds out which kind the client is (drag_bg_probe); a client with
    background None gets the colour of its own right edge (sampled when the drag starts) as background pixel until the drag ends,
-   then None again. A client with a background pixel (xterm, Xt) is left alone: its strip is already its own colour, and lhwm
+   then None again. A client with a background pixel (xterm, Xt) is left alone: its strip is already its own colour, and luxwm
    cannot read the old value back to restore it. */
 #define SYNC_WAIT 50
 struct drag_cl {
@@ -5571,16 +5569,15 @@ client_read_ext(struct client *c)
         XFree(d); d = NULL;
     }
     if (XGetWindowProperty(display, c->window, lhwm_flags_atom, 0, 1, False, XA_CARDINAL, &ty, &fmt, &n, &after, &d) == Success && d) {
-        if (fmt == 32 && n == 1) c->ext_flags = ((unsigned long *)d)[0] & 0xFFFFUL;   /* the client's flags (the higher bits are lhwm's) */
+        if (fmt == 32 && n == 1) c->ext_flags = ((unsigned long *)d)[0] & 0xFFFFUL;   /* the client's flags (the higher bits are luxwm's) */
         XFree(d);
     }
     LOGP("client 0x%lx extend %lu %lu %lu %lu flags %lu", c->window, c->ext[0], c->ext[1], c->ext[2], c->ext[3], c->ext_flags);
 }
 
 /* root _LHWM_COMPOSITED (1: DWM glass frames, extended frames honoured) and _LHWM_FRAME_METRICS (CARDINAL[19]: caption_h border_l
-   border_r border_b text_rgb glow_rgb inactive_text_rgb 0, then since 2026-10-24 max_caption_h max_border_l max_border_r
-   max_border_b border_t max_border_t, since 2026-10-25 max_text_rgb max_inactive_text_rgb max_glow_rgb 0, since 2026-10-27
-   deco_h; CLIENT-PROTOCOL.md); written when they change; extended clients are repainted when
+   border_r border_b text_rgb glow_rgb inactive_text_rgb 0 max_caption_h max_border_l max_border_r
+   max_border_b border_t max_border_t max_text_rgb max_inactive_text_rgb max_glow_rgb 0 deco_h; CLIENT-PROTOCOL.md); written when they change; extended clients are repainted when
    composition comes or goes (the extension is then ignored / honoured again) */
 #define METRICS_N 19
 static void
@@ -5594,7 +5591,7 @@ composited_publish(void)
     double glow[3] = { 0, 0, 0 };
     if (theme.mode == THEME_DWM) memcpy(glow, theme.glow, sizeof glow);
     else if (theme.ms && theme.ms[MP_CAPTION].sh_type[0]) memcpy(glow, theme.ms[MP_CAPTION].sh_rgb[0], sizeof glow);
-    int ml, mr, mt, mb; theme_margins_ex(&theme, 1, &ml, &mr, &mt, &mb);   /* maximised: DWM caption with no borders (M5a), msstyles MAXCAPTION */
+    int ml, mr, mt, mb; theme_margins_ex(&theme, 1, &ml, &mr, &mt, &mb);   /* maximised: DWM caption with no borders, msstyles MAXCAPTION */
     long m[METRICS_N] = { t, l, r, b, RGB(theme.text_a), RGB(glow), RGB(theme.text_i), 0,
                           mt, ml, mr, mb,                                     /* the maximised frame margins */
                           theme_caption_border(&theme, 0), theme_caption_border(&theme, 1),   /* top border kept above a CLIENT_CAPTION client */
@@ -5704,7 +5701,7 @@ anim_expire(void)
     return next < 0 ? -1 : (int)next + 1;
 }
 
-/* M5b crossfade (README "Maximised mode"): the weight of the maximised plate for frame_paint_ex3, linear over XFADE_MS like lhshell's
+/* the maximise crossfade (README "Maximised mode"): the weight of the maximised plate for frame_paint_ex3, linear over XFADE_MS like luxshell's
    black layers (runtime.lua: lh.animate(..., 400), linear, 25 ms tick); -1 = by state (no fade running; a finished one is cleared) */
 static double
 xfade_weight(struct client *c)
@@ -5738,7 +5735,7 @@ xfade_tick(void)
     return next < 0 ? -1 : (int)next + 1;
 }
 
-/* where a minimised window goes: its taskbar button (_NET_WM_ICON_GEOMETRY, set by lhshell), else the bottom-left of the work
+/* where a minimised window goes: its taskbar button (_NET_WM_ICON_GEOMETRY, set by luxshell), else the bottom-left of the work
    area (a 160 x 24 rectangle sitting on its bottom edge) */
 static void
 anim_icon_rect(struct client *c, int *x, int *y, int *w, int *h)
@@ -5766,8 +5763,8 @@ static int muldiv(int a, int b, int c) { double v = (double)a * b / c; return (i
    wireframe (AnimateFrame / DrawWireFrame, 1 px white XOR pen) is Win95 code that XP compiles out ("DISABLE OLD ANIMATION FOR
    M7"); ANIMATE_WIREFRAME draws XOR rectangles (3 px, GXxor) with the same timing instead.
 
-   XP locks the screen for the whole 250 ms; holding the X server grab that long froze every other client (an xclock missed its
-   tick, 2026-10-27). Now only each frame's erase + draw runs under the grab (well under a millisecond); between frames the server
+   XP locks the screen for the whole 250 ms; holding the X server grab that long freezes every other client (an xclock misses its
+   tick). Only each frame's erase + draw runs under the grab (well under a millisecond); between frames the server
    is free and other clients draw, also under our caption or wireframe. So a frame is not erased blindly: each patch keeps the
    screen it covered (saved) and what we put there (drawn), and the erase reads the screen back and restores saved only where
    our pixels are still there; a pixel a client painted meanwhile is left as the client painted it (no stale save-under, no
@@ -5955,7 +5952,7 @@ main(int argc, char *argv[])
         }
     }
 
-    if (conf_path[0] == '\0') {   /* berry's autostart script, now ~/.config/lhde/luxwm-autostart; run only when it exists */
+    if (conf_path[0] == '\0') {   /* berry's autostart script, ~/.config/lhde/luxwm-autostart; run only when it exists */
         lhde_config_file(LUXWM_AUTOSTART, conf_path, MAXLEN);
         if (access(conf_path, R_OK) != 0) conf_found = false;
     }

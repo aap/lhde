@@ -36,10 +36,10 @@ struct client {
     int depth;                          /* the client's depth: 32 (ARGB) may be translucent, anything else covers its part of the plate */
     unsigned long paint_serial;         /* first request of the last frame paint: Expose events older than it are already covered */
     bool dirty;                         /* an Expose arrived after the last paint: repainted when the event queue is empty */
-    int unmap_ignore;                   /* UnmapNotify events lhwm caused itself (minimise unmaps the client) */
+    int unmap_ignore;                   /* UnmapNotify events luxwm caused itself (minimise unmaps the client) */
     bool unmapped;                      /* minimised: client and decoration window are unmapped (ICCCM IconicState) */
     double anim_until;                  /* _LHWM_ANIMATE is 2 (picom geometry animation) until this time (ms, now_ms()), 0: not */
-    double xfade_t0, xfade_next;        /* M5b maximise/restore crossfade of the DWM plate: start (ms, now_ms(); 0 = none), next repaint */
+    double xfade_t0, xfade_next;        /* maximise/restore crossfade of the DWM plate: start (ms, now_ms(); 0 = none), next repaint */
     bool xfade_to_max;                  /* its direction: normal -> maximised plate, or back */
     Visual *visual;                     /* the client's visual (the header pixmap is made in its depth/visual) */
     Pixmap hdr_pix;                     /* _LHWM_HEADER_PIXMAP published on the client (None: none) */

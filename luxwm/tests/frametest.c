@@ -2,8 +2,8 @@
    frametest THEMEDIR out.png                         -> 4 frames: focused, hover close, pressed max, inactive (360x90 each)
    frametest THEMEDIR out.png W H TITLE FOCUSED [MAXIMIZED [HOVER [ICON.png]]]  -> one W x H frame (HOVER: close|max|min)
    (env FRAMETEST_EXT="l r t b [flags]": extended frame; FRAMETEST_FADE=F: maximised-plate crossfade weight 0..1;
-    FRAMETEST_FONTS="DIR[;DIR]": font directories as the registry's fonts =;
-    FRAMETEST_SOURCE=dir|lib: the theme directory's PNG cache, or the visual style through libuxtheme (default: the library when lhwm
+    FRAMETEST_FONTS="DIR[;DIR]": font directories as the theme's path.fonts;
+    FRAMETEST_SOURCE=dir|lib: the theme directory's PNG cache, or the visual style through libuxtheme (default: the library when luxwm
     has it and a style is named). THEMEDIR may be a theme spec, "DIR|STYLE.msstyles|COLOR|SIZE" or "|STYLE.msstyles|COLOR|SIZE")
    also prints the frame margins, hit-test probes and the window shape the painter's alpha produces */
 #include "../frame.h"
@@ -12,7 +12,7 @@
 #include <string.h>
 int main(int argc, char **argv) {
     if (argc < 3) { fprintf(stderr, "usage: frametest THEMEDIR out.png [W H TITLE FOCUSED [MAXIMIZED [HOVER [ICON]]]]\n"); return 2; }
-    /* FRAMETEST_FONTS="DIR[;DIR]": the registry's fonts = (docs/history/THEMES.md), registered as lhwm does before the theme loads */
+    /* FRAMETEST_FONTS="DIR[;DIR]": the theme's path.fonts, registered as luxwm does before the theme loads */
     if (getenv("FRAMETEST_FONTS")) frame_fonts_set(getenv("FRAMETEST_FONTS"));
     const char *src = getenv("FRAMETEST_SOURCE");
     if (src && !strcmp(src, "dir")) frame_theme_source = FRAME_SRC_DIR;
@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
         if (es && sscanf(es, "%d %d %d %d %u", &el, &er, &et, &eb, &ext.flags) >= 4) {
             int l, r, tp, b; theme_margins_ex(&t, max, &l, &r, &tp, &b);
             if (el < 0 && er < 0 && et < 0 && eb < 0) { ext.sheet = 1; ext.t = h - tp - b; } else { ext.l = el; ext.r = er; ext.t = et; ext.b = eb; } }
-        /* FRAMETEST_FADE=F: the M5b crossfade weight of the maximised plate (0 normal .. 1 maximised; default by MAXIMIZED) */
+        /* FRAMETEST_FADE=F: the crossfade weight of the maximised plate (0 normal .. 1 maximised; default by MAXIMIZED) */
         const char *fs = getenv("FRAMETEST_FADE"); double fade = fs ? atof(fs) : -1;
         cairo_t *cr = cairo_create(img); frame_paint_cr3(cr, &t, w, h, argv[5], icon, foc, hov, 0, max, es ? &ext : NULL, fade); cairo_destroy(cr);
         int l, r, tp, b; theme_margins_ex(&t, max, &l, &r, &tp, &b); printf("margins l=%d r=%d t=%d b=%d\n", l, r, tp, b);

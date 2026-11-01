@@ -1,4 +1,4 @@
-/* lhwm: popup menus shown by the window manager (docs/LUXWM.md "The window menu"). The system menu of a window (wm.c wmmenu_open)
+/* luxwm: popup menus shown by the window manager (docs/LUXWM.md "The window menu"). The system menu of a window (wm.c wmmenu_open)
    is the first user; the API takes a plain item list so other context menus can reuse it.
 
    Look: wuxtheme's popup menu painter (ut_menu_draw), the one that draws wux's user32 menus too: the frame theme's visual style

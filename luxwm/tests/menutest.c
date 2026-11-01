@@ -1,6 +1,6 @@
-/* lhwm: renders the window menu (menu.c) offline, as wmmenu_popup draws it: ./menutest THEMESPEC out.png [SEL [MAXIMIZED [KEYBOARD]]]
+/* luxwm: renders the window menu (menu.c) offline, as wmmenu_popup draws it: ./menutest THEMESPEC out.png [SEL [MAXIMIZED [KEYBOARD]]]
    THEMESPEC as frametest's (a directory, DIR|STYLE|COLOR|SIZE or |STYLE|COLOR|SIZE); MENUTEST_FONTS="DIR[;DIR]" registers font
-   directories as the registry's fonts = does. Build: see README "The window menu". */
+   directories as the theme's path.fonts does. Build: see README "The window menu". */
 #include "../config.h"
 #include <stdio.h>
 #include <stdlib.h>

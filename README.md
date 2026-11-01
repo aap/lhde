@@ -87,8 +87,8 @@ missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).
 Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac -p`), and luxwm's frame
 regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a
-baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the first run;
-`--baseline-from-x11 DIR` takes it from the x11 lab's build); skipped without imported styles.
+baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the first run); skipped
+without imported styles.
 Last the free baseline (`make check-free`, `tests/check-free.sh`): ReactOS's boot CD (`LHDE_REACTOS_ISO`, else
 `~/lib/windows_isos/ReactOS-*.iso`; skipped without one) imported once into `build/free/windows`, and with that tree
 alone every shipped theme must resolve (`lhde-theme explain`, `explain --files`), classic and the ReactOS themes with

@@ -1,7 +1,7 @@
 #ifndef __BERRY_GLOBALS_H_
 #define __BERRY_GLOBALS_H_
 
-#define LUXWM_AUTOSTART "luxwm-autostart"   /* in ~/.config/lhde (lhde_config_file); was berry/autostart */
+#define LUXWM_AUTOSTART "luxwm-autostart"   /* in ~/.config/lhde (lhde_config_file); berry's autostart */
 
 #ifndef __WINDOW_MANAGER_NAME__
 #define __WINDOW_MANAGER_NAME__ "wm"
