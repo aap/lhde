@@ -2,7 +2,6 @@
 #ifndef LHDE_INTERNAL_H
 #define LHDE_INTERNAL_H
 #include <stddef.h>
-char *lhde__trim(char *s);
 int lhde__mkdirs(const char *d);
 int lhde__write_file(const char *path, const char *data);   /* atomic, through symlinks, parent created; 0 on success */
 int lhde__exists(const char *p);

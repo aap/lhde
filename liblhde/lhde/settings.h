@@ -43,6 +43,8 @@ void lhde_ini_header(lhde_ini *ini, const char *text);
    the parent directory is created). 0 on success. */
 char *lhde_ini_text(const lhde_ini *ini);
 int lhde_ini_save(const lhde_ini *ini, const char *path);
+/* the ini reader's trim, in place: leading blanks and tabs, trailing blanks, tabs, CR and LF; returns the start within s */
+char *lhde_trim(char *s);
 
 /* ---- the store ---- */
 /* the settings file (above) and the directory of the user's theme files, ${XDG_CONFIG_HOME:-~/.config}/lhde/themes */

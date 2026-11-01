@@ -80,7 +80,7 @@ void lhde_ini_free(lhde_ini *ini)
     free(ini->l); free(ini);
 }
 
-char *lhde__trim(char *s)
+char *lhde_trim(char *s)
 {
     while (*s == ' ' || *s == '\t') s++;
     char *e = s + strlen(s);
@@ -98,20 +98,20 @@ static int classify(const char *line, char *sec, size_t ns, char *key, size_t nk
         const char *e = strchr(s, ']');
         size_t len = e ? (size_t)(e - s - 1) : strlen(s + 1);
         char tmp[512]; snprintf(tmp, sizeof tmp, "%.*s", (int)(len < 511 ? len : 511), s + 1);
-        snprintf(sec, ns, "%s", lhde__trim(tmp));
+        snprintf(sec, ns, "%s", lhde_trim(tmp));
         return 1;
     }
     const char *eq = strchr(s, '=');
     if (!eq) return 0;
     char tk[512]; snprintf(tk, sizeof tk, "%.*s", (int)((size_t)(eq - s) < 511 ? (size_t)(eq - s) : 511), s);
-    snprintf(key, nk, "%s", lhde__trim(tk));
+    snprintf(key, nk, "%s", lhde_trim(tk));
     const char *v = eq + 1;
     if (cstart) *cstart = -1;
     size_t vl = strlen(v);
     for (size_t i = 1; i < vl; i++)
         if ((v[i] == ';' || v[i] == '#') && (v[i - 1] == ' ' || v[i - 1] == '\t')) { if (cstart) *cstart = (int)(v + i - line); vl = i; break; }
     char tv[4096]; snprintf(tv, sizeof tv, "%.*s", (int)(vl < 4095 ? vl : 4095), v);
-    snprintf(val, nv, "%s", lhde__trim(tv));
+    snprintf(val, nv, "%s", lhde_trim(tv));
     return 2;
 }
 
@@ -152,10 +152,10 @@ static int remove_if_empty(lhde_ini *ini, const char *sec)
         if (keys) continue;
         /* the header and what follows it up to the next section (blank lines, comments), and one blank line before it */
         for (int x = j - 1; x >= i; x--) drop(ini, x);
-        if (i > 0 && !*lhde__trim(strdupa(ini->l[i - 1])) && (i >= ini->n || !*lhde__trim(strdupa(ini->l[i])))) { drop(ini, i - 1); i--; }
+        if (i > 0 && !*lhde_trim(strdupa(ini->l[i - 1])) && (i >= ini->n || !*lhde_trim(strdupa(ini->l[i])))) { drop(ini, i - 1); i--; }
         i--; changed = 1;
     }
-    while (ini->n > 0 && !*lhde__trim(strdupa(ini->l[ini->n - 1]))) drop(ini, ini->n - 1);
+    while (ini->n > 0 && !*lhde_trim(strdupa(ini->l[ini->n - 1]))) drop(ini, ini->n - 1);
     return changed;
 }
 
@@ -169,7 +169,7 @@ int lhde_ini_set(lhde_ini *ini, const char *sec, const char *key, const char *va
         int c = classify(ini->l[i], s2, sizeof s2, k, sizeof k, v, sizeof v, &cs);
         if (c == 1) { snprintf(cur, sizeof cur, "%s", s2); if (!strcasecmp(cur, sec)) { have_sec = 1; last_line = i; } continue; }
         if (strcasecmp(cur, sec) || !cur[0]) continue;
-        if (*lhde__trim(strdupa(ini->l[i]))) last_line = i;
+        if (*lhde_trim(strdupa(ini->l[i]))) last_line = i;
         if (c == 2 && !strcasecmp(k, key)) {
             if (!value) { drop(ini, i); i--; last_line = i; changed = 1; continue; }
             if (last_key >= 0) { drop(ini, last_key); i--; changed = 1; }   /* a duplicate: the later one wins, one stays */
@@ -197,7 +197,7 @@ int lhde_ini_set(lhde_ini *ini, const char *sec, const char *key, const char *va
     snprintf(line, need, "%s = %s", key, value);
     if (have_sec) push(ini, line, last_line + 1);
     else {
-        if (ini->n > 0 && *lhde__trim(strdupa(ini->l[ini->n - 1]))) push(ini, "", -1);
+        if (ini->n > 0 && *lhde_trim(strdupa(ini->l[ini->n - 1]))) push(ini, "", -1);
         char hdr[300]; snprintf(hdr, sizeof hdr, "[%s]", sec);
         push(ini, hdr, -1); push(ini, line, -1);
     }
@@ -215,12 +215,12 @@ int lhde_ini_remove_section(lhde_ini *ini, const char *sec)
         for (; j < ini->n; j++) if (classify(ini->l[j], s, sizeof s, k, sizeof k, v, sizeof v, NULL) == 1) break;
         /* keep comment lines that introduce the next section (directly before its header) */
         int end = j;
-        while (end > i + 1 && j < ini->n && classify(ini->l[end - 1], s, sizeof s, k, sizeof k, v, sizeof v, NULL) == 0 && *lhde__trim(strdupa(ini->l[end - 1]))) end--;
+        while (end > i + 1 && j < ini->n && classify(ini->l[end - 1], s, sizeof s, k, sizeof k, v, sizeof v, NULL) == 0 && *lhde_trim(strdupa(ini->l[end - 1]))) end--;
         for (int x = end - 1; x >= i; x--) drop(ini, x);
-        if (i > 0 && !*lhde__trim(strdupa(ini->l[i - 1])) && (i >= ini->n || !*lhde__trim(strdupa(ini->l[i])))) drop(ini, i - 1);
+        if (i > 0 && !*lhde_trim(strdupa(ini->l[i - 1])) && (i >= ini->n || !*lhde_trim(strdupa(ini->l[i])))) drop(ini, i - 1);
         i--; changed = 1;
     }
-    while (ini && ini->n > 0 && !*lhde__trim(strdupa(ini->l[ini->n - 1]))) drop(ini, ini->n - 1);
+    while (ini && ini->n > 0 && !*lhde_trim(strdupa(ini->l[ini->n - 1]))) drop(ini, ini->n - 1);
     return changed;
 }
 
