@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <poll.h>
 #include <string.h>
 #include <unistd.h>
@@ -37,6 +38,8 @@ std::mutex g_lock;
 std::vector<std::string> g_paths;      // CLIPBOARD's files
 bool g_cut;
 bool g_clip_text;                      // CLIPBOARD holds g_text[0] instead of files
+bool g_clip_data;                      // CLIPBOARD holds g_data instead of files or text
+Data g_data;                           // target name, bytes
 std::string g_text[2];                 // text offered: [0] CLIPBOARD, [1] PRIMARY
 unsigned g_req, g_done;                // set_files' requests, and the last one the thread carried out
 unsigned g_preq, g_pdone;              // the same for PRIMARY
@@ -71,11 +74,33 @@ void answer(Display* d, const Atoms& a, const XSelectionRequestEvent& rq)
     ev.time = rq.time;
     ev.property = rq.property ? rq.property : rq.target;   // obsolete clients
     std::vector<std::string> paths;
-    bool cut, text_mode;
+    bool cut, text_mode, data_mode;
     std::string text;
+    Data data;
     bool prim = rq.selection == a.primary;
-    { std::lock_guard<std::mutex> l(g_lock); paths = g_paths; cut = g_cut; text_mode = prim || g_clip_text; text = g_text[prim ? 1 : 0]; }
-    if (text_mode && (rq.selection == a.clipboard || prim)) {   // text: UTF-8, plain and Latin-1 STRING (as is)
+    { std::lock_guard<std::mutex> l(g_lock); paths = g_paths; cut = g_cut; text_mode = prim || g_clip_text; text = g_text[prim ? 1 : 0];
+      data_mode = !prim && g_clip_data; if (data_mode) data = g_data; }
+    if (data_mode && rq.selection == a.clipboard) {   // typed data: the targets by name
+        if (rq.target == a.targets) {
+            std::vector<Atom> t = { a.targets, a.timestamp };
+            for (const auto& e : data) t.push_back(XInternAtom(d, e.first.c_str(), False));
+            XChangeProperty(d, rq.requestor, ev.property, XA_ATOM, 32, PropModeReplace, (unsigned char*)t.data(), (int)t.size());
+        } else if (rq.target == a.timestamp) {
+            long t = (long)g_owned_since;
+            XChangeProperty(d, rq.requestor, ev.property, XA_INTEGER, 32, PropModeReplace, (unsigned char*)&t, 1);
+        } else {
+            const std::string* bytes = nullptr;
+            for (const auto& e : data) if (XInternAtom(d, e.first.c_str(), True) == rq.target) bytes = &e.second;
+            long max = XExtendedMaxRequestSize(d) ? XExtendedMaxRequestSize(d) : XMaxRequestSize(d);
+            if (bytes && (long)bytes->size() > max * 4 - 1024) {
+                fprintf(stderr, "flxp: the clipboard's %zu bytes exceed the server's request size\n", bytes->size());
+                bytes = nullptr;
+            }
+            if (bytes) XChangeProperty(d, rq.requestor, ev.property, rq.target, 8, PropModeReplace, (const unsigned char*)bytes->data(), (int)bytes->size());
+            else ev.property = None;
+        }
+    }
+    else if (text_mode && (rq.selection == a.clipboard || prim)) {   // text: UTF-8, plain and Latin-1 STRING (as is)
         if (rq.target == a.targets) {
             Atom t[] = { a.targets, a.timestamp, a.utf8, a.text_plain, XA_STRING };
             XChangeProperty(d, rq.requestor, ev.property, XA_ATOM, 32, PropModeReplace, (unsigned char*)t, (int)(sizeof t / sizeof t[0]));
@@ -140,7 +165,8 @@ void owner_thread(Display* d)
             (void)!read(g_pipe[0], c, sizeof c);
             bool empty, pempty;
             unsigned req, done, preq, pdone;
-            { std::lock_guard<std::mutex> l(g_lock); req = g_req; done = g_done; empty = g_clip_text ? g_text[0].empty() : g_paths.empty();
+            { std::lock_guard<std::mutex> l(g_lock); req = g_req; done = g_done;
+              empty = g_clip_data ? g_data.empty() : g_clip_text ? g_text[0].empty() : g_paths.empty();
               preq = g_preq; pdone = g_pdone; pempty = g_text[1].empty(); }
             if (preq != pdone) {
                 Time t = server_time(d, w, a.prop);
@@ -183,7 +209,7 @@ bool start()
 bool set_files(const std::vector<std::string>& paths, bool cut)
 {
     if (!start()) return false;
-    { std::lock_guard<std::mutex> l(g_lock); g_paths = paths; g_cut = cut; g_clip_text = false; g_req++; }
+    { std::lock_guard<std::mutex> l(g_lock); g_paths = paths; g_cut = cut; g_clip_text = false; g_clip_data = false; g_data.clear(); g_req++; }
     g_lost = false;
     (void)!write(g_pipe[1], "o", 1);
     return true;
@@ -196,7 +222,7 @@ bool ours()
     if (g_failed) return !g_clip_text;
     if (!g_started) return false;
     std::lock_guard<std::mutex> l(g_lock);
-    if (g_clip_text) return false;   // our text, no files
+    if (g_clip_text || g_clip_data) return false;   // our text or data, no files
     return g_req != g_done ? !g_paths.empty() : (bool)g_owned;
 }
 
@@ -212,11 +238,30 @@ bool set_text(const std::string& text, bool primary)
         std::lock_guard<std::mutex> l(g_lock);
         g_text[primary ? 1 : 0] = text;
         if (primary) g_preq++;
-        else { g_clip_text = true; g_paths.clear(); g_req++; }
+        else { g_clip_text = true; g_clip_data = false; g_data.clear(); g_paths.clear(); g_req++; }
     }
     if (!primary) g_lost = true;   // cut marks of an earlier set_files are stale
     (void)!write(g_pipe[1], "o", 1);
     return true;
+}
+
+bool set_data(const Data& data)
+{
+    if (!start()) return false;
+    {
+        std::lock_guard<std::mutex> l(g_lock);
+        g_data = data; g_clip_data = true; g_clip_text = false; g_paths.clear(); g_req++;
+    }
+    g_lost = true;   // cut marks of an earlier set_files are stale
+    (void)!write(g_pipe[1], "o", 1);
+    return true;
+}
+
+bool owned()
+{
+    if (!g_started || g_failed) return false;
+    std::lock_guard<std::mutex> l(g_lock);
+    return g_req != g_done || g_owned;
 }
 
 bool other_owner()
@@ -259,6 +304,7 @@ bool get_text(std::string& out, bool primary, int timeout_ms)
         if (primary && (g_preq != g_pdone || g_powned)) { out = g_text[1]; return !out.empty(); }
         if (!primary && (g_req != g_done || g_owned || g_failed)) {
             if (g_clip_text) out = g_text[0];
+            else if (g_clip_data) { for (const auto& e : g_data) if (e.first == "UTF8_STRING") out = e.second; }
             else for (size_t i = 0; i < g_paths.size(); i++) out += (i ? "\n" : "") + g_paths[i];   // files as their paths
             return !out.empty();
         }

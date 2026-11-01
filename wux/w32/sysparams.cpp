@@ -8,6 +8,7 @@ extern "C" {
 #include "flxp_shell.h"
 }
 #include "sys/sys.h"
+#include "shell/xclip.h"
 #include "gdi/font.h"
 
 using namespace w32;
@@ -313,11 +314,42 @@ BOOL WINAPI EnumDisplayMonitors(HDC, LPRECT, MONITORENUMPROC proc, LPARAM lp)
 
 static std::map<UINT, HANDLE> g_clip;
 static UINT g_next_clipfmt = 0xC000;
+static std::map<std::u16string, UINT> g_clipfmts;   // registered names (the same name: the same format)
 static bool g_clip_text_set;   // flxp: text was set since OpenClipboard: CloseClipboard puts it on the X CLIPBOARD
+static bool g_clip_data_set;   // flxp: a registered format named by a MIME type ("image/png"; "PNG" is image/png) was set
 
-BOOL WINAPI OpenClipboard(HWND) { g_clip_text_set = false; return TRUE; }
+// the X target a registered format stands for: its name when it is a MIME type, "PNG" as image/png; "" for none
+static std::string clip_target(UINT fmt)
+{
+    for (const auto& e : g_clipfmts) {
+        if (e.second != fmt) continue;
+        std::string n = utf8_of((const WCHAR*)e.first.c_str());
+        if (n == "PNG") return "image/png";
+        return n.find('/') != std::string::npos ? n : std::string();
+    }
+    return std::string();
+}
+
+BOOL WINAPI OpenClipboard(HWND) { g_clip_text_set = g_clip_data_set = false; return TRUE; }
 BOOL WINAPI CloseClipboard(void)
 {
+    if (g_clip_data_set) {   // flxp: typed data (and the text, if any) on the X CLIPBOARD, by target name
+        g_clip_data_set = g_clip_text_set = false;
+        shell::xclip::Data data;
+        for (const auto& e : g_clip) {
+            std::string target = clip_target(e.first);
+            if (target.empty() || !e.second) continue;
+            data.emplace_back(target, std::string((const char*)GlobalLock((HGLOBAL)e.second), GlobalSize((HGLOBAL)e.second)));
+            GlobalUnlock((HGLOBAL)e.second);
+        }
+        if (HANDLE h = g_clip.count(CF_UNICODETEXT) ? g_clip[CF_UNICODETEXT] : nullptr) {
+            std::string t = utf8_of((const WCHAR*)GlobalLock((HGLOBAL)h));
+            GlobalUnlock((HGLOBAL)h);
+            data.emplace_back("UTF8_STRING", t);
+            data.emplace_back("text/plain;charset=utf-8", t);
+        }
+        shell::xclip::set_data(data);
+    }
     if (g_clip_text_set) {
         g_clip_text_set = false;
         if (HANDLE h = GetClipboardData(CF_UNICODETEXT)) {
@@ -339,6 +371,7 @@ HANDLE WINAPI SetClipboardData(UINT fmt, HANDLE h)
     auto it = g_clip.find(fmt);
     if (it != g_clip.end() && it->second && it->second != h) GlobalFree((HGLOBAL)it->second);
     g_clip[fmt] = h;
+    if (fmt >= 0xC000 && !clip_target(fmt).empty()) g_clip_data_set = true;
     if (fmt == CF_UNICODETEXT || fmt == CF_TEXT) {
         g_clip_text_set = true;
         if (fmt == CF_TEXT) { auto u = g_clip.find(CF_UNICODETEXT); if (u != g_clip.end()) { if (u->second) GlobalFree((HGLOBAL)u->second); g_clip.erase(u); } }
@@ -390,8 +423,31 @@ BOOL WINAPI IsClipboardFormatAvailable(UINT fmt)
     return FALSE;
 }
 INT WINAPI CountClipboardFormats(void) { return (INT)g_clip.size(); }
-UINT WINAPI RegisterClipboardFormatW(LPCWSTR) { return g_next_clipfmt++; }
-UINT WINAPI RegisterClipboardFormatA(LPCSTR) { return g_next_clipfmt++; }
+UINT WINAPI RegisterClipboardFormatW(LPCWSTR name)
+{
+    if (!name || !*name) return 0;
+    std::u16string n((const char16_t*)name);
+    auto it = g_clipfmts.find(n);
+    if (it != g_clipfmts.end()) return it->second;
+    return g_clipfmts[n] = g_next_clipfmt++;
+}
+UINT WINAPI RegisterClipboardFormatA(LPCSTR name)
+{
+    if (!name || !*name) return 0;
+    return RegisterClipboardFormatW((LPCWSTR)utf16_of(name).c_str());
+}
+INT WINAPI GetClipboardFormatNameW(UINT fmt, LPWSTR buf, INT cch)
+{
+    for (const auto& e : g_clipfmts) {
+        if (e.second != fmt) continue;
+        if (!buf || cch <= 0) return 0;
+        INT n = (INT)e.first.size() < cch - 1 ? (INT)e.first.size() : cch - 1;
+        memcpy(buf, e.first.data(), n * sizeof(WCHAR));
+        buf[n] = 0;
+        return n;
+    }
+    return 0;
+}
 HWND WINAPI GetClipboardOwner(void) { return nullptr; }
 DWORD WINAPI GetClipboardSequenceNumber(void) { return (DWORD)g_clip.size(); }
 

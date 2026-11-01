@@ -6,6 +6,7 @@
 // owner's files is a synchronous conversion on a second connection. No win32.
 #pragma once
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace shell {
@@ -32,6 +33,13 @@ bool get_files(std::vector<std::string>& paths, bool& cut, int timeout_ms = 1000
 // are their paths, one per line.
 bool set_text(const std::string& text, bool primary);
 bool get_text(std::string& out, bool primary, int timeout_ms = 500);
+// Data of any type on CLIPBOARD: each entry a target name ("image/png", "UTF8_STRING") and its bytes (empty list: gives
+// it up). Offered as they are, without INCR: an entry larger than the server's request size is refused with a message.
+using Data = std::vector<std::pair<std::string, std::string>>;
+bool set_data(const Data& data);
+// What our last set_files, set_text (CLIPBOARD) or set_data put there is still what CLIPBOARD holds (or the take-over is
+// pending): a program that offered something stays to answer requests until this turns false.
+bool owned();
 
 }
 }
