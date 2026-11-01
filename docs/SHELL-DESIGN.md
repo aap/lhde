@@ -1,13 +1,11 @@
-> **Imported from the Longhorn X11 lab** (`~/fun/longhorn/x11` at d353b69, SHELL-DESIGN.md) into lhde in step 3 of docs/LAYOUT.md. Program and path names are updated to lhde (lhwm → luxwm, lhwmc → luxwmc, lhshell → luxshell, lhnav → luxnav; x11/... and lhwm/themes, lhshell/themes, lhshell/assets → the lhde tree and data directories, see docs/LAYOUT.md and tools/lhde-import); the X atoms (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the window manager name "lhwm", luxnav's C API (`lhnav_*`, `lhnav.h`), configuration paths (`~/.config/longhorn`, `~/.config/lhde/keys`, `~/.config/lhshell`) and setting values (`header_engine = lhnav`, `classic_start_menu = lhshell`) keep their names. Dated sections are history: they describe the x11 tree as it was (its compare_*.png and screenshots stay in the research workspace).
+# luxshell: the Longhorn taskbar and sidebar
 
-> **Naming (2026-10-25):** the Lua/cairo Avalon-style shell designed here is called **lux** (directory/binary still `luxshell`); the win32 layer under flxp is **wux**. See USAGE.md.
-
-# Longhorn shell on Linux: taskbar + sidebar runtime design
-
-Research document for the second phase of the Longhorn/X11 recreation: after `luxwm` (the window
-manager, `luxwm/`) comes the *shell*: taskbar, start button, tray/clock, sidebar with tiles and
-flyouts, for both the 4051 (Slate, classic taskbar + Avalon "start bar") and 4074 (Aero/Jade,
-Avalon taskbar + sidebar) looks.
+luxshell ("lux", the Avalon shell; flxp is the wux side) draws the Avalon taskbar, the sidebar with its tiles and flyouts, the
+toasts and the tray for the 4042-5112 looks. The classic Win32 taskbar and the start menu are flxp's (flxp-taskbar,
+flxp-startmenu); luxshell starts them and talks to them through the root properties and messages below. Sections 1-3 are the
+research the shell is built from (what the builds do, with sources); sections 4-17 say how luxshell does it. Use:
+docs/USAGE.md; settings: docs/SETTINGS.md; theme files: docs/THEME-FORMAT.md; the WM side: docs/LUXWM.md. luxshell's windows have the
+X class `luxshell` (names `luxshell-taskbar`, `luxshell-sidebar`, ...); the atoms `_LHSHELL_*` and `_LH_*` are stable names.
 
 Everything numeric below is taken from a file in this tree; the source is named in each table.
 Rows marked **(inferred)** are our reading of the data, not a stated fact. Pixel sizes of
@@ -30,7 +28,7 @@ Source shorthands:
 | `slate51` | `res/4051/slate_longhorn.ini` + `res/4051/slate.msstyles/BITMAP_<id>_1033.bmp`, `BLOB_<id>_1033.png` |
 | `imageres` | `res/4074/imageres.dll/PNGFILE_<id>_1033.png` (same files as `mock/assets/imageres/<id>.png`) |
 | `xaml/*` | `res/4074/xaml/xaml_sidebar_*.xaml`, `xaml_notification_notification.xaml` |
-| `XP` | `/u/aap/lib/nt5src/Source/XPSP1/NT/shell/explorer/{tray,taskband,traynot,trayclok}.cpp` |
+| `XP` | `~/lib/nt5src/Source/XPSP1/NT/shell/explorer/{tray,taskband,traynot,trayclok}.cpp` |
 | `il` | `res/4074/il/desktop.il` (System.Windows.Desktop IL dump) |
 | `sym` | `res/sym4051/explorer_syms.txt`, `res/sym4051/system_syms.txt` |
 | `sdk` | `wim/sdk4051/lhsdk/LHSDK/shell/sidebar/`, `.../samples/shellcore/` |
@@ -41,12 +39,12 @@ Source shorthands:
 
 | Build / theme | Taskbar | Sidebar | Where the imagery lives |
 | --- | --- | --- | --- |
-| 4051 Slate (screenshot `4051-vm-now.png`) | **classic Win32** `CTray`/`CTaskBand` drawn through the uxtheme classes `TaskBar`, `TaskBand`, `TrayNotify*`, but with the Avalon start button image (imageres 1156, bilinear; correction 2026-10-24, 2.1.2); 29 px tall (rows 835..863); tray clock hidden because the sidebar shows a clock (`CAvalonTaskBar::_ToggleClock`, COMPOSITION.md §11) | Avalon "start bar" (`startbar.cpp`, registry `Explorer\StartBar\Modules`), Slate look: flat dark grey, clock near the top | uxtheme `.msstyles` BITMAPs; the `Sidebar` class holds its 60 parts as `IMAGEDATA` BLOBs |
+| 4051 Slate (screenshot `4051-vm-now.png`) | **classic Win32** `CTray`/`CTaskBand` drawn through the uxtheme classes `TaskBar`, `TaskBand`, `TrayNotify*`, but with the Avalon start button image (imageres 1156, bilinear, 2.1.2); 29 px tall (rows 835..863); tray clock hidden because the sidebar shows a clock (`CAvalonTaskBar::_ToggleClock`, COMPOSITION.md §11) | Avalon "start bar" (`startbar.cpp`, registry `Explorer\StartBar\Modules`), Slate look: flat dark grey, clock near the top | uxtheme `.msstyles` BITMAPs; the `Sidebar` class holds its 60 parts as `IMAGEDATA` BLOBs |
 | 4074 Jade (default shipped look) | Avalon taskbar is available but the Jade `.msstyles` still carries the classic `TaskBar`/`TaskBand` bitmaps in Segoe UI 9 | Avalon sidebar, `Slate_*Resources` or `Aero_*Resources` dictionaries | `imageres.dll` PNGs 1000-1162 (Slate set) and 1167-1201 (Aero set), plus a few `theme://Sidebar,...` parts as `PNGSTREAM`s |
 | 4074 Aero/DWM (screenshot `4074-dwm.png`) | Avalon taskbar, 30 px glass strip (imageres 1187), glass start button (1179), 140 px task buttons, round sidebar toggle | Avalon sidebar 149 px wide, 70 % black glass (1178), tiles separated by 1199 lines, clock tile pinned at the bottom | `imageres.dll` 1167-1201 |
 
 The classic path and the Avalon path are two renderers over the same model (window list, tray,
-clock, tiles). Section 6 proposes one runtime with two theme packs.
+clock, tiles): luxshell draws the Avalon one, flxp-taskbar the classic one (section 12).
 
 ---
 
@@ -121,11 +119,11 @@ The 3-state `Start::Button` strip is NORMAL (dark slate pill), HOT (bright green
 green); in `slate51` 335 the flag logo is **not** in the bitmap: explorer draws `IDB_START`
 (`tray.cpp:3916-3925`, `start.bmp`) as the button image and the string `IDS_START` = "start"
 (`explorer.rc:306`); the 4051 screenshot shows only the flag, so 4051 either shipped an empty
-string or a logo-only `IDB_START` **(inferred)**. **Correction 2026-10-24:** the 4051 explorer.exe (and the 4051chk one) has no
+string or a logo-only `IDB_START` **(inferred)**. But the 4051 explorer.exe (and the 4051chk one) has no
 bitmap 143 (`IDB_START`), 176 or 178 at all, and the start button of `4051-vm-now.png` is not the 335 pill: it is imageres
 1156 (the Avalon `StartButton` image, 74x23, flag included) drawn 79x29 **bilinear** at the bar's top-left, which reproduces
 the shot to a mean squared error of 0.2 per pixel (nearest 249). Only the task band (dark 146 px plates = 349) and the bar
-background are the classic parts. See "4051 vs 4074 Slate" in the M6 status.
+background are the classic parts. See "4051 vs 4074 Slate" in section 5.
 
 #### 2.1.3 Composition and metrics confirmed in the XP SP1 source
 
@@ -185,10 +183,7 @@ black bar **(inferred)**.
 
 `taskbutton.xaml`: `<AreaButton Style="{TaskButton}" ClipToBounds="true"/>`.
 `taskitem.xaml` content: `Border(0,0,2,0){Image#TaskItemIcon 16x16}` + `Text#TaskItemText`
-(luxshell's icon rule, 2026-10-24: `_NET_WM_ICON`, smallest image >= 16 scaled with cairo BEST, else the `WM_HINTS` pixmap + mask,
-else the pack's `default_icon`, the shell32 application icon, as Explorer falls back to IDI_APPLICATION; re-read on every
-`_NET_WM_ICON` / `WM_HINTS` PropertyNotify)
-(Style TaskItemText = white, VerticalAlignment Center, TextWrap Wrap, TextTrimming
+(luxshell's icon rule: 6.2) (Style TaskItemText = white, VerticalAlignment Center, TextWrap Wrap, TextTrimming
 CharacterEllipsis). `taskgroupitem.xaml`: same plus `Text#TaskItemCount` (bold) + 2 px spacer
 on the left and a Marlett "u" (down arrow) docked right.
 
@@ -224,7 +219,8 @@ the 4 px right `Border` leaves room for.
 
 ### 2.3 Avalon sidebar (4074, `sidebar.xaml` + `*_sidebarresources.xaml`)
 
-Note: early M4 builds had both bars with the taskbar running the full width and the sidebar ending at its top; `[sidebar] stacking = bottom` reproduces that (the sidebar yields to lux's own taskbar strut like to a foreign bottom dock) and, since 2026-10-25, also puts the sidebar under the windows like part of the desktop (`_NET_WM_STATE_BELOW`, no strut; Win+S brings it on top at once, USAGE.md "Stacking"); default `top` is the 4074 layout described here, above the windows with its strut.
+This is the 4074 layout (`[sidebar] stacking = top`): the sidebar above the windows with its strut, the taskbar shortened. The
+other arrangement, the taskbar running the full width and the sidebar ending at its top, is `stacking = bottom` (7.2).
 
 #### 2.3.1 Element tree (`xaml/xaml_sidebar_sidebar.xaml`)
 
@@ -311,16 +307,15 @@ pressed → `theme://Sidebar,SDB_TILECHEVRONBACK,SDBTCB_PRESSED`, side button wi
 `flyout.xaml`: `FillPanel { HackImage FlyoutBackground; DockPanel { DockPanel#FlyoutTop (Top) {
 OptionsButton#FlyoutOptions (Right) }; Border FlyoutBorder (Fill) { FillPanel#FlyoutContent } } }`.
 
-Sizes measured on `4074-dwm.png` (**correction 2026-10-24:** the bar is **150 px**, x = 1130..1279; column 1130 is 1178's dark
-column 0, not desktop, and every Slate reference starts it at 1152 - 150 = 1002, matching the IL default `Sidebar\Width` 150): sidebar x = 1131..1279 = 149 px, full screen height (the
-taskbar yields to it); options row y = 0..16, separator at y = 17-18; tile separators (1199,
+Sizes measured on `4074-dwm.png`: sidebar x = 1130..1279 = **150 px** (column 1130 is 1178's dark column 0, not desktop; the IL
+default `Sidebar\Width` is 150), full screen height (the taskbar yields to it); options row y = 0..16, separator at y = 17-18; tile separators (1199,
 3 px) at y ≈ 198-199, 214/215-224, 309-310, 345 (the 2nd and 3rd tiles' header rows); clock
 separator at y = 925-927; clock face 80 px (x ≈ 1170..1250, y ≈ 927..1004), centred on the bar;
 time/date text "3:28 AM, Jan 9" at y ≈ 1004..1013. The tiles visible are a news-feed tile
 (bulleted headlines), a quick-launch tile (two icons + "Search for..." box), a picture tile
 (full-width sunset photo), then empty space down to the pinned clock.
 
-On `4051-vm-now.png` (Slate): sidebar x ≈ 1003..1151 = **149 px**; options separator again at
+On `4051-vm-now.png` (Slate): sidebar x = 1002..1151 = **150 px** (every Slate reference starts it at 1152 - 150); options separator again at
 y = 17-18; a quick-launch tile (IE + mail icons) at y ≈ 19..45; the clock tile below with a
 **~95 px** face (x ≈ 1027..1124, y ≈ 75..170) and "6:37 AM, Oct 23" at y ≈ 200; each tile shows the
 TileArrow glyph at its top-right (Flipped = right edge). The 4051 sidebar background is opaque
@@ -505,44 +500,44 @@ Line numbers are `desktop.il` lines ("L…"). All Avalon sizes are measure units
 | Built-in clock (`Microsoft.Windows.WCPClient`) | `SideBarClock : BaseTile` with `alarm`, `CreateFlyout`, `CreateProperties`, `DigitalTextElement`; `AnalogClockPanel`, `CalendarElement`, `SidebarAlarmClock` (states Idle/WaitingForCoarseTrigger/WaitingForTrigger/Trigger, Snooze, RepeatDaily, MusicFile); `BaseSidebarClockSettings` carries `ClockSize, ClockCenter, HandOverhang, LayerIDs/LayerOrigins/LayerTypes` (the layered face), `DigitalFont`, `FlyoutWidth/Height`, calendar metrics — values live in the DLL/theme, not in the docs |
 | Sidebar internals named in the reference | `Sidebar : SidebarXAML : Appbar : FillPanel`; `TileCollection : OverflowableCollection` with `PreviewIndex/PreviewPercent`, `StartDrag/Drop/Remove`, `ChildrenWontFit`/`ExtraSpace`; `TileOverflow`; `OuterTile` DPs `TargetSize`, `ShowFlashImage`, `RMA`, `RMAID`; `Tile.AutoSize`; `FlyoutXAML` fields `FlyoutTop/Content/Bottom`, `FlyoutLink : AreaButton`, `FlyoutOptions`; `Microsoft_Windows_Client.xml` documents only the older "Do not use" model (`ClockTile`, `MediaTile`, `SidebarElement`, `FlyoutElement`, `SidebarCPL`) |
 
-Model consequence for the Lua tile API (4.3): a tile = `foreground` (interactive, no flyout
+Model consequence for the Lua tile API (7.5): a tile = `foreground` (interactive, no flyout
 on click) + `background` (click opens the flyout), optional `flyout()`, `properties()`, context
 menu items, `icon`, `tooltip`, `has_properties`, `flyout_link`; the host owns the menu, the
 flyout window and the properties window, and calls `initialize()` after `sidebar` is set.
 
 ---
 
-## 3. Behaviours to implement
+## 3. Behaviours
 
 ### 3.1 Window list (both shells)
 
-| Behaviour | Longhorn/XP reference | Linux mechanism |
+| Behaviour | Longhorn/XP reference | luxshell |
 | --- | --- | --- |
 | Enumerate top-level windows in creation order | `CTaskBand` inserts on `HSHELL_WINDOWCREATED`, keeps order, group inserts next to siblings | root `_NET_CLIENT_LIST` (creation order; `_NET_CLIENT_LIST_STACKING` for z-order), `PropertyNotify` on the root |
 | Skip taskbar-less windows | `WS_EX_TOOLWINDOW`, owned windows | skip `_NET_WM_WINDOW_TYPE` dock/toolbar/menu/splash/utility/dialog-with-transient, `_NET_WM_STATE_SKIP_TASKBAR`, windows with `WM_TRANSIENT_FOR` |
 | Active (checked) button | `HSHELL_WINDOWACTIVATED`, `TB_CHECKBUTTON` | root `_NET_ACTIVE_WINDOW` |
-| Minimised state (restore on click) | `IsIconic` | `_NET_WM_STATE_HIDDEN` in the client's `_NET_WM_STATE` (published by luxwm since M2, with `WM_STATE` Iconic; minimised is separate from berry's workspace "hide") |
+| Minimised state (restore on click) | `IsIconic` | `_NET_WM_STATE_HIDDEN` in the client's `_NET_WM_STATE` (published by luxwm, with `WM_STATE` Iconic; minimised is separate from berry's workspace "hide") |
 | Click: activate or minimise if active | `_HandleClick`: minimise when already foreground | send `_NET_ACTIVE_WINDOW` client message (source 2 = pager) or `_NET_WM_STATE` add `_NET_WM_STATE_HIDDEN` / `XIconifyWindow` |
-| Title / icon | `WM_GETTEXT`, `WM_GETICON` small 16 px | `_NET_WM_NAME` (UTF8) fallback `WM_NAME`; `_NET_WM_ICON` pick the 16x16 (luxwm's `frame_icon_from_netwm()` already does this) |
-| Flashing (`TaskBand.FLASHBUTTON`, Avalon `TaskButton.Flash` 1183) | `HSHELL_FLASH` | `_NET_WM_STATE_DEMANDS_ATTENTION` |
-| Grouping | `TaskbarGlomming`, `TaskbarGroupSize`, group when forced to `iMin` | group key = `WM_CLASS` class (XP uses the exe path); same rules: group of ≥ 2 only, GLOM_OLDEST default, ungroup when ≥ 2 open slots; the group button shows count + Marlett "u" (Avalon) or the DROPDOWNBUTTON part (classic) and opens a popup list (`TaskBandGroupMenu` parts) |
-| Button width (classic) | `iIdeal = (W - fixed) / n` clamped to [`1.8*(cySize+2*edge)+textspace`, `cxMinimized`]; remainder to the first buttons | same; 160 max for the classic pack |
-| Button width / rows (Avalon) | height 29 per row, rows `clamp(h/29, 1, 4)`; columns `max(1, w/130)`; width `min(140, w/itemsPerRow)`; overflow to the chevron below 60 px, pull back above 70 px (2.4.2) | the Avalon pack's list layout; measured 140 px pitch confirms |
-| Group popup (Avalon) | `TaskGroupFlyout` MaxWidth 200, items = icon + title; drag-over opens a group after 250 ms, an item after 500 ms, the start button after 1000 ms | override-redirect popup above the button |
-| Window context menu (Avalon) | End Task, Restore, Move, Size, Minimize, Maximize, Close (SC_* via WM_SYSCOMMAND, disabled by window styles); group: End Group Tasks, Cascade, Tile Vertically/Horizontally, Minimize/Restore/Close Group; taskbar: Task Manager, Show Desktop, Cascade, Tile, properties (2.4.2) | `_NET_WM_STATE` / `_NET_CLOSE_WINDOW` / `_NET_WM_MOVERESIZE`; cascade/tile done by luxwm on request (`luxwmc`) |
-| Tooltips | toolbar tooltips with the full title | own tooltip window (ARGB) |
-| Right click | window system menu (`TBC_SYSMENUCOUNT`) | our own menu: restore/minimise/maximise/close via `_NET_WM_STATE`/`_NET_CLOSE_WINDOW` |
+| Title / icon | `WM_GETTEXT`, `WM_GETICON` small 16 px | `_NET_WM_NAME` (UTF8), else `WM_NAME`; icon rule in 6.2 |
+| Flashing (`TaskBand.FLASHBUTTON`, Avalon `TaskButton.Flash` 1183) | `HSHELL_FLASH` | `_NET_WM_STATE_DEMANDS_ATTENTION` (read; drawing not done) |
+| Grouping | `TaskbarGlomming`, `TaskbarGroupSize`, group when forced to `iMin` | not done; would be: group key = `WM_CLASS` class (XP uses the exe path), the same rules (group of ≥ 2 only, GLOM_OLDEST default, ungroup when ≥ 2 open slots), the group button with count + Marlett "u" (Avalon) and a popup list |
+| Button width (classic) | `iIdeal = (W - fixed) / n` clamped to [`1.8*(cySize+2*edge)+textspace`, `cxMinimized`]; remainder to the first buttons | flxp-taskbar (section 12) |
+| Button width / rows (Avalon) | height 29 per row, rows `clamp(h/29, 1, 4)`; columns `max(1, w/130)`; width `min(140, w/itemsPerRow)`; overflow to the chevron below 60 px, pull back above 70 px (2.4.2) | 6.1, 6.2; the measured 140 px pitch confirms |
+| Group popup (Avalon) | `TaskGroupFlyout` MaxWidth 200, items = icon + title; drag-over opens a group after 250 ms, an item after 500 ms, the start button after 1000 ms | not done |
+| Window context menu (Avalon) | End Task, Restore, Move, Size, Minimize, Maximize, Close (SC_* via WM_SYSCOMMAND, disabled by window styles); group: End Group Tasks, Cascade, Tile Vertically/Horizontally, Minimize/Restore/Close Group; taskbar: Task Manager, Show Desktop, Cascade, Tile, properties (2.4.2) | the taskbar menu (6.5): `_NET_SHOWING_DESKTOP`, cascade / tile through `_NET_MOVERESIZE_WINDOW` |
+| Tooltips | toolbar tooltips with the full title | not done for task buttons (tiles have them, `tooltip.lua`) |
+| Right click | window system menu (`TBC_SYSMENUCOUNT`) | luxwm's window menu at the pointer (`_GTK_SHOW_WINDOW_MENU`, 6.2) |
 
 ### 3.2 Appbar placement, struts, autohide
 
-| Behaviour | Reference | Implementation |
+| Behaviour | Reference | luxshell |
 | --- | --- | --- |
-| Reserve the screen edge | `SHAppBarMessage(ABM_SETPOS)`; stuck rect = edge strip of `_sStuckWidths` | `_NET_WM_WINDOW_TYPE_DOCK` + `_NET_WM_STRUT_PARTIAL` (bottom = 30 or 28; right = 149 with the full height); luxwm honours struts (`_NET_WORKAREA`) when maximising and placing since M2 |
-| Taskbar yields to the sidebar | `SetMixedTaskbarSidebar`, screenshot: taskbar ends at x=1130 | taskbar strut `bottom_start_x..bottom_end_x = 0..W-149` and window width `W-149` when the sidebar is docked on the same screen |
-| Autohide (classic) | 500 ms poll, hide when pointer outside rect + 4*edge and not active; show on pointer movement > dblclk distance after 50 ms; slide 400 ms out / 200 ms in, 20 ms frames; 2 px remain visible | timer + `XQueryPointer` (or `MotionNotify` on a 2 px ARGB strip left at the edge); animate `XMoveWindow`; update the strut to 2 px while hidden (XP keeps the hidden bar out of the work area too: `tray.cpp:2607-2612` "don't subtract the tray if it is autohide") |
-| Autohide (Avalon) | driven by "focus within" (mouse over, flyout or popup open, tile focus); visible percent ± 20 every 20 ms = 100 ms linear slide; `2 + (size-2)*pct/100` px visible; a bar jumps to 0/100 when autohide is toggled (2.4.2) | same machinery with the theme pack choosing 100 ms linear vs 400/200 ms; focus-within = `EnterNotify`/`LeaveNotify` on the bar plus "a popup of ours is open" |
-| Always on top | `ABS_ALWAYSONTOP` | `_NET_WM_STATE_ABOVE` (dock windows are above normal windows in luxwm anyway) |
-| Persistence | `StuckRects2` TVSD, `Explorer\Sidebar\...` (see 2.4) | `~/.local/state/lhde/luxshell-state.ini`: edge, thickness, autohide, hideclock, tile list and heights |
+| Reserve the screen edge | `SHAppBarMessage(ABM_SETPOS)`; stuck rect = edge strip of `_sStuckWidths` | `_NET_WM_WINDOW_TYPE_DOCK` + `_NET_WM_STRUT_PARTIAL` (bottom = the bar's height; right = 150 over the full height); luxwm keeps `_NET_WORKAREA` and maximises and places inside it |
+| Taskbar yields to the sidebar | `SetMixedTaskbarSidebar`, screenshot: taskbar ends at x=1130 | taskbar strut `bottom_start_x..bottom_end_x = 0..W-150` and window width `W-150` while the sidebar is on top (7.2) |
+| Autohide (classic) | 500 ms poll, hide when pointer outside rect + 4*edge and not active; show on pointer movement > dblclk distance after 50 ms; slide 400 ms out / 200 ms in, 20 ms frames; 2 px remain visible | flxp-taskbar (section 12) |
+| Autohide (Avalon) | driven by "focus within" (mouse over, flyout or popup open, tile focus); visible percent ± 20 every 20 ms = 100 ms linear slide; `2 + (size-2)*pct/100` px visible; a bar jumps to 0/100 when autohide is toggled (2.4.2) | 6.4 |
+| Always on top | `ABS_ALWAYSONTOP` | `_NET_WM_STATE_ABOVE` (luxwm keeps docks above clients unless BELOW) |
+| Persistence | `StuckRects2` TVSD, `Explorer\Sidebar\...` (see 2.4) | settings.ini `[taskbar]`, `[sidebar]`, `[clock]`; luxshell-state.ini: the tile order (section 14) |
 
 ### 3.3 The maximised-window black layer
 
@@ -551,1013 +546,577 @@ strips. `SetMaximizedWindow` animates them 0 → 1 over **400 ms** when a window
 on that monitor and back when none is; the taskbar forwards the state to the sidebar (message
 1388) and the task button text is animated to white over the same 400 ms (2.4.3). The native
 detector is XP's "rude app" logic (`CTray::HandleFullScreenApp`, `CTaskBand::_FindRudeApp`).
-Under luxwm:
-subscribe to `_NET_WM_STATE` changes of all clients plus `_NET_ACTIVE_WINDOW`; "maximised" =
-`_NET_WM_STATE_MAXIMIZED_VERT`+`HORZ` (or fullscreen) and not hidden, on the bar's monitor.
-Render: paint the black rectangle with alpha `a(t)` under the 9-grid strip; with alpha 1 the
-bar becomes opaque black and picom's blur is irrelevant (so the compositor cost drops too, as in
-the DWM).
+luxshell's side is section 11: luxwm publishes the condition, and with alpha 1 the bar is opaque black, so picom's blur
+under it does not matter.
 
 ### 3.4 Sidebar tiles
 
-| Behaviour | Reference | Notes |
+| Behaviour | Reference | luxshell |
 | --- | --- | --- |
-| Add / remove | `CSidebarWnd::_OnAddTile/_OnRemoveTile`, `CShellSidebar::AddTile/RemoveTile`; modules registered under `Explorer\StartBar\Modules` (4051) / `Explorer\Sidebar\Modules` (4074) with `Friendly Name`, `ShowInMenu`, `MultiInstance`, `Transient`, `IconOnly`, `MaxHeight`; instances persisted under `Sidebar\Tiles\{TileGUID}` and the order lists `SidebarTiles`/`SidebarPinnedTiles`/`TaskbarTiles`; new tile added by a third party → consent toast "New Sidebar Tile Added" Show/Hide (2.4.4) | runtime: Lua tiles in `~/.config/luxshell/tiles/*.lua` with the same metadata keys; "Options"/right-click menu lists Friendly Names ("Add a Tile"), tile menu = Auto Size, Move Up/Down, Remove, Properties |
-| Lifecycle animations | fade in `TileUI` 800 ms; remove 400 ms; resize to a new height 400 ms ease-in-out; hide: 100 ms delay then 400 ms to 0; hover chrome 120 ms in / 80 ms out; flash 0.5↔1.0 with period 1000 → 100 ms (2.4.4) | `anim` nodes with easing 3 (ease-in-out) |
-| Sizes | tile height min 30, default 30, max = remaining `sidebarMain` height or module `MaxHeight`; "very large" dialog forces 400 and asks; shrink deferred 30 s after a grow; width = bar width (150 default, 100..600) | tile `height` is a Lua-side request, the host clamps |
-| Order and drag | `DragButton#TileContent`, `OuterTileBack`/`OuterContentHostBack` insertion markers (`PreviewPercent`, 800 ms snap, 10 s reset), `SBContentHostOverflow.DropTarget` highlights the overflow strip with `SDB_TASKBACK SELECTED` | pointer drag within the sidebar window; drop between tiles or on the overflow strip |
-| Resize | `OuterContentHostSizer` 4 px thumb at each tile's bottom (double-click = Auto Size again); `SidebarSizer` 2 px (Aero) / 6 px (Slate) thumb on the inner edge changes the bar width (message 1457, clamp 100..600) | same |
-| Overflow | a tile that does not fit (remaining height < 40) collapses to a 24x24 button (16 px icon, default imageres 1056) in `OverflowItems`; expando 1008/1009/1004; list auto-closes 1 s after the mouse leaves; hovering an overflow item previews it at 150 px for 4-10 s | |
-| Minimise the bar | `SidebarControl.BarMinimized` (`SetMinimized`, reg `Sidebar\Minimized`): tiles and title hidden, only the taskbar-tile collection and overflow row (24 px) remain, the sidebar re-docks to the taskbar's edge as a strip of `_cxSidebar` px at the right end of the taskbar; toggle button glyph 1170 ↔ 1167 (2.4.2) | the taskbar's right-end strip in minimised mode |
-| Minimised-window tiles (MWT) | `TaskData._CheckMWTs`: iconic windows can become sidebar tiles (`ShowMinimizedWindowTile`), header restore/close → `RestoreTask`/`CloseTask`; the "Rich Minimized Application" (RMA) hooks `TrackRMA`, `EnableRichMinimizedApp` | optional later: a minimised client's `_NET_WM_ICON` + title as a tile with restore/close |
-| Flyout | `CreateFlyout` body (or the tile's own content moved into the flyout when there is none) in a `Popup` placed at the tile rect on the free side, `FlyoutContent` width 150 when placed on the flipped side; Aero frame 1175 grid 53,3,3,3 with the Options row (17 px) and border 8,4,8,8; the open flyout keeps an autohide bar visible (`ShowingFlyout`); optional bottom link (`FlyoutLinkText`) | separate ARGB override-redirect window positioned at the tile's y, to the left of a right-docked bar; closes on focus loss / Esc / click outside |
-| Clock tile | pinned module, `Sidebar\Clock` DWORD; views in 2.3.4; alarm; calendar flyout | Lua tile shipped with the runtime |
-| Notifications | `notification.xaml` toast: 205x60 frame 4002 with a countdown bar (4001), close button, Options; bottom-right of the work area with a 10 px margin, round-rect radius 9, 10 s timeout (min 5), expands on hover over 200 ms, body text wrapped at 110/154/220, ≤ 2 buttons 73x24 (2.4.5) | toast window at the work-area corner; wire to `org.freedesktop.Notifications` later |
+| Add / remove | `CSidebarWnd::_OnAddTile/_OnRemoveTile`, `CShellSidebar::AddTile/RemoveTile`; modules registered under `Explorer\StartBar\Modules` (4051) / `Explorer\Sidebar\Modules` (4074) with `Friendly Name`, `ShowInMenu`, `MultiInstance`, `Transient`, `IconOnly`, `MaxHeight`; instances persisted under `Sidebar\Tiles\{TileGUID}` and the order lists `SidebarTiles`/`SidebarPinnedTiles`/`TaskbarTiles`; new tile added by a third party → consent toast "New Sidebar Tile Added" Show/Hide (2.4.4) | `luxshell/tiles/*.lua`; the sidebar menu's parts list adds and removes them, the tile menu has Move Up/Down, Remove, Properties (7.5, 7.6) |
+| Lifecycle animations | fade in `TileUI` 800 ms; remove 400 ms; resize to a new height 400 ms ease-in-out; hide: 100 ms delay then 400 ms to 0; hover chrome 120 ms in / 80 ms out; flash 0.5↔1.0 with period 1000 → 100 ms (2.4.4) | fade-in 800 ms and resize 400 ms ease-in-out done; hide, hover chrome and flash not |
+| Sizes | tile height min 30, default 30, max = remaining `sidebarMain` height or module `MaxHeight`; "very large" dialog forces 400 and asks; shrink deferred 30 s after a grow; width = bar width (150 default, 100..600) | a tile's `height` is its own request, the host clamps to min 30 (7.5); the very-large consent not done |
+| Order and drag | `DragButton#TileContent`, `OuterTileBack`/`OuterContentHostBack` insertion markers (`PreviewPercent`, 800 ms snap, 10 s reset), `SBContentHostOverflow.DropTarget` highlights the overflow strip with `SDB_TASKBACK SELECTED` | not done (Move Up / Move Down in the tile menu) |
+| Resize | `OuterContentHostSizer` 4 px thumb at each tile's bottom (double-click = Auto Size again); `SidebarSizer` 2 px (Aero) / 6 px (Slate) thumb on the inner edge changes the bar width (message 1457, clamp 100..600) | the bar width: 7.1; the tile sizer drag not done |
+| Overflow | a tile that does not fit (remaining height < 40) collapses to a 24x24 button (16 px icon, default imageres 1056) in `OverflowItems`; expando 1008/1009/1004; list auto-closes 1 s after the mouse leaves; hovering an overflow item previews it at 150 px for 4-10 s | not done |
+| Minimise the bar | `SidebarControl.BarMinimized` (`SetMinimized`, reg `Sidebar\Minimized`): tiles and title hidden, only the taskbar-tile collection and overflow row (24 px) remain, the sidebar re-docks to the taskbar's edge as a strip of `_cxSidebar` px at the right end of the taskbar; toggle button glyph 1170 ↔ 1167 (2.4.2) | the taskbar's right end in the minimized mode (7.3) |
+| Minimised-window tiles (MWT) | `TaskData._CheckMWTs`: iconic windows can become sidebar tiles (`ShowMinimizedWindowTile`), header restore/close → `RestoreTask`/`CloseTask`; the "Rich Minimized Application" (RMA) hooks `TrackRMA`, `EnableRichMinimizedApp` | not done |
+| Flyout | `CreateFlyout` body (or the tile's own content moved into the flyout when there is none) in a `Popup` placed at the tile rect on the free side, `FlyoutContent` width 150 when placed on the flipped side; Aero frame 1175 grid 53,3,3,3 with the Options row (17 px) and border 8,4,8,8; the open flyout keeps an autohide bar visible (`ShowingFlyout`); optional bottom link (`FlyoutLinkText`) | `flyout.lua` (7.7) |
+| Clock tile | pinned module, `Sidebar\Clock` DWORD; views in 2.3.4; alarm; calendar flyout | `tiles/clock.lua` (8.1); alarm and calendar flyout not done |
+| Notifications | `notification.xaml` toast: 205x60 frame 4002 with a countdown bar (4001), close button, Options; bottom-right of the work area with a 10 px margin, round-rect radius 9, 10 s timeout (min 5), expands on hover over 200 ms, body text wrapped at 110/154/220, ≤ 2 buttons 73x24 (2.4.5) | section 9 |
 
 ---
 
-## 4. Proposed architecture: `luxshell` (C + cairo + Lua)
-
-### 4.1 Processes and windows
-
-```
-luxwm (WM)  ── EWMH root properties ──▶  luxshell (one process)
-                                         ├─ taskbar window   (ARGB, _NET_WM_WINDOW_TYPE_DOCK, strut bottom/top/left/right)
-                                         ├─ sidebar window   (ARGB dock, strut right/left, full height)
-                                         ├─ popup windows    (override-redirect ARGB: start menu, group menu, flyouts, tooltips, toasts)
-                                         └─ Lua VM           (theme pack + tiles + behaviour scripts)
-picom: blur-background for the ARGB docks (already configured in session/picom-glass.conf)
-```
-
-One process keeps the model (window list, tray, clock, tiles) in one place and lets the taskbar
-yield to the sidebar without IPC. Each top-level is a `struct surface` with an X window, a
-cairo xlib surface (32-bit visual) and a scene root. Later, the same `surface` type gets a
-`wl_surface` + `zwlr_layer_surface_v1` back end (anchor edge, exclusive zone = strut,
-`keyboard_interactivity` none for bars, `on_demand` for the start menu); nothing above the
-surface layer needs to know.
-
-### 4.2 Scene graph node types
-
-The XAML in 2.2-2.3 reduces to a small set of node kinds. Every node has `x,y,w,h`, `opacity`,
-`visible`, `clip`, `dock` (left/top/right/bottom/fill), `size` (fixed, percent, auto),
-optional `margin` (Border thickness), children.
-
-| Node | Models | Paint |
-| --- | --- | --- |
-| `panel` | `DockPanel`, `FillPanel`, `FlowPanel`, `Canvas` | layout only; `dock` layout = WPF DockPanel rules; `fill` = all children get the full rect; `flow` wraps |
-| `ninegrid` | `HackImage`/`HackBorder` with `HackNineGrid`, uxtheme `IMAGEFILE` + `SIZINGMARGINS` (`STRETCH`/`TILE`), `HackFlipHoriz`, `TRUESIZE` | cairo: 9 `cairo_set_source_surface` + `cairo_pattern_set_extend(REPEAT)` for TILE; strips with `IMAGECOUNT n` are sliced by state index |
-| `image` | `Image`, `ResImage` 16 px icons, clock faces | scaled surface |
-| `text` | `Text` with font, colour, wrap, `CharacterEllipsis`, shadow (`TEXTSHADOWOFFSET`/`ShadowText` 1,1), glow (`TextGlow.BACKGROUND` 21x21 grid 10 as in luxwm's caption) | libuxtheme's GDI text (`text.c`, since 2026-10-27; pangocairo before); glow = the coverage blurred under the text, shadow = offset copy |
-| `rect` | `Border Background`, black layers, clock hands, polygon second hand | cairo fill / path |
-| `button` | `Button`, `AreaButton`, `DragButton`, `StartButton`, `TaskButton`, `TileThumb` | state machine: normal/hot/pressed/checked/hotchecked/flash/disabled → picks a child or a strip index; press-and-release-inside semantics (luxwm already has these for caption buttons); `drag` emits move deltas (thumbs, tile drag) |
-| `transform` | `TransformDecorator`, `ScaleDecorator DesignSize`, `AnalogClockLayerDecorator Origin` (rotate about origin) | `cairo_save/translate/rotate/scale` |
-| `list` | `TaskOverflowableCollection`, `SBContentHostCollection`, `OverflowPanel` | data-bound: item template function + width/height rules (3.1) |
-| `timer` / `anim` | `IDT_*` timers, `AnimatePropertyTo` (opacity, width, height, text brush), slide 400/200 ms (classic) or 20 ms steps (Avalon), black layer 400 ms, tile fades 800/400/120/80 ms, clock tick | `timerfd`/poll-based scheduler; `anim(node, prop, to, ms, easing, delay)` with the four `Animator2` easings (linear, ease-out `2t-t^2`, ease-in `2t^2`, ease-in-out) at a 20-25 ms tick, marking the surface dirty each frame |
-| `popup` | `Popup` (group flyout MaxWidth 200, tile flyout, context menus, tooltips, toast) | override-redirect ARGB top-level with placement rect + side, close-on-click-outside (`CloseMode 2`), keeps the owning bar's "focus within" |
-
-Dirty tracking per surface, repaint only the union rect, `XFlush` after paint (lesson from luxwm).
-
-### 4.3 Lua API sketch
-
-```lua
--- theme pack: themes/aero/shell.lua
-local T = theme "aero"
-T.font        = "Segoe UI 9"
-T.taskbar     = { height = 30, bg = ninegrid("imageres/1187.png", {0,7,0,0}),
-                  black_layer = true }
-T.start       = { w = 83, h = 29, margin = {0,0,4,0},
-                  img = states("imageres/1179.png", "imageres/1180.png", "imageres/1181.png") }
-T.taskbutton  = { max_w = 140, border = {0,2,2,0}, pad = {6,5,6,6}, grid = 3,
-                  img = { normal="imageres/1182.png", hot="imageres/1184.png",
-                          pressed="imageres/1185.png", checked="imageres/1185.png",
-                          flash="imageres/1183.png" },
-                  text = { color = "#ffffff", ellipsis = true }, icon = 16, icon_gap = 2 }
-T.sidebar     = { width = 149, bg = ninegrid("imageres/1178.png", {36,0,0,0}),
-                  separator = image("imageres/1199.png", 3), options_h = 17 }
-T.flyout      = { bg = ninegrid("imageres/1175.png", {53,3,3,3}), border = {8,4,8,8} }
-
--- classic pack: themes/slate4051/shell.lua, same keys, uxtheme-style strips
-T.taskbar    = { height = 28, bg = strip("slate51/266.bmp", margins={0,0,15,12}, mode="tile") }
-T.taskbutton = { img = strip6("slate51/349.bmp", margins={4,4,16,12}, content={0,4,4,4}),
-                 max_w = 160, min_w = function(h) return math.floor(h*1.8) end,
-                 font = "Tahoma 8", text = { color="#ffffff" } }
-T.start      = { img = strip3("slate51/335.bmp", margins={6,13,4,2}, content={7,19,2,4}),
-                 font = "Franklin Gothic Medium Italic 14", text="start",
-                 shadow = { dx=2, dy=2, color="#4b4b4b" }, logo = "start.png" }
-T.tray       = { bg = strip("slate51/360.bmp", margins={13,10,14,13}, content={19,7,0,0}),
-                 chevron = strip3("slate51/359.bmp"), clock = { font="Tahoma 8", color="#ffffff" } }
-
--- a tile: ~/.config/luxshell/tiles/clock.lua   (mirrors BaseTile, 2.5)
-local tile = Tile { friendly_name = "Clock", guid = "b6852cff-6f7c-4a39-b56b-6c9d40679adb",
-                    height = 105, pinned = true, has_properties = true, tooltip = "Clock",
-                    icon = "imageres/1056.png", multi_instance = false }
-function tile:initialize()                       -- BaseTile.Initialize: sidebar is set, tile not yet shown
-  self.face = self.background:add(AnalogClock { size = 80, face="imageres/1074.png",
-                                                glass="imageres/1076.png", anchor="imageres/1083.png",
-                                                second_color = "#6db8cf" })     -- background: click opens the flyout
-  self.label = self.foreground:add(Text { style = "digital", format = "%-I:%M %p, %b %-d" })  -- foreground: interactive
-  shell.every(1000, function() self.face:set(os.time()); self.label:set(os.date(self.label.format)) end)
-  self.sidebar.on_context_menu = function(menu) menu:add("Clock faces...", function() ... end) end
-end
-function tile:create_flyout() return ClockFlyout(self) end        -- CreateFlyout
-function tile:create_properties() return PropSheet { ... } end    -- CreateProperties (OK/Cancel 84x24)
-function tile:dispose() shell.cancel(self.timer) end               -- Dispose
--- host-provided: self.sidebar:show_flyout(elem), :close_flyout(), :close_properties(), :remove_me()
-
--- behaviour hooks exposed by the runtime
-shell.windows             -- array of { id, title, icon, active, hidden, demands_attention, class }
-shell.on("window-added" | "window-removed" | "window-changed" | "active-changed", fn)
-shell.on("maximized-changed", function(any_maximized) bar.black:animate("opacity", any_maximized and 1 or 0, 400) end)
-shell.activate(id); shell.minimize(id); shell.close(id)
-shell.timer(ms, fn); node:animate(prop, to, ms)
-```
-
-The C core owns: X11/Wayland surfaces, EWMH model, cairo painting, input routing, timers,
-image cache (BMP with alpha and PNG via cairo/`stb_image`; the `.bmp` strips are 32-bit with
-alpha, `identify` reports `srgba`). Lua owns: which nodes exist, their styles, tile logic, menus.
-Theme packs are directories of the extracted PNG/BMP files plus `shell.lua`, mirroring
-`data/frames/<name>/theme.ini`; the `id → file` tables from `mock/assets/resmap.json`
-(`aero_to_slate`) give the Slate pack for free.
-
-### 4.4 Theme switching matrix
-
-| Pack | Taskbar renderer | Sidebar | Frames (luxwm) |
-| --- | --- | --- | --- |
-| `slate4051` | classic strips from `slate51` (28 px, Tahoma, pill start button, tray chevron, clock hidden when the sidebar has a clock) | Avalon with `Slate_*Resources` ids (1000/1155...) and the 4051 Sidebar class PNGs for the clock plate (BLOB 404/405) | Slate frame parts (not yet in luxwm) |
-| `jade4074` | Avalon with `Slate_*Resources` (Jade shipped the Slate dictionaries plus `theme://Sidebar,...` streams 507-566) or the classic Jade strips (Segoe UI 9) | Avalon Slate look | `themes/jade` |
-| `aero4074` | Avalon with `Aero_*Resources` (1167-1201), glass | Avalon Aero (1178, 1175, 1199) | `themes/aero` |
-
-Both renderers are Lua over the same node kinds; the classic pack sets `renderer = "classic"`
-which selects the tray/clock-in-bar layout and the uxtheme strip semantics (`IMAGECOUNT`
-slicing, `SIZINGTYPE`), the Avalon pack selects dock-panel layouts with `HackNineGrid`.
-
 ---
 
-## 5. Implementation plan
+## 4. luxshell: windows and code
 
-| Milestone | Deliverable | Depends on |
+```
+luxwm ── EWMH, _LHWM_* ──▶ luxshell (one process: C core + Lua)
+                            ├─ luxshell-taskbar  ARGB dock, bottom strut, _NET_WM_STATE_ABOVE
+                            ├─ luxshell-sidebar  ARGB dock, right strut (pinned mode: bottom strut; stacked at the bottom: none, BELOW)
+                            ├─ luxshell-desktop  24-bit _NET_WM_WINDOW_TYPE_DESKTOP, sticky + below, no strut (section 11)
+                            ├─ popups            override-redirect ARGB: luxshell-flyout, luxshell-tooltip (POPUP_MENU),
+                            │                    luxshell-menu (MENU), luxshell-toast (NOTIFICATION)
+                            ├─ tray manager      InputOnly window owning _NET_SYSTEM_TRAY_S<screen> (section 10)
+                            └─ D-Bus             org.freedesktop.Notifications on the session bus (section 9)
+                            starts and stops: flxp-startmenu or flxp-taskbar (sections 12, 13), picom (section 14)
+```
+
+One process keeps the model (window list, tray, clock, tiles) in one place, so the taskbar yields to the sidebar without IPC.
+Each top-level is a `surface` (X window, cairo xlib surface on the 32-bit visual, or 24-bit with `opaque = true`, a scene root).
+A surface's frame is laid out and painted into an offscreen group and put on the window with one SOURCE paint (painting the
+40-odd layers straight into the window let the compositor show half-drawn frames on every hover); only dirty surfaces repaint,
+`XFlush` after each. Images are prescaled once on the client (server-side `FILTER_BEST` of the 263 px clock layers on every
+frame cost 10 ms per sidebar repaint). The poll loop runs with timeout 0 while Xlib's queue holds events already read
+(`XEventsQueued(QueuedAlready)`): round trips in Lua handlers otherwise left events waiting for the next timer.
+
+C: `luxshell.c` (surfaces, the EWMH client model, input, timers, the Lua API `lh`), `scene.c`/`scene.h`, `text.c`, `tray.c`,
+`notify.c`, `menupaint.c`. Lua (found beside the binary: `luxshell/` of the tree, `<prefix>/lib/lhde/luxshell`; `LUXSHELL_LUA`
+overrides): `runtime.lua` (event bus, animation, packs, taskbar, sidebar and its modes, maximised mode, theme switching, classic
+bar and start-menu coordination, compositor, root commands), `session.lua` (the theme through liblhde, settings.ini, the state
+file, session commands), `settings.lua` (settings flyout, run box), `menu.lua`, `flyout.lua`, `toast.lua`, `notifylog.lua`,
+`tooltip.lua`, `apps.lua` (desktop entries, icon-theme lookup, launch counts), `tiles/*.lua`.
+
+Events (`lh.on(name, fn)`, `lh._emit`): from C `windows`, `window(id)`, `desktop`, `maxmode`, `workarea`, `toplevel(win, map |
+unmap | destroy)`, `lh-theme`, `command`, `settings-changed(serial, hint)`, `start-key(l0..l4)`, `startmenu-open`,
+`selection(name, owner)`, `tray(count)`, `tray-lost`, `notification`, `notification-close(id)`, `surface-press(x, y, button,
+surface id)`, `exit`; from Lua `start-click`, `start-press`, `start-forwarded`, `toggle-sidebar`, `sidebar-options`,
+`sidebar-resize`, `tile-menu`, `tile-close`, `tile-restore`, `tile-visibility`, `clock-layout`, `clock-pinned`, `tray-owner`,
+`notifylog`, `pack`. `LHSHELL_DEBUG=1` logs every event and paint with CLOCK_MONOTONIC ms.
+
+`lh.animate(node, prop, to, ms, easing, done)` is Animator2 (2.4.3): 25 ms tick, linear / easeout `2t - t^2` / easein /
+easeinout, the first frame applied in the same repaint as the trigger; `ms = 0` cancels a running animation and sets the value.
+
+Not done: Wayland (a `surface` back end on wlr-layer-shell, anchor + exclusive zone = strut, was the plan; nothing above the
+surface layer would change).
+
+### 4.1 Scene graph (`scene.h`)
+
+| Kind | Models | Notes |
 | --- | --- | --- |
-| **M0 asset pack** | `tools/shellpack.py`: copies the ids in 2.1-2.3 into `data/packs/{slate4051,jade4074,aero4074}/`, converting `.bmp` strips to per-state PNGs (6/3 slices) and writing `assets.lua` with sizes and margins straight from the `.ini` tables above | nothing |
-| **M1 core** | `luxshell` binary: ARGB dock window with strut, cairo 9-grid/strip painter (reuse `luxwm/frame.c` loader and TextGlow), Lua VM, scene nodes `panel/ninegrid/image/text/rect/button`, timers, hot/pressed states; renders the Aero taskbar background + start button + sidebar background statically | M0 |
-| **M2 window list** (done) | EWMH model (`_NET_CLIENT_LIST`, `_NET_ACTIVE_WINDOW`, `_NET_WM_STATE`, names, icons); task buttons with the width rule of 3.1, click to activate/minimise; luxwm publishes `_NET_WM_STATE_HIDDEN`, `_NET_CLIENT_LIST_STACKING`, honours `_NET_WM_STRUT_PARTIAL`/`_NET_WORKAREA` when maximising and treats dock windows as above | M1 |
-| **M3 classic renderer** | `slate4051` pack: 28 px bar, `Start::Button` strip + "start" text/logo, task strips with CHECKED state, `TrayNotify` background, chevron bubble, clock (`%H:%M` per locale, no seconds, minute timer), group menu parts; compare against `4051-vm-now.png` crops | M2 |
-| **M4 sidebar + tiles** | sidebar dock (149 px), options row, separators, `SBContentHostCollection` with `OuterTile` chrome (side strip 9 px, arrow, restore/close on hover, 4 px sizer), pinned bottom host, Lua `Tile` API (foreground/background/flyout/properties/menu), clock tile with the 80 px analog face and digital line, taskbar yielding to the sidebar | M1, M2 |
-| **M5 behaviours** | black layer 400 ms on maximise (+ white task text), autohide (classic 500/50 ms timers and 400/200 ms slides; Avalon focus-within and 100 ms slide; 2 px sliver, strut update), grouping with the XP rules (classic) and the 29/130/140/60/70 rules (Avalon) plus the group popup, flashing (`DEMANDS_ATTENTION`), tooltips, right-click window menu, state persistence (`state.ini` mirroring `Taskbar\{StuckPlace,AutoHide,RowCount,Width}` and `Sidebar\{StuckPlace,AutoHide,Minimized,Width,Clock}`) | M2-M4 |
-| **M6 flyouts, overflow, toasts** | flyout windows (1175 frame, Options row, 150 px content), tile drag/reorder with the insertion markers (800 ms snap), overflow row with expando (1 s auto-close, previews), `BarMinimized` strip at the taskbar's end, tile fade/resize/flash animations, notification toast (4002/4006 frame, countdown bar, 10 s, hover expand), `org.freedesktop.Notifications` bridge | M4, M5 |
-| **M7 start menu** | classic `StartPanel` parts (USERPANE, PROGLIST, PLACESLIST, LOGOFF) in the Slate pack; Avalon start menu is out of scope until its XAML (`StartMenu` class) is decoded | M3 |
-| **M8 Wayland** | `surface` back end on `wlr-layer-shell` (anchor + exclusive zone = strut, margins), input via `wl_pointer`; same Lua packs | M1-M6 |
+| panel (layouts `dock`, `fill`, `canvas`, `hbox`, `vbox`) | `DockPanel` (WPF dock rules), `FillPanel`, `Canvas`, stacks | `dock` left/top/right/bottom/fill; sizes fixed, percent or auto; `margin` = a Border's thickness; `clip`, `opacity`, `visible` |
+| `ninegrid` | `HackImage`/`HackBorder` with `HackNineGrid`, uxtheme `SIZINGMARGINS` (STRETCH/TILE), `HackFlipHoriz`, state strips (`IMAGECOUNT`) | `grid` is **top, right, bottom, left**; `HackNineGrid` is a XAML Thickness (left, top, right, bottom), so 1178's `36,0,0,0` is `grid = {0,0,0,36}` and 1187's `0,7,0,0` is `{7,0,0,0}`; each piece samples only its own source rectangle |
+| `image` | `Image`, 16 px icons, clock layers | `filter` per node, else the pack's (`nearest` / `bilinear`); shrinking is always BEST |
+| `text` | `Text` | GDI text through libuxtheme (section 15): font, colour, `wrap`, `ellipsis`, `markup` (mnemonic underlines), `shadow`, `glow` |
+| `rect` | `Border Background`, black layers | fill, `radius`, `stroke`/`stroke_width`, `gradient = { dir = "h"|"v", {offset, "#rrggbb"}, ... }` (LinearGradientBrush) |
+| `button` | `Button`, `AreaButton`, `DragButton`, `StartButton`, `TaskButton`, `TileThumb` | states normal/hot/pressed/checked/hotchecked/flash/disabled pick an image; press-and-release-inside; `on_drag(dx, dy)` |
+| `transform`, `hand` | `TransformDecorator`, `ScaleDecorator`, `AnalogClockLayerDecorator` | rotate about an origin, translate, scale |
+| `tray` | the notification area | XEmbed icons in rows (`icon_size`, `pitch`) |
 
-**M2 status.** luxwm (`wm.c`, details in `docs/LUXWM.md` "EWMH and the shell"): `_NET_CLIENT_LIST` in creation
-order, `_NET_CLIENT_LIST_STACKING`, `_NET_WM_STATE` HIDDEN / MAXIMIZED_VERT+HORZ / DEMANDS_ATTENTION (+ urgency hint) /
-FOCUSED with add/remove/toggle client messages and `WM_CHANGE_STATE`, minimised as a state of its own, struts of
-unmanaged docks → `_NET_WORKAREA` (1131x770 on the 1280x800 lab with the Aero taskbar and sidebar), maximise / snap /
-centring / smart placement inside the work area, docks above clients (unless `_NET_WM_STATE_BELOW`), dialogs and
-transients centred on the parent, `USPosition`/`PPosition` with window gravity, `_NET_ACTIVE_WINDOW` switching the
-desktop (berry's `XSync(dpy, True)` in `switch_ws` dropped such messages). luxshell: windows carry `maximized`,
-`fullscreen`, `stacking` (index in `_NET_CLIENT_LIST_STACKING`; task order stays `_NET_CLIENT_LIST`), transients get no
-button, icons fall back from `_NET_WM_ICON` to `WM_HINTS` icon_pixmap/icon_mask (xterm, xclock) and then to the pack's
-`default_icon` (none defined yet), `lh.desktop()`; the black layers follow 2.4.3: on iff the active window (or, with
-none active, any visible window on the current desktop) is maximised or fullscreen, 400 ms fade. Struts verified:
-taskbar bottom 30 over x 0..1130, sidebar right 149 over the full height. Fixed on the way: `emit()` called its first
-argument instead of `lh._emit` for events with arguments (`window`, `surface-press` never reached Lua), and a
-rebuilt task list left the surface's hot/pressed node dangling (crash on the next click). The 400 ms white task text
-(2.4.3) stays in M5.
+Any node: `hoverable`, `cursor` (sizewe, sizens, hand, arrow: the X cursor while the node is hot or pressed), handlers
+`on_click`, `on_press`, `on_release`, `on_hover`, `on_within`, `on_drag`, `icon_geometry_for = <client>` (section 5.3).
+`node:desired([w, h])` and `node:measure([wrap_width])` measure a subtree as layout would. Surfaces: `lh.surface{ name, type,
+popup, opaque, dock, strut, layer }`, `:move`, `:show`, `:hide`, `:raise`, `:lower`, `:set_layer`, `:background(color)`,
+`:round(r)` (XShape), `:grab()`/`:ungrab()` with `on_outside`, `on_key`, `on_enter`/`on_leave`, `:icon_offset(dx, dy)`.
+Nodes are reference counted; a Lua node's table lives as long as the C tree links it, so a replaced pack's tree is freed once
+nothing (animation, timer, tile) holds it. Image names: pack-relative paths (`4074/imageres/1187.png`), `@icon:<window>`,
+`@notify:<id>`, `@menu:<depth>`; `lh.image_flush()` drops cache entries whose file's mtime or size changed.
 
-Validation at each milestone: render the lab (`session/lab.sh`, Xvfb + picom xrender) and diff the
-crops in the scratch directory against the real screenshots at the same coordinates (taskbar
-rows 994-1023 / 836-863, sidebar columns 1131-1279 / 1003-1151).
+## 5. Packs
 
-## Corrections from the luxshell rendering pass
+A pack is `data/packs/NAME/shell.lua` (text only); its images are under `packs/<build>/` of the imported Windows tree
+(`~/.local/share/lhde-windows/generated/packs`, written by lhde-import; `lh.data_find`). The theme's `Shell.pack` names it.
 
-- **Two clock face sets.** `analogclock.xaml` names 1074/1076 (light grey face, black XAML rectangle hands), but the Aero/Jade 4074 screenshot shows the **dark-blue set**: face 1190 (263x263; 1192 is a byte-identical copy), glass 1191 (265x265), hands as images: hour 1193 (11x122, shadow 1194 12x103), minute 1195 (11x151, shadow 1196 12x133), second 1197 (11x163, shadow 1198 15x136), anchor 1188/1189 (11/12 px). That shot has the DWM running; without it 4074 draws the light set under Jade and Slate alike (lh4074-181714.png, lh4074-181636.png), with the image hands 1077/1078/1079 on the `LayerOrigins` of `SidebarClockSettings` (~/fun/longhorn/sidebar/CLOCK.md 1.1). luxshell picks the set by the theme's visual style (slate*: the light set; jade* and aero*: the dark set; plex*: the Plex builds' light set, 4042's imageres when imported; others: the light set; pack key `clock_face` overrides); the dark set's hand pivots are estimated (tail ~22 design px for hour/minute, ~35 for the second hand).
-- **Sizes of `HackImage` slots include the margins of the wrapping Border.** E.g. options glyph: image 9x6 plus Border 4,7,2,2 is a 15x15 slot; the TileArrow 8x8 with Border 0,2,1,0 is 9x10.
-- Slate clock hands are thin dark grey (#3E3F3F-ish, ~1 px at 80 px), not thick black; anchor is small.
-- `picom-glass.conf`: the dock window type was not in `blur-background-exclude` (it is in the shadow and rounded-corner excludes), so docks already blur.
+| Pack | Build, look |
+| --- | --- |
+| `4074-aero` | Aero imageres 1167-1201, 30 px taskbar, glass, `filter = nearest` |
+| `4074-aerovision` | `4074-aero` with `taskbar_text = "glow"` and `clock_pack = "4074-aero"` (taste: Aero vision's text on glass) |
+| `4074-slate` | the Slate ids (`ids` maps the Aero ids: 1178 → 1000, 1187 → 1155, 1179 → 1156, ...), 30 px, `tile_bg = 1000`, 6 px sizer 1108, `nearest` |
+| `4051-slate` | `4074-slate` with `filter = bilinear`, `imageres = "4051/imageres"`, a 29 px bar, the clock in the tile list |
+| `4042-plex` | the Plex sidebar parts (`start_compose`, `sidebar.title`, `tile_chrome`, a three-piece `flyout`), 24 px bar |
+| `5112-aero` | 5112's imageres, 30 px |
 
-## M5a design: the maximised look, the desktop layer, and running without a compositor
+`R(id)` gives the pack's image for an Aero imageres id: the pack's `ids` remap, then the pack's own `imageres` directory when it
+has that image (4051: the 34 PNGs of 4051's imageres.dll that differ from 4074's or are missing there, e.g. tile arrow
+1105/1106, tile restore/close 1058-1062, toast parts 4003-4011), else `packs/4074/imageres`. Keys: `name` (the pack's
+directory name), `family` (`slate` in both Slate packs: Slate's opaque flyouts, toasts and borders), `font`, `filter`,
+`default_icon`, `taskbar = { height, bg_grid, bg_filter }`, `taskbar_text`, `taskbar_glow`, `taskbar_dy`, `start = { w, h }`,
+`start_dy`, `start_alpha`, `start_extend_bottom`, `start_compose`, `toggle`, `toggle_minimized`, `taskbutton = { max_w, fill_w,
+margin, grid, content, icon_margin, font, images }`, `sidebar = { width, bg_grid, sizer, title }`, `tile_bg`, `tile_chrome`,
+`flyout`, `tray = { icon, pitch, origin }`, `tiles`, `pinned_tiles`, `taskbar_tiles`, `clock_pinned`, `clock_pack`,
+`clock_face`, `clock_layers`, `toast_place`.
 
-Status 2026-10-23: implemented (luxwm `_LHWM_MAXIMIZED_MODE`, square DWM maximised frames, `fallback_theme` + `_LHWM_THEME`; luxshell desktop layer; `LAB_PICOM=0`), verified on the lab; details and deviations in `docs/LUXWM.md` "Maximised mode".
+**Image filter.** Stretched nine-grid pieces and magnified images use the pack's filter. Evidence, as fits of 1156 / 1179 drawn
+79x29 over the bar's own background (mean squared error per pixel): 4074 Slate (`lh4074-181533.png`) nearest 54 vs bilinear
+250, Aero without DWM (`lh4074-181415.png`) 129 vs 266, Aero glass (`4074-dwm.png`) 1868 vs 2047 (blur under it); 4051
+(`4051-vm-now.png`) bilinear 0.2 vs nearest 249. The flag's edge profile shows the same (4074 repeats rows, 4051 ramps).
 
-Status update 2026-10-23 (M4b pass, black layer timing). aap: on maximise the black "pops in eventually", on restore it
-"blends out". New behaviour: the **desktop layer switches instantly both ways**: when `_LHWM_MAXIMIZED_MODE` turns on, luxshell
-sets the desktop window's X background to opaque black and maps it (lowered first), so the server paints it black as part of
-the map, no transparent first frame and no fade; on restore it is unmapped at once. It is now a **24-bit (opaque) window**:
-it is only ever mapped while black, and picom treats every ARGB window as translucent (full-screen blur behind it on every
-frame); the Aurora will need ARGB again. The **taskbar and sidebar black layers keep the 400 ms Animator2 fade** both ways
-(2.4.3), now at Animator2's 25 ms tick with the first frame applied in the same repaint as the trigger. Why it was late,
-measured with a 10 ms pixel sampler and a 50 ms full-screen series against `LHSHELL_DEBUG=1` timestamps (both CLOCK_MONOTONIC):
-(1) luxshell's poll loop could sleep on X events already read into Xlib's queue by round trips in Lua handlers and cairo (up
-to the next timer, the clock's 1 s); it now polls with timeout 0 while `XEventsQueued(QueuedAlready)` is non-zero. After the fix
-the `maxmode` event reaches Lua 1-20 ms after the property change and the first frame is painted 2-10 ms later. (2) Every fade
-frame repainted the full-screen desktop layer and the sidebar with server-side `FILTER_BEST` resampling of the 263 px clock
-layers; images are now prescaled once on the client (sidebar repaint 10 ms → 2 ms idle) and leaf rect/image opacity no longer
-pushes a group. (3) What remains is the compositor: on the Xvfb lab picom (xrender, gaussian blur) presents no frame for
-~300-450 ms around luxwm's geometry change, so the series shows the maximised window, the black desktop and the (already
-finished) black bars appearing in the same composited frame (t = 651 ms after the request, maxmode event at 203 ms), and on
-restore the desktop black disappearing with the first frame picom shows (t = 601 ms, event at 126 ms) while the bars fade.
+**4051 vs 4074 Slate** (builds after ~4060 look like 4074). 4074 Slate's Avalon taskbar (`lh4074-181533.png`) is 30 px, rows
+834..863, with 1155 (50x28) stretched whole, nearest (rows 7 and 21 repeat; a 7 px top grid does not fit): bg grid 0; the Start
+button 83x29 with the 4 px right Border (image 79x29; error 0.03 per pixel against the shot). 4051 (`4051-vm-now.png`) is 29
+px, rows 835..863, 1155 drawn top 7 / bottom 2 fixed and the middle nearest (`bg_filter`, repeating row 16 as the classic bar
+does: exact); 1156 bilinear (error 1.4). The 4051 `Sidebar` class blobs are pixel-identical to 4074 Slate's streams (60 of 60).
+Against `4051-vm-now.png` the sidebar's width, edge columns, options row, separator rows 17/18 and first tile arrow are exact.
+4051 ran the classic Win32 taskbar (task band plates 349, no sidebar toggle): that is flxp-taskbar (section 12); `4051-slate`
+with the Avalon taskbar is a stand-in.
 
-Written 2026-10-23 after M2. aap's description of the original: when a window is maximised,
-Longhorn puts a **black background behind the window**, the frame's **rounded corners disappear**,
-and the shell's black layers (taskbar/sidebar, 2.4.3) come on; this also holds for the non-DWM
-Jade/Aero (msstyles) frames. For the XP-era classic frames the corners are rounded or square
-depending on maximisation and window type (MAXCAPTION / SMALLCAPTION parts), and no compositor is
-needed or wanted.
+## 6. The taskbar
 
-### Shared condition
-"Maximised mode" on a desktop = the active window is maximised or fullscreen, or, with no active
-window, any visible window on that desktop is. luxshell already computes this for the black layers
-(runtime.lua, `lh.set_maximized`); luxwm knows it from its own state. Both must switch at the same
-moment, so luxwm publishes it too: root property `_LHWM_MAXIMIZED_MODE` (CARDINAL 0/1 per desktop
-index, like `_NET_WORKAREA`), updated whenever maximise/restore/focus/desktop changes. luxshell
-reads that property when present and only falls back to its own EWMH-derived condition when luxwm
-is not running (another WM).
+### 6.1 Geometry, Start button, toggle, rows
 
-### The desktop layer (luxshell)
-A third luxshell surface, `desktop`: full screen, 32-bit ARGB, `_NET_WM_WINDOW_TYPE_DESKTOP`,
-STICKY + BELOW, no struts, mapped first so it is at the bottom of the stack. Normally fully
-transparent (the wallpaper stays the root background, set by the user or lab.sh). In maximised
-mode it fades to opaque black in 400 ms with the same Animator2 ease as the black layers and fades
-back on restore. It is also the future home of the Aurora desktop (`xaml_sidebar_desktopaurora.xaml`,
-`mock/aurora.svg`), so give it a scene root like the other surfaces. picom: exclude
-`window_type = 'desktop'` from blur, shadow and fading in `picom-glass.conf`. luxwm must leave
-DESKTOP windows unmanaged and never raise anything below them (berry already ignores them; verify
-`XRestackWindows` keeps them at the bottom after `restart-wm`).
+Height = row height (`taskbar.height`: 30; 4051 29; Plex 24) x `[taskbar] rows` (1..3, Taskbar\RowCount). The bar runs from x 0
+to the sidebar's left edge (`SetMixedTaskbarSidebar`), the full width when the sidebar is minimized or stacked at the bottom;
+strut = its height (2 with autohide). Layers bottom up: `TaskbarBlackLayer` (black rect, opacity 0), `TaskbarBackground` 1187
+(grid from the pack), `InnerTaskbar` dock panel: StartButton (Dock Left, Width 83, Height 29, Border 0,0,4,0, 1179/1180/1181;
+in a canvas slot, so on a bar of several rows it stays one row high at the top), TaskbarToggleBar (Dock Right, 29 px slot, the
+17x17 glyph 1170, 1167 while the sidebar is minimized, hover 1171, pressed 1172), the TBContentHost (the minimized sidebar's
+tiles, section 7.3), the task rows. A 3 px invisible SizeNS strip on the top edge changes the rows (the horizontal bar's
+TaskbarSizer is Width 0; rows go through the appbar's sizing edge, `_PtOnResizableEdge` → `SetTaskbarRowCount`), snapping at
+half rows; `[taskbar] rows` is written on release. The Start button shows StartButton.FakePressed (1181, `checked`) while the
+start menu is open (section 13).
 
-### luxwm frames when maximised
-- **DWM themes (aero, jade):** square corners. Draw the plate's four corner cells from the
-  adjacent straight-edge cells instead of the rounded corner pixels (i.e. the 9-slice with the
-  corner sources replaced by the edge sources), draw the overlay likewise, and set the shape
-  region to the full rectangle. The frame keeps its caption height and side margins but the
-  side and bottom borders lie outside the work area, as the classic MAXCAPTION path already does
-  (README "Classic msstyles mode"), so the client fills the work area exactly. Check for any
-  maximised window in `screenshots/` (4074 Slate shots `lh4074-18*.png`, `4051-vm-now.png`) to
-  confirm whether the caption's top corners are square or clipped by the screen edge, and note
-  what you find in the README.
-- **msstyles themes:** already MAXCAPTION with the borders off-screen; verify the shape is a
-  full rectangle in that state and that restore brings the rounded corners back. SMALLCAPTION
-  (tool windows, `_NET_WM_WINDOW_TYPE_UTILITY` / MWM tool hint) rounded/square rules are a
-  later item.
-- Shadow (`shadow.png`, LGFRAMESHADOW) is not drawn while maximised; picom shadows for the
-  maximised client are moot (fills the work area) but should be excluded via a `_LHWM_MAXIMIZED`
-  window property + picom rule to avoid a shadow strip over the taskbar.
+### 6.2 Task buttons
 
-### Running without a compositor
-Classic frames need none. DWM frames do: without a compositor an ARGB decoration window over the
-root shows its translucent pixels as black. Rules:
-- `lab.sh`: `LAB_PICOM=0` starts the lab without picom (`start`, `ensure`, `restart-picom` print
-  a note instead); `docs/USAGE.md` documents it next to `LAB_THEME`.
-- luxwm: on startup and on `_NET_WM_CM_S<screen>` selection owner changes, if the current theme
-  is a DWM theme (has `plate_active.png`, `mode = dwm`) and no compositor owns the selection,
-  switch to the theme's `fallback_theme` (theme.ini key; aero → `jade4074-classic`, jade →
-  `jade4074-classic`) and back when a compositor appears. This mirrors Longhorn's own
-  `USESCOMPOSITION` fallback to the msstyles frame. Log the switch to stderr. Theme switching at
-  runtime = reload theme, recompute margins for every client, re-place clients so the client
-  rectangle stays put, repaint.
-- `luxwmc` or a keybinding to switch theme at runtime is a natural by-product; expose
-  `_LHWM_THEME` root property (string) that luxwm sets and honours when changed by
-  `xprop -root -f _LHWM_THEME 8s -set _LHWM_THEME <path>`.
+Windows from `_NET_CLIENT_LIST` on the current desktop plus sticky ones; skipped: skip-taskbar, transients, dock/toolbar/menu/
+splash/utility types (luxwm publishes `_NET_WM_STATE_HIDDEN` with `WM_STATE` Iconic, `_NET_CLIENT_LIST_STACKING`,
+DEMANDS_ATTENTION). Width rule (2.4.2): items per row = `ceil(n / rows)`, width `min(max_w = 140, w / per)`; Plex
+(`fill_w = 130`, 4042's TaskPresenter) shares the whole width. TaskButton = Border 0,2,2,0 > 1182/1184/1185 grid 3 > Border
+6,5,6,6 > icon 16 + 2 px + title (ellipsis); checked = the active window. Click: activate, or minimise when already active;
+right click: luxwm's window menu at the pointer (`lh.window_menu`, `_GTK_SHOW_WINDOW_MENU`; XP's task button menu is the
+system menu). Drag: past 4 px the button takes the place of the one under the pointer, live (as 4074's taskbar); the order is
+kept for the X session in the root property `_LHSHELL_TASK_ORDER` (window ids, decimal, space separated, all desktops), so a
+restarted luxshell keeps it; new windows go to the end.
 
-### Order of work
-1. luxwm: `_LHWM_MAXIMIZED_MODE`, square-corner DWM maximised frames, no shadow when maximised.
-2. luxshell: desktop surface + black fade; read `_LHWM_MAXIMIZED_MODE`.
-3. lab.sh `LAB_PICOM=0`; luxwm compositor detection + fallback theme + `_LHWM_THEME`.
-Verify on the lab: maximise (Super+Up) → desktop fades to black with the bars, corners square,
-client fills 0,0..workarea; restore → everything back. With `LAB_PICOM=0 LAB_THEME=aero`, frames
-come up in jade4074-classic and `xprop -root _LHWM_THEME` says so.
+Icon: `_NET_WM_ICON`, the smallest image >= 16 (else the largest), scaled once with `CAIRO_FILTER_BEST`; else the `WM_HINTS`
+icon pixmap + mask; else the pack's `default_icon` (shell32 16/3, IDI_APPLICATION, as Explorer). Re-read on every
+`_NET_WM_ICON` / `WM_HINTS` PropertyNotify.
 
-## M4b: notification area, toasts, power tile
+Text: `taskbar_text = "plain"` (white, 4074) or `"glow"` (black over a white halo, the GDI coverage blurred: `taskbar_glow = {
+color, text, size = 4, strength = 2.5 }`), also used by the minimized sidebar's taskbar clock.
 
-Written 2026-10-23. Three sidebar-side pieces that make the bar "alive", plus `_NET_WM_ICON_GEOMETRY` for luxwm.
+### 6.3 `_NET_WM_ICON_GEOMETRY`
 
-### Tile chrome correction
-The right-docked sidebar is Flipped (2.4.1), so `TileSideAreaBack` docks **Right** and `TileForegroundPadder` (6) **Left**
-(2.3.3). runtime.lua had them the other way round. With the fix the foreground is x 7..140 of the bar (133 wide) and y 3.. of
-the tile, which is exactly where the 4074 Slate power tile's battery starts (`lh4074-181415.png`, x 1010 on a bar at 1003) and
-where the 4051 arrow sits (top-right, `4051-vm-now.png`). The clock moved 3 px left (centre 75 on a 149 px bar). Tiles may
-define `flyout(self) → node, w, h`; a click on the foreground then toggles the generic flyout (below). `sb.resize_tile(tile, h)`
-animates a tile to a new height in 400 ms ease-in-out (2.4.4), min 30.
+Each task button writes its plate's rect (inside the 0,2,2,0 margin) in root coordinates on its client after every layout,
+rewrites it when the buttons reflow and deletes it when the button goes; a hidden taskbar surface (classic / none) drops all of
+them. With autohide the geometry is where the button is when the bar is shown (`icon_offset`).
 
-### `_NET_WM_ICON_GEOMETRY`
-Task buttons carry `icon_geometry_for = <client>`; after every layout of a surface, luxshell writes the button plate's rect
-(inside its 0,2,2,0 margin: e.g. `83, 772, 138, 28`) in root coordinates on the client, rewrites it when the buttons reflow and
-deletes it when the button goes away (skip-taskbar, window gone). Verified with `xprop` on the lab.
+### 6.4 Autohide
 
-### Notification area (system tray) tile, `tiles/notifications.lua` + `tray.c`
+`[taskbar] autohide = 1`, the Avalon rule (2.4.2): the window keeps its size and is shifted so `2 + (h - 2) * pct / 100` px stay
+on screen; while "focus within" (pointer over the bar, a menu or flyout of ours open) pct moves by 20 every 20 ms (100 ms,
+linear), polled every 100 ms while shown, re-shown by `EnterNotify` on the 2 px sliver. The strut is the sliver, so the work area
+grows. Switching autohide on jumps straight to 0 / 100.
+
+### 6.5 Taskbar menu
+
+Right click on the bar outside the buttons. `ExtendedTaskbar.GetContextMenu` (L23627): *Minimize bar* / *Restore bar* (the
+sidebar's real state; 4074 passed constants and always said "Restore bar"), *Properties* (the settings flyout), separator,
+*Task Manager* (the first of xfce4-taskmanager, lxtask, gnome-system-monitor, mate-system-monitor, qps, else `xterm -e top`;
+greyed when none; looked up with `io.popen`, since `os.execute` reports -1 under luxshell's ignored SIGCHLD), separator, *Show
+Desktop* / *Hide Desktop* (`_NET_SHOWING_DESKTOP`), *Cascade* (26 px steps, 60 % of the work area), *Tile Vertically*, *Tile
+Horizontally* (more than three windows: a grid, as TileWindows), through `_NET_MOVERESIZE_WINDOW` over the work area (client
+sizes; luxwm adds its frame); then luxshell's own: *Auto-hide the taskbar*, *Sidebar* ▸ Full / Minimized / Pinned tiles only.
+No screenshot of this menu exists; the wording is the IL's.
+
+## 7. The sidebar
+
+### 7.1 Geometry, edge, width
+
+150 px (`Sidebar\Width`; the bar is x 1130..1279 on `4074-dwm.png`, column 1130 being 1178's dark column 0), full height on the
+right, right strut = its width; `[sidebar] width` 100..600 (`_ValidateSize`). Tree: `SidebarBlackLayer`, `SidebarBackground`
+1178 (grid left 36: the edge gradient keeps its width at any bar width; Slate 1000, no grid), `sidebarMain`: the options row
+(17 px, the 9x6 glyph 1176/1177 in Border 4,7,2,2 (the 10 columns of 1176 drawn into 9 by dropping one, as both builds do:
+exact with nearest), "Options" fading in over 120 ms on hover), separator 1199 (2 px), the pinned host at the bottom (clock),
+the clock separator (3 px, shown only above a non-empty pinned host), the tile collection. `SidebarSizer` on the inner edge:
+2 px (Aero, image hidden; the visible edge is 1178's columns 0-1) or 6 px of 1108 (Slate: without it 1000's dark column 0
+showed as a black line). Dragging it (`_OnSizerDrag`, width - dx) applies the width every 25 ms: surface, strut, the taskbar,
+`_NET_WORKAREA` (luxwm refits maximised windows), event `sidebar-resize` (tiles reflow); `[sidebar] width` on release;
+`[sidebar] locked = 1` (*Lock the Sidebar*, the 4051 `SetLockBar` idea) stops the drag. Plex: its own title band
+(`sidebar.title`: TITLEBACK, FLYOUTOPTIONSBACK hot/pressed, the glyph centred) and no separators.
+
+### 7.2 Stacking
+
+`[sidebar] stacking = top` (default, 4074): `_NET_WM_STATE_ABOVE` like the taskbar, raised with it on window-list changes, its
+strut, full height, the taskbar shortened. `bottom`: part of the desktop, `_NET_WM_STATE_BELOW` (luxwm keeps BELOW docks under
+the clients), no strut (windows and maximised windows cover it), ending at the top of the full-width taskbar, which then shows
+the clock's taskbar view at its right end (the sidebar's clock may be covered). Win+S (luxwm `shell sidebar-stacking toggle`),
+the sidebar menu's *Stacking* ▸ and the settings flyout switch it at once, no animation; the order of the steps keeps every
+in-between state invisible (to bottom the taskbar first runs the full width under the sidebar's corner, to top the sidebar
+first runs the full height under the taskbar; the restack comes last). A server grab around it froze picom (xrender) mid-paint.
+
+### 7.3 Modes
+
+`[sidebar] mode` (default: the theme's `Shell.sidebar`, else full), from the toggle button (`_ToggleSidebar`), the menus and the
+settings flyout:
+
+- `full`: the layout above.
+- `minimized` (`SidebarControl.SetMinimized`): the sidebar slides out to the right (400 ms ease-in-out) and is unmapped, no
+  strut; the taskbar runs the full width with the pack's `taskbar_tiles` (4074 `Sidebar\TaskbarTiles`; else the pinned tiles) as
+  compact views (`tile:taskbar(host)`: the tray row, the digital time, the Quick Launch icons, the notification bell and count)
+  at its right end; the toggle shows 1167.
+- `pinned` (ours, taste): the surface shrinks to the bottom block of `pinned_tiles` (notifications + clock), no options row; a
+  **bottom** strut of the block's height over the sidebar's columns (luxwm's work area is one rectangle; a right strut would
+  take the full width for a small block), so everything above is free desktop. With autohide on, only the clock and the tray
+  icons remain: the "minimal" mode.
+
+Transitions slide or shrink over 400 ms ease-in-out; the struts take their final value when a transition starts.
+
+### 7.4 Yielding to a bottom dock, the classic taskbar
+
+`[sidebar] yield_bottom = auto` (default) | `0`: `lh.struts()` reads `_NET_WM_STRUT_PARTIAL`/`_NET_WM_STRUT` of every mapped
+top-level not ours (and one level down, inside WM frames); the largest bottom strut over the sidebar's columns shortens it (the
+right strut's range follows), lifts the pinned block above it (bottom strut = block + bar) and keeps the minimized one out of
+the way. Re-checked on `_NET_WORKAREA` changes and on top-level map / unmap / destroy (luxwm may keep `_NET_WORKAREA` unchanged
+when one bottom strut replaces another). With the classic taskbar (section 12), `[sidebar] with_classic = 0` (default) hides
+the sidebar entirely (unmapped, no strut, `_LHSHELL_CLOCK_VISIBLE` 0); its mode is kept and comes back with the Avalon taskbar.
+`with_classic = 1` is the 4051 layout: the sidebar yields above the full-width classic bar.
+
+### 7.5 Tiles and their chrome
+
+The tile list is luxshell-state.ini `[sidebar] tiles` (`;`-separated, `none` = empty) with `[sidebar] tiles_base` = the pack's
+`tiles` it was made from: while the pack's list is unchanged the user's list holds, otherwise the pack's list wins. A tile added
+again goes to its place in the pack's order (else 4074's SidebarTiles order: notifyhistory, quicklaunch, notifications, power,
+clock). Tiles are `luxshell/tiles/NAME.lua`, rebuilt on a pack switch, a mode change and a reload.
+
+Chrome (`tile.xaml` / `outertile.xaml`): the right-docked bar is Flipped (2.4.1), so `TileSideAreaBack` (9 px: arrow 1173/1174,
+restore 1058/1059 and close 1061/1062 on hover) docks **right** and `TileForegroundPadder` (6) **left**: the foreground is x
+7..140 of the bar (133 wide) and y 3.. of the tile, where the 4074 Slate power tile's battery starts (`lh4074-181415.png`) and
+where the 4051 arrow sits (top-right). Bottom: the 4 px `OuterContentHostSizer` (1199/1200, Border 0,2,0,0). Slate repaints
+1000 under each tile (`tile_bg`). `TileUI` fades in over 800 ms. Plex (`tile_chrome`): TILEBACK under the whole tile, a 16 px
+side strip (TILEHEADERBACK, TILECHEVRONBACK pressed, the tile icon) fading in over 300 ms while the pointer is within the tile
+and out over 500 ms, a 7 px TILESIZER.
+
+Tile API (mirrors BaseTile, 2.5): a tile file returns a table `{ name, height, pinned }` with methods `initialize` (the host has
+set `foreground`, `sb`, `T`, `R`), `dispose`, `flyout()` → node, w, h (a click on the foreground or the side strip toggles it),
+`flyout_closed`, `properties()`, `menu()` (items in front of the host's), `taskbar(host)` (the compact view). Host calls:
+`sb.resize_tile(tile, h)` (400 ms ease-in-out, min 30, 2.4.4), `sb.tile_rect`, `lh.open_flyout` / `lh.toggle_flyout` /
+`lh.close_flyout`, `lh.tooltip(node, text)`.
+
+### 7.6 Sidebar and tile menus
+
+Sources: `lh4074-091929.png` (4074 Slate sidebar menu: *Minimize bar*, *Properties*, separator, the parts list *Basket, Classic
+Tray ✔, Contacts, News Feed, Notification History ✔, People nearby, Quick Launch ✔, Search ✔, Slide Show, Sync*, separator,
+*Power (Transient) ✔, Web Host Tile (Transient) ✔*, separator, *Clock ✔*; *Properties* opens "Taskbar and Start Menu
+Properties", `lh4074-091944.png`) and the IL: `SidebarBaseMenu2.GetBaseContextMenu` (L17037), `SidebarControl.GetContextMenu`
+(L37721), `_OnOptions` (L38583), `OuterTile._GetContextMenu` (L44524: the tile's own items first, *Auto Size* (checkable), *Move
+Up*/*Move Down* (*Left*/*Right* in the taskbar), *Remove <name> Tile from overflow*, *<Friendly Name> Tile Properties* with a
+property page, *Remove <Friendly Name> Tile* unless pinned; no separators).
+
+- Sidebar menu: right click outside the tiles, or the Options glyph (under it, right-aligned). 4074's base items, then
+  luxshell's group *Lock the Sidebar* and *Stacking* ▸ Top / Bottom, then the parts list in the screenshot's order: *Classic
+  Tray* = `notifications`, *Notification History* = `notifyhistory`, *Quick Launch* = `quicklaunch`, *Power (Transient)* =
+  `power`, *Clock* = `clock` (checked = in the tile list, a click adds or removes it; only in full mode), the other modules
+  greyed. The list stays inline as in 4074.
+- Tile menu: right click on a tile, or a click on its arrow when it has no flyout. The tile's `menu()`, a separator (ours),
+  *Auto Size* (checked and greyed: tiles size to their content), *Move Up* / *Move Down* (greyed at the ends and for pinned
+  tiles), *<Name> Tile Properties* (`properties()`, else the flyout; greyed without either), *Remove <Name> Tile* (not on pinned
+  tiles). Friendly names: Classic Tray, Power, Clock, Quick Launch, Notification History.
+
+All menus are `menu.lua` over wuxtheme's painter (section 16).
+
+### 7.7 Flyouts (`flyout.lua`)
+
+`flyout.xaml`: 1175 nine-grid 53,3,3,3 (Slate 1109, grid 3), the Options row (17 px, glyph 1176/1177 in Border 4,5,4,4,
+"Options" fading in over 120 ms), FlyoutBorder 8,4,8,8 (Slate 4,0,4,4); Plex: the three-piece FLYOUTTOP / CONTENT / BOTTOM. One
+flyout at a time, `_NET_WM_WINDOW_TYPE_POPUP_MENU`, placed left of the bar at the tile's top (placement 2), clamped to the
+screen; closed by a second click on the tile, a click on another luxshell surface or any click outside (pointer grab with owner
+events, `on_outside`). Other owners (the settings flyout, the run box) may add `place`, `on_key` (keyboard grab; Escape closes)
+and `stay_open`. An open flyout or menu keeps an autohide taskbar shown.
+
+## 8. Tiles
+
+### 8.1 Clock (`tiles/clock.lua`)
+
+`[clock] pinned = 1` (4074: the pinned host at the bottom) | `0` (4051: a tile in the list: ~96 px face at tile y 22, "6:37 AM,
+Oct 23" in Tahoma 10 at tile y 142, tile 160 high). The choice holds for the pack it was made in (`[clock] pinned_pack`; a
+pack's `clock_pack` shares another's: aerovision → aero); other packs use their `clock_pinned` (nil = pinned). `[clock] layout`
+= the six `clocksidebar*.xaml` views: `default` (80 px analog + LongTime), `digtime`, `digtimemonthday`, `digtimeweekday`
+(analog + bold DigitalTime #D8E4FF / #9EB5BB + DigitalText lines; the AnalogClockPanel has no size in these XAMLs: 56 px, 40 px
+beside the weekday/date lines, inferred), `minical` (42 px clock + MiniCalendar + centred bold time), `cal` (the month grid,
+gradients #838A90 → #767B7F header, #6B7278 → #5B6366 body, Tahoma 7.5 white dates, weeks from the locale's first weekday).
+Chosen from the tile's menu or its Properties flyout (the six layouts and the pinned switch). XAML margins like `bin:02HHVV` are
+two-value Thickness (horizontal, vertical). Times follow the environment's LC_TIME (luxshell itself runs in the C locale).
+
+Face sets, chosen by the theme's visual style (pack key `clock_face` overrides): `slate*` and anything else the light set
+(1074 face, 1076 glass, image hands 1077/1078/1079 and anchor 1083 on `SidebarClockSettings`' LayerOrigins, design size 260;
+`~/fun/longhorn/sidebar/CLOCK.md` 1.1); `jade*`, `aero*` the dark-blue set of `4074-dwm.png` (face 1190 263x263, 1192 a
+byte-identical copy, glass 1191 265x265, hour 1193 / shadow 1194, minute 1195 / 1196, second 1197 / 1198, anchor 1188/1189;
+its hand pivots are estimates: tail ~22 design px for hour/minute, ~35 for the second hand); `plex*` the Plex builds' light
+set from `packs/4042/imageres` when imported (`clock_layers = "full"`: 4042 main's 179 px clock as the tile's Background, Arial
+20 white time under it, checked against `4042mainwmptile.png`). `analogclock.xaml` itself names 1074/1076 with black XAML
+rectangle hands; the 4074 shots without DWM show the light set under Jade and Slate alike. Slate hands are thin dark grey
+(~#3E3F3F). One 1 s timer; the second hand ticks.
+
+### 8.2 Notification area (`tiles/notifications.lua`, *Classic Tray*)
+
+The tray (section 10) in a tile. Geometry from the 4051 / 4074 quick-launch icon tiles (`4051-vm-now.png` y 19..51, icons at x
+1015 / 1043; `lh4074-181415.png` x 1017 / 1043): first icon at 5,6 in the foreground (12,9 in the tile), **28 px pitch** (5 per
+row in 133 px), height **33** for one row incl. the sizer, + 24 per extra row (inferred; no multi-row reference), animated on
+`tray(count)`. Hidden while another client owns the tray selection; minimized taskbar view: one row, 20 px apart, centred.
+
+### 8.3 Power (`tiles/power.lua`)
+
+`/sys/class/power_supply/BAT0` (`status`, `capacity`, `energy_now/full` + `power_now` or `charge_*` + `current_now`),
+`AC/online`, every **30 s**; time left = now / rate (discharging), (full - now) / rate (charging). `LHSHELL_POWER_SUPPLY` /
+`LHSHELL_BATTERY` point it at a fake sysfs directory. `powergauge.xaml` uses no imageres ids, only vector brushes: the battery
+(`battery_body` 35x19 ShinyWhite, `nub` 3x10, red plus/minus, `ACLogo` plug) rotated 270° and scaled 0.95, at x 7..24, y 7..41 of
+the tile as measured in `lh4074-181415.png`; the ACLogo pulses 0 → 1 → 0 over 2 s while charging. Gauge `#808080` 104x19 at x
+33, y 6, ShinyGreen (Yellow <= 25 %, Red <= 10 %) inset 2 px over a 40 % copy, GraySweep 15 %. Text Segoe UI 13 bold `#dddddd`
+centred under it: "Charging: N%", "XhMM left: N%", "Charged: N%". Tile 49 high. Flyout (`powerflyout.xaml`): white, 194 wide,
+"Power Status (1)" #808080 bold 14, the gauge, status / charge / time / rate / capacity rows, "Power Plans" with the selected
+one from `/sys/firmware/acpi/platform_profile` (read-only); brightness and "keep my screen on" are not shown.
+
+### 8.4 Quick Launch (`tiles/quicklaunch.lua`)
+
+4074's QuickLaunchTile: the `.desktop` files of `[quicklaunch] dir` (default `~/.config/lhde/quicklaunch/`, created once with
+copies of the browser, the mail client, the file manager and a terminal; an emptied folder stays empty), file-name order,
+re-read on change (5 s poll). One row of 16 px icons at 28 px pitch, the first at 12,9 (the tray tile's geometry), 35 high,
+wrapping at 24 px (inferred). Click launches (`apps.lua A.launch`: field codes dropped, `Terminal=true` in xterm, counted in
+`~/.local/state/lhde/luxshell-mfu.ini`). Tooltips per item; menu *Open Quick Launch folder* (ours).
+
+### 8.5 Notification History (`tiles/notifyhistory.lua`, `notifylog.lua`)
+
+4074's NotificationHistoryTile: a time line, not a list. The newest (at most 8) notifications are 19x16 bubbles (4014 unviewed,
+4013 viewed) along the bar by age (span = max(30, minutes since the oldest), f = age / span, square-rooted above 30 min; offset =
+(1 - f) * width); neighbours <= 20 px apart pile into stacks of at most 4 (15 + 4 (n - 1) wide, diagonal down-right, newest on
+top); a ninth drops the oldest stack; a 60 s timer re-spaces. Verified on `lh4074-193747.png`. A bubble's tooltip is the time
+and header; a click shows the toast again. The flyout: 400x300 white list by day, time, bubble, header (#E96D00) and body;
+closing it marks all viewed. Menu: *Go to rules and alerts* (greyed: no rules engine) and *Delete All Notifications* (ours
+works; 4074's did nothing). Store: `~/.local/state/lhde/luxshell-notifications`, newest last, at most 100, one tab-separated line
+each (time, viewed, app, icon, summary, body; `\\ \t \n` escaped); `transient` notifications stay out; `CloseNotification`
+revokes, `replaces_id` updates in place; viewed once dismissed, clicked, re-shown or seen in the flyout.
+
+## 9. Toasts: `org.freedesktop.Notifications` (`notify.c`, `toast.lua`)
+
 | Item | Value |
 | --- | --- |
-| Protocol | freedesktop System Tray 0.3 + XEmbed: luxshell owns `_NET_SYSTEM_TRAY_S<screen>` with an InputOnly manager window (server timestamp from a property append), announces `MANAGER` on the root, sets `_NET_SYSTEM_TRAY_ORIENTATION` = 0 (horizontal), `_NET_SYSTEM_TRAY_VISUAL` = our 32-bit visual, `_NET_SYSTEM_TRAY_ICON_SIZE` = 16 |
-| Docking | `REQUEST_DOCK`: select Structure/PropertyChange, `XAddToSaveSet`, reparent into the sidebar surface, size 16x16, send `XEMBED_EMBEDDED_NOTIFY` (embedder = sidebar, version 0), map per `_XEMBED_INFO` flags (no property: map). Unmap/destroy/reparent-away undock; `_XEMBED_INFO` changes map/unmap; an icon resizing itself is put back to the slot size. BEGIN/CANCEL_MESSAGE balloons are ignored |
-| Alpha | an ARGB child would replace the glass under it (transparent icon pixels = holes). With Composite + Damage present, each icon is **redirected manually** and painted by luxshell with cairo OVER from the redirected window in the `tray` node's paint (Damage → repaint); input still goes to the icon window. The libXcomposite/libXdamage headers are not installed here, so the five entry points are `dlopen`ed (without them icons draw themselves) |
-| Exit | on SIGTERM/SIGINT the icons are unmapped and reparented to the root before exit and the selection is dropped. Otherwise the save-set maps them on the root, luxwm manages them and puts a passive button grab on them; after the next luxshell re-docks them a click froze the pointer (an orphaned sync grab, observed on the lab) |
-| Geometry (measured) | the only references are the 4051/4074 quick-launch icon tiles (`4051-vm-now.png` y 19..51, icons 16x16 at x 1015 / 1043, y 28; `lh4074-181415.png` x 1017 / 1043, y 108): first icon at 5,6 in the foreground (12,9 in the tile), **28 px pitch** across (5 per row in 133 px), tile height **33** for one row incl. the 4 px sizer; rows 24 px apart (inferred, no multi-row reference) |
-| Lua | node `kind = "tray"` with `icon_size`, `pitch = {x, y}`; `lh.tray_start(node)`, `lh.tray_count()`, event `tray(count)` → the tile resizes (`33 + 24 * (rows - 1)`) |
+| Server | libdbus-1 on `DBUS_SESSION_BUS_ADDRESS` only (no X11 autolaunch); `RequestName(DO_NOT_QUEUE)`; when another daemon owns the name, no toasts (logged). `GetCapabilities` (body, actions, icon-static), `GetServerInformation` (name luxshell, vendor lhde, spec 1.2), `Notify` (`susssasa{sv}i`; `replaces_id` keeps the id), `CloseNotification`, Introspect; signals `NotificationClosed` (1 expired, 2 dismissed, 3 closed by call) and `ActionInvoked` |
+| To Lua | event `notification` with `id, replaces_id, app_name, app_icon, summary, body, actions = {{key, label}}, hints, urgency, image_path, image` (`image-data` → `@notify:<id>`), `expire_timeout`; `notification-close(id)`; `lh.notification_closed(id, reason)`, `lh.notification_action(id, key)` |
+| Window | override-redirect ARGB, `_NET_WM_WINDOW_TYPE_NOTIFICATION` (picom: no shadow, no rounding), XShape round rect radius **9**, never focused |
+| Layout (`notification.xaml`) | ToastBackground black (opacity 0 under Aero = glass); 4002 frame grid 7 (205x60 minimum); TimerControl 5 px on the right, 4001 shrinking from the top; options row: close 14x15 4003/4004/4005, "Options" white; icon left (image-data, image-path, app_icon path or icon theme; <= 48); 4006 panel grid 7, border 6: summary Franklin Gothic Medium 15 px, body 12 px wrapped at 110, else 154 (<= 2 lines), else 220 (<= 4 lines); <= 2 action buttons 73x24 (hover 1110, pressed 1111) |
+| Behaviour (2.4.5) | 10 s default, minimum 5 s (`expire_timeout` 0 = until dismissed); the bar ticks every `timeout / height` ms; hover stops it, rewinds to 0.75 in 200 ms and expands downward (buttons + Options fade in, 200 ms); leaving collapses and restarts; one at a time, FIFO; a click outside the buttons = the `default` action (if offered) + dismissed; the close glyph = dismissed |
+| Placement | `x = work.right - w - 10`, `y = work.bottom - (expanded - collapsed) - h - 10`: above the taskbar (ours or the classic one), left of the sidebar (full width when the sidebar is hidden); pack `toast_place = "sidebar"` puts it over the sidebar's top |
 
-Tested with `tests/trayicon.c` (ARGB circle, re-docks on `MANAGER`, logs clicks, optional exit timer): 7 icons → two rows,
-the 5 timed ones exiting → one row again, clicks reach the icon, icons survive luxshell restarts. `blueman-tray` is installed but
-needs a running blueman-applet/bluetooth; GTK2/3 `GtkStatusIcon` apps and anything using the XEmbed fallback dock the same way.
+No reference screenshot of a 4074 toast exists; the look follows the XAML and the 4002/4006 images.
 
-### Toasts: `org.freedesktop.Notifications` (`notify.c`) + `toast.lua`
+## 10. The tray (`tray.c`)
+
 | Item | Value |
 | --- | --- |
-| Server | libdbus-1, session bus from `DBUS_SESSION_BUS_ADDRESS` only (no X11 autolaunch); `RequestName(DO_NOT_QUEUE)`, if another daemon owns the name toasts are off (logged). Fd in luxshell's poll, dispatched every loop. Methods `GetCapabilities` (body, actions, icon-static), `GetServerInformation` (luxshell, Longhorn X11 lab, 0.1, 1.2), `Notify` (`susssasa{sv}i` → id; `replaces_id` keeps the id), `CloseNotification`, Introspect; signals `NotificationClosed` (1 expired, 2 dismissed, 3 closed by call) and `ActionInvoked` |
-| To Lua | event `notification` with `id, replaces_id, app_name, app_icon, summary, body, actions = {{key, label}}, hints, urgency, image_path, image` (`image-data` hint → `@notify:<id>` image), `expire_timeout`; `notification-close(id)`; `lh.notification_closed(id, reason)`, `lh.notification_action(id, key)` |
-| Window | override-redirect ARGB, `_NET_WM_WINDOW_TYPE_NOTIFICATION`, round-rect bounding shape radius **9** (XShape), never focused |
-| Layout (notification.xaml) | ToastBackground black (opacity 0 under Aero = glass, 1 in Slate); 4002 frame grid 7 (205x60 is the minimum size); TimerControl column 5 px on the right, 4001 bar shrinking from the top as time runs out; options row 15: close 14x15 4003/4004/4005, "Options" white; icon left (image-data, image-path, app_icon path or icon-theme PNG; scaled to <= 48); 4006 panel grid 7, border 6: summary ITC Franklin Gothic Std Medium 15 px (Franklin Gothic Medium 15), body 12 px, wrapped at 110, else 154 if <= 2 lines, else 220 (<= 4 lines); action buttons 73x24 (<= 2, hover 1110 / pressed 1111) |
-| Behaviour (2.4.5) | 10 s default, minimum 5 s (`expire_timeout` 0 = until dismissed); the bar ticks every `timeout / height` ms; hover stops the timer, rewinds to 0.75 in 200 ms and expands (buttons row + Options fade in, 200 ms, the window grows downward into the room reserved by the placement); leaving collapses and restarts; one toast at a time, FIFO; click anywhere but the buttons = `default` action (if offered) + dismissed; close glyph = dismissed |
-| Placement | IL: `x = work.right - w - 10`, `y = work.bottom - (expanded - collapsed) - h - 10` (work area = screen minus the taskbar and sidebar struts): above the taskbar, left of the sidebar. `T.toast_place = "sidebar"` puts it over the sidebar's top instead |
+| Protocol | freedesktop System Tray 0.3 + XEmbed: an InputOnly manager window owns `_NET_SYSTEM_TRAY_S<screen>` (server timestamp from a property append), `MANAGER` on the root, `_NET_SYSTEM_TRAY_ORIENTATION` 0, `_NET_SYSTEM_TRAY_VISUAL` = the 32-bit visual, `_NET_SYSTEM_TRAY_ICON_SIZE` 16 |
+| Docking | `REQUEST_DOCK`: select Structure/PropertyChange, `XAddToSaveSet`, reparent into the surface holding the `tray` node (sidebar or taskbar), 16x16, `XEMBED_EMBEDDED_NOTIFY`, map per `_XEMBED_INFO`; a foreign ParentRelative background is reset (BadMatch in a 32-bit parent). Unmap / destroy / reparent-away undock; an icon resizing itself is put back. Balloons (BEGIN/CANCEL_MESSAGE) are ignored |
+| Alpha | an ARGB child would punch holes in the glass, so with Composite + Damage each icon is redirected manually and painted with cairo OVER in the `tray` node's paint (Damage → repaint); input still goes to the icon. libXcomposite / libXdamage are `dlopen`ed (no build dependency; without them icons draw themselves) |
+| Hand-back | on exit (SIGTERM/SIGINT) and `lh.tray_stop` the icons are unredirected, unmapped and reparented to the root, the selection dropped (left mapped, the WM would manage them and a later re-dock froze the pointer on an orphaned grab) |
+| One tray per display | `tray_start` never takes the selection from another owner; while another owns it the notifications tile hides (`tray-owner`, XFixes `SelectSelectionInput`, else a 2 s poll) and claims it again when the owner goes |
 
-Verified with `notify-send "Hello" "from Longhorn"`, `notify-send -A ok=OK -A no=Cancel ...` (button → `ActionInvoked(2, 'ok')`,
-`NotificationClosed(2, 2)`, notify-send prints `ok`), `-t 5000` (closed with reason 1 after 5 s), `CloseNotification` (reason 3),
-`replaces_id` (rebuilt in place), a queue of three, and a body click with a `default` action. No reference screenshot of a 4074
-toast exists; the look follows the XAML and the 4002/4006 images only.
+Tested with `luxshell/tests/trayicon.c` (an ARGB circle that re-docks on `MANAGER`, logs clicks, optional exit timer). GTK
+`GtkStatusIcon` apps and anything on the XEmbed fallback dock the same way.
 
-### Power tile `tiles/power.lua` and the generic flyout `flyout.lua`
-| Item | Value |
-| --- | --- |
-| Data | `/sys/class/power_supply/BAT0` (`status`, `capacity`, `energy_now/full` + `power_now`, or `charge_*` + `current_now`), `AC/online`; polled every **30 s**; time left = now / rate (discharging) or (full - now) / rate (charging). `LHSHELL_POWER_SUPPLY` / `LHSHELL_BATTERY` point it elsewhere (a fake sysfs dir is how the "Charging: 95%" comparison was made) |
-| Drawing (powergauge.xaml) | the XAML uses **no imageres ids**: it is vector brushes. Battery (`battery_body` 35x19 ShinyWhite, `nub` 3x10 ShinyGray, red `plus_h/plus_v/minus`, `ACLogo` black plug) rotated 270° and scaled 0.95, as measured in `lh4074-181415.png`: body x 7..24, y 7..41 of the tile, nub 9x3 on top; the ACLogo pulses 0 → 1 → 0 over 2 s while charging on AC. Gauge: `#808080` box 104x19 at x 33, y 6 (gauge panel Height 21), ShinyGreen (ShinyYellow <= 25 %, ShinyRed <= 10 %) bar inset 2 px over a 40 % copy of itself, GraySweep at 15 %. Text Segoe UI 13 bold `#dddddd` centred under the gauge (Helvetica Bold 13 px here: 89 px for "Charging: 95%" vs 86 in the reference); "Charging: N%", "XhMM left: N%" (the XAML sample text is "4h23"), "Charged: N%" |
-| Tile | 49 high (45 body + 4 sizer), 2nd in the default list after the tray, as in the 4074 Slate shot |
-| Flyout (flyout.xaml, 2.3.2) | override-redirect ARGB `_NET_WM_WINDOW_TYPE_POPUP_MENU`: 1175 nine-grid 53,3,3,3 (Slate 1109 grid 3), options row 17 (glyph 1176/1177 in a 4,5,4,4 border, "Options" fading in 120 ms), FlyoutBorder 8,4,8,8 (Slate 4,0,4,4); placed left of the bar at the tile's top (placement 2), clamped to the screen; closed by a second tile click, a click on another luxshell surface, or any click outside (pointer grab with owner events, `surface.on_outside`) |
-| Power flyout (powerflyout.xaml) | white panel 194 wide; "Power Status (1)" HeadingText #808080 bold 14 margin 8; the gauge again (wider); status / charge / time / rate / capacity / battery rows; #808080 rule; "Power Plans" with the three plans and descriptions, the selected one from `/sys/firmware/acpi/platform_profile` (read-only). The brightness and "keep my screen on" parts are not shown |
+## 11. Maximised mode
 
-Comparison crops (reference vs ours, power and tray tiles, toast collapsed/expanded): `x11/lhshell/compare_tiles.png`.
+Longhorn: a maximised window's frame becomes a dark plate and the bars go black (`SetMaximizedWindow`, 2.4.3); nothing else on
+screen changes (`screenshots/aero_max.png`, a maximised 4074 Aero Explorer). luxwm draws the frame (LGFRAMEMAX 493 /
+MAXEXPLORER 494, docs/LUXWM.md "Maximised mode") and publishes the condition as root `_LHWM_MAXIMIZED_MODE` (CARDINAL 0/1 per
+desktop index, like `_NET_WORKAREA`), written in the same server grab as the geometry change, so both sides switch in one
+composited frame. Condition: the active window is maximised or fullscreen, or, with none active, any visible window on that
+desktop is. luxshell uses the property and falls back to the same rule over EWMH (`MAXIMIZED_VERT`+`HORZ`, fullscreen) under
+another WM.
 
-### Scene additions
-`rect` takes `gradient = { dir = "h"|"v", {offset, "#rrggbb"}, ... }` (LinearGradientBrush), `stroke`, `stroke_width`;
-`node:desired([w, h])` returns a subtree's auto size (vbox/hbox children now stack in the measurement too, as in layout);
-`node:measure([wrap_width])`; text with `wrap = true` measures wrapped; `surface:background(color)`, `surface:round(r)`,
-`surface:grab()/ungrab()` with `on_outside`, `lh.surface{ opaque = true }` (24-bit), popups carry `type` ("notification",
-otherwise popup_menu); `surface-press` passes the surface id as a 4th argument. `LHSHELL_DEBUG=1` logs events and paint times.
+- **Black layers.** `TaskbarBlackLayer` / `SidebarBlackLayer` go to opacity 1 / 0. `[shell] max_fade_ms = 0` (default): in the
+  same repaint (the bar is dark ~80 ms after Super+Up on the lab, picom included); a number = SetMaximizedWindow's fade (4074:
+  400 ms). luxwm's `MAX_FADE_MS` is 0 too. The task text's 400 ms brush animation to white is not done (the text is white).
+- **Desktop layer.** `luxshell-desktop`: full screen, `_NET_WM_WINDOW_TYPE_DESKTOP`, sticky + below, no struts, kept at the bottom
+  of the stack, normally unmapped (the wallpaper is the root background). `[desktop] desktop_black = 1` maps it black in
+  maximised mode: its X background is set to opaque black and it is lowered before the map, so the server paints it black with
+  the map (no transparent first frame), and it is unmapped at once on restore. It is 24-bit: it is only ever mapped while black,
+  and picom blurs behind every ARGB window (a full-screen one cost ~150-300 ms per frame on the xrender lab). It is the future
+  home of the Aurora (`xaml_sidebar_desktopaurora.xaml`); the Aurora will need ARGB. `LHSHELL_DESKTOP=0` (lhde-session sets it
+  while flxp-desktop runs) leaves it out; flxp-desktop owns the desktop then.
 
-### picom rules wanted (not applied; `picom-glass.conf` belongs to the WM work)
-- `shadow-exclude += "window_type = 'notification'"`: the toast has its own 4002 rim and a round shape.
-- Fading on map/unmap of notifications is welcome (picom default); the toast does no slide of its own (the IL has none).
+## 12. The classic taskbar (flxp-taskbar)
 
-## M6 design: one theme setting for everything, session commands, start menu, minimal mode
+The msstyles-themed classic taskbar is Win32 explorer code (`tray.cpp`, `taskband.cpp`, `traynot.cpp`, `trayclok.cpp`: a rebar
+with `TaskBand::Toolbar`, `Start::Button`, the `TrayNotify` toolbar and clock, all uxtheme classes, 2.1), so it lives on the
+flxp toolkit, which has Wine's comctl32 rebar / toolbar / tooltips and the uxtheme renderer; rebuilding it in luxshell's scene
+would duplicate that toolkit with less fidelity. luxshell keeps the Avalon bars and the sidebar, as 4051 ran the Avalon start
+bar next to the classic taskbar.
 
-Status 2026-10-23: step 1 (registry, `_LH_THEME`, consumers, `docs/history/THEMES.md`, session commands, `luxwmc quit`) implemented and
-verified on the lab (`:3`); details in `docs/LUXWM.md` ("EWMH and the shell", "Maximised mode"), `docs/CLIENT-PROTOCOL.md`
-"Theme changes", `docs/history/THEMES.md` and `USAGE.md` "Themes and switching them". Deviations: `color`/`size` are `Default`/`Normal`
-(the 4074/4051 `.theme` files), not `NormalColor`/`NormalSize`; registry paths are relative to the file (`frame =
-data/frames/jade4074`, `shell = data/packs/4074-aero`), not bare names; old luxwm theme names are `aliases`; a fifth name
-`jade4074-classic` (`composition = off`) covers the old `jade4074-classic` frame theme; the session-command confirmation
-flyout is left to step 2 with the start menu (commands run through `lh.session.run(name)` or the root property
-`_LHSHELL_COMMAND`).
+The bottom bar is the theme key `Shell.taskbar` = `avalon | classic | none` (THEME-FORMAT.md; from the settings flyout,
+`_LHSHELL_COMMAND taskbar KIND` and `lhde-session taskbar avalon|classic|classic+sidebar|none` it goes into the current layer;
+`LHSHELL_TASKBAR` forces one for a run). `classic` and `none`: the Avalon taskbar is unmapped, no strut, no task buttons, no
+`_NET_WM_ICON_GEOMETRY`. `classic` runs `[commands] taskbar` (default flxp-taskbar from build/bin or the install, else PATH;
+`$LHSHELL_TASKBAR_CMD`) through `lh.spawn_pid` (`sh -c 'exec ...'`, so the pid is the bar's) with luxshell's DISPLAY and session
+bus, `FLXP_TRAY_TAKEOVER=1`, `FLXP_START_MENU=panel` (`[taskbar] classic_start_menu = flxp`, default: XP's start panel) or
+`classic` (`= flxp-classic`: the classic popup menu), `FLXP_START_KEY=1`, its log in `$XDG_RUNTIME_DIR/luxshell-taskbar<display>.log`.
+No `--theme`: flxp-taskbar follows `_LH_THEME` itself. A bar already running on the display is adopted. It is stopped by its pid
+(after checking `/proc/PID/comm` and `DISPLAY` in `/proc/PID/environ`) on a switch away and on luxshell's exit; a change of
+`classic_start_menu` restarts it once the start-menu selection is free.
 
-Status 2026-10-24: step 2 (start menu, Super key, autohide, sidebar modes, settings flyout, session confirmation) implemented
-and verified on the lab (`:3`); user docs in `USAGE.md` "Start menu, taskbar autohide, sidebar modes". Files: `luxshell/startmenu.lua`,
-`menu.lua` (cascade + context menus), `apps.lua` (desktop entries, icon theme lookup, MFU, xdg defaults), `settings.lua`
-(settings flyout, run/search box), `runtime.lua` (placement, autohide, modes, taskbar menu), `flyout.lua` (any owner, keyboard),
-`lhshell.c` (keyboard grab + `on_key`, `on_enter`/`on_leave`, `_LHSHELL_START`, `_NET_WM_WINDOW_TYPE_MENU`, `icon_offset`,
-`list_dir`/`mtime`), `tray.c` (the tray moves between surfaces), `scene.c` (nine-grid pieces sample only their own source
-rectangle), `luxwm/wm.c` (`start` key action: Super alone → `_LHSHELL_START`). Assets: `shellpack.sh` extracts the `StartPanel`,
-`StartMenu::Toolbar` and `StartMenu::MenuBand` parts of the 4074 Jade and Slate msstyles into `assets/startpanel-{jade,slate}/`
-(PNG per part/state, un-premultiplied; `startpanel.ini` = the decompiled sections with decoded fonts) and 16/24/32/48 px
-shell32 icons (4074) into `assets/shell32/`. Comparison: `lhshell/compare_startmenu.png`, `lhshell/compare_modes.png`.
-- **Start menu measurements** (4074-dwm.png, Jade/Aero, 1280x1024): menu x 0..379, y 428..993 (380x566), directly on the
-  taskbar; 1 px black + 1 px #6b6b6b outer frame; no user pane (Jade's StartPanel has no USERPANE part). Left column PROGLIST
-  x 0..189 (bitmap 327 224x192, SIZINGMARGINS 50 1 100 91, CONTENTMARGINS 6 4 9 5), places PLACESLIST x 190..379 (324 190x200,
-  25 25 100 91; white rounded panel from x 192), body height 526, LOGOFF row 40 (316 211x40) under both. Program tiles 40 px
-  (sfthost: max(32 px icon, 2 text lines) + 4*SM_CYEDGE): first tile top ~435, 32 px icon at x 10, text at x 47, title bold
-  white, subtitle CAPTIONTEXT 180; pinned/MFU separator 2 px (328, 134 px wide at x 31, y 520) in an 8 px slot (4*cySep);
-  bonus separator at y 917 above "All Programs" (row 34 px, y 919..953, Segoe UI Bold white, text x 48, 19 px arrow 321/322
-  4 px after it). Places rows 36 px from y ~437: 24 px icons at x 200, text at x 228, separators 1 px (325) in 4 px slots;
-  first group bold (darker), the rest TEXTCOLOR 100. Log Off / Stand by: 24 px glyph cells from LOGOFFBUTTONS 317/318 (72x24 =
-  eject, log off, power) at x 196 and 274, y 960, text 6 px after the glyph, 11 px between buttons, last text ending 32 px
-  from the right edge. Slate (lh4074-181541.png, 1152x864): same 380 px / 190 split, y 288..835: USERPANE 64 px (248, picture
-  frame 249 55x55 at ~7,7, name Franklin Gothic Medium 14 white with a 2,2 black shadow at x ~66), body 441 (PROGLIST/PLACESLIST
-  are thin strips: 156x4 / 180x6, a 2 px orange accent line on top, white resp. #fff8e5 body), log off row 42 (234 97x39),
-  places 30 px (Tahoma 8), Log Off + Shut down. Our rendering matches these within 1-2 px (fonts: Segoe UI is not installed,
-  Tahoma stands in).
-- **Behaviour** from desktop2: tile metrics (`_ComputeTileMetrics`), separators (`_DrawSeparators`, 4*cySep slots + the bonus
-  one), log off toolbar right-aligned (`_RightAlign`), MFU = own launch counts (count, then recency; XP decays UEM counts),
-  All Programs opens after the menu show delay (400 ms hover) or Right/Return, keyboard across panes (deskhost). Super alone
-  toggles; inside the menu (our keyboard grab, so luxwm's passive grab is not active) Super's release closes it.
-- **Deviations:** the 4074 bottom row has two buttons (Jade: Log Off + Stand by, Slate: Log Off + Shut down); both open the
-  three-button flyout (Log Off / Stand by / Turn Off) with the clicked action preselected, so all three commands are one
-  click away but nothing runs without confirmation. Jade has no user pane (msstyles has no USERPANE); `[start] userpane = 1`
-  forces one. Places use the 4074 shell32 icons (Documents 348, Pictures 387, Music 386, Computer 16, Control Panel 137,
-  Search 23, Run 25); no Recent Items/Contacts/Games/Help (nothing to point them at). The pinned block of the `pinned`
-  sidebar mode reserves a **bottom** strut (luxwm's work area is one rectangle; a right strut would have taken the full
-  149 px width for a 138 px block); minimized-mode taskbar tiles are compact views (`tile:taskbar(host)`: tray row, digital
-  time). The All Programs cascade uses `StartMenu::Toolbar` (bg, hot 3-state button) and `MenuBand.SEPERATOR`, stretched
-  (our nine-grid TILE repeats the whole bitmap). picom (xrender) sometimes left popups under a newly mapped submenu unpainted:
-  the open levels are repainted 180 ms after a level opens.
-
-Status 2026-10-24 (step 3, aap's review: sidebar edge, resize drags, clock modes, menu polish, Luna start menu, compositor
-rule); user docs in `USAGE.md` ("Resizing the bars", "Clock tile", "Compositor rule", "Luna start menu", state.ini table).
-- **Sidebar edge bug.** Root cause (not scene.c's nine-grid pieces: Aero rendered pixel-identical to `4074-dwm.png` at the
-  edge): (1) the bar was 149 px instead of 150, (2) the `SidebarSizer` was not drawn. In Slate the sizer is 6 px of 1108
-  (white at alpha 72/120/101/66/37/16) over the background; without it 1000's dark column 0 (rgb 56) showed as a 1 px black
-  line and the light edge was missing (the user saw it in Luna, which uses the Slate pack). Now 150 px, sizer drawn: Slate's
-  first columns are 112/161/148/124/104/89, the same values as `4051-vm-now.png` and the `lh4074-18*` shots. Also fixed:
-  `HackNineGrid` is a XAML Thickness (left, top, right, bottom), scene.c's `grid` is top, right, bottom, left: 1178's
-  `36,0,0,0` is now left 36 (the edge gradient keeps its width at any bar width) and 1187/1155's `0,7,0,0` top 7 (the row-1
-  highlight stays on taller bars). `lhshell/compare_sidebar_edge.png` (reference / before / after, Aero and Slate, 4x).
-- **Resize drags.** `SidebarSizer`: a `cursor = "sizewe"` node (scene nodes take `cursor`: sizewe, sizens, hand, arrow;
-  lhshell.c sets the X cursor of the hot/pressed node) docked left, 2 px (Aero, image hidden) / 6 px (Slate, 1108); drag =
-  `_OnSizerDrag` (width - dx), clamp 100..600 (`_ValidateSize`), applied every 25 ms: surface, right strut, taskbar width,
-  `_NET_WORKAREA` (luxwm refits), event `sidebar-resize` (clock and tray tiles reflow); `[sidebar] width` on release. Taskbar:
-  the horizontal bar's `TaskbarSizer` is Width 0 (Rotated), rows go through the appbar's sizing edge (`_PtOnResizableEdge` →
-  `SetTaskbarRowCount`, RowCount 1..3), so luxshell has a 3 px SizeNS strip on the bar's top edge, snapping at half rows;
-  height = rows x 30 (Slate 28), task buttons fill rows (`ceil(n / rows)` per row, width rule as before), start button at the
-  top (inferred), toggle centred; `[taskbar] rows`. Verified with xdotool on `:3`: workarea 1130 → 1030 (250 px), clamp to
-  100 px (1180), 3 rows → 710 high, back to 1 row → 770.
-- **Clock tile modes** (`tiles/clock.lua`). `[clock] pinned = 1` (4074, bottom host) | `0` (a tile in the list: the 4051 look,
-  96 px face at tile y 22, "6:37 AM, Oct 23" in Tahoma 10 at tile y 142, tile 160 high; measured against `4051-vm-now.png`:
-  face rows 75 vs 75, text glyph top 194 vs 196 with our tray tile 2 px shorter than its quick-launch tile, text 90 vs 94 px
-  wide). `[clock] layout` = the six `clocksidebar*.xaml` views, from the tile's right-click menu ("Clock layout", plus "Pinned
-  to the bottom (4074)", Move Up / Move Down for tiles in the list, order in `[sidebar] tiles`). The XAML margins
-  `bin:02HHVV` are two-value Thickness (horizontal, vertical). digtime views: analog + bold DigitalTime (#D8E4FF / #9EB5BB) +
-  DigitalText lines; their AnalogClockPanel has no size in the XAML: 56 px, 40 px beside the weekday/date lines (inferred).
-  minical: 42 px clock + MiniCalendar (#D3D3D3 border, "^ddd" on #ADD8E6, date Tahoma 11 #4B5681 on white) + centred bold
-  time. The big calendar (`cal`) was cheap and is done: `clocksidebarcal.xaml`'s grid (gradients #838A90→#767B7F header,
-  #6B7278→#5B6366 body, Tahoma 7.5 white dates, Sunday first as the January 2004 sample shows) for the current month.
-  `lhshell/compare_clock_modes.png`.
-- **All Programs cascade** (`menu.lua`). It fell back to DejaVu Sans ("Segoe UI" is not installed; the panel says
-  "Segoe UI,Tahoma"): msstyles fonts now get Tahoma as fallback family (Franklin Gothic Medium → ITC Franklin Gothic Std
-  Medium). Hover: Slate's (and Luna's) `StartMenu::Toolbar.BUTTON` is an empty 8x6 bitmap in all three states, so nothing was
-  drawn; when the HOT strip has no alpha (`lh.image_alpha`) the cascade uses the flat-menu MENUHILIGHT with HIGHLIGHTTEXT
-  (`StartMenu::Toolbar(HOT)` TEXTCOLOR when set), as XP's MenuBand does; Jade keeps its light-blue plate.
-- **Luna start menu.** `tools/lhstyle.py --variant NAME`; `shellpack.sh` extracts the 4051 `luna.msstyles` StartPanel /
-  StartMenu parts for NORMALBLUE / NORMALHOMESTEAD / NORMALMETALLIC into `assets/startpanel-luna-{blue,olive,silver}/`
-  (non-alpha TRANSPARENT parts keyed on TRANSPARENTCOLOR; the Jade/Slate output is byte-identical to before). `themes.ini`
-  gains `startpanel = luna-*` (Luna keeps the Slate bars); `data/packs/startpanels.lua` holds the XP metrics (380 wide,
-  user pane 64, PROGLIST 306 + MOREPROGRAMS 30 | PLACESLIST 336, log off 40; tiles 40 / 32 and separators 8 per
-  `_ComputeTileMetrics`; selection COLOR_HIGHLIGHT; "Log Off" + "Turn Off Computer") and each scheme's FLATMENUS colours.
-  No XP start-menu screenshot exists in flxp's screenshots/doc (only flat menus), so the metrics are the source's, not
-  measured: `lhshell/compare_startmenu_luna.png` (XP flat menu reference / ours in blue, olive, silver).
-- **Compositor follows the theme** (runtime.lua `lh.compositor`): on a `_LH_THEME` change `composition = off` stops this
-  display's picom (processes named picom with our DISPLAY in /proc/PID/environ, SIGTERM), `auto` starts `[commands] picom` /
-  `$LHSHELL_PICOM_CMD` / picom-glass.conf+glx when `_NET_WM_CM_S0` has no owner; settings flyout "Composition: Follow the
-  theme / Always on / Always off" (`[shell] composition`, on/off also applied at startup). Verified on `:3`: aero4074 → luna:
-  picom stopped, `_LHWM_COMPOSITED` 0, `_LHWM_THEME` luna-blue (classic frames); → aero4074: picom started, composited 1,
-  glass frames; slate4051 likewise; the flyout's Always off / Always on stop and start it.
-
-Status 2026-10-24 (step 4, aap's review: Slate start button, 4051 vs 4074, layering, toggle glyph); user docs in `USAGE.md`
-("4051 vs 4074 Slate", "Stacking", state.ini `[sidebar] layer`, `[clock] pinned_pack`) and `docs/history/THEMES.md` ("luxshell packs").
-- **Slate start button "not full height".** Root cause: the rows work put the StartButton in a canvas slot (so it stays one row
-  high at the top of a taller bar) with the pack's `start = { w = 78, h = 23 }`, i.e. 1156's own size; before, as a Dock=Left
-  child of the dock panel, it had been stretched to the full bar height regardless of `h`. Now Width 83 / Height 29 with the 4 px
-  right Border as in Aero (image 79x29), and the Slate bar is 30 px, not 28: `lh4074-181533.png` (4074 Slate Avalon taskbar) has
-  the bar at rows 834..863 and 1155 (50x28) stretched whole to 30 rows nearest-neighbour (rows 7 and 21 repeat; a 7 px top grid
-  does not fit), so the pack's bg grid is 0. Ours against the shot: start button mean squared error 0.03 per pixel, bar column
-  1.6 (one row: pixman's 16.16 stepping repeats row 6 where the shot repeats row 7).
-- **Image filter per pack** (`filter = nearest | bilinear` in shell.lua, docs/history/THEMES.md "luxshell packs"; scene.c `scene_filter`,
-  node `filter`, `lh.image_filter`): stretched nine-grid pieces and magnified images use it, shrinking stays BEST. Evidence, all
-  as fits of 1156 / 1179 drawn 79x29 over the bar's own background column: 4074 Slate (`lh4074-181533.png`) nearest 54 vs
-  bilinear 250, Aero without DWM (`lh4074-181415.png`) 129 vs 266, Aero glass (`4074-dwm.png`) 1868 vs 2047 (blur under it);
-  4051 (`4051-vm-now.png`) bilinear 0.2 vs nearest 249. Edge profile of the flag (column 36 of the button, luminance):
-  4074 `86 144 144 196 203 178 182 182 ... 98 98 144 166 134 114 114 95` (repeated rows = blocky), 4051 `86 126 169 198 202
-  181 178 175 172 177 170 126 119 152 173 155 143 125 98` (ramps). aero and slate are `nearest`, slate4051 `bilinear`.
-  The options glyph (1176/1103, 10x6 in a 9x6 HackImage) is drawn 9x6 with a column dropped in both builds (exact with nearest;
-  ours had stretched it to 9x8 because the docked image took the row's height): fixed in the sidebar and the flyout.
-- **4051 vs 4074 Slate** (rule of thumb: builds after ~4060 look like 4074). `themes.ini [slate4051] shell =
-  data/packs/4051-slate`, a pack that loads `themes/slate` and changes: `filter = bilinear`; taskbar 29 px (`4051-vm-now.png`
-  rows 835..863, not 28) with 1155 drawn top 7 / bottom 2 fixed and the middle nearest (`bg_filter`), which repeats row 16 as
-  the classic bar does (exact); start button 83x29 (1156 bilinear, error 1.4 against the shot); `imageres = imageres-4051`:
-  `shellpack.sh` writes the 34 PNGs of 4051's imageres.dll that differ from 4074's or are missing there (tile arrow 1105/1106 =
-  the right-angled corner of the shot, tile restore/close 1058-1062, toast parts 4003-4011, 6000-6007, ...); clock tile in the
-  list by default (`clock_pinned = false`; `[clock] pinned` now applies only to the pack named in `[clock] pinned_pack`, which
-  the clock's menu writes); tiles tray + clock (no power tile in the 4051 shots). The 4051 `Sidebar` class blobs
-  (`assets/sidebar-slate51`) are pixel-identical to 4074 Slate's streams (60 of 60), so they change nothing. Sidebar against
-  `4051-vm-now.png`: width 150, edge columns, options row, separator rows 17/18 and the first tile arrow are exact (rows 0..27:
-  error 0); the first tile is our tray tile, 2 px shorter than 4051's quick launch tile, so the clock and its text sit 2 px
-  higher (text 194 vs 196). **Stand-in:** 4051 ran the classic Win32 taskbar (task band plates 349, no sidebar toggle); we keep
-  the Avalon taskbar with the 4051 start button, height and filter (the classic one is M8, flxp-tray).
-  `lhshell/compare_4051_4074.png`: reference 4051 / ours / reference 4074 Slate / ours, start button area at 4x.
-- **Layering.** The sidebar is `_NET_WM_STATE_ABOVE` like the taskbar (it was BELOW, which looked wrong where it runs past the
-  taskbar's end); it is raised with the taskbar on window-list changes instead of lowered on every placement. `[sidebar] layer =
-  below` keeps the old stacking. Checked on `:4`: a window moved over the sidebar stays under it, a maximised one gets 1130x770
-  (`_NET_WORKAREA` unchanged), the aero black layers fade with `_LHWM_MAXIMIZED_MODE` 1 (xrender picom); with `layer = below`
-  the window has `_NET_WM_STATE_BELOW` again.
-- **Sidebar toggle glyph sometimes missing.** Root cause: in `build_taskbar` the toggle's `images = {...}` had slipped into the
-  `-- TransformDecorator VCenter` comment at the end of the line above (rows work), so the button had no image; it appeared only
-  after a sidebar mode change (update_toggle set the images) and vanished again on every pack switch or restart. Now built with
-  its images (`toggle_images()`, also used by update_toggle) and centred by `toggle_y()`. Checked on `:4`: visible at start, full
-  → minimized → full, full → pinned → full, slate4051 → slate4074 → aero4074.
-
-Status 2026-10-24 (icons, fonts, desktop layer; with luxwm): user report "icons only very occasionally". luxshell itself read
-`_NET_WM_ICON` and `WM_HINTS` and followed PropertyNotify, and showed icons for every lab client that has one; what was missing was a
-default (no pack set `T.default_icon`; zenity, extendframe, xmessage and every flxp window, which sets no icon at all, got none) and
-the size pick (nearest to 16, scaled with FILTER_GOOD). Now: `icon_from_netwm` takes the smallest image >= 16 (else the largest), both
-paths scale once with `CAIRO_FILTER_BEST`, both packs have `default_icon = "shell32/16/3.png"` (task_button used `R()`, the imageres
-mapper, for it; now a plain assets path). The `@icon:<window>` entry is replaced on each icon PropertyNotify and the task list rebuilt
-(`window` event), so a changed icon shows at once (checked with xprop set/delete). Fonts: themes.ini `fonts =` (docs/history/THEMES.md "Fonts")
-is applied by `lh.fonts()` (lhshell.c: FcConfigAppFontClear + AddDir, new pango font map) at startup and on every `_LH_THEME` change
-(the bars are rebuilt when the set changed), so the packs' "Segoe UI 9" is 4074's Segoe UI 0.7 instead of DejaVu Sans;
-`LHSHELL_DEBUG=1` logs the resolved face. `[shell] desktop_black` (M5b). Comparisons: `lhshell/compare_icons.png`,
-`lhwm/compare_fonts.png`.
-
-Written 2026-10-23 night. aap's questions: who owns the theme when luxwm, luxshell and the flxp
-toolkit (`~/src/flxp`, Wine-derived uxtheme reading real .msstyles) all need to change together,
-how clients learn about it (and re-check the glass extension), how to quit the session, and a
-"minimal" mode: taskbar hidden, only time and tray icons visible.
-
-### 6.1 Theme registry and the `_LH_THEME` root property
-Windows has one setting (the active visual style + colour + size) and one broadcast
-(`WM_THEMECHANGED`). We do the same with a root property and a shared registry file.
-
-- **Registry:** `data/themes.ini`, one section per theme *name*:
-  ```
-  [jade4074]
-  msstyles = /u/aap/fun/longhorn/wim/4074/.../jade.msstyles   ; what uxtheme clients load
-  color    = NormalColor
-  size     = NormalSize
-  frame    = jade              ; luxwm theme dir when composited
-  frame_classic = jade4074-classic   ; luxwm theme dir without a compositor (or when composition is off)
-  shell    = aero              ; luxshell pack (Avalon bars imagery)
-  wallpaper = mock/assets/wallpaper/longhorn.jpg
-  composition = auto           ; auto | off  (off = always classic frames, like USESCOMPOSITION=FALSE)
-  ```
-  Names to ship: `aero4074`, `jade4074`, `slate4074`, `slate4051`. Paths are absolute or relative
-  to the file. flxp reads the same file (document the format in `docs/history/THEMES.md`; it is plain ini
-  and the msstyles/color/size triple maps straight onto `FLXP_THEME`, `FLXP_THEME_COLOR`,
-  `FLXP_THEME_SIZE`). The file's location is published too, so nobody hardcodes it.
-- **Setting:** root property `_LH_THEME` (UTF8_STRING): the theme *name*. Root property
-  `_LH_THEMES_INI` (UTF8_STRING): absolute path of the registry. Whoever starts first publishes the
-  persisted value: luxshell owns persistence (`~/.local/state/lhde/luxshell-state.ini`, key `theme`), luxwm
-  publishes `LHWM_THEME`/`-t` only if `_LH_THEME` is absent at startup (so `lhde-session THEME`
-  keeps working: it writes the name into the state dir, luxwm maps it through the registry).
-- **Consumers:**
-  - luxwm watches `_LH_THEME`; on change it loads `frame` (composited) or `frame_classic`,
-    exactly the existing `_LHWM_THEME` switch; `_LHWM_THEME` stays as the *derived* frame-theme
-    path (read-only for others from now on; setting it directly still works for debugging).
-    It republishes `_LHWM_COMPOSITED` and `_LHWM_FRAME_METRICS` on every switch even if unchanged,
-    so clients get one PropertyNotify per theme change.
-  - luxshell watches it, swaps the pack (bars imagery, clock face, tile chrome) live, sets the
-    wallpaper (`feh --bg-fill` or an internal root pixmap later), and its theming settings UI
-    writes it.
-  - Clients (flxp, extendframe): treat PropertyNotify on the root for `_LH_THEME`,
-    `_LHWM_COMPOSITED` or `_LHWM_FRAME_METRICS` as `WM_THEMECHANGED`: reload the msstyles named
-    by the registry, re-read `_LHWM_COMPOSITED`, and re-decide the glass extension (set or
-    delete `_LHWM_EXTEND_FRAME`, repaint the header opaque or transparent). This is already how
-    `examples/extendframe.c` handles composition changes; extend it to `_LH_THEME`.
-- **Semantics for the deco:** aero/jade names use glass frames when a compositor is present
-  and fall back to `frame_classic` otherwise (as M5a does); slate names are classic always.
-  `composition = off` forces classic for a glass-capable theme (the 4074 "no DWM" look).
-
-### 6.2 Session commands
-luxshell gets configurable commands in `state.ini` `[commands]` with defaults: `logoff` =
-`lhde-session stop` when its state dir exists, else `luxwmc quit` (luxwm exits cleanly:
-properties deleted, clients left mapped); `standby` = `zzz` if present else `loginctl suspend`;
-`shutdown` = `loginctl poweroff`; `restart` = `loginctl reboot`; `lock` = `xlock`/`slock` if
-present. luxwm gains a `quit` IPC command (berry's `luxwmc`) and a clean-exit path. The start
-menu's "Log Off" / "Stand by" / "Turn Off" use these. A confirmation dialog is not Longhorn's
-(XP asks via the shutdown dialog; we do a small luxshell flyout with the three buttons).
-
-### 6.3 Start menu (M7 brought forward)
-4074's start menu is the XP start panel (DirectUI, `sfthost.cpp`/`userpane.cpp`) skinned via the
-msstyles `StartPanel` class: parts USERPANE, MOREPROGRAMS, OPENBOX, SEARCHVIEW, PROGLIST,
-PLACESLIST, LOGOFF, LOGOFFBUTTONS, USERPICTURE, PREVIEW (Longhorn adds `STARTPANEL.PREVIEW`),
-with the `StartPanel::Toolbar` text colours. Reference: `screenshots/4074-dwm.png` (Aero start
-menu open: dark pane, white places column, "All Programs ▸", "Log Off" / "Stand by" row) and the
-XP source (`shell/explorer/desktop2/*.cpp`, `/u/aap/lib/nt5src/...`) for metrics and behaviour.
-Build it in luxshell as a popup surface (`_NET_WM_WINDOW_TYPE_MENU`, override-redirect, grabbed
-pointer/keyboard like a menu), opened by the StartButton (and Super alone, via luxwm sending a
-`_LHSHELL_START` root message when the Super key is pressed and released without another key):
-- left column: pinned items (ini list of `.desktop` files; default web browser + mail client
-  from `xdg-settings`), separator, recent/frequent apps (own launch history), "All Programs"
-  (cascading submenu built from `/usr/share/applications` + `~/.local/share/applications` by
-  category, with icons from the icon theme, 16 px);
-- right column: Documents, Pictures, Music, Computer (open with the configured file manager:
-  `T.commands.filemanager`, default `xdg-open`/rox/flxp when present), Control Panel
-  (= lhshell settings flyout: theme list from the registry, taskbar autohide, sidebar mode,
-  wallpaper), Search, Run (`T.commands.run`, default `rofi -show run` else a small own run box);
-- bottom: Log Off / Stand by / Turn Off from 6.2; user pane: `$USER` + picture
-  (`~/.face` if present else imageres default icon).
-Use the Slate/Jade StartPanel bitmaps from the msstyles (extract with `tools/lhstyle.py` into
-`the data directory's packs/ (lhde-import; was lhshell/assets/) startpanel-<theme>/`, same as the sidebar packs) and the StartPanel fonts and
-colours from the ini. Keyboard: Esc closes, arrows navigate, typing jumps.
-
-### 6.4 Taskbar autohide and sidebar modes (the "minimal" mode)
-- **Taskbar autohide** per 2.1/3.x (Avalon: hides when focus leaves the bar, 100 ms slide,
-  2 px sliver at the edge, re-shows on pointer at the edge; the strut becomes the sliver so the
-  work area grows). Setting in `state.ini` `[taskbar] autohide`.
-- **Sidebar modes** `[sidebar] mode = full | minimized | pinned`:
-  - `full`: today;
-  - `minimized`: Longhorn's `SidebarControl.SetMinimized` (research row L401): tile
-    collection hidden, the pinned clock and the notifications tile move into the **taskbar**
-    (`TBContentHost`), sidebar width 0, the taskbar runs the full screen width; the taskbar
-    toggle button (1170/1167) flips it, as in 4074;
-  - `pinned` (our addition for aap's wish): the sidebar surface shrinks to the bottom block
-    holding only the pinned tiles (clock + notifications), with glass background, no options
-    row, strut covering only that block; everything above is free desktop.
-  With `autohide` on and `mode = pinned`, only the clock and the tray icons are visible, which
-  is the requested minimal mode. Transitions animate like the tile fades (400 ms), the WM's
-  work area follows the struts (M2), maximised windows refit (M2).
-
-### Order of work
-1. Registry + `_LH_THEME` + lhwm/lhshell/extendframe consumers + `docs/history/THEMES.md` + session
-   commands + `luxwmc quit` (one agent, luxwm + luxshell).
-2. Start menu + autohide + sidebar modes + settings flyout (one agent, luxshell; flxp is told the
-   registry format via docs/history/THEMES.md).
-
-## M5b design: maximised windows the Longhorn way (2026-10-24)
-
-Status 2026-10-24 (luxwm part): implemented. Maximised DWM frames draw `plate_max` (aero/jade LGFRAMEMAX 493) or `plate_max_explorer`
-(MAXEXPLORER 494, extended clients); aero's are opaque dark greys with no pill (desksrv 9-grid margins (0,27)(0,0) and (0,71)(0,0)), Jade
-4074's are its normal plate again. The frame jumps to the new rectangle and crossfades the two plates there, 400 ms linear (the curve
-luxshell's black layers use), 25 ms ticks from luxwm's main loop, replacing picom's geometry animation for these themes; `_LHWM_MAXIMIZED_MODE`
-is still written before the geometry. Verified on the lab (mode-before-ConfigureNotify trace, 50 ms series: on restore frame and bars fade
-in step) and against `aero_max.png` (`lhwm/compare_max_plate.png`). Classic themes unchanged. luxshell part (2026-10-24, later pass): `[shell]
-desktop_black = 0` is the default, so the desktop layer stays unmapped in maximised mode (its future Aurora role only) and a maximise
-shows only luxwm's frame crossfade and the bars' black layers; `desktop_black = 1` restores the M5a full-screen black (checked on `:3`:
-the `lhshell-desktop` window stays IsUnMapped with `_LHWM_MAXIMIZED_MODE` 1, IsViewable with 1). The maximised caption title is now
-white without glow, fading with the plate (`docs/LUXWM.md` "Icons, maximised caption text, fonts"). Details, measurements and deviations: `docs/LUXWM.md` "Maximised mode" (M5b).
-Status 2026-10-25 (luxwm): the maximise/restore geometry change is one step (frame and client to their final rectangles in one batch,
-one paint, under a server grab together with the `_LHWM_MAXIMIZED_MODE` write), so the bars and the plate crossfade start in the same
-composited frame and end together; the default animation style no longer runs picom's geometry animation (`_LHWM_ANIMATE = 8` is gone).
-luxshell unchanged. `docs/LUXWM.md` "Maximised mode", "One step".
-
-aap's correction, with `screenshots/aero_max.png` (a maximised 4074 Aero Explorer from a video):
-the black does not fade over the whole screen. The maximised window's **own frame is a dark plate**
-and the bars go black; nothing else exists on screen. 4074's CompositedWindow has the textures:
-`LGFRAMEMAX` (493) and `MAXEXPLORER` (494) are the maximised plates (COMPOSITION.md §3 table), 5048
-has a dark maximised plate too (uDWM bitmap 1002). So:
-
-- luxwm, DWM themes: a maximised frame draws `plate_max` (LGFRAMEMAX; `plate_max_explorer` =
-  MAXEXPLORER for extended/Explorer-style clients) instead of the normal plate with squared
-  corners; the plates are extracted into `themes/aero|jade` with their own insets (measure; the
-  maximised plate has no rounded corners and probably no side borders). The glass alpha rule
-  applies to them as to the others.
-- The transition is a **400 ms crossfade of the frame itself** between the normal and the
-  maximised plate, drawn by luxwm over the window's *new* rectangle (on maximise the frame first
-  jumps to the maximised geometry and fades dark; on restore it jumps to the restored geometry and
-  fades back to glass), in step with the bars' black layers (same 400 ms, same curve). No
-  full-screen desktop black: luxshell's desktop layer stays transparent in this mode and keeps
-  only its future Aurora role (`[shell] desktop_black = 0` default; 1 restores the old behaviour).
-- Classic (msstyles) themes: unchanged (MAXCAPTION, instant), the bars' black layers still fade
-  (the Avalon shell does that regardless of DWM, 2.4.3).
-- Verification: compare against `aero_max.png` (1920x1080: header dark glass with the sheen,
-  taskbar and sidebar black, clock face dark) and a 50 ms series of maximise/restore.
-
-## M8 design: the classic (Win32-style) taskbar as a separate program (2026-10-24)
-
-aap asked whether the msstyles-themed classic taskbar should be a mode of luxshell's Avalon taskbar
-or a distinct program, possibly in flxp land. Recommendation: **a distinct program built on the
-flxp toolkit** (working name `flxp-tray`), for the same reason Longhorn had it that way: the
-classic taskbar *is* Win32 explorer code (`tray.cpp`, `taskband.cpp`, `traynot.cpp`,
-`trayclok.cpp`: a rebar with a `TaskBand::Toolbar`, the `Start::Button`, the `TrayNotify` toolbar
-and clock, all drawn through uxtheme classes, research in 2.1), and flxp already has the Wine
-comctl32 rebar/toolbar/tooltips and the uxtheme renderer those classes need. Rebuilding it in
-luxshell's Lua scene would duplicate that toolkit with less fidelity (grouping menus, chevrons,
-tooltips, balloon tips, the autohide timers of 2.1 are all comctl32/explorer behaviour). luxshell
-keeps the Avalon bars and the sidebar, exactly as 4051 ran the Avalon "start bar"/sidebar next to
-the classic taskbar.
-
-### Interface between flxp-tray and lhshell/lhwm (all standard or already existing)
 | Need | Mechanism |
 | --- | --- |
-| Window list, titles, icons, active, minimised, attention, desktops | EWMH on the root (`_NET_CLIENT_LIST`, `_NET_WM_STATE`, `_NET_ACTIVE_WINDOW`, `_NET_WM_ICON`, `WM_HINTS`), as luxshell reads them today (lhshell.c is the reference). |
-| Activate / minimise / close from a button | `_NET_ACTIVE_WINDOW`, `_NET_WM_STATE` HIDDEN, `_NET_CLOSE_WINDOW` client messages (luxwm M2). |
-| Minimise animation target | the task button owner sets `_NET_WM_ICON_GEOMETRY` on each client; luxshell stops setting it when its taskbar is off (`[taskbar] enabled = 0`). |
-| Reserve screen space | `_NET_WM_STRUT_PARTIAL` + `_NET_WM_WINDOW_TYPE_DOCK` (luxwm M2). With the sidebar present, the classic taskbar spans the full width and the sidebar yields to it (4051 screenshot: taskbar 28 px full width, sidebar above it) — so luxshell's sidebar must honour another dock's bottom strut (`[sidebar] yield_bottom = auto`: read `_NET_WORKAREA`). |
-| Start menu | the classic Start button sends the root client message `_LHSHELL_START` (already used by the Super key); luxshell shows its StartPanel menu anchored above the button rect passed in the message's data (x, y, w, h) instead of its own button. |
-| Tray icons | one XEmbed tray manager per display: when flxp-tray owns `_NET_SYSTEM_TRAY_S0`, luxshell's notifications tile hides itself (it polls the selection owner), and vice versa. |
-| Clock | `_ToggleClock` semantics (COMPOSITION.md §11): if the sidebar shows a clock, the tray clock is hidden; luxshell publishes `_LHSHELL_CLOCK_VISIBLE` (CARDINAL) on the root; flxp-tray reads it. |
-| Theme | `_LH_THEME` + `themes.ini` (docs/history/THEMES.md): flxp-tray loads the msstyles it names (`flxp_msstyles` when set) and switches live; its `[sysmetrics]`/`TaskBar` classes give sizes. |
-| Autohide / position | its own (explorer's `StuckRects2` logic, 2.1); persisted in its own ini. luxshell's taskbar autohide is independent. |
-| Black layers when maximised | the classic taskbar has none (that is Avalon-only, 2.4.3); nothing to do. |
-| Composition | none needed; it is an opaque dock. Shadows: picom rule `window_type = 'dock'` already disables them. |
+| Window list, activation, minimise, close | EWMH (`_NET_CLIENT_LIST`, `_NET_WM_STATE`, `_NET_ACTIVE_WINDOW`, `_NET_WM_ICON`, `WM_HINTS`, `_NET_CLOSE_WINDOW`) |
+| Minimise target | flxp-taskbar sets `_NET_WM_ICON_GEOMETRY`; luxshell's hidden bar sets none |
+| Screen space | `_NET_WM_STRUT_PARTIAL` + dock type, full width; the sidebar is hidden or yields above it (7.4); flyouts, toasts and menus sit above it (`lh.taskbar_shown_top`) |
+| Tray | one XEmbed tray per display: before starting the bar luxshell hands its tray over (`lh.tray_yield`: icons back to the root, selection released, no reclaim for 10 s or until the new tray is up), since a takeover raced with flxp-taskbar's ReparentNotify handling |
+| Clock | `_ToggleClock` (COMPOSITION.md §11): root `_LHSHELL_CLOCK_VISIBLE` (CARDINAL) = 1 while a clock tile of luxshell's is on screen (the sidebar's, or the minimized sidebar's compact clock in the Avalon taskbar), else 0, deleted on exit; flxp-taskbar hides its clock while it is 1 |
+| Start menu | flxp-taskbar is the provider (section 13) |
+| Theme | `_LH_THEME` / `_LH_THEME_RESOLVED`; flxp-taskbar switches live |
+| Autohide, position | its own (explorer's `StuckRects2` logic, 2.1) |
+| Black layers | none (Avalon only, 2.4.3) |
 
-### What luxshell needs for this
-`[taskbar] enabled = 0|1` (0: no Avalon taskbar surface, no struts, no `_NET_WM_ICON_GEOMETRY`,
-Super key still opens the start menu anchored to the `_LHSHELL_START` rect or bottom-left), the
-sidebar yielding to a foreign bottom strut, the tray-owner check, `_LHSHELL_CLOCK_VISIBLE`, and
-the `_LHSHELL_START` message carrying an anchor rect. Fallback if flxp-tray never happens: the
-same switch could later select an luxshell classic renderer over the 2.1 fact sheet, since the
-model is shared ("two renderers over the same model", §3).
+## 13. The start menu
 
-### Start menu ownership (2026-10-24)
-Question from aap: does the start menu belong here or in flxp land? In Longhorn the start panel is
-Win32 DirectUI inside explorer, next to the classic taskbar, so by the M8 logic it would be flxp's.
-Decision for now: **keep luxshell's StartPanel menu** (it works, is themed from the msstyles parts,
-and already serves both a classic Start button and the Super key through `_LHSHELL_START`, which
-carries an anchor rect). If flxp-tray later wants its own, it registers as the start-menu provider
-by owning the selection `_LH_STARTMENU_S<screen>`; luxshell then forwards `_LHSHELL_START` (and the
-Super key) to the owner instead of opening its own. Either way there is exactly one start menu per
-display and the themed look comes from the same msstyles through libuxtheme.
+Longhorn's Avalon shell has no start menu of its own; 4074's is the XP start panel (DirectUI, `sfthost.cpp`) skinned by the
+msstyles `StartPanel` class, Win32 code next to the classic taskbar. So the start menu is flxp's: flxp-taskbar's start panel,
+and next to the Avalon taskbar (or none) **flxp-startmenu** (flxp-taskbar by another name: the start panel without bar, tray
+or struts). luxshell has no menu of its own; without a provider nothing opens (logged).
 
-### Start menu ownership, revised (2026-10-25)
-flxp-taskbar exists (`~/src/flxp/src/taskbar`, NOTES.md "The taskbar") and already carries a
-start menu; flxp is building the accurate start panel. Decision: **responsibility moves to flxp.**
-luxshell keeps its StartPanel menu only as the fallback when no provider is present. Protocol
-(implemented in luxshell now, to be mirrored by flxp-taskbar): the provider owns the selection
-`_LH_STARTMENU_S<screen>`; luxshell checks the owner when the Avalon Start button is clicked or the
-Super key arrives and, if someone owns it, sends `_LHSHELL_START` (data: anchor x, y, w, h, and
-flags bit 0 = toggle) to the owner window instead of opening its own; the owner also receives
-the message when flxp-taskbar is the one with the Start button, so one menu serves both bars.
-Switching bars: `[taskbar] enabled = avalon | classic | none` in luxshell's state.ini; `classic`
-starts flxp-taskbar (`[commands] taskbar`, default `flxp-taskbar`) and stops luxshell's own bar,
-with the sidebar yielding to its strut (M8 table). `lhde-session taskbar avalon|classic`
-and the settings flyout flip it.
+**Provider protocol.** The provider owns the selection `_LH_STARTMENU_S<screen>`. luxshell owns `_LHSHELL_S<screen>` while it
+runs. `_LHSHELL_START` is a ClientMessage, format 32, `message_type` = `_LHSHELL_START`: `l[0]` = flags (bit 0 = toggle: close
+the menu if open, else open it; 0 = open, nothing if already open; other bits reserved, 0), `l[1..4]` = x, y, width, height of
+the anchor rectangle in root coordinates (width or height 0 = no anchor: the provider opens at its own Start button, else
+bottom-left above the work area). The menu opens above the anchor with its left edge at the anchor's (below it when the
+anchor is in the upper half of the screen). Senders:
 
-#### `_LHSHELL_START`: the message layout (for start-menu providers)
-`_LHSHELL_START` is a ClientMessage, format 32, `message_type` = the atom `_LHSHELL_START`. Data: `l[0]` = flags (bit 0 =
-toggle: close the menu if it is open, else open it; 0 = open, nothing if already open; other bits 0, reserved), `l[1]`, `l[2]`,
-`l[3]`, `l[4]` = x, y, width, height of the anchor rectangle in root coordinates (the Start button that asked; width or height 0 =
-no anchor: the provider opens at its own Start button, else bottom-left above the work area). The menu opens above the anchor
-with its left edge at the anchor's (below it when the anchor is in the upper half of the screen). Three senders:
-(1) **luxwm**, Super pressed and released alone: sent to the root (`SubstructureNotify|SubstructureRedirect`) with `l[0]` = the
-key's timestamp and no rect; a root message without a rect therefore always means "toggle, no anchor", whatever `l[0]` holds.
-(2) **a classic Start button that leaves the menu to luxshell** (flxp-taskbar `start_menu = lhshell`): sent to the root with
-flags and its button's rect. (3) **luxshell forwarding to a provider**: a client that owns the selection
-`_LH_STARTMENU_S<screen>` is the provider; luxshell sends the message to the selection owner window itself (`XSendEvent(owner,
-propagate False, mask 0)`) whenever the Avalon Start button is clicked (flags 1, the button's rect) or a root `_LHSHELL_START`
-arrives (flags as received, 1 for luxwm's; the rect as received, else the Avalon Start button's rect, else none), and opens no menu
-of its own. A provider must answer messages on its owner window, and must ignore root `_LHSHELL_START` broadcasts while the
-selection `_LHSHELL_S<screen>` has an owner (luxshell runs and forwards them; answering both would toggle twice); without luxshell
-it may answer luxwm's broadcast itself. Its own Start button opens its menu directly. With no provider, luxshell opens its
-StartPanel menu for all of these, anchored as above (the old behaviour).
+1. **luxwm**, Super pressed and released alone (the `start` key action): to the root (`SubstructureNotify|SubstructureRedirect`)
+   with `l[0]` = the key's timestamp and no rect; a root message without a rect always means "toggle, no anchor".
+2. **luxshell**, to the selection owner window itself (`XSendEvent(owner, False, 0)`): for a click on the Avalon Start button
+   (flags 1, the button's rect) and for every root `_LHSHELL_START` (with a rect: flags and rect as received; without: flags 1
+   and the Avalon Start button's rect, or none without the Avalon taskbar).
 
-### M8 luxshell side (status 2026-10-25)
-Implemented and verified on the lab (`:3`, aero4074, luxwm + picom xrender, flxp-taskbar from PATH); user docs in `USAGE.md`
-("Classic taskbar instead of the Avalon one", state.ini table, `lhde-session taskbar`). `lhshell/compare_taskbars.png`:
-avalon / classic in one session (top: half size; bottom: the bottom-right corner 1:1).
-- **Switch** `[taskbar] enabled = avalon | classic | none` (1/0 of the first draft = avalon/none; `LHSHELL_TASKBAR` overrides it
-  for one run). `classic`/`none`: the taskbar surface is unmapped, its strut deleted, no task buttons, and lhshell.c deletes the
-  `_NET_WM_ICON_GEOMETRY` it had written (a hidden surface drops its icon geometries). `classic` runs `[commands] taskbar`
-  (default `flxp-taskbar`; `$LHSHELL_TASKBAR_CMD`) through `lh.spawn_pid` (`sh -c 'exec ...'`, so the pid is the bar's), with
-  luxshell's DISPLAY and session bus, `FLXP_TRAY_TAKEOVER=1`, and `FLXP_START_MENU=luxshell FLXP_START_KEY=0` (`[taskbar]
-  classic_start_menu = lhshell`, then the default; now `flxp` is, see the update below) or `own`/`1` (`= flxp`; luxshell then leaves luxwm's Super message to the bar while it runs
-  and nobody owns `_LH_STARTMENU_S`); no `--theme` (flxp-taskbar follows `_LH_THEME` itself). A bar already running on the display
-  is adopted, not started twice. Stopped by that pid after checking `/proc/PID/comm` and `DISPLAY` in `/proc/PID/environ`, on a
-  switch away and on luxshell's exit. Live from the settings flyout (*Taskbar* group) and from `lhde-session taskbar
-  avalon|classic|none` (root `_LHSHELL_COMMAND` = `taskbar KIND`; state.ini written directly when no luxshell runs there;
-  `SECOND_DISPLAY=:N` for other displays). Start menu, flyouts and toasts sit above the classic bar (`lh.taskbar_shown_top`
-  = the top of another dock's full-width bottom strut when our taskbar is off).
-- **Sidebar yield** (`[sidebar] yield_bottom = auto | 0`): `lh.struts()` (lhshell.c) reads `_NET_WM_STRUT_PARTIAL`/`_NET_WM_STRUT`
-  of every mapped top-level that is not ours (and one level down, inside WM frames); the largest bottom strut over the sidebar's
-  columns shortens the full sidebar (`h = screen - strut`, the right strut's partial range follows), puts the pinned block
-  above it (bottom strut = block + bar) and the minimized one out of the way. Re-checked on every `_NET_WORKAREA` change and on
-  top-level map/unmap/destroy (luxwm keeps `_NET_WORKAREA` unchanged when our Avalon bar's strut replaces the classic one's).
-  Measured on 1280x800: classic: sidebar 1099,0 181x770 with right strut range 0..769, flxp-taskbar 1280x30 at y 770,
-  `_NET_WORKAREA` 0,0 1099x770; back to avalon: sidebar 181x800, taskbar 1099x30, work area 1099x770; none + minimized: 1280x800.
-- **Tray**: `tray_start` no longer takes `_NET_SYSTEM_TRAY_S<screen>` from another owner (it did before: "taking over");
-  the notifications tile hides itself (tile chrome invisible, pinned block and clock separator follow) while another client owns
-  it and claims it again when the owner goes away (`lh.watch_selection` = XFixes `SelectSelectionInput`, else a 2 s poll; event
-  `tray-owner`). Before starting the classic bar luxshell hands the tray over itself (`lh.tray_yield`: icons unredirected,
-  unmapped, reparented to the root, selection released; no reclaim for 10 s or until the new tray is up): letting flxp-taskbar
-  take it over raced (see below). Handing icons back now also unredirects them (Composite), otherwise a tray without compositing
-  shows nothing for them, and docking resets a foreign ParentRelative background (BadMatch into our 32-bit window otherwise).
-- **Clock**: root `_LHSHELL_CLOCK_VISIBLE` CARDINAL = 1 while a clock tile of ours is on screen (sidebar; the minimized
-  sidebar's compact clock in the Avalon taskbar), else 0; deleted on exit. Checked: 1 in full mode (flxp hides its clock), 0 with
-  the sidebar minimized in classic mode (flxp shows "12:34 AM").
-- **Start menu**: per the paragraph above; luxshell also owns `_LHSHELL_S<screen>` while it runs. Checked with a test provider
-  owning `_LH_STARTMENU_S0`: Super → `flags 1, rect 0,0 0x0` (classic) / `flags 1, rect 0,770 83x29` (avalon, the Start button),
-  flxp's Start button → `flags 0, rect 0,770 88x30`, Avalon Start button → `flags 1, rect 0,770 83x29`, our menu stayed closed;
-  provider gone → our menu again. Without a provider, Super and flxp's Start button open the StartPanel above the classic bar.
-- **flxp-taskbar against the M8 table** (read from `~/src/flxp/src/taskbar`, run unchanged). Matches: window list, activation,
-  `_NET_WM_ICON_GEOMETRY` on every client, `_NET_WM_STRUT(_PARTIAL)` full width (30 px), dock type / above / sticky, theme
-  from `_LH_THEME` live, `_LHSHELL_CLOCK_VISIBLE` (hides its clock while 1), tray ownership with `tray_takeover`, `start_menu =
-  luxshell` sending the button rect in `l[1..4]` with `l[0]` = 0 (fits the layout: flags 0 = open). For the flxp team:
-  (1) it does not own `_LH_STARTMENU_S<screen>` with its own menu, so luxshell cannot forward to it; (2) its X thread handles
-  `_LHSHELL_START` only on the root, not on an owner window; (3) with `start_key = 1` it answers luxwm's root broadcast itself, so
-  next to luxshell two menus open unless `start_key = 0`: once it is a provider it should ignore the broadcast while
-  `_LHSHELL_S<screen>` is owned; (4) tray takeover race: when it takes the selection from luxshell, luxshell's hand-back
-  (reparent to the root) can reach the server after its own `XSelectInput` on the icon but before its reparent, and the
-  `ReparentNotify` (parent root) makes `tray_forget` drop an icon that then sits in its container unmanaged (check the current
-  parent before forgetting); luxshell now avoids the takeover; (5) on exit it reparents icons to the root still mapped, so the WM
-  manages them as windows until the next tray docks them (seen as a "trayicon" task button): unmap first, as luxshell's
-  `tray_stop` does; it also leaves its ParentRelative background on them; (6) icons created under luxshell's ARGB tray visual stay
-  32-bit and show black where transparent in its tray (no compositing there).
-- **Deviations**: luxshell does not own `_LH_STARTMENU_S` itself (it is the fallback, not a provider); the classic bar gets the
-  tray handed over before it starts rather than by takeover; `lhde-session taskbar` instead of the `taskbar on|off` restart
-  that flxp's NOTES suggested.
+A provider answers messages on its owner window and ignores root broadcasts while `_LHSHELL_S<screen>` has an owner (luxshell
+forwards them; answering both would toggle twice); without luxshell it may answer luxwm's broadcast itself. Its own Start
+button opens its menu directly. It sets root `_LH_STARTMENU_OPEN` (CARDINAL) = 1 while its menu is mapped, 0 or deleted when
+closed (docs/CLIENT-PROTOCOL.md "Start menu state"); the Avalon Start button shows FakePressed while it is 1. For a
+provider that never sets it, the button shows pressed from the forward until the first top-level mapped within 1.5 s of it
+(its popup) unmaps, until the next forward (a click on the pressed button closes the provider's menu), or after 1.5 s without a
+map; any change of the property ends that guess.
 
-#### Update (2026-10-25, later): classic mode without the sidebar, flxp's start panel as the classic menu
-Two items of aap's todo ("classic taskbar should disable sidebar", "switch to flxp start menu, always saw the luxshell one").
-Verified on the lab `:4` (aero4074, luxwm + picom xrender, flxp-taskbar of commit 41985d4); `lhshell/compare_classic_startpanel.png`:
-classic + Super, classic + flxp's Start button (both flxp's XP start panel, a toast above the bar, no sidebar), avalon + Super
-(luxshell's StartPanel, the sidebar back in its mode).
-- **`[sidebar] with_classic = 0|1`** (default 0, written to state.ini). 0: in `enabled = classic` the sidebar surface is unmapped
-  with no strut (`_NET_WORKAREA` 0,0 1280x770 on 1280x800), `_LHSHELL_CLOCK_VISIBLE` = 0 (flxp-taskbar shows its clock; it has
-  the tray anyway), toasts take the full width above the bar (toast.lua: no sidebar column), Super works. The mode stays in
-  `[sidebar] mode`; changing it while hidden only records it; switching back to avalon restores it (checked: pinned → classic →
-  avalon = pinned; full chosen while hidden → avalon = full, work area 1099x770). 1: the 4051 layout as before (yield above the
-  bar, work area 1099x770, clock visible 1). runtime.lua `sb_hidden()` (= `lh.sidebar_hidden`) gates `place_sidebar`, `set_mode`,
-  `publish_clock`, the startup show and the raise on `windows`; `lh.set_taskbar` re-places the sidebar. Live: settings flyout
-  *Sidebar* > "Also with the classic taskbar", root `_LHSHELL_COMMAND` `sidebar-with-classic 0|1`, `lhde-session taskbar
-  classic` (sets 0) / `classic+sidebar` (sets 1). New `_LHSHELL_COMMAND` `settings` opens the settings flyout (the classic bar
-  and flxp's panel have no way to it).
-- **`[taskbar] classic_start_menu = flxp`** is the default now (`flxp-classic`, `luxshell` the others; the old `own` = `flxp`).
-  What flxp-taskbar reads (src/taskbar/taskbar.cpp, shell/config.cpp: `setting(key)` = env `FLXP_<KEY>`, else flxp.ini, else the
-  theme's `flxp_<key>`): `start_menu = panel` (default; XP's start panel) | `classic` (or `own`; the popup menu) | `luxshell`
-  (sends root `_LHSHELL_START` with flags 0 and its button rect); `start_key = 1` (default) opens its menu on **any** root
-  `_LHSHELL_START` (xwm.cpp: the message type on the root, data ignored), unless `start_menu = lhshell`. It does **not** own
-  `_LH_STARTMENU_S<screen>`, handles no `_LHSHELL_START` on a window of its own, and does not look at `_LHSHELL_S<screen>`. So
-  luxshell starts it with `FLXP_START_MENU=panel FLXP_START_KEY=1` (`classic`/`1` for flxp-classic) and the bridge is the root
-  itself: luxwm's broadcast reaches flxp-taskbar directly, and luxshell (startmenu.lua "start-key") ignores every root
-  `_LHSHELL_START`, with or without a rect, and closes its own menu, while the classic bar it started or adopted runs with its
-  own menu and no provider owns `_LH_STARTMENU_S`. A forward to the dock window, as first planned, would reach nobody (the
-  message would go to its Wine-side connection, which does not handle it). Result: one menu per Super press; a second Super
-  closes flxp's panel (its own toggle). luxshell's menu is the fallback only when the bar is gone. luxshell has no other start
-  request in classic mode (the Avalon Start button is unmapped). Checked: Super and the Start button open flxp's panel, the
-  luxshell log shows no start-menu activity, `classic_start_menu = lhshell` still gives luxshell's menu on flxp's button, avalon
-  Super opens luxshell's menu.
-- **For the flxp team** (what their side still needs for the provider protocol above, none of it blocking now):
-  (1) own `_LH_STARTMENU_S<screen>` while its own menu is in use (`start_menu = panel|classic`) and answer `_LHSHELL_START` on
-  that owner window (flags bit 0 toggle, `l[1..4]` the anchor rect; luxshell forwards the Avalon Start button and Super there,
-  which makes flxp's panel usable with the Avalon taskbar too); (2) once it owns it, ignore the root broadcast while
-  `_LHSHELL_S<screen>` has an owner (luxshell forwards it; answering both would toggle twice, since with `start_key = 1` today
-  it answers every root message); (3) read the root message's data: a rect in `l[1..4]` should anchor the panel and `l[0]`
-  bit 0 decide toggle vs open (today data is ignored); (4) a way from its panel's Control Panel to luxshell's settings when
-  luxshell runs (root `_LHSHELL_COMMAND` = `settings`), so the sidebar/taskbar choice is reachable in classic mode; (5) the
-  tray items (4)-(6) of the list above are unchanged.
+**flxp-startmenu's life.** Wanted whenever the bottom bar is not `classic` (then flxp-taskbar is the provider). Started with
+`FLXP_START_MENU=panel FLXP_START_KEY=1`, log `$XDG_RUNTIME_DIR/luxshell-startmenu<display>.log`, only after `_LH_STARTMENU_S<screen>`
+has no owner (one that finds it owned stays no provider; luxshell waits up to 3 s); adopted when one (or a `flxp-taskbar
+--start-menu-only`) already runs on the display; restarted when it dies (checked every 3 s, at most 5 starts a minute, then
+none until the settings change); stopped by its pid (comm + DISPLAY checked) on the switch to the classic bar and on exit.
 
-#### Status (2026-10-25, evening): lux on the shared settings store, presets, flxp's start panel everywhere
-lux is the shell's name from here on (directory and binary stay `luxshell`). Verified on the lab `:4` (luxwm + picom xrender,
-flxp-taskbar of flxp 6861d31 from PATH, a scratch `XDG_CONFIG_HOME`). User docs: USAGE.md "Settings and presets"; protocol:
-SETTINGS.md ("Resolved theme", "lux's migration").
-- **Settings store.** session.lua: `S.get/S.has/S.set` on `$XDG_CONFIG_HOME/longhorn/settings.ini` (cached by mtime+size; `S.set`
-  edits the one line in place, keeps unknown keys, comments and order, does nothing when the value is unchanged, and queues one
-  `_LH_SETTINGS_CHANGED` per handled event: serial = highest seen + 1, data[1] the section atom when only one changed).
-  lhshell.c: `lh.send_root_message`, `lh.atom`, event `settings-changed`(serial, hint name) for the root message. runtime.lua
-  `reload_settings` (50 ms debounce) re-reads the file and applies every key that differs from what runs: theme, composition,
-  taskbar kind (unless `LHSHELL_TASKBAR`), autohide, rows, sidebar mode/width/with_classic, clock pinned and layout (event
-  `clock-layout`), wallpaper/mode, desktop_black, max_fade_ms, start menu; the open settings flyout is rebuilt. `state.ini`
-  keeps `[sidebar] tiles` only. Migration (`S.migrate`, once, before anything else): checked with a copy of the real state.ini:
-  13 keys moved, `state.ini.pre-settings` written, state.ini left with the header comment and `[sidebar] tiles`.
-- **Presets.** `S.resolve(name)`: registry (name, alias, path), else `themes/NAME.theme` over its base (`.over` = the keys it
-  sets; `shell` may be a pack name). The settings flyout has two columns now: themes, "Your themes", *Save as preset...* | the
-  quick switches plus *Start menu*. Theme changes go through `apply_theme`: pack/start panel/fonts/wallpaper/compositor, write
-  `[theme] name`, `_LH_THEME_RESOLVED`, `_LH_THEME` = base, then the message. Own `_LH_THEME` writes are counted and their
-  PropertyNotify ignored (so a preset is not undone by its base coming back). Checked: `_LH_THEME = slatejade` (Jade base, Slate
-  pack, luna-olive panel, ascent wallpaper, animations 4074) -> `_LH_THEME` jade4074, luxwm `_LHWM_THEME` jade, lux the Slate
-  pack, resolved name slatejade; Save as preset "My Luna" -> `themes/my-luna.theme` (base luna) selected; lux restarted (with and
-  without `_LH_THEME_RESOLVED` on the root) keeps my-luna; `_LH_THEME = luna` then switches to the registry luna, `jade` to
-  jade4074.
-- **`[start] menu = flxp | lux`** (default flxp). flxp in avalon/none: `flxp-taskbar --start-menu-only` started (or adopted,
-  /proc cmdline), restarted on death (3 s check, at most 5 per minute), stopped by pid (comm + DISPLAY checked) on the switch
-  to classic, to lux, and on exit; a new flxp-taskbar is started only after `_LH_STARTMENU_S0` has no owner (one that finds it
-  owned stays no provider). classic: flxp-taskbar as before, `classic_start_menu` defaulting from `[start] menu`. lux: no
-  forwarding at all. The root-message bridge for a non-provider classic bar (`lh.classic_owns_start_key`) is gone.
-  Verified with real Super (luxwm) and clicks: avalon: Super opens flxp's panel above the Avalon Start button ("forwarded ...
-  anchor 0,770 83x29"), Super again closes it, the Start button opens it, a second click closes it (the panel's grab takes
-  that click); classic: Super open/close, flxp's Start button open, Escape close; none: Super open/close; `menu = lux` (set by
-  editing settings.ini + the message, as flxp's dialog will): avalon Super/Start button open lux's menu, classic Super and
-  flxp's Start button open lux's menu (`FLXP_START_MENU=luxshell`). Always exactly one of the two menus mapped. Theme switch
-  aero -> luna while flxp's panel was open: the panel closed, reopened in Luna; no errors. `_LHSHELL_COMMAND settings` opens the
-  flyout.
-- **Maximised mode** `[shell] max_fade_ms` (default 0): the taskbar/sidebar black layers switch in the same repaint (checked:
-  the bar is dark 80 ms after Super+Up); a number restores the fade. The `desktop_black` desktop layer was already instant.
-- **For luxwm (next task):** read `_LH_THEME_RESOLVED` (frames from its `msstyles`/`color`/`size`/`frame`/`frame_classic`,
-  `animations`); today a preset gives the base's frames.
-- **For the flxp team:** (1) Control Panel > *Display Properties* in the start panel is a message box (startmenu.cpp
-  `CMD_DISPLAY`); until the dialog exists it could set the root `_LHSHELL_COMMAND` = `settings` when `_LHSHELL_S<screen>` is
-  owned (lux's flyout opens). (2) The dialog: write settings.ini as SETTINGS.md says, then `_LH_THEME`, then
-  `_LH_SETTINGS_CHANGED`; lux applies the rest. (3) Its Theme cascade lists only the registry: add `themes/*.theme`. (4) Read
-  `_LH_THEME_RESOLVED` instead of looking up `_LH_THEME` (a preset's `msstyles`/`color`/`size`/`icons`); today flxp briefly sees
-  a preset name on `_LH_THEME` when somebody writes one and logs "not in themes.ini; keeping ..." before lux replaces it with
-  the base. (5) flxp-desktop: `[desktop] wallpaper = none` means no image.
+## 14. Theme, settings, compositor, reload
 
-#### Status (2026-10-25, late): in sync with flxp's Display Properties (flxp bf79f78)
-Decision (SETTINGS.md "Preset names on `_LH_THEME`"): `_LH_THEME` carries the selected name, registry or preset; every reader
-resolves it (registry section/alias first, then `themes/NAME.theme` = base entry + overrides); nobody writes a preset's base
-back. Verified on the lab `:3` with the real dialog (`~/src/flxp/build/settings/flxp-settings`) next to luxwm + lux + picom
-(xrender), a scratch `XDG_CONFIG_HOME` (empty `longhorn/`, a copy of the user's `flxp/flxp.ini`), driven by xdotool; contact sheet
-`lhshell/compare_settings_sync.png`.
-- **luxwm** resolves preset names itself (frame.c `theme_preset_lookup`, wm.c `lh_theme_apply`): `_LH_THEME_RESOLVED` when its
-  `name` is the preset, else the preset file; `[VisualStyle]`, `[Frames]`, `[Fonts]`, `[Composition] composition` (off = the
-  classic frame) over the base entry, applied like a registry entry; the preset's `[Composition] animations` wins over
-  `[theme] animations`; `_LHWM_THEME` unchanged (the spec); `_LH_THEME_RESOLVED` changes re-apply; an unknown name keeps the
-  theme. luxwm README "EWMH and the shell". `tests/regress.sh`: 144 identical.
-- **lux** writes the selected name (preset too) to `_LH_THEME`, `_LH_THEME_RESOLVED` first as before; a preset name written by
-  someone else is applied and left alone (checked with `xprop -spy`: flxp's Apply of `test1` -> no write by lux or luxwm). The
-  startup compat rule (root = base, resolved + `[theme] name` = the preset) only serves sessions from before the decision.
-  `_LH_SETTINGS_CHANGED` serials now go through the root `_LH_SETTINGS_SERIAL` like flxp's (flxp's next message continued at
-  lux's 719187625 + 1). `lh.select_theme(name, force)`: Save as preset over the selected preset republishes.
-- **Dialog steps** (all live, nothing restarted): Jade (4074) -> luxwm jade frames, dialog restyled; Composition Off -> lux stops
-  picom, luxwm `jade4074-classic`; Animations Invented -> `_LHWM_ANIMATE` 7 -> 3 on clients; Taskbar Classic -> lux stops its
-  bar, sidebar and the `--start-menu-only` provider, starts flxp-taskbar; Save As `test1` (icons xp) + Apply -> `_LH_THEME =
-  test1`, luxwm "theme test1: preset (base jade4074)", lux "theme test1 (preset over jade4074)", resolved `icons=xp`; back to
-  Aero/Avalon/Follow/4074plus in one Apply (hint 0) -> picom started by lux, glass frames, `_LHWM_ANIMATE` 7, the provider back;
-  `test1` from Aero -> jade classic frames, picom stopped, animations 3 from the preset; lux and luxwm restarted with `test1`
-  on the root keep it.
-- **For the flxp team:** (1) `resolved_for()` (lhtheme.cpp) treats `_LH_THEME_RESOLVED` as a bare section name; it is
-  `key=value;...` (SETTINGS.md "Resolved theme"): take its `base=` (unescaped), and only when its `name=` equals `_LH_THEME`.
-  Harmless today (the lookup fails and flxp reads the preset file), but the "preset file we cannot read" fallback never works.
-  (2) A preset's `[Composition] animations` (Save As always writes it) wins over `[theme] animations` in lux and luxwm, so the
-  Appearance tab's Animations has no visible effect while such a preset is selected: write it into the preset (or leave it out
-  of Save As unless it differs). Same for `[Desktop] icons`. (3) Each Apply with a theme change writes `_LH_THEME` twice (same
-  value; two PropertyNotify seen with `xprop -spy`, none of them from lux or luxwm): harmless, but a single write is enough.
-  (4) Choosing a theme writes `[desktop] wallpaper =` (empty) even when the key was absent, so the theme change's hint is 0;
-  fine for us, just noting why the hint is rarely `theme`.
+**The theme.** Root `_LH_THEME` (UTF8_STRING) holds the selected theme's name: a theme file of `data/themes/` or
+`~/.config/lhde/themes/`, or a bare style, resolved by liblhde (docs/THEME-FORMAT.md; an alias is replaced on the root by its
+theme's name). At startup the root wins, else settings.ini `[theme] name`; the first one up publishes it and brings `[theme]
+name` in line. The record's `Shell.pack` names the pack (`LHSHELL_THEME`, a pack name or directory, only when no theme names
+one; default `4074-aero`). luxshell writes `_LH_THEME_RESOLVED` (`theme=NAME`, `serial=` the current `_LH_SETTINGS_SERIAL`,
+then the record's `key=value` lines; docs/SETTINGS.md) before `_LH_THEME` and only when it does not describe the record yet
+(luxwm writes the same record when it resolves first). Its own `_LH_THEME` writes are counted and their PropertyNotify ignored;
+the current name written again by someone else is a pack reload (below).
 
-### M5b, note for flxp-desktop (2026-10-25)
-The "full-screen black fade on maximise/restore, even without composition" that aap still sees
-comes from **flxp-desktop**: `src/desktop/desktop.cpp` fades the whole desktop to black over
-`desktop_fade_ms` (400 ms, smoothstep) while `_LHWM_MAXIMIZED_MODE` is 1, copied from lux's old
-M5a desktop layer. M5b replaced that: the desktop does not fade at all; only the maximised
-window's frame plate and the bars' black layers switch (and since 2026-10-25 instantly, no fade).
-flxp-desktop should default `desktop_fade_ms` to 0 (or drop the behaviour) to match. Our side
-has nothing left that fades: lux `desktop_black = 0`, `max_fade_ms = 0`; luxwm `MAX_FADE_MS 0`.
+A switch (`apply_theme`): pack loaded (nodes rebuilt on the same windows when the pack or the font set changed; tray icons move
+to the new tray node; a toast on screen keeps its look until it closes), wallpaper, composition, the theme's `Shell.taskbar`,
+the start-menu provider check, `[theme] name` (liblhde `lhde_theme_select`, which drops another theme's current layer),
+`_LH_THEME_RESOLVED`, `_LH_THEME`. Per-theme keys changed in luxshell (taskbar kind, composition) go into the current layer
+(settings.ini `[current]`, `lhde_current_set_key`) and the theme is applied again; the flyout then shows "NAME (Modified)".
+*Save as...* writes `~/.config/lhde/themes/FILE.theme` from the theme and its layer (`lhde_theme_save_as`) and selects it.
 
-## Context menus and pack reload (status 2026-10-26)
+**Settings.** settings.ini (`~/.config/lhde/settings.ini`, liblhde's store: unknown keys, comments and order kept, nothing
+written when a value is unchanged) holds the user's choices; luxshell's keys: `[taskbar] autohide rows classic_start_menu`,
+`[sidebar] mode width stacking with_classic yield_bottom locked`, `[clock] pinned pinned_pack layout`, `[desktop] wallpaper
+= none, desktop_black`, `[shell] max_fade_ms`, `[quicklaunch] dir`, `[commands]`, `[fonts] smoothing` (menus); missing
+defaults are written on first run. After a write luxshell sends one root ClientMessage `_LH_SETTINGS_CHANGED` per handled event:
+`l[0]` = serial (root CARDINAL `_LH_SETTINGS_SERIAL` + 1, written first, never below the highest serial seen or the clock seed),
+`l[1]` = the section's atom when only one changed, else 0. On a received message (its own too) it re-reads the file 50 ms after
+the burst and applies every key that differs from what runs (theme, current layer, composition, taskbar, autohide, rows, sidebar
+mode / width / stacking / with_classic / locked, clock pinned and layout, desktop_black, max_fade_ms, wallpaper, the start
+provider); an open settings flyout is rebuilt. Runtime state stays in `~/.local/state/lhde/luxshell-state.ini` (`[sidebar] tiles
+tiles_base`; `LHSHELL_STATE` overrides the path).
 
-**Sources.** The only real screenshot of a sidebar menu is `screenshots/lh4074-091929.png` (4074, Slate; described with the
-rest in `screenshots/README-sidebar-shots.md`): *Minimize bar*, *Properties* (hot), separator, the parts list *Basket, Classic
-Tray ✔, Contacts, News Feed, Notification History ✔, People nearby, Quick Launch ✔, Search ✔, Slide Show, Sync*, separator,
-*Power (Transient) ✔, Web Host Tile (Transient) ✔*, separator, *Clock ✔*; no mnemonics drawn. *Properties* opens
-"Taskbar and Start Menu Properties" with the *Sidebar & Taskbar* tab (`lh4074-091944.png`). No tile menu and no Avalon
-taskbar menu was captured; their items come from the IL (`res/4074/il/desktop.il`):
-- `SidebarBaseMenu2.GetBaseContextMenu` (L17037): "Minimize bar" / "Restore bar" (command ToggleMinimized → message 1381
-  `_ToggleSidebar`), "Properties" (message 1379).
-- `SidebarControl.GetContextMenu` (L37721): the base items, a separator (`MenuItem.Mode` 2), `GetAddPartsMenu` (Friendly
-  Names, checked when the module has a tile, " (Multi-Instance)"; then the transient modules with " (Transient)"), a
-  separator, "Clock" (ToggleClock, checked while the clock tile is shown). `_OnOptions` (L38583): the Options button opens
-  the same menu with itself as PlacementTarget.
-- `OuterTile._GetContextMenu` (L44524): `FireContextMenuEvent` first (the tile's own `MenuItem`s, `ISidebar.ContextMenuEvent`),
-  then "Auto Size" (checkable, `_fAutoSize`), "Move Up" (enabled unless `_iIndex` = 0; "Move Left" in the taskbar), "Move
-  Down" (enabled while `_iIndex + 1 < _cTiles`; "Move Right"), in the overflow "Remove <name> Tile from overflow", "<Friendly
-  Name> Tile Properties" when the tile has a `TypeOfPropertyPage`, "Remove <Friendly Name> Tile" unless pinned. No separators.
-- `ExtendedTaskbar.GetContextMenu` (L23627): the base items (4074 passes constants, so the taskbar always said "Restore bar"),
-  separator, "Task Manager", separator, "Show Desktop" / "Hide Desktop" (`_fDesktopVisible`), "Cascade", "Tile Vertically",
-  "Tile Horizontally" (enabled when there are windows).
+**Settings flyout** (`settings.lua`; *Properties* in the taskbar and sidebar menus, `_LHSHELL_COMMAND settings`): two columns,
+the theme list (shipped themes whose visual style is imported, then the user's; *Save as...*) | composition (follow / on / off),
+taskbar (Avalon / classic / none) and autohide, sidebar mode, stacking and *Also with the classic taskbar*, *Show the
+wallpaper*. Run box (`_LHSHELL_COMMAND run`, Super+R): a one-line command for sh (its search mode, the best matching application,
+else an existing path through the file manager, else the line as a command, is opened by nothing).
 
-**lux** (`runtime.lua` "sidebar and tile context menus", `menu.lua`):
-- `menu.lua` draws every menu with wuxtheme's popup menu painter (`lh.menu_render`, `menupaint.c`: `ut_menu_layout` /
-  `ut_menu_draw`, the pixels of flxp's menus and luxwm's window menu) in the session theme: the style's Menu class where it
-  has one (Aero / Jade POPUPITEM band, separators, check marks, cascade arrows), its [SysMetrics] colours, FLATMENUS and
-  MENUFONT; Windows Classic from the scheme's Colors.* and Metrics.menufont; text smoothing from `[fonts] smoothing`, else the
-  theme's `Fonts.smoothing`; XP's 4 px drop shadow (luxwm's 4074 Slate measurement; without a compositor the screen under it,
-  darkened). The menu is one image node with a hoverable node over each item's rectangle from the painter's layout. This is
-  not 4074's Avalon ContextMenu, chosen so (menus look the same everywhere): `lh4074-091929.png` has a white plate, a 1 px
-  #919191 frame and a 1 px shadow, 19 px rows with an 18 px MENUHILIGHT bar whose top row is 30 % and bottom row 40 % lighter,
-  text 17 px from the frame, 7 px separators with a 1 px #BEBEBE line; the painter under Slate gives the style's #F5F5F5 plate,
-  a #4E5358 frame, a flat 19 px #EFC38C bar inset 3 px, text 22 px in, the 4 px shadow, and the same 19 px rows.
-  `opts.flip`: TrackPopupMenu placement (the menu opens to the left of / above the point where it would not fit; the
-  screenshot's menu is flipped that way). Mnemonics: `&` in item text, underlined by the painter once the keyboard is used
-  (XP's keyboard cues; opened from the keyboard: at once); the key activates a unique mnemonic or cycles through duplicates;
-  other letters jump by initial; Home/End added. 4074 drew no underlines.
-- Sidebar menu: right click on the sidebar outside the tiles, or a click on the Options glyph (under it, right-aligned). Items:
-  4074's two base items; lux's group *Lock the Sidebar* (`[sidebar] locked`, the 4051 `CShellSidebar::SetLockBar` idea: the
-  sizer stops dragging) and *Stacking* ▸ Top / Bottom; the 4074 parts list in the screenshot's order, where *Classic Tray* =
-  `tiles/notifications.lua`, *Power (Transient)* = `tiles/power.lua`, *Clock* = `tiles/clock.lua` (checked = in the tile list;
-  a click adds or removes it), the other modules greyed. Instead of the requested "Add Tile ▸" submenu the list stays inline as
-  in 4074, and *Minimize bar* is 4074's wording for "Minimize Sidebar".
-- The tile list is state.ini `[sidebar] tiles` (`none` = empty) with `[sidebar] tiles_base` = the pack's own list it was made
-  from: while the pack's list is unchanged the user's list holds (added and removed tiles), otherwise the pack's list wins (an
-  old state.ini without `tiles_base` keeps the old rule: used when it names the same tiles). A tile comes back at its place in
-  the pack's order (else notifications, power, clock).
-- Tile menu: right click on a tile; a click on the tile's arrow opens the flyout when the tile has one, else this menu. The
-  tile's `tile:menu()` items, a separator (ours), then *Auto Size* (checked, greyed: our tiles size to their content), *Move
-  Up* / *Move Down* (greyed at the ends and for pinned tiles), *<Name> Tile Properties* (`tile:properties()`, else the tile's
-  flyout; greyed without either: the tray tile), *Remove <Name> Tile* (not on pinned tiles). Friendly names: Classic Tray,
-  Power, Clock. `tiles/clock.lua` got `tile:properties()`: a flyout with the six layouts and the pinned switch.
-- Taskbar menu: the IL's items with the sidebar's real state, *Properties* = the settings flyout, *Task Manager* (first of
-  xfce4-taskmanager, lxtask, gnome-system-monitor, mate-system-monitor, qps, else `xterm -e top`; greyed when none; found
-  with `io.popen`, since `os.execute` reports -1 under lux's ignored SIGCHLD), *Show/Hide Desktop* = `_NET_SHOWING_DESKTOP`
-  (luxwm implements it), *Cascade* / *Tile Vertically* / *Tile Horizontally* through `_NET_MOVERESIZE_WINDOW`
-  (`lh.wm_moveresize`, new in `lhshell.c`) over the work area (sizes are client sizes, luxwm adds its frame); then lux's
-  *Auto-hide the taskbar* and *Sidebar* ▸ (replacing the old "Sidebar: Full/Minimized/Pinned" rows and "Settings...").
-- Checked on `:4` (aero-patch, slate4074): both stackings, classic taskbar + `with_classic`, minimized (Restore bar from the
-  taskbar menu), keyboard (arrows, mnemonics, Esc, submenus), outside clicks; `x11/lhshell/compare_menus.png`.
+**Fonts.** The theme's `path.fonts` directories become fontconfig application fonts and libuxtheme font directories (`lh.fonts`:
+`FcConfigAppFontClear` + `AddDir`, `ut_add_font_dir`) at startup and on every switch, so the packs' "Segoe UI 9" is 4074's
+Segoe UI 0.7; the bars are rebuilt when the set changed. Fallback family Tahoma (Franklin Gothic Medium → ITC Franklin Gothic
+Std Medium).
 
-**Pack reload** (`lh.reload_pack`, USAGE.md "Live-editing a theme"): `_LHSHELL_COMMAND reload`, or `_LH_THEME` written again
-with the current name (only writes that are not our own echo), debounced to one reload per 150 ms. It re-resolves the theme
-(themes.ini / preset), re-reads `shell.lua` (a failing pack keeps the old one), re-applies start panel and fonts, calls
-`lh.image_flush()` (new in `scene.c`: cache entries whose file's mtime or size changed are dropped; the old surfaces stay
-allocated on a stale list because nodes borrow them), then `rebuild_shell()` (tiles re-read from `tiles/*.lua`, "pack" event:
-flyout chrome, start menu, menu caches) and the theme-entry steps of a switch (wallpaper, composition, taskbar kind, start
-provider, `_LH_THEME_RESOLVED`). ~40 ms on the lab. `session/theme-reload.sh` sends it plus luxwm's reload (`luxwmc reload-theme`,
-else the `_LHWM_RELOAD` root ClientMessage); `session/theme-watch.sh` calls it on file changes (inotifywait, else a 1 s poll).
+**Wallpaper.** The resolved `Desktop.wallpaper` / `Desktop.mode` (`[desktop] wallpaper = none`: solid #3a6ea5, the 4074
+`[sysmetrics]` BACKGROUND; also `LHSHELL_WALLPAPER=0`) through `feh --no-fehbg` (fill, fit, center, tile, stretch); at startup only
+when no `_XROOTPMAP_ID` exists; never when another program owns the desktop (`LHSHELL_DESKTOP=0`, or another client's
+`_NET_WM_WINDOW_TYPE_DESKTOP` window; flxp-desktop reads the wallpaper from the resolved record).
 
-## Text through libuxtheme, provider start state, text on glass (status 2026-10-27)
-aap's items: "lux start button does not know when the wux start menu is open", blurry taskbar text, taskbar text on glass hard
-to read in Aero vision.
-- **Start button and a provider's menu** (`docs/CLIENT-PROTOCOL.md` "Requests to the wux side"): lhshell.c emits
-  `startmenu-open` on root `_LH_STARTMENU_OPEN` changes; runtime.lua shows StartButton.FakePressed (the pack's 1181, the
-  `checked` state) while our menu is open or the property is 1. A provider that never set it (the property absent since the
-  forward): pressed from the forward (`start-forwarded`, emitted by startmenu.lua for the button and Super) until the first
-  top-level mapped within 1.5 s (its popup; the `toplevel` event now carries the window and map / unmap / destroy) unmaps, until
-  the next forward (a click on the pressed button closes the provider's menu), or after 1.5 s without a map. Any change of the
-  property drops that guess (the provider speaks the protocol). Checked on `:4` (aerovision, flxp-taskbar --start-menu-only
-  without the property: pressed while its panel was open, released on Esc; `xprop` 1 / 0 / deleted by hand).
-- **Text** (`luxshell/text.c`, replacing pango in `scene.c` and `lhshell.c`; lux links libuxtheme as luxnav does,
-  `../(gone: the top-level build)`, plus fontconfig and freetype2; no pango): every `text` node is libuxtheme's GDI text, as luxnav's
-  (NAVBAR.md "Text and pixels without pango and cairo"): the pango-style descriptions stay (`Segoe UI 9`, `Segoe UI,Tahoma Bold
-  14px`, `ITC Franklin Gothic Std Medium 15px`, ...) and become a `ut_font` (first family that exists, theme font directories
-  first as libuxtheme looks them up; weight words incl. Medium = 500; points at 96 dpi; lfHeight = -px rounded); each line is one
-  `ut_draw_text_mask` (DT_SINGLELINE | DT_NOPREFIX, DT_END_ELLIPSIS for `ellipsis`) composited with cairo in the node colour at
-  whole device pixels; widths are GDI advances (`ut_text_extent_font`, cached); `wrap` is greedy at blanks with GDI widths (a
-  long word between characters, pango's WORD_CHAR); `markup` keeps the menus' mnemonics: tags removed, the underline drawn at
-  GDI's underline rows (those `lfUnderline` draws) under the prefix's extent; `glow` = the coverage blurred (two box passes,
-  node keys `glow_size` 4, `glow_strength` 2.5) in the glow colour, `shadow` = the coverage offset. The line box is the font's
-  hhea ascent / descent at the size, rounded up (what pango laid out with): GDI's cell sits on that baseline, so nodes keep their
-  sizes and baselines; for Segoe UI and Tahoma it equals GDI's, Franklin Gothic's winAscent is 2-3 px taller than its hhea
-  ascent. A string with characters the face lacks (`✓`, `●`, `▸` in Segoe UI 0.7) is drawn in fontconfig's face for them (GDI
-  has no per-glyph fallback). `lh.fonts` registers the theme directories with libuxtheme too (`ut_add_font_dir`; it only adds).
-  `LHSHELL_TEXT_TRACE=FILE` logs every painted text node (rect, block origin, baseline).
-  Equivalence (`:4`, aero-patch and slate4074, old = `7c9413a` with pango, same scenes: task buttons incl. an ellipsized title,
-  the sidebar clock and power texts, the start menu (Jade; Slate with the Franklin user pane), the taskbar menu with mnemonics, a
-  wrapped toast; 60 nodes): every node rect identical except Slate's auto-sized "Log Off" (2 px wider, GDI's advance), every
-  baseline within 0.5 px (pango's centred blocks sat on half pixels), block x identical; text widths +-2 px. Ellipsis is GDI's
-  ("A very long window ..." keeps the blank). `lhshell/compare_text_gdi.png`: task buttons, clock, menu, toast at 4x, pango
-  above GDI.
-- **Text on glass** (pack key `taskbar_text = plain | glow`, docs/history/THEMES.md "luxshell packs"): `glow` draws the task buttons' titles
-  and the minimized sidebar's taskbar clock black over a white halo (luxnav's treatment; `taskbar_glow = { color, text, size,
-  strength }`). New pack `themes/aerovision` (`aero` + `taskbar_text = "glow"`, `clock_pack = "aero"` so the clock's pinned
-  choice made in aero holds), used by themes.ini `[aerovision]`; `aero` keeps `plain` (white).
+**Compositor follows the theme.** `composition` = follow (the theme's `Glass.composition`: auto unless the theme has no glass
+frames or says off) | on | off (`LHSHELL_COMPOSITION` forces one; lhde-session sets it from `LHDE_PICOM`). Off: SIGTERM to the
+processes named picom whose environment has this DISPLAY (nothing else is touched). On: when nobody owns `_NET_WM_CM_S<screen>`,
+start `[commands] picom`, else `$LHSHELL_PICOM_CMD`, else `picom --config session/picom-glass.conf --backend glx`. Applied 1.5 s
+after startup, on every theme switch and when the switch changes. luxwm follows the compositor's presence by itself (glass ⇄
+classic frames, `_LHWM_COMPOSITED`).
 
+**Pack reload** (USAGE.md "Live-editing a theme"): `_LHSHELL_COMMAND reload`, or `_LH_THEME` written again with the current name;
+at most one per 150 ms. It resolves the theme again, re-reads `shell.lua` (a pack that fails keeps the old one), applies the
+fonts, flushes changed images (`lh.image_flush`), rebuilds bars, tiles (re-read from `tiles/*.lua`), flyout chrome and menus in
+place, then the switch's theme steps. ~40 ms on the lab. `session/theme-reload.sh` sends it plus luxwm's reload;
+`session/theme-watch.sh` calls it on file changes.
+
+**Root commands.** Root property `_LHSHELL_COMMAND` (UTF8 string; luxshell deletes it after reading:
+`xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND logoff`): `run`, `reload`, `settings`, `taskbar avalon|classic|none`,
+`sidebar-stacking top|bottom|toggle`, `sidebar-with-classic 0|1`, `desktop N|next|prev` (`_NET_CURRENT_DESKTOP`, 0-based), and
+the session commands `logoff`, `standby`, `shutdown`, `restart`, `lock` from settings.ini `[commands]`, else: logoff =
+`lhde-session stop` inside an lhde-session (its state directory exists), else `luxwmc quit` (luxwm exits cleanly, clients left
+mapped); standby = `zzz` if present, else `loginctl suspend`; shutdown = `loginctl poweroff`; restart = `loginctl reboot`;
+lock = `xlock` or `slock`. luxwm's keys send `shell CMD` this way (Super+R `run`, Super+S `sidebar-stacking toggle`).
+
+## 15. Text (`text.c`)
+
+Every `text` node is libuxtheme's GDI text, as luxnav's (docs/NAVBAR.md); no pango. Font descriptions are pango-style (`Segoe
+UI 9`, `Segoe UI,Tahoma Bold 14px`, `ITC Franklin Gothic Std Medium 15px`) and become a `ut_font`: the first family that exists
+(theme font directories first), weight words incl. Medium = 500, points at 96 dpi, lfHeight = -px rounded. Each line is one
+`ut_draw_text_mask` (DT_SINGLELINE | DT_NOPREFIX, DT_END_ELLIPSIS for `ellipsis`) composited in the node colour at whole device
+pixels; widths are GDI advances (`ut_text_extent_font`, cached); `wrap` is greedy at blanks with GDI widths (a long word breaks
+between characters); `markup` keeps the menus' mnemonics (tags removed, the underline at GDI's underline rows under the
+prefix's extent); `glow` = the coverage blurred (two box passes, `glow_size` 4, `glow_strength` 2.5) in the glow colour;
+`shadow` = the coverage offset. The line box is the font's hhea ascent / descent at the size, rounded up: GDI's cell sits on
+that baseline (equal to GDI's for Segoe UI and Tahoma; Franklin Gothic's winAscent is 2-3 px taller than its hhea ascent).
+Characters the face lacks (`✓`, `●`, `▸` in Segoe UI 0.7) are drawn in fontconfig's face for them (GDI has no per-glyph
+fallback). `LHSHELL_TEXT_TRACE=FILE` logs every painted text node (rect, block origin, baseline). Checked against pango's layout
+of the same 60 nodes (task buttons, clock and power texts, menus, a wrapped toast): every node rect identical except one
+auto-sized label (2 px, GDI's advance), every baseline within 0.5 px, so node sizes and baselines match pango's.
+
+## 16. Context menus (`menu.lua`, `menupaint.c`)
+
+Every menu (sidebar, tiles, the Avalon taskbar, the notification history) is drawn by wuxtheme's popup menu painter
+(`lh.menu_render`: `ut_menu_layout` / `ut_menu_draw`, the pixels of flxp's menus and luxwm's window menu) in the session
+theme: the style's Menu class where it has one (Aero / Jade POPUPITEM band, separators, check marks, cascade arrows), its
+`[SysMetrics]` colours, FLATMENUS and MENUFONT; Windows Classic from the scheme's `Colors.*` and `Metrics.menufont`; smoothing
+from `[fonts] smoothing`, else the theme's `Fonts.smoothing`; Marlett registered for the classic glyphs; XP's 4 px drop shadow
+(luxwm's 4074 Slate measurement; without a compositor the screen under it, darkened, copied before the map). One image node per
+level (`@menu:<depth>`), redrawn on selection, with a hoverable node over each item from the painter's layout. This is **not**
+4074's Avalon ContextMenu, by choice (taste: menus look the same everywhere): `lh4074-091929.png` has a white plate, a 1 px
+#919191 frame and a 1 px shadow, 19 px rows with an 18 px MENUHILIGHT bar whose top row is 30 % and bottom row 40 % lighter,
+text 17 px from the frame, 7 px separators with a 1 px #BEBEBE line; the painter under Slate gives #F5F5F5, a #4E5358 frame, a
+flat 19 px #EFC38C bar inset 3 px, text 22 px in, the same 19 px rows. Placement: `flip` (TrackPopupMenu: left of / above the
+point where it would not fit, as the screenshot's menu), `up` (bottom-left corner at the point). Keyboard: `&` mnemonics,
+underlined once the keyboard is used (opened from the keyboard: at once; 4074 drew none); a mnemonic key activates a unique
+item or cycles through duplicates; other letters jump by initial; arrows, Home/End, Return, Escape, cascades.
+
+## 17. Not done
+
+From sections 2-3, not in luxshell: task grouping (glomming) and the group flyout, flashing task buttons
+(`DEMANDS_ATTENTION` is read, not drawn), task tooltips, the task overflow chevron, tile drag-and-drop and the tile sizer drag
+(*Auto Size* stays checked), the sidebar overflow row and expando, tile flash, minimised-window tiles (MWT/RMA), the white task
+text animation, the "very large tile" consent, tile property sheets (`propsheet.xaml`; the clock's Properties is a flyout), the
+clock flyout with alarm and calendar, the Basket, News Feed, Contacts, Search, Slide Show and Sync tiles, the secondary-monitor
+taskbar, the Aurora desktop.
+
+Validation: render the lab (`session/lab.sh`, Xvfb + picom xrender) and compare crops against the real screenshots at the same
+coordinates (taskbar rows 994-1023 / 835-863, sidebar columns 1130-1279 / 1002-1151); `lab.sh shot` takes them.
