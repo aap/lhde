@@ -1232,6 +1232,17 @@ void build_walls()
         }
     }
     if (!wall_file().empty()) add(wall_file(), stem(wall_file()));   // a picture from elsewhere
+    // XP's order: "(None)" first, then every name alphabetically (the recent pictures are listed, not put on top)
+    std::stable_sort(walls.begin() + 1, walls.end(), [](const Wall& a, const Wall& b) { return strcasecmp(a.label.c_str(), b.label.c_str()) < 0; });
+}
+
+// the entry of the background in force
+int wall_selected()
+{
+    std::string wf = wall_file(), wv = wall_value();
+    for (size_t i = 0; i < walls.size(); i++)
+        if (wv == "none" ? walls[i].value == "none" : (!walls[i].file.empty() && walls[i].file == wf)) return (int)i;
+    return 0;
 }
 
 void fill_walls(HWND dlg)
@@ -1241,8 +1252,7 @@ void fill_walls(HWND dlg)
     uiicons::sync();   // the icon set of the theme in force (it changes with Apply)
     SendMessageW(lv, WM_SETREDRAW, FALSE, 0);
     SendMessageW(lv, LVM_DELETEALLITEMS, 0, 0);
-    int image = uiicons::index("image"), sel = 0;
-    std::string wf = wall_file(), wv = wall_value();
+    int image = uiicons::index("image"), sel = wall_selected();
     for (size_t i = 0; i < walls.size(); i++) {
         std::u16string t = W(walls[i].label);
         LVITEMW it = {};
@@ -1251,13 +1261,14 @@ void fill_walls(HWND dlg)
         it.pszText = (LPWSTR)t.c_str();
         it.iImage = walls[i].file.empty() ? I_IMAGENONE : image;
         SendMessageW(lv, LVM_INSERTITEMW, 0, (LPARAM)&it);
-        if (wv == "none" ? walls[i].value == "none" : (!walls[i].file.empty() && walls[i].file == wf)) sel = (int)i;
     }
     LVITEMW st = {};
     st.stateMask = st.state = LVIS_SELECTED | LVIS_FOCUSED;
     SendMessageW(lv, LVM_SETITEMSTATE, (WPARAM)sel, (LPARAM)&st);
-    SendMessageW(lv, LVM_ENSUREVISIBLE, (WPARAM)sel, FALSE);
     SendMessageW(lv, WM_SETREDRAW, TRUE, 0);
+    // after the redraw is on again: the list's scroll range is only updated then (Wine's LISTVIEW_UpdateScroll), before it
+    // the scroll to an entry past the first page stays at the top
+    SendMessageW(lv, LVM_ENSUREVISIBLE, (WPARAM)sel, FALSE);
     InvalidateRect(lv, nullptr, TRUE);
 }
 
@@ -1876,9 +1887,18 @@ INT_PTR CALLBACK shell_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
     return FALSE;
 }
 
+// --list desktop: the Desktop tab's lists as the dialog fills them, without a window (tests/settings-lists.sh): every
+// "wallpaper LABEL"; the entry in force marked with a leading "*"
+void list_desktop()
+{
+    build_walls();
+    int sel = wall_selected();
+    for (size_t i = 0; i < walls.size(); i++) printf("%swallpaper %s\n", (int)i == sel ? "*" : "", walls[i].label.c_str());
+}
+
 void usage(FILE* f)
 {
-    fputs("usage: flxp-settings [--tab themes|desktop|appearance|shell]\n"
+    fputs("usage: flxp-settings [--tab themes|desktop|appearance|shell | --list desktop]\n"
           "Display Properties: the session theme (theme files; your changes are settings.ini [current], \"NAME (Modified)\",\n"
           "until Save As writes ~/.config/lhde/themes/NAME.theme) and the per-user settings (~/.config/lhde/settings.ini).\n", f);
 }
@@ -1893,13 +1913,16 @@ int tab_of(const std::string& t)
 int main(int argc, char** argv)
 {
     int start = 0;
+    bool list = false;
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         if ((a == "--tab" || a == "-t") && i + 1 < argc) start = tab_of(argv[++i]);
+        else if (a == "--list" && i + 1 < argc && !strcmp(argv[i + 1], "desktop")) { list = true; i++; }
         else if (a.rfind("--tab=", 0) == 0) start = tab_of(a.substr(6));
         else if (a == "--help" || a == "-h") { usage(stdout); return 0; }
         else { usage(stderr); return 2; }
     }
+    if (list) { cur = load_state(); recompute(); list_desktop(); return 0; }   // no display needed
     shell::setup_fonts();
     shell::setup_theme();
     w32::init();

@@ -868,8 +868,9 @@ ignored by everybody (the current theme stays; luxwm and luxshell log it).
 
 **Display Properties (flxp-settings).** flxp's dialog (`flxp-settings [--tab themes|desktop|appearance|effects]`, or `flxp
 --settings`; also flxp's start panel Control Panel > Display Properties...) is the full settings UI on the same file: Themes (the
-shipped themes and yours, Save As..., Delete), Desktop (background, position, icon set), Appearance (explorer frame, taskbar kind,
-start menu, composition, animations), Effects (font smoothing, shadows under menus, hiding underlined letters until Alt). Apply
+shipped themes and yours, Save As..., Delete), Desktop (background: "(None)" first, then every picture by name, as XP lists them,
+the ones you browsed to among them; position; icon set), Appearance (explorer frame, taskbar kind, start menu, composition,
+animations), Effects (font smoothing, shadows under menus, hiding underlined letters until Alt). Apply
 writes settings.ini, sets `_LH_THEME` for a theme change and sends one `_LH_SETTINGS_CHANGED`; luxshell applies the theme,
 composition (starts/stops picom), taskbar kind, start menu and wallpaper live, luxwm the frames and animations.
 
