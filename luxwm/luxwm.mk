@@ -5,8 +5,7 @@
 #   build/luxwm/tests/frametest menutest desktopwin dockorder strutdock   (tests/regress.sh: make check-luxwm)
 
 LUXWM_PKGS   = x11 xext xfixes xinerama fontconfig xft cairo cairo-xlib pangocairo
-# berry's warnings; -Os as berry's configure chose
-LUX_COPT    ?= -Os -g -DNDEBUG
+# berry's warnings; LUX_COPT (the top-level Makefile: -Os)
 LUXWM_CFLAGS = -std=c99 $(LUX_COPT) -Wall -Wextra -Wredundant-decls -Wshadow -Wno-deprecated-declarations -MMD -MP \
                -DHAVE_UXTHEME -Iluxwm -Iliblhde -idirafter . $(shell pkg-config --cflags $(LUXWM_PKGS))
 LUXWM_LIBS   = -Lbuild/lib -lwuxtheme '-Wl,-rpath,$$ORIGIN/../lib' $(shell pkg-config --libs $(LUXWM_PKGS)) -lm
