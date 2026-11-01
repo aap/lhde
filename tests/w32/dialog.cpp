@@ -1,4 +1,4 @@
-// Milestone 1: real dialog templates from Wine's comdlg32 resources, run
+// Real dialog templates from Wine's comdlg32 resources, run
 // through the vendored dialog manager and controls.
 #include <stdio.h>
 #include <stdlib.h>
