@@ -7,7 +7,8 @@ D=${1:-:71}
 T=$(mktemp -d)
 B=$(cd "$(dirname "$0")/../.." && pwd)/build/bin/flxp
 mkdir -p $T/home/.config $T/src $T/dst; echo a >$T/src/alpha.txt; echo b >$T/src/beta.txt
-export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config DISPLAY=$D
+export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config XDG_DATA_HOME=$T/home/.local/share XDG_STATE_HOME=$T/home/.local/state \
+       XDG_CACHE_HOME=$T/home/.cache DISPLAY=$D   # the scratch home only: nothing exported from outside leaks in
 Xvfb $D -screen 0 1280x800x24 -nolisten tcp >/dev/null 2>&1 & XP=$!
 sleep 1
 $B --geometry 600x500+0+0 $T/src 2>/dev/null & P1=$!

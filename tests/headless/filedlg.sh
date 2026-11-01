@@ -10,7 +10,8 @@ T=$(mktemp -d)
 B=$(cd "$(dirname "$0")/../.." && pwd)/build/bin/flxp-filedialog
 mkdir -p $T/home/.config/lhde $T/dir/Projects $T/dir/Photos
 for f in notes.txt todo.txt Budget.xls Accounts.xls readme.md; do echo x > "$T/dir/$f"; done
-export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config DISPLAY=$D
+export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config XDG_DATA_HOME=$T/home/.local/share XDG_STATE_HOME=$T/home/.local/state \
+       XDG_CACHE_HOME=$T/home/.cache DISPLAY=$D   # the scratch home only: nothing exported from outside leaks in
 Xvfb $D -screen 0 1280x800x24 -nolisten tcp >/dev/null 2>&1 & XP=$!
 sleep 1
 fails=0
