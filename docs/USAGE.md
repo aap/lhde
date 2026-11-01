@@ -256,6 +256,45 @@ lhde-import --styles ~/Downloads/xp-themes          # then for real (into $LHDE_
   patched `uxtheme.dll`); importing them is the user's act, as with the Windows files, and nothing of them belongs in a resource
   pack meant for others (`lhde-pack --from-tree` packs `local/` too: `--no-local` leaves it out).
 
+### Installing RealAero (the Aero theme for 4074)
+`aero4074` and `aerovision` are drawn with **RealAero**, Lucas Brooks' reconstruction of Microsoft's private Aero theme for
+the M7 builds of pre-reset Longhorn, made for build 4074 x86fre (https://betawiki.net/wiki/User:Lucas_Brooks/RealAero). It is
+not Microsoft's own Aero (which was never released) nor one of the other "Aero patches" for Longhorn: it builds on the same
+author's TrueAeroPlus (2021-05-26) and takes some resources from TrueAero and TWIWMTB's Aero. It is made by resource
+replacement in Microsoft's 4074 styles, so it is Microsoft's art underneath: lhde cannot ship it, in the repository or in the
+free pack; you download it yourself from the BetaWiki page and import its `aero.msstyles`:
+```
+lhde-import --style aero.msstyles realaero    # NAME may be left out: a RealAero file is recognised and called realaero
+lhde-theme explain aero4074                   # the visual style row names the release ("RealAero 0.2 by Lucas Brooks")
+```
+`--style` copies it to `local/themes/realaero.msstyles` and makes the frame sets `realaero` (the CompositedWindow PNG streams
+under luxwm's names) and `aerovision` (its caption buttons, `tools/build_aerovision.py`). The importer knows three releases by
+their sha256 and writes which one it is into the file's annotations (`user.lux.author = Lucas Brooks`, `user.lux.desc`,
+`user.lux.source`: docs/ANNOTATIONS.md) and into the frame sets' `manifest.ini` (`[about]`); an `aero.msstyles` it does not
+know that carries the private Aero's DemoCheck and 4074 CompositedWindow parts is "RealAero, unknown release" (TrueAero and
+other reconstructions carry both too).
+
+| Release | Where | sha256 (start), size | What changed (frames lhde draws) |
+| --- | --- | --- | --- |
+| pre-0.1 | longhorn.ms `aero-4074.zip` (the file dated 2021-10-08; 0.1 itself is of 2021-10-23) | `fa153e6b15ad7682`, 7,192,720 bytes | the release lhde's `realaero` frame set is tuned to and the frame regression renders |
+| 0.2 | BetaWiki, pre-release of 2021-11-10 (`aero.msstyles`, `desksrv.dll`, readme, decompiled source) | `a8e100222f45dbba`, 7,127,184 bytes | six CompositedWindow streams: SMFRAME, SMCLOSEBTN, BORDERONLY (tool and borderless windows, which luxwm does not draw from these), LGFRAMEEXPLORER (the Explorer plate's highlight arc redrawn, alpha a little lower), LGFRAMEMAX and LGFRAMEMAXEXPLORER (now 801x1214 like the other plates instead of 787x1198, the arc redrawn, the Explorer line one row lower) |
+| 0.3 | the "0.3 Test" package (with a patched `desksrv.dll`, `Microsoft.Windows.WCPClient.dll`, `System.Windows.Explorer.dll`, `DesktopAurora.exe`, `setup.cmd`) | `cd6f61a1aae1d838`, 7,073,936 bytes | two more: LGFRAMEEXPLORER and LGFRAMEMAXEXPLORER get a band 3 rows shorter (the header lines at rows 76/77, not 79/80) and the Explorer body as translucent as the normal plate's |
+
+Under 0.2 and 0.3 the normal frames, the caption buttons and `aerovision`'s buttons are pixel for pixel those of pre-0.1; the
+Explorer headers and maximised frames differ, and with 0.3 the Explorer header's lines no longer fall where `realaero`'s
+`explorer_rows` / `max_explorer_rows` put them (fitted to rows 78/79): until the frame set is fitted to it, pre-0.1 or 0.2
+give the better Explorer header. The packages' `desksrv.dll` (4074's DWM) also holds a built-in frame set (PNGSTREAM 111-136),
+but 4074 draws a style's own CompositedWindow streams and uses the built-ins only as a fallback (after the DWM is restarted):
+0.2's built-ins are its style's streams again, 0.3's are 4074's stock Jade ones, so lhde reads the style and imports no
+desksrv.dll. Nor does the desktop aurora come from the 0.3 package's `Microsoft.Windows.WCPClient.dll`: the aurora recipe reads
+a source's `resources/<build>/` (`lhde-import --iso`), and `lhde-import --dir` takes Windows directories, not a theme package.
+
+A tree imported before lhde called the style `realaero` holds `local/themes/aero-patch.msstyles` and the frame set
+`generated/frames/aero-patch`: every import renames the file (`lhde-import --reindex` does only that), and
+`lhde-import --regenerate` also makes the frame sets again under the new name. `aero-patch` stays an alias of `aero4074`, so a
+`settings.ini` that selected it keeps working; a theme file of your own that says `style = aero-patch` or `frames = aero-patch`
+needs the new name.
+
 ### Icon packs
 An icon recipe (`share/icons/NAME.theme`, chosen by a theme's `Desktop.icons`) maps flxp's icon keys to sources: `pe:FILE#ID`
 (an icon in an imported DLL) or `file:PACK/PATH` (a file of an icon pack imported with `lhde-import --icons`). A pack is any

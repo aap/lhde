@@ -30,6 +30,10 @@ imported is the free baseline. Left:
 * Also the place for lhde-theme dirs' view of the three trees.
 
 ## 4. Open smaller points
-* frame sets that exist only as copied pixels without a recipe (aerovision: "copied in"); every set should be regenerable.
+* RealAero 0.3 moved the Explorer plates' header lines up 3 rows (76/77 instead of 79/80; LGFRAMEEXPLORER, LGFRAMEMAXEXPLORER):
+  realaero's explorer_rows / max_explorer_rows are fitted to pre-0.1, so under 0.3 the Explorer header loses its lines. Values
+  per release (the frame set could read them from the style's [about] release), or fit to 0.3 if aap prefers it.
+* RealAero 0.3's patched Microsoft.Windows.WCPClient.dll: lhdebaml cannot decode its desktopaurora.baml (34720 bytes, "BAML
+  2004: bad record 0x0 at 0x84b8"); BetaWiki says the package's Desktop Aurora BAML is "in the correct format".
 * Aero vision's resources resolve into the research workspace ([elsewhere] in explain); the import should own them.
 * Slate vision and Metal vision are still .todo theme files.
