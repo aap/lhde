@@ -81,7 +81,6 @@ int ut_get_margins(ut_theme *t, const char *cls, int part, int state, int prop, 
 int ut_get_rect(ut_theme *t, const char *cls, int part, int state, int prop, ut_rect *r);
 int ut_get_position(ut_theme *t, const char *cls, int part, int state, int prop, int *x, int *y);
 int ut_get_font(ut_theme *t, const char *cls, int part, int state, int prop, ut_font *f);
-int ut_get_intlist(ut_theme *t, const char *cls, int part, int state, int prop, int *values, int max, int *count);
 /* Any property as its text (the ini form; a filename/stream is "#<resource id>"). UTF-8. */
 int ut_get_string(ut_theme *t, const char *cls, int part, int state, int prop, char *buf, size_t size);
 
@@ -98,8 +97,6 @@ void ut_free(void *p);
 
 /* GetThemePartSize: which = 0 TS_MIN, 1 TS_TRUE, 2 TS_DRAW (bounds may be NULL). */
 int ut_part_size(ut_theme *t, const char *cls, int part, int state, int which, const ut_rect *bounds, int *cx, int *cy);
-/* GetThemeBackgroundContentRect. */
-int ut_content_rect(ut_theme *t, const char *cls, int part, int state, const ut_rect *bounds, ut_rect *content);
 
 /* DrawThemeBackground into a premultiplied ARGB buffer (composited over what
  * is there). clip may be NULL. 1 on success. */
@@ -175,8 +172,6 @@ int ut_draw_frame_control(uint32_t *pixels, int width, int height, int stride, c
  * CXEDGE from the left of the text area, vertically centred as DrawText does it, "..." when it does not fit. */
 int ut_draw_caption(uint32_t *pixels, int width, int height, int stride, const ut_rect *rect, unsigned flags, const char *title,
                     const uint32_t *icon, int icon_w, int icon_h, const ut_font *font, const uint32_t *colors);
-/* GradientFill(GRADIENT_FILL_RECT_H) as GDI computes it: c0 (0xRRGGBB) at rect's left edge to c1 at its right */
-int ut_gradient_fill_h(uint32_t *pixels, int width, int height, int stride, const ut_rect *rect, uint32_t c0, uint32_t c1);
 /* the text renderer's "Smooth edges of screen fonts" for every draw call of this process: 0 off, 1 standard (grayscale where the
  * font's gasp table allows it: Tahoma 8 stays crisp), 2 ClearType (RGB subpixel coverage on opaque pixels, ignoring the gasp
  * table; grey where the target keeps alpha). Default 1. */
@@ -215,38 +210,6 @@ int ut_menu_draw(const ut_menu_spec *spec, const ut_menu_item *items, int n, int
  * menu and outside the shadow. */
 enum { UT_MENU_SHADOW = 5 };
 int ut_menu_shadow_alpha(int x, int y, int w, int h);
-
-#ifdef UT_WITH_CAIRO
-/* cairo: the part is rendered at rect's size (device pixels = user units) and
- * painted at rect.left/top through the current clip. Header-only, so the
- * library does not depend on cairo. */
-#include <cairo.h>
-#include <stdlib.h>
-static inline int ut_draw_background_cairo(ut_theme *t, const char *cls, int part, int state,
-                                           cairo_t *cr, const ut_rect *rect)
-{
-    int w = rect->right - rect->left, h = rect->bottom - rect->top, ok;
-    cairo_surface_t *s;
-    ut_rect r;
-    if (w <= 0 || h <= 0) return 1;
-    s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
-    if (cairo_surface_status(s) != CAIRO_STATUS_SUCCESS) return 0;
-    r.left = 0; r.top = 0; r.right = w; r.bottom = h;
-    cairo_surface_flush(s);
-    ok = ut_draw_background(t, cls, part, state, (uint32_t *)cairo_image_surface_get_data(s), w, h,
-                            cairo_image_surface_get_stride(s), &r, NULL);
-    cairo_surface_mark_dirty(s);
-    if (ok) {
-        cairo_save(cr);
-        cairo_set_source_surface(cr, s, rect->left, rect->top);
-        cairo_rectangle(cr, rect->left, rect->top, w, h);
-        cairo_fill(cr);
-        cairo_restore(cr);
-    }
-    cairo_surface_destroy(s);
-    return ok;
-}
-#endif
 
 #ifdef __cplusplus
 }

@@ -68,7 +68,6 @@ static const char *const METRICS[] = {
     "borderwidth", "scrollwidth", "scrollheight", "captionwidth", "captionheight", "smcaptionwidth", "smcaptionheight",
     "menuwidth", "menuheight", "captionfont", "smcaptionfont", "menufont", "statusfont", "messagefont", "icontitlefont", NULL };
 const char *lhde_color_name(int i) { return i >= 0 && i < (int)(sizeof COLORS / sizeof *COLORS) ? COLORS[i] : NULL; }
-const char *lhde_metric_name(int i) { return i >= 0 && i < (int)(sizeof METRICS / sizeof *METRICS) ? METRICS[i] : NULL; }
 static const char *const KEYS[] = {
     "Theme.name", "Theme.base", "Theme.build",
     "VisualStyle.style", "VisualStyle.color", "VisualStyle.size", "VisualStyle.scheme", "VisualStyle.shellstyle",

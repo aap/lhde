@@ -122,9 +122,8 @@ const char *lhde_theme_user_dir(char *out, size_t n);
    look's Colors.NAME (the COLOR_ constant without COLOR_: Colors.activecaption) and Metrics.NAME (NONCLIENTMETRICS:
    Metrics.captionheight, Metrics.captionfont, ...; docs/THEME-FORMAT.md section 2a) */
 int lhde_theme_is_key(const char *key);
-/* the Colors.* names by COLOR_ index (0 scrollbar .. 30 menubar; NULL past the end) and the Metrics.* names (NULL past the end) */
+/* the Colors.* names by COLOR_ index (0 scrollbar .. 30 menubar; NULL past the end) */
 const char *lhde_color_name(int index);
-const char *lhde_metric_name(int i);
 
 /* ---- visual styles ---- */
 enum lhde_style_kind { LHDE_STYLE_MISSING, LHDE_STYLE_CLASSIC, LHDE_STYLE_XP, LHDE_STYLE_LONGHORN, LHDE_STYLE_DWM };

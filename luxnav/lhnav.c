@@ -255,7 +255,7 @@ struct lhnav {
     uint32_t crumb_rgb, glow_rgb;
     int glow;
     /* content */
-    char *title, **seg, *field[2], *placeholder;
+    char *title, **seg, *field[2];
     int nseg, can_back, can_fwd, focused, maximized, caret[2], editing[2];
     struct tool *tools; int ntools;
     int search_open, open;
@@ -834,7 +834,6 @@ lhnav *lhnav_new(struct ut_theme *style, const lhnav_metrics *m)
     if (m) n->m = *m; else lhnav_metrics_default(&n->m);
     n->focused = 1; n->can_back = n->can_fwd = 0;
     n->caret[0] = n->caret[1] = -1;
-    n->placeholder = strdup("Search");
     load_art(n); apply_metrics(n);
     lhnav_set_tools(n, n->m.tools);
     return n;
@@ -850,7 +849,7 @@ void lhnav_free(lhnav *n)
     free(n->style_name);
     for (int i = 0; i < NICONS; i++) { px_img_free(&n->cicon[i][0]); px_img_free(&n->cicon[i][1]); }
     for (int i = 0; i < n->nseg; i++) free(n->seg[i]);
-    free(n->seg); free(n->r_seg); free(n->r_sep); free(n->title); free(n->field[0]); free(n->field[1]); free(n->placeholder);
+    free(n->seg); free(n->r_seg); free(n->r_sep); free(n->title); free(n->field[0]); free(n->field[1]);
     free(n);
 }
 
@@ -898,7 +897,6 @@ const char *lhnav_art_sources(lhnav *n)
 void lhnav_set_title(lhnav *n, const char *s) { free(n->title); n->title = dupstr(s); }
 void lhnav_set_history(lhnav *n, int b, int f) { n->can_back = b != 0; n->can_fwd = f != 0; }
 void lhnav_set_frame_state(lhnav *n, int focused, int maximized) { n->focused = focused != 0; n->maximized = maximized != 0; }
-void lhnav_set_placeholder(lhnav *n, const char *s) { free(n->placeholder); n->placeholder = dupstr(s ? s : ""); }
 
 void lhnav_set_path(lhnav *n, const char *const *seg, int count)
 {
@@ -1748,7 +1746,7 @@ void lhnav_paint(lhnav *n, uint32_t *px, int w, int h, int stride, int composite
             int y = text_top(n, t ? F_CRUMB : F_HINT, r, m->crumb_dy);
             if (t && (n->editing[1] || !composited)) draw_text(n, c, F_CRUMB, t, x0, y, 0, n->editing[1] ? 0 : ccol, 1, 0);
             else if (t) draw_text(n, c, F_CRUMB, t, x0, y, 0, ccol, 1, composited);
-            else draw_text(n, c, F_HINT, n->placeholder, x0, y, 0, ccol, 0.55, 0);   /* placeholder */
+            else draw_text(n, c, F_HINT, "Search", x0, y, 0, ccol, 0.55, 0);   /* placeholder */
             if (n->editing[1] && n->caret[1] >= 0) caret(c, x0 + prefix_w(n, t, n->caret[1]), r);
         } else if (n->caret[1] >= 0) caret(c, r->x + 5, r);
         *c = sv;

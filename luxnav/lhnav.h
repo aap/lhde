@@ -196,9 +196,8 @@ void   lhnav_set_history(lhnav *n, int can_back, int can_fwd);
 void   lhnav_set_frame_state(lhnav *n, int focused, int maximized);
 /* the edit fields (painting only; the text, caret and keys are the client's): part = LHNAV_ADDRESS or LHNAV_SEARCH.
    editing: the field is shown opaque white with text and a caret at byte offset `caret` (-1: none); for LHNAV_ADDRESS the
-   breadcrumb is hidden meanwhile. text NULL or "" with LHNAV_SEARCH shows the placeholder. */
+   breadcrumb is hidden meanwhile. text NULL or "" with LHNAV_SEARCH shows "Search" in italics. */
 void   lhnav_set_field(lhnav *n, int part, const char *utf8, int caret, int editing);
-void   lhnav_set_placeholder(lhnav *n, const char *utf8);   /* default "Search" */
 
 void   lhnav_layout(lhnav *n, int width);   /* computes every rect; call after the setters and on every resize */
 int    lhnav_height(lhnav *n);              /* the header in client rows: deco_h + orb row + gap - border_t (small 47 - 2 = 45),

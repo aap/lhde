@@ -445,19 +445,6 @@ int ut_get_font(ut_theme* t, const char* cls, int part, int state, int prop, ut_
     return 1;
 }
 
-int ut_get_intlist(ut_theme* t, const char* cls, int part, int state, int prop, int* values, int max, int* count)
-{
-    Lock l;
-    PTHEME_PROPERTY p = find_prop(t, cls, part, state, prop);
-    if (!p) return 0;
-    INTLIST* il = (INTLIST*)calloc(1, sizeof(INTLIST));
-    MSSTYLES_GetPropertyIntList(p, il);
-    for (int i = 0; i < il->iValueCount && i < max; i++) values[i] = il->iValues[i];
-    *count = il->iValueCount;
-    free(il);
-    return 1;
-}
-
 int ut_get_string(ut_theme* t, const char* cls, int part, int state, int prop, char* buf, size_t size)
 {
     Lock l;
@@ -555,18 +542,6 @@ int ut_part_size(ut_theme* t, const char* cls, int part, int state, int which, c
     SIZE s = {};
     if (FAILED(GetThemePartSize((HTHEME)tc, dc.h, part, state, bounds ? &r : nullptr, (THEMESIZE)which, &s))) return 0;
     *cx = s.cx; *cy = s.cy;
-    return 1;
-}
-
-int ut_content_rect(ut_theme* t, const char* cls, int part, int state, const ut_rect* bounds, ut_rect* content)
-{
-    Lock l;
-    PTHEME_CLASS tc = t && cls ? class_of(t, cls) : nullptr;
-    if (!tc || !bounds) return 0;
-    MemDC dc;
-    RECT r = rect_of(bounds), o;
-    if (FAILED(GetThemeBackgroundContentRect((HTHEME)tc, dc.h, part, state, &r, &o))) return 0;
-    content->left = o.left; content->top = o.top; content->right = o.right; content->bottom = o.bottom;
     return 1;
 }
 
@@ -841,18 +816,6 @@ int ut_draw_frame_control(uint32_t* pixels, int width, int height, int stride, c
     BOOL ok = DrawFrameControl(dc.hdc(), &r, type, state);
     if (ok && (type == UT_DFC_CAPTION || type == UT_DFC_BUTTON || type == UT_DFC_SCROLL)) opaque_rect(pixels, width, height, stride, rect_of(rect));
     return ok ? 1 : 0;
-}
-
-int ut_gradient_fill_h(uint32_t* pixels, int width, int height, int stride, const ut_rect* rect, uint32_t c0, uint32_t c1)
-{
-    Lock l;
-    if (!buffer_ok(pixels, width, height, stride) || !rect) return 0;
-    TargetDC dc(pixels, width, height, stride);
-    RECT r = rect_of(rect);
-    if (r.right <= r.left || r.bottom <= r.top) return 1;
-    gradient_h(dc.hdc(), r, RGB(c0 >> 16 & 255, c0 >> 8 & 255, c0 & 255), RGB(c1 >> 16 & 255, c1 >> 8 & 255, c1 & 255));
-    opaque_rect(pixels, width, height, stride, r);
-    return 1;
 }
 
 int ut_draw_caption(uint32_t* pixels, int width, int height, int stride, const ut_rect* rect, unsigned flags, const char* title,
