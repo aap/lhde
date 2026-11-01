@@ -177,7 +177,7 @@ static void make_xwindow(NativeWindow* w)
     Visual* visual = CopyFromParent;
     int depth = CopyFromParent;
     if (w->argb) {
-        // as examples/glassdemo.c: own colormap, border and background pixel 0
+        // as examples/extendframe.c: own colormap, border and background pixel 0
         // (transparent until the first present; None would show garbage)
         if (!w->cmap) w->cmap = XCreateColormap(dpy, root, argb_visual.visual, AllocNone);
         attr.colormap = w->cmap;

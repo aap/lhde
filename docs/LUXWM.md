@@ -47,10 +47,14 @@ theme") and `quit` (clean exit, "EWMH and the shell").
 `shell CMD`, `start`, `none`. Without the file the defaults: `Mod4+Return` urxvt, `Mod4+t` xterm, `Mod4+e` flxp (rox when flxp is not on
 PATH), `Mod4+r shell run`, `Mod4+d showdesktop`, `Mod4+s shell sidebar-stacking toggle`, `Mod4+q` and `Mod1+F4` close, `Mod1+space
 sysmenu`, `Mod1+Tab`/`Mod4+Tab` and their `Shift+` forms `cycle`, `Mod4+Up` maximize, `Mod4+Down` minimize, `Mod4+1..4` `workspace
-0..3`, `Print shell screenshot`, `Mod1+Print shell screenshot_window`, `Shift+Print shell screenshot_region`, `Super_L`/`Super_R
-start`. A user file keeps its own bindings; `Mod4+d`, `Mod4+r`, `Mod4+s`, `Mod1+space`, the two `Shift+Tab` bindings and the three
-`Print` bindings are added where that key is unbound there, and `Super_L`/`Super_R start` when the file binds neither Super key (`Super_L
-none` disables it). `shell CMD` sets the root property `_LHSHELL_COMMAND` = CMD (UTF8_STRING); luxshell's runtime.lua accepts `run`
+0..3`, `Mod4+Shift+s shell screenshot_region` (Windows 10's snip key), `Mod4+Shift+f shell screenshot` (the full screen),
+`Mod4+Shift+w shell screenshot_window` (the active window), `Super_L`/`Super_R start`. The screenshot keys are Super+Shift ones because
+XP binds no Super+Shift key and luxwm none besides Super+Shift+Tab; Print is no default, since a global grab of it takes it from a
+user who has it as the compose key; `Print shell screenshot` (and `Mod1+Print`, `Shift+Print` for the others) in the keys file
+binds it. A user file keeps its own bindings; `Mod4+d`, `Mod4+r`, `Mod4+s`, `Mod1+space`, the two `Shift+Tab` bindings and the
+three `Mod4+Shift` screenshot bindings are added where that key is unbound there (never `Print`), and `Super_L`/`Super_R start`
+when the file binds neither Super key (`Super_L none` disables it). `shell CMD` sets the root property `_LHSHELL_COMMAND` = CMD
+(UTF8_STRING); luxshell's runtime.lua accepts `run`
 (lux's Run box), `sidebar-stacking toggle|top|bottom`, `taskbar KIND`, `sidebar-with-classic 0|1`, `settings`, `desktop N|next|prev`
 (N 0-based, through `_NET_CURRENT_DESKTOP`), `reload`, and runs any other word as the session command of that name (settings.ini
 `[commands]`, docs/SETTINGS.md): `screenshot`, `screenshot_window`, `screenshot_region` start luxshot. Every `exec` child does

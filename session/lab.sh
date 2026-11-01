@@ -8,7 +8,7 @@
 #   theme's frames_classic); LAB_WMARGS="" restarts luxwm without -d (debug log); LAB_BACKEND=glx for picom's glx backend.
 #   session/lab.sh start [xephyr]   start Xvfb (or a visible Xephyr window on $DISPLAY) on $LAB with luxwm, picom, wallpaper
 #   session/lab.sh shell [on|off]   start (restart) / stop luxshell on $LAB (LAB_SHELL_DESKTOP=0: without its desktop layer)
-#   session/lab.sh demo             open two terminals ($LAB_TERM, default xterm) and the glassdemo window on $LAB
+#   session/lab.sh demo             open two terminals ($LAB_TERM, default xterm) and the extendframe window on $LAB
 #   session/lab.sh shot [file.png]  screenshot $LAB
 #   session/lab.sh theme NAME       switch the session theme (root _LH_THEME): luxwm, luxshell and clients follow live
 #   session/lab.sh restart-wm | restart-picom
@@ -55,7 +55,7 @@ shell)
 demo)
   export DISPLAY=$LAB; t=${LAB_TERM:-xterm}
   ($t -geometry 70x18+40+60 -title Terminal >/dev/null 2>&1 &); ($t -geometry 60x14+120+330 -title "Another window" >/dev/null 2>&1 &)
-  ("$(lhde_bin glassdemo)" >/dev/null 2>&1 &); sleep 2; w=$(xdotool search --class glassdemo | head -1); [ -n "$w" ] && xdotool windowmove "$w" 560 120 ;;
+  ("$(lhde_bin extendframe)" >/dev/null 2>&1 &); sleep 2; w=$(xdotool search --class extendframe | head -1); [ -n "$w" ] && xdotool windowmove "$w" 560 120 ;;
 shot) DISPLAY=$LAB import -window root "${2:-$LOG/shot.png}" && echo "${2:-$LOG/shot.png}" ;;
 restart-wm) killlab fvwm2; killlab luxwm; sleep 0.5
   # an explicit LAB_THEME becomes the session theme (otherwise the running session's _LH_THEME stays)
@@ -65,7 +65,7 @@ theme) n=$(themename "$2"); [ -n "$n" ] || { echo "no such theme; have: $(lhde_t
   DISPLAY=$LAB xprop -root -f _LH_THEME 8u -set _LH_THEME "$n" && echo "theme $n on $LAB" ;;
 restart-picom) if [ "${LAB_PICOM:-1}" = 0 ]; then startpicom; else killlab picom; sleep 0.5; startpicom; echo "picom restarted on $LAB"; fi ;;
 stop)
-  for n in picom fvwm2 glassdemo navdemo extendframe xterm luxshell luxwm flxp-desktop flxp-taskbar flxp-startmenu flxp flxp-settings flxp-filedialog \
+  for n in picom fvwm2 navdemo extendframe aurorademo xterm luxshell luxwm flxp-desktop flxp-taskbar flxp-startmenu flxp flxp-settings flxp-filedialog \
            luxshot skeleton; do killlab $n; done
   for p in $(pgrep -x Xvfb) $(pgrep -x Xephyr); do tr '\0' '\n' </proc/$p/cmdline | grep -qx -- "$LAB" && kill -9 $p; done; echo "lab stopped" ;;
 *) echo "usage: $0 start [xephyr] | ensure | shell [on|off] | demo | shot [file] | theme NAME | restart-wm | restart-picom | stop" ;;

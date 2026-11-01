@@ -16,14 +16,13 @@ under my chaotic supervision. Code review and feedback from GPT Astra.
 
 Free themes (ReactOS's styles and Windows Classic, nothing imported from Windows):
 
-![Lunar](screenshots/lhde_lunar1.png)
 ![Windows Classic](screenshots/lhde_classic1.png)
+![Lunar (ReactOS)](screenshots/lhde_lunar1.png)
 
 Some of the Windows themes, with the user's own resources imported:
 
 ![Luna](screenshots/lhde_luna1.png)
 ![Slate (Longhorn 4074)](screenshots/lhde_slate1.png)
-![Aero (Longhorn 4074)](screenshots/lhde_aero1.png)
 ![Aero](screenshots/lhde_aero2.png)
 ![Zune](screenshots/lhde_zune1.png)
 
@@ -47,7 +46,7 @@ Then a session, from a text console (`startx`, display :1) or nested in a Xephyr
     lhde-session start --nested [THEME]
     lhde-session theme NAME                  switch live; lhde-theme list shows what is complete
 
-The sidebar's Start, the Print key for a screenshot (`luxshot`), `flxp DIR` for an explorer window,
+The sidebar's Start, Super+Shift+S for a screenshot (`luxshot`), `flxp DIR` for an explorer window,
 `flxp-settings` for Display Properties.
 
 ### Installing Windows themes
