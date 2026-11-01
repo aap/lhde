@@ -37,7 +37,7 @@ function tile:claim()
     lh.on("tray-owner", self.on_owner)
   end
 end
--- the minimized sidebar's taskbar view (TBContentHost, SHELL-DESIGN 6.4): one row of 16 px icons, 20 px apart, centred in
+-- the minimized sidebar's taskbar view (TBContentHost, SHELL-DESIGN 7.3): one row of 16 px icons, 20 px apart, centred in
 -- the 30 px bar; the tray moves its icon windows into the taskbar surface (tray_start on a node of another surface)
 function tile:taskbar(host)
   local pitch = 20

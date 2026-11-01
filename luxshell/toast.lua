@@ -14,7 +14,7 @@
 -- Window: override-redirect ARGB with _NET_WM_WINDOW_TYPE_NOTIFICATION (picom rules match it), never takes focus.
 return function(ctx)
   local R, T, sb, tb = ctx.R, ctx.T, ctx.sb, ctx.tb
-  -- read from the pack per toast (T is swapped in place on a theme switch, SHELL-DESIGN 6.1)
+  -- read from the pack per toast (T is swapped in place on a theme switch, SHELL-DESIGN 14)
   local glass, hfont, bfont
   local function pack_style()
     glass = T.family ~= "slate"                                       -- IsAeroRunning → ToastBackground opacity 0

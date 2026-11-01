@@ -1,4 +1,4 @@
--- Applications for the start menu (SHELL-DESIGN 6.3): freedesktop desktop entries, a small icon-theme lookup, the launch
+-- Applications for the start menu (SHELL-DESIGN 13): freedesktop desktop entries, a small icon-theme lookup, the launch
 -- counts behind the frequently-used list (XP's MFU), the default browser / mail client, the XDG user directories.
 --   local A = dofile("apps.lua")
 --   A.entries()            { id = entry }, entry = { id, name, generic, comment, exec, icon, terminal, categories = {..}, path }
@@ -99,7 +99,7 @@ end
 local function mfu_write(t)
   os.execute("mkdir -p " .. q(mfu_path:match("^(.*)/") or "."))
   local f = io.open(mfu_path .. ".tmp", "w"); if not f then return end
-  f:write("; luxshell start menu launch counts (SHELL-DESIGN 6.3): desktop id = count last-launch-epoch\n[mfu]\n")
+  f:write("; luxshell start menu launch counts (SHELL-DESIGN 13): desktop id = count last-launch-epoch\n[mfu]\n")
   local ids = {}; for id in pairs(t) do table.insert(ids, id) end; table.sort(ids)
   for _, id in ipairs(ids) do f:write(string.format("%s = %d %d\n", id, t[id].n, t[id].t)) end
   f:close(); os.rename(mfu_path .. ".tmp", mfu_path)

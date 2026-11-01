@@ -323,7 +323,7 @@ HWND child(HWND parent, const WCHAR* cls, const WCHAR* text, DWORD style, int x,
 
 } // namespace
 
-// ---- session commands (SHELL-DESIGN 6.2) ------------------------------------------------
+// ---- session commands (SHELL-DESIGN 14) ------------------------------------------------
 
 void log_off()
 {

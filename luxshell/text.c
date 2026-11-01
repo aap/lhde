@@ -1,5 +1,5 @@
 /* luxshell text: libuxtheme's GDI-faithful text (flxp's renderer, the same glyphs luxnav and flxp draw) for every N_TEXT node.
-   SHELL-DESIGN 4.2 "Text"; the approach is lhnav's (NAVBAR.md "Text and pixels without pango and cairo"):
+   SHELL-DESIGN 15; the approach is lhnav's (NAVBAR.md "Text and pixels without pango and cairo"):
    - a node's font is its pango-style description ("Segoe UI 9", "Segoe UI,Tahoma Bold 14px", "ITC Franklin Gothic Std Medium
      15px"): the first family that exists (the theme's font directories first, as libuxtheme looks them up, then the system), the
      weight and slant words, the size in points at 96 dpi or in px; it becomes a ut_font (lfHeight = -px rounded, as GDI does);

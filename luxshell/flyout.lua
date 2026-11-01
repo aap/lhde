@@ -39,7 +39,7 @@ return function(ctx)
     content = body:add(lh.node{ layout = "fill" })
     fl.surface:root(root)
   end
-  -- the chrome follows the pack: built at load and again after a theme switch (event "pack", SHELL-DESIGN 6.1); the old tree is
+  -- the chrome follows the pack: built at load and again after a theme switch (event "pack", SHELL-DESIGN 14); the old tree is
   -- left to the garbage of the switch (it is never shown again)
   local function chrome()
     if T.flyout then return plex_chrome(T.flyout) end

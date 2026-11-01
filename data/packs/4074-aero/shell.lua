@@ -1,5 +1,5 @@
 -- Aero_*Resources pack (imageres ids 1167-1201), SHELL-DESIGN 2.2.2 / 2.3.2
--- Selected by the session theme: a theme's `[Shell] pack = 4074-aero`, SHELL-DESIGN 6.1;
+-- Selected by the session theme: a theme's `[Shell] pack = 4074-aero`, SHELL-DESIGN 5;
 -- swapped live on a _LH_THEME change (runtime.lua rebuild_shell), so keep everything the pack decides in this table.
 return {
   name = "4074-aero", font = "Segoe UI 9",
@@ -25,7 +25,7 @@ return {
   -- 4074 Administrator SidebarTiles: Search, Notification History, Quick Launch, Classic Tray (+ the transient Power, the pinned
   -- Clock): lh4074-193747.png top to bottom (no Search tile in luxshell yet)
   tiles = { "notifyhistory", "quicklaunch", "notifications", "power", "clock" },
-  pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 6.4)
+  pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 7.3)
   taskbar_tiles = { "notifyhistory", "quicklaunch", "notifications", "clock" },   -- minimized: 4074 TaskbarTiles (all five)
   -- popup menus: the 4074 Jade [sysmetrics] FLATMENUS colours (MENU, MENUTEXT, MENUHILIGHT, MENUBAR, GRAYTEXT)
   menu = { bg = "#f4f4f4", text = "#00025c", hot = "#c5e7f6", hot_text = "#000000", border = "#929497", gray = "#b0b1b3" },

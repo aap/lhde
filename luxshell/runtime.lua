@@ -32,7 +32,7 @@ local function img(id) return "4074/imageres/" .. id .. ".png" end
 local function N(t) return lh.node(t) end
 local screen_w, screen_h, screen_no = lh.screen()
 
------------------------------------------------------------------- theme (SHELL-DESIGN 6.1): session theme name → resolved theme → pack
+------------------------------------------------------------------ theme (SHELL-DESIGN 14): session theme name → resolved theme → pack
 -- The session theme is the root property _LH_THEME, a theme name liblhde resolves (docs/THEME-FORMAT.md); its Shell.pack
 -- names the pack. At startup: _LH_THEME if someone (luxwm, a script) set it, else settings.ini [theme] name, which is then
 -- published; LHSHELL_THEME (a pack directory) only when neither names a theme. A change of _LH_THEME
@@ -122,7 +122,7 @@ local function apply_fonts(e)
   return changed
 end
 apply_fonts(theme_entry)
------------------------------------------------------------------- shell settings (SHELL-DESIGN 6.4; settings.ini, SETTINGS.md; defaults written on first run)
+------------------------------------------------------------------ shell settings (SHELL-DESIGN 14; settings.ini, SETTINGS.md; defaults written on first run)
 --   [taskbar] kind = avalon|classic|none (classic = flxp-taskbar, started from [commands] taskbar; LHSHELL_TASKBAR overrides it
 --   for one run), autohide = 0|1, rows = 1..3 (Taskbar\RowCount, 2.4.2; the top-edge drag), classic_start_menu = flxp|flxp-classic
 --   (the menu the classic bar's Start button opens)
@@ -163,7 +163,7 @@ local function taskbar_kind(v)
   if v == "classic" or v == "none" or v == "avalon" then return v end
   return nil
 end
--- taskbar kind, start menu and the compositor switch are per theme (SETTINGS.md "Per-theme settings" / "Per-theme overrides"):
+-- taskbar kind, start menu and the compositor switch are theme keys (THEME-FORMAT.md):
 -- S.theme_value(theme_entry, ...) = the resolved record's key (the current layer, the theme file, its base chain, the default); they
 -- are applied at startup, on every theme change and on _LH_SETTINGS_CHANGED. LHSHELL_TASKBAR / LHSHELL_COMPOSITION (on|off|follow;
 -- lhde-session sets it from LHDE_PICOM=0/1) force one for this run.
@@ -230,7 +230,7 @@ local black_on = false  -- maximised mode (set_maximized below); new black layer
 -- (nodes are reference counted (scene.h): a replaced pack's tree is freed by the GC once nothing (an animation, a timer, a
 -- tile) holds a node of it, and a node someone holds stays valid)
 
------------------------------------------------------------------- desktop layer (SHELL-DESIGN "M5a design")
+------------------------------------------------------------------ desktop layer (SHELL-DESIGN 11)
 -- full screen, _NET_WM_WINDOW_TYPE_DESKTOP, sticky + below, no struts, at the bottom of the stack. Unmapped normally (the
 -- wallpaper is the root background); with [shell] desktop_black = 1 it is mapped black at once in maximised mode (no fade)
 -- and unmapped at once on restore; the default (0) leaves it unmapped. Future home of the Aurora.
@@ -765,7 +765,7 @@ end
 lh.on("tile-visibility", function() after_tiles(); if mode == "pinned" and lh.place_sidebar then lh.place_sidebar() end end)
 build_tiles(); after_tiles()
 
------------------------------------------------------------------- live theme switch (SHELL-DESIGN 6.1)
+------------------------------------------------------------------ live theme switch (SHELL-DESIGN 14)
 -- New node trees for the taskbar and the sidebar on the same windows (the tray icons stay docked in the sidebar window and
 -- move to the new tray node), surfaces resized when the pack's bar sizes differ (the struts follow, luxwm refits), tiles
 -- disposed and created again, flyout chrome rebuilt (event "pack"). A toast on screen keeps its look until it closes.
@@ -782,7 +782,7 @@ local function rebuild_shell()
   if lh.update_start_button then lh.update_start_button() end   -- the new Start button: pressed if a menu is open
   lh._emit("pack")
 end
------------------------------------------------------------------- bar placement, taskbar autohide, sidebar modes (SHELL-DESIGN 6.4)
+------------------------------------------------------------------ bar placement, taskbar autohide, sidebar modes (SHELL-DESIGN 6.4, 7.3)
 -- Taskbar autohide (Avalon, 2.4.2): the window keeps its size and is shifted so 2 + (h-2)*pct/100 px stay on screen; "focus
 -- within" (pointer over the bar, the start menu, a menu or flyout of ours) moves pct by 20 every 20 ms (100 ms, linear); the
 -- strut is the 2 px sliver while autohide is on, so the work area grows; switching autohide on jumps straight to 0/100.
@@ -847,7 +847,7 @@ local function autohide_check() if cfg.autohide then slide_to(focus_within() and
 lh.timer(function() if cfg.autohide and tb_on() and tb.pct > 0 then autohide_check() end end, 100, true)   -- shown: poll focus-within
 tb.surface.on_enter = function() if cfg.autohide and tb_on() then autohide_check() end end            -- hidden: the sliver re-shows it
 -- The Start button shows StartButton.FakePressed (1181, the "checked" state) while the provider's start menu is open
--- (CLIENT-PROTOCOL "Requests to the wux side"): the provider sets root _LH_STARTMENU_OPEN = 1 while its
+-- (CLIENT-PROTOCOL "Start menu state"): the provider sets root _LH_STARTMENU_OPEN = 1 while its
 -- menu is mapped (0 or deleted when closed). A provider that does not set it (the property never changed since the forward):
 -- pressed from the forward (Start button or Super) until the first toplevel mapped within 1.5 s of it (its popup) unmaps, or
 -- until the next forward (a click on the button while it shows pressed closes the provider's menu), or 1.5 s without a map.
@@ -1462,7 +1462,7 @@ function lh.tray_yield(ms)
   lh.timer(tray_check, ms + 50)
 end
 
--- Start-menu provider (SHELL-DESIGN "Start menu ownership, revised"): the provider owns _LH_STARTMENU_S<screen>; we forward the
+-- Start-menu provider (SHELL-DESIGN 13): the provider owns _LH_STARTMENU_S<screen>; we forward the
 -- Start button and Super to it (above). We own _LHSHELL_S<screen> while running, so a provider knows luxshell forwards luxwm's
 -- root Super message and must not answer that broadcast itself.
 lh.startmenu_selection = "_LH_STARTMENU_S" .. (screen_no or 0)
@@ -1527,9 +1527,8 @@ end
 
 -- a theme switch (SETTINGS.md order: write settings.ini, set _LH_THEME, send _LH_SETTINGS_CHANGED; the message goes out from
 -- S.set's 0 ms timer, after this). e = S.resolve(name): a theme file or a bare style. _LH_THEME_RESOLVED is written before
--- _LH_THEME, so a client reacting to _LH_THEME already finds the resolved view current. _LH_THEME gets the selected name itself,
--- a preset's too (SETTINGS.md "Preset names on _LH_THEME": luxwm and flxp resolve presets; only an alias is replaced by its
--- theme's name). root_set: the value somebody else just wrote to _LH_THEME (not written again: no bounce)
+-- _LH_THEME, so a client reacting to _LH_THEME already finds the resolved view current. _LH_THEME gets the selected name itself
+-- (SETTINGS.md "The session theme on the root": every reader resolves it; only an alias is replaced by its theme's name). root_set: the value somebody else just wrote to _LH_THEME (not written again: no bounce)
 local function apply_theme(e, root_set)
   local t0 = lh.now()
   theme_name, theme_entry = e.name, e
@@ -1623,7 +1622,7 @@ end)
 -- shell.lua is read again even when the directory is the same, the theme's fonts are
 -- applied again, changed PNGs leave the image cache (lh.image_flush: mtime/size), and the bars, tiles (tiles/*.lua are read
 -- again by build_tiles), flyout chrome, start menu and menus are rebuilt in place (rebuild_shell: same windows, no restart).
--- Wallpaper (wallpapers.ini), composition and taskbar kind follow the theme's entry as on a switch. A pack that fails to load
+-- Wallpaper (Desktop.wallpaper), composition and taskbar kind follow the theme's entry as on a switch. A pack that fails to load
 -- keeps the running one (the error goes to the log). Several requests within 150 ms are one reload.
 local reload_pending
 local function reload_pack_now(why)

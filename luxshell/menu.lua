@@ -1,4 +1,4 @@
--- Popup menus (SHELL-DESIGN 6.3/6.4): the context menus of the sidebar, its tiles, the Avalon taskbar and its Start button,
+-- Popup menus (SHELL-DESIGN 16): the context menus of the sidebar, its tiles, the Avalon taskbar and its Start button,
 -- drawn by wuxtheme's popup menu painter (lh.menu_render, menupaint.c: ut_menu_layout / ut_menu_draw, the pixels of flxp's
 -- user32 menus and luxwm's window menu) in the session theme's visual style: its Menu class where it has one (the Aero / Jade
 -- POPUPITEM band, separators, check marks, cascade arrows), [SysMetrics] colours, FLATMENUS and MENUFONT; Windows Classic from

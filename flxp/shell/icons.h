@@ -43,7 +43,7 @@ bool load_icon_theme(const std::string& name_or_path);   // selects the theme; f
 // warning on stderr; missing toolbar strips are dropped. False on fallback.
 bool select_icon_theme(const std::string& name);
 const IconTheme& icon_theme();
-// The icons setting again (it is per theme: docs/SETTINGS.md "Per-theme settings"):
+// The icons setting again (a theme key, Desktop.icons: docs/THEME-FORMAT.md):
 // selects that theme when it names another one. True if it did.
 bool refresh_icon_theme();
 int icon_theme_generation();                             // + 1 on every selection

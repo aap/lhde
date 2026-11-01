@@ -14,7 +14,7 @@ awk '/^\[Sidebar\./{sec=$0; gsub(/[\[\]]/,"",sec); gsub(/Sidebar\./,"",sec); gsu
 i=0; awk '/^\[Sidebar\./{sec=$0; gsub(/[\[\]]/,"",sec); gsub(/Sidebar\./,"",sec); gsub(/[()]/,"_",sec); sub(/_$/,"",sec)} /PNGSTREAM = STREAM#/{id=$3; sub(/STREAM#/,"",id); if(sec!="") print sec, id}' $R/4074/slate_longhorn.ini | while read part id; do bid=$((id - 394 + 364)); [ -f "$R/4051/slate.msstyles/BLOB_${bid}_1033.png" ] && cp "$R/4051/slate.msstyles/BLOB_${bid}_1033.png" "$A/sidebar-slate51/$part.png"; done
 cp "$WS"/resources/wallpapers/mock/*.jpg "$A/wallpaper/"
 echo "imageres: $(ls $A/imageres | wc -l)  jade74 sidebar parts: $(ls $A/sidebar-jade74 | wc -l)  slate51 sidebar parts: $(ls $A/sidebar-slate51 | wc -l)"
-# M6 start menu (SHELL-DESIGN 6.3): the StartPanel class (+ StartMenu::Toolbar / MenuBand for the All Programs cascade) of the
+# The start panel art (SHELL-DESIGN 13): the StartPanel class (+ StartMenu::Toolbar / MenuBand for the All Programs cascade) of the
 # 4074 Jade and Slate msstyles → assets/startpanel-<theme>/: one PNG per part/state (the 32-bit BMPs are premultiplied,
 # un-premultiplied here), and startpanel.ini = the decompiled sections with the FONT blobs decoded as "face, lfHeight, weight, italic".
 # Plus the Longhorn shell32 icons the places column uses, at 24 and 32 px → assets/shell32/<size>/<id>.png.

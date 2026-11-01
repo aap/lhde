@@ -317,7 +317,7 @@ Atom tray_selection;
 bool tray_wanted, tray_takeover;   // tray_start was called: claim the selection whenever it is free
 bool tray_waiting_logged;
 Atom luxshell_selection;         // _LHSHELL_S<screen>: luxshell runs (it forwards _LHSHELL_START, it may own the tray)
-// The start-menu provider (docs/SHELL-DESIGN.md "Start menu ownership, revised"): we own _LH_STARTMENU_S<screen>
+// The start-menu provider (docs/SHELL-DESIGN.md 13): we own _LH_STARTMENU_S<screen>
 // with this window while our menu is the display's start menu; luxshell sends _LHSHELL_START to it.
 ::Window menu_owner;
 Atom menu_selection;

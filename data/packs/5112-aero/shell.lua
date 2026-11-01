@@ -29,7 +29,7 @@ return {
   sidebar = { width = 150, bg_grid = {0, 0, 0, 36}, sizer = { w = 2, image = nil } },
   tile_bg = nil,                                          -- Aero tiles are transparent over the glass
   tiles = { "notifications", "power", "clock" },     -- tray tile, power tile (lh4074-181415.png order: tray/QL above power), pinned clock
-  pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 6.4)
+  pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 7.3)
   -- popup menus: the 4074 Jade [sysmetrics] FLATMENUS colours (MENU, MENUTEXT, MENUHILIGHT, MENUBAR, GRAYTEXT)
   menu = { bg = "#f4f4f4", text = "#00025c", hot = "#c5e7f6", hot_text = "#000000", border = "#929497", gray = "#b0b1b3" },
 }

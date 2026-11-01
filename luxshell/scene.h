@@ -1,4 +1,4 @@
-/* luxshell scene graph: the handful of node kinds the Longhorn XAML reduces to (SHELL-DESIGN.md 4.2) */
+/* luxshell scene graph: the handful of node kinds the Longhorn XAML reduces to (SHELL-DESIGN.md 4.1) */
 #ifndef LHSHELL_SCENE_H
 #define LHSHELL_SCENE_H
 #include <cairo/cairo.h>

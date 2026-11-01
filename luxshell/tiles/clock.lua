@@ -421,7 +421,7 @@ function tile:properties()
   end
   lh.open_flyout(owner)
 end
--- the minimized sidebar's taskbar view (TBContentHost, SHELL-DESIGN 6.4): the digital time, white with the ShadowText 1,1
+-- the minimized sidebar's taskbar view (TBContentHost, SHELL-DESIGN 7.3): the digital time, white with the ShadowText 1,1
 function tile:taskbar(host)
   local ts = lh.taskbar_text_style and lh.taskbar_text_style() or { color = "#ffffff" }   -- pack key taskbar_text (runtime.lua)
   self.tbtext = host:add(N{ kind = "text", text = "", color = ts.color, glow = ts.glow, glow_size = ts.glow_size, glow_strength = ts.glow_strength,

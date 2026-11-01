@@ -1,5 +1,5 @@
 -- Slate_*Resources pack: same styles, Slate imageres ids (resmap aero_to_slate), SHELL-DESIGN 2.2.2 (ids in brackets)
--- Selected by the session theme: a theme's `[Shell] pack = 4074-slate`, SHELL-DESIGN 6.1;
+-- Selected by the session theme: a theme's `[Shell] pack = 4074-slate`, SHELL-DESIGN 5;
 -- slate4051 has its own pack (packs/4051-slate: this table with the 4051 differences).
 return {
   name = "4074-slate", family = "slate", font = "Tahoma 8",   -- family slate: Slate's opaque flyouts, toasts and borders
@@ -24,7 +24,7 @@ return {
   -- 4074 Administrator SidebarTiles: Search, Notification History, Quick Launch, Classic Tray (+ the transient Power, the pinned
   -- Clock): lh4074-193747.png top to bottom (no Search tile in luxshell yet)
   tiles = { "notifyhistory", "quicklaunch", "notifications", "power", "clock" },
-  pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 6.4)
+  pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 7.3)
   taskbar_tiles = { "notifyhistory", "quicklaunch", "notifications", "clock" },   -- minimized: 4074 TaskbarTiles (all five)
   -- popup menus: the 4074 Slate [sysmetrics] FLATMENUS colours (MENU, MENUTEXT, MENUHILIGHT, GRAYTEXT)
   menu = { bg = "#ffffff", text = "#373738", hot = "#edb078", hot_text = "#000000", border = "#969696", gray = "#969696" },

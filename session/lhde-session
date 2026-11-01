@@ -1,7 +1,7 @@
 #!/bin/sh
 # lhde-session: the Longhorn desktop session.
 # luxwm in a restart loop, picom when the theme wants a compositor, luxshell (Avalon bars, sidebar), flxp-desktop (wallpaper and
-# icons), a terminal. The theme is the root property _LH_THEME (SHELL-DESIGN.md 6.1): luxwm publishes the
+# icons), a terminal. The theme is the root property _LH_THEME (SHELL-DESIGN.md 14): luxwm publishes the
 # session's when it starts first, after that the root wins and luxwm, luxshell and the clients follow it live.
 #
 #   lhde-session start [--nested | --attach] [THEME]

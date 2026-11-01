@@ -106,7 +106,7 @@ static char theme_req[2200], theme_cur[2200], theme_written[2200];   /* requeste
 static bool compositor = false;
 static int xfixes_ev = -1;
 static Atom cm_atom, lhwm_theme_atom, lhwm_maxmode_atom, lhwm_max_atom;
-/* the session theme (SHELL-DESIGN 6.1) is the root _LH_THEME, a theme name that liblhde resolves (docs/THEME-FORMAT.md:
+/* the session theme (SHELL-DESIGN 14) is the root _LH_THEME, a theme name that liblhde resolves (docs/THEME-FORMAT.md:
    theme files, bare styles, aliases); luxwm maps the record to frames / frames_classic / composition. _LHWM_THEME is the derived
    frame directory. */
 static char theme_req_classic[1024];   /* the resolved frames_classic directory ("style" = the style's own decorations) */
@@ -456,7 +456,7 @@ close_wm(void)
 {
     LOGN("Shutting down window manager");
 
-    /* clean exit (luxwmc quit, SHELL-DESIGN 6.2): clients stay where they are and mapped; windows parked off screen on other
+    /* clean exit (luxwmc quit, SHELL-DESIGN 14): clients stay where they are and mapped; windows parked off screen on other
        workspaces come back; minimised ones stay unmapped with WM_STATE Iconic, so the next luxwm adopts them minimised again
        (berry set every client Withdrawn here, which made a restarted WM lose the minimised ones). Frames go away. */
     for (int i = 0; i < WORKSPACE_NUMBER; i++)
@@ -938,7 +938,7 @@ get_client_from_window(Window w)
 
 /* _NET_RESTACK_WINDOW (EWMH; LUXWM.md "Restack requests"): data.l[0] source indication, l[1] sibling, l[2] detail (Above 0, Below 1,
    TopIf 2, BottomIf 3, Opposite 4). The client and its frame are restacked together (c_list order, client_raise), the focus is not
-   touched: a drag source (flxp's XDND drag, CLIENT-PROTOCOL.md "Requests to the wux side") raises the window under the pointer while
+   touched: a drag source (flxp's XDND drag, CLIENT-PROTOCOL.md "Raising a window during a drag") raises the window under the pointer while
    it holds an active pointer grab, and the window being dragged from keeps the focus. Above with no sibling = raise to the top,
    Below with no sibling = lower to the bottom of the managed windows; with a managed sibling on the same desktop: directly above /
    below it. TopIf/BottomIf are taken as Above/Below (no occlusion test), Opposite as Above unless it is the top window already.
@@ -4180,7 +4180,7 @@ handle_destroy_notify(XEvent *e)
     dock_forget(e->xdestroywindow.window);
 }
 
-/* ---- maximised mode, compositor detection, runtime theme switching (SHELL-DESIGN.md "M5a design") ---- */
+/* ---- maximised mode, compositor detection, runtime theme switching (SHELL-DESIGN.md 11) ---- */
 
 /* _LHWM_MAXIMIZED_MODE (root, CARDINAL per desktop, like _NET_WORKAREA): 1 while the desktop's active window is maximised or
    fullscreen, or, with no active window there, any window on it that is not minimised is. On the current desktop the active
@@ -4614,7 +4614,7 @@ static void keys_setup(void) {
     FILE *f = fopen(path, "r");
     if (f) { char line[300]; while (fgets(line, sizeof line, f)) { line[strcspn(line, "\n")] = 0; if (line[0] && line[0] != '#') keys_add(line); } fclose(f); }
     else for (int i = 0; default_keys[i]; i++) keys_add(default_keys[i]);
-    /* "start" (Super pressed and released alone → _LHSHELL_START to the shell, SHELL-DESIGN 6.3): added to a user's keys file
+    /* "start" (Super pressed and released alone → _LHSHELL_START to the shell, SHELL-DESIGN 13): added to a user's keys file
        that binds none, so the start menu key works there too; "Super_L none" in the file turns it off */
     bool has_start = false; for (int i = 0; i < nkeys; i++) if (keys[i].sym == XK_Super_L || keys[i].sym == XK_Super_R) has_start = true;
     if (!has_start) { keys_add("Super_L start"); keys_add("Super_R start"); }

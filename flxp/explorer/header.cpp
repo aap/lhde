@@ -160,8 +160,8 @@ HBITMAP g_mag_icon;                  // shell32's Search icon (32x32), premultip
 bool g_mag_looked;
 const int MAG_W = 30, MAG_H = 32, MAG_CX = 19, MAG_CY = 12;   // the lens centre in the cell
 
-// The vision mode: the header's contents through lhnav (docs/NAVBAR.md "Porting
-// lhnav into flxp"), when the frame theme has a
+// The vision mode: the header's contents through lhnav (docs/NAVBAR.md "flxp's
+// header"), when the frame theme has a
 // nav.ini (header_engine = auto | lhnav | flxp). Its code is below ("vision").
 struct Vision {
     bool on = false;
@@ -1956,7 +1956,7 @@ void set_nav_hot(int part)
 }
 
 // ---- vision: the header through lhnav --------------------------------------------------
-// docs/NAVBAR.md "Porting lhnav into flxp": lhnav lays out, paints and hit-tests the
+// docs/NAVBAR.md "flxp's header": lhnav lays out, paints and hit-tests the
 // travel orb, the title in lhwm's 15-row deco, the breadcrumb, the search box
 // and the right-hand items (nav.ini `tools`); flxp keeps what a click does (the
 // history and its menus, the crumbs' drop-down menus, the bookmarks, New Folder,

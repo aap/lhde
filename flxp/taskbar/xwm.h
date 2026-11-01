@@ -29,7 +29,7 @@ enum Change : uint32_t {
     ChangeStartKey = 128,           // _LHSHELL_START: lhwm's root broadcast (Super) or luxshell's to our owner window
 };
 
-// _LHSHELL_START (docs/SHELL-DESIGN.md "Start menu ownership, revised"): l[0] bit 0 = toggle, l[1..4] = the anchor
+// _LHSHELL_START (docs/SHELL-DESIGN.md 13): l[0] bit 0 = toggle, l[1..4] = the anchor
 // rectangle in root coordinates (0 x 0: none). lhwm's root broadcast (no rect) always toggles.
 struct StartRequest {
     bool toggle = false;

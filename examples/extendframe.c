@@ -16,7 +16,7 @@
         _LH_THEME itself; docs/THEME-FORMAT.md section 4; a uxtheme client loads its path.style), re-read _LHWM_COMPOSITED
         and repaint (glass or the header pixmap); the extension stays set.
 
-   -c (experimental, CLIENT-PROTOCOL.md "CLIENT_CAPTION"): the window also takes the caption rows. luxwm grows it up to the frame's
+   -c (CLIENT-PROTOCOL.md "Client content over the caption rows"): the window also takes the caption rows. luxwm grows it up to the frame's
    top border and publishes _LHWM_CAPTION_RECT (the caption buttons, client coordinates); we leave that rectangle empty and cut it
    out of our input shape, so clicks there reach luxwm's buttons on the decoration window below, and draw the title ourselves.
    The caption rows are caption_h - border_t of _LHWM_FRAME_METRICS, or max_caption_h - max_border_t while maximised

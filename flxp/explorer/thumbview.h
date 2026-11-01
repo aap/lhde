@@ -8,7 +8,7 @@
 // it (XP's CreateDefaultThumbnail), folders XP's folder thumbnail with up to
 // four pictures of their contents.
 //
-// The Longhorn hosts (set_longhorn; 4051/4074, docs/USAGE.md "Views"): the
+// The Longhorn hosts (set_longhorn; 4051/4074, docs/USAGE.md "The Explorer's views (flxp)"): the
 // images of every view at its size, on transparency, so a thumbnail is just a
 // bigger or smaller icon: a picture in a photo frame that follows its aspect
 // (a soft shadow, a 1 px grey line, a mat graded white to light grey; bare

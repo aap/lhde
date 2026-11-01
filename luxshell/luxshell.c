@@ -507,7 +507,7 @@ static int l_maxmode(lua_State *L) {
 static int l_screen(lua_State *L) { lua_pushinteger(L, scr_w); lua_pushinteger(L, scr_h); lua_pushinteger(L, screen); return 3; }   /* width, height, X screen number */
 /* lh.root_prop(name): a root property as a string (8-bit types: STRING, UTF8_STRING) or an integer (the first 32-bit item:
    CARDINAL, PIXMAP, WINDOW, ...); nil when missing. lh.set_root_prop(name, string | nil): UTF8_STRING, nil deletes it.
-   The theme setting (_LH_THEME, _LH_THEME_RESOLVED) and _LHSHELL_COMMAND go through these (SHELL-DESIGN 6.1/6.2). */
+   The theme setting (_LH_THEME, _LH_THEME_RESOLVED) and _LHSHELL_COMMAND go through these (SHELL-DESIGN 14). */
 static int l_root_prop(lua_State *L) {
     Atom a = XInternAtom(dpy, luaL_checkstring(L, 1), False), ty; int fmt; unsigned long n, after; unsigned char *d = NULL;
     if (XGetWindowProperty(dpy, root, a, 0, 4096, False, AnyPropertyType, &ty, &fmt, &n, &after, &d) != Success || !d || !n) { if (d) XFree(d); lua_pushnil(L); return 1; }
@@ -631,7 +631,7 @@ static int l_fonts(lua_State *L) {
 }
 static int l_now(lua_State *L) { lua_pushinteger(L, now_ms()); return 1; }
 
-/* ---- the classic taskbar next to luxshell (SHELL-DESIGN "M8 luxshell side") ---- */
+/* ---- the classic taskbar next to luxshell (SHELL-DESIGN 12) ---- */
 /* lh.selection_owner(name): the owner window of a selection (e.g. _NET_SYSTEM_TRAY_S0, _LH_STARTMENU_S0) or nil */
 static int l_selection_owner(lua_State *L) { Window w = XGetSelectionOwner(dpy, XInternAtom(dpy, luaL_checkstring(L, 1), False)); if (w == None) lua_pushnil(L); else lua_pushinteger(L, (lua_Integer)w); return 1; }
 /* lh.watch_selection(name): XFixes owner-change notification for a selection (event "selection"(name, owner or 0));
@@ -787,7 +787,7 @@ static void handle_event(XEvent *e) {
             else if (p->atom == atom[A_LH_THEME] && p->state == PropertyNewValue) emit("lh-theme", 0);          /* the session theme (6.1) */
             else if (p->atom == atom[A_LHSHELL_COMMAND] && p->state == PropertyNewValue) emit("command", 0);   /* a session command (6.2) */
             else if (p->atom == atom[A_NET_WORKAREA]) emit("workarea", 0);                                       /* struts changed (the sidebar yields to a foreign bottom dock) */
-            else if (p->atom == atom[A_LH_STARTMENU_OPEN]) emit("startmenu-open", 0);                           /* the provider's menu state (CLIENT-PROTOCOL "Requests to the wux side") */
+            else if (p->atom == atom[A_LH_STARTMENU_OPEN]) emit("startmenu-open", 0);                           /* the provider's menu state (CLIENT-PROTOCOL "Start menu state") */
             return; }
         struct client *c = client_find(p->window); if (!c) return;
         if (p->atom == atom[A_NET_WM_NAME] || p->atom == XA_WM_NAME) client_update_title(c); else if (p->atom == atom[A_NET_WM_ICON] || p->atom == XA_WM_HINTS) client_update_icon(c); else if (p->atom == atom[A_NET_WM_STATE] || p->atom == atom[A_WM_STATE] || p->atom == atom[A_NET_WM_DESKTOP]) client_update_state(c); else return;

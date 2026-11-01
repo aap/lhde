@@ -1,4 +1,4 @@
--- The settings flyout ("Control Panel" in the start menu, "Properties" in the taskbar and sidebar menus; SHELL-DESIGN 6.3/6.4) and the
+-- The settings flyout ("Control Panel" in the start menu, "Properties" in the taskbar and sidebar menus; SHELL-DESIGN 14) and the
 -- run / search box, both in the generic flyout chrome (flyout.lua: 1175 frame, Options row, white body like powerflyout.xaml).
 --   lh.settings_flyout([x])  two columns: the theme list (the shipped theme files, then the user's; the selected one with unsaved
 --                            changes, the current layer, reads "NAME (Modified)" as in Windows; Save as...), composition

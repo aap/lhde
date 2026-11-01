@@ -1,4 +1,4 @@
-/* luxshell tray: freedesktop System Tray (XEmbed) manager hosted in a sidebar tile (SHELL-DESIGN "M4b: notification area, toasts, power tile").
+/* luxshell tray: freedesktop System Tray (XEmbed) manager hosted in a sidebar tile (SHELL-DESIGN 10).
    Owns _NET_SYSTEM_TRAY_S<screen>, announces MANAGER on the root, docks icon windows on REQUEST_DOCK by reparenting them
    into the surface that holds the N_TRAY node, and lays them out in rows (icon_size, pitch_x, pitch_y of the node).
    Alpha: we advertise our 32-bit visual (_NET_SYSTEM_TRAY_VISUAL). An ARGB child of an ARGB window would simply replace
