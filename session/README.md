@@ -3,7 +3,7 @@
 - `lhde-session`: the desktop session: `start [--nested|--attach] [THEME]`,
   `theme NAME`, `taskbar avalon|classic|classic+sidebar|none`, `shell on|off`, `picom on|off`, `desktop on|off`, `stop`
   (`lhde-session --help`). Installed to `$PREFIX/bin`; the rest of this directory to `$PREFIX/lib/lhde/session` (program
-  files: docs/LAYOUT.md "The three trees"). At start it also moves an old-layout `~/.local/share/lhde` (`lhde-import --migrate`).
+  files: docs/LAYOUT.md "The three trees").
 - `lab.sh`: the headless test bench (Xvfb, or a Xephyr window): `LAB=:N session/lab.sh start | shell | theme NAME | shot | stop`.
 - `lhde-paths.sh`: sourced by the scripts: the build tree or install, program lookup; data lookups go through `lhde-theme find`
   and `lhde-theme dirs --list` (liblhde's one implementation).

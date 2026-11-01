@@ -45,9 +45,6 @@ const char *lhde_tree_name(int kind);
 const char *lhde_data_user(void);
 /* the Windows tree itself: $LHDE_WINDOWS (default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows), or $LHDE_DATA */
 const char *lhde_windows_dir(void);
-/* an unmigrated old-layout directory (${XDG_DATA_HOME:-~/.local/share}/lhde still holding Windows files, before
-   lhde-import --migrate): never searched, only reported; NULL when there is none or $LHDE_WINDOWS / $LHDE_DATA is set */
-const char *lhde_old_dir(void);
 /* which tree PATH really lies in (symlinks resolved; enum lhde_tree_kind, -1 elsewhere); rel = the path below that tree's
    top (for the Windows tree: below $LHDE_WINDOWS, e.g. 4074/system32/imageres.dll), else the resolved path */
 int lhde_data_origin(const char *path, char *rel, size_t n);

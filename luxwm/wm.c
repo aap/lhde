@@ -4610,9 +4610,6 @@ static void keys_add(const char *line) {
     if (k->sym != NoSymbol) nkeys++;
 }
 static void keys_setup(void) {
-    /* the one-time move of ~/.config/{longhorn,luxshell,flxp,luxwm} into lhde's directories (lhde-session does it before us; a
-       luxwm started by hand does it here, so ~/.config/lhde/keys is where the file is by the time we read it) */
-    { static char rep[16384]; if (lhde_settings_migrate(0, rep, sizeof rep) > 0 && rep[0]) fputs(rep, stderr); }
     char path[MAXLEN]; lhde_config_file("keys", path, sizeof path);
     FILE *f = fopen(path, "r");
     if (f) { char line[300]; while (fgets(line, sizeof line, f)) { line[strcspn(line, "\n")] = 0; if (line[0] && line[0] != '#') keys_add(line); } fclose(f); }

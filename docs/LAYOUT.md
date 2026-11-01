@@ -28,7 +28,6 @@ $PREFIX/share/lhde/                  shipped data, our text only (DATADIR)
   frames/SET/theme.ini (+ nav.ini)     frame-set tuning; the pixels are generated, below
   packs/PACK/shell.lua                 luxshell's packs
   res/icons/                           flxp's own (Wine's) icons
-  .lhde-install                        the list of the files above (lhde-import --migrate tells them from yours)
 $PREFIX/lib/lhde/                    code that is not a binary (PKGLIBDIR)
   luxshell/                            luxshell's Lua (runtime.lua, tiles/, ...)
   session/                             lhde-session's helpers: lhde-paths.sh, lhwall.sh, lab.sh, theme-*.sh, picom configs
@@ -95,20 +94,3 @@ design: its text is shipped, its pixels are generated; `lhde_data_find_in` joins
 scheme, glass and classic frame set, taskbar, shell pack and its imageres, start menu, navbar and its art, icon recipe and its
 DLLs, wallpaper, fonts, resources) with the setting, `ok` / `off` / `missing -> fallback X` and the file with its tree;
 `lhde-theme dirs` shows the trees and their sizes (docs/USAGE.md "When something looks wrong").
-
-**Migration.** Before this layout everything was in `~/.local/share/lhde` (with `make install PREFIX=~/.local` also the
-install's own share/lhde): shipped text, luxshell's Lua, session and tools beside 435 MB of Windows files and caches, frame sets
-and packs mixing shipped `theme.ini`/`shell.lua` with generated PNGs (often twice, beside theme.ini and in `cache/`).
-`lhde-import --migrate` (`-n`: only list) moves it without reading any ISO: `resources/<b>`, `fonts/<b>`, `wallpapers/<b>` ->
-`lhde-windows/<b>/{system32,fonts,wallpapers}` (names that are no source, e.g. `demo`, `mock`: `local/`); each
-`styles/NAME.msstyles` (+ `styles/NAME/Shell`) to the place its source's `[styles]` names (`4074/themes/Jade/jade.msstyles`),
-the others to `local/themes`; the schemes to `local/schemes` (the old layout kept no HIVEDEF.INF to remake them); frame and
-pack PNGs and manifests -> `generated/` without the `cache/` level (where a PNG was there twice, the one
-beside `theme.ini`, which the programs used, is kept); shipped text stays when the directory is the install's own (it has
-`.lhde-install`), else is deleted as a stale copy, and a text file we do not ship (your own theme) goes to `~/.config/lhde`;
-`luxshell/ session/ tools/` are deleted (now in `$PREFIX/lib/lhde`); then `<b>/source.ini` (the shipped sources/ID.ini) and
-`index/`. It is idempotent (a second run finds nothing to do) and lhde-session runs it once by itself at start
-(`$XDG_RUNTIME_DIR/lhde-session:N/layout-migration.log`). An unmigrated directory is not searched: its files reach the
-programs only once moved, and `lhde-theme dirs` names it with the command to run until then.
-Switching an existing setup: `make install PREFIX=~/.local`, then `lhde-import --migrate -n`, then `lhde-import --migrate`.
-

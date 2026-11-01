@@ -50,11 +50,9 @@ check-luxwm: build/luxwm/tests/frametest
 install-luxwm: $(LUXWM_PROGRAMS)
 	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(MANDIR)/man1
 	install -m 755 $(LUXWM_PROGRAMS) $(DESTDIR)$(BINDIR)/
-	ln -sf luxwm $(DESTDIR)$(BINDIR)/lhwm
-	ln -sf luxwmc $(DESTDIR)$(BINDIR)/lhwmc
 	install -m 644 luxwm/luxwm.1 luxwm/luxwmc.1 $(DESTDIR)$(MANDIR)/man1/
 uninstall-luxwm:
-	rm -f $(addprefix $(DESTDIR)$(BINDIR)/,luxwm luxwmc lhwm lhwmc) $(addprefix $(DESTDIR)$(MANDIR)/man1/,luxwm.1 luxwmc.1)
+	rm -f $(addprefix $(DESTDIR)$(BINDIR)/,luxwm luxwmc) $(addprefix $(DESTDIR)$(MANDIR)/man1/,luxwm.1 luxwmc.1)
 
 -include $(patsubst %.o,%.d,$(filter %.o,$(LUXWM_OBJS))) $(O)/luxwm/client.d $(patsubst build/luxwm/tests/%,$(O)/luxwm/tests/%.d,$(LUXWM_TESTS))
 .PHONY: luxwm check-luxwm install-luxwm uninstall-luxwm

@@ -29,7 +29,6 @@
 --   S.set(sec, key, value)     writes it (liblhde: unknown keys, comments and order kept) and sends _LH_SETTINGS_CHANGED once the
 --                              current event is handled (several sets: one message); value nil removes it (S.unset)
 --   S.reload()                 forget the cached file (on _LH_SETTINGS_CHANGED from another writer)
---   S.migrate()                the one-time move from ~/.config/longhorn and ~/.config/lhshell (liblhde lhde_settings_migrate)
 --   S.state_get(sec, key)      / S.state_set(sec, key, value): luxshell-state.ini, runtime state only (LHSHELL_STATE overrides the path)
 --   S.command(name)            the shell command for logoff | standby | shutdown | restart | lock (settings.ini [commands] or
 --                              the defaults below); S.run(name) runs it
@@ -285,18 +284,6 @@ function S.set(sec, key, value)
   return true
 end
 function S.unset(sec, key) if not S.has(sec, key) then return false end return S.set(sec, key, nil) end
--- the one-time migration (SETTINGS.md "Migration"): ~/.config/longhorn and ~/.config/lhshell -> ~/.config/lhde and
--- ~/.local/state/lhde, by liblhde
-function S.migrate()
-  local n, rep = lh.settings_migrate()
-  if n and n > 0 then
-    io.stderr:write(rep)
-    cache = nil
-    for _, k in ipairs{ "theme", "desktop", "taskbar", "sidebar", "clock", "start", "commands" } do dirty[k] = true end
-    S.notify()
-  end
-  return n
-end
 
 ------------------------------------------------------------------ session commands (6.2)
 function S.default_command(name)

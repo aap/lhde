@@ -62,32 +62,6 @@ int lhde_settings_set(const char *sec, const char *key, const char *value);
 /* forget the cached file (another writer changed it) */
 void lhde_settings_reload(void);
 
-/* ---- the one-time migration (docs/SETTINGS.md "Migration to ~/.config/lhde") ----
-   From ${XDG_CONFIG_HOME:-~/.config}/longhorn/settings.ini, longhorn/themes/<name>.theme (the presets) and lhshell/state.ini into
-   lhde/settings.ini and lhde/themes/:
-     - settings.ini is copied with its comments; the keys that became theme keys leave it: [override:NAME] sections become
-       themes/NAME-modified.theme (base NAME, the keys mapped: taskbar, start, icons, frame, composition, animations,
-       wallpaper, mode), [override] (all themes) the same for the selected theme; [theme] name follows an old name to its theme
-       file (aero-patch -> aero4074) and to NAME-modified when that was written; [theme] composition = follow and
-       [theme] animations go (per theme now), [desktop] icons / mode too when nothing else uses them
-     - each preset themes/NAME.theme becomes lhde/themes/NAME.theme in the new format (base mapped, [VisualStyle] msstyles ->
-       style, [Composition] -> [Glass], [Frames] frame -> frames, [Shell] shell -> pack, [Desktop] icons longhorn -> longhorn4074)
-     - lhshell/state.ini: the user-facing keys an earlier luxshell kept there move into settings.ini, the runtime state
-       (tile order) stays
-     - then longhorn/settings.ini is kept as settings.ini.pre-lhde
-   That part runs once: nothing happens when lhde/settings.ini exists (force = 1: again, keeping what lhde/ has).
-   Every time, lhde/settings.ini's own legacy sections are converted the same way ([override:NAME], [override]; nothing
-   applies them live) and a [desktop] wallpaper = PATH (+ mode) becomes the selected theme's current layer ([current]
-   Desktop.wallpaper / Desktop.mode); [desktop] wallpaper = none stays (the per-user switch the resolver applies).
-   Then, every time (idempotent, a few stats when there is nothing to do), the files that were scattered over other
-   directories move to the two of lhde (above): flxp/flxp.ini -> lhde/flxp.ini (the keys that duplicated theme keys and the
-   path overrides the resolver makes redundant are removed and reported), flxp/views and flxp/desktop-positions ->
-   state/lhde/flxp-views, flxp-desktop-positions; lhshell/state.ini, mfu.ini -> state/lhde/luxshell-state.ini, luxshell-mfu.ini;
-   lhwm/keys -> lhde/keys; a longhorn/settings.ini symlink (which an earlier migration made) is removed; an emptied old
-   directory is removed. report gets a human-readable summary (may be NULL), also appended to lhde/migration.log.
-   Returns the number of items moved, 0 when there was nothing to do, -1 on an error. */
-int lhde_settings_migrate(int force, char *report, size_t n);
-
 #ifdef __cplusplus
 }
 #endif

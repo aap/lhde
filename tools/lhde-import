@@ -26,16 +26,13 @@ usage:
   lhde-import --annotate                      write the file annotations (extended attributes, docs/ANNOTATIONS.md) a tree lacks:
                                               originals, generated files, directories; keeps attributes that are there; idempotent
   lhde-import --reindex                       make index/ again (after moving or deleting files by hand)
-  lhde-import --migrate [-n]                  move an old-layout ~/.local/share/lhde (everything in one directory) into the
-                                              three trees without reading any ISO; -n lists what it would do. Run it after
-                                              make install; lhde-session runs it once by itself. Idempotent.
   lhde-import --list                          what the Windows tree holds
   lhde-import --clean [--yes]                 delete the Windows tree (every source, local/, generated/, index/) after asking
                                               on the terminal, or without asking with --yes: before importing a clean set
                                               (make install-resources-free / -windows / -full)
 options: --windows DIR (default $LHDE_WINDOWS, else ${XDG_DATA_HOME:-~/.local/share}/lhde-windows), --force (replace files that exist), --no-recipes (raw files only), --tmp DIR (scratch for an extracted WIM;
          default beside the Windows tree), --no-annotate (write no extended attributes: the importer annotates what it writes,
-         best effort, docs/ANNOTATIONS.md), --old DIR (--migrate: the old directory, default ${XDG_DATA_HOME:-~/.local/share}/lhde)
+         best effort, docs/ANNOTATIONS.md)
 """
 import os
 import shutil
@@ -111,7 +108,7 @@ def from_workspace(ws, W, force, copyres):
 
 def listing(W):
     if not os.path.isdir(W):
-        L.die('no Windows tree %s (lhde-import --pack FILE; lhde-import --migrate for an old ~/.local/share/lhde)' % W)
+        L.die('no Windows tree %s (lhde-import --pack FILE)' % W)
     print('%s:' % W)
     print('  sources:    %s' % (' '.join(T.sources_in(W)) or '(none)'))
     for k in ('styles', 'frames', 'packs', 'resources', 'fonts', 'wallpapers'):
@@ -153,7 +150,7 @@ def clean(W, yes):
 
 def main():
     a = sys.argv[1:]
-    o = {'force': False, 'recipes': True, 'copyres': False, 'dry': False}
+    o = {'force': False, 'recipes': True, 'copyres': False}
     mode = arg = None
     extra = []
     while a:
@@ -170,10 +167,6 @@ def main():
         elif x == '--licence': o['licence'] = a.pop(0)
         elif x == '--source': o['source'] = a.pop(0)
         elif x == '--windows': o['data'] = a.pop(0)
-        elif x == '--old': o['old'] = a.pop(0)
-        elif x in ('-n', '--dry-run'): o['dry'] = True
-        elif x == '--migrate': mode = 'migrate'
-        elif x == '--auto': o['auto'] = True
         elif x == '--reindex': mode = 'reindex'
         elif x == '--annotate': mode = 'annotate'
         elif x == '--no-annotate': T.set_annotate(False)
@@ -193,11 +186,6 @@ def main():
         listing(data); return 0
     if mode == 'clean':
         return clean(data, o.get('yes', False))
-    if mode == 'migrate':
-        T.migrate(os.path.abspath(o.get('old') or T.old_dir()), data, T.config_dir(), o['dry'], o.get('auto', False))
-        if not o['dry']:
-            T.annotate_tree(data)
-        return 0
     if mode == 'annotate':
         if not os.path.isdir(data):
             L.die('no Windows tree %s' % data)

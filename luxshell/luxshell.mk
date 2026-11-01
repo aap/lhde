@@ -32,12 +32,11 @@ check-luxshell: build/bin/luxshell
 install-luxshell: build/bin/luxshell
 	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(PKGLIBDIR)/luxshell/tiles
 	install -m 755 build/bin/luxshell $(DESTDIR)$(BINDIR)/
-	ln -sf luxshell $(DESTDIR)$(BINDIR)/lhshell
 	install -m 644 $(wildcard luxshell/*.lua) $(DESTDIR)$(PKGLIBDIR)/luxshell/
 	install -m 644 $(wildcard luxshell/tiles/*.lua) $(DESTDIR)$(PKGLIBDIR)/luxshell/tiles/
 	install -m 755 luxshell/shellpack.sh luxshell/shellpack-aero5112.sh $(DESTDIR)$(PKGLIBDIR)/luxshell/
 uninstall-luxshell:
-	rm -f $(DESTDIR)$(BINDIR)/luxshell $(DESTDIR)$(BINDIR)/lhshell
+	rm -f $(DESTDIR)$(BINDIR)/luxshell
 	rm -rf $(DESTDIR)$(PKGLIBDIR)/luxshell
 
 -include $(LUXSHELL_OBJS:.o=.d)

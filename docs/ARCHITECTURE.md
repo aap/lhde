@@ -16,9 +16,9 @@ Windows files (docs/LAYOUT.md).
 | `luxnav/` | `libluxnav.{a,so}` (`lhnav_*`) | the Longhorn navigation bar as the concept art had it (the "vision" header): layout, painting, hit testing; art from the style through wuxtheme; linked into flxp and `examples/navdemo` |
 | `luxwm/` | `luxwm`, `luxwmc` | the window manager: non-reparenting, EWMH, frames in three modes (DWM glass from the style's CompositedWindow streams or a generated frame set; non-composited msstyles frames through wuxtheme; Windows Classic from a scheme's colours and metrics), the XP window menu, animations, the extended-frame protocol for the Explorer's tall caption (docs/CLIENT-PROTOCOL.md), a frame regression (`tests/regress.sh`) |
 | `luxshell/` | `luxshell` (C core + Lua) | the Avalon reinterpretation: taskbar, sidebar, tiles (clock, notifications, power), tray, toasts, context menus, settings flyout and a Lua start menu; C scene nodes with the behaviour in `*.lua`; packs (`data/packs/*/shell.lua`) name the imageres art it draws |
-| `liblhde/` | `liblhde.{a,so}`, `lhde-theme` | `<lhde/data.h>` the three trees and every lookup by relative name; `<lhde/theme.h>` the theme resolver (theme files, inheritance, the current layer, style probe, defaults, fallbacks, "where did this come from"); `<lhde/settings.h>` the settings store with change notification and the migration from the pre-lhde paths |
+| `liblhde/` | `liblhde.{a,so}`, `lhde-theme` | `<lhde/data.h>` the three trees and every lookup by relative name; `<lhde/theme.h>` the theme resolver (theme files, inheritance, the current layer, style probe, defaults, fallbacks, "where did this come from"); `<lhde/settings.h>` the settings store with change notification, the user's config and state directories |
 | `session/` | `lhde-session`, `lab.sh`, `lhwall.sh`, `theme-*.sh`, picom configs | starting and controlling a session, and the headless bench |
-| `tools/` | `lhde-pack`, `lhde-import`, `lhde-schemes`, Python modules, recipe builders | the resource pack from ISOs, the import into the Windows tree, the recipes that derive frame sets, pack images and start panels from the imported files, the layout migration |
+| `tools/` | `lhde-pack`, `lhde-import`, `lhde-schemes`, Python modules, recipe builders | the resource pack from ISOs, the import into the Windows tree, the recipes that derive frame sets, pack images and classic schemes from the imported files |
 | `data/` | text only | the shipped themes, navbar layouts, icon recipes, import sources, frame-set tuning, shell packs |
 | `tests/`, `examples/` | | toolkit and w32 tests, headless Xvfb scripts, `check.sh`; `extendframe`, `navdemo`, `glassdemo` as reference clients |
 
@@ -29,7 +29,7 @@ frame regression against a local baseline; last the free baseline (`make check-f
 ## A running session
 
 `lhde-session start [THEME]` (a real X server on `:1`, `--nested` in Xephyr, `--attach` to a running server) runs, in this
-order: the settings and layout migrations if needed, the root wallpaper once, **luxwm** in a restart loop, **picom** when the
+order: the root wallpaper once, **luxwm** in a restart loop, **picom** when the
 theme's frames want a compositor, **luxshell** (or nothing, for `taskbar = classic`, where luxshell itself starts
 `flxp-taskbar`), **flxp-desktop**, and `flxp-startmenu` (flxp-taskbar's start panel without the bar) as the start-menu provider
 when the Avalon taskbar is up. `session/lab.sh` does the same on an Xvfb display with the build-tree binaries, for
@@ -58,8 +58,7 @@ the ones that matter for orientation:
 What the user chose lives in `~/.config/lhde/`: `settings.ini` (the selected theme, its unsaved current layer, per-user keys
 such as the sidebar mode and taskbar autohide), `themes/` (saved theme files), `flxp.ini` (flxp's preferences), `keys`
 (luxwm's bindings). What a program remembers on its own lives in `~/.local/state/lhde/` (luxshell's tile order and launch
-counts, flxp's remembered views and icon positions). Nothing else is read (docs/SETTINGS.md "Files"); an earlier layout's
-files are moved there once by liblhde's migration, which every program runs at startup.
+counts, flxp's remembered views and icon positions). Nothing else is read (docs/SETTINGS.md "Files").
 
 ## Where things are duplicated, on purpose or not yet resolved
 

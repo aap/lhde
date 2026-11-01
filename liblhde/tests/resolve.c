@@ -1,10 +1,10 @@
-/* liblhde's resolver, settings store and migration on fake files (no Microsoft files): a fresh $LHDE_DATA with empty style
+/* liblhde's resolver and settings store on fake files (no Microsoft files): a fresh $LHDE_DATA with empty style
    files classified by a test probe, theme files written here, $XDG_CONFIG_HOME of its own. make check-liblhde.
    Covers: inheritance and its sources, absent vs none, the defaults of each style kind (v3, v4 CompositedWindow 4074, v4
    Sidebar 4051, v4 DWM 5048/5112, classic), bare styles as themes, aliases, the fallbacks (frames, pack -> classic taskbar,
    wallpaper, style luna -> luna4051, icons, base not found), cycles and the depth limit, lhde_theme_set_key
-   (NAME-modified.theme), serialization, the settings store (comments kept), the conversion of the legacy [override:NAME] sections and the
-   migration from ~/.config/longhorn + ~/.config/lhshell. */
+   (NAME-modified.theme), serialization, the settings store (comments kept), the per-user [desktop] wallpaper = none, the
+   three trees. */
 #define _GNU_SOURCE
 #include "lhde/data.h"
 #include "lhde/theme.h"
@@ -352,95 +352,20 @@ int main(void)
     EQ(slurp("config/lhde/settings.ini"), "; my comment\n[theme]\nname = aero   ; the theme\n\n[mine]\nx = 1\n\n[sidebar]\nwidth = 181\n");
     CHECK(lhde_settings_set("mine", "x", NULL) == 1);
     EQ(slurp("config/lhde/settings.ini"), "; my comment\n[theme]\nname = aero   ; the theme\n\n[sidebar]\nwidth = 181\n");
-    /* flxp's legacy [override:NAME] (also under an alias) and [desktop] wallpaper = PATH: not applied live; the migration
-       (every run) turns them into NAME-modified.theme and the selected theme's current layer */
-    lhde_settings_set("override:jade-old", "taskbar", "none");
-    lhde_settings_set("override:jade", "icons", "xp");
-    lhde_settings_set("desktop", "wallpaper", "/pics/w.jpg");
-    lhde_settings_set("desktop", "mode", "fit");
-    t = R("jade");
-    CHECK(strcmp(G(t, "Shell.taskbar"), "none") != 0); CHECK(lhde_theme_source(t, "Shell.taskbar") != LHDE_FROM_SETTINGS);
-    CHECK(strcmp(G(t, "Desktop.icons"), "xp") != 0);
-    lhde_theme_free(t);
-    t = R("aero"); CHECK(strcmp(G(t, "Desktop.wallpaper"), "/pics/w.jpg") != 0); lhde_theme_free(t);
-    {
-        static char lrep[8192];
-        CHECK(lhde_settings_migrate(0, lrep, sizeof lrep) > 0);
-        HAS(lrep, "[override:jade-old]"); HAS(lrep, "-> [current] of ");
-        char *ls = slurp("config/lhde/settings.ini");
-        CHECK(!strstr(ls, "override")); HAS(ls, "name = aero");
-        HAS(ls, "Desktop.wallpaper = /pics/w.jpg\nDesktop.mode = fit");
-        char *lj = slurp("config/lhde/themes/jade-modified.theme");
-        HAS(lj, "base = jade"); HAS(lj, "taskbar = none"); HAS(lj, "icons = xp");
-        t = R("jade-modified"); EQ(G(t, "Shell.taskbar"), "none"); EQ(G(t, "Desktop.icons"), "xp"); lhde_theme_free(t);
-        t = R("aero"); EQ(G(t, "Desktop.mode"), "fit"); CHECK(lhde_theme_source(t, "Desktop.mode") == LHDE_FROM_CURRENT);   /* (the picture itself is missing: a fallback) */
-        lhde_theme_free(t);
-        CHECK(lhde_settings_migrate(0, lrep, sizeof lrep) == 0);   /* idempotent */
-        lhde_settings_set("current", "theme", NULL); lhde_settings_set("current", "Desktop.wallpaper", NULL); lhde_settings_set("current", "Desktop.mode", NULL);
-        snprintf(p, sizeof p, "%s/config/lhde/themes/jade-modified.theme", T); unlink(p);
-    }
     /* the per-user [desktop] wallpaper = none is applied (luxshell's "Show the wallpaper" off) */
     lhde_settings_set("desktop", "wallpaper", "none");
     t = R("aero"); EQ(G(t, "Desktop.wallpaper"), "none"); EQ(G(t, "path.wallpaper"), ""); CHECK(lhde_theme_source(t, "Desktop.wallpaper") == LHDE_FROM_SETTINGS);
     lhde_theme_free(t);
 
-    /* ---- the migration ---- */
+    /* a fresh config directory for what follows */
     snprintf(p, sizeof p, "%s/config/lhde", T);
     { char c[PATH_MAX + 32]; snprintf(c, sizeof c, "rm -rf '%s'", p); if (system(c)) return 2; }
     lhde_settings_reload();
-    put("config/longhorn/settings.ini", "; Shared desktop settings (x11/SETTINGS.md).\n; Every writer keeps keys; _LH_SETTINGS_CHANGED.\n\n"
-        "[theme]\ncomposition = follow\nname = jadeclassic\nanimations = 4074plus\n\n[desktop]\nmode = fill\nwallpaper = \nicons = xp\n\n"
-        "[taskbar]\nautohide = 0\nkind = avalon\n\n[override:jade-old]\nicons = xp\ntaskbar = none\n\n[override:aero]\ncomposition = off\n\n"
-        "[sidebar]\nwidth = 181\n");
-    put("config/longhorn/themes/My Aero.theme", "[Theme]\nname = My Aero\nbase = aero\n[Desktop]\nwallpaper = /pics/a.jpg\nicons = longhorn\n"
-        "[Composition]\ncomposition = off\n[Shell]\nshell = slate\n");
-    put("config/lhshell/state.ini", "; lhshell state\n[shell]\ntheme = aero\n[sidebar]\ntiles = power;clock\nlayer = below\n[clock]\npinned = 1\n");
-    put("config/lhshell/mfu.ini", "[mfu]\nfirefox.desktop = 3 1\n");
-    put("config/flxp/flxp.ini", "# flxp settings\n[flxp]\nfont_path = /elsewhere/Fonts\nicons = xp\nnt5src = /x\ntheme_path =\nterminal = urxvt\nfiledlg_size = 951x576\n");
-    put("config/flxp/views", "/home/me/Pictures\ticons@96\n");
-    put("config/flxp/desktop-positions", "a 1 2\n");
-    put("config/lhwm/keys", "Mod4+Return exec urxvt\n");
-    static char rep[16384];
-    int m = lhde_settings_migrate(0, rep, sizeof rep);
-    CHECK(m > 0);
-    char *ns = slurp("config/lhde/settings.ini");
-    HAS(ns, "; lhde's settings"); HAS(ns, "name = jade-modified"); HAS(ns, "width = 181"); HAS(ns, "autohide = 0");
-    CHECK(!strstr(ns, "override")); CHECK(!strstr(ns, "kind = avalon")); CHECK(!strstr(ns, "animations")); CHECK(!strstr(ns, "x11/SETTINGS.md"));
-    HAS(ns, "stacking = bottom"); HAS(ns, "pinned = 1");   /* from state.ini */
-    char *jm = slurp("config/lhde/themes/jade-modified.theme");
-    HAS(jm, "base = jade"); HAS(jm, "icons = xp"); HAS(jm, "taskbar = none");
-    char *am = slurp("config/lhde/themes/aero-modified.theme");
-    HAS(am, "composition = off");
-    char *my = slurp("config/lhde/themes/my-aero.theme");
-    HAS(my, "base = aero"); HAS(my, "wallpaper = /pics/a.jpg"); HAS(my, "icons = longhorn4074"); HAS(my, "[Glass]\ncomposition = off");
-    HAS(my, "pack = 4074-slate");
-    /* the scattered files: into the config and state directories (the state.ini moved after its user-facing keys left it) */
-    char *st = slurp("state/lhde/luxshell-state.ini");
-    HAS(st, "tiles = power;clock"); CHECK(!strstr(st, "theme = aero")); CHECK(!strstr(st, "layer"));
-    HAS(slurp("state/lhde/luxshell-mfu.ini"), "firefox.desktop = 3 1");
-    HAS(slurp("state/lhde/flxp-views"), "icons@96"); HAS(slurp("state/lhde/flxp-desktop-positions"), "a 1 2");
-    HAS(slurp("config/lhde/keys"), "Mod4+Return exec urxvt");
-    char *fi = slurp("config/lhde/flxp.ini");
-    HAS(fi, "# flxp settings"); HAS(fi, "terminal = urxvt"); HAS(fi, "filedlg_size = 951x576");
-    CHECK(!strstr(fi, "font_path")); CHECK(!strstr(fi, "icons")); CHECK(!strstr(fi, "nt5src")); CHECK(!strstr(fi, "theme_path"));
-    HAS(rep, "font_path = /elsewhere/Fonts removed");
-    { struct stat ls;
-      snprintf(p, sizeof p, "%s/config/longhorn/settings.ini", T); CHECK(lstat(p, &ls) != 0);   /* no symlink: nothing reads the old path */
-      snprintf(p, sizeof p, "%s/config/longhorn/settings.ini.pre-lhde", T); CHECK(lstat(p, &ls) == 0 && S_ISREG(ls.st_mode));
-      snprintf(p, sizeof p, "%s/config/flxp", T); CHECK(lstat(p, &ls) != 0);                     /* emptied directories go */
-      snprintf(p, sizeof p, "%s/config/lhwm", T); CHECK(lstat(p, &ls) != 0);
-      snprintf(p, sizeof p, "%s/config/lhshell", T); CHECK(lstat(p, &ls) == 0);                  /* keeps state.ini.pre-lhde */ }
-    CHECK(lhde_settings_migrate(0, rep, sizeof rep) == 0);   /* once */
-    /* a file that reappears in an old place (an old program) is moved by the next run, unless the new one exists */
-    put("config/lhwm/keys", "Mod4+x close\n");
-    CHECK(lhde_settings_migrate(0, rep, sizeof rep) == 0); HAS(slurp("config/lhde/keys"), "Mod4+Return");
-    { char b[PATH_MAX + 64]; snprintf(b, sizeof b, "%s/config/lhde/keys", T); unlink(b); }
-    CHECK(lhde_settings_migrate(0, rep, sizeof rep) > 0); HAS(slurp("config/lhde/keys"), "Mod4+x close");
     /* the path helpers */
     { char b[PATH_MAX]; snprintf(p, sizeof p, "%s/state/lhde/x.ini", T); EQ(lhde_state_file("x.ini", b, sizeof b), p);
       snprintf(p, sizeof p, "%s/config/lhde/x.ini", T); EQ(lhde_config_file("x.ini", b, sizeof b), p); }
 
-    /* ---- the three trees (docs/LAYOUT.md): the Windows tree's index, the user's files first, an old layout reported ---- */
+    /* ---- the three trees (docs/LAYOUT.md): the Windows tree's index, the user's files first ---- */
     {
         char W[PATH_MAX + 32], q[PATH_MAX * 2], o[PATH_MAX], rel[PATH_MAX], flat[PATH_MAX];
         snprintf(W, sizeof W, "%s/xdg/lhde-windows", T);
@@ -485,16 +410,6 @@ int main(void)
         CHECK(lhde_data_find_in(fd, "close.png", o, sizeof o) != NULL);
         CHECK(lhde_data_origin(o, rel, sizeof rel) == LHDE_TREE_WINDOWS); EQ(rel, "generated/frames/jade4074w/close.png");
         CHECK(lhde_data_origin(fd, rel, sizeof rel) == LHDE_TREE_SHIPPED); EQ(rel, "frames/jade4074w");
-        /* not migrated: an old ~/.local/share/lhde with Windows files is reported, never searched */
-        put("xdg/lhde/styles/old4051.msstyles", "x");
-        lhde_data_reset();
-        CHECK(lhde_old_dir() != NULL);
-        CHECK(lhde_data_find("styles/old4051.msstyles", o, sizeof o) == NULL);
-        nd = lhde_data_dirs(d, LHDE_DATA_MAX);
-        CHECK(nd == 3);
-        /* $LHDE_WINDOWS set: not even reported */
-        setenv("LHDE_WINDOWS", W, 1); lhde_data_reset();
-        CHECK(lhde_old_dir() == NULL && lhde_data_find("styles/old4051.msstyles", o, sizeof o) == NULL);
         unsetenv("LHDE_WINDOWS"); setenv("LHDE_DATA", flat, 1); setenv("XDG_DATA_DIRS", "/nonexistent", 1); lhde_data_reset();
     }
 

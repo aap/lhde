@@ -539,8 +539,7 @@ static int l_component_dir(lua_State *L) { char b[4200]; if (lhde_component_dir(
      lh.current_set_key("Sec.key", value | nil) -> true when settings.ini changed, false when not, nil on an error (no theme
      selected, not a theme key); lh.theme_select(name) -> true when settings.ini changed (the [theme] name, another
      theme's layer dropped), false when not, nil on an error; lh.theme_save_as(file, title) -> true, or nil, error
-     lh.settings_set(sec, key, value | nil) -> true when the file changed; lh.settings_path(); lh.config_file(NAME), lh.state_file(NAME) -> path; lh.settings_reload();
-     lh.settings_migrate() -> count, report */
+     lh.settings_set(sec, key, value | nil) -> true when the file changed; lh.settings_path(); lh.config_file(NAME), lh.state_file(NAME) -> path; lh.settings_reload() */
 static int l_theme_resolve(lua_State *L) {
     char err[600]; lhde_theme *t = lhde_theme_resolve(luaL_checkstring(L, 1), err, sizeof err);
     if (!t) { lua_pushnil(L); lua_pushstring(L, err); return 2; }
@@ -596,10 +595,6 @@ static int l_settings_path(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_
 static int l_config_file(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_config_file(luaL_checkstring(L, 1), b, sizeof b)); return 1; }
 static int l_state_file(lua_State *L) { char b[4200]; lua_pushstring(L, lhde_state_file(luaL_checkstring(L, 1), b, sizeof b)); return 1; }
 static int l_settings_reload(lua_State *L) { (void)L; lhde_settings_reload(); return 0; }
-static int l_settings_migrate(lua_State *L) {
-    static char rep[65536]; int n = lhde_settings_migrate(0, rep, sizeof rep);
-    lua_pushinteger(L, n); lua_pushstring(L, rep); return 2;
-}
 /* lh.list_dir(path): file names in a directory (no . and ..), nil when it cannot be read; lh.mtime(path): modification time
    in seconds or nil (desktop-entry and icon caches of the start menu) */
 static int l_list_dir(lua_State *L) { DIR *d = opendir(luaL_checkstring(L, 1)); if (!d) { lua_pushnil(L); return 1; }
@@ -919,7 +914,7 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"theme_resolve", l_theme_resolve}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},
     {"theme_user_dir", l_theme_user_dir}, {"current_set_key", l_current_set_key},
     {"theme_select", l_theme_select}, {"theme_save_as", l_theme_save_as}, {"settings_set", l_settings_set},
-    {"settings_path", l_settings_path}, {"config_file", l_config_file}, {"state_file", l_state_file}, {"settings_reload", l_settings_reload}, {"settings_migrate", l_settings_migrate},
+    {"settings_path", l_settings_path}, {"config_file", l_config_file}, {"state_file", l_state_file}, {"settings_reload", l_settings_reload},
     {"cm_owner", l_cm_owner}, {"kill", l_kill}, {"fonts", l_fonts}, {"image_filter", l_image_filter}, {"image_flush", l_image_flush}, {"wm_moveresize", l_wm_moveresize}, {"menu_render", l_menu_render}, {NULL, NULL} };
 static const luaL_Reg nodemeth[] = { {"add", l_node_add}, {"remove", l_node_remove}, {"clear", l_node_clear}, {"set", l_node_set}, {"bounds", l_node_bounds}, {"measure", l_node_measure}, {"desired", l_node_desired}, {NULL, NULL} };
 static const luaL_Reg surfmeth[] = { {"root", l_surface_root}, {"show", l_surface_show}, {"hide", l_surface_hide}, {"move", l_surface_move}, {"raise", l_surface_raise}, {"lower", l_surface_lower}, {"set_layer", l_surface_layer}, {"damage", l_surface_damage}, {"id", l_surface_id}, {"press", l_surface_press},

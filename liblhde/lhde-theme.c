@@ -19,9 +19,6 @@
                                            NAME-modified.theme (or the user's own NAME.theme); VALUE "-" removes the key
      lhde-theme style NAME                 what liblhde reads from a visual style (kind, format, build, family, first scheme)
      lhde-theme setting SEC KEY [VALUE]    a per-user key of settings.ini: print it, or write it (VALUE "-" removes it)
-     lhde-theme migrate [--force]          the one-time move of ~/.config/{longhorn,lhshell,flxp,lhwm} into ~/.config/lhde and
-                                           ~/.local/state/lhde, and legacy settings.ini sections into theme files
-                                           (docs/SETTINGS.md "Migration")
      lhde-theme explain --files THEME      the Windows-tree files THEME reads, one real path each (lhde-pack --profile essentials)
      lhde-theme explain [THEME]            where every visible part of THEME (default: the selected one, with its current layer)
                                            comes from: one row per component, its file and tree, ok / off / missing -> fallback
@@ -51,7 +48,7 @@ static void usage(void)
 {
     fprintf(stderr, "usage: lhde-theme list | resolve NAME [--files] [--why | --get KEY | --shell] | current | set NAME |\n"
                     "                  layer | layer-set KEY VALUE | layer-clear | save-as FILE [TITLE] | delete NAME | styles | schemes |\n"
-                    "                  set-key NAME KEY VALUE | setting SEC KEY [VALUE] | style NAME | migrate [--force] |\n"
+                    "                  set-key NAME KEY VALUE | setting SEC KEY [VALUE] | style NAME |\n"
                     "                  explain [THEME | --files THEME] | dirs [--list | --windows | --user] | find REL | find KIND NAME | path VALUE\n");
     exit(2);
 }
@@ -197,13 +194,6 @@ int main(int argc, char **argv)
         printf("kind=%s\nformat=%d\ncomposited=%d\ndwm=%d\nsidebar=%d\nbuild=%s\nfamily=%s\ncolor=%s\nsize=%s\npath=%s\n",
                kinds[si.kind], si.format, si.composited, si.dwm, si.sidebar, si.build, si.family, si.color, si.size, si.path);
         return ok ? 0 : 1;
-    }
-    if (!strcmp(cmd, "migrate")) {
-        static char rep[65536];
-        int r = lhde_settings_migrate(argc > 2 && !strcmp(argv[2], "--force"), rep, sizeof rep);
-        fputs(rep, stdout);
-        if (r == 0) printf("lhde-theme: nothing to migrate (%s exists; no file left in ~/.config/{longhorn,lhshell,flxp,lhwm})\n", lhde_settings_path(buf, sizeof buf));
-        return r < 0;
     }
     usage();
     return 2;

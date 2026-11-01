@@ -11,7 +11,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-static char user_dir[PATH_MAX + 64], win_dir[PATH_MAX + 32], old_dir[PATH_MAX + 32], tree_dir[PATH_MAX], exe_dir[PATH_MAX];
+static char user_dir[PATH_MAX + 64], win_dir[PATH_MAX + 32], tree_dir[PATH_MAX], exe_dir[PATH_MAX];
 static struct root { char path[PATH_MAX]; int kind; } roots[LHDE_DATA_MAX];
 static int ndirs = -1;
 
@@ -54,15 +54,6 @@ static void add_dir(const char *d, int kind)
     roots[ndirs++].kind = kind;
 }
 
-/* an old-layout data directory (before the three trees): Windows files beside the program files; never searched, only
-   reported (lhde-theme dirs) until lhde-import --migrate moves it */
-static int is_old_layout(const char *d)
-{
-    static const char *const k[] = { "styles", "resources", "fonts", "wallpapers", NULL };
-    for (int i = 0; k[i]; i++) { char p[PATH_MAX + 32]; snprintf(p, sizeof p, "%s/%s", d, k[i]); if (is_dir(p)) return 1; }
-    return 0;
-}
-
 static void init(void)
 {
     if (ndirs >= 0) return;
@@ -70,7 +61,7 @@ static void init(void)
     const char *e = getenv("LHDE_DATA"), *w = getenv("LHDE_WINDOWS"), *x = getenv("XDG_DATA_HOME"), *h = getenv("HOME");
     char share[PATH_MAX - 64];
     if (x && *x) snprintf(share, sizeof share, "%s", x); else snprintf(share, sizeof share, "%s/.local/share", h ? h : "");
-    tree_dir[0] = exe_dir[0] = old_dir[0] = 0;
+    tree_dir[0] = exe_dir[0] = 0;
     find_exe_and_tree();
     /* 1. the user's files: ~/.config/lhde (themes/, and any data file the user puts there under its data-directory name) */
     /* (spelled out here, not lhde_config_dir: libluxnav and glassdemo link data.o alone) */
@@ -87,12 +78,6 @@ static void init(void)
         if (w && *w) snprintf(win_dir, sizeof win_dir, "%s", w); else snprintf(win_dir, sizeof win_dir, "%s/lhde-windows", share);
         snprintf(user_dir, sizeof user_dir, "%s/index", win_dir);
         add_dir(user_dir, LHDE_TREE_WINDOWS);
-        /* not migrated yet: an old ~/.local/share/lhde that held everything is noted, not searched (lhde-session runs
-           lhde-import --migrate, which empties it) */
-        if (!(w && *w)) {
-            char o[PATH_MAX + 8]; snprintf(o, sizeof o, "%s/lhde", share);
-            if (is_old_layout(o)) snprintf(old_dir, sizeof old_dir, "%s", o);
-        }
     }
     /* 3. the shipped data: <exe>/../share/lhde (the program's own prefix), then $XDG_DATA_DIRS/lhde */
     if (exe_dir[0] && !tree_dir[0]) { char p[PATH_MAX + 32]; snprintf(p, sizeof p, "%s/../share/lhde", exe_dir); add_dir(p, LHDE_TREE_SHIPPED); }
@@ -133,7 +118,6 @@ const char *lhde_tree_name(int kind)
 
 const char *lhde_data_user(void) { init(); return user_dir; }
 const char *lhde_windows_dir(void) { init(); return win_dir; }
-const char *lhde_old_dir(void) { init(); return old_dir[0] ? old_dir : NULL; }
 const char *lhde_tree(void) { init(); return tree_dir[0] ? tree_dir : NULL; }
 
 /* DIR/REL, else DIR/<REL's directory>/cache/<REL's last component> (the caches of a $LHDE_DATA) */

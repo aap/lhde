@@ -104,7 +104,7 @@ check-free: build/bin/lhde-theme build/luxwm/tests/frametest
 
 # data/ (text only: the theme files, navbar layouts, icon recipes, import sources, the frame sets' theme.ini/nav.ini, the packs'
 # shell.lua) into DATADIR; session/ (lhde-session's helpers) and tools/ (lhde-import's Python) into PKGLIBDIR; the commands into
-# BINDIR. DATADIR/.lhde-install lists the shipped files (lhde-import --migrate tells them from the user's).
+# BINDIR.
 SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh \
                 picom-glass.conf picom-glass-fvwm.conf lab.fvwm2rc
 TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py lhdeschemes.py lhdetree.py wim0108.py
@@ -118,9 +118,6 @@ install-data:
 	install -m 644 data/sources/*.ini $(DESTDIR)$(DATADIR)/sources/
 	for d in data/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
 	for d in data/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done
-	{ echo '# lhde: the files make install put into $(DATADIR) (program files; docs/LAYOUT.md)'; \
-	  cd data && ls themes/*.theme navbar/*.ini icons/*.theme sources/*.ini frames/*/*.ini packs/*/*.lua; \
-	  cd ../flxp && ls res/icons/*.theme res/icons/*.ico res/icons/*.bmp; } > $(DESTDIR)$(DATADIR)/.lhde-install
 	install -m 755 session/lhde-session $(DESTDIR)$(BINDIR)/
 	install -m 755 tools/lhde-import tools/lhde-pack tools/lhde-schemes $(DESTDIR)$(BINDIR)/
 	cd session && install -m 644 $(SESSION_FILES) $(DESTDIR)$(PKGLIBDIR)/session/
@@ -130,7 +127,7 @@ install-data:
 uninstall-data:
 	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(BINDIR)/lhde-pack $(DESTDIR)$(BINDIR)/lhde-schemes
 	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar \
-	       $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources $(DESTDIR)$(DATADIR)/.lhde-install \
+	       $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \
 	       $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
 	-rmdir $(DESTDIR)$(PKGLIBDIR)
 

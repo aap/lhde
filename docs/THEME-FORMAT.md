@@ -140,12 +140,10 @@ the desktop colour (COLOR_BACKGROUND) under the wallpaper; `Desktop.color` when 
   (a preview of a layer not stored), `lhde_theme_resolve_current`.
 - The one per-user key the resolver applies, below the current layer: `settings.ini [desktop] wallpaper = none` (luxshell's
   "Show the wallpaper" off) switches the picture off in every theme (source `settings`). No other settings.ini key is a theme
-  key; the old `[override:NAME]` sections are converted into theme files by the migration (docs/SETTINGS.md), not applied.
-- Migration: existing `NAME-modified.theme` files stay what they are, ordinary user themes (their `base = NAME` and `name =
-  TITLE (modified)`); nothing converts them. Delete them in Display Properties, or keep them under a better name with Save As.
-- `lhde_theme_set_key` (the earlier model: the first change writes `NAME-modified.theme` with `base = NAME`, only the changed
-  keys, `name = TITLE (modified)`, and selects it) still works for its callers (`lhde-theme set-key`); Display Properties and
-  luxshell's flyout no longer use it (section 15).
+  key.
+- `lhde_theme_set_key` (`lhde-theme set-key`, lhde-session's `taskbar` without a luxshell): the first change writes
+  `NAME-modified.theme` with `base = NAME`, only the changed keys, `name = TITLE (modified)`, and selects it; Display Properties
+  and luxshell's flyout write the current layer instead.
 
 ## 4. The resolver (liblhde, `<lhde/theme.h>`)
 `lhde_theme_resolve(name)` returns one flat record `section.key = value` with inheritance, defaults and

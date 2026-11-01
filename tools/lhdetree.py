@@ -1,6 +1,5 @@
 """lhde's three trees on disk (docs/LAYOUT.md "The three trees"): where lhde-import puts the Windows files, the index the
-programs look things up through (liblhde/data.c reads $LHDE_WINDOWS/index), and the migration from the old layout, where
-everything lived in ~/.local/share/lhde.
+programs look things up through (liblhde/data.c reads $LHDE_WINDOWS/index).
 
 The Windows tree, $LHDE_WINDOWS (default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows):
   <source>/      the raw files of one build exactly as the resource pack has them: system32/ themes/ fonts/ wallpapers/ setup/,
@@ -16,7 +15,6 @@ The Windows tree, $LHDE_WINDOWS (default ${XDG_DATA_HOME:-~/.local/share}/lhde-w
   import.log
 Run with python3 -I."""
 import configparser
-import datetime
 import glob
 import os
 import shutil
@@ -36,18 +34,9 @@ def xdg_data_home():
     return os.environ.get('XDG_DATA_HOME') or os.path.expanduser('~/.local/share')
 
 
-def config_dir():
-    return os.path.join(os.environ.get('XDG_CONFIG_HOME') or os.path.expanduser('~/.config'), 'lhde')
-
-
 def windows_dir(arg=None):
     """the Windows tree: --windows DIR, else $LHDE_WINDOWS, else ${XDG_DATA_HOME:-~/.local/share}/lhde-windows"""
     return os.path.abspath(arg or os.environ.get('LHDE_WINDOWS') or os.path.join(xdg_data_home(), 'lhde-windows'))
-
-
-def old_dir():
-    """the old layout's data directory (everything in one): ${XDG_DATA_HOME:-~/.local/share}/lhde"""
-    return os.path.join(xdg_data_home(), 'lhde')
 
 
 def shipped_dirs():
@@ -165,7 +154,7 @@ def reindex(W, quiet=False):
     return n
 
 
-# ---------------------------------------------------------------- the migration from the old layout
+# ---------------------------------------------------------------- sizes
 def human(b):
     for u, f in (('GB', 1 << 30), ('MB', 1 << 20), ('KB', 1 << 10)):
         if b >= f:
@@ -186,332 +175,6 @@ def du(p):
                 b += os.path.getsize(q)
             n += 1
     return b, n
-
-
-class Plan:
-    """the migration's steps: listed (-n) or done; idempotent because every step moves or deletes its source"""
-    def __init__(self, old, W, cfg):
-        self.old, self.W, self.cfg = old, W, cfg
-        self.steps = []    # (verb move|delete, src, dst, note)
-        self.kept = []     # (path, why)
-        self.rmdirs = []   # emptied directories of the old layout
-        self.logs = []     # (src, dst): import.log appended
-
-    def short(self, p):
-        for top, name in ((self.W, '$W'), (self.old, '$OLD'), (self.cfg, '$CONFIG')):
-            if p == top or p.startswith(top + '/'):
-                return name + p[len(top):]
-        return p
-
-    def move(self, src, dst, note=''):
-        self.steps.append(('move', src, dst, note))
-
-    def delete(self, src, note=''):
-        self.steps.append(('delete', src, None, note))
-
-    def keep(self, src, why):
-        self.kept.append((src, why))
-
-    def pending(self):
-        return [s for s in self.steps if os.path.lexists(s[1])] + [l for l in self.logs if os.path.isfile(l[0])]
-
-    def run(self):
-        moved = deleted = 0
-        for verb, src, dst, note in self.steps:
-            if not os.path.lexists(src):
-                continue
-            if verb == 'move':
-                _move(src, dst)
-                moved += 1
-            else:
-                _remove(src)
-                deleted += 1
-        for src, dst in self.logs:
-            if os.path.isfile(src):
-                os.makedirs(os.path.dirname(dst), exist_ok=True)
-                with open(dst, 'a') as o, open(src) as i:
-                    o.write(i.read())
-                os.unlink(src)
-        for d in self.rmdirs:
-            _rmdir_empty(d)
-        return moved, deleted
-
-    def report(self):
-        """one line per step; a run of more than 4 steps with the same note as one line"""
-        groups = []
-        for verb, src, dst, note in self.steps:
-            if not os.path.lexists(src):
-                continue
-            if groups and groups[-1][0] == (verb, note):
-                groups[-1][1].append((src, dst))
-            else:
-                groups.append(((verb, note), [(src, dst)]))
-        lines = []
-        for (verb, note), items in groups:
-            if len(items) <= 4:
-                for src, dst in items:
-                    b, n = du(src)
-                    size = ' (symlink to %s)' % os.readlink(src) if os.path.islink(src) else ' (%s%s)' % ('%d files, ' % n if n > 1 else '', human(b))
-                    if verb == 'move':
-                        lines.append('  move   %s -> %s%s  %s' % (self.short(src), self.short(dst), size, note))
-                    else:
-                        lines.append('  delete %s%s  %s' % (self.short(src), size, note))
-            else:
-                b = sum(du(s)[0] for s, d in items)
-                s0, d0 = items[0]
-                if verb == 'move':
-                    lines.append('  move   %d files (%s), %s -> %s, ...  %s' % (len(items), human(b), self.short(s0), self.short(d0), note))
-                else:
-                    lines.append('  delete %d files (%s), %s, ...  %s' % (len(items), human(b), self.short(s0), note))
-        for src, dst in self.logs:
-            if os.path.isfile(src):
-                lines.append('  append %s -> %s  the import history' % (self.short(src), self.short(dst)))
-        return lines
-
-
-def _move(src, dst):
-    """move src to dst; when dst exists (an earlier run, or frames/X/a.png and frames/X/cache/a.png both), merge directories
-    and drop the duplicate file"""
-    if os.path.lexists(dst):
-        if os.path.isdir(src) and not os.path.islink(src) and os.path.isdir(dst) and not os.path.islink(dst):
-            for x in os.listdir(src):
-                _move(os.path.join(src, x), os.path.join(dst, x))
-            _rmdir_empty(src)
-        else:
-            _remove(src)
-        return
-    os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.move(src, dst)
-
-
-def _remove(p):
-    if os.path.isdir(p) and not os.path.islink(p):
-        shutil.rmtree(p)
-    elif os.path.lexists(p):
-        os.unlink(p)
-
-
-def _rmdir_empty(top):
-    """remove top and its subdirectories when they hold no files"""
-    if not os.path.isdir(top) or os.path.islink(top):
-        return
-    for r, ds, fs in os.walk(top, topdown=False):
-        try:
-            os.rmdir(r)
-        except OSError:
-            pass
-
-
-INSTALL_LIST = '.lhde-install'   # make install's list of the files it put into $PREFIX/share/lhde
-
-
-def install_list(d):
-    try:
-        with open(os.path.join(d, INSTALL_LIST)) as f:
-            return {l.strip() for l in f if l.strip() and not l.startswith('#')}
-    except OSError:
-        return None
-
-
-def _flat(rel):
-    """frames/X/cache/a.png -> a.png below X: the generated tree has no cache/ level"""
-    return '/'.join(c for c in rel.split('/') if c != 'cache')
-
-
-def plan_migration(old, W, cfg):
-    """every step that turns the old ~/.local/share/lhde into the three trees, without reading any ISO"""
-    P = Plan(old, W, cfg)
-    if not os.path.isdir(old):
-        return P
-    shipped = shipped_dirs()
-    # make install PREFIX=~/.local: the old directory is the install's share/lhde too. Its shipped text stays (make install
-    # keeps it current); what is shipped is known from make install's list, else from the other shipped directories
-    same = install_list(old) is not None or any(os.path.realpath(d) == os.path.realpath(old) for d in shipped) or \
-        os.path.exists(os.path.join(old, '..', '..', 'bin', 'lhde-theme'))
-    others = [d for d in shipped if os.path.realpath(d) != os.path.realpath(old)]
-    listed = set()
-    for d in shipped + [old]:
-        listed |= install_list(d) or set()
-
-    def _shipped_has(rel, _=None):
-        return rel in listed or any(os.path.lexists(os.path.join(d, rel)) for d in others)
-    known = set()
-    for d in shipped:
-        known |= {os.path.basename(p)[:-4] for p in glob.glob(os.path.join(d, 'sources', '*.ini'))}
-
-    def stale_or_user(path, rel, kind):
-        """a text file of a kind we ship: ours (stale when it is not the install's own copy), else the user's own"""
-        if same:
-            return   # shipped: this is also the install's share/lhde (make install PREFIX=~/.local), where it belongs
-        if _shipped_has(rel, shipped):
-            P.delete(path, 'stale copy: make install puts %s in its share/lhde' % rel)
-        else:
-            P.move(path, os.path.join(cfg, rel), 'not shipped: your own %s' % kind)
-
-    # the build directories: resources/<b>, fonts/<b>, wallpapers/<b>
-    for kind, sub in (('resources', 'system32'), ('fonts', 'fonts'), ('wallpapers', 'wallpapers')):
-        d = os.path.join(old, kind)
-        if not os.path.isdir(d):
-            continue
-        for b in sorted(os.listdir(d)):
-            src = os.path.join(d, b)
-            if b in known:
-                P.move(src, os.path.join(W, b, sub), 'the %s of source %s' % (kind, b))
-            else:
-                P.move(src, os.path.join(W, 'local', kind, b), 'no source %s: local' % b)
-        P.rmdirs.append(d)
-    # the styles: each into its source's place ([styles] of sources/<sid>.ini), else local/themes; schemes are generated
-    d = os.path.join(old, 'styles')
-    if os.path.isdir(d):
-        claim = {}
-        present = set(sources_in(W)) | {b for b in known if any(os.path.isdir(os.path.join(old, k, b)) for k in ('resources', 'fonts', 'wallpapers'))}
-        for sid in sorted(present):
-            p = source_ini(W, sid) or shipped_source_ini(sid)
-            for name, rel in section(read_ini(p) if p else None, 'styles'):
-                claim.setdefault(name, (sid, rel))
-        # classic schemes: generated/ only holds what --regenerate can make again; the old layout kept no HIVEDEF.INF, so
-        # they go to local/schemes (lhde-schemes' place) unless a source of the tree has its INF
-        regen = any(os.path.isfile(ci_path(os.path.join(W, sid), rel)) for sid in sources_in(W)
-                    for _, rel in section(read_ini(source_ini(W, sid)) if source_ini(W, sid) else None, 'schemes'))
-        for f in sorted(x for x in os.listdir(d) if x.endswith('.scheme')):
-            P.move(os.path.join(d, f), os.path.join(W, 'generated' if regen else 'local', 'schemes', f),
-                   'classic schemes' + (': generated' if regen else ' (no HIVEDEF.INF imported to remake them): local'))
-        for f in sorted(x for x in os.listdir(d) if not x.endswith('.scheme')):
-            src = os.path.join(d, f)
-            name = f[:-9] if f.lower().endswith('.msstyles') else f
-            if name in claim:
-                sid, rel = claim[name]
-                if os.path.isdir(src):   # styles/NAME/ (Shell/, or the style itself): beside the style file
-                    for x in sorted(os.listdir(src)):
-                        P.move(os.path.join(src, x), os.path.join(W, sid, os.path.dirname(rel), x), 'style %s of source %s' % (name, sid))
-                    P.rmdirs.append(src)
-                else:
-                    P.move(src, os.path.join(W, sid, rel), 'style %s of source %s' % (name, sid))
-            else:
-                P.move(src, os.path.join(W, 'local', 'themes', f), 'no source has style %s: local' % name)
-        P.rmdirs.append(d)
-    # frame sets: the PNGs and manifests are generated, the theme.ini / nav.ini are ours (shipped) or generated (a set we do not ship)
-    d = os.path.join(old, 'frames')
-    if os.path.isdir(d):
-        for s in sorted(os.listdir(d)):
-            seen, dups = set(), []   # a PNG both in frames/X/ and frames/X/cache/: the one beside theme.ini is the one luxwm drew
-            for r, ds, fs in os.walk(os.path.join(d, s)):
-                ds.sort(key=lambda x: x == 'cache')
-                for f in sorted(fs):
-                    src = os.path.join(r, f)
-                    rel = os.path.relpath(src, d)
-                    srel = 'frames/' + _flat(rel)
-                    if f.endswith('.ini') and f != 'manifest.ini' and _shipped_has(srel, shipped):
-                        if not same:
-                            P.delete(src, 'stale copy: make install ships %s' % srel)
-                    elif _flat(rel) in seen:
-                        dups.append((src, os.path.join(d, _flat(rel))))
-                    else:
-                        seen.add(_flat(rel))
-                        P.move(src, os.path.join(W, 'generated', 'frames', _flat(rel)), 'frame set %s: generated' % s)
-            if dups:
-                import filecmp
-                nd = sum(1 for a, b in dups if os.path.isfile(b) and not filecmp.cmp(a, b, shallow=False))
-                for a, b in dups:
-                    P.delete(a, 'frame set %s: second copies in cache/ (%s; the PNG beside theme.ini was in use and is kept)'
-                             % (s, '%d of %d differ' % (nd, len(dups)) if nd else 'identical'))
-            P.rmdirs.append(os.path.join(d, s))
-    # packs: shell.lua and startpanels.lua are ours; images, startpanel.ini and manifests generated
-    d = os.path.join(old, 'packs')
-    if os.path.isdir(d):
-        seen, dups = set(), []
-        for r, ds, fs in os.walk(d):
-            ds.sort(key=lambda x: x == 'cache')   # beside first: what luxshell found first
-            for f in sorted(fs):
-                src = os.path.join(r, f)
-                rel = os.path.relpath(src, d)
-                if f.endswith('.lua'):
-                    stale_or_user(src, 'packs/' + rel, 'pack')
-                elif _flat(rel) in seen:
-                    dups.append((src, os.path.join(d, _flat(rel))))
-                else:
-                    seen.add(_flat(rel))
-                    P.move(src, os.path.join(W, 'generated', 'packs', _flat(rel)), 'pack images: generated')
-        if dups:
-            import filecmp
-            nd = sum(1 for a, b in dups if os.path.isfile(b) and not filecmp.cmp(a, b, shallow=False))
-            for a, b in dups:
-                P.delete(a, 'pack images: second copies in cache/ (%s; the one outside cache/ was in use and is kept)'
-                         % ('%d of %d differ' % (nd, len(dups)) if nd else 'identical'))
-        P.rmdirs.append(d)
-    # the shipped text kinds
-    for kind in ('themes', 'navbar', 'icons', 'sources'):
-        d = os.path.join(old, kind)
-        if os.path.isdir(d):
-            for f in sorted(os.listdir(d)):
-                stale_or_user(os.path.join(d, f), kind + '/' + f, kind[:-1] if kind.endswith('s') else kind)
-    # program files that live in $PREFIX/lib/lhde now
-    for kind in ('luxshell', 'session', 'tools'):
-        p = os.path.join(old, kind)
-        if os.path.lexists(p):
-            P.delete(p, 'program files: make install puts %s/ in $PREFIX/lib/lhde' % kind)
-    # flxp's res/icons: shipped by flxp's install into share/lhde
-    p = os.path.join(old, 'res')
-    if os.path.isdir(p):
-        if same:
-            pass
-        elif any(x.startswith('res/') for x in listed) or any(os.path.isdir(os.path.join(d, 'res')) for d in others):
-            P.delete(p, 'stale copy of flxp\'s res/ (make install ships it)')
-        else:
-            P.keep(p, 'flxp\'s res/: no install has it; left in place')
-    p = os.path.join(old, 'import.log')
-    if os.path.isfile(p):
-        P.logs.append((p, os.path.join(W, 'import.log')))
-    # anything else stays
-    handled = {'resources', 'fonts', 'wallpapers', 'styles', 'frames', 'packs', 'themes', 'navbar', 'icons', 'sources',
-               'luxshell', 'session', 'tools', 'res', 'import.log'}
-    for x in sorted(os.listdir(old)):
-        if x not in handled and x != INSTALL_LIST:
-            P.keep(os.path.join(old, x), 'unknown: left in place')
-    return P
-
-
-def migrate(old, W, cfg, dry, auto=False):
-    """lhde-import --migrate: 0 nothing to do, 1 done (or listed, with -n)"""
-    P = plan_migration(old, W, cfg)
-    if not P.pending():
-        if not auto:
-            log('nothing to migrate: %s holds no old-layout files%s' % (old, '' if os.path.isdir(old) else ' (it does not exist)'))
-        return 0
-    shipped = shipped_dirs()
-    print('lhde-import --migrate%s: the old layout -> the three trees (docs/LAYOUT.md)' % (' -n' if dry else ''))
-    print('  $OLD     = %s  (the old layout)' % old)
-    print('  $W       = %s  (Windows files, $LHDE_WINDOWS)' % W)
-    print('  $CONFIG  = %s  (your files)' % cfg)
-    print('  shipped  = %s' % (', '.join(shipped) or '(no install found: make install first)'))
-    for l in P.report():
-        print(l)
-    for src, why in P.kept:
-        print('  keep   %s  (%s)' % (P.short(src), why))
-    srcs = sorted({s[2][len(W) + 1:].split('/')[0] for s in P.steps if s[0] == 'move' and os.path.lexists(s[1]) and s[2].startswith(W + '/')} - set(SPECIAL))
-    print('  then   $W/<source>/source.ini for %s (copies of the shipped sources/<id>.ini), $W/index (symlinks)' % (' '.join(srcs) or '-'))
-    if dry:
-        print('(dry run: nothing changed; run without -n to do it)')
-        return 1
-    moved, deleted = P.run()
-    for sid in srcs:
-        dst = os.path.join(W, sid, 'source.ini')
-        p = shipped_source_ini(sid)
-        if p and not os.path.exists(dst):
-            with open(p) as i, open(dst, 'w') as o:
-                o.write('; copied by lhde-import --migrate from %s (this build was imported before the three trees)\n' % p)
-                o.write(i.read())
-    for x in os.listdir(old):
-        _rmdir_empty(os.path.join(old, x))   # the directories the moves emptied
-    try:
-        os.rmdir(old)   # empty unless it is also the install's share/lhde
-    except OSError:
-        pass
-    reindex(W)
-    with open(os.path.join(W, 'import.log'), 'a') as f:
-        f.write('# lhde-import --migrate %s, %s: %d moved, %d deleted\n' % (old, datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), moved, deleted))
-    log('migrated %s: %d moved, %d deleted; the Windows files are in %s' % (old, moved, deleted, W))
-    return 1
 
 
 # ---------------------------------------------------------------- file annotations (docs/ANNOTATIONS.md; ~/src/luxfs x / lsx)

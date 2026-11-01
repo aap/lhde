@@ -66,8 +66,6 @@ local function R(id)
   end
   return img(id)
 end
--- ~/.config/lhde/settings.ini (SETTINGS.md) holds the per-user keys; liblhde's one-time migration of the pre-lhde files
-S.migrate()
 -- the effective values of a resolved theme (S.resolve: liblhde's record, docs/THEME-FORMAT.md): the theme files, their base
 -- chain, the style's defaults and the fallbacks, with settings.ini's per-user [desktop] wallpaper = none (the flyout's "Show the
 -- wallpaper" off) and the current layer applied by the resolver. v.wallpaper_src says where the wallpaper came from.

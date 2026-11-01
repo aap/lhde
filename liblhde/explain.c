@@ -428,9 +428,6 @@ int lhde_explain_files(const char *name)
             DIR *d = opendir(pd); struct dirent *e;
             while (d && (e = readdir(d))) if (!strncmp(e->d_name, "manifest", 8)) {
                 char mp[PATH_MAX + 300]; snprintf(mp, sizeof mp, "%s/%s", pd, e->d_name);
-                lhde_ini *m = lhde_ini_load(mp); char kind[64] = "", args[200] = "";
-                if (m) { lhde_ini_get(m, "recipe", "kind", kind, sizeof kind); lhde_ini_get(m, "recipe", "args", args, sizeof args); lhde_ini_free(m); }
-                if (!strcmp(kind, "startpanel")) continue;   /* an old import's start panels: nothing draws them any more */
                 emit_manifest(mp);
             }
             if (d) closedir(d);
@@ -531,9 +528,6 @@ int lhde_dirs_report(void)
     const char *wd = lhde_windows_dir();
     tree_line(getenv("LHDE_DATA") && *getenv("LHDE_DATA") ? "LHDE_DATA" : "windows", wd, NULL);
     if (isdir(wd)) entries(wd, "    ");
-    if (lhde_old_dir())
-        printf("  unmigrated %s: Windows files of the old layout, not searched; `lhde-import --migrate` moves them (-n shows the move)\n",
-               tilde(lhde_old_dir(), t, sizeof t));
     printf("User files (docs/SETTINGS.md \"Files\"):\n");
     tree_line("config", lhde_config_dir(buf, sizeof buf), "what you chose: settings.ini, themes/, flxp.ini, keys, overridden shipped files");
     if (isdir(buf)) entries(buf, "    ");
