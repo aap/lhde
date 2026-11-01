@@ -85,6 +85,20 @@ counts, flxp's remembered views and icon positions). Nothing else is read (docs/
   images, wux in a window of its own under each popup menu (docs/CLIENT-PROTOCOL.md "Drop shadows").
 - **Theme resolution**: one implementation, liblhde; flxp's `shell/lhtheme.cpp` only maps the record onto flxp's older keys.
 
+## Names in the code
+
+- **C libraries**: the public API carries the library's prefix (`ut_` wuxtheme, `lhnav_` luxnav, `lhde_` liblhde); a symbol shared
+  between the library's own files `prefix__` (`lhde__mkdirs`, `lhnav__px_blit`); everything else is `static`, no prefix.
+- **luxwm** (C, berry's layout): what crosses a file is `wm_` (`wm_frame_paint_ex4`, `wm_theme_load`, `wm_menu_popup`); the rest of
+  `wm.c` is `static`.
+- **C++** (wux, wuxtheme's internals, flxp): one namespace per directory or component (`w32::`, `gdi::`; `shell::` with
+  `shell::store::`, `browser::`, `tb::startpanel::`, ...), file-local code in an anonymous namespace or `static`, no `static`
+  free functions in headers. The Win32 API wux implements and the vendored Wine code keep their own names. The small string and
+  file helpers are `flxp/shell/util.h` (`shell::trim`, `lower`, `iequal`, `exists`, `is_dir`, `is_file`, `read_file`).
+- **luxshell**: C bindings `l_*`, the Lua surface only under `lh.` (`lh.trim`, `lh.exists` next to the file helpers), modules as
+  local tables, every log line `luxshell: ...`.
+- The old names (`lhwm` other than the window manager's `_NET_WM_NAME`, `lhshell`, `lux:` in logs) are not used for new code.
+
 ## Where to look first
 
 - A pixel is wrong: `lhde-theme explain THEME`, then `lhde-theme resolve THEME --why`, then the component's doc.
