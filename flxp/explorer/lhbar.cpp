@@ -107,7 +107,7 @@ void load_msstyles(const std::string& style)
 {
     std::string path = shell::theme_setting("menubar_msstyles");
     if (path.empty()) {
-        std::string sys = shell::theme_setting("longhorn_system32");
+        std::string sys = shell::longhorn_resources();
         if (sys.empty()) return;
         path = sys + "/../Resources/Themes/Slate/slate.msstyles";
         // a copied resources/<build> (lhde-import --copy-resources) has no Resources/ beside it:

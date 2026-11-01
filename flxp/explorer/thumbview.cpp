@@ -218,7 +218,7 @@ static void framed(Square& sq, const gdi::Bitmap* b)
 // shell32 #389 (the back half) and #390 (the front cover) of the build, when it has them
 static std::string folder_art(int id)
 {
-    std::string sys = shell::theme_setting("longhorn_system32");
+    std::string sys = shell::longhorn_resources();
     return sys.empty() ? "" : "pe:" + sys + "/shell32.dll#" + std::to_string(id);
 }
 

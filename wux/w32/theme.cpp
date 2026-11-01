@@ -30,7 +30,7 @@ static bool g_theme_inited;
 static std::string g_path, g_color, g_size;     // what is loaded
 
 // "luna" -> the first <dir>/luna/luna.msstyles (or lhde's styles/luna-xp.msstyles, ...) found in
-// the usual places: shell::find_msstyles (theme_path=, lhde's styles/, wine's and ~/.themes)
+// the usual places: shell::find_msstyles (lhde's styles/, wine's and ~/.themes)
 static std::string resolve_theme(const char* name)
 {
     std::string n = name;

@@ -149,16 +149,16 @@ flxp needs none: it finds the imported art through the lookup above (`flxp/shell
 `lhde-theme explain` the same for the whole theme).
 Settings live in `~/.config/lhde/flxp.ini` (flxp's preferences; any key also as `FLXP_<KEY>` in the environment) and the session
 store `~/.config/lhde/settings.ini`; what flxp remembers on its own (views, icon positions) is in `~/.local/state/lhde/`
-(docs/SETTINGS.md "Files"). The path keys below exist as `FLXP_<KEY>` for one run only; the theme supplies the files.
+(docs/SETTINGS.md "Files"). There are no path keys: the theme and the imported tree supply the files.
 
-| key | default (lhde's data directories) |
+| what | where it comes from (lhde's data directories) |
 |-----|-----------------------------------|
 | the session theme | `_LH_THEME` resolved by liblhde (the theme files; `_LH_THEME_RESOLVED` when it is current): style, icons, chrome, navigation bar, taskbar, start menu, wallpaper; flxp.ini's `icons`, `frame`, `taskbar_kind`, `wallpaper`, `wallpaper_mode`, `themes_ini` are ignored (docs/history/flxp-NOTES.md "flxp on liblhde") |
-| `theme_path` | `--theme NAME` / `FLXP_THEME` (one run's style instead of the session theme's): styles by name, `styles/NAME.msstyles`, `styles/NAME/` (one style inside), else `NAME-xp` |
-| `longhorn_system32` | the session theme's `path.resources` when it is a Longhorn build's (`resources/4051`, `resources/4074`, ...) |
-| `explorer_resources`, `longhorn_wim` | the framelets: `Microsoft.Windows.Client.dll` beside (or in) `resources/<build>`, the theme's build first, then 4074 |
-| `font_path` | `fonts/<build>` with tahoma.ttf (4074's); the session theme's `fonts` (registry) are added too |
-| `wallpaper_dirs` | `~/Pictures/Wallpapers` and every `wallpapers/<build>`; the theme's wallpaper from `wallpapers.ini` (root `wallpapers/`) |
+| `--theme NAME` / `FLXP_THEME` | one run's style instead of the session theme's, by name: `styles/NAME.msstyles`, `styles/NAME/` (one style inside), else `NAME-xp` |
+| the Longhorn art (shell32, slate.msstyles) | the session theme's `path.resources` when it is a Longhorn build's (`resources/4051`, `resources/4074`, ...) |
+| the framelets | `Microsoft.Windows.Client.dll` beside (or in) `resources/<build>`, the theme's build first, then 4074 |
+| the fonts | `fonts/<build>` with tahoma.ttf (4074's); the session theme's `fonts` (registry) are added too |
+| Display Properties' wallpaper list | flxp.ini `wallpaper_dirs` (`:`-separated), default `~/Pictures/Wallpapers` and every `wallpapers/<build>`; the theme's wallpaper from `wallpapers.ini` (root `wallpapers/`) |
 | `taskpane_aurora` | `resources/demo` (needs the demo's `docLib/`, `search/` images; the import has only `aurora_strip.png` so far) |
 | (XP/2000 art) | no setting: the xp/2k/longhorn4074 icon recipes (`data/icons/*.theme`), the toolbar strips, the task pane's shellstyle bitmaps, the start flag, the Log Off buttons, the user tile and the Folders bar's close glyph are read by resource id from `resources/xp`, `resources/2k` (lhde-import; docs/history/flxp-NOTES.md "XP and 2000 art by resource id"). Without them: Wine's icons and drawn lookalikes. |
 

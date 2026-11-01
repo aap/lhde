@@ -17,23 +17,6 @@ namespace shell {
 
 static bool exists(const std::string& p) { struct stat st; return stat(p.c_str(), &st) == 0; }
 
-static std::vector<std::string> split_path(const std::string& s)
-{
-    std::vector<std::string> out;
-    size_t a = 0;
-    while (a <= s.size()) {
-        size_t b = s.find(':', a);
-        if (b == std::string::npos) b = s.size();
-        if (b > a) {
-            std::string d = s.substr(a, b - a);
-            if (d[0] == '~') d = home_dir() + d.substr(1);
-            out.push_back(d);
-        }
-        a = b + 1;
-    }
-    return out;
-}
-
 static const char template_text[] =
     "# flxp settings. An empty value means automatic. Any key can be overridden\n"
     "# for one run by the environment variable FLXP_<KEY> (FLXP_TERMINAL=xterm).\n"
@@ -41,7 +24,7 @@ static const char template_text[] =
     "\n"
     "# Every Windows file comes from the imported Windows tree through the session\n"
     "# theme (lhde-theme explain; flxp --info shows what was found): no path keys\n"
-    "# live here. For one run: FLXP_FONT_PATH, FLXP_LONGHORN_SYSTEM32, FLXP_THEME_PATH.\n"
+    "# live here.\n"
     "\n"
     "# What the desktop shares is in settings.ini (docs/SETTINGS.md): font\n"
     "# smoothing and the menu effects (Display Properties > Appearance > Effects),\n"
@@ -66,7 +49,7 @@ static const char template_text[] =
 
     "# The longhorn frame's menu bar row: the folder-type gradient of Longhorn's\n"
     "# slate.msstyles (default, document, music, picture, video, contact, game;\n"
-    "# auto: document, read from longhorn_system32/../Resources/Themes/Slate) or\n"
+    "# auto: document, read from the build's Resources/Themes/Slate) or\n"
     "# gradient (drawn: menubar_gradient = edge centre [right], #rrggbb each;\n"
     "# auto: #24438e #5572bb). menubar_text: #rrggbb (auto: white).\n"
     "# menubar_msstyles: another Longhorn slate.msstyles (4051 or 4074).\n"
@@ -210,9 +193,8 @@ void setup_fonts()
     win::set_drop_shadows(store::get("effects", "menu_shadows") != "0");
     // Effects' "Hide underlined letters for keyboard navigation until I press the Alt key" ([effects] keyboard_cues = 1: off)
     win::set_keyboard_cues(store::get("effects", "keyboard_cues") == "1");
-    // font_path, else the imported Windows fonts (lhde's fonts/<build> with Tahoma)
-    std::vector<std::string> fp = split_path(setting("font_path"));
-    if (fp.empty()) fp = default_font_dirs();
+    // the imported Windows fonts (lhde's fonts/<build> with Tahoma)
+    std::vector<std::string> fp = default_font_dirs();
     // ReactOS's free faces (fonts/reactos) in the fallback tier: a Windows build's Tahoma or Marlett wins a family both
     // have (in one tier fontconfig picked ReactOS's Marlett over 4074's, and the classic caption glyphs came out small and grey)
     for (const std::string& d : fp) {
@@ -220,7 +202,7 @@ void setup_fonts()
         for (int i = 0; i < n_wanted; i++)
             if (g_found[i].empty()) g_found[i] = find_in_dir(d, wanted[i].file);
     }
-    // Families neither font_path nor the system has: Wine's own font directories.
+    // Families neither the imported fonts nor the system have: Wine's own font directories.
     for (const std::string& d : wine_font_dirs()) {
         if (!exists(d)) continue;
         bool use = false;
@@ -239,8 +221,8 @@ void setup_fonts()
         bool exact;
         std::string f = system_match(wanted[i].family, exact);
         if (!exact && i == 0)
-            fprintf(stderr, "flxp: no Tahoma font; using %s (lhde-import fonts/<build>, put tahoma.ttf in ~/.fonts or set font_path= in %s)\n",
-                    f.empty() ? "fontconfig's default" : f.c_str(), settings_path().c_str());
+            fprintf(stderr, "flxp: no Tahoma font; using %s (lhde-import fonts/<build>, or put tahoma.ttf in ~/.fonts)\n",
+                    f.empty() ? "fontconfig's default" : f.c_str());
     }
 }
 
@@ -262,7 +244,7 @@ std::vector<FontInfo> font_report()
 
 std::vector<std::string> theme_dirs()
 {
-    std::vector<std::string> dirs = split_path(setting("theme_path"));
+    std::vector<std::string> dirs;
     for (const std::string& d : lhde_dirs()) dirs.push_back(d + "/styles");   // lhde-import's styles/
     const char* wp = getenv("WINEPREFIX");
     dirs.push_back((wp && *wp ? std::string(wp) : home_dir() + "/.wine") + "/drive_c/windows/resources/themes");

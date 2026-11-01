@@ -154,7 +154,7 @@ void make_fonts()
 
 // The demo's resource directory, only with taskpane_style = aurora:
 // taskpane_aurora (a directory), else lhde's resources/demo (shell/lhdata.h),
-// else next to the Longhorn images (<longhorn_system32>/../../../../demo_resources).
+// else next to the Longhorn images (<the theme's Longhorn resources>/../../../../demo_resources).
 // "" = none: the menu band's gradient (taskpane_style = menubar, the default).
 std::string aurora_dir()
 {
@@ -167,7 +167,7 @@ std::string aurora_dir()
     if (!set.empty()) c.push_back(set);
     std::string demo = shell::lhde_find("resources/demo");
     if (!demo.empty()) c.push_back(demo);
-    std::string sys = shell::theme_setting("longhorn_system32");
+    std::string sys = shell::longhorn_resources();
     if (!sys.empty()) c.push_back(sys + "/../../../../demo_resources");
     for (const std::string& d : c)
         if (exists(d + "/docLib/exec_briefing_docLib.dir_3_404.png")) return g_aurora_dir = d;

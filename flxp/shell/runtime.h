@@ -1,5 +1,5 @@
 // Start-up plumbing shared by flxp's programs: the settings template written
-// on first run, the fonts (font_path or auto-detection through fontconfig)
+// on first run, the fonts (the imported ones, else fontconfig's)
 // and the visual style (theme name -> .msstyles). No win32 here; the theme
 // choice is handed to the shim through FLXP_THEME before w32::init.
 #pragma once
@@ -12,16 +12,16 @@ namespace shell {
 // is none yet. True if it wrote one.
 bool write_settings_template();
 
-// Fonts: the font_path directories are searched before the system's. With no
-// font_path, the Windows families flxp uses (Tahoma, Microsoft Sans Serif,
-// Marlett) that fontconfig does not know are looked for in Wine's font
-// directories; whatever is still missing falls back to fontconfig's choice.
+// Fonts: the imported fonts/<build> directories are searched before the
+// system's. The Windows families flxp uses (Tahoma, Microsoft Sans Serif,
+// Marlett) that neither has are looked for in Wine's font directories;
+// whatever is still missing falls back to fontconfig's choice.
 void setup_fonts();
 struct FontInfo { std::string family, file; bool exact; };
 std::vector<FontInfo> font_report();       // what each wanted family resolves to
 
-// Visual style: theme=, theme_color=, theme_size=, theme_path= (default
-// "luna" when it can be found, else classic). Exports the result as
+// Visual style: the session theme's, else FLXP_THEME (--theme) by name in
+// theme_dirs() (default "luna" when it can be found, else classic). Exports the result as
 // FLXP_THEME[_COLOR,_SIZE] for the shim's init (and child processes).
 // Returns the .msstyles path ("" = classic).
 std::string setup_theme();

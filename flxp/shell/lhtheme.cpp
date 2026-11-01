@@ -228,7 +228,7 @@ std::string theme_setting(const std::string& key, const std::string& fallback)
 
     std::string v = setting(key);
     if (!v.empty()) return v;
-    if (key == "longhorn_system32") return or_fallback(longhorn_resources(t));
+
     if (key == "menubar_style") return t.value("Explorer.chrome") == "longhorn" ? "document" : fallback;
     if (key == "header_engine") {
         std::string nb = t.value("Explorer.navbar");
@@ -241,6 +241,8 @@ std::string theme_setting(const std::string& key, const std::string& fallback)
     }
     return fallback;
 }
+
+std::string longhorn_resources() { return longhorn_resources(g_theme); }
 
 std::string font_smoothing()
 {

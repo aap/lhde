@@ -65,7 +65,7 @@ int main()
     setenv("XDG_DATA_DIRS", (T + "/none").c_str(), 1);
     setenv("LHDE_TREE", "0", 1);
     unsetenv("DISPLAY"); unsetenv("LHDE_SETTINGS");
-    for (const char* k : { "FLXP_LONGHORN_SYSTEM32", "FLXP_FONT_PATH", "FLXP_WALLPAPER_DIRS", "FLXP_THEME", "FLXP_THEME_PATH",
+    for (const char* k : { "FLXP_WALLPAPER_DIRS", "FLXP_THEME",
                            "FLXP_ICONS", "FLXP_FRAME", "FLXP_HEADER_ENGINE", "FLXP_HEADER_PRESET", "FLXP_TASKBAR_KIND" })
         unsetenv(k);
     lhde_data_reset();
@@ -99,22 +99,20 @@ int main()
     CHECK_EQ(t.msstyles, D + "/styles/slate4051.msstyles");
     CHECK_EQ(theme_build(t), "4051");
     set_session_theme(t);
-    CHECK_EQ(theme_setting("longhorn_system32"), D + "/resources/4051");
+    CHECK_EQ(longhorn_resources(), D + "/resources/4051");
     CHECK_EQ(theme_setting("frame"), "longhorn");
     CHECK_EQ(theme_setting("header_engine"), "flxp");
     CHECK_EQ(theme_setting("menubar_style"), "document");
     CHECK_EQ(theme_setting("icons", "xp"), "longhorn");                // flxp's res/icons/longhorn.theme
     CHECK_EQ(theme_setting("taskbar_kind"), "avalon");
-    setenv("FLXP_LONGHORN_SYSTEM32", "/elsewhere", 1);
-    CHECK_EQ(theme_setting("longhorn_system32"), "/elsewhere");
-    unsetenv("FLXP_LONGHORN_SYSTEM32");
+
     Wallpaper wp;
     CHECK_EQ(theme_wallpaper(t, wp) ? wp.file : "", D + "/wallpapers/4051/Bliss.jpg");
 
     CHECK_EQ(resolve_theme("luna", t) ? t.msstyles : "", D + "/styles/luna.msstyles");
     set_session_theme(t);
     CHECK_EQ(theme_setting("frame"), "xp");
-    CHECK_EQ(theme_setting("longhorn_system32"), "");                 // XP's resources are not a Longhorn build's
+    CHECK_EQ(longhorn_resources(), "");                               // XP's resources are not a Longhorn build's
     CHECK_EQ(theme_setting("icons", "xp"), "xp");
     CHECK_EQ(theme_setting("menubar_style"), "");
     CHECK_EQ(theme_wallpaper(t, wp) ? wp.file.substr(0, D.size() + 20) : "", D + "/wallpapers/xp/Bliss");
@@ -126,7 +124,7 @@ int main()
     CHECK_EQ(theme_setting("header_engine"), "lhnav");
     CHECK_EQ(theme_setting("header_preset"), "big");
 
-    CHECK_EQ(theme_setting("longhorn_system32"), "");                 // resources/5112 not imported
+    CHECK_EQ(longhorn_resources(), "");                               // resources/5112 not imported
     CHECK_EQ(theme_wallpaper(t, wp) ? "picture" : "none", "none");
     CHECK_EQ(t.value("path.navbar"), D + "/navbar/vision.ini");
 

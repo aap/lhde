@@ -93,7 +93,7 @@ std::string theme_build(const SessionTheme& t)
     return b;
 }
 
-std::string default_longhorn_system32()
+std::string build_resources()
 {
     std::string b;
     const SessionTheme& t = session_theme();
@@ -164,12 +164,12 @@ std::string lhde_report()
     }
     if (res.empty()) line("resources", "resources/: not imported");
     if (!b.empty() && !have_b) line("", "resources/" + b + ": not imported (the theme's build)");
-    std::string set = setting("longhorn_system32"), sys = theme_setting("longhorn_system32");
-    line("system32", sys.empty() ? std::string("(none)") : sys + (!set.empty() ? " (flxp.ini / FLXP_LONGHORN_SYSTEM32)" : " (the theme's path.resources)"));
+    std::string sys = longhorn_resources();
+    line("system32", sys.empty() ? std::string("(none)") : sys + " (the theme's path.resources)");
     look("demo", "resources/demo/docLib", "the task band's aurora");
     look("", "resources/demo/aurora_strip.png");
     std::vector<std::string> fd = default_font_dirs();
-    line("fonts", fd.empty() ? std::string("fonts/*/tahoma.ttf: not imported") : fd[0] + " (font_path's default)");
+    line("fonts", fd.empty() ? std::string("fonts/*/tahoma.ttf: not imported") : fd[0] + " (on the font path)");
     std::vector<std::string> wd = lhde_subdirs("wallpapers");
     line("wallpapers", wd.empty() ? std::string("wallpapers/: not imported") : std::to_string(wd.size()) + " directories in " + dir_of(wd[0]));
     look("styles", "styles");

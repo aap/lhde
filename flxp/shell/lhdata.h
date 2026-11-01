@@ -1,16 +1,15 @@
 // lhde's data directories for flxp (liblhde's lhde/data.h, docs/LAYOUT.md "Asset
 // policy"): where the art the user imported with lhde-import is found, so that
-// flxp.ini needs no paths. The search order is lhde_data's: $LHDE_DATA (else
+// flxp.ini has no paths. The search order is lhde_data's: $LHDE_DATA (else
 // ${XDG_DATA_HOME:-~/.local/share}/lhde), the install's share/lhde,
-// $XDG_DATA_DIRS/lhde, the source tree's data/. flxp.ini's path keys stay as
-// overrides (theme_setting, setting); these are the defaults under them.
+// $XDG_DATA_DIRS/lhde, the source tree's data/.
 //
 //   styles/NAME.msstyles  visual styles by name (--theme / FLXP_THEME)
-//   resources/<build>     a build's system32 (longhorn_system32's default: the
-//                         session theme's build), its Microsoft.Windows.Client.dll
+//   resources/<build>     a build's system32 (the session theme's path.resources:
+//                         shell::longhorn_resources), its Microsoft.Windows.Client.dll
 //   resources/demo        the PDC demo's images (the task band's aurora)
-//   fonts/<build>         the session theme's fonts (path.fonts);
-//                         font_path's default: the imported Fonts with Tahoma
+//   fonts/<build>         the session theme's fonts (path.fonts); the imported
+//                         Fonts with Tahoma, always on the font path
 //   wallpapers/<build>    the Desktop tab's list
 #pragma once
 #include <string>
@@ -34,10 +33,10 @@ std::vector<std::string> lhde_subdirs(const std::string& rel);
 // Theme.build, else path.resources' build (resources/4074), else the digits in the theme's name,
 // its style's or its fonts' (slate4051, luna4051, fonts/5112).
 std::string theme_build(const SessionTheme& t);
-// longhorn_system32's default: resources/<build> of the session theme (or of FLXP_THEME's
-// style when no theme is followed), when imported; "" otherwise
-std::string default_longhorn_system32();
-// font_path's default: the imported fonts/<build> directories that have tahoma.ttf
+// resources/<build> of the session theme's build (or of FLXP_THEME's style when no theme is followed), when imported;
+// "" otherwise
+std::string build_resources();
+// the imported fonts/<build> directories that have tahoma.ttf (flxp's font path)
 std::vector<std::string> default_font_dirs();
 // wallpaper_dirs' default: ~/Pictures/Wallpapers, then every wallpapers/<build>
 std::string default_wallpaper_dirs();

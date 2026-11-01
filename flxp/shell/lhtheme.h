@@ -57,7 +57,7 @@ void set_session_theme(const SessionTheme& t);
 //   icons              Desktop.icons (longhorn4074 -> longhorn while flxp's res/icons has no file of that name)
 //   frame              Explorer.chrome (auto | xp | longhorn; navbar none -> xp)
 //   taskbar_kind       Shell.taskbar
-//   longhorn_system32  flxp.ini, else path.resources when it is a Longhorn build's (resources/NNNN)
+
 //   menubar_style      flxp.ini, else document for chrome = longhorn
 //   header_engine      flxp.ini, else Explorer.navbar: vision -> lhnav, 4051 | 4074 -> flxp
 //   header_preset      flxp.ini, else Explorer.navbar_preset for navbar = vision
@@ -65,6 +65,9 @@ void set_session_theme(const SessionTheme& t);
 
 // any other key: setting(key, fallback) (flxp.ini, the settings store).
 std::string theme_setting(const std::string& key, const std::string& fallback = "");
+// The session theme's path.resources when it is a Longhorn build's (resources/4051, resources/4074, ...: that build's
+// system32), else "": shell32's Longhorn art, the framelets beside it, slate.msstyles under its Resources
+std::string longhorn_resources();
 // settings.ini [fonts] smoothing (the user's), else the theme's Fonts.smoothing; "" = neither (off | standard | cleartype)
 std::string font_smoothing();
 

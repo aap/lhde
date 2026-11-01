@@ -48,14 +48,8 @@ static std::string expand(const std::string& v)
         else if (v[i] == '$') {
             size_t j = i + 1; while (j < v.size() && (isalnum((unsigned char)v[j]) || v[j] == '_')) j++;
             std::string var = v.substr(i + 1, j - i - 1);
-            if (var.rfind("FLXP_", 0) == 0) {   // flxp settings: $FLXP_LONGHORN_SYSTEM32 is longhorn_system32=
-                std::string key = var.substr(5);
-                for (char& c : key) if (c >= 'A' && c <= 'Z') c += 32;
-                out += theme_setting(key);   // or what the session theme decides for it
-            } else {
-                const char* e = getenv(var.c_str());
-                out += e ? e : "";
-            }
+            const char* e = getenv(var.c_str());
+            out += e ? e : "";
             i = j - 1;
         } else out += v[i];
     }

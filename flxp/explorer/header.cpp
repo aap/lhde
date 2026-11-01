@@ -19,7 +19,6 @@
 // the header in the client is 76 - 27 = 49 rows; the title is moved down until
 // its capitals are inside (4074 draws it partly over the caption rows).
 #include <ctype.h>
-#include <glob.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -487,13 +486,9 @@ HBITMAP dib_from(const gdi::Bitmap* b)
 
 // 4074's images, read from its Avalon assembly. 4051 and 4074 have the same
 // images and no per-theme variants (Microsoft.Windows.Client.dll holds the only
-// framelet_* set). Looked for, in order: flxp.ini's (or FLXP_*'s)
-// explorer_resources, then next to its longhorn_system32; the session theme's
-// path.resources; lhde's
-// resources/<build> (shell/lhdata.h: the theme's build, then 4074, then the
-// others); then the places of extracted Longhorn images: <registry>/../wim and
-// longhorn_wim= in flxp.ini (no default), */*/WINDOWS/Microsoft.NET/Avalon (4074 first, then
-// the newest build). The first file with all eight images wins.
+// framelet_* set). Looked for, in order: beside the session theme's
+// path.resources; lhde's resources/<build> (shell/lhdata.h: the theme's
+// build, then 4074, then the others). The first file with all eight images wins.
 struct Candidate { std::string path, origin; };
 
 std::vector<Candidate> framelet_candidates()
@@ -505,43 +500,16 @@ std::vector<Candidate> framelet_candidates()
                                "/Microsoft.Windows.Client.dll" })
             out.push_back({ sys + r, origin });
     };
-    auto origin_of = [](const char* key) {
-        std::string var = "FLXP_";
-        for (const char* c = key; *c; c++) var += (char)toupper((unsigned char)*c);
-        const char* e = getenv(var.c_str());
-        return e && *e ? var : std::string("flxp.ini ") + key;
-    };
-    std::string res = shell::setting("explorer_resources");
-    if (!res.empty()) out.push_back({ res, origin_of("explorer_resources") });
-    add_sys(shell::setting("longhorn_system32"), origin_of("longhorn_system32"));
     const shell::SessionTheme& st = shell::session_theme();
-    if (!st.name.empty()) add_sys(shell::theme_setting("longhorn_system32"), "theme " + st.name + " path.resources");
+    if (!st.name.empty()) add_sys(shell::longhorn_resources(), "theme " + st.name + " path.resources");
     // lhde's resources/<build> (lhde-import: a build's system32, its Microsoft.NET beside it):
     // the theme's build, then the others, 4074 first (the header's reference)
-    std::string dflt = shell::default_longhorn_system32();
+    std::string dflt = shell::build_resources();
     if (!dflt.empty()) add_sys(dflt, "lhde resources of the theme's build");
     std::vector<std::string> builds = shell::lhde_subdirs("resources");
     std::stable_sort(builds.begin(), builds.end(), [](const std::string& a, const std::string& b) {
         return (shell::base_of(a) == "4074") > (shell::base_of(b) == "4074"); });
     for (const std::string& r : builds) if (r != dflt) add_sys(r, "lhde resources");
-    std::vector<std::string> roots;
-    std::string wim = shell::setting("longhorn_wim");
-    if (!wim.empty()) roots.push_back(wim);
-    for (const std::string& r : roots) {
-        glob_t gl = {};
-        std::string pat = r + "/*/*/WINDOWS/Microsoft.NET/Avalon/[Mm]icrosoft.[Ww]indows.[Cc]lient.dll";
-        if (glob(pat.c_str(), 0, nullptr, &gl) == 0) {
-            std::vector<std::string> found(gl.gl_pathv, gl.gl_pathv + gl.gl_pathc);
-            // 4074 first (the header's reference), then the newer builds
-            std::stable_sort(found.begin(), found.end(), [&](const std::string& a, const std::string& b) {
-                bool a4 = a.find("/4074/") != std::string::npos, b4 = b.find("/4074/") != std::string::npos;
-                if (a4 != b4) return a4;
-                return a > b;
-            });
-            for (const std::string& f : found) out.push_back({ f, "well-known location " + r });
-        }
-        globfree(&gl);
-    }
     return out;
 }
 
@@ -601,8 +569,8 @@ bool load_framelets()
     if (g_framelet_source.empty()) {
         static bool warned;
         if (!warned)
-            fprintf(stderr, "flxp: no Microsoft.Windows.Client.dll with 4074's framelet images (lhde-import resources/4074, or "
-                    "explorer_resources= / longhorn_system32= in %s); drawing lookalike Back/Forward buttons\n", shell::settings_path().c_str());
+            fprintf(stderr, "flxp: no Microsoft.Windows.Client.dll with 4074's framelet images (lhde-import resources/4074); "
+                    "drawing lookalike Back/Forward buttons\n");
         warned = true;
         return false;
     }
@@ -1194,14 +1162,14 @@ HBITMAP draw_magnifier(bool colour)
 
 // The real one (doc/4051-explorer-research.md section 3): not a theme part
 // but shell32.dll's icon group 23 (Search), its 32x32 image, which 4051 draws
-// at (cw-81, 11); from the theme's longhorn_system32 (slate4051: 4051's
+// at (cw-81, 11); from the theme's Longhorn resources (slate4051: 4051's
 // coloured glass, the 4074 themes: 4074's). Null without the Longhorn files:
 // the drawn one.
 HBITMAP search_icon()
 {
     if (g_mag_looked) return g_mag_icon;
     g_mag_looked = true;
-    std::string sys = shell::theme_setting("longhorn_system32");
+    std::string sys = shell::longhorn_resources();
     if (sys.empty()) return nullptr;
     HICON ic = (HICON)uiicons::load_themed("pe:" + sys + "/shell32.dll#23", IMAGE_ICON, 32, 32, 0);
     if (!ic) return nullptr;
@@ -2113,7 +2081,7 @@ void vision_metrics()
     long m[19] = {};
     int n = FlxpGetRootCardinals("_LHWM_FRAME_METRICS", m, 19);
     bool max = zoomed();
-    if (!lm.icon_dir[0]) snprintf(lm.icon_dir, sizeof lm.icon_dir, "%s", shell::theme_setting("longhorn_system32").c_str());
+    if (!lm.icon_dir[0]) snprintf(lm.icon_dir, sizeof lm.icon_dir, "%s", shell::longhorn_resources().c_str());
     long cap = n > 0 ? m[0] : 27;
     lm.border_t = n > 13 ? (int)m[max ? 13 : 12] : n > 0 ? 0 : lm.deco_h;   // no lhwm: under an ordinary caption
     lm.border_l = max ? 0 : n > 1 ? (int)m[1] : 0;
@@ -3186,7 +3154,7 @@ void theme_changed()
     grey_out(g_nav[0][DISABLED]); grey_out(g_nav[1][DISABLED]);
     navbar::reload();
     g_buttons_setting = button_images_setting();
-    if (g_mag_icon) DeleteObject(g_mag_icon);   // the theme's longhorn_system32 may be another build's
+    if (g_mag_icon) DeleteObject(g_mag_icon);   // the theme's Longhorn resources may be another build's
     g_mag_icon = nullptr; g_mag_looked = false;
     g_mode = GLASS;             // fonts and layout again for whatever comes now
     read_settings();            // the theme's navbar_preset may give another size

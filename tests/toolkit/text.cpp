@@ -1,6 +1,6 @@
 // Text rendering test: draws a few GDI-style fonts into a bitmap, prints their
 // metrics and writes a PPM. Usage: build/text [out.ppm]
-// Extra font dirs come from FLXP_FONT_PATH (colon-separated).
+// Extra font dirs come from TEXT_FONT_DIRS (colon-separated).
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,7 +51,7 @@ static void print_tm(const char* name, const gdi::Font* f)
 int main(int argc, char** argv)
 {
     const char* out = argc > 1 ? argv[1] : "text.ppm";
-    add_path_dirs(getenv("FLXP_FONT_PATH"));
+    add_path_dirs(getenv("TEXT_FONT_DIRS"));
 
     gdi::Bitmap* bmp = gdi::create_bitmap(480, 320);
     gdi::DC* dc = gdi::create_dc(bmp);

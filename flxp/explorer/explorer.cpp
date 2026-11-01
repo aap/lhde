@@ -1024,7 +1024,7 @@ static void CALLBACK stop_timer(HWND, UINT, UINT_PTR, DWORD)
 
 static void create()
 {
-    std::string sys = shell::theme_setting("longhorn_system32");
+    std::string sys = shell::longhorn_resources();
     HIMAGELIST normal = nullptr, hot = nullptr, ie = nullptr, iehot = nullptr;
     if (!sys.empty()) {
         normal = strip_list("pe:" + sys + "/shell32.dll#216", 16);

@@ -1554,7 +1554,7 @@ static void lh_sync_tools(Dlg& d)
     static bool tried = false;
     if (!tried) {
         tried = true;
-        std::string sys = shell::theme_setting("longhorn_system32");
+        std::string sys = shell::longhorn_resources();
         if (!sys.empty()) shell = strip_list("pe:" + sys + "/shell32.dll#216", 16);
         if (shell && ImageList_GetImageCount(shell) < 48) { ImageList_Destroy(shell); shell = nullptr; }
     }
