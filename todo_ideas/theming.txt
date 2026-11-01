@@ -28,7 +28,7 @@ imported is the free baseline. Left:
   lists only the styles a theme file names, so adding a style means adding a theme for it.
 * Look: 3683's Avalon settings dialog and Vista's Personalization as inspiration; XP's Display Properties stays the classic
   path. Where it lives: Display Properties' Themes tab ("Install theme...") and a standalone `lhde-setup`.
-* Also the place for the migration messages and lhde-theme dirs' view of the three trees.
+* Also the place for lhde-theme dirs' view of the three trees.
 
 ## 4. Open smaller points
 * frame sets that exist only as copied pixels without a recipe (aerovision: "copied in"); every set should be regenerable.

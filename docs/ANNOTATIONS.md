@@ -34,7 +34,7 @@ semicolons), trimmed, without duplicates, in their order; an emptied value remov
 - `lhde-pack` writes the same attributes on the pack's files and directories (`source` is then the medium's real in-image
   path, as in the MANIFEST) and makes the tarball with `tar --xattrs --xattrs-include='user.*'`; `lhde-import --pack` extracts
   with `--xattrs` and copies them into the Windows tree. `--no-annotate` on either tool turns it off.
-- `lhde-import --annotate` annotates an existing tree (one imported before this convention, or migrated): it only adds
+- `lhde-import --annotate` annotates an existing tree (one imported before this convention): it only adds
   attributes that are missing, so it is idempotent and keeps what you wrote; `source` of an original is then reconstructed
   from the source's `[files]` rules (a setup file's compressed name, e.g. `SHELL32.DL_`, is not recoverable that way).
 - Best effort: a filesystem without user xattrs gives one warning, and the import goes on.
