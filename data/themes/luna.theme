@@ -12,7 +12,7 @@ size     = NormalSize
 [Glass]
 frames         = none
 frames_classic = luna4051-blue
-composition    = off
+composition    = 0
 
 [Shell]
 taskbar  = classic

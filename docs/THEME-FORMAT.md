@@ -61,7 +61,7 @@ shellstyle = auto               ; auto = the one beside the style for this colou
 [Glass]
 frames         = jade4074       ; composited frame set; none = no glass (classic decorations)
 frames_classic = none           ; non-composited frame set; none = the style's own decorations (default)
-composition    = auto           ; auto | on | off
+composition    = auto           ; auto (a compositor when the theme has glass frames) | 1 | 0
 animations     = 4074plus       ; 4074plus | 4074 | 5048 | invented | none
 
 [Shell]
@@ -95,7 +95,7 @@ Options, window sizes, terminal, file associations, bookmarks.
 
 Who draws a navbar family is the resolver's business, not the theme's: today `4051`/`4074` are flxp's
 own header and `vision` is luxnav; when luxnav reproduces 4051/4074 pixel for pixel (flxp's header is
-the reference), the resolver switches and no theme file changes. `composition = on` with `frames = none`:
+the reference), the resolver switches and no theme file changes. `composition = 1` with `frames = none`:
 the compositor runs (shadows, animations), windows keep classic frames; nobody should expect glass.
 
 ## 2a. The classic look: `[Colors]`, `[Metrics]`, schemes (2026-10-28)

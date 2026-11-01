@@ -73,11 +73,11 @@ return function(ctx)
       line()
       option("action", "Save as...", false, function() lh.close_flyout(); lh.save_preset_box() end)
       col = right
-      -- the compositor rule (runtime.lua lh.compositor): follow the theme's `composition`, or always on / off. Composition and
+      -- the compositor rule (runtime.lua lh.compositor): follow the theme's `composition` (auto), or always on / off (1 / 0). Composition and
       -- taskbar are theme keys: a change goes into the current layer (settings.ini [current], THEME-FORMAT.md sections 3
       -- and 14; no theme file is written) and the theme is applied again
       heading("Composition")
-      for _, m in ipairs{ { "follow", "Follow the theme" }, { "on", "Always on" }, { "off", "Always off" } } do
+      for _, m in ipairs{ { "auto", "Follow the theme" }, { "1", "Always on" }, { "0", "Always off" } } do
         option("radio", m[2], lh.composition_mode() == m[1], function() lh.set_composition_mode(m[1]); refresh() end)
       end
       line(); heading("Taskbar")

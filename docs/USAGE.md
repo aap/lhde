@@ -222,11 +222,11 @@ lhde-theme resolve luna --get path.style     one key; --files: the theme files o
 lhde-theme current                      the selected theme's name (settings.ini [theme] name)
 lhde-theme set jade4074                 settings.ini [theme] name (the current layer dropped), then _LH_THEME on $DISPLAY
 lhde-theme layer                        the current layer: settings.ini [current], the unsaved changes on top of the theme
-lhde-theme layer-set Glass.composition off   a key of the selected theme's layer ("-" removes it); layer-clear drops the layer
+lhde-theme layer-set Glass.composition 0   a key of the selected theme's layer ("-" removes it); layer-clear drops the layer
 lhde-theme save-as my-jade "My Jade"    the theme with its layer as ~/.config/lhde/themes/my-jade.theme, selected
 lhde-theme delete my-jade               one of your theme files
 lhde-theme styles | schemes             the visual styles and the classic schemes Display Properties lists
-lhde-theme set-key aero4074 Glass.composition off    -> aero4074-modified.theme (the flyout writes the current layer instead)
+lhde-theme set-key aero4074 Glass.composition 0    -> aero4074-modified.theme (the flyout writes the current layer instead)
 lhde-theme setting sidebar width 200    a per-user key; without VALUE: print it
 lhde-theme style jade4074               what liblhde reads from a style (kind, format, build, family, first scheme)
 lhde-theme explain [THEME]              where every visible part comes from ("When something looks wrong" above); --files THEME
@@ -686,16 +686,16 @@ year shows in the title). It opens at the clock and covers the bar's bottom, as 
 it, or another click on the clock; it always opens on today's month. The tile's time line and the weekday and month names
 follow `LC_TIME` (24-hour time where the locale has it); the flyout's large time is 4074's fixed `h:mm AM/PM`.
 
-**Compositor rule.** The compositor follows the theme: switching to a theme with `composition = off` (Slate, Jade, Luna, the
+**Compositor rule.** The compositor follows the theme: switching to a theme with `composition = 0` (Slate, Jade, Luna, the
 classic and ReactOS themes, basic5048/5112) stops the picom of this display (only a process named `picom` whose environment has
-the same `DISPLAY`), and switching to an `auto` or `on` theme (aero4074, aerovision, aero5048, aero5112) starts one if no
+the same `DISPLAY`), and switching to an `auto` or `1` theme (aero4074, aerovision, aero5048, aero5112) starts one if no
 compositor runs. luxwm follows the compositor (glass frames with it, the theme's classic frames without), so the whole desktop
 changes look together. The settings flyout's *Composition* group overrides this: *Always on* / *Always off*; *Follow the theme*
 is the default. The switch is the theme key `Glass.composition` like the taskbar (see "Per-theme taskbar, composition" below).
 The rule is applied at startup too: 1.5 s after luxshell starts it stops the picom of its display when the theme says off and
 starts one for a glass theme when none runs (log `luxshell: compositor at startup: ...`). `lhde-session` decides with the same
 rule whether to start picom at all (`lhcomp_wanted` in `lhwall.sh`), so a classic session shows no flash of glass; `LHDE_PICOM=0`
-/ `LHDE_PICOM=1` force it off / on for the whole session, luxshell included (`LHSHELL_COMPOSITION=off|on|follow` forces luxshell
+/ `LHDE_PICOM=1` force it off / on for the whole session, luxshell included (`LHSHELL_COMPOSITION=0|1|auto` forces luxshell
 for one run; the flyout can still change it). A picom you start by hand (`lhde-session picom on`) stays until the next theme change
 or luxshell start. The picom command is `[commands] picom` in settings.ini, else `$LHSHELL_PICOM_CMD`, else `picom --config
 <session dir>/picom-glass.conf --backend glx`; on an Xvfb display, which needs xrender, start luxshell with

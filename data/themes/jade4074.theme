@@ -12,7 +12,7 @@ size     = Normal
 [Glass]
 frames         = none
 frames_classic = jade4074-classic
-composition    = off
+composition    = 0
 
 [Shell]
 taskbar  = avalon

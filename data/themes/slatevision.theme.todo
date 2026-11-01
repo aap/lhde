@@ -12,7 +12,7 @@
 ; [Glass]
 ; frames         = none
 ; frames_classic = slatevision      ; Aero caption buttons on Slate
-; composition    = off
+; composition    = 0
 ;
 ; [Shell]
 ; pack     = 4074-slate

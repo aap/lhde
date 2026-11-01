@@ -82,7 +82,7 @@ the shipped theme files, aliases, bare styles, the current layer). luxwm resolve
 - `VisualStyle.style = classic`, or neither a frame set nor a visual style: Windows Classic frames ("Windows Classic frames"), always,
   composited or not;
 - `[Glass] frames = SET`: the glass set with the theme's style, spec `data/frames/SET|STYLE|COLOR|SIZE`; its classic frame (no
-  compositor, or `[Glass] composition = off`) is `frames_classic`, or with `frames_classic = none` the style's own ("Classic fallback");
+  compositor, or `[Glass] composition = 0`) is `frames_classic`, or with `frames_classic = none` the style's own ("Classic fallback");
 - `frames = none`: the classic set `frames_classic` with the style, or the style alone (`|STYLE|COLOR|SIZE`), always.
 
 It also takes the fonts (`path.fonts`), `Fonts.smoothing` (the window menu) and `Glass.animations` ("Animations"). At startup the root's
@@ -528,7 +528,7 @@ empty (black) in Wine's draw.c, hence frame.c's row repeat.
 
 ## Classic fallback
 
-The classic frame of a DWM theme, used while no compositor runs or with `[Glass] composition = off`, is chosen in `theme_select()`:
+The classic frame of a DWM theme, used while no compositor runs or with `[Glass] composition = 0`, is chosen in `theme_select()`:
 - `frames_classic` naming a set: that set (aero4074, aerovision: `jade4074-classic`);
 - `frames_classic = none` (empty or `style` likewise): the theme's **own visual style in msstyles mode**, the spec `|STYLE|COLOR|SIZE`
   (`struct theme` keeps the resolved `style`, `style_color`, `style_size`), drawn live like any bare style (no directory: every tuning
@@ -536,7 +536,7 @@ The classic frame of a DWM theme, used while no compositor runs or with `[Glass]
   `fallback_theme` is the last resort;
 - `_LHWM_THEME` set directly: the set's `fallback_theme`, where `style` means the own style too.
 
-Log: `luxwm: no compositor: DIR|STYLE|... -> |STYLE|COLOR|SIZE (the theme's own msstyles)` (or `composition = off: ...`);
+Log: `luxwm: no compositor: DIR|STYLE|... -> |STYLE|COLOR|SIZE (the theme's own msstyles)` (or `composition = 0: ...`);
 `_LHWM_THEME` then publishes the `|STYLE|...` spec, `_LHWM_COMPOSITED` 0. basic5048 / aero5048 and basic5112 / aero5112 use it: both
 styles have the whole Window class (CAPTION, MAXCAPTION, MINCAPTION, SMALLCAPTION, FRAMELEFT/RIGHT/BOTTOM, MIN/MAX/CLOSE/RESTORE/
 HELPBUTTON): 5048 CAPTIONBARHEIGHT 18, no SIZINGBORDERWIDTH (margins 4/4/23/4), 5112 CAPTIONBARHEIGHT 19, SIZINGBORDERWIDTH 4 (margins

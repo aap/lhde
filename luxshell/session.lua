@@ -104,7 +104,7 @@ function S.resolve(name)
     shell = nz(v["path.pack"]), fonts = v["path.fonts"] or "",
     msstyles = v["path.style"] or "", color = v["VisualStyle.color"] or "", size = v["VisualStyle.size"] or "",
     frame = v["path.frames"] or "", frame_classic = v["path.frames_classic"] or "",
-    composition = (nz(v["path.frames"]) and v["Glass.composition"] ~= "off") and "auto" or "off",
+    composition = (nz(v["path.frames"]) and v["Glass.composition"] ~= "0") and "auto" or "0",
     wallpaper = v["Desktop.wallpaper"] == "none" and "none" or (v["path.wallpaper"] or ""), mode = v["Desktop.mode"] or "fill",
     icons = v["Desktop.icons"] or "" }
   e.modified = (tonumber(v["current"] or "") or 0) > 0
@@ -130,13 +130,13 @@ end
 function S.theme_value(e, key)
   local k = S.theme_keys[key]; if not (k and e and e.v) then return nil, nil end
   local v = e.v[k]
-  if key == "composition" and (v == "auto" or v == nil) then v = "follow" end
+  if key == "composition" and v ~= "1" and v ~= "0" then v = "auto" end
   return v, srcname(e.why and e.why[k])
 end
 function S.theme_default(e, key) return S.theme_value(e, key) end
 function S.set_theme_value(e, key, value)
   local k = S.theme_keys[key]; if not (k and e) then return nil end
-  if key == "composition" and value == "follow" then value = "auto" end
+
   local changed = lh.current_set_key(k, value)
   io.stderr:write(string.format("luxshell: theme %s: %s = %s into the current layer%s\n", e.name, k, tostring(value),
     changed == nil and " failed" or changed and "" or " (unchanged)"))

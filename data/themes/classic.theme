@@ -13,7 +13,7 @@ scheme   = windows-standard
 [Glass]
 frames         = none
 frames_classic = none
-composition    = off
+composition    = 0
 animations     = none
 
 [Shell]

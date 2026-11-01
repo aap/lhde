@@ -11,7 +11,7 @@ size     = Normal
 [Glass]
 frames         = aero5112    ; DWMWindow's streams, for aero5112
 frames_classic = none
-composition    = off
+composition    = 0
 
 [Shell]
 taskbar  = classic

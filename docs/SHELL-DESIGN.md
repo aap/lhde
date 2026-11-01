@@ -1039,7 +1039,7 @@ provider); an open settings flyout is rebuilt. Runtime state stays in `~/.local/
 tiles_base`; `LHSHELL_STATE` overrides the path).
 
 **Settings flyout** (`settings.lua`; *Properties* in the taskbar and sidebar menus, `_LHSHELL_COMMAND settings`): two columns,
-the theme list (shipped themes whose visual style is imported, then the user's; *Save as...*) | composition (follow / on / off),
+the theme list (shipped themes whose visual style is imported, then the user's; *Save as...*) | composition (follow the theme / always on / always off: `Glass.composition` auto / 1 / 0 in the current layer),
 taskbar (Avalon / classic / none) and autohide, sidebar mode, stacking and *Also with the classic taskbar*, *Show the
 wallpaper*. Run box (`_LHSHELL_COMMAND run`, Super+R): a one-line command for sh (its search mode, the best matching application,
 else an existing path through the file manager, else the line as a command, is opened by nothing).
@@ -1054,8 +1054,8 @@ Std Medium).
 when no `_XROOTPMAP_ID` exists; never when another program owns the desktop (`LHSHELL_DESKTOP=0`, or another client's
 `_NET_WM_WINDOW_TYPE_DESKTOP` window; flxp-desktop reads the wallpaper from the resolved record).
 
-**Compositor follows the theme.** `composition` = follow (the theme's `Glass.composition`: auto unless the theme has no glass
-frames or says off) | on | off (`LHSHELL_COMPOSITION` forces one; lhde-session sets it from `LHDE_PICOM`). Off: SIGTERM to the
+**Compositor follows the theme.** `Glass.composition` = auto (a compositor unless the theme has no glass frames) | 1 | 0
+(`LHSHELL_COMPOSITION` forces one; lhde-session sets it from `LHDE_PICOM`). Off: SIGTERM to the
 processes named picom whose environment has this DISPLAY (nothing else is touched). On: when nobody owns `_NET_WM_CM_S<screen>`,
 start `[commands] picom`, else `$LHSHELL_PICOM_CMD`, else `picom --config session/picom-glass.conf --backend glx`. Applied 1.5 s
 after startup, on every theme switch and when the switch changes. luxwm follows the compositor's presence by itself (glass ⇄

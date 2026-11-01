@@ -4,4 +4,4 @@ name     = Aero (5048)
 base     = basic5048
 
 [Glass]
-composition = on
+composition = 1

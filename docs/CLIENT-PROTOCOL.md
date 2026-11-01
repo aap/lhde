@@ -49,7 +49,7 @@ stays (it is the session's). A client treats a missing `_LHWM_COMPOSITED` as 0 (
 
 | Property | Type | Meaning |
 | --- | --- | --- |
-| `_LHWM_COMPOSITED` | CARDINAL 0/1 | 1 = luxwm draws DWM glass frames: a compositor is present (XFixes watch of `_NET_WM_CM_Sn`) and the frame mode is dwm. 0 in msstyles/classic mode, without a compositor, and for a theme with `composition = off` even with picom running. The `DwmIsCompositionEnabled` of this protocol: decide glass from it, never from the theme name. Rewritten on every theme switch even when unchanged; written again if someone deletes it. When it changes, every client with an extension or flags is repainted. |
+| `_LHWM_COMPOSITED` | CARDINAL 0/1 | 1 = luxwm draws DWM glass frames: a compositor is present (XFixes watch of `_NET_WM_CM_Sn`) and the frame mode is dwm. 0 in msstyles/classic mode, without a compositor, and for a theme with `composition = 0` even with picom running. The `DwmIsCompositionEnabled` of this protocol: decide glass from it, never from the theme name. Rewritten on every theme switch even when unchanged; written again if someone deletes it. When it changes, every client with an extension or flags is repainted. |
 | `_LHWM_THEME` | STRING | The active frame set (a directory, or a spec `DIR\|STYLE\|COLOR\|SIZE`), derived from the session theme `_LH_THEME`; read-only for clients (writing it directly asks luxwm for that frame set). Clients read the frame set's `nav.ini` beside its theme.ini. |
 | `_LHWM_FRAME_METRICS` | CARDINAL[19] | The frame now in use, so a client can lay out its header to match (fields below). Written when it changes and on every theme switch. Fonts are not in it (the theme's). Readers take up to 19 items and treat missing ones as absent. |
 
@@ -255,7 +255,7 @@ A switch is Windows' `WM_THEMECHANGED`: a client treats a PropertyNotify on the 
 `VisualStyle.color`, `VisualStyle.size`), re-read `_LHWM_COMPOSITED` and the metrics, and repaint the header transparent or
 opaque, keeping `_LHWM_EXTEND_FRAME` and `_LHWM_FRAME_FLAGS` set. luxwm rewrites `_LHWM_COMPOSITED` and `_LHWM_FRAME_METRICS` on
 every `_LH_THEME` change even when the values stay the same, so watching those two alone notices every switch; several
-notifications arrive per switch in one burst, so handle them once the queue is empty. Themes with `composition = off` (slate4051,
+notifications arrive per switch in one burst, so handle them once the queue is empty. Themes with `composition = 0` (slate4051,
 slate4074, jade4074, the luna and basic* themes, classic) keep `_LHWM_COMPOSITED` at 0 with a compositor running.
 
 ## What the client does

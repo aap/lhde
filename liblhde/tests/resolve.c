@@ -167,7 +167,7 @@ int main(void)
     put("data/resources/xp/shell32.dll", "x");   /* from here on the XP icon set has its resources */
     /* ---- theme files: inheritance, none, aliases, fallbacks ---- */
     put("data/themes/jade.theme", "[Theme]\nname = Jade (4074)\naliases = jade-old jadeclassic\n[VisualStyle]\nstyle = jade4074\n"
-                                  "[Glass]\nframes = none\nframes_classic = jade4074-classic\ncomposition = off\n[Desktop]\nwallpaper = 4074/Bliss\n");
+                                  "[Glass]\nframes = none\nframes_classic = jade4074-classic\ncomposition = 0\n[Desktop]\nwallpaper = 4074/Bliss\n");
     put("data/themes/aero.theme", "[Theme]\nname = Aero\nbase = jade\n[Glass]\nframes = jade4074\ncomposition = auto\n[Shell]\npack = 9999-none\n"
                                   "[Desktop]\nwallpaper = demos/missing\n");
     t = R("jade");
@@ -241,7 +241,7 @@ int main(void)
     t = R("aero-modified");
     EQ(G(t, "Desktop.icons"), "xp"); CHECK(lhde_theme_source(t, "Glass.frames") == LHDE_FROM_BASE); EQ(G(t, "Theme.name"), "Aero (modified)");
     lhde_theme_free(t);
-    CHECK(lhde_theme_set_key("aero-modified", "Glass.composition", "off", sel, sizeof sel) == 1);   /* the modified file itself */
+    CHECK(lhde_theme_set_key("aero-modified", "Glass.composition", "0", sel, sizeof sel) == 1);   /* the modified file itself */
     EQ(sel, "aero-modified");
     CHECK(lhde_theme_set_key("aero-modified", "Glass.composition", "auto", sel, sizeof sel) == 1);  /* = the base's: removed */
     CHECK(!strstr(slurp("config/lhde/themes/aero-modified.theme"), "composition"));
@@ -272,7 +272,7 @@ int main(void)
         put("data/icons/2k.theme", "[theme]\nresources = resources/xp\n");
         CHECK(lhde_current_set_key("Desktop.icons", "2k") == 1);
         EQ(lhde_current_theme(b2, sizeof b2), "jade");
-        CHECK(lhde_current_set_key("Glass.composition", "off") == 0);   /* jade's own value: not kept, nothing changed */
+        CHECK(lhde_current_set_key("Glass.composition", "0") == 0);   /* jade's own value: not kept, nothing changed */
         CHECK(lhde_current_keys(NULL, NULL) == 1);
         CHECK(lhde_current_set_key("Theme.name", "x") == -1); CHECK(lhde_current_set_key("Bogus.key", "x") == -1);
         t = R("jade");

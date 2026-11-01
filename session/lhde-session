@@ -115,11 +115,11 @@ session() {
 	# wallpaper the session keeps
 	. "$LHDE_SESSION_DIR/lhwall.sh"; lhwall_apply "$(cat "$STATE/theme")"
 	[ "$LHDE_WM" = fvwm ] && PCONF=$LHDE_SESSION_DIR/picom-glass-fvwm.conf
-	# picom only when the session's theme wants one (lhcomp_wanted: the per-theme composition switch, follow = the theme's frame
+	# picom only when the session's theme wants one (lhcomp_wanted: the per-theme composition switch, auto = the theme's frame
 	# mode); luxshell applies the same rule 1.5 s after it starts. LHDE_PICOM=0/1 forces it either way, for luxshell too.
 	case ${LHDE_PICOM:-} in
-	0) lhpicom=no; export LHSHELL_COMPOSITION=off ;;
-	1) lhpicom=yes; export LHSHELL_COMPOSITION=on ;;
+	0) lhpicom=no; export LHSHELL_COMPOSITION=0 ;;
+	1) lhpicom=yes; export LHSHELL_COMPOSITION=1 ;;
 	*) lhpicom=$(lhcomp_wanted "$(cat "$STATE/theme")") ;;
 	esac
 	[ "$LHDE_WM" = fvwm ] && [ -z "$LHDE_PICOM" ] && lhpicom=yes   # fvwm: no luxshell to follow the theme

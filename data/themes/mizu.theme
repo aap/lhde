@@ -11,7 +11,7 @@ style    = mizu
 [Glass]
 frames         = none
 frames_classic = none
-composition    = off
+composition    = 0
 
 [Shell]
 taskbar  = classic

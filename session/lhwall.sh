@@ -8,7 +8,7 @@
 #   lhwall_apply [THEME]    sets the root background once: feh --bg-MODE PATH, or xsetroot -solid '#3a6ea5' for none.
 #                           LHSHELL_WALLPAPER=0 forces "none". Needs DISPLAY.
 #   lhcomp_wanted [THEME]   prints yes / no: whether a compositor should run for THEME (luxshell's rule, runtime.lua
-#                           apply_composition): Glass.composition on -> yes, off -> no, auto -> yes when the theme has a glass
+#                           apply_composition): Glass.composition 1 -> yes, 0 -> no, auto -> yes when the theme has a glass
 #                           frame set (path.frames), else no.
 # The sourcing script has sourced lhde-paths.sh and run lhde_setup_paths (lhde_bin finds lhde-theme in the build tree or beside
 # the install); LHDE_WINDOWS, LHDE_DATA and XDG_CONFIG_HOME are honoured as by every lhde program.
@@ -32,8 +32,8 @@ lhwall_apply() {
 lhcomp_wanted() {
 	lhw_t=$(lhw_theme "$1"); [ -n "$lhw_t" ] || lhw_t=aero4074
 	case $(lhw_get "$lhw_t" Glass.composition) in
-	on) echo yes ;;
-	off) echo no ;;
+	1) echo yes ;;
+	0) echo no ;;
 	*) [ -n "$(lhw_get "$lhw_t" path.frames)" ] && echo yes || echo no ;;
 	esac
 }

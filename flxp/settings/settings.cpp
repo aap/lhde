@@ -1823,7 +1823,7 @@ std::vector<Item> items_for(int id)
         }
         return out;
     }
-    case IDC_AP_COMP: return items({ { "Automatic", "auto" }, { "On", "on" }, { "Off", "off" } });
+    case IDC_AP_COMP: return items({ { "Automatic", "auto" }, { "On", "1" }, { "Off", "0" } });
     default: return items({ { "4074 plus", "4074plus" }, { "4074", "4074" }, { "Invented", "invented" }, { "5048", "5048" }, { "None", "none" } });
     }
 }

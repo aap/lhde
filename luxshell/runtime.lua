@@ -150,7 +150,7 @@ local cfg = {
   rows = clamp(math.floor(tonumber(S.get("taskbar", "rows") or "") or 1), 1, ROWS_MAX),
   sidebar_w = tonumber(S.get("sidebar", "width") or ""),
   sb_bottom = S.get("sidebar", "stacking") == "bottom",   -- [sidebar] stacking = bottom: the sidebar under the windows
-  composition = "follow",                                 -- set below from the per-theme chain
+  composition = "auto",                                   -- set below from the per-theme chain: auto | 1 | 0
   -- maximised windows do not black out the whole desktop (luxwm crossfades the frame to its dark maximised plate; only
   -- the bars' black layers fade). desktop_black = 1: the full-screen black of the desktop layer too
   desktop_black = S.flag("desktop", "desktop_black", false),
@@ -166,14 +166,14 @@ local function valid_taskbar(v)
 end
 -- taskbar kind, start menu and the compositor switch are theme keys (THEME-FORMAT.md):
 -- S.theme_value(theme_entry, ...) = the resolved record's key (the current layer, the theme file, its base chain, the default); they
--- are applied at startup, on every theme change and on _LH_SETTINGS_CHANGED. LHSHELL_TASKBAR / LHSHELL_COMPOSITION (on|off|follow;
+-- are applied at startup, on every theme change and on _LH_SETTINGS_CHANGED. LHSHELL_TASKBAR / LHSHELL_COMPOSITION (1|0|auto;
 -- lhde-session sets it from LHDE_PICOM=0/1) force one for this run.
 local taskbar_env = valid_taskbar(os.getenv("LHSHELL_TASKBAR"))
-local comp_env = os.getenv("LHSHELL_COMPOSITION"); if comp_env ~= "on" and comp_env ~= "off" and comp_env ~= "follow" then comp_env = nil end
+local comp_env = os.getenv("LHSHELL_COMPOSITION"); if comp_env ~= "1" and comp_env ~= "0" and comp_env ~= "auto" then comp_env = nil end
 local function theme_taskbar(e) return taskbar_env or valid_taskbar(S.theme_value(e, "taskbar")) or "avalon" end
 local function theme_composition(e)
   if comp_env then return comp_env end
-  local c = S.theme_value(e, "composition"); if c ~= "on" and c ~= "off" then c = "follow" end
+  local c = S.theme_value(e, "composition"); if c ~= "1" and c ~= "0" then c = "auto" end
   return c
 end
 cfg.taskbar = theme_taskbar(theme_entry)
@@ -1467,11 +1467,11 @@ function lh.start_anchor()
 end
 
 ------------------------------------------------------------------ the compositor follows the theme
--- On a theme change luxshell applies the theme's `composition`: off → stop the picom of this display (only processes named
+-- On a theme change luxshell applies the theme's `composition`: 0 → stop the picom of this display (only processes named
 -- picom whose environment has our DISPLAY; nothing else is touched), auto → start one when no compositor owns
 -- _NET_WM_CM_S<screen>. luxwm already follows the compositor's presence (glass ⇄ frame_classic, _LHWM_COMPOSITED), so this is
--- the whole chain. The switch (per theme: the resolved Glass.composition, auto = follow) is
--- follow (the theme's `composition` decides) | on | off; it is applied at startup (1.5 s in: stops the picom the session may
+-- the whole chain. The switch (per theme: the resolved Glass.composition) is
+-- auto (the theme's frames decide) | 1 | 0; it is applied at startup (1.5 s in: stops the picom the session may
 -- have started for a classic theme, starts one for a glass theme when none runs), on every theme change and when it changes.
 -- Command: settings.ini [commands] picom, else $LHSHELL_PICOM_CMD, else picom --config session/picom-glass.conf --backend glx.
 local function picom_pids()
@@ -1504,13 +1504,13 @@ function lh.compositor(want)   -- want: true = running, false = stopped
 end
 local function composition_wanted(entry)
   local m = cfg.composition
-  if m == "on" then return true elseif m == "off" then return false end
-  return ((entry and entry.composition) or "auto") ~= "off"
+  if m == "1" then return true elseif m == "0" then return false end
+  return ((entry and entry.composition) or "auto") ~= "0"
 end
 local function apply_composition(entry) lh.compositor(composition_wanted(entry)) end
 function lh.composition_mode() return cfg.composition end
 function lh.set_composition_mode(m)
-  if m ~= "follow" and m ~= "on" and m ~= "off" then return end
+  if m ~= "auto" and m ~= "1" and m ~= "0" then return end
   cfg.composition = m
   local sel = S.set_theme_value(theme_entry, "composition", m)   -- a theme key: the current layer
   if sel then lh.select_theme(sel, true) else apply_composition(theme_entry) end

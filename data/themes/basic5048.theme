@@ -10,9 +10,9 @@ color    = NormalColor       ; its only scheme
 size     = Normal
 
 [Glass]
-frames         = aero5048    ; the uDWM bitmaps' glass, for aero5048 (composition on)
+frames         = aero5048    ; the uDWM bitmaps' glass, for aero5048 (composition = 1)
 frames_classic = none        ; the style's own decorations
-composition    = off
+composition    = 0
 
 [Shell]
 taskbar  = classic

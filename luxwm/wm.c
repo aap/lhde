@@ -110,7 +110,7 @@ static Atom cm_atom, lhwm_theme_atom, lhwm_maxmode_atom, lhwm_max_atom;
    theme files, bare styles, aliases); luxwm maps the record to frames / frames_classic / composition. _LHWM_THEME is the derived
    frame directory. */
 static char theme_req_classic[1024];   /* the resolved frames_classic directory ("style" = the style's own decorations) */
-static bool theme_comp_off = false;    /* Glass.composition = off, or no glass frame set: always the classic frame */
+static bool theme_comp_off = false;    /* Glass.composition = 0, or no glass frame set: always the classic frame */
 static bool theme_announce = false;    /* a switch was asked for: republish _LHWM_COMPOSITED and _LHWM_FRAME_METRICS even if unchanged */
 static char lh_theme_cur[256];   /* the _LH_THEME name applied last */
 static Atom lh_theme_atom;
@@ -4308,7 +4308,7 @@ theme_select(void)
         for (int i = 0; i < nc; i++) {
             struct theme ft;
             if (theme_load(&ft, cand[i])) {
-                fprintf(stderr, "luxwm: %s: %s -> %s%s\n", compositor ? "composition = off" : "no compositor", theme_req, cand[i],
+                fprintf(stderr, "luxwm: %s: %s -> %s%s\n", compositor ? "composition = 0" : "no compositor", theme_req, cand[i],
                         !strcmp(cand[i], own) ? " (the theme's own msstyles)" : "");
                 theme_free(&nt); nt = ft; snprintf(eff, sizeof eff, "%s", cand[i]);
                 break;
@@ -4448,7 +4448,7 @@ lh_theme_apply(const char *arg, char *canon, size_t n)
     } else if (frames[0]) {
         snprintf(theme_req, sizeof theme_req, "%.1000s|%.1000s|%.63s|%.63s", frames, style, color, size);
         snprintf(theme_req_classic, sizeof theme_req_classic, "%s", classic[0] ? classic : "style");
-        theme_comp_off = !strcasecmp(comp, "off");
+        theme_comp_off = !strcmp(comp, "0");
     } else {
         snprintf(theme_req, sizeof theme_req, "%.1000s|%.1000s|%.63s|%.63s", classic, style, color, size);
         snprintf(theme_req_classic, sizeof theme_req_classic, "%s", classic[0] ? classic : "style");

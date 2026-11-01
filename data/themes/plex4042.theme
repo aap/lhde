@@ -13,7 +13,7 @@ size     = Normal
 [Glass]
 frames         = none
 frames_classic = none          ; the style's own (XP-format) caption and borders
-composition    = off
+composition    = 0
 animations     = none
 
 [Shell]

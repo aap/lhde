@@ -196,7 +196,7 @@ int lhde_explain(const char *name)
         printf("  plus %s unsaved change%s from %s [current] (lhde-theme layer; Display Properties' \"(Modified)\")\n", G("current"),
                strcmp(G("current"), "1") ? "s" : "", tilde(lhde_settings_path(buf, sizeof buf), w, sizeof w));
     printf("  composition %s: %s\n\n", G("Glass.composition"),
-           !strcasecmp(G("Glass.composition"), "off") ? "never glass" : !strcasecmp(G("Glass.composition"), "on") ? "a compositor runs: the glass frame set" :
+           !strcmp(G("Glass.composition"), "0") ? "never glass" : !strcmp(G("Glass.composition"), "1") ? "a compositor runs: the glass frame set" :
            "the glass frame set when a compositor runs, else the classic one");
     nrows = 0;
     struct row *r;
