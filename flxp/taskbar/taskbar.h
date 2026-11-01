@@ -82,7 +82,7 @@ void shut_down();
 }
 
 namespace startpanel {
-void show(const RECT& button_screen, bool anchored = false);   // XP's two-column start panel (start_menu = panel, the default)
+void show(const RECT& button_screen, bool anchored = false);   // XP's two-column start panel ([taskbar] start_menu = panel, the default)
 void close();                               // dismiss it if it is open (a toggling _LHSHELL_START)
 void count_launch(const std::string& app_id);   // +1 in $XDG_DATA_HOME/flxp/mfu
 // A menu item image (MIIM_BITMAP): a 32 bpp premultiplied DIB of a .desktop Icon= (the panel's lookup), else of

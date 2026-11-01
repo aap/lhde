@@ -10,6 +10,7 @@
 #include "gdi/font.h"
 #include "lhtheme.h"
 #include "lhdata.h"
+#include "settings.h"
 #include "win/window.h"   // win::set_drop_shadows (SPI_SETDROPSHADOW)
 
 namespace shell {
@@ -42,12 +43,9 @@ static const char template_text[] =
     "# theme (lhde-theme explain; flxp --info shows what was found): no path keys\n"
     "# live here. For one run: FLXP_FONT_PATH, FLXP_LONGHORN_SYSTEM32, FLXP_THEME_PATH.\n"
     "\n"
-    "# Smooth edges of screen fonts (XP's Display Properties > Appearance >\n"
-    "# Effects): off, standard or cleartype (auto: standard, XP's default).\n"
-    "# Standard is grayscale where the font's gasp table allows it: Tahoma 8 stays\n"
-    "# crisp, the Luna start button and captions are smoothed. cleartype is sub-\n"
-    "# pixel on opaque surfaces and ignores the gasp table, as GDI's ClearType.\n"
-    "font_smoothing =\n"
+    "# What the desktop shares is in settings.ini (docs/SETTINGS.md): font\n"
+    "# smoothing and the menu effects (Display Properties > Appearance > Effects),\n"
+    "# the start panel's pinned programs, the start menu, the session commands.\n"
     "# The theme decides the icon set, the Explorer frame and navigation bar, the\n"
     "# taskbar, the start menu and the wallpaper (Desktop.icons, Explorer.chrome,\n"
     "# Explorer.navbar, Shell.taskbar, Shell.start, Desktop.wallpaper: docs/\n"
@@ -212,13 +210,13 @@ void setup_fonts()
     static bool done;
     if (done) return;
     done = true;
-    std::string sm = theme_setting("font_smoothing");
+    std::string sm = font_smoothing();
     gdi::set_font_smoothing(sm == "off" || sm == "0" ? gdi::SMOOTH_OFF :
                             sm == "cleartype" ? gdi::SMOOTH_CLEARTYPE : gdi::SMOOTH_STANDARD);
     // Effects' "Show shadows under menus" (settings.ini [effects] menu_shadows; on unless 0): the menus opened from now on
-    win::set_drop_shadows(setting("menu_shadows") != "0");
+    win::set_drop_shadows(store::get("effects", "menu_shadows") != "0");
     // Effects' "Hide underlined letters for keyboard navigation until I press the Alt key" ([effects] keyboard_cues = 1: off)
-    win::set_keyboard_cues(setting("keyboard_cues") == "1");
+    win::set_keyboard_cues(store::get("effects", "keyboard_cues") == "1");
     // font_path, else the imported Windows fonts (lhde's fonts/<build> with Tahoma)
     std::vector<std::string> fp = split_path(setting("font_path"));
     if (fp.empty()) fp = default_font_dirs();

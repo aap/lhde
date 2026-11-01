@@ -17,13 +17,11 @@ std::vector<std::string> data_dirs();         // $XDG_DATA_DIRS or /usr/local/sh
 // flxp settings: $XDG_CONFIG_HOME/lhde/flxp.ini (docs/SETTINGS.md "Files"), plain "key=value" lines
 // ([sections] and #/; comments ignored). An environment variable
 // FLXP_<KEY> (upper case) overrides the file. An empty value (in the file
-// or the environment) means unset: the fallback, i.e. automatic. Keys that the
-// shared store maps (shell/settings.h: font_smoothing, pinned) fall back to
-// ~/.config/lhde/settings.ini before the fallback. The keys that duplicated
-// theme keys (icons, frame, taskbar_kind, wallpaper, wallpaper_mode, themes_ini)
-// are ignored in flxp.ini (one note on stderr); the theme decides (lhtheme.h).
+// or the environment) means unset: the fallback, i.e. automatic. flxp.ini holds
+// flxp's own preferences only: what the desktop shares is settings.ini's
+// (shell::store, settings.h), what the theme decides the session theme's (lhtheme.h).
 std::string setting(const std::string& key, const std::string& fallback = "");
-std::string file_setting(const std::string& key, const std::string& fallback = "");   // flxp.ini (then settings.ini), no FLXP_<KEY>
+std::string file_setting(const std::string& key, const std::string& fallback = "");   // flxp.ini only, no FLXP_<KEY>
 std::string settings_path();                  // $XDG_CONFIG_HOME/lhde/flxp.ini
 // Sets key = value in flxp.ini, keeping the rest of the file (comments, order,
 // the other keys): the first "key =" line is rewritten in place, else the line

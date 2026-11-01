@@ -21,9 +21,6 @@ extern "C" {
 
 namespace shell {
 
-// config.cpp's hook (weak there): settings.ini under flxp.ini
-std::string store_value_for(const std::string& key) { return store::value_for(key); }
-
 namespace store {
 
 namespace {
@@ -84,15 +81,6 @@ const Ini& current()
     }
     return g_cache.ini;
 }
-
-// the per-user keys flxp.ini shares with settings.ini (flxp.ini, when it sets one, wins)
-struct Map { const char* flxp; const char* section; const char* key; };
-const Map maps[] = {
-    { "font_smoothing", "fonts", "smoothing" },
-    { "menu_shadows", "effects", "menu_shadows" },
-    { "keyboard_cues", "effects", "keyboard_cues" },
-    { "pinned", "start", "pinned" },
-};
 
 Display* open_display()
 {
@@ -267,31 +255,6 @@ bool set(const std::vector<Edit>& edits)
 bool set(const std::string& section, const std::string& key, const std::string& value)
 {
     return set(std::vector<Edit>{ Edit{ section, key, value } });
-}
-
-bool mapping(const std::string& flxp_key, std::string& section, std::string& key)
-{
-    for (const Map& m : maps)
-        if (flxp_key == m.flxp) { section = m.section; key = m.key; return true; }
-    return false;
-}
-
-std::string value_for(const std::string& flxp_key)
-{
-    std::string s, k;
-    return mapping(flxp_key, s, k) ? get(s, k) : "";
-}
-
-bool set_shared(const std::vector<Edit>& edits)
-{
-    bool ok = set(edits);
-    Ini flxp;
-    if (!flxp.load(settings_path())) return ok;
-    for (const Edit& e : edits)
-        for (const Map& m : maps)
-            if (iequal(e.section, m.section) && iequal(e.key, m.key) && !flxp.get("flxp", m.flxp).empty())
-                ok = write_setting(m.flxp, e.value) && ok;
-    return ok;
 }
 
 // ---- the sidebar's stacking (a per-user key) ----

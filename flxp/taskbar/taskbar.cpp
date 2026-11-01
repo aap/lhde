@@ -527,7 +527,9 @@ void paint_start(HWND hwnd, HDC hdc)
     if (owned) DeleteObject(f);
 }
 
-std::string start_menu_mode() { return setting("start_menu", "panel"); }   // panel, classic
+// settings.ini [taskbar] start_menu = panel (XP's start panel, the default) | classic (the classic popup menu): what the classic
+// bar's Start button opens, read at every open; the start-menu provider next to luxshell's Avalon bar is the panel
+std::string start_menu_mode() { return !g.menu_only && shell::store::get("taskbar", "start_menu") == "classic" ? "classic" : "panel"; }
 
 // Our menu is the display's start menu: own _LH_STARTMENU_S<screen> so that luxshell forwards its Avalon Start button and
 // the Super key to us

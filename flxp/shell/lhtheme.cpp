@@ -225,10 +225,7 @@ std::string theme_setting(const std::string& key, const std::string& fallback)
         return or_fallback(t.value("Explorer.chrome"));
     }
     if (key == "taskbar_kind") return or_fallback(t.value("Shell.taskbar"));
-    if (key == "font_smoothing") {
-        std::string v = setting(key);               // settings.ini [fonts] smoothing (the store), the user's
-        return v.empty() ? or_fallback(t.value("Fonts.smoothing")) : v;
-    }
+
     std::string v = setting(key);
     if (!v.empty()) return v;
     if (key == "longhorn_system32") return or_fallback(longhorn_resources(t));
@@ -243,6 +240,12 @@ std::string theme_setting(const std::string& key, const std::string& fallback)
         return t.value("Explorer.navbar") == "vision" && !p.empty() && p != "auto" ? p : fallback;
     }
     return fallback;
+}
+
+std::string font_smoothing()
+{
+    std::string v = store::get("fonts", "smoothing");   // the user's (Display Properties > Appearance > Effects)
+    return v.empty() ? g_theme.value("Fonts.smoothing") : v;
 }
 
 static bool follows_now()

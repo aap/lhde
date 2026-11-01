@@ -249,12 +249,11 @@ void session_theme_refresh()
 // _LH_SETTINGS_CHANGED (docs/SETTINGS.md): the settings every program follows
 // live. A theme file may have changed (NAME-modified.theme): the record again.
 // Font smoothing (settings.ini [fonts] smoothing, else the theme's
-// Fonts.smoothing, under flxp.ini's font_smoothing): the glyph caches are keyed
-// by it, so a repaint is all it takes.
+// Fonts.smoothing): the glyph caches are keyed by it, so a repaint is all it takes.
 static void settings_changed()
 {
     session_theme_refresh();
-    std::string sm = shell::theme_setting("font_smoothing");
+    std::string sm = shell::font_smoothing();
     int mode = sm == "off" || sm == "0" ? gdi::SMOOTH_OFF : sm == "cleartype" ? gdi::SMOOTH_CLEARTYPE : gdi::SMOOTH_STANDARD;
     if (mode == gdi::font_smoothing()) return;
     gdi::set_font_smoothing(mode);

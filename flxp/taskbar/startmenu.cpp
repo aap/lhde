@@ -1,4 +1,4 @@
-// The classic start menu (start_menu = classic): a popup menu as the classic
+// The classic start menu (settings.ini [taskbar] start_menu = classic): a popup menu as the classic
 // (Windows 2000 / "Classic Start menu") one, without its large icons and
 // banner: Programs (the .desktop applications by their main category), My
 // Documents, My Computer, Settings (Display Properties, the session themes),
@@ -328,7 +328,7 @@ HWND child(HWND parent, const WCHAR* cls, const WCHAR* text, DWORD style, int x,
 void log_off()
 {
     if (MessageBoxW(g.wnd, L"Are you sure you want to log off?", L"Log Off", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return;
-    std::string c = setting("logoff_command");
+    std::string c = shell::store::get("commands", "logoff");   // settings.ini [commands] logoff, luxshell's too
     if (!c.empty()) { run_shell(c); return; }
     // lhwm: `luxwmc quit` ends the window manager cleanly; that ends a session whose last program it is
     std::string wm = xwm::wm_name();
@@ -346,7 +346,7 @@ void log_off()
 
 void shut_down()
 {
-    std::string c = setting("shutdown_command", "loginctl poweroff");
+    std::string c = shell::store::get("commands", "shutdown", "loginctl poweroff");
     std::u16string t = W("Turn off the computer?\n\n(" + c + ")");
     if (MessageBoxW(g.wnd, (LPCWSTR)t.c_str(), L"Shut Down", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return;
     run_shell(c);

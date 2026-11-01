@@ -4,9 +4,10 @@
 // the _LH_SETTINGS_CHANGED root message. Shared by luxwm, luxshell and the flxp
 // programs. No win32 here; the notification uses a short X connection of its own.
 //
-// Precedence for a flxp program: FLXP_<KEY> (the run's options) > flxp.ini >
-// settings.ini (font_smoothing, pinned: value_for) > the default; the theme's
-// keys come from the session theme's record (shell::theme_setting, lhtheme.h).
+// The desktop's shared keys ([fonts], [effects], [start], [commands], [taskbar],
+// ...) are read here and only here; flxp.ini (config.h) holds flxp's own
+// preferences, the theme's keys come from the session theme's record
+// (shell::theme_setting, lhtheme.h).
 #pragma once
 #include <string>
 #include <vector>
@@ -39,17 +40,6 @@ struct Edit { std::string section, key, value; };   // value "" removes the key
 // through liblhde's store (lhde_settings_set: unknown keys, comments, order kept)
 bool set(const std::vector<Edit>& edits);
 bool set(const std::string& section, const std::string& key, const std::string& value);
-
-// set() for a settings UI: a key that maps to a flxp.ini key which flxp.ini
-// sets (and so would win) is rewritten in flxp.ini as well.
-bool set_shared(const std::vector<Edit>& edits);
-
-// settings.ini's value for a flxp.ini key, the per-user ones only: font_smoothing ([fonts] smoothing),
-// pinned ([start] pinned). "" if not mapped or not set. The theme keys (icons, frame, taskbar_kind,
-// wallpaper) are the theme's: shell::theme_setting, the session theme's record.
-std::string value_for(const std::string& flxp_key);
-// the (section, key) a flxp key maps to; false if none
-bool mapping(const std::string& flxp_key, std::string& section, std::string& key);
 
 // [sidebar] stacking: top | bottom, a per-user key (Win+S in luxwm flips it)
 std::string sidebar_stacking();

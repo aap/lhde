@@ -62,9 +62,11 @@ void set_session_theme(const SessionTheme& t);
 //   header_engine      flxp.ini, else Explorer.navbar: vision -> lhnav, 4051 | 4074 -> flxp
 //   header_preset      flxp.ini, else Explorer.navbar_preset for navbar = vision
 //   taskpane_position  flxp.ini, else Explorer.taskpane (top | bottom: the Longhorn task band under the list)
-//   font_smoothing     settings.ini [fonts] smoothing (the user's), else Fonts.smoothing
+
 // any other key: setting(key, fallback) (flxp.ini, the settings store).
 std::string theme_setting(const std::string& key, const std::string& fallback = "");
+// settings.ini [fonts] smoothing (the user's), else the theme's Fonts.smoothing; "" = neither (off | standard | cleartype)
+std::string font_smoothing();
 
 // True if flxp follows the session theme: theme_follow (default 1) and no
 // explicit theme for this run (--theme / FLXP_THEME that setup_theme did not

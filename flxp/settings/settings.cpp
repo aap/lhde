@@ -140,7 +140,8 @@ State load_state()
     s.sbmode = store::get("sidebar", "mode");
     s.sbstack = store::sidebar_stacking();
     s.sbclassic = bool_value(store::get("sidebar", "with_classic"));
-    s.smoothing = shell::theme_setting("font_smoothing", "standard");
+    s.smoothing = shell::font_smoothing();
+    if (s.smoothing.empty()) s.smoothing = "standard";
     if (s.smoothing == "0") s.smoothing = "off";
     s.shadows = store::get("effects", "menu_shadows") == "0" ? "0" : "1";
     s.cues = store::get("effects", "keyboard_cues") == "1" ? "1" : "0";
@@ -890,7 +891,7 @@ void apply()
                                                           committed.layer.at("Desktop.wallpaper") != cur.layer.at("Desktop.wallpaper"));
     if (wall && value("Desktop.wallpaper") != "none" && shell::wallpaper_hidden()) edits.push_back(store::Edit{ "desktop", "wallpaper", "" });
     if (!theme_changed && !layer_changed && edits.empty()) return;
-    bool ok = edits.empty() || store::set_shared(edits);
+    bool ok = edits.empty() || store::set(edits);
     // order (SETTINGS.md): the theme selected (another theme's layer dropped), the layer, then _LH_THEME and one message
     if (theme_changed) ok = lhde_theme_select(cur.theme.c_str()) >= 0 && ok;
     if (theme_changed || layer_changed) {

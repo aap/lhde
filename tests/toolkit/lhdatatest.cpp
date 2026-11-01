@@ -66,7 +66,7 @@ int main()
     setenv("LHDE_TREE", "0", 1);
     unsetenv("DISPLAY"); unsetenv("LHDE_SETTINGS");
     for (const char* k : { "FLXP_LONGHORN_SYSTEM32", "FLXP_FONT_PATH", "FLXP_WALLPAPER_DIRS", "FLXP_THEME", "FLXP_THEME_PATH",
-                           "FLXP_ICONS", "FLXP_FRAME", "FLXP_HEADER_ENGINE", "FLXP_HEADER_PRESET", "FLXP_TASKBAR_KIND", "FLXP_START_MENU" })
+                           "FLXP_ICONS", "FLXP_FRAME", "FLXP_HEADER_ENGINE", "FLXP_HEADER_PRESET", "FLXP_TASKBAR_KIND" })
         unsetenv(k);
     lhde_data_reset();
     lhde_style_set_probe(probe);
@@ -117,7 +117,6 @@ int main()
     CHECK_EQ(theme_setting("longhorn_system32"), "");                 // XP's resources are not a Longhorn build's
     CHECK_EQ(theme_setting("icons", "xp"), "xp");
     CHECK_EQ(theme_setting("menubar_style"), "");
-    CHECK_EQ(theme_setting("start_menu", "panel"), "panel");
     CHECK_EQ(theme_wallpaper(t, wp) ? wp.file.substr(0, D.size() + 20) : "", D + "/wallpapers/xp/Bliss");
     CHECK_EQ(std::to_string(wp.color), std::to_string(0x004e98));
     CHECK_EQ(wp.mode, "stretch");
@@ -126,7 +125,7 @@ int main()
     set_session_theme(t);
     CHECK_EQ(theme_setting("header_engine"), "lhnav");
     CHECK_EQ(theme_setting("header_preset"), "big");
-    CHECK_EQ(theme_setting("start_menu", "panel"), "panel");          // one start menu: flxp's panel
+
     CHECK_EQ(theme_setting("longhorn_system32"), "");                 // resources/5112 not imported
     CHECK_EQ(theme_wallpaper(t, wp) ? "picture" : "none", "none");
     CHECK_EQ(t.value("path.navbar"), D + "/navbar/vision.ini");
@@ -177,11 +176,13 @@ int main()
     store::apply_theme("slate4051-modified");   // another theme: the layer is dropped
     CHECK_EQ(std::to_string(store::current_layer().size()), "0");
 
-    // flxp.ini's own keys; settings.ini's per-user ones through the store
+    // flxp.ini's own keys; settings.ini's shared ones through the store only, flxp.ini's spelling of them is no key
     write_setting("taskpane", "0");
     CHECK_EQ(setting("taskpane"), "0");
     store::set("fonts", "smoothing", "cleartype");
-    CHECK_EQ(theme_setting("font_smoothing"), "cleartype");
+    CHECK_EQ(font_smoothing(), "cleartype");
+    write_setting("font_smoothing", "off");
+    CHECK_EQ(font_smoothing(), "cleartype");
     CHECK_EQ(store::path(), T + "/config/lhde/settings.ini");
 
     // fonts, wallpapers, styles by name

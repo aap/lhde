@@ -124,8 +124,8 @@ end
 apply_fonts(theme_entry)
 ------------------------------------------------------------------ shell settings (SHELL-DESIGN 14; settings.ini, SETTINGS.md; defaults written on first run)
 --   [taskbar] kind = avalon|classic|none (classic = flxp-taskbar, started from [commands] taskbar; LHSHELL_TASKBAR overrides it
---   for one run), autohide = 0|1, rows = 1..3 (Taskbar\RowCount, 2.4.2; the top-edge drag), classic_start_menu = flxp|flxp-classic
---   (the menu the classic bar's Start button opens)
+--   for one run), autohide = 0|1, rows = 1..3 (Taskbar\RowCount, 2.4.2; the top-edge drag), start_menu = panel|classic
+--   (the menu the classic bar's Start button opens: flxp-taskbar reads it itself)
 --   [sidebar] mode = full|minimized|pinned, width = 100..600 (Sidebar\Width, default 150; the SidebarSizer drag),
 --   with_classic = 0|1 (0, default: no sidebar with the classic taskbar; 1: the 4051 layout), yield_bottom = auto|0,
 --   stacking = top|bottom (top: 4074, the sidebar is above the windows (_NET_WM_STATE_ABOVE) with its strut, runs full height and
@@ -1250,17 +1250,16 @@ local function pid_is(pid, name)   -- pid still runs NAME on our display (pids a
 end
 -- The classic taskbar: [commands] taskbar (default flxp-taskbar; $LHSHELL_TASKBAR_CMD), run with our DISPLAY and session bus
 -- (inherited) and its log in $XDG_RUNTIME_DIR. It follows _LH_THEME by itself (flxp's WM_THEMECHANGED; no --theme). It may take
--- the tray over from us (FLXP_TRAY_TAKEOVER=1: our notifications tile then hides, tiles/notifications.lua). Start menu:
--- [taskbar] classic_start_menu = flxp (default; FLXP_START_MENU=panel: XP's start panel of flxp-taskbar; it owns
--- _LH_STARTMENU_S<screen>, so we forward Super to it, and its own Start button opens it directly) | flxp-classic (flxp's classic
--- popup menu, FLXP_START_MENU=classic).
+-- the tray over from us (FLXP_TRAY_TAKEOVER=1: our notifications tile then hides, tiles/notifications.lua). It owns
+-- _LH_STARTMENU_S<screen>, so we forward Super to it, and its own Start button opens it directly; which menu that is
+-- (settings.ini [taskbar] start_menu = panel | classic) flxp-taskbar reads at every open.
 local classic = {}
 local function classic_command()
   local c = S.get("commands", "taskbar") or os.getenv("LHSHELL_TASKBAR_CMD")
   return (c and c ~= "") and c or lh.prog("flxp-taskbar")
 end
 local function classic_name() return (classic_command():gsub("'", ""):match("^%s*(%S+)") or "flxp-taskbar"):match("([^/]+)$") end
-local function classic_menu() return S.get("taskbar", "classic_start_menu") == "flxp-classic" and "flxp-classic" or "flxp" end
+
 -- flxp-taskbar processes of this display: the bar, or one run by hand as the menu-only provider (/proc/PID/cmdline has
 -- --start-menu-only; the provider we start is flxp-startmenu, a name of its own)
 local function menu_only(pid)
@@ -1292,11 +1291,10 @@ local function classic_start()
   -- hand the tray over before it starts (a takeover races: icons answering its MANAGER while we still hand them back were lost
   -- by flxp-taskbar's ReparentNotify handling); our tile stays hidden while it starts and claims again if nobody took the tray
   if lh.tray_yield then lh.tray_yield(10000) end
-  local menu = classic_menu()
-  local env = { FLXP_TRAY_TAKEOVER = "1", FLXP_START_MENU = (menu == "flxp-classic" and "classic" or "panel"), FLXP_START_KEY = "1" }
+  local env = { FLXP_TRAY_TAKEOVER = "1", FLXP_START_KEY = "1" }
   local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/luxshell-taskbar" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
-  classic.pid = lh.spawn_pid(classic_command() .. " >" .. S.quote(log) .. " 2>&1 </dev/null", env); classic.name, classic.menu = name, menu
-  io.stderr:write(string.format("luxshell: taskbar: started %s (pid %s, start menu %s, log %s)\n", classic_command(), tostring(classic.pid), classic_menu(), log))
+  classic.pid = lh.spawn_pid(classic_command() .. " >" .. S.quote(log) .. " 2>&1 </dev/null", env); classic.name = name
+  io.stderr:write(string.format("luxshell: taskbar: started %s (pid %s, log %s)\n", classic_command(), tostring(classic.pid), log))
 end
 local function classic_stop()
   local pid, name = classic.pid, classic.name or classic_name(); classic.pid = nil
@@ -1336,19 +1334,13 @@ local function provider_start()
     if not provider_wanted() or provider_running() then return end
     table.insert(provider.starts, lh.now())
     local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/luxshell-startmenu" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
-    provider.pid = lh.spawn_pid(lh.prog(PROVIDER) .. " >" .. S.quote(log) .. " 2>&1 </dev/null", { FLXP_START_MENU = "panel", FLXP_START_KEY = "1" })
+    provider.pid = lh.spawn_pid(lh.prog(PROVIDER) .. " >" .. S.quote(log) .. " 2>&1 </dev/null", { FLXP_START_KEY = "1" })
     provider.name = PROVIDER
     io.stderr:write(string.format("luxshell: start menu: started %s (pid %s, log %s)\n", lh.prog(PROVIDER), tostring(provider.pid), log))
   end)
 end
 function lh.start_provider_check()
   if provider_wanted() then provider_start() elseif provider.pid then provider_stop() end
-  -- the classic bar was started with the other start menu ([taskbar] classic_start_menu): start it again with this one
-  if cfg.taskbar == "classic" and classic.pid and classic.menu and classic.menu ~= classic_menu() and pid_is(classic.pid, classic.name or classic_name()) then
-    io.stderr:write("luxshell: taskbar: start menu " .. classic.menu .. " -> " .. classic_menu() .. ", restarting " .. (classic.name or classic_name()) .. "\n")
-    classic_stop()
-    when_provider_free(function() if cfg.taskbar == "classic" then classic_start() end end)
-  end
 end
 function lh.start_provider_reset() provider.starts, provider.gave_up = {}, nil end
 lh.timer(function() if provider_wanted() and not provider_running() then provider_start() end end, 3000, true)   -- died: again

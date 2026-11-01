@@ -218,7 +218,7 @@ BOOL WINAPI SystemParametersInfoW(UINT action, UINT param, void* pv, UINT)
         return TRUE;
     case SPI_GETDRAGFULLWINDOWS: if (pv) *(BOOL*)pv = TRUE; return TRUE;
     // Display Properties' "Smooth edges of screen fonts" (gdi::set_font_smoothing;
-    // shell::setup_fonts sets it from font_smoothing=)
+    // shell::setup_fonts sets it from settings.ini [fonts] smoothing)
     case SPI_GETFONTSMOOTHING: if (pv) *(BOOL*)pv = gdi::font_smoothing() != gdi::SMOOTH_OFF; return TRUE;
     case SPI_SETFONTSMOOTHING:
         if (!param) gdi::set_font_smoothing(gdi::SMOOTH_OFF);
@@ -231,7 +231,7 @@ BOOL WINAPI SystemParametersInfoW(UINT action, UINT param, void* pv, UINT)
         if (gdi::font_smoothing() != gdi::SMOOTH_OFF)
             gdi::set_font_smoothing((UINT)(UINT_PTR)pv == FE_FONTSMOOTHINGCLEARTYPE ? gdi::SMOOTH_CLEARTYPE : gdi::SMOOTH_STANDARD);
         return TRUE;
-    // XP's "Show shadows under menus" (on by default; flxp: menu_shadows), for the popups created after it
+    // XP's "Show shadows under menus" (on by default; settings.ini [effects] menu_shadows), for the popups created after it
     case SPI_GETDROPSHADOW: if (pv) *(BOOL*)pv = win::drop_shadows(); return TRUE;
     case SPI_SETDROPSHADOW: win::set_drop_shadows((BOOL)(INT_PTR)pv != FALSE); return TRUE;
     case SPI_GETLISTBOXSMOOTHSCROLLING: if (pv) *(BOOL*)pv = FALSE; return TRUE;

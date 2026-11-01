@@ -354,8 +354,8 @@ luxshell never runs feh/xsetroot while another program owns the desktop (`LHSHEL
 lhde-session runs on the display, else `luxwmc quit` (luxwm exits cleanly: its root properties are deleted, the windows stay
 mapped; the lab's `restart-wm` brings it back); `standby` = `zzz` if installed, else `loginctl suspend`; `shutdown` = `loginctl
 poweroff`; `restart` = `loginctl reboot`; `lock` = `xlock` or `slock` if installed. From a terminal:
-`xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND logoff`. flxp's start panel asks first, then runs its own flxp.ini
-`logoff_command` (else it ends luxwm with `luxwmc quit`) and `shutdown_command` (default `loginctl poweroff`).
+`xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND logoff`. flxp's start panel asks first, then runs the same
+`[commands] logoff` (else it ends luxwm with `luxwmc quit`) and `[commands] shutdown` (default `loginctl poweroff`).
 
 ## Keys in the session
 
@@ -815,7 +815,7 @@ luxshell keeps the button pressed from the click (or Super) until the panel's wi
 | `[desktop]` | `wallpaper` | absent (default: the theme's `Desktop.wallpaper`) or `none` (no picture in any theme, solid #3a6ea5; `LHSHELL_WALLPAPER=0` forces it) |
 | `[desktop]` | `desktop_black` * | `0` (default): a maximised window darkens only its own frame (luxwm) and the bars' black layers; `1`: the whole desktop also turns black |
 | `[shell]` | `max_fade_ms` * | `0` (default): the bars' black layers switch at once when a window is maximised or restored; a number: a fade in ms (4074: 400) |
-| `[taskbar]` | `classic_start_menu` | whose menu the classic bar's Start button opens: `flxp` (its XP start panel, default) or `flxp-classic` (its classic popup menu). |
+| `[taskbar]` | `start_menu` | the menu the classic bar's Start button opens: `panel` (XP's start panel, default) or `classic` (the classic popup menu); flxp-taskbar reads it at every open. Next to the Avalon bar the start menu is the panel. |
 | `[taskbar]` | `autohide` * | `0` (default) or `1` |
 | `[taskbar]` | `rows` * | 1 (default), 2 or 3: the top-edge drag writes it |
 | `[sidebar]` | `mode` * | `full` (default), `minimized`, `pinned` |
@@ -826,7 +826,7 @@ luxshell keeps the button pressed from the click (or Super) until the panel's wi
 | `[sidebar]` | `locked` | `1`: the width sizer does not drag (the sidebar menu's *Lock the Sidebar*) |
 | `[clock]` | `pinned`, `pinned_pack` | `1` (pinned at the bottom) or `0` (a tile in the list), chosen in the pack `pinned_pack` (the clock's menu writes both); other packs use their own default: pinned in 4074-aero, 4074-slate and 5112-aero, a tile in 4051-slate |
 | `[clock]` | `layout` * | `default`, `digtime`, `digtimemonthday`, `digtimeweekday`, `minical`, `cal` |
-| `[start]` | `pinned` | flxp's start panel's pinned programs (through flxp.ini's `pinned` mapping), `a.desktop;b.desktop` (default: the default web browser and mail client from `xdg-settings`/`xdg-mime`, else an installed one) |
+| `[start]` | `pinned` | flxp's start panel's pinned programs, `a.desktop;b.desktop` (desktop ids, `terminal`, `explorer` or a command line; default `terminal;explorer`) |
 | `[quicklaunch]` | `dir` | the Quick Launch tile's folder (default `~/.config/lhde/quicklaunch/`) |
 | `[commands]` | `logoff`, `standby`, `shutdown`, `restart`, `lock` | session commands ("The session" above) |
 | `[commands]` | `taskbar` | the classic taskbar for `Shell.taskbar = classic` and, with `--start-menu-only`, the start-menu provider (default: `$LHSHELL_TASKBAR_CMD`, else `flxp-taskbar`) |

@@ -62,7 +62,8 @@ counts, flxp's remembered views and icon positions). Nothing else is read (docs/
 
 ## Where things are duplicated, on purpose or not yet resolved
 
-- **Start menu**: one, flxp's XP start panel (or its classic popup menu, flxp.ini `start_menu = classic`). luxshell's Avalon
+- **Start menu**: one, flxp's XP start panel (or, on the classic bar, its classic popup menu: settings.ini `[taskbar] start_menu =
+  classic`). luxshell's Avalon
   Start button and the Super key are forwarded to whoever owns `_LH_STARTMENU_S<n>`: flxp-taskbar with the classic bar,
   `flxp-startmenu` next to the Avalon bar (luxshell starts it). Longhorn's Avalon shell never had a start menu of its own, so
   there is none to reproduce.

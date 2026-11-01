@@ -957,11 +957,10 @@ The bottom bar is the theme key `Shell.taskbar` = `avalon | classic | none` (THE
 `LHSHELL_TASKBAR` forces one for a run). `classic` and `none`: the Avalon taskbar is unmapped, no strut, no task buttons, no
 `_NET_WM_ICON_GEOMETRY`. `classic` runs `[commands] taskbar` (default flxp-taskbar from build/bin or the install, else PATH;
 `$LHSHELL_TASKBAR_CMD`) through `lh.spawn_pid` (`sh -c 'exec ...'`, so the pid is the bar's) with luxshell's DISPLAY and session
-bus, `FLXP_TRAY_TAKEOVER=1`, `FLXP_START_MENU=panel` (`[taskbar] classic_start_menu = flxp`, default: XP's start panel) or
-`classic` (`= flxp-classic`: the classic popup menu), `FLXP_START_KEY=1`, its log in `$XDG_RUNTIME_DIR/luxshell-taskbar<display>.log`.
-No `--theme`: flxp-taskbar follows `_LH_THEME` itself. A bar already running on the display is adopted. It is stopped by its pid
-(after checking `/proc/PID/comm` and `DISPLAY` in `/proc/PID/environ`) on a switch away and on luxshell's exit; a change of
-`classic_start_menu` restarts it once the start-menu selection is free.
+bus, `FLXP_TRAY_TAKEOVER=1`, `FLXP_START_KEY=1`, its log in `$XDG_RUNTIME_DIR/luxshell-taskbar<display>.log`. Its Start button
+opens `[taskbar] start_menu` (`panel`, default: XP's start panel, or `classic`: the classic popup menu), which flxp-taskbar reads
+at every open. No `--theme`: flxp-taskbar follows `_LH_THEME` itself. A bar already running on the display is adopted. It is
+stopped by its pid (after checking `/proc/PID/comm` and `DISPLAY` in `/proc/PID/environ`) on a switch away and on luxshell's exit.
 
 | Need | Mechanism |
 | --- | --- |
@@ -1004,7 +1003,7 @@ provider that never sets it, the button shows pressed from the forward until the
 map; any change of the property ends that guess.
 
 **flxp-startmenu's life.** Wanted whenever the bottom bar is not `classic` (then flxp-taskbar is the provider). Started with
-`FLXP_START_MENU=panel FLXP_START_KEY=1`, log `$XDG_RUNTIME_DIR/luxshell-startmenu<display>.log`, only after `_LH_STARTMENU_S<screen>`
+`FLXP_START_KEY=1` (as the provider it always opens the start panel), log `$XDG_RUNTIME_DIR/luxshell-startmenu<display>.log`, only after `_LH_STARTMENU_S<screen>`
 has no owner (one that finds it owned stays no provider; luxshell waits up to 3 s); adopted when one (or a `flxp-taskbar
 --start-menu-only`) already runs on the display; restarted when it dies (checked every 3 s, at most 5 starts a minute, then
 none until the settings change); stopped by its pid (comm + DISPLAY checked) on the switch to the classic bar and on exit.
@@ -1028,7 +1027,7 @@ the start-menu provider check, `[theme] name` (liblhde `lhde_theme_select`, whic
 *Save as...* writes `~/.config/lhde/themes/FILE.theme` from the theme and its layer (`lhde_theme_save_as`) and selects it.
 
 **Settings.** settings.ini (`~/.config/lhde/settings.ini`, liblhde's store: unknown keys, comments and order kept, nothing
-written when a value is unchanged) holds the user's choices; luxshell's keys: `[taskbar] autohide rows classic_start_menu`,
+written when a value is unchanged) holds the user's choices; luxshell's keys: `[taskbar] autohide rows`,
 `[sidebar] mode width stacking with_classic yield_bottom locked`, `[clock] pinned pinned_pack layout`, `[desktop] wallpaper
 = none, desktop_black`, `[shell] max_fade_ms`, `[quicklaunch] dir`, `[commands]`, `[fonts] smoothing` (menus); missing
 defaults are written on first run. After a write luxshell sends one root ClientMessage `_LH_SETTINGS_CHANGED` per handled event:

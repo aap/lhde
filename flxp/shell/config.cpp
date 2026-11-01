@@ -64,21 +64,10 @@ static std::string trim(const std::string& s)
     return s.substr(a, b - a);
 }
 
-// settings.ini's value for a flxp key (flxp/shell/settings.cpp; weak so that a
-// program without the store, flxp-portal, links)
-std::string store_value_for(const std::string& key) __attribute__((weak));
-
-static std::string store_or(const std::string& key, const std::string& fallback)
-{
-    if (!store_value_for) return fallback;
-    std::string v = store_value_for(key);
-    return v.empty() ? fallback : v;
-}
-
 std::string file_setting(const std::string& key, const std::string& fallback)
 {
     std::string text;
-    if (!read_file(settings_path(), text)) return store_or(key, fallback);
+    if (!read_file(settings_path(), text)) return fallback;
     size_t i = 0;
     while (i < text.size()) {
         size_t j = text.find('\n', i);
@@ -90,10 +79,10 @@ std::string file_setting(const std::string& key, const std::string& fallback)
         if (eq == std::string::npos) continue;
         if (trim(line.substr(0, eq)) == key) {
             std::string v = trim(line.substr(eq + 1));
-            return v.empty() ? store_or(key, fallback) : v;   // "key =" means automatic
+            return v.empty() ? fallback : v;   // "key =" means automatic
         }
     }
-    return store_or(key, fallback);
+    return fallback;
 }
 
 std::string setting(const std::string& key, const std::string& fallback)

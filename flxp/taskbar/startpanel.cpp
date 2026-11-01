@@ -23,6 +23,7 @@
 #include "gdi/image.h"
 #include "shell/apps.h"
 #include "shell/config.h"
+#include "shell/settings.h"
 #include "sys/sys.h"
 #include "taskbar.h"
 
@@ -318,7 +319,7 @@ void add_app(const shell::App& a, bool bold)
 // pinned = item;item...: a .desktop id, `terminal`, `explorer`, or a command line
 void add_pinned(std::vector<std::string>& ids)
 {
-    std::string list = setting("pinned", "terminal;explorer");
+    std::string list = shell::store::get("start", "pinned", "terminal;explorer");   // settings.ini [start] pinned
     size_t a = 0;
     while (a <= list.size()) {
         size_t b = list.find(';', a);
