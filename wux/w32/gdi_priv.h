@@ -53,7 +53,7 @@ int region_type(const gdi::Region& r);    // NULLREGION / SIMPLEREGION / COMPLEX
 Region* region_of(HRGN h);
 
 // UTF-16 <-> UTF-8 for the GDI shim ("ANSI" is UTF-8 in this project).
-static inline std::string to_utf8(const WCHAR* s, int len)
+inline std::string to_utf8(const WCHAR* s, int len)
 {
     std::string o;
     if (!s) return o;
@@ -70,7 +70,7 @@ static inline std::string to_utf8(const WCHAR* s, int len)
     return o;
 }
 
-static inline std::u16string to_utf16(const char* s, int len)
+inline std::u16string to_utf16(const char* s, int len)
 {
     std::u16string o;
     if (!s) return o;
