@@ -108,7 +108,7 @@ static DBusHandlerResult on_message(DBusConnection *c, DBusMessage *msg, void *u
         const char *caps[] = { "body", "actions", "icon-static" }; const char **p = caps;
         r = dbus_message_new_method_return(msg); dbus_message_append_args(r, DBUS_TYPE_ARRAY, DBUS_TYPE_STRING, &p, 3, DBUS_TYPE_INVALID);
     } else if (dbus_message_is_method_call(msg, NIFACE, "GetServerInformation")) {
-        const char *name = "lhshell", *vendor = "Longhorn X11 lab", *version = "0.1", *spec = "1.2";
+        const char *name = "luxshell", *vendor = "lhde", *version = "0.1", *spec = "1.2";
         r = dbus_message_new_method_return(msg); dbus_message_append_args(r, DBUS_TYPE_STRING, &name, DBUS_TYPE_STRING, &vendor, DBUS_TYPE_STRING, &version, DBUS_TYPE_STRING, &spec, DBUS_TYPE_INVALID);
     } else if (dbus_message_is_method_call(msg, NIFACE, "Notify")) {
         r = on_notify(msg);

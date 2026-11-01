@@ -228,7 +228,7 @@ function S.state_get(sec, key)
 end
 function S.state_set(sec, key, value)
   local lines = read_lines(state_path)
-  if #lines == 0 then lines = { "; lux runtime state (tile order). The settings are in " .. lh.settings_path() .. " (docs/SETTINGS.md)" } end
+  if #lines == 0 then lines = { "; luxshell runtime state (tile order). The settings are in " .. lh.settings_path() .. " (docs/SETTINGS.md)" } end
   lines_set(lines, sec, key, value)
   write_lines(state_path, lines)
 end

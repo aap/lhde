@@ -330,7 +330,7 @@ void log_off()
     if (MessageBoxW(g.wnd, L"Are you sure you want to log off?", L"Log Off", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return;
     std::string c = setting("logoff_command");
     if (!c.empty()) { run_shell(c); return; }
-    // lhwm: `lhwmc quit` ends the window manager cleanly; that ends a session whose last program it is
+    // lhwm: `luxwmc quit` ends the window manager cleanly; that ends a session whose last program it is
     std::string wm = xwm::wm_name();
     if (wm.find("lhwm") != std::string::npos || wm.find("berry") != std::string::npos) {
         std::string exe = xwm::wm_executable();

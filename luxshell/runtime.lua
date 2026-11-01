@@ -243,7 +243,7 @@ if not (dk_env == "0" or dk_env == "off" or dk_env == "no" or dk_env == "false")
   dk = {}
   -- opaque (24-bit): it is only ever mapped while black, and a solid window lets picom skip the full-screen blur behind it
   -- (an ARGB one cost ~150-300 ms per composited frame during the maximise on the xrender lab). The Aurora will need ARGB again.
-  dk.surface = lh.surface{ name = "lhshell-desktop", type = "desktop", x = 0, y = 0, w = screen_w, h = screen_h, opaque = true }
+  dk.surface = lh.surface{ name = "luxshell-desktop", type = "desktop", x = 0, y = 0, w = screen_w, h = screen_h, opaque = true }
   dk.root = N{ layout = "fill" }
   dk.black = dk.root:add(N{ kind = "rect", fill = "#000000", opacity = 0 })                        -- the maximised-mode black
   dk.scene = dk.root:add(N{ layout = "fill" })                                                     -- Aurora (xaml_sidebar_desktopaurora) goes here
@@ -260,7 +260,7 @@ tb.wide = mode == "minimized"           -- the pinned tiles live in the taskbar 
 -- the taskbar runs the full width when the sidebar is minimized, or over a desktop-level sidebar ([sidebar] stacking = bottom)
 local function tb_full() return tb.wide or cfg.sb_bottom end
 tb.geo = { x = 0, y = screen_h - tb.h, w = tb_full() and screen_w or (screen_w - sidebar_w), h = tb.h }
-tb.surface = lh.surface{ name = "lhshell-taskbar", x = tb.geo.x, y = tb.geo.y, w = tb.geo.w, h = tb.h, dock = "bottom", strut = tb_on() and tb.h or 0, layer = "above" }
+tb.surface = lh.surface{ name = "luxshell-taskbar", x = tb.geo.x, y = tb.geo.y, w = tb.geo.w, h = tb.h, dock = "bottom", strut = tb_on() and tb.h or 0, layer = "above" }
 -- the sidebar toggle's 17x17 glyph: centred in its 29x29 slot on the first row (Border 6, TransformDecorator VCenter), the
 -- slot itself centred on a bar of several rows; Taskbar.BarVisible=false (sidebar minimized) → 1167 [Slate 1162]
 local function toggle_y() return math.floor((tb.row_h - 17) / 2) + math.floor((tb.h - tb.row_h) / 2) end
@@ -472,7 +472,7 @@ sb.geo = { x = screen_w - sb.w, y = 0, w = sb.w, h = screen_h }
 -- (shortened) taskbar at the corner (4074); bottom = a desktop-level layer: _NET_WM_STATE_BELOW (luxwm keeps BELOW docks under the
 -- clients), no strut (windows and maximised windows cover it), ending at the top of the full-width taskbar, which stays above it.
 local function sb_layer() return cfg.sb_bottom and "below" or "above" end
-sb.surface = lh.surface{ name = "lhshell-sidebar", x = sb.geo.x, y = 0, w = sb.w, h = screen_h, dock = "right", strut = cfg.sb_bottom and 0 or sb.w, layer = sb_layer() }
+sb.surface = lh.surface{ name = "luxshell-sidebar", x = sb.geo.x, y = 0, w = sb.w, h = screen_h, dock = "right", strut = cfg.sb_bottom and 0 or sb.w, layer = sb_layer() }
 -- top: raised (luxwm keeps the docks' order among themselves, docks_raise() raises them as a group in the server's order, so a
 -- plain raise puts the sidebar over the taskbar); bottom: lowered under every window (the desktop layer goes below it again)
 local function sb_stack()
@@ -1294,7 +1294,7 @@ local function classic_start()
   if lh.tray_yield then lh.tray_yield(10000) end
   local menu = classic_menu()
   local env = { FLXP_TRAY_TAKEOVER = "1", FLXP_START_MENU = (menu == "flxp-classic" and "classic" or "panel"), FLXP_START_KEY = "1" }
-  local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/lhshell-taskbar" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
+  local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/luxshell-taskbar" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
   classic.pid = lh.spawn_pid(classic_command() .. " >" .. S.quote(log) .. " 2>&1 </dev/null", env); classic.name, classic.menu = name, menu
   io.stderr:write(string.format("luxshell: taskbar: started %s (pid %s, start menu %s, log %s)\n", classic_command(), tostring(classic.pid), classic_menu(), log))
 end
@@ -1335,7 +1335,7 @@ local function provider_start()
     provider.pending = false
     if not provider_wanted() or provider_running() then return end
     table.insert(provider.starts, lh.now())
-    local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/lux-startmenu" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
+    local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/luxshell-startmenu" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
     provider.pid = lh.spawn_pid(lh.prog(PROVIDER) .. " >" .. S.quote(log) .. " 2>&1 </dev/null", { FLXP_START_MENU = "panel", FLXP_START_KEY = "1" })
     provider.name = PROVIDER
     io.stderr:write(string.format("luxshell: start menu: started %s (pid %s, log %s)\n", lh.prog(PROVIDER), tostring(provider.pid), log))
@@ -1504,7 +1504,7 @@ end
 function lh.compositor(want)   -- want: true = running, false = stopped
   if want then
     if #picom_pids() > 0 or lh.cm_owner() then return end
-    local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/lhshell-picom" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
+    local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/luxshell-picom" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
     io.stderr:write("luxshell: compositor: starting " .. lh.picom_command() .. "\n")
     lh.spawn(lh.picom_command() .. " >" .. S.quote(log) .. " 2>&1 </dev/null")
   else

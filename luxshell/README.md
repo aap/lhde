@@ -13,5 +13,5 @@ tiles/*.lua. Design: docs/SHELL-DESIGN.md; use: docs/USAGE.md.
 - Packs: the text in data/packs/NAME/shell.lua (4042-plex, 4051-slate, 4074-aero, 4074-aerovision, 4074-slate, 5112-aero),
   the images under packs/<build>/ of the Windows tree (`~/.local/share/lhde-windows/generated/packs`; lhde-import; `lh.data_find`).
 - shellpack.sh, shellpack-aero5112.sh: the research tools that extracted the pack images from the extracted builds (they need
-  the workspace's res/ and wim/; lhde-import copies their output). The X class of luxshell's windows stays `lhshell`, its atoms
-  `_LHSHELL_*`; `make install` adds an `lhshell` symlink.
+  the workspace's res/ and wim/; lhde-import copies their output). luxshell's windows have the X class `luxshell` (names
+  `luxshell-taskbar`, `luxshell-sidebar`, ...); its atoms are `_LHSHELL_*`.

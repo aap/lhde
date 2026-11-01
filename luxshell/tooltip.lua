@@ -6,7 +6,7 @@
 --                                under the pointer, clamped to the screen; leaving, a press or 5 s hide it.
 --   lh.tooltip_hide()
 return function(ctx)
-  local surf = lh.surface{ name = "lhshell-tooltip", popup = true, type = "popup_menu", x = 0, y = 0, w = 10, h = 10 }
+  local surf = lh.surface{ name = "luxshell-tooltip", popup = true, type = "popup_menu", x = 0, y = 0, w = 10, h = 10 }
   local pending, shown_timer, owner
   local function hide()
     if pending then lh.cancel(pending); pending = nil end

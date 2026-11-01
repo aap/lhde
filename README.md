@@ -164,6 +164,5 @@ store `~/.config/lhde/settings.ini`; what flxp remembers on its own (views, icon
 
 `LHDE_WINDOWS` (environment) is another Windows tree, `LHDE_DATA` a flat data directory used instead of it (tests, scratch
 imports), for every lhde program and script.
-Program names of the flxp side, these settings files and the X properties (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`) are
-unchanged from flxp and the Longhorn lab; the lux programs are renamed (lhwm → luxwm, lhwmc → luxwmc,
-lhshell → luxshell, lhnav → luxnav; the install keeps lhwm, lhwmc, lhshell symlinks).
+The X properties (`_LH_*`, `_LHWM_*`, `_LHSHELL_*`), the window manager's name `lhwm` (its `_NET_WM_NAME`) and the C
+prefixes (`ut_`, `lhnav_`, `lhde_`) are stable names; the programs are luxwm, luxwmc, luxshell, luxnav and the flxp ones.

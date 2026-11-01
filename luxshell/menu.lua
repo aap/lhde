@@ -30,7 +30,7 @@ return function(ctx)
   local pool = {}
   local function surface_for(depth)
     if not pool[depth] then
-      local s = lh.surface{ name = "lhshell-menu", popup = true, type = "menu", x = 0, y = 0, w = 10, h = 10 }
+      local s = lh.surface{ name = "luxshell-menu", popup = true, type = "menu", x = 0, y = 0, w = 10, h = 10 }
       s.on_outside = function() M.close() end
       s.on_key = function(_, name, text, state, pressed) if pressed then local r = M.key(name, text); if r == "close" then M.close() end end end
       s._root = lh.node{ layout = "canvas" }; s:root(s._root)   -- one tree per surface, cleared on close (nodes are not leaked per open)

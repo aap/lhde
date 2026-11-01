@@ -22,7 +22,7 @@ return function(ctx)
     bfont = T.toast_body_font or "ITC Franklin Gothic Std Medium 12px"
   end
   local queue, cur = {}, nil
-  local surf = lh.surface{ name = "lhshell-toast", popup = true, type = "notification", x = 0, y = 0, w = 10, h = 10 }
+  local surf = lh.surface{ name = "luxshell-toast", popup = true, type = "notification", x = 0, y = 0, w = 10, h = 10 }
   surf:round(9)                                                       -- round-rect region radius 9 (2.4.5)
 
   -- icon lookup: absolute/file:// PNG paths, then icon-theme names (PNG only: cairo has no SVG loader)

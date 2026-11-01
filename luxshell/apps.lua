@@ -16,7 +16,7 @@ local A = {}
 local HOME = os.getenv("HOME") or "/"
 local XDG_DATA_HOME = os.getenv("XDG_DATA_HOME") or (HOME .. "/.local/share")
 local XDG_CONFIG_HOME = os.getenv("XDG_CONFIG_HOME") or (HOME .. "/.config")
-local CACHE = (os.getenv("XDG_CACHE_HOME") or (HOME .. "/.cache")) .. "/lhshell"
+local ICONS = lh.state_file("luxshell-icons")   -- converted icons, ~/.local/state/lhde/luxshell-icons/<size>/
 local q = S.quote
 local function exists(p) local f = io.open(p, "r"); if f then f:close() return true end return false end
 local function trim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
@@ -99,7 +99,7 @@ end
 local function mfu_write(t)
   os.execute("mkdir -p " .. q(mfu_path:match("^(.*)/") or "."))
   local f = io.open(mfu_path .. ".tmp", "w"); if not f then return end
-  f:write("; lhshell start menu launch counts (SHELL-DESIGN 6.3): desktop id = count last-launch-epoch\n[mfu]\n")
+  f:write("; luxshell start menu launch counts (SHELL-DESIGN 6.3): desktop id = count last-launch-epoch\n[mfu]\n")
   local ids = {}; for id in pairs(t) do table.insert(ids, id) end; table.sort(ids)
   for _, id in ipairs(ids) do f:write(string.format("%s = %d %d\n", id, t[id].n, t[id].t)) end
   f:close(); os.rename(mfu_path .. ".tmp", mfu_path)
@@ -161,7 +161,7 @@ end
 -- themes: the GTK icon theme (gtk-3.0 / gtk-2.0 settings), its Inherits chain, then hicolor; base dirs ~/.icons,
 -- $XDG_DATA_HOME/icons, $XDG_DATA_DIRS/icons; per theme the index.theme Directories with Size/MinSize/MaxSize/Type/Scale,
 -- the closest size wins; last /usr/share/pixmaps. Files that are not PNG (svg, xpm) or not square PNGs are converted once
--- with ImageMagick into ~/.cache/lhshell/icons/<size>/.
+-- with ImageMagick into ~/.local/state/lhde/luxshell-icons/<size>/.
 local bases = { HOME .. "/.icons", XDG_DATA_HOME .. "/icons" }
 for d in (os.getenv("XDG_DATA_DIRS") or "/usr/local/share:/usr/share"):gmatch("[^:]+") do table.insert(bases, d .. "/icons") end
 local function gtk_theme()
@@ -237,11 +237,11 @@ local icon_cache = {}
 local function to_png(src, size)
   local w, h = nil, nil
   if src:match("%.png$") then w, h = png_size(src); if w and w == h then return src end end
-  local out = string.format("%s/icons/%d/%s.png", CACHE, size, (src:gsub("^/", ""):gsub("/", "_")))
+  local out = string.format("%s/%d/%s.png", ICONS, size, (src:gsub("^/", ""):gsub("/", "_")))
   local sm, om = lh.mtime(src), lh.mtime(out)
   if om and sm and om >= sm then return out end
   os.execute(string.format("mkdir -p %s && magick -background none %s -resize %dx%d -gravity center -extent %dx%d %s 2>/dev/null",
-    q(CACHE .. "/icons/" .. size), q(src), size, size, size, size, q(out)))
+    q(ICONS .. "/" .. size), q(src), size, size, size, size, q(out)))
   return exists(out) and out or nil
 end
 A.to_png = to_png

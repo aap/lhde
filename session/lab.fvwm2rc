@@ -3,4 +3,4 @@ Read $HOME/cfg/fvwmrc/fvwm2rc.win95
 ImagePath +:$HOME/cfg/fvwm/win2k
 # our self-framed clients draw their own frame
 Style glassdemo NoTitle, !Handles, BorderWidth 0, !Borders
-Style lhshell NoTitle, !Handles, BorderWidth 0, !Borders, Sticky, WindowListSkip, NeverFocus
+Style luxshell NoTitle, !Handles, BorderWidth 0, !Borders, Sticky, WindowListSkip, NeverFocus

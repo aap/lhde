@@ -132,7 +132,7 @@ bool tray_start(struct node *n) {
     if (prev != None) { fprintf(stderr, "luxshell: tray: %s is owned by 0x%lx, not taking it\n", name, prev); return false; }
     XSetWindowAttributes a = { .event_mask = PropertyChangeMask | StructureNotifyMask };
     mgr = XCreateWindow(dpy, root, -1, -1, 1, 1, 0, CopyFromParent, InputOnly, CopyFromParent, CWEventMask, &a);
-    XStoreName(dpy, mgr, "lhshell-tray");
+    XStoreName(dpy, mgr, "luxshell-tray");
     long orient = 0 /* _NET_SYSTEM_TRAY_ORIENTATION_HORZ */, vid = (long)XVisualIDFromVisual(argb), size = n->icon_size;
     XChangeProperty(dpy, mgr, a_orient, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&orient, 1);
     XChangeProperty(dpy, mgr, a_visual, XA_VISUALID, 32, PropModeReplace, (unsigned char *)&vid, 1);

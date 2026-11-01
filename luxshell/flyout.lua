@@ -11,7 +11,7 @@
 -- open and only the tile closes it).
 return function(ctx)
   local R, T, sb = ctx.R, ctx.T, ctx.sb
-  local fl = { surface = lh.surface{ name = "lhshell-flyout", popup = true, type = "popup_menu", x = 0, y = 0, w = 10, h = 10 } }
+  local fl = { surface = lh.surface{ name = "luxshell-flyout", popup = true, type = "popup_menu", x = 0, y = 0, w = 10, h = 10 } }
   local border, content
   local chrome_h = 17          -- the chrome's height above and below the content (17: the 4074 options row)
   -- pack key flyout = { top, top_h, top_grid, content, bottom, bottom_h, bottom_grid, opt_hot, opt_pressed, glyph, glyph_w,

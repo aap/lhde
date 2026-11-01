@@ -243,8 +243,8 @@ static int l_surface(lua_State *L) {
         .event_mask = ExposureMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | LeaveWindowMask | EnterWindowMask | StructureNotifyMask | KeyPressMask | KeyReleaseMask };
     s->win = XCreateWindow(dpy, root, s->x, s->y, s->w, s->h, 0, dep, InputOutput, vis, CWColormap | CWBorderPixel | CWBackPixel | CWEventMask | CWOverrideRedirect, &a);
     s->xs = cairo_xlib_surface_create(dpy, s->win, vis, s->w, s->h);
-    lua_getfield(L, 1, "name"); const char *name = lua_tostring(L, -1); if (!name) name = "lhshell";
-    XStoreName(dpy, s->win, name); XClassHint ch = { (char *)name, "lhshell" }; XSetClassHint(dpy, s->win, &ch); lua_pop(L, 1);
+    lua_getfield(L, 1, "name"); const char *name = lua_tostring(L, -1); if (!name) name = "luxshell";
+    XStoreName(dpy, s->win, name); XClassHint ch = { (char *)name, "luxshell" }; XSetClassHint(dpy, s->win, &ch); lua_pop(L, 1);
     long one = 1; XChangeProperty(dpy, s->win, atom[A_LHWM_SELF_FRAMED], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&one, 1);
     long mwm[5] = { 2, 0, 0, 0, 0 }; XChangeProperty(dpy, s->win, atom[A_MOTIF], atom[A_MOTIF], 32, PropModeReplace, (unsigned char *)mwm, 5);
     if (popup) {   /* override-redirect: toasts ("notification") and flyouts ("popup_menu") still carry their EWMH type for picom rules */
@@ -650,7 +650,7 @@ static int l_own_selection(lua_State *L) {
     Atom sel = XInternAtom(dpy, luaL_checkstring(L, 1), False), ts = XInternAtom(dpy, "_LHSHELL_TIMESTAMP", False);
     XSetWindowAttributes a = { .event_mask = PropertyChangeMask, .override_redirect = True };
     Window w = XCreateWindow(dpy, root, -1, -1, 1, 1, 0, CopyFromParent, InputOnly, CopyFromParent, CWEventMask | CWOverrideRedirect, &a);
-    XStoreName(dpy, w, "lhshell-selection");
+    XStoreName(dpy, w, "luxshell-selection");
     unsigned char c = 0; XEvent e; XChangeProperty(dpy, w, ts, XA_STRING, 8, PropModeAppend, &c, 0); XWindowEvent(dpy, w, PropertyChangeMask, &e);
     XSetSelectionOwner(dpy, sel, w, e.xproperty.time);
     if (XGetSelectionOwner(dpy, sel) != w) { XDestroyWindow(dpy, w); lua_pushnil(L); return 1; }

@@ -140,7 +140,7 @@ static Atom lhwm_ext_atom, lhwm_flags_atom, lhwm_comp_atom, lhwm_metrics_atom, l
 #define XFADE_MS (MAX_FADE_MS > 0 ? (double)MAX_FADE_MS : 400.0)   /* config.h MAX_FADE_MS; 0 = no fade at all (max_transition) */
 #define XFADE_TICK 25
 static Atom lhwm_anim_atom, net_icon_geom_atom;   /* _LHWM_ANIMATE (picom-glass.conf animation rules), _NET_WM_ICON_GEOMETRY */
-/* the animation style in use (LUXWM.md "Animations"): ../SETTINGS.md [theme] animations, LHWM_ANIMATIONS, else config.h ANIMATE_STYLE;
+/* the animation style in use (LUXWM.md "Animations"): the theme's Glass.animations, LHWM_ANIMATIONS, else config.h ANIMATE_STYLE;
    ANIM_NONE: no _LHWM_ANIMATE property and no animation of luxwm's own. Reloaded on the root ClientMessage _LH_SETTINGS_CHANGED. */
 #define ANIM_NONE 0
 static long anim_style = ANIMATE_STYLE;
@@ -5655,8 +5655,8 @@ anim_style_name(long v)
     return v == ANIM_4074PLUS ? "4074plus" : v == ANIM_4074 ? "4074" : v == ANIM_INVENTED ? "invented" : v == ANIM_5048 ? "5048" : v == ANIM_NONE ? "none" : "?";
 }
 
-/* [theme] animations from lhde's settings store (~/.config/lhde/settings.ini, liblhde; docs/SETTINGS.md), read at
-   startup and on every _LH_SETTINGS_CHANGED; LHWM_ANIMATIONS=<name> overrides it, config.h ANIMATE_STYLE is the default. A change
+/* the animation style from the theme's Glass.animations, read at startup, on a theme change and on every
+   _LH_SETTINGS_CHANGED; LHWM_ANIMATIONS=<name> overrides it, config.h ANIMATE_STYLE is the default. A change
    rewrites _LHWM_ANIMATE on every client and decoration window, so picom's rules switch live (a window in a running ANIM_INVENTED
    geometry animation gets the new value when that ends). */
 static void
