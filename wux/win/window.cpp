@@ -1099,6 +1099,21 @@ void track_mouse_leave(Window* w, bool nc)
     if (nc) w->track_nc_leave = true; else w->track_leave = true;
 }
 
+// The modifiers (and with buttons the mouse buttons) of g_keys from an X state: an event's (the
+// state before its own key or button changed) or sys::query_mods()'s. g_keys otherwise only
+// follows the key events we are sent, so a Ctrl pressed or released while another client had
+// the keyboard (or held a grab) would be missed: a Ctrl+1 seen without Ctrl, a Ctrl stuck down.
+static void keys_from_mods(uint32_t mods, bool buttons)
+{
+    g_keys[VK_SHIFT] = g_keys[VK_LSHIFT] = (mods & sys::ModShift) != 0;
+    g_keys[VK_CONTROL] = g_keys[VK_LCONTROL] = (mods & sys::ModControl) != 0;
+    g_keys[VK_MENU] = g_keys[VK_LMENU] = (mods & sys::ModAlt) != 0;
+    if (!buttons) return;
+    g_keys[VK_LBUTTON] = (mods & sys::ModLButton) != 0;
+    g_keys[VK_RBUTTON] = (mods & sys::ModRButton) != 0;
+    g_keys[VK_MBUTTON] = (mods & sys::ModMButton) != 0;
+}
+
 int16_t key_state(uint32_t vk) { return vk < 256 && g_keys[vk] ? (int16_t)0x8000 : 0; }
 bool key_down(uint32_t vk) { return vk < 256 && g_keys[vk]; }
 
@@ -1408,13 +1423,7 @@ uint32_t drag_files(Window* source, const std::vector<std::string>& paths, uint3
         dispatch_message(m);
     }
     // the button release and key changes went to the drag
-    uint32_t mods = sys::query_mods();
-    g_keys[VK_LBUTTON] = (mods & sys::ModLButton) != 0;
-    g_keys[VK_RBUTTON] = (mods & sys::ModRButton) != 0;
-    g_keys[VK_MBUTTON] = (mods & sys::ModMButton) != 0;
-    g_keys[VK_SHIFT] = g_keys[VK_LSHIFT] = (mods & sys::ModShift) != 0;
-    g_keys[VK_CONTROL] = g_keys[VK_LCONTROL] = (mods & sys::ModControl) != 0;
-    g_keys[VK_MENU] = g_keys[VK_LMENU] = (mods & sys::ModAlt) != 0;
+    keys_from_mods(sys::query_mods(), true);
     return sys::drag_result();
 }
 
@@ -1481,6 +1490,7 @@ static void handle_event(const sys::Event& ev)
     case sys::EventKind::ButtonUp:
     case sys::EventKind::Wheel:
         if (ev.kind == sys::EventKind::ButtonDown) g_last_input_keyboard = false;
+        if (ev.kind == sys::EventKind::ButtonDown || ev.kind == sys::EventKind::ButtonUp) keys_from_mods(ev.mods, false);   // a Shift+click's Shift
         dispatch_mouse(t, ev);
         break;
     case sys::EventKind::PointerLeft:
@@ -1501,6 +1511,7 @@ static void handle_event(const sys::Event& ev)
         uint32_t vk = vk_from_keysym(ev.keysym);
         bool down = ev.kind == sys::EventKind::KeyDown;
         if (down) g_last_input_keyboard = true;
+        keys_from_mods(ev.mods, false);   // the modifiers as X had them, then this key's own change
         if (vk < 256) g_keys[vk] = down;
         if (vk == VK_SHIFT) g_keys[VK_LSHIFT] = down;
         if (vk == VK_CONTROL) g_keys[VK_LCONTROL] = down;
@@ -1529,6 +1540,7 @@ static void handle_event(const sys::Event& ev)
             // (the modal dialog) instead; the WM is asked to follow
             if (Window* p = enabled_owned_popup(t)) { sys::activate_window(p->top->native); t = p; }
         }
+        keys_from_mods(sys::query_mods(), true);   // what changed while another window had the keyboard
         if (g_active == t && is_window(g_focus) && toplevel_of(g_focus) == t) break;   // already redirected here
         g_active = t;
         if (!is_window(g_focus) || toplevel_of(g_focus) != t) set_focus(t);

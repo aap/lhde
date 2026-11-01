@@ -80,7 +80,7 @@ header (the step-2 `LUXNAV_DIR` hook and build/compat are gone).
 `tests/check.sh` runs what needs no Microsoft files: kerneltest (the shim's
 kernel/CRT/registry/resource/usp10 parts), gditest, fileops_test, and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
-incl. GTK, the file dialog in both looks) on displays :71-:73
+incl. GTK, the file dialog in both looks, the modifier keys across a focus change) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).

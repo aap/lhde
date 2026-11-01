@@ -63,6 +63,7 @@ else
     fi
     tests/headless/dnd.sh "$2" > "$T/dnd.log" 2>&1; result headless/dnd.sh $? "$T/dnd.log"
     tests/headless/lvtiles.sh "$2" > "$T/lvtiles.log" 2>&1; result "headless/lvtiles.sh ($(tail -n 1 "$T/lvtiles.log"))" $? "$T/lvtiles.log"
+    tests/headless/modkeys.sh "$1" > "$T/modkeys.log" 2>&1; result headless/modkeys.sh $? "$T/modkeys.log"
     tests/headless/filedlg.sh "$3" > "$T/filedlg.log" 2>&1; result headless/filedlg.sh $? "$T/filedlg.log"
 fi
 
