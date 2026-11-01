@@ -34,7 +34,6 @@ install-luxshell: build/bin/luxshell
 	install -m 755 build/bin/luxshell $(DESTDIR)$(BINDIR)/
 	install -m 644 $(wildcard luxshell/*.lua) $(DESTDIR)$(PKGLIBDIR)/luxshell/
 	install -m 644 $(wildcard luxshell/tiles/*.lua) $(DESTDIR)$(PKGLIBDIR)/luxshell/tiles/
-	install -m 755 luxshell/shellpack.sh luxshell/shellpack-aero5112.sh $(DESTDIR)$(PKGLIBDIR)/luxshell/
 uninstall-luxshell:
 	rm -f $(DESTDIR)$(BINDIR)/luxshell
 	rm -rf $(DESTDIR)$(PKGLIBDIR)/luxshell

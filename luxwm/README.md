@@ -14,9 +14,10 @@ drawn live from the visual style through libwuxtheme (Window.CAPTION & co.) with
   tools/lhde-import), found through liblhde/data.c.
 - From berry (MIT, Joshua L Ervin; its notice is luxwm/LICENSE, docs/LICENSING.md): wm.c and client.c (they carry berry's
   copyright line), config.h, globals.h, ipc.h, types.h, utils.c, utils.h, the man pages luxwm.1 and luxwmc.1 (berry's
-  berry.1 and berryc.1) and examples/. Written for lhde: frame.c, frame.h, frame_ut.c, frame_ut.h, menu.c, menu.h, luxwm.mk
+  berry.1 and berryc.1). Written for lhde: frame.c, frame.h, frame_ut.c, frame_ut.h, menu.c, menu.h, luxwm.mk
   and tests/.
 - Names kept from lhwm: the X atoms (`_LHWM_*`), the window manager's `_NET_WM_NAME` "lhwm" (luxshell and flxp's log-off know
   it by that), `LHWM_*` environment variables, `~/.config/lhde/keys`. `make install` adds `lhwm` and `lhwmc` symlinks.
 - tests/: frametest (renders frames offline), menutest, regress.sh, and small X clients for the lab (desktopwin, dockorder,
-  strutdock); examples/: berry's autostart and sxhkdrc samples (its xephyr.sh dev script, which runs killall, is not imported).
+  strutdock). berry's examples/ (an autostart of berryc colour and gap settings, an sxhkdrc) are not carried: luxwm reads
+  its keys and its frames itself (docs/LUXWM.md).

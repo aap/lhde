@@ -50,7 +50,7 @@ restart-picom | stop`): luxwm (`LAB_WM=fvwm` for an fvwm2 session with `lab.fvwm
 (xrender backend with gaussian blur; `LAB_BACKEND=glx`), the mock wallpaper, and the theme `aero4074` (`LAB_THEME=NAME` another;
 `lhde-theme list` names them). `LAB_PICOM=0` starts it without picom (`start`/`ensure`/`restart-picom` just say so); luxwm then
 shows the theme's classic frame set. `LAB_WMARGS=""` starts luxwm without `-d` (its debug log). `shell` starts luxshell
-(`LAB_SHELL_DESKTOP=0`: without its desktop layer), `demo` two terminals (`$LAB_TERM`, default xterm) and the glassdemo window.
+(`LAB_SHELL_DESKTOP=0`: without its desktop layer), `demo` two terminals (`$LAB_TERM`, default xterm) and the extendframe window.
 `restart-wm` restarts luxwm from the build tree (with `LAB_THEME` set, that theme becomes the session's); `stop` ends every
 process whose `DISPLAY` is the lab's, then its X server. `session/hovertest.sh [DIR]` scripts the caption buttons' hover and press
 states on the lab and saves zooms.

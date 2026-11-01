@@ -64,7 +64,7 @@ static void init(void)
     tree_dir[0] = exe_dir[0] = 0;
     find_exe_and_tree();
     /* 1. the user's files: ~/.config/lhde (themes/, and any data file the user puts there under its data-directory name) */
-    /* (spelled out here, not lhde_config_dir: libluxnav and glassdemo link data.o alone) */
+    /* (spelled out here, not lhde_config_dir: libluxnav links data.o alone) */
     const char *xc = getenv("XDG_CONFIG_HOME");
     char cfg[PATH_MAX + 16];
     if (xc && *xc) snprintf(cfg, sizeof cfg, "%s/lhde", xc); else snprintf(cfg, sizeof cfg, "%s/.config/lhde", h ? h : "");
