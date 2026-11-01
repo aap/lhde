@@ -104,7 +104,9 @@ header (the step-2 `LUXNAV_DIR` hook and build/compat are gone).
 
 `tests/check.sh` runs what needs no Microsoft files: kerneltest (the shim's
 kernel/CRT/registry/resource/usp10 parts), gditest, fileops_test, `tests/settings-lists.sh` (Display Properties' Desktop
-lists without a window: the backgrounds' order and selection, the icon sets), `tests/aero-patches.py` (lhde-import's table of Aero
+lists without a window: the backgrounds' order and selection, the icon sets; Appearance's "Windows and buttons", `--list
+appearance --pick STYLE`: classic, a bare style with and without a frame set, back to the theme's own, with the user's
+`jade4074.msstyles` copied under other names, skipped without it), `tests/aero-patches.py` (lhde-import's table of Aero
 patches and which styles get a frame set, on stand-in files), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
 incl. GTK, the file dialog in both looks, the modifier keys across a focus change) on displays :71-:73

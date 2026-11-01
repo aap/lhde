@@ -179,10 +179,11 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    imageres, explorer, browseui, comctl32, themeui, shellstyle, uDWM; `themes/` = the build's Resources/Themes; `fonts/`,
    `wallpapers/`, `source.ini`); a style dropped in by hand goes to `local/themes/` (its `Shell/` directory, the task pane's
    shellstyle.dll per colour scheme, with it when it lies beside the file) and then shows on Display Properties' Appearance tab
-   ("Windows and buttons") beside the styles the shipped themes use; choosing it there gives "THEME (Modified)", and Save As
-   on the Themes tab makes it a theme of its own. The pack's `local/` goes to the tree's `local/` (indexed as if dropped in by
-   hand, and the recipes of its styles run: realaero's frame sets, the frame set of any other style with 4074's
-   CompositedWindow parts). `index/` holds the names the programs ask
+   ("Windows and buttons") beside the styles the shipped themes use; choosing it there gives "THEME (Modified)" with the
+   style's own frames (its frame set when it has one, as an Aero patch does, else its own decorations), choosing the theme's
+   own style again takes the change back, and Save As on the Themes tab makes it a theme of its own. The pack's `local/` goes
+   to the tree's `local/` (indexed as if dropped in by hand, and the recipes of its styles run: realaero's frame sets, the
+   frame set of any other style with 4074's CompositedWindow parts). `index/` holds the names the programs ask
    for, as relative symlinks: `styles/<name>.msstyles` (build-qualified: jade4074, slate4051, aero5112, luna = XP's own, whose
    `styles/luna/` is XP's `themes/Luna/` with `Shell/<Scheme>/shellstyle.dll`; luna4051 / luna4074 = Longhorn's copies),
    `resources/<source>`, `fonts/<source>`, `wallpapers/<source>`, `icons/<pack>`, `frames` and `packs` (-> `generated/`). Then the recipes of
@@ -328,8 +329,9 @@ and `Theme.build = 4074`. Only `realaero` has the shipped, fitted set and `aerov
 A tree imported before lhde called the style `realaero` holds `local/themes/aero-patch.msstyles` and the frame set
 `generated/frames/aero-patch`: every import renames the file (`lhde-import --reindex` does only that), and
 `lhde-import --regenerate` also makes the frame sets again under the new name. `aero-patch` stays an alias of `aero4074`, so a
-`settings.ini` that selected it keeps working; a theme file of your own that says `style = aero-patch` or `frames = aero-patch`
-needs the new name.
+`settings.ini` that selected it keeps working, and a theme file that still says `style = aero-patch` gets `realaero` (the
+resolver's fallback: "style aero-patch not imported: realaero"); `frames = aero-patch` in a theme file of your own needs the new
+name.
 
 ### Icon packs
 An icon recipe (`share/icons/NAME.theme`, chosen by a theme's `Desktop.icons`) maps flxp's icon keys to sources: `pe:FILE#ID`

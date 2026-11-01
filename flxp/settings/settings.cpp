@@ -1410,8 +1410,20 @@ void fill_appearance(HWND dlg)
     InvalidateRect(GetDlgItem(dlg, IDC_AP_PREVIEW), nullptr, FALSE);
 }
 
+// one visual style under two names: the same name, or two names of one file (lhde_style_path). The theme's own style is
+// compared as its files resolve it (files: aliases and renames applied, an old theme file's aero-patch is realaero)
+bool same_style(const std::string& a, const std::string& b)
+{
+    if (a == b) return true;
+    char pa[PATH_MAX] = "", pb[PATH_MAX] = "", ra[PATH_MAX], rb[PATH_MAX];
+    lhde_style_path(a.c_str(), pa, sizeof pa);
+    lhde_style_path(b.c_str(), pb, sizeof pb);
+    return pa[0] && pb[0] && realpath(pa, ra) && realpath(pb, rb) && !strcmp(ra, rb);
+}
+
 // "Windows and buttons" changed: the style with a colour and size of its own (the current ones when it has them); the
-// window frames follow the style (its own frame set, as a bare style gets it), the rest of the theme stays
+// window frames follow the style (its own frame set, as a bare style gets it: an Aero patch's generated one, else none), the
+// rest of the theme stays. Back to the theme's own style: the layer loses the style and what came with it
 void pick_style(const std::string& name)
 {
     std::string theme_style = files.value("VisualStyle.style");
@@ -1432,10 +1444,15 @@ void pick_style(const std::string& name)
     set_key("VisualStyle.style", name);
     set_key("VisualStyle.color", has(colors, c) ? c : colors.empty() ? "" : colors[0].value);
     set_key("VisualStyle.size", has(sizes, z) ? z : sizes.empty() ? "" : sizes[0].value);
-    if (name == theme_style) {   // back to the theme's own style: its frames again
+    if (!theme_style.empty() && theme_style != "classic" && same_style(name, theme_style)) {   // the theme's own: its frames again
+        cur.layer.erase("VisualStyle.style");
         cur.layer.erase("Glass.frames");
         cur.layer.erase("Glass.frames_classic");
         cur.layer.erase("VisualStyle.scheme");
+        for (const char* k : { "VisualStyle.color", "VisualStyle.size" }) {
+            auto it = cur.layer.find(k);
+            if (it != cur.layer.end() && it->second == files.value(k)) cur.layer.erase(it);
+        }
     } else {
         shell::SessionTheme bare;
         if (shell::resolve_theme_files(name, bare)) {
@@ -1912,9 +1929,21 @@ void list_desktop()
     for (const Item& it : icon_items) printf("%sicons %s = %s\n", it.value == v ? "*" : "", it.label.c_str(), it.value.c_str());
 }
 
+// --list appearance [--pick STYLE]...: Appearance's "Windows and buttons" without a window (tests/settings-lists.sh): each
+// STYLE picked in turn as the combo does it, then "style NAME", "frames NAME", "frames_classic NAME" as the session would
+// resolve them and the pending layer, "layer KEY = VALUE" (sorted)
+void list_appearance(const std::vector<std::string>& picks)
+{
+    load_styles();
+    for (const std::string& n : picks) { pick_style(n); recompute(); }
+    printf("style %s\nframes %s\nframes_classic %s\n", value("VisualStyle.style").c_str(), value("Glass.frames").c_str(),
+           value("Glass.frames_classic").c_str());
+    for (const auto& kv : cur.layer) printf("layer %s = %s\n", kv.first.c_str(), kv.second.c_str());
+}
+
 void usage(FILE* f)
 {
-    fputs("usage: flxp-settings [--tab themes|desktop|appearance|shell | --list desktop]\n"
+    fputs("usage: flxp-settings [--tab themes|desktop|appearance|shell | --list desktop | --list appearance [--pick STYLE]...]\n"
           "Display Properties: the session theme (theme files; your changes are settings.ini [current], \"NAME (Modified)\",\n"
           "until Save As writes ~/.config/lhde/themes/NAME.theme) and the per-user settings (~/.config/lhde/settings.ini).\n", f);
 }
@@ -1929,16 +1958,20 @@ int tab_of(const std::string& t)
 int main(int argc, char** argv)
 {
     int start = 0;
-    bool list = false;
+    bool list = false, list_ap = false;
+    std::vector<std::string> picks;
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         if ((a == "--tab" || a == "-t") && i + 1 < argc) start = tab_of(argv[++i]);
         else if (a == "--list" && i + 1 < argc && !strcmp(argv[i + 1], "desktop")) { list = true; i++; }
+        else if (a == "--list" && i + 1 < argc && !strcmp(argv[i + 1], "appearance")) { list_ap = true; i++; }
+        else if (a == "--pick" && i + 1 < argc) picks.push_back(argv[++i]);
         else if (a.rfind("--tab=", 0) == 0) start = tab_of(a.substr(6));
         else if (a == "--help" || a == "-h") { usage(stdout); return 0; }
         else { usage(stderr); return 2; }
     }
     if (list) { cur = load_state(); recompute(); list_desktop(); return 0; }   // no display needed
+    if (list_ap) { cur = load_state(); recompute(); list_appearance(picks); return 0; }
     shell::setup_fonts();
     shell::setup_theme();
     w32::init();
