@@ -848,9 +848,9 @@ gradients #838A90 → #767B7F header, #6B7278 → #5B6366 body, Tahoma 7.5 white
 Chosen from the tile's menu or its Properties flyout (the six layouts and the pinned switch). XAML margins like `bin:02HHVV` are
 two-value Thickness (horizontal, vertical). Times follow the environment's LC_TIME (luxshell itself runs in the C locale).
 
-Face sets, chosen by the theme's visual style (pack key `clock_face` overrides): `slate*` and anything else the light set
+Face sets, chosen by the style's family (the resolver's `style.family`; pack key `clock_face` overrides): slate and anything else the light set
 (1074 face, 1076 glass, image hands 1077/1078/1079 and anchor 1083 on `SidebarClockSettings`' LayerOrigins, design size 260;
-`~/fun/longhorn/sidebar/CLOCK.md` 1.1); `jade*`, `aero*` the dark-blue set of `4074-dwm.png` (face 1190 263x263, 1192 a
+`~/fun/longhorn/sidebar/CLOCK.md` 1.1); the jade and aero families (RealAero too) the dark-blue set of `4074-dwm.png` (face 1190 263x263, 1192 a
 byte-identical copy, glass 1191 265x265, hour 1193 / shadow 1194, minute 1195 / 1196, second 1197 / 1198, anchor 1188/1189;
 its hand pivots are estimates: tail ~22 design px for hour/minute, ~35 for the second hand); `plex*` the Plex builds' light
 set from `packs/4042/imageres` when imported (`clock_layers = "full"`: 4042 main's 179 px clock as the tile's Background, Arial

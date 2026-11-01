@@ -60,16 +60,16 @@ local FMT = {
   day = function() return tostring(tonumber(os.date("%d"))) end,           -- "%d"
 }
 
--- the face set for the theme: "light" | "dwm" | "plex", from the resolved theme's VisualStyle.style (the pack key clock_face
--- overrides):  slate* -> light;  jade*, aero* (aero4074, aerovision, aero5048, aero5112, basic5112) -> dwm;  plex* -> plex;
--- anything else (luna, classic, ...) -> light
+-- the face set for the theme: "light" | "dwm" | "plex", from the resolved theme's style family (the resolver's style.family:
+-- jade, aero, slate, plex, luna, ...; the pack key clock_face overrides):  jade, aero (jade4074, aero4074, aerovision, aero5048,
+-- aero5112, basic5112; realaero is family aero) -> dwm;  plex -> plex;  slate and anything else (luna, classic, ...) -> light
 function tile:face_set()
   local o = self.T.clock_face
   if o == "dwm" or o == "light" or o == "plex" then return o end
   local e; if lh.theme_name then e = select(2, lh.theme_name()) end
-  local st = (e and e.v and e.v["VisualStyle.style"] or ""):lower()
-  if st:match("^jade") or st:match("^aero") then return "dwm" end
-  if st:match("^plex") then return "plex" end
+  local fam = (e and e.v and e.v["style.family"] or ""):lower()
+  if fam == "jade" or fam == "aero" then return "dwm" end
+  if fam == "plex" then return "plex" end
   return "light"
 end
 -- Plex: the Plex builds' clock is the light layered clock of 4042-4053 (CLOCK.md 3: the 260 px set 1074 face, 1076 glass,
