@@ -73,7 +73,6 @@ sidebar  = full                 ; full | minimized | pinned | none
 chrome   = longhorn             ; auto | xp | longhorn: the Explorer's own look
 navbar   = 4074                 ; 4051 | 4074 | vision | none (later 5048, 5112): a layout family
 navbar_preset = medium          ; family-specific size: 4074 small|medium|large|xlarge; vision small|big
-taskband = 0                    ; the Longhorn task band
 taskpane = top                  ; top | bottom: where flxp's Longhorn task band goes, under the command bar (4051) or under the
                                 ; list (mirrored; basic/aero 5048 and 5112: close to Vista's details pane, a choice, not the builds')
 

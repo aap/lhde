@@ -24,7 +24,7 @@
 // details (none when less than 200 px are left), 189 px columns, 26 px rows,
 // the last slot "more" when they do not all fit. Its background is the command
 // bar's: the theme's per-folder Rebar.BACKGROUND strip (lhbar), or with
-// taskpane_style=aurora the Longhorn demo's aurora bitmaps by folder kind.
+// taskpane_background = aurora the Longhorn demo's aurora bitmaps by folder kind.
 #pragma once
 #include <memory>
 #include <string>

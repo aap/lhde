@@ -2343,7 +2343,7 @@ static void print_info()
     if (lh) printf("buttons      %s\n", header::buttons_source().c_str());
     if (lh) printf("%s", header::metrics_info().c_str());
     if (lh) printf("task band    %s, %s; %s\n", taskpane::wanted() ? "on" : "off (taskpane=1, --taskpane or View > Task Band)",
-                   shell::theme_setting("taskpane_position", "top") == "bottom" ? "under the list (Explorer.taskpane = bottom)"
+                   shell::session_theme().value("Explorer.taskpane") == "bottom" ? "under the list (Explorer.taskpane = bottom)"
                                                                                : "under the command bar", taskpane::source().c_str());
 }
 

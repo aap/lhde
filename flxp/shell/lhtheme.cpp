@@ -205,21 +205,15 @@ void set_session_theme(const SessionTheme& t)
 
 std::string theme_setting(const std::string& key, const std::string& fallback)
 {
-    // a run's option (FLXP_<KEY>) wins over the theme
-    std::string var = "FLXP_";
-    for (char c : key) var += (c >= 'a' && c <= 'z') ? (char)(c - 32) : c;
-    if (const char* e = getenv(var.c_str())) if (*e) return e;
-    const SessionTheme& t = g_theme;
-    auto or_fallback = [&](const std::string& v) { return v.empty() ? fallback : v; };
+    // FLXP_<KEY>, then flxp.ini (setting), then the theme's default for the key
     std::string v = setting(key);
     if (!v.empty()) return v;
-
+    const SessionTheme& t = g_theme;
     if (key == "menubar_style") return t.value("Explorer.chrome") == "longhorn" ? "document" : fallback;
     if (key == "header_engine") {
         std::string nb = t.value("Explorer.navbar");
         return nb == "vision" ? "lhnav" : nb == "4051" || nb == "4074" ? "flxp" : fallback;
     }
-    if (key == "taskpane_position") return or_fallback(t.value("Explorer.taskpane"));   // top | bottom
     if (key == "header_preset") {
         std::string p = t.value("Explorer.navbar_preset");
         return t.value("Explorer.navbar") == "vision" && !p.empty() && p != "auto" ? p : fallback;

@@ -77,7 +77,7 @@ int effective() { return g_compact || g_room - g_exp_h < LIST_MIN ? COMPACT_H : 
 // the band's first row in the bitmap render() makes: what hangs over the left pane is below the band at the top, above it at
 // the bottom
 int band_y() { return g_bottom ? HANG : 0; }
-bool read_bottom() { return shell::theme_setting("taskpane_position", "top") == "bottom"; }
+bool read_bottom() { return shell::session_theme().value("Explorer.taskpane") == "bottom"; }   // the theme's: top | bottom
 bool small() { return H == COMPACT_H; }
 int box_x() { return PAD; }
 int box_w() { return H + 8; }
@@ -152,19 +152,16 @@ void make_fonts()
     g_fonts[F_LINE_U] = tahoma(11, true);
 }
 
-// The demo's resource directory, only with taskpane_style = aurora:
-// taskpane_aurora (a directory), else lhde's resources/demo (shell/lhdata.h),
-// else next to the Longhorn images (<the theme's Longhorn resources>/../../../../demo_resources).
-// "" = none: the menu band's gradient (taskpane_style = menubar, the default).
+// The demo's resource directory, only with taskpane_background = aurora:
+// lhde's resources/demo (shell/lhdata.h), else next to the Longhorn images
+// (<the theme's Longhorn resources>/../../../../demo_resources).
+// "" = none: the menu band's gradient (taskpane_background = menubar, the default).
 std::string aurora_dir()
 {
     if (g_aurora_looked) return g_aurora_dir;
     g_aurora_looked = true;
-    std::string style = shell::theme_setting("taskpane_style", "menubar");
-    if (style != "aurora") return g_aurora_dir = "";
+    if (shell::setting("taskpane_background", "menubar") != "aurora") return g_aurora_dir = "";
     std::vector<std::string> c;
-    std::string set = shell::theme_setting("taskpane_aurora");
-    if (!set.empty()) c.push_back(set);
     std::string demo = shell::lhde_find("resources/demo");
     if (!demo.empty()) c.push_back(demo);
     std::string sys = shell::longhorn_resources();

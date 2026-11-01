@@ -159,7 +159,7 @@ store `~/.config/lhde/settings.ini`; what flxp remembers on its own (views, icon
 | the framelets | `Microsoft.Windows.Client.dll` beside (or in) `resources/<build>`, the theme's build first, then 4074 |
 | the fonts | `fonts/<build>` with tahoma.ttf (4074's); the session theme's `fonts` (registry) are added too |
 | Display Properties' wallpaper list | flxp.ini `wallpaper_dirs` (`:`-separated), default `~/Pictures/Wallpapers` and every `wallpapers/<build>`; the theme's wallpaper from `wallpapers.ini` (root `wallpapers/`) |
-| `taskpane_aurora` | `resources/demo` (needs the demo's `docLib/`, `search/` images; the import has only `aurora_strip.png` so far) |
+| the task band's aurora (flxp.ini `taskpane_background = aurora`) | `resources/demo` (needs the demo's `docLib/`, `search/` images; the import has only `aurora_strip.png` so far) |
 | (XP/2000 art) | no setting: the xp/2k/longhorn4074 icon recipes (`data/icons/*.theme`), the toolbar strips, the task pane's shellstyle bitmaps, the start flag, the Log Off buttons, the user tile and the Folders bar's close glyph are read by resource id from `resources/xp`, `resources/2k` (lhde-import; docs/history/flxp-NOTES.md "XP and 2000 art by resource id"). Without them: Wine's icons and drawn lookalikes. |
 
 `LHDE_WINDOWS` (environment) is another Windows tree, `LHDE_DATA` a flat data directory used instead of it (tests, scratch

@@ -551,6 +551,11 @@ or the bottom (`Explorer.taskpane`): the 5048 and 5112 themes have it under the 
 which comes close to Vista's details pane; there it is the same band mirrored, the picture hanging above it over the left pane
 (whose view button moves up out of its way) and its top edge dragging it.
 
+The task band's keys: the theme says where it goes (`Explorer.taskpane = top | bottom`); `flxp.ini` holds the user's choices,
+all spelled `taskpane*`: `taskpane` (shown, `0 | 1`), `taskpane_compact` (`0 | 1`), `taskpane_height` (the expanded rows,
+87..246, default 126) and `taskpane_background` (`menubar`, default: the command bar's strip; `aurora`: the Longhorn demo's
+aurora bitmaps from `resources/demo`, a taste choice).
+
 ## Descriptions and tags (flxp)
 
 A file or folder can carry a one-line **description**, **tags** and a **comment**. They are extended attributes on the file

@@ -65,9 +65,7 @@ std::string theme_taskbar();
 //   menubar_style      flxp.ini, else document for chrome = longhorn
 //   header_engine      flxp.ini, else Explorer.navbar: vision -> lhnav, 4051 | 4074 -> flxp
 //   header_preset      flxp.ini, else Explorer.navbar_preset for navbar = vision
-//   taskpane_position  flxp.ini, else Explorer.taskpane (top | bottom: the Longhorn task band under the list)
-
-// any other key: setting(key, fallback) (flxp.ini, the settings store).
+// any other key: setting(key, fallback) (FLXP_<KEY>, flxp.ini).
 std::string theme_setting(const std::string& key, const std::string& fallback = "");
 // The session theme's path.resources when it is a Longhorn build's (resources/4051, resources/4074, ...: that build's
 // system32), else "": shell32's Longhorn art, the framelets beside it, slate.msstyles under its Resources
