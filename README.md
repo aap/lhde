@@ -20,12 +20,14 @@ one build, for the parts that were separate projects:
 | `share/`    | text only: `themes/*.theme` (the shipped themes), `navbar/*.ini`, `icons/*.theme`, `sources/*.ini` (what lhde-pack takes from each Windows build), `frames/*/theme.ini`, `packs/*/shell.lua` | x11 `themes.ini`, `wallpapers.ini`, `lhwm/themes/*/*.ini`, `lhshell/themes/` |
 | `docs/`     | `ARCHITECTURE.md` (the map), `LAYOUT.md` (asset policy, the three trees), `THEME-FORMAT.md`, `SETTINGS.md`, `CLIENT-PROTOCOL.md`, `USAGE.md`, `LUXWM.md`, `NAVBAR.md`, `SHELL-DESIGN.md`, `MSSTYLES-FORMAT.md`, `ANNOTATIONS.md`, `LICENSING.md`; `docs/README.md` lists them; `history/` holds the journals (flxp-NOTES, THEMES, the merge plan, the theme-format status) | |
 
-No Microsoft files are in this repository, and none may be added (docs/LAYOUT.md,
-"Asset policy"): no `.msstyles`, DLLs, fonts, wallpapers, extracted bitmaps or
-screenshots of them. The icons in `flxp/res/icons` are Wine's (LGPL), the `.res`
-files in `wux/rc` are built from Wine's `.rc` sources, `wux/w32/stdres.res` from
-Wine's user32 resources (`wux/w32/mkstdres.py WINE-SRC`). Windows art is read at
-run time from the user's own files (settings below).
+No Microsoft files are in this repository, and none may be added
+(docs/LAYOUT.md, "Asset policy"): no `.msstyles`, DLLs, fonts, wallpapers,
+extracted bitmaps, Microsoft concept art or screenshots of the real Windows
+builds. Screenshots of lhde itself are fine and live in `screenshots/`. The
+icons in `flxp/res/icons` are Wine's (LGPL), the `.res` files in `wux/rc` are
+built from Wine's `.rc` sources, `wux/w32/stdres.res` from Wine's user32
+resources (`wux/w32/mkstdres.py WINE-SRC`). Windows art is read at run time from
+the user's own files (settings below).
 
 ## Building
 
