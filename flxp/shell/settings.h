@@ -40,6 +40,8 @@ struct Edit { std::string section, key, value; };   // value "" removes the key
 // through liblhde's store (lhde_settings_set: unknown keys, comments, order kept)
 bool set(const std::vector<Edit>& edits);
 bool set(const std::string& section, const std::string& key, const std::string& value);
+// a settings.ini switch: 1 or 0 (shell::flag_value); unset or another value: fallback
+bool flag(const std::string& section, const std::string& key, bool fallback);
 
 // [sidebar] stacking: top | bottom, a per-user key (Win+S in luxwm flips it)
 std::string sidebar_stacking();

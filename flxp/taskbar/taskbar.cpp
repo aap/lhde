@@ -269,7 +269,7 @@ std::string format_time(const struct tm& tm, const std::string& f)
     return s;
 }
 
-bool show_date() { return setting("clock_date", "0") == "1"; }
+bool show_date() { return shell::setting_flag("clock_date", false); }
 
 void update_clock_text()
 {
@@ -671,7 +671,7 @@ void start_request(const xwm::StartRequest& q)
     static uint32_t done;
     if (q.serial == done) return;
     done = q.serial;
-    if (q.from_root && setting("start_key", "1") != "1") return;
+    if (q.from_root && !shell::setting_flag("start_key", true)) return;
     if (start_down) {                       // open: a toggle closes it, a plain "open" leaves it
         if (q.toggle) { startpanel::close(); startmenu::close(); }
         return;
@@ -690,7 +690,7 @@ void read_clock_visible()
 {
     long v = 0;
     clock_hidden = FlxpGetRootCardinals("_LHSHELL_CLOCK_VISIBLE", &v, 1) >= 1 && v == 1;
-    if (setting("clock", "1") == "0") clock_hidden = true;
+    if (!shell::setting_flag("clock", true)) clock_hidden = true;
 }
 
 void on_x_changed()
@@ -848,9 +848,9 @@ int main(int argc, char** argv)
     w32::init();
     if (edge.empty()) edge = setting("taskbar_edge", "bottom");
     g.edge = edge == "top" ? EdgeTop : edge == "left" ? EdgeLeft : edge == "right" ? EdgeRight : EdgeBottom;
-    tray_on = setting("tray", "1") != "0";
+    tray_on = shell::setting_flag("tray", true);
     // only the start menu (flxp-startmenu, next to luxshell's Avalon taskbar): no bar, no struts, no tray, no task buttons
-    g.menu_only = setting("start_menu_only", "0") == "1";
+    g.menu_only = shell::setting_flag("start_menu_only", false);
     // settings.ini [taskbar] kind (start-up only): none, or avalon while lux draws its bar -> only the menu
     std::string kind = shell::setting("start_menu_only").empty() ? shell::theme_taskbar() : "";
     if (kind == "none" || (kind == "avalon" && shell::store::lux_running())) g.menu_only = true;
@@ -890,7 +890,7 @@ int main(int argc, char** argv)
     update_clock_text();
 
     if (!xwm::start(g.own, notify_from_x)) { fprintf(stderr, "flxp-taskbar: no X connection\n"); return 1; }
-    if (tray_on) xwm::tray_start(setting("tray_takeover", "0") == "1", !g.horizontal());
+    if (tray_on) xwm::tray_start(shell::setting_flag("tray_takeover", false), !g.horizontal());
     update_menu_provider();
     layout();
     set_clock_tip();

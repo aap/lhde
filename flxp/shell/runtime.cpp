@@ -18,8 +18,9 @@ namespace shell {
 static bool exists(const std::string& p) { struct stat st; return stat(p.c_str(), &st) == 0; }
 
 static const char template_text[] =
-    "# flxp settings. An empty value means automatic. Any key can be overridden\n"
-    "# for one run by the environment variable FLXP_<KEY> (FLXP_TERMINAL=xterm).\n"
+    "# flxp settings. An empty value means automatic; a switch is 1 or 0 (no other\n"
+    "# spelling). Any key can be overridden for one run by the environment variable\n"
+    "# FLXP_<KEY> (FLXP_TERMINAL=xterm).\n"
     "[flxp]\n"
     "\n"
     "# Every Windows file comes from the imported Windows tree through the session\n"
@@ -107,7 +108,7 @@ static const char template_text[] =
     "# (auto: 0, the places pane instead).\n"
     "folders =\n"
     "# The places pane (Places and Bookmarks) where the Folders tree is when that\n"
-    "# is off: on or off (auto: on).\n"
+    "# is off: 1 or 0 (auto: 1).\n"
     "places_pane =\n";
 
 bool write_settings_template()
@@ -188,9 +189,9 @@ void setup_fonts()
     gdi::set_font_smoothing(sm == "off" || sm == "0" ? gdi::SMOOTH_OFF :
                             sm == "cleartype" ? gdi::SMOOTH_CLEARTYPE : gdi::SMOOTH_STANDARD);
     // Effects' "Show shadows under menus" (settings.ini [effects] menu_shadows; on unless 0): the menus opened from now on
-    win::set_drop_shadows(store::get("effects", "menu_shadows") != "0");
+    win::set_drop_shadows(store::flag("effects", "menu_shadows", true));
     // Effects' "Hide underlined letters for keyboard navigation until I press the Alt key" ([effects] keyboard_cues = 1: off)
-    win::set_keyboard_cues(store::get("effects", "keyboard_cues") == "1");
+    win::set_keyboard_cues(store::flag("effects", "keyboard_cues", false));
     // the imported Windows fonts (lhde's fonts/<build> with Tahoma)
     std::vector<std::string> fp = default_font_dirs();
     // ReactOS's free faces (fonts/reactos) in the fallback tier: a Windows build's Tahoma or Marlett wins a family both

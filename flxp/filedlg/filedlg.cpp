@@ -880,7 +880,7 @@ static void lh_view_items(Dlg& d, HMENU m)
     CheckMenuRadioItem(m, 0, 2, radio == ID_VIEW_DETAILS ? 0 : radio == ID_VIEW_TILES ? 1 : 2, MF_BYPOSITION);
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m, MF_STRING | ((code & VIEW_NONAMES_FLAG) ? MF_CHECKED : 0) | (radio == ID_VIEW_ICONS ? 0 : MF_GRAYED), ID_VIEW_HIDENAMES, L"Hide Fi&le Names");
-    AppendMenuW(m, MF_STRING | (shell::setting("thumbnails", "1") != "0" ? MF_CHECKED : 0), ID_VIEW_THUMBS, L"Sho&w Thumbnails");
+    AppendMenuW(m, MF_STRING | (shell::setting_flag("thumbnails", true) ? MF_CHECKED : 0), ID_VIEW_THUMBS, L"Sho&w Thumbnails");
 }
 
 // Right-click on the view background: View, Arrange Icons By, Refresh, New Folder (XP's defview background menu, trimmed).
@@ -1943,7 +1943,7 @@ static void lh_init(Dlg& d, HWND owner)
     SendMessageW(d.list, LVM_SETBKCOLOR, 0, (LPARAM)LIST_BK);
     SendMessageW(d.list, LVM_SETTEXTBKCOLOR, 0, (LPARAM)CLR_NONE);
     thumbview::init(d.list, dlg);
-    d.grouped = fd_setting("filedlg_groups", "1") != "0";
+    d.grouped = shell::setting_flag("filedlg_groups", true);
     d.zoomable = true;
     {
         std::string folded = fd_setting("filedlg_folded_types", "");   // the list's groups folded last time
@@ -1985,7 +1985,7 @@ static void lh_init(Dlg& d, HWND owner)
     order_children({ d.list, GetDlgItem(dlg, stc3), GetDlgItem(dlg, edt1), d.name_cbx, GetDlgItem(dlg, stc2), d.types,
                      GetDlgItem(dlg, chx1), GetDlgItem(dlg, IDOK), GetDlgItem(dlg, IDCANCEL), d.hide, d.pane, d.bar, d.header });
 
-    if (o.mode == Mode::Save && fd_setting("filedlg_explorer", "1") == "0") lh_set_explorer(d, false, true);
+    if (o.mode == Mode::Save && !shell::setting_flag("filedlg_explorer", true)) lh_set_explorer(d, false, true);
 
     place_dialog(d, owner);
     sys::NativeWindow* nw = sys::window_for_user((void*)dlg);

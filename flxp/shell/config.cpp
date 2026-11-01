@@ -93,6 +93,29 @@ std::string setting(const std::string& key, const std::string& fallback)
     return file_setting(key, fallback);
 }
 
+int flag_value(const std::string& v, const std::string& where)
+{
+    if (v.empty()) return -1;
+    if (v == "1") return 1;
+    if (v == "0") return 0;
+    static std::vector<std::string> told;   // once per key
+    bool seen = false;
+    for (const std::string& t : told) seen = seen || t == where;
+    if (!seen) {
+        told.push_back(where);
+        fprintf(stderr, "flxp: %s = %s: a switch is 0 or 1; automatic\n", where.c_str(), v.c_str());
+    }
+    return -1;
+}
+
+int setting_flag_auto(const std::string& key) { return flag_value(setting(key), "flxp.ini " + key); }
+
+bool setting_flag(const std::string& key, bool fallback)
+{
+    int v = setting_flag_auto(key);
+    return v < 0 ? fallback : v == 1;
+}
+
 std::string settings_path() { return lhde_dir(config_home()) + "/flxp.ini"; }
 
 bool write_setting(const std::string& key, const std::string& value)

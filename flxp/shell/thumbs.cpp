@@ -109,8 +109,8 @@ bool picture_size(const std::string& path, int* w, int* h)
 
 bool enabled_for(const std::string& folder)
 {
-    if (setting("thumbnails", "1") == "0") return false;
-    if (setting("thumbnails_network", "0") != "0") return true;
+    if (!setting_flag("thumbnails", true)) return false;
+    if (setting_flag("thumbnails_network", false)) return true;
     return !on_network(folder);
 }
 

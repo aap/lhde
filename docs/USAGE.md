@@ -339,8 +339,8 @@ luxshell, from the session shell (so it and the explorers it opens share DISPLAY
 wallpaper and the icon set from the session theme's record (`Desktop.wallpaper`, `Desktop.mode`, `Desktop.icons`) like everyone
 else; `--wallpaper FILE` (`FLXP_WALLPAPER`) overrides it for one run (as an exported `FLXP_<KEY>` would a flxp.ini key, which
 is why the session exports none). It survives theme switches (it is not part of the WM loop). While it runs luxshell is started with
-`LHSHELL_DESKTOP=0` (no desktop layer of its own: flxp-desktop fades to black in maximised mode itself); `LHSHELL_DESKTOP=0` (or
-off/no/false) works for any luxshell start.
+`LHSHELL_DESKTOP=0` (no desktop layer of its own: flxp-desktop fades to black in maximised mode itself); `LHSHELL_DESKTOP=0` works
+for any luxshell start.
 
 **Startup wallpaper.** `lhde-session` sets the root background once, before anything else paints, with `lhwall.sh` (sourced here
 and by `lhde-session desktop on|off`): the session theme's resolved `Desktop.wallpaper` and `Desktop.mode` (the current layer, the
@@ -827,7 +827,7 @@ luxshell keeps the button pressed from the click (or Super) until the panel's wi
 | `[sidebar]` | `width` * | 100..600 px (default 150): the SidebarSizer drag writes it |
 | `[sidebar]` | `stacking` * | `top` (default: the sidebar is above the windows with its strut, runs the full height, on top at the corner, the taskbar is shortened by its width; 4074) or `bottom` (part of the desktop: under the windows, `_NET_WM_STATE_BELOW`, no strut; the Avalon taskbar spans the full width over it and the sidebar, in every mode, ends at its top; follows taskbar autohide). Super+s toggles it live; settings flyout *Sidebar* |
 | `[sidebar]` | `with_classic` * | `0` (default: no sidebar while the classic taskbar runs; its mode returns with the Avalon one) or `1` (the sidebar stays, above the classic bar) |
-| `[sidebar]` | `yield_bottom` | `auto` (default: the sidebar ends above another dock's bottom strut, e.g. the classic taskbar) or `0` |
+| `[sidebar]` | `yield_bottom` | `1` (default: the sidebar ends above another dock's bottom strut, e.g. the classic taskbar) or `0` |
 | `[sidebar]` | `locked` | `1`: the width sizer does not drag (the sidebar menu's *Lock the Sidebar*) |
 | `[clock]` | `pinned`, `pinned_pack` | `1` (pinned at the bottom) or `0` (a tile in the list), chosen in the pack `pinned_pack` (the clock's menu writes both); other packs use their own default: pinned in 4074-aero, 4074-slate and 5112-aero, a tile in 4051-slate |
 | `[clock]` | `layout` * | `default`, `digtime`, `digtimemonthday`, `digtimeweekday`, `minical`, `cal` |

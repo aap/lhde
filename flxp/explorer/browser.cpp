@@ -166,7 +166,7 @@ static std::map<std::string, int> g_views;
 static std::map<std::string, int> g_shown;   // this window: the view each folder was last shown in
 static struct stat g_stamp;                  // the file as last read (other windows write it too)
 
-static bool enabled() { return shell::setting("remember_views", "1") != "0"; }
+static bool enabled() { return shell::setting_flag("remember_views", true); }
 
 // "icons@64" (the size: the Longhorn hosts), "tiles@48", "icons@96+nonames",
 // "details+thumbnails" (the earlier toggle), ...; -1 if not a view
@@ -1306,7 +1306,7 @@ bool view_command(Browser& b, int vc)
         show_view(b, v);
         return true;
     case VC_THUMBNAILS:
-        shell::write_setting("thumbnails", shell::setting("thumbnails", "1") == "0" ? "1" : "0");
+        shell::write_setting("thumbnails", shell::setting_flag("thumbnails", true) ? "0" : "1");
         thumbnails_changed(b);
         return true;
     case VC_DEFAULT:

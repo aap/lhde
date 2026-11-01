@@ -126,7 +126,6 @@ void layer_from_store(State& s)
     for (const store::KeyValue& kv : store::current_layer()) s.layer[kv.key] = kv.value;
 }
 
-std::string bool_value(const std::string& v) { return v == "1" || v == "true" || v == "yes" || v == "on" ? "1" : "0"; }
 
 State load_state()
 {
@@ -139,12 +138,12 @@ State load_state()
     layer_from_store(s);
     s.sbmode = store::get("sidebar", "mode");
     s.sbstack = store::sidebar_stacking();
-    s.sbclassic = bool_value(store::get("sidebar", "with_classic"));
+    s.sbclassic = store::flag("sidebar", "with_classic", false) ? "1" : "0";
     s.smoothing = shell::font_smoothing();
     if (s.smoothing.empty()) s.smoothing = "standard";
     if (s.smoothing == "0") s.smoothing = "off";
-    s.shadows = store::get("effects", "menu_shadows") == "0" ? "0" : "1";
-    s.cues = store::get("effects", "keyboard_cues") == "1" ? "1" : "0";
+    s.shadows = store::flag("effects", "menu_shadows", true) ? "1" : "0";
+    s.cues = store::flag("effects", "keyboard_cues", false) ? "1" : "0";
     return s;
 }
 

@@ -1392,10 +1392,8 @@ static void make_filter()
 // folder's web view layout is SFVMWVL_DETAILS, My Computer)
 static bool details_open()
 {
-    std::string s = shell::setting("places_details", "");
-    if (s == "1") return true;
-    if (s == "0") return false;
-    return g_details_open_default;
+    int s = shell::setting_flag_auto("places_details");
+    return s < 0 ? g_details_open_default : s == 1;
 }
 
 // the groups for the look: the XP task pane's Places and Bookmarks, the
@@ -1486,7 +1484,7 @@ HWND create(HWND parent, int id, const Callbacks& cb, const Options& o)
     g_cb = cb;
     g_opts = o;
     g_grp = o.groups;
-    g_icons = shell::setting("places_icons", "1") != "0";
+    g_icons = shell::setting_flag("places_icons", true);
     WNDCLASSW wc = {};
     wc.lpfnWndProc = proc;
     wc.hCursor = LoadCursorW(nullptr, (LPCWSTR)IDC_ARROW);

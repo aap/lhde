@@ -2805,7 +2805,6 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 
 bool g_settings_read;
 
-bool on_value(const std::string& v) { return v != "0" && v != "off" && v != "no" && v != "false"; }
 
 // <prefix>header_size and the elements; the dialog's (prefix filedlg_) fall
 // back to the explorer's for the elements. The explorer's size without a
@@ -2825,9 +2824,9 @@ void read_settings()
     else if (sz == "large") g_hsize = SIZE_LARGE;
     else if (sz == "xlarge" || sz == "extralarge" || sz == "extra-large" || sz == "huge") g_hsize = SIZE_XLARGE;
     for (int i = 0; i < ELEMENTS; i++) {
-        std::string v = shell::setting(g_prefix + ELEMENT_KEYS[i]);
-        if (v.empty() && !g_prefix.empty()) v = shell::setting(ELEMENT_KEYS[i]);
-        g_show[i] = v.empty() || on_value(v);
+        int v = shell::setting_flag_auto(g_prefix + ELEMENT_KEYS[i]);
+        if (v < 0 && !g_prefix.empty()) v = shell::setting_flag_auto(ELEMENT_KEYS[i]);
+        g_show[i] = v != 0;
     }
     // the small buttons' style (the dialog's falls back to the explorer's; flxp.ini or the theme)
     std::string sb = shell::theme_setting(g_prefix + "header_small_buttons");
@@ -2840,7 +2839,7 @@ void read_settings()
 namespace {
 bool classic_client_caption()
 {
-    return glass() && g_hsize != SIZE_SMALL && g_show[SHOW_TITLE] && shell::theme_setting("client_caption", "1") != "0";
+    return glass() && g_hsize != SIZE_SMALL && g_show[SHOW_TITLE] && shell::setting_flag("client_caption", true);
 }
 int classic_height(int caption_h);
 }
@@ -3039,7 +3038,7 @@ void set_folder(const std::shared_ptr<shell::Folder>& f)
     // Computer > Local Disk (/) > u > aap > ..., instead of the namespace's Home > ...
     const char* home = getenv("HOME");
     std::string fp = f->path();
-    bool full = home && *home && fp[0] == '/' && shell::setting("breadcrumb_home", "1") == "0" &&
+    bool full = home && *home && fp[0] == '/' && !shell::setting_flag("breadcrumb_home", true) &&
                 (fp == home || (fp.size() > strlen(home) && !fp.compare(0, strlen(home), home) && fp[strlen(home)] == '/'));
     if (full) {
         for (std::string p = fp; p.size() > 1; p = p.substr(0, std::max<size_t>(p.rfind('/'), 1)))

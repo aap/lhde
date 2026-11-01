@@ -127,7 +127,8 @@ apply_fonts(theme_entry)
 --   for one run), autohide = 0|1, rows = 1..3 (Taskbar\RowCount, 2.4.2; the top-edge drag), start_menu = panel|classic
 --   (the menu the classic bar's Start button opens: flxp-taskbar reads it itself)
 --   [sidebar] mode = full|minimized|pinned, width = 100..600 (Sidebar\Width, default 150; the SidebarSizer drag),
---   with_classic = 0|1 (0, default: no sidebar with the classic taskbar; 1: the 4051 layout), yield_bottom = auto|0,
+--   with_classic = 0|1 (0, default: no sidebar with the classic taskbar; 1: the 4051 layout), yield_bottom = 1|0 (1, default:
+--   the sidebar ends above another dock's bottom strut),
 --   stacking = top|bottom (top: 4074, the sidebar is above the windows (_NET_WM_STATE_ABOVE) with its strut, runs full height and
 --   the taskbar yields to it; bottom: part of the desktop, under the windows (_NET_WM_STATE_BELOW) with no strut, the taskbar runs
 --   the full width over it and the sidebar ends at its top; Win+S = _LHSHELL_COMMAND "sidebar-stacking toggle" flips it at once).
@@ -144,7 +145,7 @@ local SB_MIN, SB_MAX = 100, 600         -- _ValidateSize(v, 100, 150, 600) (2.4.
 local ROWS_MAX = 3                      -- Taskbar\RowCount 1..3 (Taskbar.Initialize, L51705)
 local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 local cfg = {
-  autohide = S.get("taskbar", "autohide") == "1",
+  autohide = S.flag("taskbar", "autohide", false),
   sidebar = S.get("sidebar", "mode") or (theme_entry and theme_entry.v["Shell.sidebar"]) or "full",   -- the user's, else the theme's
   rows = clamp(math.floor(tonumber(S.get("taskbar", "rows") or "") or 1), 1, ROWS_MAX),
   sidebar_w = tonumber(S.get("sidebar", "width") or ""),
@@ -152,7 +153,7 @@ local cfg = {
   composition = "follow",                                 -- set below from the per-theme chain
   -- maximised windows do not black out the whole desktop (luxwm crossfades the frame to its dark maximised plate; only
   -- the bars' black layers fade). desktop_black = 1: the full-screen black of the desktop layer too
-  desktop_black = S.get("desktop", "desktop_black") == "1",
+  desktop_black = S.flag("desktop", "desktop_black", false),
   -- [shell] max_fade_ms: the black layers' fade in maximised mode; 0 (default) = switched in the same repaint, no fade
   max_fade_ms = math.max(0, math.floor(tonumber(S.get("shell", "max_fade_ms") or "") or 0)),
 }
@@ -181,9 +182,9 @@ local function tb_on() return cfg.taskbar == "avalon" end
 -- [sidebar] with_classic = 0 (default): with the classic taskbar the sidebar is not shown at all (unmapped, no strut; flxp-taskbar
 -- has the tray and the clock, _LHSHELL_CLOCK_VISIBLE = 0); its mode is kept and comes back with the Avalon taskbar. 1: the 4051
 -- layout, the sidebar yielding above the classic bar.
-cfg.with_classic = S.get("sidebar", "with_classic") == "1"
+cfg.with_classic = S.flag("sidebar", "with_classic", false)
 -- [sidebar] locked = 1: "Lock the Sidebar" in the sidebar menu (CShellSidebar::SetLockBar, 2.4.6): no width drag on the sizer
-cfg.sb_locked = S.get("sidebar", "locked") == "1"
+cfg.sb_locked = S.flag("sidebar", "locked", false)
 local function sb_hidden() return cfg.taskbar == "classic" and cfg.with_classic ~= true end
 lh.sidebar_hidden = sb_hidden
 if cfg.sidebar_w then cfg.sidebar_w = clamp(math.floor(cfg.sidebar_w), SB_MIN, SB_MAX) end
@@ -191,8 +192,8 @@ if cfg.sidebar_w then cfg.sidebar_w = clamp(math.floor(cfg.sidebar_w), SB_MIN, S
 -- (and a state.ini from before pinned_pack existed) uses the pack's default T.clock_pinned (nil = pinned, the 4074 look)
 local function pack_key() return T.clock_pack or (pack_dir or ""):match("([^/]+)/*$") or "" end   -- T.clock_pack: a pack that shares another's choice (4074-aerovision: 4074-aero)
 local function clock_pinned()
-  local v, at = S.get("clock", "pinned"), S.get("clock", "pinned_pack")
-  if (v == "0" or v == "1") and at == pack_key() then return v == "1" end
+  local v, at = S.flag_value(S.get("clock", "pinned"), "settings.ini [clock] pinned"), S.get("clock", "pinned_pack")
+  if v ~= nil and at == pack_key() then return v end
   return T.clock_pinned ~= false
 end
 cfg.clock_pinned = clock_pinned()
@@ -203,8 +204,7 @@ local wp_applied        -- wallpaper|mode last put on the root (a settings reloa
 -- lhde-session already put the same wallpaper on the root once): luxshell then never runs feh/xsetroot itself. Also when a
 -- _NET_WM_WINDOW_TYPE_DESKTOP window of another client exists (flxp-desktop started by hand next to a luxshell with its own layer).
 local function desktop_elsewhere()
-  local e = (os.getenv("LHSHELL_DESKTOP") or ""):lower()
-  if e == "0" or e == "off" or e == "no" or e == "false" then return true end
+  if S.flag_value(os.getenv("LHSHELL_DESKTOP"), "LHSHELL_DESKTOP") == false then return true end
   local me = ""; local f = io.open("/proc/self/stat"); if f then me = (f:read("*l") or ""):match("^(%d+)") or ""; f:close() end
   local p = io.popen("for w in $(xprop -root _NET_CLIENT_LIST 2>/dev/null | sed 's/.*# //; s/,//g'); do "
     .. "xprop -id $w _NET_WM_WINDOW_TYPE _NET_WM_PID 2>/dev/null | tr '\\n' ' '; echo; done 2>/dev/null")
@@ -234,12 +234,11 @@ local black_on = false  -- maximised mode (set_maximized below); new black layer
 -- full screen, _NET_WM_WINDOW_TYPE_DESKTOP, sticky + below, no struts, at the bottom of the stack. Unmapped normally (the
 -- wallpaper is the root background); with [shell] desktop_black = 1 it is mapped black at once in maximised mode (no fade)
 -- and unmapped at once on restore; the default (0) leaves it unmapped. Future home of the Aurora.
--- LHSHELL_DESKTOP=0 (or off/no/false) leaves it out entirely, for when another program owns the desktop (flxp-desktop draws
+-- LHSHELL_DESKTOP=0 leaves it out entirely, for when another program owns the desktop (flxp-desktop draws
 -- the wallpaper and icons and does the maximised-mode black fade itself; lhde-session sets it while flxp-desktop runs).
 -- lh.desktop_layer is then nil; the taskbar and sidebar black layers still switch.
 local dk = nil
-local dk_env = (os.getenv("LHSHELL_DESKTOP") or ""):lower()
-if not (dk_env == "0" or dk_env == "off" or dk_env == "no" or dk_env == "false") then
+if S.flag_value(os.getenv("LHSHELL_DESKTOP"), "LHSHELL_DESKTOP") ~= false then
   dk = {}
   -- opaque (24-bit): it is only ever mapped while black, and a solid window lets picom skip the full-screen blur behind it
   -- (an ARGB one cost ~150-300 ms per composited frame during the maximise on the xrender lab). The Aurora will need ARGB again.
@@ -791,7 +790,7 @@ end
 -- the sidebar sits above it). Our own surfaces are not counted (lh.struts skips them), so in the avalon mode this is 0 and the
 -- Avalon taskbar keeps yielding to the sidebar as before. [sidebar] yield_bottom = 0 turns it off.
 local function foreign_bottom(x0, x1)
-  if S.get("sidebar", "yield_bottom") == "0" then return 0 end
+  if not S.flag("sidebar", "yield_bottom", true) then return 0 end
   local b = 0
   for _, st in ipairs(lh.struts()) do
     if st.bottom > 0 and st.bottom < screen_h / 2 and st.bottom_end_x >= x0 and st.bottom_start_x <= x1 then b = math.max(b, st.bottom) end
@@ -1573,7 +1572,7 @@ local function reload_settings()
   if c ~= cfg.composition then cfg.composition = c; apply_composition(theme_entry) end
   local k = theme_taskbar(theme_entry)
   if k ~= cfg.taskbar then apply_taskbar(k) end
-  local ah = S.get("taskbar", "autohide") == "1"
+  local ah = S.flag("taskbar", "autohide", false)
   if ah ~= cfg.autohide then lh.shell_set("autohide", ah) end
   local rows = tonumber(S.get("taskbar", "rows") or "")
   if rows and math.floor(rows) ~= tb.rows then lh.taskbar_set_rows(math.floor(rows)) end
@@ -1583,15 +1582,15 @@ local function reload_settings()
   if w and clamp(math.floor(w), SB_MIN, SB_MAX) ~= sb.w then lh.sidebar_set_width(w) end
   local lay = S.get("sidebar", "stacking") == "bottom" and "bottom" or "top"
   if lay ~= lh.shell_get("sidebar_stacking") then lh.set_sidebar_stacking(lay) end
-  local wc = S.get("sidebar", "with_classic") == "1"
+  local wc = S.flag("sidebar", "with_classic", false)
   if wc ~= cfg.with_classic then lh.set_sidebar_with_classic(wc) end
-  cfg.sb_locked = S.get("sidebar", "locked") == "1"
+  cfg.sb_locked = S.flag("sidebar", "locked", false)
   if clock_pinned() ~= cfg.clock_pinned then
     cfg.clock_pinned = clock_pinned()
     if mode == "full" then build_sidebar(); build_tiles(); after_tiles(); place_sidebar() end
   end
   lh._emit("clock-layout", S.get("clock", "layout") or "default")
-  cfg.desktop_black = S.get("desktop", "desktop_black") == "1"
+  cfg.desktop_black = S.flag("desktop", "desktop_black", false)
   cfg.max_fade_ms = math.max(0, math.floor(tonumber(S.get("shell", "max_fade_ms") or "") or 0))
   publish_resolved(theme_entry)                          -- [desktop] wallpaper / mode / icons, [theme] animations
   local v = effective(theme_entry); local key = v.wallpaper .. "|" .. v.mode

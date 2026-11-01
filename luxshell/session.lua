@@ -25,7 +25,8 @@
 --   S.save_as(title, e)        Save As: the selected theme with its layer as the user's theme file (lhde_theme_save_as: base = the
 --                              theme or a copy of the user's own file, the layer's keys, name = TITLE), selected, the layer cleared;
 --                              returns the new theme's name
---   S.get(sec, key)            settings.ini value (nil when missing or empty); S.has(sec, key): the key exists at all
+--   S.get(sec, key)            settings.ini value (nil when missing or empty); S.has(sec, key): the key exists at all;
+--                              S.flag(sec, key, default): a 0/1 switch (S.flag_value: the one parser)
 --   S.set(sec, key, value)     writes it (liblhde: unknown keys, comments and order kept) and sends _LH_SETTINGS_CHANGED once the
 --                              current event is handled (several sets: one message); value nil removes it (S.unset)
 --   S.reload()                 forget the cached file (on _LH_SETTINGS_CHANGED from another writer)
@@ -250,6 +251,22 @@ end
 function S.reload() cache = nil; lh.settings_reload() end
 function S.has(sec, key) local t = settings()[sec]; return t ~= nil and t[key] ~= nil end
 function S.get(sec, key) local t = settings()[sec]; local v = t and t[key]; if v == nil or v == "" then return nil end return v end
+-- Switches: 1 or 0, nothing else (flxp's shell::flag_value is the same rule). S.flag_value(v, where): true / false, nil for
+-- unset or anything else (reported once per WHERE); S.flag(sec, key, default): settings.ini's, else default
+local flag_told = {}
+function S.flag_value(v, where)
+  if v == "1" then return true elseif v == "0" then return false end
+  if v ~= nil and v ~= "" and not flag_told[where] then
+    flag_told[where] = true
+    io.stderr:write(string.format("luxshell: %s = %s: a switch is 0 or 1; the default\n", where, v))
+  end
+  return nil
+end
+function S.flag(sec, key, default)
+  local v = S.flag_value(S.get(sec, key), "settings.ini [" .. sec .. "] " .. key)
+  if v == nil then return default end
+  return v
+end
 -- _LH_SETTINGS_CHANGED: data[0] a serial, data[1] the section when only one changed. The serial is the root CARDINAL
 -- _LH_SETTINGS_SERIAL + 1 (flxp's shell::store does the same: read, add one, write the property, send), and never below the highest
 -- serial seen in a message or our clock seed, so it keeps increasing over luxshell restarts and between writers

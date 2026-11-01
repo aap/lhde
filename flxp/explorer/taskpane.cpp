@@ -803,7 +803,7 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 
 } // namespace
 
-bool wanted() { return shell::setting("taskpane", "0") == "1"; }
+bool wanted() { return shell::setting_flag("taskpane", false); }
 
 int height() { return H; }
 bool bottom() { return g_bottom; }
@@ -829,7 +829,7 @@ HWND create(HWND frame, const Callbacks& cb)
     g_cb = cb;
     int eh = atoi(shell::setting("taskpane_height", "126").c_str());
     g_exp_h = eh < EXP_MIN ? EXP_MIN : eh > EXP_MAX ? EXP_MAX : eh;
-    g_compact = shell::setting("taskpane_compact", "0") == "1";
+    g_compact = shell::setting_flag("taskpane_compact", false);
     g_bottom = read_bottom();
     H = effective();
     make_fonts();

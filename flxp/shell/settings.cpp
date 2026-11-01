@@ -252,6 +252,12 @@ bool set(const std::vector<Edit>& edits)
     return ok;
 }
 
+bool flag(const std::string& section, const std::string& key, bool fallback)
+{
+    int v = flag_value(get(section, key), "settings.ini [" + section + "] " + key);
+    return v < 0 ? fallback : v == 1;
+}
+
 bool set(const std::string& section, const std::string& key, const std::string& value)
 {
     return set(std::vector<Edit>{ Edit{ section, key, value } });

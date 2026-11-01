@@ -59,7 +59,7 @@ comments, the order and the keys it does not know: it reads the whole file, chan
               width = 150                ; 100..600 (the sizer drag)
               stacking = top             ; top: above the windows, with its strut | bottom: under them, part of the desktop (Win+S)
               with_classic = 0           ; 1: the sidebar stays with the classic taskbar
-              yield_bottom = auto        ; auto: ends above another dock's bottom strut | 0
+              yield_bottom = 1           ; 1: ends above another dock's bottom strut | 0
               locked = 0                 ; 1: Lock the Sidebar (no width drag)
 [clock]       pinned = 1 ; pinned_pack = 4074-aero ; layout = default   ; the clock tile; pinned holds for the pack it was chosen in
 [quicklaunch] dir = ~/some/dir           ; the Quick Launch tile's folder (default ~/.config/lhde/quicklaunch/)
@@ -69,6 +69,13 @@ comments, the order and the keys it does not know: it reads the whole file, chan
 [effects]     menu_shadows = 1           ; XP's drop shadow under menus (wux's popup menus, luxwm's window menu)
               keyboard_cues = 0          ; 0: mnemonics underlined only after Alt (XP's default); 1: always
 ```
+
+**Switches** are `1` or `0` in every file lhde reads (settings.ini, flxp.ini, theme files) and in the `FLXP_<KEY>` /
+`LHSHELL_*` environment; `on`, `off`, `yes`, `no`, `true`, `false` are not accepted: such a value is reported once on stderr
+and taken as unset (the default). One parser each: flxp's `shell::flag_value` (`setting_flag`, `store::flag`), luxshell's
+`S.flag_value` (`S.flag`). `auto` is a value only where it chooses something: the theme's `Glass.composition` (auto: a
+compositor when the theme has glass frames), `VisualStyle.shellstyle`, `Explorer.chrome`, `Explorer.navbar_preset`; in
+flxp.ini an empty value is automatic for every key.
 
 luxshell writes the defaults of `[desktop] desktop_black`, `[taskbar] autohide rows`, `[sidebar] width with_classic stacking`,
 `[clock] layout` and `[shell] max_fade_ms` when they are missing. `[desktop] wallpaper = none` is the one per-user key the

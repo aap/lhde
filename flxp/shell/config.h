@@ -21,6 +21,12 @@ std::vector<std::string> data_dirs();         // $XDG_DATA_DIRS or /usr/local/sh
 // flxp's own preferences only: what the desktop shares is settings.ini's
 // (shell::store, settings.h), what the theme decides the session theme's (lhtheme.h).
 std::string setting(const std::string& key, const std::string& fallback = "");
+// A switch: 1 or 0, nothing else (an empty or other value is automatic: the fallback; another value is
+// reported once on stderr). setting_flag_auto: 1, 0, or -1 for automatic. flag_value parses one value
+// (WHERE names it in the report): the one boolean parser of flxp, settings.ini's too (store::flag).
+bool setting_flag(const std::string& key, bool fallback);
+int setting_flag_auto(const std::string& key);
+int flag_value(const std::string& v, const std::string& where);
 std::string file_setting(const std::string& key, const std::string& fallback = "");   // flxp.ini only, no FLXP_<KEY>
 std::string settings_path();                  // $XDG_CONFIG_HOME/lhde/flxp.ini
 // Sets key = value in flxp.ini, keeping the rest of the file (comments, order,

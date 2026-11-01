@@ -774,7 +774,7 @@ Transitions slide or shrink over 400 ms ease-in-out; the struts take their final
 
 ### 7.4 Yielding to a bottom dock, the classic taskbar
 
-`[sidebar] yield_bottom = auto` (default) | `0`: `lh.struts()` reads `_NET_WM_STRUT_PARTIAL`/`_NET_WM_STRUT` of every mapped
+`[sidebar] yield_bottom = 1` (default) | `0`: `lh.struts()` reads `_NET_WM_STRUT_PARTIAL`/`_NET_WM_STRUT` of every mapped
 top-level not ours (and one level down, inside WM frames); the largest bottom strut over the sidebar's columns shortens it (the
 right strut's range follows), lifts the pinned block above it (bottom strut = block + bar) and keeps the minimized one out of
 the way. Re-checked on `_NET_WORKAREA` changes and on top-level map / unmap / destroy (luxwm may keep `_NET_WORKAREA` unchanged

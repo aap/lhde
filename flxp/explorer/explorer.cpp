@@ -618,8 +618,8 @@ static void set_view(int view, bool navigating = false) { browser::set_view(g, v
 static void sync_thumbs_mode()
 {
     g.zoomable = g.longhorn;
-    g.grouped = g.longhorn && shell::setting("groups", "0") == "1";
-    verbs::thumbs_toggle = g.longhorn ? (shell::setting("thumbnails", "1") != "0" ? 1 : 0) : -1;
+    g.grouped = g.longhorn && shell::setting_flag("groups", false);
+    verbs::thumbs_toggle = g.longhorn ? (shell::setting_flag("thumbnails", true) ? 1 : 0) : -1;
 }
 
 // The View menu's views, made again each time it opens (the frame can change): XP's
@@ -1135,7 +1135,7 @@ static void sync_taskpane();
 // default, CShellBrowser2::_LoadStatusBar); View > Status Bar remembers it per frame
 static bool status_setting()
 {
-    return g.longhorn ? shell::setting("statusbar_longhorn", "0") == "1" : shell::setting("statusbar", "1") != "0";
+    return g.longhorn ? shell::setting_flag("statusbar_longhorn", false) : shell::setting_flag("statusbar", true);
 }
 static void layout();
 static void taskpane_resized() { sync_taskpane(); layout(); }
@@ -1274,7 +1274,7 @@ static void create_children(HWND frame)
 
     // folders tree
     bandsite::create(frame);
-    if (shell::setting("places_pane", "on") != "off") {
+    if (shell::setting_flag("places_pane", true)) {
         places::Callbacks pcb = { header_navigate, places_current, header_filter, places_done, nullptr, places_path };
         places::Options po;
         po.groups = g.longhorn;              // the Longhorn frame: the dialog's groups look; XP: the task pane
@@ -1827,12 +1827,12 @@ static void fo_applied(dialogs::FolderOptions& o)
 {
     browser::views::set_default(g.zoomable, o.default_view == browser::views::builtin_default(g.zoomable) ? -1 : o.default_view);
     shell::write_setting("remember_views", o.remember ? "1" : "0");
-    if (o.full_path != (shell::setting("breadcrumb_home", "1") == "0")) {
+    if (o.full_path != !shell::setting_flag("breadcrumb_home", true)) {
         shell::write_setting("breadcrumb_home", o.full_path ? "0" : "1");
         if (g.header && g.folder) { header::set_folder(g.folder); header_refit(g.frame); }
     }
     if (o.hidden != g.show_hidden) on_command(ID_VIEW_HIDDEN);   // (writes show_hidden, refreshes)
-    if (g.zoomable && o.thumbnails != (shell::setting("thumbnails", "1") != "0")) on_command(ID_VIEW_THUMBNAILS);
+    if (g.zoomable && o.thumbnails != shell::setting_flag("thumbnails", true)) on_command(ID_VIEW_THUMBNAILS);
 }
 
 static void folder_options()
@@ -1845,10 +1845,10 @@ static void folder_options()
     if (!g.zoomable) o.current_view &= ZOOM_VIEW & ~VIEW_THUMBS_FLAG;
     o.zoom_levels.push_back(0);
     for (int z : browser::zoom_levels()) o.zoom_levels.push_back(z);
-    o.remember = shell::setting("remember_views", "1") != "0";
+    o.remember = shell::setting_flag("remember_views", true);
     o.hidden = g.show_hidden;
-    o.full_path = shell::setting("breadcrumb_home", "1") == "0";
-    o.thumbnails = shell::setting("thumbnails", "1") != "0";
+    o.full_path = !shell::setting_flag("breadcrumb_home", true);
+    o.thumbnails = shell::setting_flag("thumbnails", true);
     o.apply_all = fo_apply_all;
     o.reset_all = fo_reset_all;
     o.applied = fo_applied;
@@ -2461,8 +2461,8 @@ int main(int argc, char** argv)
         g.longhorn = want_longhorn();
         sync_thumbs_mode();
         g.show_status = status_setting();
-        g.show_folders = shell::setting("folders", "0") == "1";
-        g.show_hidden = shell::setting("show_hidden", "0") == "1";   // Folder Options, View > Show Hidden Files
+        g.show_folders = shell::setting_flag("folders", false);
+        g.show_hidden = shell::setting_flag("show_hidden", false);   // Folder Options, View > Show Hidden Files
     }
     WNDCLASSW wc = {};
     wc.lpfnWndProc = frame_proc;
