@@ -1,4 +1,4 @@
-# Sourced (not run) by lhde-session (was xinitrc.lab and second-display.sh): the startup wallpaper and the compositor rule, from
+# Sourced (not run) by lhde-session: the startup wallpaper and the compositor rule, from
 # liblhde's resolved theme (lhde-theme resolve, docs/THEME-FORMAT.md), so the first frames of a session already show the wallpaper
 # and the frames the session keeps.
 #   lhwall_resolve [THEME]  prints "MODE PATH": PATH is an image, "none" (no image) or empty (nothing to paint). The theme's

@@ -1,6 +1,6 @@
 # session: lhde-session and the lab
 
-- `lhde-session`: the desktop session (the x11 lab's xinitrc.lab and second-display.sh merged): `start [--nested|--attach] [THEME]`,
+- `lhde-session`: the desktop session: `start [--nested|--attach] [THEME]`,
   `theme NAME`, `taskbar avalon|classic|classic+sidebar|none`, `shell on|off`, `picom on|off`, `desktop on|off`, `stop`
   (`lhde-session --help`). Installed to `$PREFIX/bin`; the rest of this directory to `$PREFIX/lib/lhde/session` (program
   files: docs/LAYOUT.md "The three trees"). At start it also moves an old-layout `~/.local/share/lhde` (`lhde-import --migrate`).

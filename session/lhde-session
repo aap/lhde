@@ -1,7 +1,7 @@
 #!/bin/sh
-# lhde-session: the Longhorn desktop session (first version: the x11 lab's xinitrc.lab and second-display.sh merged; d353b69).
+# lhde-session: the Longhorn desktop session.
 # luxwm in a restart loop, picom when the theme wants a compositor, luxshell (Avalon bars, sidebar), flxp-desktop (wallpaper and
-# icons), a terminal. The theme is the root property _LH_THEME (docs/history/THEMES.md, SHELL-DESIGN.md 6.1): luxwm publishes the
+# icons), a terminal. The theme is the root property _LH_THEME (SHELL-DESIGN.md 6.1): luxwm publishes the
 # session's when it starts first, after that the root wins and luxwm, luxshell and the clients follow it live.
 #
 #   lhde-session start [--nested | --attach] [THEME]
@@ -27,7 +27,7 @@
 # Environment: LHDE_PICOM=0/1 forces the compositor off/on for the session (luxshell too); LHDE_SHELL=0 without luxshell;
 # LHDE_DESKTOP=0 without flxp-desktop (luxshell then shows its own desktop layer); LHDE_WM=fvwm for an fvwm2 session (lab.fvwm2rc);
 # LHDE_TERMINAL=command (default urxvt, else xterm; none for no terminal); LHDE_WINDOWS another Windows tree (as every lhde program);
-# the x11-era LAB_THEME / LAB_PICOM / LAB_SHELL / LAB_DESKTOP / LAB_WM and SECOND_DISPLAY still work.
+# LAB_THEME / LAB_PICOM / LAB_SHELL / LAB_DESKTOP / LAB_WM and SECOND_DISPLAY are accepted for the LHDE_ ones.
 # Settings: ~/.config/lhde/settings.ini and themes/ (docs/SETTINGS.md); the first start moves ~/.config/longhorn and
 # ~/.config/lhshell there (lhde-theme migrate), and an old-layout ~/.local/share/lhde into ~/.local/share/lhde-windows and the
 # install (lhde-import --migrate; docs/LAYOUT.md "Migration").
@@ -97,7 +97,7 @@ startdesk() {
 	(cd "$HOME" && DISPLAY=$D DBUS_SESSION_BUS_ADDRESS=$bus setsid "$FLXPDESK" >"$STATE/flxp-desktop.log" 2>&1 </dev/null &)
 }
 
-# ---- the session itself (was xinitrc.lab): runs on $D, in the X server's client process (startx) or in the background ----
+# ---- the session itself: runs on $D, in the X server's client process (startx) or in the background ----
 session() {
 	D=$DISPLAY STATE=$(statedir "$DISPLAY"); mkdir -p "$STATE"
 	# the one-time move of ~/.config/longhorn and ~/.config/lhshell to ~/.config/lhde (docs/SETTINGS.md "Migration")
@@ -114,7 +114,7 @@ session() {
 	[ -s "$STATE/shell" ] || echo "${LHDE_SHELL:-1}" > "$STATE/shell"
 	[ -s "$STATE/desktop" ] || echo "${LHDE_DESKTOP:-1}" > "$STATE/desktop"
 	rm -f "$STATE/quit"; echo $$ > "$STATE/loop.pid"
-	[ "$LHDE_MODE" = real ] && [ -f "$HOME/.xinit_all" ] && . "$HOME/.xinit_all"   # the x11 lab's personal X startup, real sessions only
+	[ "$LHDE_MODE" = real ] && [ -f "$HOME/.xinit_all" ] && . "$HOME/.xinit_all"   # aap's personal X startup, real sessions only
 	[ -f "$HOME/.Xresources" ] && xrdb "$HOME/.Xresources" 2>/dev/null
 	# a session bus for luxshell's notification server (toasts via notify-send); a tty login has none. Ours, ended with the session
 	# (bus_stop): dbus-launch left one dbus-daemon per start behind, and with it an at-spi bus and an xdg-desktop-portal; a hundred

@@ -1,11 +1,11 @@
 #!/bin/sh
-# lhde's headless test bench (was the x11 lab's lab.sh, d353b69): a display of its own (LAB=:2 by default; Xvfb, nothing appears on
+# lhde's headless test bench: a display of its own (LAB=:2 by default; Xvfb, nothing appears on
 # your screen, or a visible Xephyr) with luxwm, picom and the wallpaper, for screenshots and scripted tests. lhde-session is the
 # real session; this is the bench. Programs come from the build tree when it runs from one (build/bin, build/examples), else from
 # beside the install; the art from lhde's data directories (LHDE_WINDOWS and LHDE_DATA honoured, as by every lhde program).
 #   LAB_WM=fvwm for an fvwm2 session (lab.fvwm2rc), default luxwm; LAB_THEME=NAME a theme (lhde-theme list; aliases such as aero-patch work: jade4074,
-#   slate4074, slate4051, luna-xp, aero5048, aero5112, aerovision, ...); LAB_PICOM=0 without a compositor (luxwm then uses the
-#   theme's frame_classic); LAB_WMARGS="" restarts luxwm without -d (debug log); LAB_BACKEND=glx for picom's glx backend.
+#   slate4074, slate4051, luna, aero5048, aero5112, aerovision, ...); LAB_PICOM=0 without a compositor (luxwm then uses the
+#   theme's frames_classic); LAB_WMARGS="" restarts luxwm without -d (debug log); LAB_BACKEND=glx for picom's glx backend.
 #   session/lab.sh start [xephyr]   start Xvfb (or a visible Xephyr window on $DISPLAY) on $LAB with luxwm, picom, wallpaper
 #   session/lab.sh shell [on|off]   start (restart) / stop luxshell on $LAB (LAB_SHELL_DESKTOP=0: without its desktop layer)
 #   session/lab.sh demo             open two terminals ($LAB_TERM, default xterm) and the glassdemo window on $LAB
@@ -27,7 +27,7 @@ startpicom() {
 }
 # a theme name (an alias, a bare style) through liblhde: prints the theme's name, nothing when unknown
 themename() { lhde_themename "$1"; }
-# what luxwm gets as LHWM_THEME: the registry name, or a frame set that is not in the registry. luxwm only uses it while the
+# what luxwm gets as LHWM_THEME: the theme's name, or a frame set that is no theme. luxwm only uses it while the
 # display has no _LH_THEME yet (the session's setting wins; `theme` / LAB_THEME on restart-wm change that)
 wmtheme() { n=$(themename "${LAB_THEME:-aero-patch}"); if [ -n "$n" ]; then echo "$n"; else lhde_resolve "frames/$LAB_THEME"; fi; }
 killlab() { for pid in $(pgrep -x "$1"); do tr '\0' '\n' < /proc/$pid/environ 2>/dev/null | grep -qx "DISPLAY=$LAB" && kill "$pid"; done; }
