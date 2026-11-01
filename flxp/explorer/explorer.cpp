@@ -54,6 +54,8 @@ extern "C" {
 
 using shell::Item;
 
+namespace {   // the program's own: the frame, its bands and the host, up to main
+
 // The frame around the shared browsing widget (browser.h: the list, its
 // views, filter and history live in browser::Browser).
 struct Explorer : browser::Browser {
@@ -2384,6 +2386,8 @@ static bool loop_keys(MSG& msg)
     }
     return false;
 }
+
+} // namespace
 
 int main(int argc, char** argv)
 {

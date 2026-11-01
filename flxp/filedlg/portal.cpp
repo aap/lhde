@@ -24,6 +24,8 @@
 #include <vector>
 #include "shell/config.h"
 
+namespace {   // the program's own, up to main
+
 static const char* BUS_NAME = "org.freedesktop.impl.portal.desktop.flxp";
 static const char* OBJ_PATH = "/org/freedesktop/portal/desktop";
 static const char* IFACE = "org.freedesktop.impl.portal.FileChooser";
@@ -444,6 +446,8 @@ static void dispatch()
     while (dbus_connection_dispatch(g_conn) == DBUS_DISPATCH_DATA_REMAINS) {}
     dbus_connection_flush(g_conn);
 }
+
+} // namespace
 
 int main(int argc, char** argv)
 {
