@@ -301,7 +301,7 @@ struct tmask {
 #define NM 512
 static struct tmask mc[NM];
 
-static void blur_a8(unsigned char *d, int w, int h, int st, int r)   /* lhnav_px.c px_blur_a8: a box blur, rows then columns */
+static void blur_a8(unsigned char *d, int w, int h, int st, int r)   /* lhnav_px.c lhnav__px_blur_a8: a box blur, rows then columns */
 {
     if (r <= 0) return;
     unsigned char *tmp = malloc((size_t)(w > h ? w : h));

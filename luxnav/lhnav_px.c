@@ -10,7 +10,7 @@ static inline uint32_t mul8(uint32_t a, uint32_t b) { uint32_t t = a * b + 0x80;
 
 /* ---- images ---- */
 
-px_img *px_img_new(int w, int h)
+px_img *lhnav__px_img_new(int w, int h)
 {
     if (w <= 0 || h <= 0) return NULL;
     px_img *im = malloc(sizeof *im);
@@ -20,21 +20,21 @@ px_img *px_img_new(int w, int h)
     return im;
 }
 
-px_img *px_img_from(const uint32_t *px, int w, int h, int rows)
+px_img *lhnav__px_img_from(const uint32_t *px, int w, int h, int rows)
 {
     if (rows > h) rows = h;
-    px_img *im = px_img_new(w, rows);
+    px_img *im = lhnav__px_img_new(w, rows);
     if (im) memcpy(im->px, px, (size_t)w * rows * 4);
     return im;
 }
 
-void px_img_free(px_img **im)
+void lhnav__px_img_free(px_img **im)
 {
     if (!*im) return;
     free((*im)->px); free(*im); *im = NULL;
 }
 
-uint32_t px_img_at(const px_img *im, int x, int y)
+uint32_t lhnav__px_img_at(const px_img *im, int x, int y)
 {
     return im && x >= 0 && y >= 0 && x < im->w && y < im->h ? im->px[(size_t)y * im->w + x] : 0;
 }
@@ -86,13 +86,13 @@ static uint32_t *png_decode(FILE *f, struct png_mem *mem, int *ow, int *oh)
     return o;
 }
 
-uint32_t *px_png_decode(const void *data, size_t size, int *w, int *h)
+uint32_t *lhnav__px_png_decode(const void *data, size_t size, int *w, int *h)
 {
     struct png_mem m = { data, size };
     return size > 8 && !memcmp(data, "\x89PNG", 4) ? png_decode(NULL, &m, w, h) : NULL;
 }
 
-px_img *px_img_png(const char *path)
+px_img *lhnav__px_img_png(const char *path)
 {
     FILE *f = fopen(path, "rb");
     if (!f) return NULL;
@@ -108,14 +108,14 @@ px_img *px_img_png(const char *path)
 
 /* ---- destinations ---- */
 
-px_cv px_cv_make(uint32_t *px, int w, int h, int stride)
+px_cv lhnav__px_cv_make(uint32_t *px, int w, int h, int stride)
 {
     px_cv c = { px, w, h, stride, 0, 0, w, h };
     return c;
 }
-px_cv px_cv_img(px_img *im) { return px_cv_make(im->px, im->w, im->h, im->w * 4); }
+px_cv lhnav__px_cv_img(px_img *im) { return lhnav__px_cv_make(im->px, im->w, im->h, im->w * 4); }
 
-void px_clip(px_cv *c, int x, int y, int w, int h)
+void lhnav__px_clip(px_cv *c, int x, int y, int w, int h)
 {
     if (x > c->x0) c->x0 = x;
     if (y > c->y0) c->y0 = y;
@@ -134,7 +134,7 @@ static inline uint32_t px_mul(uint32_t p, uint32_t a)
     if (a == 255) return p;
     return mul8(p >> 24, a) << 24 | mul8(p >> 16 & 255, a) << 16 | mul8(p >> 8 & 255, a) << 8 | mul8(p & 255, a);
 }
-void px_over(uint32_t *d, uint32_t s)
+void lhnav__px_over(uint32_t *d, uint32_t s)
 {
     uint32_t ia = 255 - (s >> 24);
     if (!s) return;
@@ -151,7 +151,7 @@ static inline uint32_t to8(double v) { if (v <= 0) return 0; if (v >= 1) return 
 static inline uint32_t alpha8(double a) { return to8(a); }
 
 static void blit_part_a(px_cv *c, const px_img *im, int sx, int sy, int w, int h, int x, int y, uint32_t a);
-void px_blit(px_cv *c, const px_img *im, int x, int y, double alpha)
+void lhnav__px_blit(px_cv *c, const px_img *im, int x, int y, double alpha)
 {
     if (im) blit_part_a(c, im, 0, 0, im->w, im->h, x, y, alpha >= 1 ? 255 : alpha8(alpha));
 }
@@ -166,7 +166,7 @@ static void blit_part_a(px_cv *c, const px_img *im, int sx, int sy, int w, int h
             if (dx < c->x0 || dx >= c->x1 || xx < 0 || xx >= im->w) continue;
             uint32_t s = im->px[(size_t)yy * im->w + xx];
             if (a != 255) s = px_mul(s, a);
-            px_over(at(c, dx, dy), s);
+            lhnav__px_over(at(c, dx, dy), s);
         }
     }
 }
@@ -192,7 +192,7 @@ static int weights(int i, double x, double k, int box, double *wt, int *n, int m
     return j0;
 }
 
-void px_blit_scaled(px_cv *c, const px_img *im, double x, double y, double k, double alpha)
+void lhnav__px_blit_scaled(px_cv *c, const px_img *im, double x, double y, double k, double alpha)
 {
     if (!im || k <= 0) return;
     uint32_t a = alpha >= 1 ? 255 : alpha8(alpha);
@@ -226,12 +226,12 @@ void px_blit_scaled(px_cv *c, const px_img *im, double x, double y, double k, do
             for (int ch = 0; ch < 3; ch++) { uint32_t v = (uint32_t)fmin(255, acc[ch] + 0.5); if (v > al) v = al; s |= v << (8 * ch); }
             s |= al << 24;
             if (a != 255) s = px_mul(s, a);
-            px_over(at(c, dx, dy), s);
+            lhnav__px_over(at(c, dx, dy), s);
         }
     }
 }
 
-void px_mask(px_cv *c, const unsigned char *m, int mw, int mh, int x, int y, uint32_t rgb, double alpha)
+void lhnav__px_mask(px_cv *c, const unsigned char *m, int mw, int mh, int x, int y, uint32_t rgb, double alpha)
 {
     uint32_t a = alpha8(alpha),
              s = a << 24 | to8((rgb >> 16 & 255) / 255.0 * alpha) << 16 | to8((rgb >> 8 & 255) / 255.0 * alpha) << 8 | to8((rgb & 255) / 255.0 * alpha);
@@ -242,14 +242,14 @@ void px_mask(px_cv *c, const unsigned char *m, int mw, int mh, int x, int y, uin
             int dx = x + i;
             unsigned v = m[(size_t)j * mw + i];
             if (!v || dx < c->x0 || dx >= c->x1) continue;
-            px_over(at(c, dx, dy), px_mul(s, v));
+            lhnav__px_over(at(c, dx, dy), px_mul(s, v));
         }
     }
 }
 
 /* ---- paints ---- */
 
-px_paint px_solid(double r, double g, double b, double a)
+px_paint lhnav__px_solid(double r, double g, double b, double a)
 {
     px_paint p;
     memset(&p, 0, sizeof p);
@@ -257,22 +257,22 @@ px_paint px_solid(double r, double g, double b, double a)
     p.rgba[0][0] = r; p.rgba[0][1] = g; p.rgba[0][2] = b; p.rgba[0][3] = a;
     return p;
 }
-px_paint px_rgb(uint32_t c, double a) { return px_solid((c >> 16 & 255) / 255.0, (c >> 8 & 255) / 255.0, (c & 255) / 255.0, a); }
-px_paint px_linear(double x0, double y0, double x1, double y1)
+px_paint lhnav__px_rgb(uint32_t c, double a) { return lhnav__px_solid((c >> 16 & 255) / 255.0, (c >> 8 & 255) / 255.0, (c & 255) / 255.0, a); }
+px_paint lhnav__px_linear(double x0, double y0, double x1, double y1)
 {
     px_paint p;
     memset(&p, 0, sizeof p);
     p.type = PX_LINEAR; p.x0 = x0; p.y0 = y0; p.x1 = x1; p.y1 = y1;
     return p;
 }
-px_paint px_radial(double cx0, double cy0, double r0, double cx1, double cy1, double r1)
+px_paint lhnav__px_radial(double cx0, double cy0, double r0, double cx1, double cy1, double r1)
 {
     px_paint p;
     memset(&p, 0, sizeof p);
     p.type = PX_RADIAL; p.x0 = cx0; p.y0 = cy0; p.r0 = r0; p.x1 = cx1; p.y1 = cy1; p.r1 = r1;
     return p;
 }
-void px_stop(px_paint *p, double off, double r, double g, double b, double a)
+void lhnav__px_stop(px_paint *p, double off, double r, double g, double b, double a)
 {
     if (p->nstops >= 4) return;
     int i = p->nstops++;
@@ -323,11 +323,11 @@ static uint32_t paint_at(const px_paint *p, double px, double py)
     return a8 << 24 | (r > a8 ? a8 : r) << 16 | (g > a8 ? a8 : g) << 8 | (bl > a8 ? a8 : bl);
 }
 
-void px_fill_rect(px_cv *c, int x, int y, int w, int h, const px_paint *p)
+void lhnav__px_fill_rect(px_cv *c, int x, int y, int w, int h, const px_paint *p)
 {
     int x0 = x > c->x0 ? x : c->x0, y0 = y > c->y0 ? y : c->y0, x1 = x + w < c->x1 ? x + w : c->x1, y1 = y + h < c->y1 ? y + h : c->y1;
     uint32_t s = p->type == PX_SOLID ? paint_at(p, 0, 0) : 0;
-    for (int j = y0; j < y1; j++) for (int i = x0; i < x1; i++) px_over(at(c, i, j), p->type == PX_SOLID ? s : paint_at(p, i + 0.5, j + 0.5));
+    for (int j = y0; j < y1; j++) for (int i = x0; i < x1; i++) lhnav__px_over(at(c, i, j), p->type == PX_SOLID ? s : paint_at(p, i + 0.5, j + 0.5));
 }
 
 
@@ -357,7 +357,7 @@ static void fill_sdf(px_cv *c, sdf_fn f, const void *ctx, double bx0, double by0
             cov = (unsigned)((in * 255 + SX * SY / 2) / (SX * SY));
         }
         uint32_t s = paint_at(p, i + 0.5, j + 0.5);
-        px_over(at(c, i, j), px_mul(s, cov));
+        lhnav__px_over(at(c, i, j), px_mul(s, cov));
     }
 }
 
@@ -370,12 +370,12 @@ static double rr_sdf(const void *v, double x, double y)
     double d = sqrt(ox * ox + oy * oy) + fmin(fmax(dx, dy), 0) - q->r;
     return q->lw > 0 ? fabs(d) - q->lw / 2 : d;
 }
-void px_fill_rrect(px_cv *c, double x, double y, double w, double h, double r, const px_paint *p)
+void lhnav__px_fill_rrect(px_cv *c, double x, double y, double w, double h, double r, const px_paint *p)
 {
     struct rr q = { x + w / 2, y + h / 2, w / 2, h / 2, fmin(r, fmin(w, h) / 2), 0 };
     fill_sdf(c, rr_sdf, &q, x, y, x + w, y + h, p);
 }
-void px_stroke_rrect(px_cv *c, double x, double y, double w, double h, double r, double lw, const px_paint *p)
+void lhnav__px_stroke_rrect(px_cv *c, double x, double y, double w, double h, double r, double lw, const px_paint *p)
 {
     struct rr q = { x + w / 2, y + h / 2, w / 2, h / 2, fmin(r, fmin(w, h) / 2), lw };
     fill_sdf(c, rr_sdf, &q, x - lw, y - lw, x + w + lw, y + h + lw, p);
@@ -388,12 +388,12 @@ static double circ_sdf(const void *v, double x, double y)
     double d = hypot(x - q->cx, y - q->cy) - q->r;
     return q->lw > 0 ? fabs(d) - q->lw / 2 : d;
 }
-void px_fill_circle(px_cv *c, double cx, double cy, double r, const px_paint *p)
+void lhnav__px_fill_circle(px_cv *c, double cx, double cy, double r, const px_paint *p)
 {
     struct circ q = { cx, cy, r, 0 };
     fill_sdf(c, circ_sdf, &q, cx - r, cy - r, cx + r, cy + r, p);
 }
-void px_stroke_circle(px_cv *c, double cx, double cy, double r, double lw, const px_paint *p)
+void lhnav__px_stroke_circle(px_cv *c, double cx, double cy, double r, double lw, const px_paint *p)
 {
     struct circ q = { cx, cy, r, lw };
     fill_sdf(c, circ_sdf, &q, cx - r - lw, cy - r - lw, cx + r + lw, cy + r + lw, p);
@@ -434,14 +434,14 @@ static void poly_box(const double *xy, int n, double m, double *b)
         b[1] = fmin(b[1], xy[2 * i + 1] - m); b[3] = fmax(b[3], xy[2 * i + 1] + m);
     }
 }
-void px_fill_poly(px_cv *c, const double *xy, int n, const px_paint *p)
+void lhnav__px_fill_poly(px_cv *c, const double *xy, int n, const px_paint *p)
 {
     if (n < 3) return;
     struct poly q = { xy, n, 1, 0, 0, 0 };
     double b[4]; poly_box(xy, n, 0, b);
     fill_sdf(c, poly_sdf, &q, b[0], b[1], b[2], b[3], p);
 }
-void px_stroke_poly(px_cv *c, const double *xy, int n, int closed, double lw, int round, const px_paint *p)
+void lhnav__px_stroke_poly(px_cv *c, const double *xy, int n, int closed, double lw, int round, const px_paint *p)
 {
     if (n < 2) return;
     struct poly q = { xy, n, closed, round, 1, lw };
@@ -451,7 +451,7 @@ void px_stroke_poly(px_cv *c, const double *xy, int n, int closed, double lw, in
 
 /* ---- blur ---- */
 
-void px_blur_a8(unsigned char *d, int w, int h, int st, int r)
+void lhnav__px_blur_a8(unsigned char *d, int w, int h, int st, int r)
 {
     if (r <= 0) return;
     unsigned char *tmp = malloc((size_t)(w > h ? w : h));

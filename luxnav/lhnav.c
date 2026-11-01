@@ -275,16 +275,16 @@ static void note(const char *msg);
 
 static void art_clear(struct art *a)
 {
-    for (int s = 0; s < NSTATES; s++) { px_img_free(&a->st[s]); px_img_free(&a->full[s]); }
+    for (int s = 0; s < NSTATES; s++) { lhnav__px_img_free(&a->st[s]); lhnav__px_img_free(&a->full[s]); }
 }
 
 static void art_free(lhnav *n)
 {
     for (int v = 0; v < 4; v++) { art_clear(&n->back[v]); art_clear(&n->fwd[v]); }
-    for (int s = 0; s < NSTATES; s++) px_img_free(&n->plate[s]);
-    px_img_free(&n->sep); px_img_free(&n->sep_down);
-    for (int a = 0; a < 2; a++) for (int v = 0; v < 4; v++) for (int k = 0; k < 4; k++) px_img_free(&n->fav[a][v][k]);
-    for (int i = 0; i < NICONS; i++) { px_img_free(&n->icon[i][0]); px_img_free(&n->icon[i][1]); }
+    for (int s = 0; s < NSTATES; s++) lhnav__px_img_free(&n->plate[s]);
+    lhnav__px_img_free(&n->sep); lhnav__px_img_free(&n->sep_down);
+    for (int a = 0; a < 2; a++) for (int v = 0; v < 4; v++) for (int k = 0; k < 4; k++) lhnav__px_img_free(&n->fav[a][v][k]);
+    for (int i = 0; i < NICONS; i++) { lhnav__px_img_free(&n->icon[i][0]); lhnav__px_img_free(&n->icon[i][1]); }
 }
 
 static void mc_clear(lhnav *n)
@@ -343,12 +343,12 @@ static int load_travel(lhnav *n, struct ut_theme *t, struct art *a, const char *
     if (ok) {
         int rows = n->split > 0 && n->split < h[0] ? n->split : h[0];
         uint32_t *hot = synth_orb(px[ST_NORMAL], px[ST_HOT], w[0], h[0]), *prs = synth_orb(px[ST_NORMAL], px[ST_PRESSED], w[0], h[0]);
-        a->st[ST_DISABLED] = px_img_from(px[ST_DISABLED], w[0], h[0], rows);
-        a->st[ST_NORMAL] = px_img_from(px[ST_NORMAL], w[0], h[0], rows);
-        a->st[ST_HOT] = px_img_from(hot ? hot : px[ST_HOT], w[0], h[0], rows);
-        a->st[ST_PRESSED] = px_img_from(prs ? prs : px[ST_PRESSED], w[0], h[0], rows);
+        a->st[ST_DISABLED] = lhnav__px_img_from(px[ST_DISABLED], w[0], h[0], rows);
+        a->st[ST_NORMAL] = lhnav__px_img_from(px[ST_NORMAL], w[0], h[0], rows);
+        a->st[ST_HOT] = lhnav__px_img_from(hot ? hot : px[ST_HOT], w[0], h[0], rows);
+        a->st[ST_PRESSED] = lhnav__px_img_from(prs ? prs : px[ST_PRESSED], w[0], h[0], rows);
         free(hot); free(prs);
-        for (int s = 0; s < NSTATES; s++) a->full[s] = px[s] ? px_img_from(px[s], w[0], h[0], h[0]) : NULL;
+        for (int s = 0; s < NSTATES; s++) a->full[s] = px[s] ? lhnav__px_img_from(px[s], w[0], h[0], h[0]) : NULL;
     }
     for (int s = 0; s < NSTATES; s++) if (px[s]) ut_free(px[s]);
     return ok;
@@ -420,11 +420,11 @@ static int load_band(lhnav *n, struct ut_theme *t)
         } else { n->band_gx[0] = 4; n->band_gx[1] = 4 + hw; }
         n->band_gy = (int)floor((ph - sh) / 2.0);
         for (int s = 0; s < ST_SPLITPRESSED; s++) {
-            n->plate[s] = px_img_from(bp[s], pw, ph, ph);
+            n->plate[s] = lhnav__px_img_from(bp[s], pw, ph, ph);
             for (int i = 0; i < 2; i++) {
                 uint32_t *h = sub_cols(gp[s], sw, i ? sw - hw : 0, hw, sh);
                 struct art *a = i ? &n->fwd[0] : &n->back[0];
-                if (h) { a->st[s] = px_img_from(h, hw, sh, sh); a->full[s] = px_img_from(h, hw, sh, sh); free(h); }
+                if (h) { a->st[s] = lhnav__px_img_from(h, hw, sh, sh); a->full[s] = lhnav__px_img_from(h, hw, sh, sh); free(h); }
             }
         }
         int x0 = n->band_gx[1] + hw, first = pw;
@@ -437,7 +437,7 @@ static int load_band(lhnav *n, struct ut_theme *t)
     } else ok = 0;
     for (int s = 0; s < ST_SPLITPRESSED; s++) { free(bp[s]); free(gp[s]); }
     if (ok) for (int s = 0; s < ST_SPLITPRESSED; s++) if (!n->plate[s] || !n->back[0].st[s] || !n->fwd[0].st[s]) ok = 0;
-    if (!ok) { n->band = 0; art_clear(&n->back[0]); art_clear(&n->fwd[0]); for (int s = 0; s < NSTATES; s++) px_img_free(&n->plate[s]); }
+    if (!ok) { n->band = 0; art_clear(&n->back[0]); art_clear(&n->fwd[0]); for (int s = 0; s < NSTATES; s++) lhnav__px_img_free(&n->plate[s]); }
     return ok;
 }
 #endif
@@ -448,14 +448,14 @@ static int load_strip(struct art *a, const char *dir, const char *name)
     enum { NSTRIP = ST_SPLITPRESSED };   /* the strips have no split-pressed frame */
     char p[700];
     snprintf(p, sizeof p, "%s/%s", dir, name);
-    px_img *s = px_img_png(p);
+    px_img *s = lhnav__px_img_png(p);
     if (!s) return 0;
     int w = s->w, h = s->h / NSTRIP;
     for (int k = 0; k < NSTRIP; k++) {
-        a->st[k] = px_img_from(s->px + (size_t)k * h * w, w, h, h);
-        a->full[k] = px_img_from(s->px + (size_t)k * h * w, w, h, h);
+        a->st[k] = lhnav__px_img_from(s->px + (size_t)k * h * w, w, h, h);
+        a->full[k] = lhnav__px_img_from(s->px + (size_t)k * h * w, w, h, h);
     }
-    px_img_free(&s);
+    lhnav__px_img_free(&s);
     return 1;
 }
 
@@ -465,40 +465,40 @@ static void drawn_travel(struct art *a, int fwd)
     int w = fwd ? 27 : 38, h = 44;
     double cx = fwd ? 11.5 : 19, cy = fwd ? 21 : 20.5, r = fwd ? 10 : 14.5;
     for (int s = 0; s < ST_SPLITPRESSED; s++) {
-        px_img *img = px_img_new(w, h);
+        px_img *img = lhnav__px_img_new(w, h);
         if (!img) continue;
-        px_cv c = px_cv_img(img);
-        px_paint well = px_solid(0.85, 0.88, 0.92, 0.45);
-        px_fill_circle(&c, cx, cy, r + 4, &well);
+        px_cv c = lhnav__px_cv_img(img);
+        px_paint well = lhnav__px_solid(0.85, 0.88, 0.92, 0.45);
+        lhnav__px_fill_circle(&c, cx, cy, r + 4, &well);
         if (s != ST_DISABLED || !fwd) {
             double c0[3] = { 0.55, 0.75, 0.95 }, c1[3] = { 0.10, 0.35, 0.65 };
             if (s == ST_HOT) { c0[0] = 0.55; c0[1] = 0.95; c0[2] = 0.50; c1[0] = 0.05; c1[1] = 0.55; c1[2] = 0.10; }
             if (s == ST_PRESSED) { c0[0] = 0.35; c0[1] = 0.75; c0[2] = 0.30; c1[0] = 0.02; c1[1] = 0.40; c1[2] = 0.05; }
-            px_paint g = px_radial(cx - r * 0.3, cy - r * 0.4, r * 0.1, cx, cy, r);
-            px_stop(&g, 0, c0[0], c0[1], c0[2], 1); px_stop(&g, 1, c1[0], c1[1], c1[2], 1);
-            px_fill_circle(&c, cx, cy, r, &g);
-            px_paint rim = px_solid(0.05, 0.15, 0.35, 0.8);
-            px_stroke_circle(&c, cx, cy, r, 1, &rim);
+            px_paint g = lhnav__px_radial(cx - r * 0.3, cy - r * 0.4, r * 0.1, cx, cy, r);
+            lhnav__px_stop(&g, 0, c0[0], c0[1], c0[2], 1); lhnav__px_stop(&g, 1, c1[0], c1[1], c1[2], 1);
+            lhnav__px_fill_circle(&c, cx, cy, r, &g);
+            px_paint rim = lhnav__px_solid(0.05, 0.15, 0.35, 0.8);
+            lhnav__px_stroke_circle(&c, cx, cy, r, 1, &rim);
             double d = fwd ? -1 : 1, ar = r * 0.55;   /* the tip at cx - d * ar: back points left, forward right */
             double pts[] = { cx - d * ar, cy, cx + d * ar * 0.1, cy - ar * 0.8, cx + d * ar * 0.1, cy - ar * 0.3, cx + d * ar, cy - ar * 0.3,
                              cx + d * ar, cy + ar * 0.3, cx + d * ar * 0.1, cy + ar * 0.3, cx + d * ar * 0.1, cy + ar * 0.8 };
-            px_paint arrow = px_solid(1, 1, 1, s == ST_DISABLED ? 0.5 : 0.95);
-            px_fill_poly(&c, pts, 7, &arrow);
+            px_paint arrow = lhnav__px_solid(1, 1, 1, s == ST_DISABLED ? 0.5 : 0.95);
+            lhnav__px_fill_poly(&c, pts, 7, &arrow);
         }
-        a->st[s] = img; a->full[s] = px_img_from(img->px, w, h, h);
+        a->st[s] = img; a->full[s] = lhnav__px_img_from(img->px, w, h, h);
     }
 }
 
 /* premultiplied pixels (stride 4 w) as an image scaled to size x size (box-filtered), keeping the aspect */
 static px_img *img_scaled(const uint32_t *px, int w, int h, int size)
 {
-    px_img *src = px_img_from(px, w, h, h);
+    px_img *src = lhnav__px_img_from(px, w, h, h);
     if (!src || size <= 0 || (w == size && h == size)) return src;
     double k = (double)size / (w > h ? w : h);
     int dw = (int)lround(w * k), dh = (int)lround(h * k);
-    px_img *d = px_img_new(dw > 0 ? dw : 1, dh > 0 ? dh : 1);
-    if (d) { px_cv c = px_cv_img(d); px_blit_scaled(&c, src, 0, 0, k, 1); }
-    px_img_free(&src);
+    px_img *d = lhnav__px_img_new(dw > 0 ? dw : 1, dh > 0 ? dh : 1);
+    if (d) { px_cv c = lhnav__px_cv_img(d); lhnav__px_blit_scaled(&c, src, 0, 0, k, 1); }
+    lhnav__px_img_free(&src);
     return d;
 }
 
@@ -511,11 +511,11 @@ static void load_icons(lhnav *n)
     snprintf(f, sizeof f, "%s/shell32.dll", n->m.icon_dir);
     int sz = n->m.tool_icon > 0 ? n->m.tool_icon : 16, w, h;
     uint32_t *px;
-    if ((px = lhnav_res_icon(f, 23, 32, &w, &h))) { n->icon[ICN_SEARCH][0] = px_img_from(px, w, h, h); free(px); }
-    if ((px = lhnav_res_icon(f, 4, sz, &w, &h))) { n->icon[ICN_FOLDER][0] = img_scaled(px, w, h, sz); free(px); }
+    if ((px = lhnav__res_icon(f, 23, 32, &w, &h))) { n->icon[ICN_SEARCH][0] = lhnav__px_img_from(px, w, h, h); free(px); }
+    if ((px = lhnav__res_icon(f, 4, sz, &w, &h))) { n->icon[ICN_FOLDER][0] = img_scaled(px, w, h, sz); free(px); }
     int cell = sz > 16 ? 24 : 16;
     for (int hot = 0; hot < 2; hot++) {
-        if (!(px = lhnav_res_bitmap(f, (cell == 16 ? 216 : 214) + hot, &w, &h))) continue;
+        if (!(px = lhnav__res_bitmap(f, (cell == 16 ? 216 : 214) + hot, &w, &h))) continue;
         if (h == cell && w >= 33 * cell) {
             uint32_t *c = malloc((size_t)cell * cell * 4);
             for (int k = 0; k < 2 && c; k++) {
@@ -653,8 +653,8 @@ static void load_art(lhnav *n)
             int p = ut_part(t, "Toolbar", "SPLITBUTTONHORZARROW"), w, h;
             uint32_t *px = p > 0 ? ut_get_bitmap(t, tb[i], p, 0, ut_prop(t, "GLYPHIMAGEFILE"), &w, &h) : NULL;
             if (px) {   /* states stacked: the first square; the second (aero-patch: a down arrow) is the open look */
-                n->sep = px_img_from(px, w, h, h % w == 0 ? w : h);
-                if (h % w == 0 && h >= 2 * w) n->sep_down = px_img_from(px + (size_t)w * w, w, h - w, w);
+                n->sep = lhnav__px_img_from(px, w, h, h % w == 0 ? w : h);
+                if (h % w == 0 && h >= 2 * w) n->sep_down = lhnav__px_img_from(px + (size_t)w * w, w, h - w, w);
                 ut_free(px);
                 snprintf(n->src[SRC_SEP], sizeof n->src[SRC_SEP], "%s %s SPLITBUTTONHORZARROW GLYPHIMAGEFILE %dx%d, image 1 (open: %s)", sl, tb[i],
                          w, h % w == 0 ? w : h, n->sep_down ? "image 2" : "drawn down arrow");
@@ -679,7 +679,7 @@ static void load_art(lhnav *n)
                 for (int k = 0; k < 4; k++) {
                     int w, h, st = ut_state(t, "AnimationButton", part, sn[k]);
                     uint32_t *px = ut_get_bitmap(t, cls, part, st, img, &w, &h);
-                    if (px) { n->fav[a][v][k] = px_img_from(px, w, h, h); ut_free(px); }
+                    if (px) { n->fav[a][v][k] = lhnav__px_img_from(px, w, h, h); ut_free(px); }
                 }
                 if (n->fav[a][v][1] && strlen(got) + strlen(cls) + 2 < sizeof got) { strcat(got, " "); strcat(got, cls); }
             }
@@ -691,7 +691,7 @@ static void load_art(lhnav *n)
         struct art b = { { 0 }, { 0 } }, f = { { 0 }, { 0 } };
         if (load_strip(&b, n->m.art_dir, "nav_back.png") && load_strip(&f, n->m.art_dir, "nav_fwd.png")) {
             for (int v = 0; v < 4; v++) { art_clear(&n->back[v]); art_clear(&n->fwd[v]); }
-            for (int s = 0; s < NSTATES; s++) px_img_free(&n->plate[s]);
+            for (int s = 0; s < NSTATES; s++) lhnav__px_img_free(&n->plate[s]);
             n->band = 0; n->src[SRC_PLATE][0] = 0;
             n->back[0] = b; n->fwd[0] = f;
             n->split = b.st[0]->h;
@@ -815,8 +815,8 @@ void lhnav_set_icon(lhnav *n, const char *name, const uint32_t *px, int w, int h
     for (int i = 0; i < NICONS; i++) for (int hot = 0; hot < 2; hot++) {
         char nm[32]; snprintf(nm, sizeof nm, "%s%s", icon_names[i], hot ? "_hot" : "");
         if (strcmp(nm, name)) continue;
-        px_img_free(&n->cicon[i][hot]);
-        if (px && w > 0 && h > 0) n->cicon[i][hot] = px_img_from(px, w, h, h);
+        lhnav__px_img_free(&n->cicon[i][hot]);
+        if (px && w > 0 && h > 0) n->cicon[i][hot] = lhnav__px_img_from(px, w, h, h);
     }
 }
 
@@ -847,7 +847,7 @@ void lhnav_free(lhnav *n)
     if (n->art_ut) ut_close(n->art_ut);
 #endif
     free(n->style_name);
-    for (int i = 0; i < NICONS; i++) { px_img_free(&n->cicon[i][0]); px_img_free(&n->cicon[i][1]); }
+    for (int i = 0; i < NICONS; i++) { lhnav__px_img_free(&n->cicon[i][0]); lhnav__px_img_free(&n->cicon[i][1]); }
     for (int i = 0; i < n->nseg; i++) free(n->seg[i]);
     free(n->seg); free(n->r_seg); free(n->r_sep); free(n->title); free(n->field[0]); free(n->field[1]);
     free(n);
@@ -1123,13 +1123,13 @@ static void draw_text(lhnav *n, px_cv *c, int fid, const char *s, int x, int y, 
         if (g) {
             memcpy(g, m, (size_t)W * H);
             int r1 = (R + 1) / 2;
-            px_blur_a8(g, W, H, W, r1); px_blur_a8(g, W, H, W, R - r1 > 0 ? R - r1 : 1);
+            lhnav__px_blur_a8(g, W, H, W, r1); lhnav__px_blur_a8(g, W, H, W, R - r1 > 0 ? R - r1 : 1);
             for (size_t i = 0; i < (size_t)W * H; i++) { double v = g[i] * n->m.glow_strength; g[i] = (unsigned char)(v > 255 ? 255 : v); }
-            px_mask(c, g, W, H, x - ox, y - oy, n->m.glow_rgb != 0xFFFFFFFFu ? n->m.glow_rgb : n->glow_rgb, 1);
+            lhnav__px_mask(c, g, W, H, x - ox, y - oy, n->m.glow_rgb != 0xFFFFFFFFu ? n->m.glow_rgb : n->glow_rgb, 1);
             free(g);
         }
     }
-    px_mask(c, m, W, H, x - ox, y - oy, rgb, alpha);
+    lhnav__px_mask(c, m, W, H, x - ox, y - oy, rgb, alpha);
     free(m);
 #else
     (void)n; (void)c; (void)fid; (void)s; (void)x; (void)y; (void)maxw; (void)rgb; (void)alpha; (void)glow;
@@ -1349,7 +1349,7 @@ static int in(const struct rect *r, int x, int y) { return r->w > 0 && x >= r->x
 static int orb_alpha(lhnav *n, const px_img *s, const struct rect *r, int x, int y)
 {
     if (!s || !in(r, x, y)) return 0;
-    return (int)(px_img_at(s, (int)((x - r->x) / n->tk), (int)((y - r->y) / n->tk)) >> 24);
+    return (int)(lhnav__px_img_at(s, (int)((x - r->x) / n->tk), (int)((y - r->y) / n->tk)) >> 24);
 }
 
 int lhnav_hit(lhnav *n, int x, int y)
@@ -1449,22 +1449,22 @@ int lhnav_field_index(lhnav *n, int part, const char *text, int x)
 /* a field: translucent white on glass at rest, opaque white while editing; a soft dark border with a light inner line */
 static void field_box(px_cv *c, const struct rect *r, double alpha, int editing)
 {
-    px_paint fill = px_solid(1, 1, 1, editing ? 1 : alpha), line = px_solid(0.12, 0.16, 0.24, editing ? 0.75 : 0.45);
-    px_fill_rrect(c, r->x + 0.5, r->y + 0.5, r->w - 1, r->h - 1, 2.5, &fill);
-    px_stroke_rrect(c, r->x + 0.5, r->y + 0.5, r->w - 1, r->h - 1, 2.5, 1, &line);
-    if (!editing) { px_paint hl = px_solid(1, 1, 1, 0.5); px_fill_rect(c, r->x + 3, r->y + 1, r->w - 6, 1, &hl); }
+    px_paint fill = lhnav__px_solid(1, 1, 1, editing ? 1 : alpha), line = lhnav__px_solid(0.12, 0.16, 0.24, editing ? 0.75 : 0.45);
+    lhnav__px_fill_rrect(c, r->x + 0.5, r->y + 0.5, r->w - 1, r->h - 1, 2.5, &fill);
+    lhnav__px_stroke_rrect(c, r->x + 0.5, r->y + 0.5, r->w - 1, r->h - 1, 2.5, 1, &line);
+    if (!editing) { px_paint hl = lhnav__px_solid(1, 1, 1, 0.5); lhnav__px_fill_rect(c, r->x + 3, r->y + 1, r->w - 6, 1, &hl); }
 }
 
 /* the magnifier of the search box (concept art: a light blue lens in a dark rim, a grey handle to the lower right), at scale s */
 static void magnifier(px_cv *c, double cx, double cy, double s)
 {
     double handle[] = { cx + 2.6 * s, cy + 2.6 * s, cx + 6 * s, cy + 6 * s };
-    px_paint hp = px_solid(0.25, 0.27, 0.32, 0.95), rim = px_solid(0.18, 0.24, 0.36, 0.95);
-    px_stroke_poly(c, handle, 2, 0, 2.4 * s, 1, &hp);
-    px_paint g = px_radial(cx - 1.5 * s, cy - 1.5 * s, 0.5 * s, cx, cy, 4.5 * s);
-    px_stop(&g, 0, 0.95, 0.98, 1, 0.95); px_stop(&g, 1, 0.55, 0.72, 0.92, 0.95);
-    px_fill_circle(c, cx - 0.5 * s, cy - 0.5 * s, 4.2 * s, &g);
-    px_stroke_circle(c, cx - 0.5 * s, cy - 0.5 * s, 4.2 * s, 1.2 * s, &rim);
+    px_paint hp = lhnav__px_solid(0.25, 0.27, 0.32, 0.95), rim = lhnav__px_solid(0.18, 0.24, 0.36, 0.95);
+    lhnav__px_stroke_poly(c, handle, 2, 0, 2.4 * s, 1, &hp);
+    px_paint g = lhnav__px_radial(cx - 1.5 * s, cy - 1.5 * s, 0.5 * s, cx, cy, 4.5 * s);
+    lhnav__px_stop(&g, 0, 0.95, 0.98, 1, 0.95); lhnav__px_stop(&g, 1, 0.55, 0.72, 0.92, 0.95);
+    lhnav__px_fill_circle(c, cx - 0.5 * s, cy - 0.5 * s, 4.2 * s, &g);
+    lhnav__px_stroke_circle(c, cx - 0.5 * s, cy - 0.5 * s, 4.2 * s, 1.2 * s, &rim);
 }
 
 /* a part of the breadcrumb toolbar's art (SPLITBUTTON, SPLITBUTTONDROPDOWN) hot / pressed over r; 0 when the style has none */
@@ -1474,13 +1474,13 @@ static int toolbar_bg(lhnav *n, px_cv *c, const struct rect *r, int part, int pr
 #ifdef HAVE_UXTHEME
     struct ut_theme *t = n->art_ut ? n->art_ut : n->ut;   /* the art's style (nav.ini art_style) */
     if (t && n->crumb_cls[0] && part > 0 && r->w > 0 && r->h > 0) {
-        px_img *s = px_img_new(r->w, r->h);
+        px_img *s = lhnav__px_img_new(r->w, r->h);
         if (!s) return 0;
         ut_rect rr = { 0, 0, r->w, r->h };
         int st = ut_state(t, "Toolbar", part, pressed ? "PRESSED" : "HOT");
         int ok = ut_draw_background(t, n->crumb_cls, part, st > 0 ? st : pressed ? 3 : 2, s->px, r->w, r->h, r->w * 4, &rr, NULL);
-        if (ok) px_blit(c, s, r->x, r->y, 1);
-        px_img_free(&s);
+        if (ok) lhnav__px_blit(c, s, r->x, r->y, 1);
+        lhnav__px_img_free(&s);
         return ok;
     }
 #endif
@@ -1491,21 +1491,21 @@ static int toolbar_bg(lhnav *n, px_cv *c, const struct rect *r, int part, int pr
 static void crumb_bg(lhnav *n, px_cv *c, const struct rect *r, int pressed)
 {
     if (toolbar_bg(n, c, r, n->splitbtn_part, pressed)) return;
-    px_paint fill = px_solid(1, 1, 1, pressed ? 0.25 : 0.45), line = px_solid(0.1, 0.15, 0.25, pressed ? 0.6 : 0.4);
-    px_fill_rrect(c, r->x + 0.5, r->y + 0.5, r->w - 1, r->h - 1, 2, &fill);
-    px_stroke_rrect(c, r->x + 0.5, r->y + 0.5, r->w - 1, r->h - 1, 2, 1, &line);
+    px_paint fill = lhnav__px_solid(1, 1, 1, pressed ? 0.25 : 0.45), line = lhnav__px_solid(0.1, 0.15, 0.25, pressed ? 0.6 : 0.4);
+    lhnav__px_fill_rrect(c, r->x + 0.5, r->y + 0.5, r->w - 1, r->h - 1, 2, &fill);
+    lhnav__px_stroke_rrect(c, r->x + 0.5, r->y + 0.5, r->w - 1, r->h - 1, 2, 1, &line);
 }
 
 static void separator(lhnav *n, px_cv *c, int x, int y, int h, int composited, int down)
 {
     double cx = x + n->m.sep_w / 2.0, cy = y + h / 2.0;
     const px_img *g = down ? n->sep_down : n->sep;
-    if (g) { px_blit(c, g, (int)floor(cx - g->w / 2.0), (int)floor(cy - g->h / 2.0), 1); return; }
+    if (g) { lhnav__px_blit(c, g, (int)floor(cx - g->w / 2.0), (int)floor(cy - g->h / 2.0), 1); return; }
     double dn[] = { cx - 4, cy - 2, cx, cy + 2.5, cx + 4, cy - 2 }, rt[] = { cx - 2, cy - 4, cx + 2.5, cy, cx - 2, cy + 4 };
     const double *t = down ? dn : rt;
-    if (composited) { px_paint w = px_solid(1, 1, 1, 0.8); px_stroke_poly(c, t, 3, 1, 2, 0, &w); }
-    px_paint f = px_rgb(n->m.crumb_rgb != 0xFFFFFFFFu ? n->m.crumb_rgb : n->crumb_rgb, 1);
-    px_fill_poly(c, t, 3, &f);
+    if (composited) { px_paint w = lhnav__px_solid(1, 1, 1, 0.8); lhnav__px_stroke_poly(c, t, 3, 1, 2, 0, &w); }
+    px_paint f = lhnav__px_rgb(n->m.crumb_rgb != 0xFFFFFFFFu ? n->m.crumb_rgb : n->crumb_rgb, 1);
+    lhnav__px_fill_poly(c, t, 3, &f);
 }
 
 /* the chevron after segment i: a drop-down button (hot / pressed / open: SPLITBUTTONDROPDOWN, the glyph turned down while
@@ -1531,7 +1531,7 @@ static void paint_orb(lhnav *n, px_cv *c, struct art *a, struct art *a0, const s
     px_img *const *v = big(n) ? a->full : a->st, *const *v0 = big(n) ? a0->full : a0->st;
     if (st == ST_SPLITPRESSED && !v[st] && !v0[st]) st = ST_PRESSED;
     const px_img *s = v[st] ? v[st] : v0[st];
-    if (s) px_blit_scaled(c, s, r->x, r->y, n->tk, 1);   /* box-filtered when shrunk */
+    if (s) lhnav__px_blit_scaled(c, s, r->x, r->y, n->tk, 1);   /* box-filtered when shrunk */
 }
 
 /* image s drawn into the box (x, y, w, h) scaled to fit (aspect kept, centred), at alpha a */
@@ -1540,7 +1540,7 @@ static void draw_fit(px_cv *c, const px_img *s, double x, double y, double w, do
     double k = fmin(w / s->w, h / s->h);
     if (fabs(k - 1) < 1e-6) k = 1;
     double dx = floor(x + (w - s->w * k) / 2 + 0.5), dy = floor(y + (h - s->h * k) / 2 + 0.5);
-    px_blit_scaled(c, s, dx, dy, k, a);
+    lhnav__px_blit_scaled(c, s, dx, dy, k, a);
 }
 
 /* drawn stand-ins for missing icons, in an s x s box at (x, y) (designed on 16 x 16) */
@@ -1550,20 +1550,20 @@ static void drawn_icon(px_cv *c, int kind, double x, double y, double s)
 #define X(v) (x + (v) * k)
 #define Y(v) (y + (v) * k)
     if (kind == ICN_FOLDER || kind == ICN_NEWFOLDER) {   /* a manila folder (+ a spark for New Folder) */
-        px_paint body = px_solid(0.93, 0.78, 0.35, 1), edge = px_solid(0.55, 0.40, 0.10, 0.9);
+        px_paint body = lhnav__px_solid(0.93, 0.78, 0.35, 1), edge = lhnav__px_solid(0.55, 0.40, 0.10, 0.9);
         double tab[] = { X(1), Y(3), X(7), Y(3), X(7), Y(5), X(1), Y(5) }, box[] = { X(1), Y(4.5), X(15), Y(4.5), X(15), Y(14), X(1), Y(14) };
-        px_fill_poly(c, tab, 4, &body); px_fill_poly(c, box, 4, &body);
-        px_stroke_poly(c, tab, 4, 1, k, 0, &edge); px_stroke_poly(c, box, 4, 1, k, 0, &edge);
-        if (kind == ICN_NEWFOLDER) { px_paint sp = px_solid(1, 0.55, 0.1, 1); px_fill_circle(c, X(12.5), Y(3.5), 2.5 * k, &sp); }
+        lhnav__px_fill_poly(c, tab, 4, &body); lhnav__px_fill_poly(c, box, 4, &body);
+        lhnav__px_stroke_poly(c, tab, 4, 1, k, 0, &edge); lhnav__px_stroke_poly(c, box, 4, 1, k, 0, &edge);
+        if (kind == ICN_NEWFOLDER) { px_paint sp = lhnav__px_solid(1, 0.55, 0.1, 1); lhnav__px_fill_circle(c, X(12.5), Y(3.5), 2.5 * k, &sp); }
     } else if (kind == ICN_VIEWS) {   /* a window with a grid of tiles */
-        px_paint wh = px_solid(1, 1, 1, 1), bl = px_solid(0.15, 0.35, 0.75, 1);
+        px_paint wh = lhnav__px_solid(1, 1, 1, 1), bl = lhnav__px_solid(0.15, 0.35, 0.75, 1);
         double win[] = { X(1.5), Y(2.5), X(14.5), Y(2.5), X(14.5), Y(13.5), X(1.5), Y(13.5) };
-        px_fill_poly(c, win, 4, &wh); px_stroke_poly(c, win, 4, 1, k, 0, &bl);
+        lhnav__px_fill_poly(c, win, 4, &wh); lhnav__px_stroke_poly(c, win, 4, 1, k, 0, &bl);
         double bar[] = { X(1.5), Y(2.5), X(14.5), Y(2.5), X(14.5), Y(4.5), X(1.5), Y(4.5) };
-        px_fill_poly(c, bar, 4, &bl);
+        lhnav__px_fill_poly(c, bar, 4, &bl);
         for (int j = 0; j < 2; j++) for (int i = 0; i < 3; i++) {
             double t[] = { X(3.5 + 3.7 * i), Y(6.5 + 3.5 * j), X(5.9 + 3.7 * i), Y(6.5 + 3.5 * j), X(5.9 + 3.7 * i), Y(8.7 + 3.5 * j), X(3.5 + 3.7 * i), Y(8.7 + 3.5 * j) };
-            px_fill_poly(c, t, 4, &bl);
+            lhnav__px_fill_poly(c, t, 4, &bl);
         }
     }
 #undef X
@@ -1574,27 +1574,27 @@ static void drawn_icon(px_cv *c, int kind, double x, double y, double s)
 static void drawn_star(px_cv *c, double x, double y, double s, int state)
 {
     double cx = x + s / 2, cy = y + s / 2, r = s * 0.36;
-    px_paint well = px_solid(0.85, 0.88, 0.92, 0.45);
-    px_fill_circle(c, cx, cy, s * 0.48, &well);
-    px_paint g = px_radial(cx - r * 0.3, cy - r * 0.4, r * 0.1, cx, cy, r);
+    px_paint well = lhnav__px_solid(0.85, 0.88, 0.92, 0.45);
+    lhnav__px_fill_circle(c, cx, cy, s * 0.48, &well);
+    px_paint g = lhnav__px_radial(cx - r * 0.3, cy - r * 0.4, r * 0.1, cx, cy, r);
     double c1 = state == 2 ? 0.55 : state == 3 ? 0.40 : 0.35;
-    px_stop(&g, 0, 0.65, 0.85, 0.95, 1); px_stop(&g, 1, 0.05, c1, 0.65, 1);
-    px_fill_circle(c, cx, cy, r, &g);
+    lhnav__px_stop(&g, 0, 0.65, 0.85, 0.95, 1); lhnav__px_stop(&g, 1, 0.05, c1, 0.65, 1);
+    lhnav__px_fill_circle(c, cx, cy, r, &g);
     double pts[20];
     for (int k = 0; k < 10; k++) {
         double a = -M_PI / 2 + k * M_PI / 5, rr = k & 1 ? r * 0.27 : r * 0.62;
         pts[2 * k] = cx + rr * cos(a); pts[2 * k + 1] = cy + rr * sin(a);
     }
-    px_paint st = px_solid(1, 1, 1, state == 0 ? 0.5 : 0.95);
-    px_fill_poly(c, pts, 10, &st);
+    px_paint st = lhnav__px_solid(1, 1, 1, state == 0 ? 0.5 : 0.95);
+    lhnav__px_fill_poly(c, pts, 10, &st);
 }
 
 /* a little down arrow (XP's drop-down part) centred on (cx, cy) */
 static void down_arrow(px_cv *c, double cx, double cy, double a)
 {
     double t[] = { cx - 2.5, cy - 1.5, cx + 2.5, cy - 1.5, cx, cy + 1.5 };
-    px_paint p = px_solid(0, 0, 0, a);
-    px_fill_poly(c, t, 3, &p);
+    px_paint p = lhnav__px_solid(0, 0, 0, a);
+    lhnav__px_fill_poly(c, t, 3, &p);
 }
 
 static const px_img *icon_of(lhnav *n, int k, int hot)
@@ -1617,10 +1617,10 @@ static void paint_tool(lhnav *n, px_cv *c, int i, int composited)
     case LHNAV_TOOL_SEPARATOR: {   /* glass: a white line fading out at both ends (flxp's divider); opaque: dark with a light line */
         int x = r->x + r->w / 2;
         double g = composited ? 1 : 0.25, a = composited ? 0.85 : 0.5;
-        px_paint p = px_linear(0, r->y, 0, r->y + r->h);
-        px_stop(&p, 0, g, g, g, 0); px_stop(&p, 0.5, g, g, g, a); px_stop(&p, 1, g, g, g, 0);
-        px_fill_rect(c, x, r->y, 1, r->h, &p);
-        if (!composited) { px_paint l = px_solid(1, 1, 1, 0.5); px_fill_rect(c, x + 1, r->y + 2, 1, r->h - 4, &l); }
+        px_paint p = lhnav__px_linear(0, r->y, 0, r->y + r->h);
+        lhnav__px_stop(&p, 0, g, g, g, 0); lhnav__px_stop(&p, 0.5, g, g, g, a); lhnav__px_stop(&p, 1, g, g, g, 0);
+        lhnav__px_fill_rect(c, x, r->y, 1, r->h, &p);
+        if (!composited) { px_paint l = lhnav__px_solid(1, 1, 1, 0.5); lhnav__px_fill_rect(c, x + 1, r->y + 2, 1, r->h - 4, &l); }
         break; }
     case LHNAV_TOOL_FAVORITES: {   /* the style's star orb at tool_size: the small art up to 35 px, else the normal one */
         int st = dn ? 3 : hot ? 2 : 1, a = r->h <= 35 && n->fav[1][0][1] ? 1 : 0;
@@ -1632,9 +1632,9 @@ static void paint_tool(lhnav *n, px_cv *c, int i, int composited)
         double sz = r->w - 2, x = r->x + 1 + (dn ? 1 : 0), y = r->y + (r->h - sz) / 2 + (dn ? 1 : 0);
         if (hot && composited) {
             double cx = r->x + r->w / 2.0, cy = r->y + r->h / 2.0, rad = r->h / 2.0;
-            px_paint g = px_radial(cx, cy, 0, cx, cy, rad);
-            px_stop(&g, 0, 1, 1, 1, dn ? 0.45 : 0.7); px_stop(&g, 1, 1, 1, 1, 0);
-            px_fill_rect(c, (int)floor(cx - rad) - 1, (int)floor(cy - rad) - 1, (int)ceil(2 * rad) + 3, (int)ceil(2 * rad) + 3, &g);
+            px_paint g = lhnav__px_radial(cx, cy, 0, cx, cy, rad);
+            lhnav__px_stop(&g, 0, 1, 1, 1, dn ? 0.45 : 0.7); lhnav__px_stop(&g, 1, 1, 1, 1, 0);
+            lhnav__px_fill_rect(c, (int)floor(cx - rad) - 1, (int)floor(cy - rad) - 1, (int)ceil(2 * rad) + 3, (int)ceil(2 * rad) + 3, &g);
         }
         const px_img *s = icon_of(n, ICN_SEARCH, hot);
         if (s) draw_fit(c, s, x, y, sz, sz, hot ? 1 : 0.9);
@@ -1648,7 +1648,7 @@ static void paint_tool(lhnav *n, px_cv *c, int i, int composited)
         const px_img *s = icon_of(n, k, hot);
         if (s) draw_fit(c, s, ix, iy, ip, ip, 1); else drawn_icon(c, k, ix, iy, ip);
         if (t->kind == LHNAV_TOOL_VIEWS) {
-            if (hot) { px_paint d = px_solid(0, 0, 0, 0.25); px_fill_rect(c, r->x + iw, r->y + 3, 1, r->h - 6, &d); }
+            if (hot) { px_paint d = lhnav__px_solid(0, 0, 0, 0.25); lhnav__px_fill_rect(c, r->x + iw, r->y + 3, 1, r->h - 6, &d); }
             down_arrow(c, r->x + iw + 5.5 + (dn ? 1 : 0), r->y + r->h / 2.0 + (dn ? 1 : 0), 0.85);
         }
         break; }
@@ -1658,8 +1658,8 @@ static void paint_tool(lhnav *n, px_cv *c, int i, int composited)
 /* a caret: a 1 px black line in column x, the box's rows 4 .. h - 4 */
 static void caret(px_cv *c, int x, const struct rect *r)
 {
-    px_paint b = px_solid(0, 0, 0, 1);
-    px_fill_rect(c, x, r->y + 4, 1, r->h - 8, &b);
+    px_paint b = lhnav__px_solid(0, 0, 0, 1);
+    lhnav__px_fill_rect(c, x, r->y + 4, 1, r->h - 8, &b);
 }
 
 /* the top of a text cell centred in r (with the old pango layout's rounding: floor) */
@@ -1671,8 +1671,8 @@ static int text_top(lhnav *n, int fid, const struct rect *r, int dy)
 void lhnav_paint(lhnav *n, uint32_t *px, int w, int h, int stride, int composited)
 {
     const lhnav_metrics *m = &n->m;
-    px_cv cv = px_cv_make(px, w, h, stride), *c = &cv;
-    px_clip(c, 0, 0, w, lhnav_extend_top(n));
+    px_cv cv = lhnav__px_cv_make(px, w, h, stride), *c = &cv;
+    lhnav__px_clip(c, 0, 0, w, lhnav_extend_top(n));
     uint32_t tcol = composited ? m->title_rgb : m->plain_rgb,
              ccol = composited ? (m->crumb_rgb != 0xFFFFFFFFu ? m->crumb_rgb : n->crumb_rgb) : m->plain_rgb;
     /* 1. title: baseline on frame row deco_h (+ title_dy), ellipsized left of the caption buttons */
@@ -1688,7 +1688,7 @@ void lhnav_paint(lhnav *n, uint32_t *px, int w, int h, int stride, int composite
     if (n->band) {   /* the TravelBand: the plate in the chevron's state, then each glyph in its own (no menu part of their own) */
         int st = !n->can_back && !n->can_fwd ? ST_DISABLED : down_on(n, LHNAV_BACK_MENU) ? ST_PRESSED
                : n->hover == LHNAV_BACK_MENU ? ST_HOT : ST_NORMAL;
-        if (n->plate[st]) px_blit(c, n->plate[st], n->r_band.x, n->r_band.y, 1);
+        if (n->plate[st]) lhnav__px_blit(c, n->plate[st], n->r_band.x, n->r_band.y, 1);
         paint_orb(n, c, &n->fwd[0], &n->fwd[0], &n->r_fwd, LHNAV_FWD, -1, n->can_fwd);
         paint_orb(n, c, &n->back[0], &n->back[0], &n->r_back, LHNAV_BACK, -1, n->can_back);
     } else {
@@ -1703,7 +1703,7 @@ void lhnav_paint(lhnav *n, uint32_t *px, int w, int h, int stride, int composite
     }
     if (n->editing[0]) {
         px_cv sv = *c;
-        px_clip(c, n->r_addr.x + 2, n->r_addr.y, n->r_addr.w - 4, n->r_addr.h);
+        lhnav__px_clip(c, n->r_addr.x + 2, n->r_addr.y, n->r_addr.w - 4, n->r_addr.h);
         const char *t = n->field[0] ? n->field[0] : "";
         int x0 = field_origin(n, LHNAV_ADDRESS, t, n->caret[0]), y = text_top(n, F_CRUMB, &n->r_addr, m->crumb_dy);
         draw_text(n, c, F_CRUMB, t, x0, y, 0, 0x000000, 1, 0);
@@ -1711,7 +1711,7 @@ void lhnav_paint(lhnav *n, uint32_t *px, int w, int h, int stride, int composite
         *c = sv;
     } else {
         px_cv sv = *c;
-        px_clip(c, n->r_addr.x, n->r_addr.y - 4, n->r_addr.w, n->r_addr.h + 8);
+        lhnav__px_clip(c, n->r_addr.x, n->r_addr.y - 4, n->r_addr.w, n->r_addr.h + 8);
         if (n->hidden) {
             int sp = LHNAV_SEP + n->hidden - 1;
             if (n->hover == LHNAV_OVERFLOW || down_on(n, LHNAV_OVERFLOW) || n->hover == sp || down_on(n, sp))
@@ -1739,7 +1739,7 @@ void lhnav_paint(lhnav *n, uint32_t *px, int w, int h, int stride, int composite
         struct rect *r = &n->r_search;
         if (n->editing[1] || m->search_field == 1 || n->hover == LHNAV_SEARCH) field_box(c, r, m->field_alpha, n->editing[1]);
         px_cv sv = *c;
-        px_clip(c, r->x + 2, r->y, r->w - 22, r->h);
+        lhnav__px_clip(c, r->x + 2, r->y, r->w - 22, r->h);
         const char *t = n->field[1] && *n->field[1] ? n->field[1] : NULL;
         if (t || !n->editing[1]) {
             int x0 = t ? field_origin(n, LHNAV_SEARCH, t, n->editing[1] ? n->caret[1] : -1) : r->x + 5;
@@ -1760,7 +1760,7 @@ void lhnav_paint(lhnav *n, uint32_t *px, int w, int h, int stride, int composite
 
 void lhnav_text(lhnav *n, uint32_t *px, int w, int h, int stride, int x, int y, const char *utf8, int bold, uint32_t rgb)
 {
-    px_cv c = px_cv_make(px, w, h, stride);
+    px_cv c = lhnav__px_cv_make(px, w, h, stride);
     draw_text(n, &c, bold ? F_BOLD : F_CRUMB, utf8, x, y, 0, rgb, 1, 0);
 }
 

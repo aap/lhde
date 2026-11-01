@@ -135,9 +135,9 @@ static uint32_t *dib_decode(const unsigned char *p, uint32_t size, int icon, int
     return o;
 }
 
-static uint32_t *png_decode(const unsigned char *p, uint32_t size, int *ow, int *oh) { return px_png_decode(p, size, ow, oh); }
+static uint32_t *png_decode(const unsigned char *p, uint32_t size, int *ow, int *oh) { return lhnav__px_png_decode(p, size, ow, oh); }
 
-uint32_t *lhnav_res_icon(const char *file, int id, int want, int *w, int *h)
+uint32_t *lhnav__res_icon(const char *file, int id, int want, int *w, int *h)
 {
     struct pe pe;
     if (!file || !pe_open(&pe, file)) return NULL;
@@ -158,7 +158,7 @@ uint32_t *lhnav_res_icon(const char *file, int id, int want, int *w, int *h)
     return o;
 }
 
-uint32_t *lhnav_res_bitmap(const char *file, int id, int *w, int *h)
+uint32_t *lhnav__res_bitmap(const char *file, int id, int *w, int *h)
 {
     struct pe pe;
     if (!file || !pe_open(&pe, file)) return NULL;
