@@ -2,8 +2,8 @@
 # make check: the tests that run without Microsoft files, from the top of the
 # tree after make. Each prints ok/FAIL/skip; the exit status is the number of
 # failures. Tests that need assets skip when these are absent:
-#   ut-dump      the visual styles in $LHDE_STYLES (default: styles/ of the user data
-#                directory, $LHDE_DATA or ${XDG_DATA_HOME:-~/.local/share}/lhde)
+#   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
+#                Windows tree's index/styles)
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
