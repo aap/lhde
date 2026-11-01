@@ -15,6 +15,7 @@
 #include <lua5.4/lauxlib.h>
 #include <lua5.4/lualib.h>
 #include <poll.h>
+#include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -601,6 +602,13 @@ static int l_list_dir(lua_State *L) { DIR *d = opendir(luaL_checkstring(L, 1)); 
     lua_newtable(L); int k = 1; struct dirent *e; while ((e = readdir(d))) { if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue; lua_pushstring(L, e->d_name); lua_rawseti(L, -2, k++); }
     closedir(d); return 1; }
 static int l_mtime(lua_State *L) { struct stat st; if (stat(luaL_checkstring(L, 1), &st)) { lua_pushnil(L); return 1; } lua_pushinteger(L, (lua_Integer)st.st_mtime); return 1; }
+/* lh.exists(path): whether the path opens for reading (a readable file or directory: what io.open(path, "r") tells);
+   lh.trim(s): s without white space (isspace, Lua's %s) at either end */
+static int l_exists(lua_State *L) { FILE *f = fopen(luaL_checkstring(L, 1), "r"); if (f) fclose(f); lua_pushboolean(L, f != NULL); return 1; }
+static int l_trim(lua_State *L) { size_t n; const char *s = luaL_checklstring(L, 1, &n), *e = s + n;
+    while (s < e && isspace((unsigned char)*s)) s++;
+    while (e > s && isspace((unsigned char)e[-1])) e--;
+    lua_pushlstring(L, s, (size_t)(e - s)); return 1; }
 /* lh.cm_owner(): whether a compositing manager owns _NET_WM_CM_S<screen> (picom or any other) */
 static int l_cm_owner(lua_State *L) { char name[32]; snprintf(name, sizeof name, "_NET_WM_CM_S%d", screen); lua_pushboolean(L, XGetSelectionOwner(dpy, XInternAtom(dpy, name, False)) != None); return 1; }
 /* lh.kill(pid): SIGTERM to one process (the compositor rule in runtime.lua picks the pid: a `picom` with our DISPLAY) */
@@ -908,7 +916,7 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"tray_start", l_tray_start}, {"tray_count", l_tray_count}, {"tray_manager", l_tray_manager}, {"tray_stop", l_tray_stop},
     {"selection_owner", l_selection_owner}, {"watch_selection", l_watch_selection}, {"own_selection", l_own_selection}, {"send_message", l_send_message}, {"send_root_message", l_send_root_message}, {"atom", l_atom},
     {"set_root_cardinal", l_set_root_cardinal}, {"struts", l_struts}, {"spawn_pid", l_spawn_pid}, {"notification_closed", l_notification_closed}, {"notification_action", l_notification_action},
-    {"spawn", l_spawn}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"mtime", l_mtime},
+    {"spawn", l_spawn}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"mtime", l_mtime}, {"exists", l_exists}, {"trim", l_trim},
     {"data_find", l_data_find}, {"data_resolve", l_data_resolve}, {"data_resolve_dir", l_data_resolve_dir},
     {"component_dir", l_component_dir},
     {"theme_resolve", l_theme_resolve}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},

@@ -18,8 +18,7 @@ local XDG_DATA_HOME = os.getenv("XDG_DATA_HOME") or (HOME .. "/.local/share")
 local XDG_CONFIG_HOME = os.getenv("XDG_CONFIG_HOME") or (HOME .. "/.config")
 local ICONS = lh.state_file("luxshell-icons")   -- converted icons, ~/.local/state/lhde/luxshell-icons/<size>/
 local q = S.quote
-local function exists(p) local f = io.open(p, "r"); if f then f:close() return true end return false end
-local function trim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
+local exists, trim = lh.exists, lh.trim
 local function readcmd(cmd) local p = io.popen(cmd .. " 2>/dev/null"); if not p then return nil end local v = p:read("l"); p:close(); return v and trim(v) ~= "" and trim(v) or nil end
 
 ------------------------------------------------------------------ desktop entries

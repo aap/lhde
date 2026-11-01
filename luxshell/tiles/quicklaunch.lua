@@ -12,7 +12,7 @@
 local tile = { name = "Quick Launch", height = 35, tooltip = "Quick Launch" }
 local ICON, PITCH, ORIGIN = 16, { 28, 24 }, { 5, 6 }
 
-local function exists(p) local f = io.open(p, "r"); if f then f:close() return true end return false end
+local exists = lh.exists
 function tile.dir()
   local d = lh.session.get("quicklaunch", "dir")
   if d then d = d:gsub("^~", os.getenv("HOME") or "~") end

@@ -27,7 +27,7 @@ return function(ctx)
 
   -- icon lookup: absolute/file:// PNG paths, then icon-theme names (PNG only: cairo has no SVG loader)
   local icon_cache = {}
-  local function exists(p) local f = io.open(p, "rb"); if f then f:close() return true end return false end
+  local exists = lh.exists
   local function find_icon(name)
     if not name or name == "" then return nil end
     name = name:gsub("^file://", "")

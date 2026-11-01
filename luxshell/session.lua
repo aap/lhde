@@ -36,7 +36,7 @@
 local S = {}
 
 -- ini: sections in order, "key = value" lines; comments start with ';' or '#' at the start of a line or after whitespace
-local function trim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
+local trim, exists = lh.trim, lh.exists
 local function parse_ini(path)
   local f = io.open(path, "r"); if not f then return nil end
   local secs, cur = {}, nil
@@ -53,7 +53,6 @@ local function parse_ini(path)
 end
 S.parse_ini = parse_ini   -- sections in file order: { _name = "sec", key = value, ... }
 local function dirname(p) return p:match("^(.*)/[^/]*$") or "." end
-local function exists(p) local f = io.open(p, "r"); if f then f:close() return true end return false end
 local function q(s) return "'" .. s:gsub("'", "'\\''") .. "'" end   -- shell quoting
 S.quote = q
 local function have(cmd) return os.execute("command -v " .. cmd .. " >/dev/null 2>&1") == true end
