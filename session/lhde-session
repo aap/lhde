@@ -6,7 +6,8 @@
 #
 #   lhde-session start [--nested | --attach] [THEME]
 #         (default) a real X server on $LHDE_DISPLAY (default :1) and virtual terminal $LHDE_VT (default vt8), started with
-#                   startx from a console login (Xorg not setuid: log in on that tty first); Ctrl+Alt+F1 goes back
+#                   startx from a console login (Xorg not setuid: log in on that tty first); Ctrl+Alt+F1 goes back,
+#                   Ctrl+C there ends the session and everything it started (the bus too)
 #         --nested  a Xephyr window on the current $DISPLAY (1280x800, LHDE_GEOMETRY=WxH), the session inside it on
 #                   $LHDE_DISPLAY (default: the first free display from :2)
 #         --attach  the session on an X server that already runs on $LHDE_DISPLAY (an Xvfb, a bare Xorg); nothing is started
@@ -102,6 +103,7 @@ session() {
 	[ -s "$STATE/shell" ] || echo "${LHDE_SHELL:-1}" > "$STATE/shell"
 	[ -s "$STATE/desktop" ] || echo "${LHDE_DESKTOP:-1}" > "$STATE/desktop"
 	rm -f "$STATE/quit"; echo $$ > "$STATE/loop.pid"
+	trap session_end INT TERM HUP
 	[ "$LHDE_MODE" = real ] && [ -f "$HOME/.xinit_all" ] && . "$HOME/.xinit_all"   # aap's personal X startup, real sessions only
 	[ -f "$HOME/.Xresources" ] && xrdb "$HOME/.Xresources" 2>/dev/null
 	# a session bus for luxshell's notification server (toasts via notify-send); a tty login has none. Ours, ended with the session
@@ -140,9 +142,17 @@ session() {
 		# luxwm died at once (another WM holds the display): back off
 		if [ $(( $(date +%s) - t0 )) -lt 2 ]; then sleep 3; else sleep 0.3; fi
 	done
-	killon luxshell; killon flxp-desktop; killon picom
+	session_end
+}
+# the session's end, on the loop's exit and on a signal: Ctrl+C on the console the session was started from (SIGINT to the
+# process group: the X server goes down with it), xinit's SIGHUP/SIGTERM when the server exits, lhde-session stop (quit)
+session_end() {
+	trap - INT TERM HUP
+	touch "$STATE/quit"
+	killon luxshell; killon flxp-desktop; killon luxwm; killon picom
 	bus_stop
 	rm -f "$STATE/loop.pid"
+	exit 0
 }
 
 cmd=${1:-start}; [ $# -gt 0 ] && shift
