@@ -6,7 +6,7 @@
 //   list, File name (with auto-append completion) and Files of type.
 // - Longhorn: the pre-reset Longhorn Save File concept and the 4074 Open
 //   dialog on the explorer's browsing widget (src/explorer/browser.h): the
-//   header (Back/Forward, breadcrumb, search) on lhwm's glass or the theme's
+//   header (Back/Forward, breadcrumb, search) on luxwm's glass or the theme's
 //   navigation bar, the 4074 command bar, the collapsible groups of places,
 //   the list grouped by type, a details band for Save, Hide Explorer.
 // Used by the shim's GetOpenFileNameW (src/w32/comdlg.cpp), the

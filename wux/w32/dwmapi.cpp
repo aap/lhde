@@ -1,4 +1,4 @@
-// dwmapi over the lhwm frame protocol (docs/CLIENT-PROTOCOL.md): the X11
+// dwmapi over the luxwm frame protocol (docs/CLIENT-PROTOCOL.md): the X11
 // equivalent of DwmExtendFrameIntoClientArea is an ARGB toplevel plus the
 // _LHWM_EXTEND_FRAME / _LHWM_FRAME_FLAGS properties; composition is the
 // root's _LHWM_COMPOSITED. The flxp extensions are in flxp_dwmapi.h.
@@ -27,7 +27,7 @@ HRESULT WINAPI DwmIsCompositionEnabled(BOOL* enabled)
 
 HRESULT WINAPI DwmEnableComposition(UINT) { return S_OK; }
 
-// Unlike Windows this also works while composition is off: lhwm keeps the
+// Unlike Windows this also works while composition is off: luxwm keeps the
 // property and ignores it until it composites again, so the window does not
 // have to extend again on WM_DWMCOMPOSITIONCHANGED.
 HRESULT WINAPI DwmExtendFrameIntoClientArea(HWND h, const MARGINS* m)
@@ -85,7 +85,7 @@ HRESULT WINAPI DwmGetWindowAttribute(HWND h, DWORD attr, PVOID data, DWORD size)
     }
 }
 
-// lhwm draws the caption buttons outside the client: nothing to hit-test here.
+// luxwm draws the caption buttons outside the client: nothing to hit-test here.
 BOOL WINAPI DwmDefWindowProc(HWND, UINT, WPARAM, LPARAM, LRESULT* result)
 {
     if (result) *result = 0;
@@ -94,7 +94,7 @@ BOOL WINAPI DwmDefWindowProc(HWND, UINT, WPARAM, LPARAM, LRESULT* result)
 
 HRESULT WINAPI DwmFlush(void) { win::present_now(); return S_OK; }
 
-// The frame tint is not published by lhwm; FlxpDwmGetFrameMetrics has the
+// The frame tint is not published by luxwm; FlxpDwmGetFrameMetrics has the
 // caption text and glow colours instead.
 HRESULT WINAPI DwmGetColorizationColor(DWORD*, BOOL*) { return E_NOTIMPL; }
 

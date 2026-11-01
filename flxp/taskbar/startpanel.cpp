@@ -1279,7 +1279,7 @@ void show(const RECT& b, bool anchored)
     ShowWindow(P->wnd, SW_SHOWNA);
     UpdateWindow(P->wnd);
     SetCapture(P->wnd);
-    // clicks into other clients: lhwm does not refocus the window that is already active, so the
+    // clicks into other clients: luxwm does not refocus the window that is already active, so the
     // dock's FocusOut (WM_CANCELMODE) cannot be relied on; a pointer grab reports them to us
     sys::NativeWindow* nw = sys::window_for_user((void*)P->wnd);
     bool grabbed = nw && sys::grab_pointer(nw, true);

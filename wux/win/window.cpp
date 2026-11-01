@@ -1423,7 +1423,7 @@ static void handle_event(const sys::Event& ev)
     if (ev.kind == sys::EventKind::Nothing) return;
     if (ev.kind == sys::EventKind::CompositionChanged || ev.kind == sys::EventKind::FrameThemeChanged) {
         // to every toplevel, as Windows broadcasts WM_DWMCOMPOSITIONCHANGED;
-        // once per burst (lhwm rewrites _LHWM_THEME and _LHWM_FRAME_METRICS together)
+        // once per burst (luxwm rewrites _LHWM_THEME and _LHWM_FRAME_METRICS together)
         uint32_t msg = ev.kind == sys::EventKind::CompositionChanged ? WM_DWMCOMPOSITIONCHANGED : WM_DWMCOLORIZATIONCOLORCHANGED;
         for (Window* t : g_toplevels) {
             bool queued = false;

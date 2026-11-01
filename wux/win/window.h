@@ -169,7 +169,7 @@ gdi::Size screen_size();
 void set_timer(Window* w, uintptr_t id, uint32_t ms, void* callback = nullptr);
 void kill_timer(Window* w, uintptr_t id);
 
-// Window manager frames (the lhwm protocol, X11's DwmExtendFrameIntoClientArea).
+// Window manager frames (the luxwm protocol, X11's DwmExtendFrameIntoClientArea).
 // A toplevel can be ARGB: its backbuffer then tracks alpha (gdi::Bitmap::
 // has_alpha), cleared areas are transparent and show the frame plate when the
 // frame is extended under them. Switching recreates the native window.
@@ -183,12 +183,12 @@ uint32_t frame_flags(Window* w);
 bool composited();                              // the WM draws glass and honours extensions
 struct FrameMetrics {
     int32_t caption_h, border_l, border_r, border_b; gdi::Color text, glow, inactive_text;
-    bool have_max; gdi::Color max_text, max_inactive_text, max_glow; bool max_glow_none;   // maximised caption text (lhwm items 14..16)
+    bool have_max; gdi::Color max_text, max_inactive_text, max_glow; bool max_glow_none;   // maximised caption text (luxwm items 14..16)
 };
 bool frame_metrics(FrameMetrics& m);            // false if the WM publishes none
-std::string frame_theme();                      // the WM's _LHWM_THEME (lhwm's theme directory), "" if none
-gdi::Bitmap* header_pixmap(Window* w);          // lhwm's _LHWM_HEADER_PIXMAP copied (caller destroys), null if none
-bool caption_rect(Window* w, Rect& r);          // _LHWM_CAPTION_RECT: lhwm's caption buttons, client coordinates
+std::string frame_theme();                      // the WM's _LHWM_THEME (luxwm's theme directory), "" if none
+gdi::Bitmap* header_pixmap(Window* w);          // luxwm's _LHWM_HEADER_PIXMAP copied (caller destroys), null if none
+bool caption_rect(Window* w, Rect& r);          // _LHWM_CAPTION_RECT: luxwm's caption buttons, client coordinates
 void set_input_hole(Window* w, const Rect* r);  // clicks in r go through to the window manager (null: none)
 void set_shape(Window* w, const std::vector<Rect>* rects);   // a toplevel's shape (SetWindowRgn; null: rectangular)
 void set_drop_shadow(Window* w, int size, int (*alpha)(int, int, int, int));   // a popup's drop shadow (sys::set_drop_shadow)
@@ -216,7 +216,7 @@ uint32_t watch_root_property(const char* prop);
 int root_cardinals(const char* prop, long* out, int max);   // -1 if absent
 std::string root_string(const char* prop);                  // STRING/UTF8_STRING, "" if absent
 void set_root_string(const char* prop, const std::string& value);   // UTF8_STRING, "" deletes
-// The window manager's active window (root _NET_ACTIVE_WINDOW, what lhwm draws
+// The window manager's active window (root _NET_ACTIVE_WINDOW, what luxwm draws
 // with the active frame): 1 it is w's toplevel, 0 another or none, -1 the WM
 // publishes no _NET_ACTIVE_WINDOW (no EWMH WM: use the focus instead).
 int wm_active(Window* w);

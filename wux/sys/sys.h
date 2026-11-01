@@ -20,7 +20,7 @@ enum class EventKind {
     CompositionChanged,     // _LHWM_COMPOSITED changed value
     FrameThemeChanged,      // _LHWM_THEME or _LHWM_FRAME_METRICS changed
     RootPropertyChanged,    // a watch_root_property() property changed; keysym = its id
-    WindowPropertyChanged,  // lhwm changed a property of the window; keysym = WindowHeaderPixmap / WindowCaptionRect
+    WindowPropertyChanged,  // luxwm changed a property of the window; keysym = WindowHeaderPixmap / WindowCaptionRect
     // XDND target side (window = our toplevel under the pointer; pos/root, mods = the
     // keyboard now; drag_allowed/drag_action = the source's actions and its request).
     // DragOver must be answered with drop_status, DragDrop with drop_finish.
@@ -75,7 +75,7 @@ void set_title(NativeWindow* w, const char* title);
 void set_window_rect(NativeWindow* w, const gdi::Rect& screen_rect);
 gdi::Rect window_rect(NativeWindow* w);
 
-// Frame protocol of the lhwm window manager (docs/CLIENT-PROTOCOL.md): the
+// Frame protocol of the luxwm window manager (docs/CLIENT-PROTOCOL.md): the
 // frame plate extends into the client (left, right, top, bottom; 0xFFFFFFFF
 // in all four = sheet of glass; null removes it), flags as _LHWM_FRAME_FLAGS.
 enum : uint32_t { FrameNoTitle = 1, FrameNoIcon = 2, FrameNoFog = 4, FrameClientCaption = 8 };
@@ -93,12 +93,12 @@ struct FrameInfo {
     std::string theme;              // _LHWM_THEME
 };
 const FrameInfo& frame_info();      // cached, refreshed when the root properties change
-// _LHWM_HEADER_PIXMAP (lhwm, not composited): the theme's caption band
+// _LHWM_HEADER_PIXMAP (luxwm, not composited): the theme's caption band
 // continued over the extension, client width x (top frame margin + extension
 // top), its last row against the extension's bottom; copied into a new
 // bitmap (premultiplied ARGB), null when there is none or it went away
 gdi::Bitmap* header_pixmap(NativeWindow* w);
-// _LHWM_CAPTION_RECT (CLIENT_CAPTION): lhwm's caption buttons in client coordinates
+// _LHWM_CAPTION_RECT (CLIENT_CAPTION): luxwm's caption buttons in client coordinates
 bool caption_rect(NativeWindow* w, gdi::Rect& r);
 // The input shape: the whole window minus hole (null = the whole window)
 void set_input_hole(NativeWindow* w, const gdi::Rect* hole);

@@ -61,15 +61,15 @@ bool want_longhorn(std::string* why)
     FLXP_DWM_FRAME_METRICS fm = {}; fm.cbSize = sizeof fm;
     FlxpDwmGetFrameMetrics(&fm);
     WCHAR th[8];
-    bool lhwm = comp || fm.bValid || FlxpDwmGetFrameThemePath(th, 8) == S_OK;
-    if (why) *why = lhwm ? "chrome auto, luxwm runs" : "chrome auto, no luxwm on this display";
-    return lhwm;
+    bool luxwm = comp || fm.bValid || FlxpDwmGetFrameThemePath(th, 8) == S_OK;
+    if (why) *why = luxwm ? "chrome auto, luxwm runs" : "chrome auto, no luxwm on this display";
+    return luxwm;
 }
 
-// The frame extends lhwm's glass by the header height and draws its own title.
+// The frame extends luxwm's glass by the header height and draws its own title.
 void extend_frame(HWND frame)
 {
-    // on glass one row further: lhwm ends the extension with its plate's light
+    // on glass one row further: luxwm ends the extension with its plate's light
     // and dark lines (frame.c plate_explorer), which then lie under the header's
     // opaque dark last row and the bar below it (the clean 4051 edge); the
     // vision header ends in them itself (header::extend_top)
@@ -86,7 +86,7 @@ void extend_frame(HWND frame)
     caption_hole(frame);
 }
 
-// CLIENT_CAPTION: lhwm's caption buttons lie under our window; clicks there go
+// CLIENT_CAPTION: luxwm's caption buttons lie under our window; clicks there go
 // through to them (the header leaves the rectangle transparent anyway)
 void caption_hole(HWND frame)
 {
@@ -95,13 +95,13 @@ void caption_hole(HWND frame)
     DwmGetWindowAttribute(frame, DWMWA_FLXP_FRAME_FLAGS, &flags, sizeof flags);
     if (header::search_box() && (flags & FLXP_DWMFF_CLIENT_CAPTION) && FlxpDwmGetCaptionRect(frame, &r) == S_OK) FlxpDwmSetInputHole(frame, &r);
     else FlxpDwmSetInputHole(frame, nullptr);
-    if (header::search_box()) header::caption_changed();    // the vision header keeps lhwm's buttons free
+    if (header::search_box()) header::caption_changed();    // the vision header keeps luxwm's buttons free
 }
 
 void unextend_frame(HWND frame)
 {
     MARGINS none = { 0, 0, 0, 0 };
-    DwmExtendFrameIntoClientArea(frame, &none);     // lhwm's own caption with title and icon again
+    DwmExtendFrameIntoClientArea(frame, &none);     // luxwm's own caption with title and icon again
     DWORD flags = 0;
     DwmSetWindowAttribute(frame, DWMWA_FLXP_FRAME_FLAGS, &flags, sizeof flags);
     FlxpDwmSetInputHole(frame, nullptr);

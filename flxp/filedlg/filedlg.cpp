@@ -1346,7 +1346,7 @@ static void init_dialog(Dlg& d, HWND owner)
 // The pre-reset Longhorn Save File concept (image9.jpeg) and the 4074 Open
 // dialog (lh4074-180309.png), unified as Codex described them
 // (NOTES "The Longhorn file dialog"): top to bottom the explorer's header
-// (Back/Forward, title, breadcrumb, search) on lhwm's glass or the theme's
+// (Back/Forward, title, breadcrumb, search) on luxwm's glass or the theme's
 // navigation bar; the 4074 command bar (Up a Folder, New Folder, Change View)
 // on the theme's per-folder Rebar strip; the browser: the places pane in the
 // groups look (Common Places, Computer, Bookmarks, the Filter box) and the
@@ -1891,7 +1891,7 @@ static void lh_init(Dlg& d, HWND owner)
     for (const Filter& f : o.filters) SendMessageW(d.types, CB_ADDSTRING, 0, (LPARAM)WS(f.name));
     SendMessageW(d.types, CB_SETCURSEL, (WPARAM)std::max(d.type_filter, 0), 0);
 
-    // the header on lhwm's glass (or the navigation bar)
+    // the header on luxwm's glass (or the navigation bar)
     header::Callbacks hcb = { lh_navigate, lh_filter, lh_done, lh_command, lh_history, lh_favorites, lh_tool };
     header::configure("filedlg_", "small");      // compact (the portal's dialog): 4074's Small unless set
     d.header = header::create(dlg, hcb);
@@ -2001,7 +2001,7 @@ static void lh_init(Dlg& d, HWND owner)
     SetFocus(d.name_edit);
     SendMessageW(d.name_edit, EM_SETSEL, 0, -1);
     d.ready = true;
-    // once shown: everything again. The window becomes ARGB (lhwm's glass) after
+    // once shown: everything again. The window becomes ARGB (luxwm's glass) after
     // the first paints, which leave the glow text on black until a full repaint;
     // at the Medium size CLIENT_CAPTION's resize did that, at Small nothing does
     SetTimer(dlg, LH_REDRAW_TIMER, 150, nullptr);
@@ -2012,7 +2012,7 @@ static void lh_save_state(Dlg& d)
 {
     RECT wr; GetWindowRect(d.dlg, &wr);
     int h = d.show_explorer ? wr.bottom - wr.top : d.full_h;
-    // lhwm's CLIENT_CAPTION grew the client by its caption (less the top border
+    // luxwm's CLIENT_CAPTION grew the client by its caption (less the top border
     // it keeps): the size asked for next time is the one without it
     DWORD flags = 0;
     DwmGetWindowAttribute(d.dlg, DWMWA_FLXP_FRAME_FLAGS, &flags, sizeof flags);

@@ -596,7 +596,7 @@ void do_menu_provide(bool on)
 void start_message(const XClientMessageEvent& m, bool from_root)
 {
     StartRequest r;
-    r.toggle = from_root && !(m.data.l[3] > 0 && m.data.l[4] > 0) ? true : (m.data.l[0] & 1) != 0;   // lhwm's: l[0] is a time
+    r.toggle = from_root && !(m.data.l[3] > 0 && m.data.l[4] > 0) ? true : (m.data.l[0] & 1) != 0;   // luxwm's: l[0] is a time
     r.x = (int)m.data.l[1]; r.y = (int)m.data.l[2]; r.w = (int)m.data.l[3]; r.h = (int)m.data.l[4];
     if (r.w <= 0 || r.h <= 0) r.x = r.y = r.w = r.h = 0;
     r.from_root = from_root;
@@ -646,7 +646,7 @@ void handle(XEvent& e)
     case ClientMessage:
         if (e.xclient.message_type == atoms[A_LHSHELL_START]) {
             if (menu_owner && e.xclient.window == menu_owner) start_message(e.xclient, false);
-            // the root broadcast (lhwm's Super key, or a classic button leaving the menu to luxshell): luxshell answers it
+            // the root broadcast (luxwm's Super key, or a classic button leaving the menu to luxshell): luxshell answers it
             // or forwards it to the provider while it runs; another provider owns the menu: theirs
             else if (e.xclient.window == root && !owned(luxshell_selection) && (menu_owner || !owned(menu_selection)))
                 start_message(e.xclient, true);
@@ -743,7 +743,7 @@ bool start(uint64_t own_window, Notify notify)
     menu_selection = XInternAtom(xd, name, False);
     if (pipe(wake_fds) == 0)
         for (int f : wake_fds) { fcntl(f, F_SETFL, fcntl(f, F_GETFL) | O_NONBLOCK); fcntl(f, F_SETFD, FD_CLOEXEC); }
-    XSelectInput(xd, root, PropertyChangeMask | SubstructureNotifyMask);   // Substructure: lhwm's _LHSHELL_START
+    XSelectInput(xd, root, PropertyChangeMask | SubstructureNotifyMask);   // Substructure: luxwm's _LHSHELL_START
     current_desktop = -1;
     read_current_desktop();
     read_client_list();

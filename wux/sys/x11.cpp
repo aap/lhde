@@ -173,7 +173,7 @@ static void make_xwindow(NativeWindow* w)
                       ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
                       KeyPressMask | KeyReleaseMask | FocusChangeMask |
                       EnterWindowMask | LeaveWindowMask;
-    if (!w->popup) attr.event_mask |= PropertyChangeMask;   // lhwm's _LHWM_HEADER_PIXMAP / _LHWM_CAPTION_RECT
+    if (!w->popup) attr.event_mask |= PropertyChangeMask;   // luxwm's _LHWM_HEADER_PIXMAP / _LHWM_CAPTION_RECT
     Visual* visual = CopyFromParent;
     int depth = CopyFromParent;
     if (w->argb) {
@@ -273,7 +273,7 @@ void destroy_window(NativeWindow* w)
     delete w;
 }
 
-// ---- lhwm frame protocol (docs/CLIENT-PROTOCOL.md) ------------------------
+// ---- luxwm frame protocol (docs/CLIENT-PROTOCOL.md) ------------------------
 
 void set_frame_extension(NativeWindow* w, const int32_t* ltrb)
 {
@@ -354,7 +354,7 @@ static bool window_cardinals(NativeWindow* w, Atom prop, Atom type, long* out, i
     return ok;
 }
 
-// lhwm frees the previous pixmap right after replacing the property, so the
+// luxwm frees the previous pixmap right after replacing the property, so the
 // id read here can be gone by the time it is copied: errors are caught and
 // the PropertyNotify of the new one repaints.
 gdi::Bitmap* header_pixmap(NativeWindow* w)

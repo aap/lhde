@@ -4,7 +4,7 @@
 // of the Longhorn search/Filter boxes, Back/Forward history and the views
 // remembered per folder; plus the frame plumbing every Longhorn host needs:
 // which frame style the session asks for (the theme's Explorer.chrome,
-// lhwm), lhwm's glass extension under the header (header.h) and the caption
+// luxwm), luxwm's glass extension under the header (header.h) and the caption
 // behaviour of the header's empty parts.
 //
 // A host derives from Browser (the explorer's Explorer, the dialog's Dlg),
@@ -42,14 +42,14 @@ using shell::Item;
 bool frame_auto();
 bool want_longhorn(std::string* why = nullptr);
 
-// lhwm's glass under the header: the extension by header::height(), the
+// luxwm's glass under the header: the extension by header::height(), the
 // NO_TITLE / NO_ICON (and on glass CLIENT_CAPTION) frame flags, the input hole
-// over lhwm's caption buttons; unextend_frame() is the way back to an ordinary
-// frame (lhwm's caption with title and icon).
+// over luxwm's caption buttons; unextend_frame() is the way back to an ordinary
+// frame (luxwm's caption with title and icon).
 void extend_frame(HWND frame);
 void caption_hole(HWND frame);
 void unextend_frame(HWND frame);
-// The header's height follows the frame (glass: 76 rows less lhwm's caption)
+// The header's height follows the frame (glass: 76 rows less luxwm's caption)
 // or the theme's navigation bar; then the extension, the host's layout and
 // the header's look follow.
 void header_refit(HWND frame, void (*layout)());
@@ -57,7 +57,7 @@ void header_refit(HWND frame, void (*layout)());
 // HTTRANSPARENT there) are the caption. False when the frame has no header.
 bool header_hittest(HWND frame, LPARAM lp, LRESULT* result);
 // Active or inactive as the window manager draws the frame (_NET_ACTIVE_WINDOW
-// through lhwm), else the focus state the host tracks (WM_ACTIVATE).
+// through luxwm), else the focus state the host tracks (WM_ACTIVATE).
 bool frame_active(HWND frame, bool focus_active);
 // The window's icon follows the folder (4051's CShellBrowser2::v_SetIcon): the
 // icon theme's key at 16, 32 and 48 px as WM_SETICON (the shim publishes them

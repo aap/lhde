@@ -1,18 +1,18 @@
 // The Longhorn 4074 Explorer header: the band above the rebar with 4074's
 // round Back and Forward buttons, the folder's name in a large font, the
-// breadcrumb of the path and the search box. Under lhwm with a compositor it
+// breadcrumb of the path and the search box. Under luxwm with a compositor it
 // lies on the window manager's glass (the frame extended into the client,
 // docs/CLIENT-PROTOCOL.md: transparent with glowing text). Without
 // composition it is opaque: the navigation bar of the session theme's
 // Longhorn msstyles (navbar.h, COMPOSITION.md 16.4: Navbar::Rebar,
 // splitter, travel/favorites buttons, fonts and colours by focus and
-// maximise state), else lhwm's _LHWM_HEADER_PIXMAP (the caption band
-// continued, e.g. Luna) under the glass layout, else (no lhwm) the 4074
+// maximise state), else luxwm's _LHWM_HEADER_PIXMAP (the caption band
+// continued, e.g. Luna) under the glass layout, else (no luxwm) the 4074
 // Slate gradient. The empty parts answer HTTRANSPARENT so the frame's
 // WM_NCHITTEST makes them a caption.
-// Vision mode: when lhwm's frame theme has a nav.ini (header_engine = auto |
+// Vision mode: when luxwm's frame theme has a nav.ini (header_engine = auto |
 // lhnav | flxp), the contents are lhnav's (docs/NAVBAR.md): the concept art's
-// orb, title in lhwm's deco, breadcrumb, search box and toolbar; the behaviour
+// orb, title in luxwm's deco, breadcrumb, search box and toolbar; the behaviour
 // stays flxp's.
 #pragma once
 #include <string>
@@ -73,14 +73,14 @@ bool menu_command(UINT id, UINT first);      // true when id was one of them (th
 // least the Back button's 54); opaque the theme's navigation bar (53 Slate,
 // 58 Jade) or the same as on glass.
 int height_for_caption(int caption_h);
-// Glass with lhwm's CLIENT_CAPTION (experimental; client_caption=0 turns it
-// off): the client covers the caption rows too, lhwm keeps only its buttons
+// Glass with luxwm's CLIENT_CAPTION (experimental; client_caption=0 turns it
+// off): the client covers the caption rows too, luxwm keeps only its buttons
 // (FlxpDwmGetCaptionRect), and the header is 4074's 76 rows less the border.
 bool client_caption();
 int height();
 // the frame extension's top (DwmExtendFrameIntoClientArea): the header, on
-// glass one row more (lhwm's line pair under the header's dark row); vision:
-// the header itself, whose last two rows are lhwm's line pair (lhnav_extend_top)
+// glass one row more (luxwm's line pair under the header's dark row); vision:
+// the header itself, whose last two rows are luxwm's line pair (lhnav_extend_top)
 int extend_top();
 // vision: (x, y) of the header is one of lhnav's top resize rows (the frame answers HTTOP)
 bool resize_hit(int x, int y);
@@ -93,8 +93,8 @@ void set_title(const std::string& title);            // the title shown instead 
 void relayout(int width, int height);
 void composition_changed();                          // repaint: glass or opaque (the height may change: height_for_caption)
 void state_changed();                               // _NET_WM_STATE: maximised or restored (title colours, button variants)
-void set_active(bool active);                        // lhwm shows the frame active (_NET_ACTIVE_WINDOW): navigation bar variant, colours
-void pixmap_changed();                               // WM_FLXP_DWMHEADERCHANGED: lhwm's header background
+void set_active(bool active);                        // luxwm shows the frame active (_NET_ACTIVE_WINDOW): navigation bar variant, colours
+void pixmap_changed();                               // WM_FLXP_DWMHEADERCHANGED: luxwm's header background
 void open_search();                                  // shows (navigation bar: it hides behind the magnifier) and focuses the box
 void theme_changed();                                // the session theme: reload the buttons' images, repaint
 HWND search_box();

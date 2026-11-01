@@ -664,7 +664,7 @@ void set_clock_tip()
     SendMessageW(clock_tip_wnd, TTM_UPDATETIPTEXTW, 0, (LPARAM)&ti);
 }
 
-// _LHSHELL_START for us: lhwm's root broadcast (only while luxshell does not run; start_key = 0 ignores it) or
+// _LHSHELL_START for us: luxwm's root broadcast (only while luxshell does not run; start_key = 0 ignores it) or
 // luxshell's message to our _LH_STARTMENU_S owner window (its Avalon Start button, the Super key it received)
 void start_request(const xwm::StartRequest& q)
 {

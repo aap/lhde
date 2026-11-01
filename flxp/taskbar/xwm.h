@@ -26,11 +26,11 @@ struct Task {
 enum Change : uint32_t {
     ChangeList = 1, ChangeActive = 2, ChangeTitle = 4, ChangeIcon = 8, ChangeState = 16,
     ChangeDesktop = 32, ChangeTray = 64,
-    ChangeStartKey = 128,           // _LHSHELL_START: lhwm's root broadcast (Super) or luxshell's to our owner window
+    ChangeStartKey = 128,           // _LHSHELL_START: luxwm's root broadcast (Super) or luxshell's to our owner window
 };
 
 // _LHSHELL_START (docs/SHELL-DESIGN.md 13): l[0] bit 0 = toggle, l[1..4] = the anchor
-// rectangle in root coordinates (0 x 0: none). lhwm's root broadcast (no rect) always toggles.
+// rectangle in root coordinates (0 x 0: none). luxwm's root broadcast (no rect) always toggles.
 struct StartRequest {
     bool toggle = false;
     int x = 0, y = 0, w = 0, h = 0;

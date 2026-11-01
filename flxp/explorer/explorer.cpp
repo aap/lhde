@@ -64,7 +64,7 @@ struct Explorer : browser::Browser {
     HWND frame = nullptr, rebar = nullptr, toolbar = nullptr, address = nullptr, tree = nullptr, status = nullptr;
     HFONT font = nullptr;                            // DEFAULT_GUI_FONT: the address bar
     HFONT item_font = nullptr, status_font = nullptr;   // the style's ICONTITLEFONT (tree, list) and STATUSFONT (fonts_changed)
-    bool longhorn = false;                           // frame=longhorn: the 4074 header on lhwm's glass
+    bool longhorn = false;                           // frame=longhorn: the 4074 header on luxwm's glass
     bool show_folders = false;        // folders= / View > Explorer Bar > Folders (remembered); off = the places pane
     bool show_status = true;
     bool folders_once = false;        // the Explore verb opens the tree for this window only
@@ -971,7 +971,7 @@ static void header_favorites(int x, int y)   // the navigation bar's star: the B
 // the vision header's Views and New Folder items (nav.ini `tools`)
 static void header_tool(int id, int x, int y) { if (id == ID_VIEWS) views_menu(x, y); else on_command(id); }
 
-// The frame extends lhwm's glass by the header height and draws its own title
+// The frame extends luxwm's glass by the header height and draws its own title
 // (browser.h, shared with the file dialog).
 static void sync_active();
 static void extend_frame(HWND frame) { browser::extend_frame(frame); }
@@ -1983,9 +1983,9 @@ static void on_command(int id)
 }
 
 // Active or inactive as the window manager draws the frame: the root
-// _NET_ACTIVE_WINDOW (lhwm sets it when it paints a frame active), not our
+// _NET_ACTIVE_WINDOW (luxwm sets it when it paints a frame active), not our
 // focus, which differs e.g. while the desktop window or a popup holds the
-// focus. The header (navigation bar variant, title colours, lhwm's pixmap
+// focus. The header (navigation bar variant, title colours, luxwm's pixmap
 // variant) and the menu bar follow it; without an EWMH window manager the
 // focus (WM_ACTIVATE) decides.
 static void sync_active()
@@ -2086,7 +2086,7 @@ static void set_frame_mode(bool lh)
         header::destroy();
         g.header = nullptr;
         if (!g.filter.empty()) { g.filter.clear(); apply_filter(); }
-        browser::unextend_frame(frame);                 // lhwm's own caption with title and icon again
+        browser::unextend_frame(frame);                 // luxwm's own caption with title and icon again
         SendMessageW(g.rebar, RB_SHOWBAND, (WPARAM)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_TOOLBAR, 0), TRUE);
         SendMessageW(g.rebar, RB_SHOWBAND, (WPARAM)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_ADDRESS, 0), TRUE);
         ModifyMenuW(bars, 1, MF_BYPOSITION | MF_STRING | MF_CHECKED | MF_GRAYED, 0, L"&Address Bar");
@@ -2138,20 +2138,20 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         }
         break;
     case WM_DWMCOMPOSITIONCHANGED:          // glass or the opaque header
-    case WM_DWMCOLORIZATIONCOLORCHANGED:    // another lhwm theme: its caption height decides the header's
+    case WM_DWMCOLORIZATIONCOLORCHANGED:    // another luxwm theme: its caption height decides the header's
         // luxwm started after us (Explorer.chrome auto): the header now; it
-        // is not taken away when lhwm goes (a restart deletes its properties)
+        // is not taken away when luxwm goes (a restart deletes its properties)
         if (!g.longhorn && frame_auto() && want_longhorn()) set_frame_mode(true);
         if (g.header) header_refit(h);
         sync_active();
         return 0;
-    case WM_FLXP_DWMCAPTIONRECTCHANGED:     // CLIENT_CAPTION: where lhwm's caption buttons are now
+    case WM_FLXP_DWMCAPTIONRECTCHANGED:     // CLIENT_CAPTION: where luxwm's caption buttons are now
         caption_hole(h);
         return 0;
-    case WM_FLXP_DWMSTATECHANGED:           // maximised/restored: lhwm's maximised caption colours
+    case WM_FLXP_DWMSTATECHANGED:           // maximised/restored: luxwm's maximised caption colours
         if (g.header) header::state_changed();
         return 0;
-    case WM_FLXP_DWMHEADERCHANGED:          // lhwm re-rendered the header background (focus, size, theme)
+    case WM_FLXP_DWMHEADERCHANGED:          // luxwm re-rendered the header background (focus, size, theme)
         if (g.header) header::pixmap_changed();
         return 0;
     case WM_THEMECHANGED:                   // the session theme: the header's images, the command bar
@@ -2339,7 +2339,7 @@ static void print_info()
     int nc = FlxpGetRootCardinals("_LHWM_COMPOSITED", &c, 1);
     std::string lt = win::frame_theme();
     printf("composited   %s (_LHWM_COMPOSITED %s%s%s)\n", comp ? "yes" : "no", nc < 1 ? "absent" : c ? "1" : "0",
-           lt.empty() ? "" : ", lhwm theme ", lt.c_str());
+           lt.empty() ? "" : ", luxwm theme ", lt.c_str());
     if (lh) printf("header       %s\n", header::background_source().c_str());
     else printf("header       (none in the xp frame)\n");
     if (lh) printf("buttons      %s\n", header::buttons_source().c_str());
@@ -2486,7 +2486,7 @@ int main(int argc, char** argv)
     HWND frame = CreateWindowExW(0, L"flxp_explorer", L"flxp", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, gx, gy, gw, gh, nullptr, nullptr, nullptr, nullptr);
     if (const char* b = getenv("FLXP_BACK")) navigate(b);   // testing: a page to go back to (screenshots compare with Back enabled)
     if (!navigate(start)) navigate("::desktop");
-    g.w_active = FlxpWatchRootProperty("_NET_ACTIVE_WINDOW");   // lhwm's active frame (sync_active)
+    g.w_active = FlxpWatchRootProperty("_NET_ACTIVE_WINDOW");   // luxwm's active frame (sync_active)
     g.w_settings = FlxpWatchRootProperty("_LH_SETTINGS_CHANGED");
     ShowWindow(frame, SW_SHOW);
     sync_active();

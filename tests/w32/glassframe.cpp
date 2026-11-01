@@ -1,4 +1,4 @@
-// glassframe: the flxp port of lhwm's reference client examples/extendframe.c
+// glassframe: the flxp port of luxwm's reference client examples/extendframe.c
 // (docs/CLIENT-PROTOCOL.md), written as a plain win32 program against the
 // shim's dwmapi: a 640x420 window whose top 60 px are the window manager's
 // glass (DwmExtendFrameIntoClientArea + NO_TITLE), holding a big folder
@@ -50,7 +50,7 @@ static void paint(HWND h, HDC dc)
     DwmIsCompositionEnabled(&composited);
     RECT head = { 0, 0, rc.right, HEADER };
     if (composited) {
-        // transparent black: lhwm's plate shows through wherever we draw nothing
+        // transparent black: luxwm's plate shows through wherever we draw nothing
         FlxpClearRect(dc, &head);
     } else {
         // the X server would show the transparent pixels black: paint the 4074 Slate Explorer's own header
@@ -80,7 +80,7 @@ static void paint(HWND h, HDC dc)
     RECT body = { 0, HEADER, rc.right, rc.bottom };
     FillRect(dc, &body, (HBRUSH)GetStockObject(WHITE_BRUSH));
     const wchar_t* lines[] = {
-        L"The header above is lhwm's frame plate, extended 60 px into this window.",
+        L"The header above is luxwm's frame plate, extended 60 px into this window.",
         L"Drag the header to move, double-click it to maximise or restore,",
         L"drag the right edge to resize. Escape or q quits.",
         composited ? L"Composited: the header is glass (_LHWM_COMPOSITED = 1)."
@@ -94,7 +94,7 @@ static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     switch (msg) {
     case WM_CREATE: {
         // rule 1+2 of the protocol: ARGB toplevel (done by the extension) and the
-        // properties before mapping; lhwm draws no caption text
+        // properties before mapping; luxwm draws no caption text
         MARGINS m = { 0, 0, HEADER, 0 };
         HRESULT hr = DwmExtendFrameIntoClientArea(h, &m);
         DWORD flags = FLXP_DWMFF_NO_TITLE;
@@ -169,7 +169,7 @@ int main(int argc, char** argv)
     wc.hCursor = LoadCursorW(nullptr, (LPCWSTR)IDC_ARROW);
     wc.lpszClassName = L"glassframe";
     RegisterClassW(&wc);
-    // the title still matters (taskbar, Alt+Tab) although lhwm does not draw it
+    // the title still matters (taskbar, Alt+Tab) although luxwm does not draw it
     HWND h = CreateWindowExW(0, L"glassframe", L"Documents", WS_OVERLAPPEDWINDOW, 120, 90, 640, 420,
                              nullptr, nullptr, nullptr, nullptr);
     if (!h) { fprintf(stderr, "glassframe: no window\n"); return 1; }

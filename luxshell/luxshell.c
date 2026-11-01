@@ -494,10 +494,10 @@ static int l_desktop(lua_State *L) { unsigned long n; int fmt; unsigned char *d 
 /* lh.maxmode([desktop]): luxwm's _LHWM_MAXIMIZED_MODE for that desktop (default: the current one) as a boolean, or nil when
    luxwm is not the running WM (no _NET_SUPPORTING_WM_CHECK window named "lhwm": the caller falls back to its own EWMH rule) */
 static int l_maxmode(lua_State *L) {
-    unsigned long n; int fmt; unsigned char *d = get_prop(root, atom[A_NET_SUPPORTING_WM_CHECK], XA_WINDOW, &n, &fmt); bool lhwm = false;
+    unsigned long n; int fmt; unsigned char *d = get_prop(root, atom[A_NET_SUPPORTING_WM_CHECK], XA_WINDOW, &n, &fmt); bool luxwm = false;
     if (d) { Window chk = ((Window *)d)[0]; XFree(d); unsigned char *nm = get_prop(chk, atom[A_NET_WM_NAME], atom[A_UTF8], &n, &fmt);
-        if (nm) { lhwm = n >= 4 && !strncmp((char *)nm, "lhwm", 4); XFree(nm); } }
-    if (!lhwm) { lua_pushnil(L); return 1; }
+        if (nm) { luxwm = n >= 4 && !strncmp((char *)nm, "lhwm", 4); XFree(nm); } }
+    if (!luxwm) { lua_pushnil(L); return 1; }
     long desk; if (lua_isinteger(L, 1)) desk = lua_tointeger(L, 1); else { d = get_prop(root, atom[A_NET_CURRENT_DESKTOP], XA_CARDINAL, &n, &fmt); desk = d ? ((long *)d)[0] : 0; if (d) XFree(d); }
     d = get_prop(root, atom[A_LHWM_MAXIMIZED_MODE], XA_CARDINAL, &n, &fmt);
     if (!d) { lua_pushnil(L); return 1; }

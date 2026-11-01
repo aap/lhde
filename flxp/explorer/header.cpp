@@ -15,7 +15,7 @@
 //   right part          a vertical divider R-91 (glass: a light line; Slate: a
 //                       dark line with a light one left of it), the search
 //                       and favourites buttons right of it
-// The window manager's caption (lhwm aero: 27 rows) sits above the client, so
+// The window manager's caption (luxwm aero: 27 rows) sits above the client, so
 // the header in the client is 76 - 27 = 49 rows; the title is moved down until
 // its capitals are inside (4074 draws it partly over the caption rows).
 #include <ctype.h>
@@ -107,11 +107,11 @@ int tools_width()
 }
 bool small_right() { return g_hsize == SIZE_SMALL || g_hsize == SIZE_LARGE; }   // the small magnifier and star
 
-// lhwm's caption text for the running frame theme (the theme.ini in
+// luxwm's caption text for the running frame theme (the theme.ini in
 // _LHWM_THEME, the colours of _LHWM_FRAME_METRICS): the header's title and
 // breadcrumb take its face, weight, colours, shadow (msstyles frames) or glow
 // (DWM frames) and antialiasing, at the header's own sizes. Not valid without
-// lhwm: then the 4074/navigation-bar look stays.
+// luxwm: then the 4074/navigation-bar look stays.
 struct CaptionLook {
     bool valid = false;
     std::u16string face;           // the first of the theme's families we have, "" = keep ours
@@ -123,7 +123,7 @@ struct CaptionLook {
     COLORREF sh_rgb[2] = {};
     bool glow = false;             // DWM theme: TextGlow (glow = #rrggbb)
     COLORREF glow_rgb = RGB(255, 255, 255);
-    // maximised (lhwm's text_max_active/_inactive, glow_max; default the above):
+    // maximised (luxwm's text_max_active/_inactive, glow_max; default the above):
     // aero/Jade's white title, no glow, on the dark LGFRAMEMAX plate
     COLORREF max_text[2] = {};
     bool max_glow = false;
@@ -141,13 +141,13 @@ HBITMAP g_nav[2][4];          // [back, forward][state]: premultiplied 32bpp DIB
 bool g_can[2];                // back, forward enabled
 int g_nav_hot = NONE, g_nav_pressed = NONE;
 
-// how the header is painted: on lhwm's glass; opaque, the theme's navigation
-// bar (navbar.h); opaque, lhwm's header pixmap under the glass layout; the
-// drawn Slate gradient (no lhwm)
+// how the header is painted: on luxwm's glass; opaque, the theme's navigation
+// bar (navbar.h); opaque, luxwm's header pixmap under the glass layout; the
+// drawn Slate gradient (no luxwm)
 enum Mode { GLASS, NAVBAR, PIXMAP };
 Mode g_mode = GLASS;
 bool g_active = true;
-HBITMAP g_pix;                       // lhwm's _LHWM_HEADER_PIXMAP, copied
+HBITMAP g_pix;                       // luxwm's _LHWM_HEADER_PIXMAP, copied
 int g_pix_w, g_pix_h;
 bool g_pix_stale = true;
 bool g_search_open;                  // navigation bar: the search box is out
@@ -167,7 +167,7 @@ struct Vision {
     lhnav* nav = nullptr;
     ut_theme* style = nullptr;           // the session's msstyles, opened for lhnav (in-process libuxtheme)
     std::string style_path, nav_ini, why;
-    lhnav_metrics base;                  // lhnav's defaults + nav.ini, before lhwm's numbers
+    lhnav_metrics base;                  // lhnav's defaults + nav.ini, before luxwm's numbers
     HBITMAP dib = nullptr;               // lhnav paints here (32bpp premultiplied, top-down)
     uint32_t* bits = nullptr;
     int dw = 0, dh = 0;
@@ -239,8 +239,8 @@ std::string button_images_setting()
 bool themed_free() { return g_mode != NAVBAR && g_buttons_setting != "framelets" && navbar::skin().buttons; }
 bool nb_buttons() { return navbar_mode() || themed_free(); }
 
-// The rows, top down, in every mode (glass, navigation bar, lhwm's pixmap):
-// with CLIENT_CAPTION the caption's rows that lhwm leaves to the client
+// The rows, top down, in every mode (glass, navigation bar, luxwm's pixmap):
+// with CLIENT_CAPTION the caption's rows that luxwm leaves to the client
 // (top_off), then the band - 4051's navigation bar (doc/4051-explorer-
 // research.md section 1): Medium 54 rows (Slate 4074's 49-row art: 53), Small
 // 36 (lh4074-195235.png) -, then Large's / Extra-Large's empty rows. The
@@ -915,7 +915,7 @@ void paint_nav(HDC dc)
 // 16): the theme's Navbar::Rebar band over the client width with its splitter,
 // the travel and favorites buttons, a gripper and the magnifier, fonts and
 // colours from the theme by focus and maximise state (navbar.h). Styles
-// without one (Luna) get lhwm's _LHWM_HEADER_PIXMAP: the caption band as the
+// without one (Luna) get luxwm's _LHWM_HEADER_PIXMAP: the caption band as the
 // frame draws it, continued down over the header (active or inactive by focus),
 // under the glass layout as 4051 drew its header under Luna (lh4051-232843.png).
 
@@ -924,7 +924,7 @@ Mode choose_mode()
     if (glass()) return GLASS;
     std::string bg = shell::theme_setting("header_background", "auto");
     if ((bg == "auto" || bg == "navbar" || bg.empty()) && navbar::skin().valid) return NAVBAR;
-    return PIXMAP;      // the Slate gradient when lhwm gives none
+    return PIXMAP;      // the Slate gradient when luxwm gives none
 }
 
 // the first row with ink of the capitals when the text's top is 0
@@ -1041,7 +1041,7 @@ void load_look()
     }
     if (font.empty()) return;
     parse_pango_font(font, l);
-    // lhwm's own colours win (they are what it draws with)
+    // luxwm's own colours win (they are what it draws with)
     FLXP_DWM_FRAME_METRICS m = {}; m.cbSize = sizeof m;
     FlxpDwmGetFrameMetrics(&m);
     if (m.bValid) { l.text[0] = m.crText; l.text[1] = m.crInactiveText; }
@@ -1057,7 +1057,7 @@ void load_look()
 }
 
 // the glass/pixmap layout's fonts: Segoe UI where it can be found (the 4074
-// Fonts have it), else Tahoma (heavier, about as wide); under lhwm its caption
+// Fonts have it), else Tahoma (heavier, about as wide); under luxwm its caption
 // face, weight and smoothing at these sizes
 void make_fonts()
 {
@@ -1083,12 +1083,12 @@ void make_navbar_fonts()
 {
     for (HFONT* f : { &g_nb_title, &g_nb_crumb, &g_nb_crumb_hot }) if (*f) { DeleteObject(*f); *f = nullptr; }
     const navbar::Skin& k = sk();
-    if (!k.buttons) return;      // the bar's fonts go with its buttons (glass, lhwm's pixmap: the same layout)
+    if (!k.buttons) return;      // the bar's fonts go with its buttons (glass, luxwm's pixmap: the same layout)
     const wchar_t* tf = have_face(k.title_face) ? k.title_face : L"Tahoma";
     const wchar_t* cf = have_face(k.crumb_face) ? k.crumb_face : L"Tahoma";
     int tw = k.title_weight;
     BYTE q = ANTIALIASED_QUALITY;
-    if (g_look.valid) {            // the Navbar's sizes, lhwm's face, weight and smoothing
+    if (g_look.valid) {            // the Navbar's sizes, luxwm's face, weight and smoothing
         if (!g_look.face.empty()) tf = cf = (const wchar_t*)g_look.face.c_str();
         tw = g_look.weight; q = g_look.quality;
     }
@@ -1208,7 +1208,7 @@ HBITMAP search_icon()
 // 4051 has only the bar's dark row (33,36,36). So: the theme's Navbar (or
 // InactiveNavbar) background's own last row - its maximised variants have
 // none (Slate's MaxNavbar ends in the band colour) and take the restored
-// one's -, else 4051's colour; opaque on glass as well (lhwm's plate under
+// one's -, else 4051's colour; opaque on glass as well (luxwm's plate under
 // it would add its own light/dark lines there: the frame is extended one row
 // further, browser.cpp extend_frame, so they lie under this row and the bar).
 // Drawn over the travel buttons: their drop-down's bottom row (4051's art ends
@@ -1323,9 +1323,9 @@ void paint_right(HDC dc, int R)
     DeleteDC(mem);
 }
 
-// lhwm's header pixmap: its last H rows (its last row lies against the bottom
+// luxwm's header pixmap: its last H rows (its last row lies against the bottom
 // of our extension). False when there is none (yet): the gradient instead.
-// lhwm's pixmap, its last H rows, into the header's rows (false: none)
+// luxwm's pixmap, its last H rows, into the header's rows (false: none)
 bool blit_pixmap(HDC dc, int R, int H)
 {
     if (g_pix_stale) {
@@ -1373,7 +1373,7 @@ bool paint_pixmap(HDC dc, int R, int H)
     return true;
 }
 
-// comctl32's DrawShadowText TST_CONTINUOUS as lhwm draws it (frame.c
+// comctl32's DrawShadowText TST_CONTINUOUS as luxwm draws it (frame.c
 // ms_shadow_text): the text into a (w+10)x(h+10) buffer at (5,5), every touched
 // pixel 255, a box over the next four pixels / 4, then the row and the four
 // above / 4, laid at (x - 4 + dx, top - 8 + dy); TST_SINGLE: one offset copy.
@@ -1429,7 +1429,7 @@ void draw_text(HDC dc, HFONT f, const std::string& s, int x, int top, bool on_gl
     int v = g_active ? 0 : 1;
     bool max = zoomed();
     if (!on_glass && g_look.valid) {
-        // maximised: lhwm draws MAXCAPTION's shadow (maxcaption.shadow.*) when the theme has one
+        // maximised: luxwm draws MAXCAPTION's shadow (maxcaption.shadow.*) when the theme has one
         const CaptionLook& L = g_look;
         bool m = max && L.max_sh;
         int t = m ? L.max_sh_type[v] : L.sh_type[v];
@@ -1784,9 +1784,9 @@ void paint(HDC dc)
     RECT rc; GetClientRect(g_wnd, &rc);
     int R = rc.right, H = rc.bottom;
     bool on_glass = g_mode == GLASS;
-    bool caption = false;            // lhwm's caption band under the glass layout
+    bool caption = false;            // luxwm's caption band under the glass layout
     if (on_glass) {
-        FlxpClearRect(dc, &rc);   // lhwm's plate shows through
+        FlxpClearRect(dc, &rc);   // luxwm's plate shows through
         if (themed_free()) paint_right(dc, R);   // 4074-dwm.png: gripper, magnifier, star
         else if (g_show[SHOW_SEARCH]) soft_line(dc, g_divider, top_off() + 2, base_height() - 4, RGB(255, 255, 255), 210);
     } else if (navbar_mode()) {
@@ -1803,7 +1803,7 @@ void paint(HDC dc)
     COLORREF title_c, crumb_c;
     int v = variant();
     if (g_look.valid && (navbar_mode() || caption || on_glass)) {
-        // lhwm's caption colours, its maximised ones when zoomed (aero: white)
+        // luxwm's caption colours, its maximised ones when zoomed (aero: white)
         title_c = crumb_c = zoomed() ? g_look.max_text[g_active ? 0 : 1] : g_look.text[g_active ? 0 : 1];
     } else if (navbar_mode()) {
         title_c = sk().title_color[v]; crumb_c = sk().crumb_color[v];
@@ -1881,7 +1881,7 @@ void paint(HDC dc)
 
 // Hover repaints only what changes: on glass every repainted rectangle is
 // damage the compositor re-blurs, and the less of the header's top edge that
-// is redrawn, the less a blur seam along lhwm's caption can appear there.
+// is redrawn, the less a blur seam along luxwm's caption can appear there.
 void invalidate_tools()
 {
     for (const ToolBtn& b : g_tools) { RECT r = b.r; InflateRect(&r, 1, 1); InvalidateRect(g_wnd, &r, TRUE); }
@@ -1925,15 +1925,15 @@ void set_nav_hot(int part)
 
 // ---- vision: the header through lhnav --------------------------------------------------
 // docs/NAVBAR.md "flxp's header": lhnav lays out, paints and hit-tests the
-// travel orb, the title in lhwm's 15-row deco, the breadcrumb, the search box
+// travel orb, the title in luxwm's 15-row deco, the breadcrumb, the search box
 // and the right-hand items (nav.ini `tools`); flxp keeps what a click does (the
 // history and its menus, the crumbs' drop-down menus, the bookmarks, New Folder,
 // Views, the filter), the address and search EDITs placed over lhnav's boxes,
-// and the background under it (glass, lhwm's _LHWM_HEADER_PIXMAP, else the
+// and the background under it (glass, luxwm's _LHWM_HEADER_PIXMAP, else the
 // theme's navigation bar). The header window covers lhnav_extend_top() rows:
-// the header plus the two rows on which lhwm draws the plate's line pair.
+// the header plus the two rows on which luxwm draws the plate's line pair.
 
-// lhwm's frame theme directory (_LHWM_THEME "DIR|STYLE|COLOR|SIZE"), "" without lhwm
+// luxwm's frame theme directory (_LHWM_THEME "DIR|STYLE|COLOR|SIZE"), "" without luxwm
 std::string frame_theme_dir()
 {
     WCHAR buf[1024];
@@ -2010,7 +2010,7 @@ void vision_load(const std::string& ini)
         if (g_v.nav) lhnav_set_style(g_v.nav, g_v.style);
         if (old) ut_close(old);       // after lhnav let go of it
     }
-    // nav.ini is re-read on every lhwm theme (re)load: its _LHWM_THEME rewrite comes as a refit
+    // nav.ini is re-read on every luxwm theme (re)load: its _LHWM_THEME rewrite comes as a refit
     lhnav_metrics_default(&g_v.base);
     if (!ini.empty()) {
         std::string preset = vision_preset(ini);
@@ -2070,7 +2070,7 @@ int host_tool(int kind, bool* enabled)
     return kind == LHNAV_TOOL_VIEWS ? ID_VIEWS : kind == LHNAV_TOOL_NEWFOLDER ? ID_NEW_FOLDER : 0;
 }
 
-// lhwm's numbers into lhnav (navdemo apply_metrics): where our row 0 lies in
+// luxwm's numbers into lhnav (navdemo apply_metrics): where our row 0 lies in
 // the frame (border_t, _LHWM_FRAME_METRICS 12/13), where the deco ends (18
 // deco_h, else the caption), the caption buttons (_LHWM_CAPTION_RECT), the
 // plain text colour; then the state flxp has (title, path, history, focus)
@@ -2083,14 +2083,14 @@ void vision_metrics()
     bool max = zoomed();
     if (!lm.icon_dir[0]) snprintf(lm.icon_dir, sizeof lm.icon_dir, "%s", shell::longhorn_resources().c_str());
     long cap = n > 0 ? m[0] : 27;
-    lm.border_t = n > 13 ? (int)m[max ? 13 : 12] : n > 0 ? 0 : lm.deco_h;   // no lhwm: under an ordinary caption
+    lm.border_t = n > 13 ? (int)m[max ? 13 : 12] : n > 0 ? 0 : lm.deco_h;   // no luxwm: under an ordinary caption
     lm.border_l = max ? 0 : n > 1 ? (int)m[1] : 0;
     if (n > 18 && m[18] > 0) lm.deco_h = (int)m[18];
     else if (n > 0) lm.deco_h = (int)(max && n > 8 ? m[8] : cap);
     if (max) lm.resize_rows = 0;
     // without composition all text in the caption's colour (inactive: its inactive one)
     lm.plain_rgb = n > 6 ? (uint32_t)(max && n > 15 ? m[g_active ? 14 : 15] : m[g_active ? 4 : 6]) : 0x1e1e1e;
-    // maximised: lhwm's maximised caption look (aero vision: white, no glow, on the dark plate)
+    // maximised: luxwm's maximised caption look (aero vision: white, no glow, on the dark plate)
     if (max && n > 16 && (uint32_t)m[16] == 0xFFFFFFFFu) { lm.title_rgb = lm.crumb_rgb = (uint32_t)m[g_active ? 14 : 15]; lm.glow_strength = 0; }
     RECT r = {};
     if (g_wnd && FlxpDwmGetCaptionRect(GetParent(g_wnd), &r) == S_OK) {
@@ -2438,7 +2438,7 @@ void vision_off()
 }
 
 // whether the header goes through lhnav now; switches it on or off. Called
-// on every refit (height_for_caption): theme, composition, metrics, lhwm's reload
+// on every refit (height_for_caption): theme, composition, metrics, luxwm's reload
 bool vision_update()
 {
     std::string ini, why;
@@ -2472,14 +2472,14 @@ void vision_paint(HDC dc)
     memset(g_v.bits, 0, (size_t)R * H * 4);
     lhnav_paint(g_v.nav, g_v.bits, R, H, R * 4, comp);
     RECT cr = {};
-    if (FlxpDwmGetCaptionRect(GetParent(g_wnd), &cr) == S_OK) {     // lhwm's caption buttons stay free
+    if (FlxpDwmGetCaptionRect(GetParent(g_wnd), &cr) == S_OK) {     // luxwm's caption buttons stay free
         int x0 = (std::max)(0, (int)cr.left), x1 = (std::min)(R, (int)cr.right), y1 = (std::min)(H, (int)cr.bottom);
         for (int y = (std::max)(0, (int)cr.top); y < y1; y++)
             for (int x = x0; x < x1; x++) g_v.bits[(size_t)y * R + x] = 0;
     }
     if (comp) {
-        FlxpClearRect(dc, &rc);                  // lhwm's plate shows through
-    } else if (!blit_pixmap(dc, R, H)) {         // lhwm's band (with its caption buttons under CLIENT_CAPTION)
+        FlxpClearRect(dc, &rc);                  // luxwm's plate shows through
+    } else if (!blit_pixmap(dc, R, H)) {         // luxwm's band (with its caption buttons under CLIENT_CAPTION)
         int v = variant();
         if (sk().valid && sk().bg[v].bmp) {
             navbar::draw_nine(dc, sk().bg[v], rc, sk().bg_margins[v]);
@@ -2510,7 +2510,7 @@ bool vision_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp, LRESULT* r)
         ScreenToClient(h, &p);
         if (GetCapture() == h) { *r = HTCLIENT; return true; }
         int part = lhnav_hit(n, p.x, p.y);
-        // the caption, the title, the top resize rows and lhwm's buttons are the
+        // the caption, the title, the top resize rows and luxwm's buttons are the
         // frame's (browser::header_hittest: HTCAPTION / HTTOP); the rest is ours
         *r = part == LHNAV_NONE || part == LHNAV_CAPTION || part == LHNAV_TITLE || part == LHNAV_RESIZE_TOP || part == LHNAV_BUTTONS
              ? HTTRANSPARENT : HTCLIENT;
@@ -2844,19 +2844,19 @@ bool classic_client_caption()
 int classic_height(int caption_h);
 }
 
-// vision: always (lhnav's title lies in lhwm's deco, composited or not)
+// vision: always (lhnav's title lies in luxwm's deco, composited or not)
 bool client_caption()
 {
     if (!g_settings_read) read_settings();
     return vision() || classic_client_caption();
 }
 
-// The same rows in every mode (top_off(), band_rows()): glass and lhwm's
-// pixmap have the navigation bar's metrics, under lhwm's caption as the bar is.
+// The same rows in every mode (top_off(), band_rows()): glass and luxwm's
+// pixmap have the navigation bar's metrics, under luxwm's caption as the bar is.
 // Small (lh4074-195235.png): 36 rows, the caption keeps the title (59 rows from
 // a 24-row caption's top edge to the dark line); Medium: the band, 54 (Slate
 // 4074: 53; 4051: 24 + 54 = 78 from the frame's top edge); Large / Extra-Large:
-// 32 / 49 more. CLIENT_CAPTION (glass, the title in the header): lhwm gives the
+// 32 / 49 more. CLIENT_CAPTION (glass, the title in the header): luxwm gives the
 // client its caption rows too (from the top border); they stay empty above the
 // band, so the band is where it is without the flag - 4074-dwm.png's own
 // placement (the title and Back button across the caption rows, 76 rows from
@@ -2864,7 +2864,7 @@ bool client_caption()
 int height_for_caption(int caption_h)
 {
     if (!g_settings_read) read_settings();
-    if (vision_update()) return vision_extend();     // the header plus lhwm's line rows (lhnav_extend_top)
+    if (vision_update()) return vision_extend();     // the header plus luxwm's line rows (lhnav_extend_top)
     return classic_height(caption_h);
 }
 
@@ -2878,7 +2878,7 @@ int classic_height(int caption_h)
     int more = g_hsize == SIZE_LARGE ? 32 : g_hsize == SIZE_XLARGE ? 49 : 0;
     int band = theme_buttons ? k.height : NAV_H, off = 0;
     if (!nb && classic_client_caption()) {
-        // the client starts at lhwm's top border (DWM frames: the side border width)
+        // the client starts at luxwm's top border (DWM frames: the side border width)
         FLXP_DWM_FRAME_METRICS m = {}; m.cbSize = sizeof m;
         FlxpDwmGetFrameMetrics(&m);
         int border = m.bValid && m.cxLeftBorder > 0 ? m.cxLeftBorder : 9;
@@ -2891,10 +2891,10 @@ int classic_height(int caption_h)
 
 int extend_top()
 {
-    if (vision()) return g_height;        // lhnav_extend_top: lhwm draws the line pair on its last two rows
+    if (vision()) return g_height;        // lhnav_extend_top: luxwm draws the line pair on its last two rows
     BOOL comp = FALSE;
     DwmIsCompositionEnabled(&comp);
-    return g_height + (comp ? 1 : 0);     // glass: lhwm's lines under the header's dark row and the bar
+    return g_height + (comp ? 1 : 0);     // glass: luxwm's lines under the header's dark row and the bar
 }
 
 bool resize_hit(int x, int y)
@@ -3097,7 +3097,7 @@ void composition_changed()
         if (g_wnd) { vision_metrics(); layout(); }
         return;
     }
-    make_fonts();               // lhwm's caption look may have changed with its theme
+    make_fonts();               // luxwm's caption look may have changed with its theme
     Mode m = choose_mode();
     if (m != g_mode) apply_mode(m);
     else make_navbar_fonts();
@@ -3121,7 +3121,7 @@ void set_active(bool active)
 {
     if (active == g_active) return;
     g_active = active;
-    // the navigation bar's variant and the title colours change now; lhwm's
+    // the navigation bar's variant and the title colours change now; luxwm's
     // pixmap variant arrives as WM_FLXP_DWMHEADERCHANGED (re-read then)
     g_pix_stale = true;
     if (vision() && g_wnd) vision_metrics();
@@ -3164,12 +3164,12 @@ HWND search_box() { return g_edit; }
 
 std::string background_source()
 {
-    if (glass()) return "glass (lhwm's plate under a transparent header)";
+    if (glass()) return "glass (luxwm's plate under a transparent header)";
     std::string bg = shell::theme_setting("header_background", "auto");
     if ((bg == "auto" || bg == "navbar" || bg.empty()) && navbar::skin().valid)
         return std::string("navigation bar, ") + navbar::skin().name + " layout, the theme's parts from " + navbar::skin().path + (bg == "auto" || bg.empty() ? "" : " (header_background=" + bg + ")");
     std::string why = bg == "pixmap" ? "header_background=pixmap" : "no Longhorn navigation bar in the theme's msstyles";
-    return "lhwm's _LHWM_HEADER_PIXMAP, else the drawn Slate gradient (" + why + ")";
+    return "luxwm's _LHWM_HEADER_PIXMAP, else the drawn Slate gradient (" + why + ")";
 }
 
 std::string buttons_source()
@@ -3181,7 +3181,7 @@ std::string buttons_source()
     std::string fr = "the Avalon framelets (" + framelet_source() + ")";
     if (theme.empty()) return fr + " (the style has no travel buttons)";
     if (set == "framelets") return "glass/pixmap: " + fr + " (header_button_images=framelets); navigation bar: " + theme;
-    return theme + (k.valid ? ", in every mode" : ", on glass and lhwm's pixmap (the style has no navigation bar)");
+    return theme + (k.valid ? ", in every mode" : ", on glass and luxwm's pixmap (the style has no navigation bar)");
 }
 
 // which header draws (flxp --info "header engine"): lhnav's vision header
@@ -3212,7 +3212,7 @@ static std::string engine_info()
 }
 
 // The header's rows and buttons at each size as they are (or would be) laid
-// out now: the settings, the session theme, lhwm's caption (flxp --info)
+// out now: the settings, the session theme, luxwm's caption (flxp --info)
 std::string metrics_info()
 {
     if (!g_settings_read) read_settings();
@@ -3232,7 +3232,7 @@ std::string metrics_info()
         if (sz == keep_size) {
             snprintf(b, sizeof b, "%s (%sheader_size): %d rows", SIZE_NAMES[sz], g_prefix.c_str(), g_height);
             rows = b;
-            if (cc) snprintf(b, sizeof b, " from lhwm's %d-row top border (CLIENT_CAPTION: the %d caption rows stay empty, then the %d-row band)",
+            if (cc) snprintf(b, sizeof b, " from luxwm's %d-row top border (CLIENT_CAPTION: the %d caption rows stay empty, then the %d-row band)",
                              border, top_off(), band_rows());
             else if (cap > 0) snprintf(b, sizeof b, " under the %d-row caption", cap);
             else b[0] = 0;

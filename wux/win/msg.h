@@ -43,8 +43,8 @@ enum : uint32_t {
     WM_DWMCOMPOSITIONCHANGED = 0x031E,          // the WM's _LHWM_COMPOSITED changed
     WM_DWMCOLORIZATIONCOLORCHANGED = 0x0320,    // its theme or frame metrics changed
     WM_FLXP_ROOTPROPERTY = 0x03F0,              // a watched root property changed (wp = watch id); flxp's own
-    WM_FLXP_HEADERPIXMAP = 0x03F1,              // lhwm's _LHWM_HEADER_PIXMAP of this toplevel changed (flxp_dwmapi.h)
-    WM_FLXP_CAPTIONRECT = 0x03F2,               // lhwm's _LHWM_CAPTION_RECT of this toplevel changed
+    WM_FLXP_HEADERPIXMAP = 0x03F1,              // luxwm's _LHWM_HEADER_PIXMAP of this toplevel changed (flxp_dwmapi.h)
+    WM_FLXP_CAPTIONRECT = 0x03F2,               // luxwm's _LHWM_CAPTION_RECT of this toplevel changed
     WM_FLXP_WINDOWSTATE = 0x03F3,               // the toplevel's _NET_WM_STATE changed (maximised or restored)
     // drag and drop (window.h: DropInfo, drag_files); lp = DropInfo*. Sent to the
     // deepest window under the pointer, def_proc hands them to the parent.

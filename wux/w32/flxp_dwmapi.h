@@ -1,4 +1,4 @@
-/* flxp extensions to dwmapi for the lhwm window manager's glass frames
+/* flxp extensions to dwmapi for the luxwm window manager's glass frames
    (docs/CLIENT-PROTOCOL.md). Include after windows.h; pulls in dwmapi.h.
 
    DwmExtendFrameIntoClientArea turns the toplevel into a 32-bit ARGB window
@@ -33,10 +33,10 @@ extern "C" {
 #define FLXP_DWMFF_NO_TITLE     0x0001  /* no caption text: the client draws its own title */
 #define FLXP_DWMFF_NO_ICON      0x0002  /* no caption icon */
 #define FLXP_DWMFF_NO_FOG       0x0004  /* no caption fog band behind the header */
-#define FLXP_DWMFF_CLIENT_CAPTION 0x0008 /* experimental: the client covers the caption rows too; lhwm keeps only its
+#define FLXP_DWMFF_CLIENT_CAPTION 0x0008 /* experimental: the client covers the caption rows too; luxwm keeps only its
                                            buttons (FlxpDwmGetCaptionRect), the window grows upwards by them */
 
-/* Posted to the toplevel when lhwm replaces its _LHWM_HEADER_PIXMAP (focus,
+/* Posted to the toplevel when luxwm replaces its _LHWM_HEADER_PIXMAP (focus,
    size, theme) or its _LHWM_CAPTION_RECT (CLIENT_CAPTION). */
 #define WM_FLXP_DWMHEADERCHANGED    0x03F1
 #define WM_FLXP_DWMCAPTIONRECTCHANGED 0x03F2
@@ -50,19 +50,19 @@ typedef struct FLXP_DWM_FRAME_METRICS {
     BOOL bValid;
     INT cyCaption, cxLeftBorder, cxRightBorder, cyBottomBorder;
     COLORREF crText, crGlow, crInactiveText;    /* crGlow: DWM TextGlow colour, or 0 */
-    /* the maximised caption text (lhwm's items 14..16, theme.ini text_max_*, glow_max);
-       FALSE in bMaxValid from an lhwm that publishes fewer items */
+    /* the maximised caption text (luxwm's items 14..16, theme.ini text_max_*, glow_max);
+       FALSE in bMaxValid from an luxwm that publishes fewer items */
     BOOL bMaxValid, bMaxGlowNone;
     COLORREF crMaxText, crMaxInactiveText, crMaxGlow;
 } FLXP_DWM_FRAME_METRICS;
 HRESULT WINAPI FlxpDwmGetFrameMetrics(FLXP_DWM_FRAME_METRICS *metrics);
 
-/* Root _LHWM_THEME: the path of lhwm's active frame theme (a directory with
+/* Root _LHWM_THEME: the path of luxwm's active frame theme (a directory with
    theme.ini and its images), UTF-16 into buf. S_FALSE with an empty string
-   when the window manager publishes none (no lhwm). */
+   when the window manager publishes none (no luxwm). */
 HRESULT WINAPI FlxpDwmGetFrameThemePath(LPWSTR buf, UINT cch);
 
-/* lhwm's _LHWM_HEADER_PIXMAP, published while not composited for windows
+/* luxwm's _LHWM_HEADER_PIXMAP, published while not composited for windows
    that extend their frame: the theme's caption band continued down over the
    extension (active or inactive by focus), client width x (top frame margin
    + extension top); its last row lies against the bottom of the extension,
@@ -70,7 +70,7 @@ HRESULT WINAPI FlxpDwmGetFrameThemePath(LPWSTR buf, UINT cch);
    caller deletes it), NULL when there is none (composited, another WM). */
 HBITMAP WINAPI FlxpDwmGetHeaderBitmap(HWND hwnd);
 
-/* CLIENT_CAPTION: lhwm's caption buttons in client coordinates (S_FALSE and
+/* CLIENT_CAPTION: luxwm's caption buttons in client coordinates (S_FALSE and
    an empty rect when there are none). Keep them free of content and let
    clicks through with FlxpDwmSetInputHole. */
 HRESULT WINAPI FlxpDwmGetCaptionRect(HWND hwnd, RECT *rc);
@@ -78,7 +78,7 @@ HRESULT WINAPI FlxpDwmGetCaptionRect(HWND hwnd, RECT *rc);
 HRESULT WINAPI FlxpDwmSetInputHole(HWND hwnd, const RECT *rc);
 
 /* Whether the window manager shows hwnd (a toplevel) as the active window:
-   the root _NET_ACTIVE_WINDOW, which lhwm sets when it draws the active
+   the root _NET_ACTIVE_WINDOW, which luxwm sets when it draws the active
    frame. S_OK with *active; S_FALSE when the window manager publishes no
    _NET_ACTIVE_WINDOW (*active is then hwnd == GetActiveWindow()). Watch the
    root property with FlxpWatchRootProperty("_NET_ACTIVE_WINDOW") to follow it. */

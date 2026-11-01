@@ -330,7 +330,7 @@ void log_off()
     if (MessageBoxW(g.wnd, L"Are you sure you want to log off?", L"Log Off", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return;
     std::string c = shell::store::get("commands", "logoff");   // settings.ini [commands] logoff, luxshell's too
     if (!c.empty()) { run_shell(c); return; }
-    // lhwm: `luxwmc quit` ends the window manager cleanly; that ends a session whose last program it is
+    // luxwm: `luxwmc quit` ends the window manager cleanly; that ends a session whose last program it is
     std::string wm = xwm::wm_name();
     if (wm.find("lhwm") != std::string::npos || wm.find("berry") != std::string::npos) {
         std::string exe = xwm::wm_executable();

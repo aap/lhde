@@ -125,7 +125,7 @@ void size_buttons()
     SendMessageW(tbw, TB_AUTOSIZE, 0, 0);
 }
 
-// _NET_WM_ICON_GEOMETRY: lhwm flies minimised windows to their button
+// _NET_WM_ICON_GEOMETRY: luxwm flies minimised windows to their button
 void publish_geometry()
 {
     for (size_t k = 0; k < items.size(); k++) {
