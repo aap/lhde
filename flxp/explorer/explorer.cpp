@@ -1,6 +1,7 @@
 // flxp explorer: a re-interpretation of the Windows 2000/XP Explorer frame on
 // this toolkit. Rebar with the standard toolbar and address band, the Folders
 // tree, the file list, a status bar, menus, history. Browses shell::Folder.
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2301,6 +2302,7 @@ static void usage(FILE* f)
         "  --small-toolbar     small toolbar buttons\n"
         "  --taskpane          Longhorn: the task band under the command bar (taskpane=1)\n"
         "  --geometry WxH+X+Y  window client size and position\n"
+        "  --select FILE       open FILE's folder with FILE selected (Windows' explorer /select,FILE)\n"
         "  --info              print the settings, data directory, fonts and theme found, and exit\n"
         "  --help              this text\n"
         "Options override %s for this run; every key there can also be set\n"
@@ -2393,6 +2395,7 @@ int main(int argc, char** argv)
 {
     // Command line: options become FLXP_<KEY> overrides for this run (children inherit them).
     std::vector<std::string> args;
+    std::string select;   // --select FILE
     bool info = false;
     int quit_ms = 0;
     for (int i = 1; i < argc; i++) {
@@ -2414,6 +2417,7 @@ int main(int argc, char** argv)
 
         else if (opt == "--geometry") setenv("FLXP_GEOMETRY", val("--geometry").c_str(), 1);
         else if (opt == "--info") info = true;
+        else if (opt == "--select") select = val("--select");
         else if (opt == "--settings") {   // Display Properties: flxp --settings [--tab NAME]
             std::string prog = shell::store::settings_program();
             std::vector<char*> av = { (char*)prog.c_str() };
@@ -2440,6 +2444,14 @@ int main(int argc, char** argv)
         if (a.rfind("::", 0) == 0 || (stat(a.c_str(), &st) == 0 && S_ISDIR(st.st_mode))) dirs.push_back(a);
         else if (stat(a.c_str(), &st) == 0) files.push_back(a);
         else fprintf(stderr, "flxp: %s: no such file or folder\n", a.c_str());
+    }
+    if (!select.empty()) {   // the folder, the file selected in it once it is listed (browser::fill_list)
+        std::string p = shell::path_from_uri(select);
+        if (!p.empty()) select = p;
+        char abs[PATH_MAX];
+        if (!realpath(select.c_str(), abs)) { fprintf(stderr, "flxp: %s: no such file or folder\n", select.c_str()); return 1; }
+        select = abs;
+        dirs.insert(dirs.begin(), shell::dir_of(select));
     }
     if (!args.empty() && dirs.empty() && files.empty()) return 1;
     std::string open_err;
@@ -2486,6 +2498,7 @@ int main(int argc, char** argv)
     HWND frame = CreateWindowExW(0, L"flxp_explorer", L"flxp", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, gx, gy, gw, gh, nullptr, nullptr, nullptr, nullptr);
     if (const char* b = getenv("FLXP_BACK")) navigate(b);   // testing: a page to go back to (screenshots compare with Back enabled)
     if (!navigate(start)) navigate("::desktop");
+    if (!select.empty()) { g.select_after_refresh = select; browser::fill_list(g); }   // after the view the folder chose
     g.w_active = FlxpWatchRootProperty("_NET_ACTIVE_WINDOW");   // luxwm's active frame (sync_active)
     g.w_settings = FlxpWatchRootProperty("_LH_SETTINGS_CHANGED");
     ShowWindow(frame, SW_SHOW);
