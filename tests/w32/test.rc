@@ -1,5 +1,6 @@
 /* kerneltest's resources (tests/w32/kerneltest.cpp test_resources), compiled
- * by make into build/tests/w32/test.res: string tables in two languages (the
+ * into tests/w32/test.res (checked in; make runs windres when this file or
+ * pal.bmp changes) and copied to build/tests/w32/: string tables in two languages (the
  * en-US one preferred), a named and a numbered bitmap, a dialog. */
 #pragma code_page(65001)
 #include <windows.h>

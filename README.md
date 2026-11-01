@@ -31,11 +31,32 @@ the user's own files (settings below).
 
 ## Building
 
-Needs a C++17 compiler and pkg-config with x11, xext, freetype2, fontconfig,
+Needs a C and C++17 compiler, GNU make, Python 3 (the standard library: every `make` runs
+`tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, xext, freetype2, fontconfig,
 libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, luxshell);
-for the lux side also xfixes, xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4);
-`x86_64-w64-mingw32-windres` only to rebuild a changed `.rc`. At run time the session
-uses picom, feh and xprop (xdotool, ImageMagick's import for the lab).
+for the lux side also xfixes, xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4).
+Every `.res` is checked in (`wux/rc/`, `wux/w32/stdres.res`, `flxp/rc/`, `tests/w32/test.res`):
+the mingw-w64 cross toolchain (`x86_64-w64-mingw32-windres`, which preprocesses with its gcc) is needed
+only when a `.rc` or a header it includes changes, and Wine's sources only to rebuild Wine's resources
+(`wux/vendor/wine/MANIFEST`).
+
+Importing the Windows resources (`lhde-import`, `lhde-pack`, `lhde-schemes`; docs/USAGE.md "Getting the
+Windows resources") needs Python 3 with Pillow, 7z (ISOs, WIMs, the compressed files of an I386 layout;
+cabextract also does those), and tar with xz (zstd when installed) for resource packs.
+At run time the session uses picom, feh, xprop, xsetroot and dbus-daemon; `lhde-session start` also
+startx (xinit), `--nested` Xephyr; the lab and `make check` Xvfb, xdotool, ImageMagick's import, xclip and
+luac5.4 (each test is skipped when its tool is missing).
+
+On Void Linux, everything above in one command:
+
+    xbps-install -S gcc make pkg-config python3 libX11-devel libXext-devel libXfixes-devel \
+        libXinerama-devel libXft-devel freetype-devel fontconfig-devel libpng-devel libjpeg-turbo-devel \
+        libwebp-devel dbus-devel cairo-devel pango-devel lua54-devel \
+        python3-Pillow 7zip cabextract xz tar \
+        dbus picom feh xprop xsetroot xinit xorg-server-xephyr xorg-server-xvfb xdotool ImageMagick xclip lua54
+
+(python3-pillow-simd works in place of python3-Pillow; `cross-x86_64-w64-mingw32` is the windres above).
+Other distributions need the equivalent packages. Then:
 
     make -j                      libs, programs and tests into build/
     make check                   tests/check.sh (below)

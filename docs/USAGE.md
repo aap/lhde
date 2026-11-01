@@ -57,9 +57,16 @@ states on the lab and saves zooms.
 
 ## Getting the Windows resources (lhde-pack, lhde-import)
 lhde ships no Microsoft files. Everything Windows-made (visual styles, DLLs for icons and art, fonts, wallpapers) comes from the
-user's own copies, in two stages below. The short way, from the top-level Makefile, to a clean Windows tree (`$LHDE_WINDOWS`,
-else `~/.local/share/lhde-windows`; each target first deletes it through `lhde-import --clean`, which asks on the terminal, or
-without asking with `CLEAN=1`):
+user's own copies, in two stages below.
+
+**Needs:** Python 3 with Pillow (`lhde-import`, `lhde-pack` and `lhde-schemes` are Python; the recipes write their PNGs with
+Pillow), 7z (ISOs, WIMs, the compressed `*.XX_` files of an I386/AMD64 layout; cabextract also does those), tar with xz, or zstd
+when it is installed, for resource packs, and the built `ut-dump` and `lhde-theme` (`build/bin` or PATH). On Void Linux
+`xbps-install -S python3 python3-Pillow 7zip cabextract xz tar`; other distributions need the equivalents (README.md "Building"
+has the whole list).
+
+The short way, from the top-level Makefile, to a clean Windows tree (`$LHDE_WINDOWS`, else `~/.local/share/lhde-windows`; each
+target first deletes it through `lhde-import --clean`, which asks on the terminal, or without asking with `CLEAN=1`):
 
 | make target | what it imports | what then resolves |
 | --- | --- | --- |
