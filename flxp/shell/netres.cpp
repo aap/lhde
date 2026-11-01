@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <string.h>
 #include "netres.h"
-#include "config.h"
 
 namespace shell {
 
