@@ -78,7 +78,7 @@ LUX_COPT       ?= -Os -g -DNDEBUG
 all:
 
 include wuxtheme/wuxtheme.mk   # first: wux.mk leaves its objects out of libwux.a
-include liblhde/liblhde.mk     # before luxnav.mk and flxp.mk: libluxnav and flxp carry its data.o
+include liblhde/liblhde.mk     # before luxnav.mk and flxp.mk: libluxnav and flxp carry its data.o, ini.o
 include luxnav/luxnav.mk       # before flxp.mk: its programs link $(LUXNAVA)
 include wux/wux.mk
 include flxp/flxp.mk

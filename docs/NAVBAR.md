@@ -30,8 +30,8 @@ opaque: the header pixmap). Art comes from the visual style through wuxtheme (`u
   `lib/libluxnav.so*`, `include/luxnav/lhnav.h` and the installed `luxnav.pc`.
 
 Sources `lhnav.c` (layout, painting, state), `lhnav_px.c` (pixels), `lhnav_res.c` (shell32's resources), compiled with
-`-DHAVE_UXTHEME` and `LUX_COPT`; the library carries `liblhde/data.o` (nav.ini's `icon_dir` and `art_style` are found in lhde's
-data directories). No cairo, pango, fontconfig or freetype of its own (FreeType is wuxtheme's). navdemo links libluxnav.a,
+`-DHAVE_UXTHEME` and `LUX_COPT`; the library carries `liblhde/data.o` and `ini.o` (nav.ini's `icon_dir` and `art_style` are found in lhde's
+data directories; its lines are trimmed with `lhde_trim`). No cairo, pango, fontconfig or freetype of its own (FreeType is wuxtheme's). navdemo links libluxnav.a,
 liblhde and libwuxtheme, and keeps cairo, pango and fontconfig for its own window.
 
 ## API

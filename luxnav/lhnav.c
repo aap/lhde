@@ -5,6 +5,7 @@
 #include "lhnav_res.h"
 #include "lhnav_px.h"
 #include "lhde/data.h"
+#include "lhde/settings.h"   /* lhde_trim */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,13 +36,6 @@ void lhnav_metrics_default(lhnav_metrics *m)
     m->tool_size = 0; m->tool_icon = 16; m->tool_gap = 4; m->tools_dx = m->tools_dy = 0; m->sep_last = 2;
 }
 
-static char *trim(char *s)
-{
-    while (*s == ' ' || *s == '\t') s++;
-    char *e = s + strlen(s);
-    while (e > s && (e[-1] == ' ' || e[-1] == '\t' || e[-1] == '\n' || e[-1] == '\r')) *--e = 0;
-    return s;
-}
 
 static uint32_t parse_rgb(const char *v)
 {
@@ -58,9 +52,9 @@ static int section_name(const char *s, char *out, size_t n)
     const char *e = strrchr(s, ']');
     if (!e) return 0;
     char buf[128]; snprintf(buf, sizeof buf, "%.*s", (int)(e - s - 1), s + 1);
-    char *b = trim(buf);
+    char *b = lhde_trim(buf);
     if (strncasecmp(b, "preset", 6) || (b[6] != ' ' && b[6] != '\t')) return 0;
-    snprintf(out, n, "%s", trim(b + 7));
+    snprintf(out, n, "%s", lhde_trim(b + 7));
     return out[0] != 0;
 }
 
@@ -116,15 +110,15 @@ static void set_key(lhnav_metrics *m, const char *path, char *k, char *v)
    0 for blank, comment and section lines */
 static int key_value(char *line, char **k, char **v)
 {
-    char *s = trim(line);
+    char *s = lhde_trim(line);
     if (!*s || *s == '#' || *s == ';' || *s == '[') return 0;
     char *eq = strchr(s, '=');
     if (!eq) return 0;
     *eq = 0;
-    *k = trim(s); *v = trim(eq + 1);
+    *k = lhde_trim(s); *v = lhde_trim(eq + 1);
     for (char *c = *v; *c; c++) if ((*c == '#' || *c == ';') && (c == *v || c[-1] == ' ' || c[-1] == '\t') && strcmp(*k, "art_dir") && strcmp(*k, "icon_dir") && strcmp(*k, "tools")) {
         if (*c == '#' && strstr(*k, "rgb")) continue;   /* #RRGGBB is a value, not a comment */
-        *c = 0; *v = trim(*v); break; }
+        *c = 0; *v = lhde_trim(*v); break; }
     return 1;
 }
 
@@ -134,7 +128,7 @@ int lhnav_presets(const char *path, char (*names)[48], int max)
     if (!f) return 0;
     char line[700], name[48]; int n = 0;
     while (fgets(line, sizeof line, f)) {
-        char *s = trim(line);
+        char *s = lhde_trim(line);
         if (section_name(s, name, sizeof name) && n < max) snprintf(names[n++], 48, "%s", name);
     }
     fclose(f);
@@ -149,7 +143,7 @@ int lhnav_metrics_load_preset(lhnav_metrics *m, const char *path, const char *pr
     /* pass 1: the keys outside the sections (and the file's `preset`) */
     int in_sec = 0;
     while (fgets(line, sizeof line, f)) {
-        char *s = trim(line), *k, *v;
+        char *s = lhde_trim(line), *k, *v;
         if (*s == '[') { in_sec = 1; if (section_name(s, sec, sizeof sec) && !first[0]) snprintf(first, sizeof first, "%s", sec); continue; }
         if (in_sec || !key_value(s, &k, &v)) continue;
         if (!strcmp(k, "preset")) snprintf(want, sizeof want, "%s", v);
@@ -166,7 +160,7 @@ int lhnav_metrics_load_preset(lhnav_metrics *m, const char *path, const char *pr
         rewind(f);
         int on = 0;
         while (fgets(line, sizeof line, f)) {
-            char *s = trim(line), *k, *v;
+            char *s = lhde_trim(line), *k, *v;
             if (*s == '[') { on = section_name(s, sec, sizeof sec) && !strcmp(sec, want); if (on) snprintf(m->preset, sizeof m->preset, "%s", want); continue; }
             if (on && key_value(s, &k, &v) && strcmp(k, "preset")) set_key(m, path, k, v);
         }

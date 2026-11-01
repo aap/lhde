@@ -4,10 +4,11 @@
 #   build/lib/libluxnav.a                 linked into flxp (the explorer header's vision mode) and navdemo
 #   build/lib/libluxnav.so.1 (+ .so)      for other programs
 #   build/lib/pkgconfig/luxnav.pc         pkg-config for the build tree; make install writes the installed one
-# libluxnav carries liblhde/data.o (nav.ini's icon_dir is relative to lhde's data directories).
+# libluxnav carries liblhde/data.o (nav.ini's icon_dir is relative to lhde's data directories) and ini.o (lhde_trim, nav.ini's
+# lines): two self-contained objects, so luxnav.pc needs no lhde.
 
 LUXNAV_SRCS   = $(addprefix luxnav/,lhnav.c lhnav_px.c lhnav_res.c)
-LUXNAV_OBJS   = $(patsubst %.c,$(O)/%.o,$(LUXNAV_SRCS)) $(O)/liblhde/data.o
+LUXNAV_OBJS   = $(patsubst %.c,$(O)/%.o,$(LUXNAV_SRCS)) $(O)/liblhde/data.o $(O)/liblhde/ini.o
 LUXNAVA       = build/lib/libluxnav.a
 LUXNAVSO      = build/lib/libluxnav.so.1
 LUXNAVPC      = build/lib/pkgconfig/luxnav.pc
