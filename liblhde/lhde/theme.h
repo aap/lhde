@@ -71,6 +71,11 @@ int lhde_theme_style_missing(const lhde_theme *t);
 /* the question a theme list asks: 1 when NAME's own files give a style that is present (classic always is), 0 when its style is
    missing, -1 when NAME is no theme. Resolves without the current layer (the caller keeps the selected theme listed anyway) */
 int lhde_theme_has_style(const char *name);
+/* every icon set (Desktop.icons): each icons/NAME.theme of the data directories (the first of a name, as lookups find it) and
+   Wine's built-in set "wine" (file "" unless a recipe has that name); sorted by title ([theme] name, else NAME). usable: the
+   recipe's resources / icon pack are imported (wine always), so choosing it resolves to itself, not to a fallback. Returns
+   how many */
+int lhde_icon_sets(void (*fn)(const char *name, const char *title, const char *file, int usable, void *ud), void *ud);
 /* the file a name selects ("" for a bare style) and the name after aliases (aero-patch -> aero4074); 0 when unknown */
 int lhde_theme_lookup(const char *name, char *canon, size_t ncanon, char *file, size_t nfile);
 

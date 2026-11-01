@@ -80,7 +80,7 @@ taskpane = top                  ; top | bottom: where flxp's Longhorn task band 
 wallpaper = 4074/Bliss          ; wallpapers/; none = colour only
 mode      = fill                ; fill | fit | center | tile | stretch
 color     = 58 110 165          ; background colour
-icons     = longhorn4074        ; icons/
+icons     = longhorn4074        ; icons/NAME.theme, or wine (the built-in set); lhde_icon_sets lists them
 
 [Fonts]
 fonts     = 4074                ; fonts/, then fontconfig
@@ -178,7 +178,7 @@ drawn buttons; a classic (msstyles) frame set whose style is not imported and th
 style's own decorations, classic for classic). The free chain, ReactOS last (it keeps Windows' resource ids;
 docs/USAGE.md "Getting the Windows resources"): a visual style missing -> classic (`style.missing = 1`: section 4, the
 theme is not listed); icons missing -> the first of `xp`, `2k`, `reactos` whose
-recipe and `resources/<source>` are imported, else the built-in Wine set; the build's resources missing ->
+recipe and `resources/<source>` are imported, else the built-in Wine set (`wine` chosen is that set, never a fallback); the build's resources missing ->
 `resources/xp`, `2k`, `reactos`, else drawn art; the build's fonts missing -> `fonts/reactos`, else
 fontconfig's. luxwm registers the first imported `marlett.ttf` of a Windows build, ReactOS's when there is
 none; flxp registers every imported build's fonts with `fonts/reactos` in a tier asked after them, so a family both have

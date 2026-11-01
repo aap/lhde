@@ -1245,6 +1245,16 @@ int wall_selected()
     return 0;
 }
 
+// every icon set whose files are imported (lhde_icon_sets: lhde's icons/*.theme and Wine's built-in set), by title; each
+// resolves to itself, so the selection reads back as what was chosen. The one in force is listed anyway (fill_list)
+void build_icon_items()
+{
+    icon_items.clear();
+    lhde_icon_sets([](const char* name, const char* title, const char*, int usable, void* ud) {
+        if (usable) static_cast<std::vector<Item>*>(ud)->push_back(Item{ title, name });
+    }, &icon_items);
+}
+
 void fill_walls(HWND dlg)
 {
     HWND lv = GetDlgItem(dlg, IDC_DT_LIST);
@@ -1279,7 +1289,7 @@ void fill_desktop(HWND dlg)
     std::vector<Item> modes = kModes;
     fill_list(dlg, IDC_DT_MODE, modes, value("Desktop.mode").empty() ? "fill" : value("Desktop.mode"));
     EnableWindow(GetDlgItem(dlg, IDC_DT_MODE), wall_value() != "none");
-    icon_items = items({ { "Longhorn", "longhorn4074" }, { "Windows XP", "xp" }, { "Windows 2000", "2k" }, { "Wine", "wine" } });
+    build_icon_items();
     fill_list(dlg, IDC_DT_ICONS, icon_items, value("Desktop.icons"));
     set_text(dlg, IDC_DT_ICONS_SRC, source_text("Desktop.icons"));
     filling = false;
@@ -1888,12 +1898,18 @@ INT_PTR CALLBACK shell_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
 }
 
 // --list desktop: the Desktop tab's lists as the dialog fills them, without a window (tests/settings-lists.sh): every
-// "wallpaper LABEL"; the entry in force marked with a leading "*"
+// "wallpaper LABEL", then every "icons TITLE = NAME"; the entry in force marked with a leading "*"
 void list_desktop()
 {
     build_walls();
     int sel = wall_selected();
     for (size_t i = 0; i < walls.size(); i++) printf("%swallpaper %s\n", (int)i == sel ? "*" : "", walls[i].label.c_str());
+    build_icon_items();
+    std::string v = value("Desktop.icons");
+    bool found = false;
+    for (const Item& it : icon_items) found |= it.value == v;
+    if (!found && !v.empty()) icon_items.push_back(Item{ v, v });   // as fill_list adds it
+    for (const Item& it : icon_items) printf("%sicons %s = %s\n", it.value == v ? "*" : "", it.label.c_str(), it.value.c_str());
 }
 
 void usage(FILE* f)

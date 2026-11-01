@@ -82,6 +82,13 @@ static lhde_theme *R(const char *name)
 }
 #define G(t, k) lhde_theme_get(t, k)
 #define W(t, k) lhde_theme_why(t, k)
+/* lhde_icon_sets' entries */
+struct isets { char names[16][64]; int usable[16], n; };
+static void iset(const char *name, const char *title, const char *file, int usable, void *ud)
+{
+    struct isets *x = ud; (void)title; (void)file;
+    if (x->n < 16) { snprintf(x->names[x->n], sizeof x->names[0], "%s", name); x->usable[x->n++] = usable; }
+}
 
 int main(void)
 {
@@ -289,8 +296,33 @@ int main(void)
         /* a preview of changes not applied */
         const char *kv[] = { "visualstyle.STYLE", "classic", "Desktop.icons", "wine" };
         t = lhde_theme_resolve_with("jade", kv, 2, NULL, 0);
-        EQ(G(t, "style.kind"), "classic"); EQ(G(t, "VisualStyle.style"), "classic"); EQ(G(t, "Desktop.icons"), "xp"); EQ(G(t, "current"), "2");   /* wine: no recipe here, the fallback */
+        EQ(G(t, "style.kind"), "classic"); EQ(G(t, "VisualStyle.style"), "classic"); EQ(G(t, "Desktop.icons"), "wine"); EQ(G(t, "current"), "2");   /* Wine's built-in set: itself, no fallback */
+        EQ(G(t, "path.icons"), ""); CHECK(lhde_theme_source(t, "Desktop.icons") == LHDE_FROM_CURRENT);
         lhde_theme_free(t);
+        /* every icon set Display Properties lists round-trips: written into the layer as itself, read back as itself; one whose
+           files are not imported falls back */
+        put("data/resources/reactos/shell32.dll", "x"); put("data/icons/reactos.theme", "[theme]\nname = ReactOS\nresources = resources/reactos\n");
+        put("data/icons/xp-hires.theme", "[theme]\nname = Windows XP (high resolution)\nrequires = icons/xp-hires\n");
+        put("config/lhde/icons/mine.theme", "[theme]\nname = Mine\nresources = resources/xp\n");
+        struct isets is = { .n = 0 };
+        lhde_data_reset();   /* config/lhde exists now: a data directory */
+        CHECK(lhde_icon_sets(iset, &is) == 7);   /* 2k, longhorn4074, mine, reactos, wine, xp, xp-hires */
+        int seen_wine = 0, seen_reactos = 0;
+        for (int i = 0; i < is.n; i++) {
+            if (!strcmp(is.names[i], "wine")) { seen_wine = 1; CHECK(is.usable[i]); }
+            if (!strcmp(is.names[i], "reactos")) { seen_reactos = 1; CHECK(is.usable[i]); }
+            if (!strcmp(is.names[i], "xp-hires")) CHECK(!is.usable[i]);   /* its pack is not imported */
+            CHECK(lhde_current_set_key("Desktop.icons", is.names[i]) >= 0);
+            t = lhde_theme_resolve_current(NULL, 0); CHECK(t);
+            if (t && is.usable[i]) EQ(G(t, "Desktop.icons"), is.names[i]);
+            if (t && !is.usable[i]) { EQ(G(t, "Desktop.icons"), "xp"); CHECK(lhde_theme_source(t, "Desktop.icons") == LHDE_FROM_FALLBACK); }
+            lhde_theme_free(t);
+        }
+        CHECK(seen_wine && seen_reactos);
+        CHECK(lhde_current_set_key("Desktop.icons", "2k") == 1);
+        for (const char *const *f = (const char *const[]){ "data/resources/reactos/shell32.dll", "data/resources/reactos", "data/icons/reactos.theme",
+                                                            "data/icons/xp-hires.theme", "config/lhde/icons/mine.theme", NULL }; *f; f++) {
+            char c[PATH_MAX + 64]; snprintf(c, sizeof c, "%s/%s", T, *f); remove(c); }
         /* classic schemes: [Colors] and [Metrics] (the size's first) under the files and the layer */
         put("data/styles/brick.scheme", "[Scheme]\nname = Brick\n[Colors]\nactivecaption = 128 0 0\nwindow = 255 255 255\n"
                                         "[Metrics]\ncaptionheight = 18\ncaptionfont = Tahoma, 8, bold\n[Metrics:Large Fonts]\ncaptionheight = 26\n");

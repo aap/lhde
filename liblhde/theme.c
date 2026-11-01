@@ -416,6 +416,65 @@ static const char *free_chain(const char *fmt, const char *skip, char *out, size
     return NULL;
 }
 
+/* an icon set: its recipe icons/NAME.theme (into path) and what the recipe reads ([theme] resources, an icon pack's requires)
+   imported; "wine" without a recipe of that name is flxp's built-in set (path ""). 0 when not usable, then what is missing in res */
+static int icons_usable(const char *name, char *path, size_t n, char *res, size_t nres)
+{
+    char rel[300], r[256] = "", req[256] = "", o[PATH_MAX];
+    if (res && nres) res[0] = 0;
+    snprintf(rel, sizeof rel, "icons/%s.theme", name);
+    if (!lhde_data_find(rel, path, n)) { path[0] = 0; return !strcmp(name, "wine"); }
+    lhde_ini *ini = lhde_ini_load(path);
+    lhde_ini_get(ini, "theme", "resources", r, sizeof r); lhde_ini_get(ini, "theme", "requires", req, sizeof req); lhde_ini_free(ini);
+    int ok = 1;
+    if (r[0] && !lhde_data_find(r, o, sizeof o)) { ok = 0; if (res && nres) snprintf(res, nres, "%s", r); }
+    if (req[0] && !lhde_data_find(req, o, sizeof o)) { ok = 0; if (res && nres) snprintf(res, nres, "%s", req); }   /* an icon pack */
+    return ok;
+}
+
+struct iconset { char name[128], title[128], file[PATH_MAX]; int usable; };
+static int cmp_iconset(const void *a, const void *b)
+{
+    const struct iconset *x = a, *y = b;
+    int c = strcasecmp(x->title, y->title);
+    return c ? c : strcmp(x->name, y->name);
+}
+static struct iconset *iconset_add(struct iconset **v, int *n, int *cap, const char *name)
+{
+    for (int k = 0; k < *n; k++) if (!strcmp((*v)[k].name, name)) return NULL;   /* the first directory's recipe wins, as lookups do */
+    if (*n == *cap) { int c = *cap ? *cap * 2 : 16; struct iconset *nv = realloc(*v, (size_t)c * sizeof *nv); if (!nv) return NULL; *v = nv; *cap = c; }
+    struct iconset *s = &(*v)[(*n)++]; memset(s, 0, sizeof *s);
+    snprintf(s->name, sizeof s->name, "%s", name);
+    s->usable = icons_usable(name, s->file, sizeof s->file, NULL, 0);
+    if (s->file[0]) { lhde_ini *ini = lhde_ini_load(s->file); lhde_ini_get(ini, "theme", "name", s->title, sizeof s->title); lhde_ini_free(ini); }
+    else if (!strcmp(name, "wine")) snprintf(s->title, sizeof s->title, "Wine");
+    if (!s->title[0]) snprintf(s->title, sizeof s->title, "%s", name);
+    return s;
+}
+
+int lhde_icon_sets(void (*fn)(const char *name, const char *title, const char *file, int usable, void *ud), void *ud)
+{
+    struct iconset *v = NULL; int n = 0, cap = 0;
+    const char *dirs[LHDE_DATA_MAX]; int nd = lhde_data_dirs(dirs, LHDE_DATA_MAX);
+    for (int i = 0; i < nd; i++) {
+        char p[PATH_MAX + 16]; snprintf(p, sizeof p, "%s/icons", dirs[i]);
+        DIR *d = opendir(p); if (!d) continue;
+        struct dirent *e;
+        while ((e = readdir(d))) {
+            size_t l = strlen(e->d_name); char nm[128];
+            if (e->d_name[0] == '.' || l <= 6 || l - 6 >= sizeof nm || strcmp(e->d_name + l - 6, ".theme")) continue;
+            memcpy(nm, e->d_name, l - 6); nm[l - 6] = 0;
+            iconset_add(&v, &n, &cap, nm);
+        }
+        closedir(d);
+    }
+    iconset_add(&v, &n, &cap, "wine");   /* the built-in set, when no recipe has that name */
+    qsort(v, (size_t)n, sizeof *v, cmp_iconset);
+    for (int i = 0; i < n && fn; i++) fn(v[i].name, v[i].title, v[i].file, v[i].usable, ud);
+    free(v);
+    return n;
+}
+
 /* section 6: what is asked for but not there becomes something plainer, with the reason; path.* derived */
 static void apply_fallbacks(lhde_theme *t, const lhde_style_info *si)
 {
@@ -461,17 +520,11 @@ static void apply_fallbacks(lhde_theme *t, const lhde_style_info *si)
         put(t, "path.resources", p, LHDE_FROM_DERIVED, w);
     }
     /* icons: the recipe and the resources it reads; else the first of xp, 2k, reactos whose recipe and resources are imported,
-       else Wine's built-in set */
+       else Wine's built-in set; wine itself, chosen, is always there (icons_usable) */
     v = get(t, "Desktop.icons"); p[0] = 0;
     if (!is_none(v)) {
-        char nm[128], rel[300]; snprintf(nm, sizeof nm, "%s", v); snprintf(rel, sizeof rel, "icons/%s.theme", nm);
-        int ok = lhde_data_find(rel, p, sizeof p) != NULL;
-        char res[256] = "";
-        if (ok) { lhde_ini *ini = lhde_ini_load(p); lhde_ini_get(ini, "theme", "resources", res, sizeof res);
-                  char req[256] = ""; lhde_ini_get(ini, "theme", "requires", req, sizeof req); lhde_ini_free(ini);
-                  char o[PATH_MAX]; if (res[0] && !lhde_data_find(res, o, sizeof o)) ok = 0;
-                  if (req[0] && !lhde_data_find(req, o, sizeof o)) { ok = 0; snprintf(res, sizeof res, "%s", req); } }   /* an icon pack */
-        if (!ok) {
+        char nm[128], res[256]; snprintf(nm, sizeof nm, "%s", v);
+        if (!icons_usable(nm, p, sizeof p, res, sizeof res)) {
             const char *fb = "wine";
             for (int i = 0; FREE_CHAIN[i]; i++) {
                 char o[PATH_MAX], ir[64], rr[64];
