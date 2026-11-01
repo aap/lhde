@@ -337,8 +337,8 @@ Environment: `LHDE_PICOM=0|1` forces the compositor off / on for the session, lu
 **flxp-desktop** shows the wallpaper and the icons in a `_NET_WM_WINDOW_TYPE_DESKTOP` window, started after luxwm and with
 luxshell, from the session shell (so it and the explorers it opens share DISPLAY, the session D-Bus and PATH). It takes the
 wallpaper and the icon set from the session theme's record (`Desktop.wallpaper`, `Desktop.mode`, `Desktop.icons`) like everyone
-else; `--wallpaper FILE` (`FLXP_WALLPAPER`) and flxp.ini's keys (any also as `FLXP_<KEY>` for one run) override it, which is why the
-session exports none. It survives theme switches (it is not part of the WM loop). While it runs luxshell is started with
+else; `--wallpaper FILE` (`FLXP_WALLPAPER`) overrides it for one run (as an exported `FLXP_<KEY>` would a flxp.ini key, which
+is why the session exports none). It survives theme switches (it is not part of the WM loop). While it runs luxshell is started with
 `LHSHELL_DESKTOP=0` (no desktop layer of its own: flxp-desktop fades to black in maximised mode itself); `LHSHELL_DESKTOP=0` (or
 off/no/false) works for any luxshell start.
 

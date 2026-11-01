@@ -852,7 +852,7 @@ int main(int argc, char** argv)
     // only the start menu (flxp-startmenu, next to luxshell's Avalon taskbar): no bar, no struts, no tray, no task buttons
     g.menu_only = setting("start_menu_only", "0") == "1";
     // settings.ini [taskbar] kind (start-up only): none, or avalon while lux draws its bar -> only the menu
-    std::string kind = shell::setting("start_menu_only").empty() ? setting("taskbar_kind") : "";
+    std::string kind = shell::setting("start_menu_only").empty() ? shell::theme_taskbar() : "";
     if (kind == "none" || (kind == "avalon" && shell::store::lux_running())) g.menu_only = true;
     if (g.menu_only) tray_on = false;
 

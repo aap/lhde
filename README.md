@@ -153,7 +153,7 @@ store `~/.config/lhde/settings.ini`; what flxp remembers on its own (views, icon
 
 | what | where it comes from (lhde's data directories) |
 |-----|-----------------------------------|
-| the session theme | `_LH_THEME` resolved by liblhde (the theme files; `_LH_THEME_RESOLVED` when it is current): style, icons, chrome, navigation bar, taskbar, start menu, wallpaper; flxp.ini's `icons`, `frame`, `taskbar_kind`, `wallpaper`, `wallpaper_mode`, `themes_ini` are ignored (docs/history/flxp-NOTES.md "flxp on liblhde") |
+| the session theme | `_LH_THEME` resolved by liblhde (the theme files; `_LH_THEME_RESOLVED` when it is current): style, icons, chrome, navigation bar, taskbar, start menu, wallpaper; flxp.ini has no key for any of them |
 | `--theme NAME` / `FLXP_THEME` | one run's style instead of the session theme's, by name: `styles/NAME.msstyles`, `styles/NAME/` (one style inside), else `NAME-xp` |
 | the Longhorn art (shell32, slate.msstyles) | the session theme's `path.resources` when it is a Longhorn build's (`resources/4051`, `resources/4074`, ...) |
 | the framelets | `Microsoft.Windows.Client.dll` beside (or in) `resources/<build>`, the theme's build first, then 4074 |

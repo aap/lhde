@@ -91,7 +91,7 @@ startdesk() {
 		tr '\0' '\n' </proc/$p/environ 2>/dev/null | grep -qx "DISPLAY=$D" || continue
 		b=$(tr '\0' '\n' </proc/$p/environ | sed -n 's/^DBUS_SESSION_BUS_ADDRESS=//p'); [ -n "$b" ] && bus=$b; break
 	done
-	# no FLXP_ICONS here: an exported FLXP_<KEY> beats the theme, and every program the desktop starts inherits it
+	# no FLXP_<KEY> here: an exported one beats flxp.ini, and every program the desktop starts inherits it
 	(cd "$HOME" && DISPLAY=$D DBUS_SESSION_BUS_ADDRESS=$bus setsid "$FLXPDESK" >"$STATE/flxp-desktop.log" 2>&1 </dev/null &)
 }
 

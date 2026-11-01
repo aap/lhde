@@ -211,21 +211,6 @@ std::string theme_setting(const std::string& key, const std::string& fallback)
     if (const char* e = getenv(var.c_str())) if (*e) return e;
     const SessionTheme& t = g_theme;
     auto or_fallback = [&](const std::string& v) { return v.empty() ? fallback : v; };
-    if (key == "icons") {
-        std::string v = t.value("Desktop.icons");
-        if (v.empty() || v == "none") return fallback;
-        // flxp's icon recipes are res/icons/{longhorn,xp,2k,wine}.theme; lhde's names are build-qualified
-        if (data_path("res/icons/" + v + ".theme").empty() && v.compare(0, 8, "longhorn") == 0) v = "longhorn";
-        return v;
-    }
-    if (key == "frame") {
-        if (t.name.empty()) return fallback;
-        std::string nb = t.value("Explorer.navbar");
-        if (nb == "none") return "xp";              // no navigation bar: XP's toolbars
-        return or_fallback(t.value("Explorer.chrome"));
-    }
-    if (key == "taskbar_kind") return or_fallback(t.value("Shell.taskbar"));
-
     std::string v = setting(key);
     if (!v.empty()) return v;
 
@@ -243,6 +228,25 @@ std::string theme_setting(const std::string& key, const std::string& fallback)
 }
 
 std::string longhorn_resources() { return longhorn_resources(g_theme); }
+
+std::string theme_icons(const std::string& fallback)
+{
+    std::string v = g_theme.value("Desktop.icons");
+    if (v.empty() || v == "none") return fallback;
+    // flxp's icon recipes are res/icons/{longhorn,xp,2k,wine}.theme; lhde's names are build-qualified
+    if (data_path("res/icons/" + v + ".theme").empty() && v.compare(0, 8, "longhorn") == 0) v = "longhorn";
+    return v;
+}
+
+std::string theme_chrome()
+{
+    if (g_theme.name.empty()) return "auto";
+    if (g_theme.value("Explorer.navbar") == "none") return "xp";   // no navigation bar: XP's toolbars
+    std::string c = g_theme.value("Explorer.chrome");
+    return c.empty() ? "auto" : c;
+}
+
+std::string theme_taskbar() { return g_theme.value("Shell.taskbar"); }
 
 std::string font_smoothing()
 {

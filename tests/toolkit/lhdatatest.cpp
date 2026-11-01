@@ -66,7 +66,7 @@ int main()
     setenv("LHDE_TREE", "0", 1);
     unsetenv("DISPLAY"); unsetenv("LHDE_SETTINGS");
     for (const char* k : { "FLXP_WALLPAPER_DIRS", "FLXP_THEME",
-                           "FLXP_ICONS", "FLXP_FRAME", "FLXP_HEADER_ENGINE", "FLXP_HEADER_PRESET", "FLXP_TASKBAR_KIND" })
+                           "FLXP_HEADER_ENGINE", "FLXP_HEADER_PRESET" })
         unsetenv(k);
     lhde_data_reset();
     lhde_style_set_probe(probe);
@@ -100,20 +100,20 @@ int main()
     CHECK_EQ(theme_build(t), "4051");
     set_session_theme(t);
     CHECK_EQ(longhorn_resources(), D + "/resources/4051");
-    CHECK_EQ(theme_setting("frame"), "longhorn");
+    CHECK_EQ(theme_chrome(), "longhorn");
     CHECK_EQ(theme_setting("header_engine"), "flxp");
     CHECK_EQ(theme_setting("menubar_style"), "document");
-    CHECK_EQ(theme_setting("icons", "xp"), "longhorn");                // flxp's res/icons/longhorn.theme
-    CHECK_EQ(theme_setting("taskbar_kind"), "avalon");
+    CHECK_EQ(theme_icons("xp"), "longhorn");                           // flxp's res/icons/longhorn.theme
+    CHECK_EQ(theme_taskbar(), "avalon");
 
     Wallpaper wp;
     CHECK_EQ(theme_wallpaper(t, wp) ? wp.file : "", D + "/wallpapers/4051/Bliss.jpg");
 
     CHECK_EQ(resolve_theme("luna", t) ? t.msstyles : "", D + "/styles/luna.msstyles");
     set_session_theme(t);
-    CHECK_EQ(theme_setting("frame"), "xp");
+    CHECK_EQ(theme_chrome(), "xp");
     CHECK_EQ(longhorn_resources(), "");                               // XP's resources are not a Longhorn build's
-    CHECK_EQ(theme_setting("icons", "xp"), "xp");
+    CHECK_EQ(theme_icons("xp"), "xp");
     CHECK_EQ(theme_setting("menubar_style"), "");
     CHECK_EQ(theme_wallpaper(t, wp) ? wp.file.substr(0, D.size() + 20) : "", D + "/wallpapers/xp/Bliss");
     CHECK_EQ(std::to_string(wp.color), std::to_string(0x004e98));

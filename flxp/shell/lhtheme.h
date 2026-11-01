@@ -52,12 +52,16 @@ std::string user_theme_path(const std::string& name);    // that file ("" when N
 const SessionTheme& session_theme();
 void set_session_theme(const SessionTheme& t);
 
-// flxp's keys that the theme decides, from the session theme's record (FLXP_<KEY> in the environment still wins: a run's
-// option). The mapping:
-//   icons              Desktop.icons (longhorn4074 -> longhorn while flxp's res/icons has no file of that name)
-//   frame              Explorer.chrome (auto | xp | longhorn; navbar none -> xp)
-//   taskbar_kind       Shell.taskbar
+// What the theme decides alone, from the session theme's record:
+//   theme_icons        Desktop.icons (longhorn4074 -> longhorn while flxp's res/icons has no file of that name), else fallback
+//   theme_chrome       Explorer.chrome: auto | xp | longhorn (Explorer.navbar none -> xp; no theme or none given: auto)
+//   theme_taskbar      Shell.taskbar: avalon | classic | none, "" = not given
+std::string theme_icons(const std::string& fallback = "");
+std::string theme_chrome();
+std::string theme_taskbar();
 
+// flxp's keys with a theme default under them, from the session theme's record (FLXP_<KEY> in the environment, then
+// flxp.ini, win). The mapping:
 //   menubar_style      flxp.ini, else document for chrome = longhorn
 //   header_engine      flxp.ini, else Explorer.navbar: vision -> lhnav, 4051 | 4074 -> flxp
 //   header_preset      flxp.ini, else Explorer.navbar_preset for navbar = vision

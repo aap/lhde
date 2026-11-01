@@ -2296,11 +2296,7 @@ static void usage(FILE* f)
         "  --theme NAME|PATH   visual style for this run, not the session theme's (luna, a name in\n"
         "                      the theme directories, a .msstyles file; FLXP_THEME the same)\n"
         "  --classic           no visual style\n"
-        "  --icons NAME|PATH   icon theme: xp, 2k, longhorn, wine or a .theme file\n"
         "  --small-toolbar     small toolbar buttons\n"
-        "  --frame xp|longhorn|auto  window frame: XP (the window manager's), the Longhorn\n"
-        "                      4074 header on luxwm's glass, or longhorn when luxwm composites\n"
-        "  --longhorn          the same as --frame longhorn\n"
         "  --taskpane          Longhorn: the task band under the command bar (taskpane=1)\n"
         "  --geometry WxH+X+Y  window client size and position\n"
         "  --info              print the settings, data directory, fonts and theme found, and exit\n"
@@ -2407,11 +2403,11 @@ int main(int argc, char** argv)
         if (opt == "--help" || opt == "-h") { usage(stdout); return 0; }
         else if (opt == "--theme") setenv("FLXP_THEME", val("--theme").c_str(), 1), unsetenv("FLXP_THEME_FOLLOWED");
         else if (opt == "--classic") setenv("FLXP_THEME", "classic", 1), unsetenv("FLXP_THEME_FOLLOWED");
-        else if (opt == "--icons") setenv("FLXP_ICONS", val("--icons").c_str(), 1);
+
         else if (opt == "--small-toolbar") setenv("FLXP_TOOLBAR_ICONS", "small", 1);
-        else if (opt == "--longhorn") setenv("FLXP_FRAME", "longhorn", 1);
+
         else if (opt == "--taskpane") setenv("FLXP_TASKPANE", "1", 1);
-        else if (opt == "--frame") setenv("FLXP_FRAME", val("--frame").c_str(), 1);
+
         else if (opt == "--geometry") setenv("FLXP_GEOMETRY", val("--geometry").c_str(), 1);
         else if (opt == "--info") info = true;
         else if (opt == "--settings") {   // Display Properties: flxp --settings [--tab NAME]

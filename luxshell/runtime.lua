@@ -158,7 +158,7 @@ local cfg = {
 }
 -- [taskbar] kind: avalon = luxshell's taskbar; classic = no taskbar surface, struts or _NET_WM_ICON_GEOMETRY of ours, the
 -- classic flxp-taskbar runs instead (started and stopped by us); none = neither.
-local function taskbar_kind(v)
+local function valid_taskbar(v)
   v = (v or ""):lower()
   if v == "classic" or v == "none" or v == "avalon" then return v end
   return nil
@@ -167,9 +167,9 @@ end
 -- S.theme_value(theme_entry, ...) = the resolved record's key (the current layer, the theme file, its base chain, the default); they
 -- are applied at startup, on every theme change and on _LH_SETTINGS_CHANGED. LHSHELL_TASKBAR / LHSHELL_COMPOSITION (on|off|follow;
 -- lhde-session sets it from LHDE_PICOM=0/1) force one for this run.
-local taskbar_env = taskbar_kind(os.getenv("LHSHELL_TASKBAR"))
+local taskbar_env = valid_taskbar(os.getenv("LHSHELL_TASKBAR"))
 local comp_env = os.getenv("LHSHELL_COMPOSITION"); if comp_env ~= "on" and comp_env ~= "off" and comp_env ~= "follow" then comp_env = nil end
-local function theme_taskbar(e) return taskbar_env or taskbar_kind(S.theme_value(e, "taskbar")) or "avalon" end
+local function theme_taskbar(e) return taskbar_env or valid_taskbar(S.theme_value(e, "taskbar")) or "avalon" end
 local function theme_composition(e)
   if comp_env then return comp_env end
   local c = S.theme_value(e, "composition"); if c ~= "on" and c ~= "off" then c = "follow" end
@@ -1403,7 +1403,7 @@ local function apply_taskbar(kind)
   io.stderr:write("luxshell: taskbar " .. old .. " -> " .. kind .. "\n")
 end
 function lh.set_taskbar(kind)
-  kind = taskbar_kind(kind)
+  kind = valid_taskbar(kind)
   if not kind then return end
   local sel = S.set_theme_value(theme_entry, "taskbar", kind)   -- a theme key: the current layer
   apply_taskbar(kind)

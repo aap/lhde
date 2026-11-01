@@ -243,13 +243,13 @@ bool select_icon_theme(const std::string& name)
 
 const IconTheme& icon_theme()
 {
-    if (!g_loaded) select_icon_theme(theme_setting("icons", "xp"));
+    if (!g_loaded) select_icon_theme(theme_icons("xp"));
     return g_theme;
 }
 
 bool refresh_icon_theme()
 {
-    std::string want = theme_setting("icons", "xp");
+    std::string want = theme_icons("xp");
     if (g_loaded && want == g_requested) return false;
     select_icon_theme(want);
     return true;

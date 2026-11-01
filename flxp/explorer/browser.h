@@ -3,7 +3,7 @@
 // Icons, List, Details; optionally grouped by type), sorting, the filter-as-you-type
 // of the Longhorn search/Filter boxes, Back/Forward history and the views
 // remembered per folder; plus the frame plumbing every Longhorn host needs:
-// which frame style the session asks for (FLXP_FRAME, the theme's Explorer.chrome,
+// which frame style the session asks for (the theme's Explorer.chrome,
 // lhwm), lhwm's glass extension under the header (header.h) and the caption
 // behaviour of the header's empty parts.
 //
@@ -35,7 +35,7 @@ using shell::Item;
 // ---- the frame ---------------------------------------------------------------------
 
 // The session theme's Explorer.chrome (xp | longhorn | auto; Explorer.navbar =
-// none: xp) or FLXP_FRAME / --frame for one run (shell::theme_setting("frame")).
+// none: xp; shell::theme_chrome).
 // auto: longhorn whenever luxwm runs (it publishes _LHWM_COMPOSITED,
 // _LHWM_THEME or _LHWM_FRAME_METRICS), glass or not, else xp. `why` says what
 // decided.

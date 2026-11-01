@@ -40,21 +40,19 @@ static std::u16string W(const std::string& s) { return w32::utf16_of(s.c_str());
 
 bool frame_auto()
 {
-    std::string fr = shell::theme_setting("frame", "auto");
+    std::string fr = shell::theme_chrome();
     return fr != "xp" && fr != "longhorn";
 }
 
 bool want_longhorn(std::string* why)
 {
-    // FLXP_FRAME (--frame) for this run, else the session theme's Explorer.chrome (navbar none: xp)
-    std::string fr = shell::theme_setting("frame");
+    // the session theme's Explorer.chrome (navbar none: xp)
+    std::string fr = shell::theme_chrome();
     if (fr == "xp" || fr == "longhorn") {
         if (why) {
-            const char* e = getenv("FLXP_FRAME");
             const shell::SessionTheme& st = shell::session_theme();
-            *why = e && *e ? "FLXP_FRAME / --frame=" + fr
-                           : "session theme " + st.name + ": Explorer.chrome=" + st.value("Explorer.chrome") +
-                             (st.value("Explorer.navbar") == "none" ? ", Explorer.navbar=none" : "");
+            *why = "session theme " + st.name + ": Explorer.chrome=" + st.value("Explorer.chrome") +
+                   (st.value("Explorer.navbar") == "none" ? ", Explorer.navbar=none" : "");
         }
         return fr == "longhorn";
     }

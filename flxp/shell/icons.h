@@ -1,8 +1,8 @@
 // Icon themes: which files supply the shell's icons and toolbar images.
 // A theme is a small ini file, a recipe: lhde's icons/<name>.theme (data/icons,
 // found in the data directories) or flxp's res/icons/<name>.theme (wine, the
-// fallback); the one selected by the icons setting (the theme's Desktop.icons,
-// icons= in flxp.ini or FLXP_ICONS; default "xp", falling back to "wine" when
+// fallback); the one the theme names (Desktop.icons, shell::theme_icons;
+// default "xp", falling back to "wine" when
 // its files are not there) maps icon keys to .ico files or to resources inside
 // a PE file ("pe:shell32.dll#4"), resolved against [theme] resources =
 // resources/<build> (lhde-import's copy of that build's DLLs), or to a file of

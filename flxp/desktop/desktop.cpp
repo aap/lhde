@@ -852,7 +852,7 @@ void usage(FILE* f)
         "Recycle Bin) in a window of type _NET_WM_WINDOW_TYPE_DESKTOP covering the screen.\n"
         "  --wallpaper FILE          BMP, PNG, JPEG or WebP, until the theme changes (else the theme's Desktop.wallpaper)\n"
         "  --wallpaper-mode MODE     stretch, center, tile, fill or fit\n"
-        "  --theme NAME|PATH, --classic, --icons NAME|PATH   as for flxp\n"
+        "  --theme NAME|PATH, --classic   as for flxp\n"
         "  --quit-after MS           close after MS milliseconds (testing)\n");
 }
 
@@ -894,7 +894,7 @@ int main(int argc, char** argv)
         else if (a == "--wallpaper-mode") setenv("FLXP_WALLPAPER_MODE", value(), 1);
         else if (a == "--theme") setenv("FLXP_THEME", value(), 1), unsetenv("FLXP_THEME_FOLLOWED");
         else if (a == "--classic") setenv("FLXP_THEME", "classic", 1), unsetenv("FLXP_THEME_FOLLOWED");
-        else if (a == "--icons") setenv("FLXP_ICONS", value(), 1);
+
         else if (a == "--quit-after") quit_ms = atoi(value());
         else { fprintf(stderr, "flxp-desktop: unknown option %s\n", a.c_str()); usage(stderr); return 2; }
     }
