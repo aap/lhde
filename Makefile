@@ -5,6 +5,7 @@
 #   make check            the tests that need no Microsoft files (tests/check.sh), luxshell's build
 #                         and Lua, luxwm's frame regression (skips without the user's styles), the free baseline
 #                         (make check-free: only ReactOS imported; skips without its ISO)
+#   make check-bare       make check with nothing imported or configured (empty temporary homes): what CI runs
 #   make install          PREFIX=/usr/local DESTDIR= (also BINDIR, LIBDIR, INCLUDEDIR, DATADIR, PKGLIBDIR, MANDIR,
 #                         PORTALDIR, DBUSSERVICEDIR); make uninstall. Program files only: the shipped data (text) into
 #                         DATADIR = $(PREFIX)/share/lhde, the code (Lua, shell, Python) into PKGLIBDIR = $(PREFIX)/lib/lhde.
@@ -101,6 +102,10 @@ check-lux: all
 # LHDE_REACTOS_ISO or ~/lib/windows_isos; skipped without one), and luxwm's classic frames render from it (tests/check-free.sh)
 check-free: build/bin/lhde-theme build/luxwm/tests/frametest
 	@tests/check-free.sh
+# make check-bare: the whole make check with an empty Windows tree and empty config, data, state and cache homes (fresh temporary
+# directories, HOME too): every test passes or skips with a message, none fails for lack of resources; what a CI job runs
+check-bare: all
+	@tests/check-bare.sh
 
 # share/ (text only: the theme files, navbar layouts, icon recipes, import sources, the frame sets' theme.ini/nav.ini, the packs'
 # shell.lua) into DATADIR; session/ (lhde-session's helpers) and tools/ (lhde-import's Python) into PKGLIBDIR; the commands into
@@ -174,7 +179,7 @@ clean:
 install: install-libs install-liblhde install-flxp install-luxnav install-luxwm install-luxshell install-data
 uninstall: uninstall-luxshell uninstall-luxwm uninstall-luxnav uninstall-data uninstall-liblhde uninstall-libs uninstall-flxp
 
-.PHONY: all libs programs tests clean install uninstall check check-lux check-free install-data uninstall-data \
+.PHONY: all libs programs tests clean install uninstall check check-lux check-free check-bare install-data uninstall-data \
         install-resources-free install-resources-windows install-resources-full
 .PRECIOUS: $(O)/%.o $(P)/%.o
 .DELETE_ON_ERROR:

@@ -49,7 +49,7 @@ for f in "$styles"/*.msstyles "$styles"/*/*.msstyles; do
     build/bin/ut-dump "$f" --list > "$T/ut-dump.log" 2>&1
     result "ut-dump $(basename "$f")" $? "$T/ut-dump.log"
 done
-[ $n = 0 ] && skip ut-dump "no visual styles in $styles"
+[ $n = 0 ] && skip ut-dump "no visual styles in ${styles:-the Windows tree (nothing imported: tools/lhde-import)}"
 
 # the programs under Xvfb
 set -- ${LHDE_TEST_DISPLAYS:-:71 :72 :73}

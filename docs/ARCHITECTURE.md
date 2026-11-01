@@ -25,6 +25,7 @@ Windows files (docs/LAYOUT.md).
 Builds: one top-level Makefile (`make`, `make check`, `make install`; README.md). `make check` runs the wux tests, the headless
 scripts, ut-dump over every imported style, then the lux side: liblhde's resolver tests, luxshell's Lua parse, and luxwm's
 frame regression against a local baseline; last the free baseline (`make check-free`: every theme with only ReactOS imported).
+`make check-bare` runs all of it with nothing imported and nothing configured (CI): every test passes or skips.
 
 ## A running session
 

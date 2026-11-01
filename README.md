@@ -93,6 +93,10 @@ Last the free baseline (`make check-free`, `tests/check-free.sh`): ReactOS's boo
 alone every shipped theme must resolve (`lhde-theme explain`, `explain --files`), classic and the ReactOS themes with
 nothing missing but what ReactOS stands in for, and luxwm's classic frames render against a baseline of their own
 (`build/luxwm/regress/baseline-free.sha256`; ReactOS's Tahoma and Marlett, so they differ from the normal run's).
+Nothing imported at all (`make check-bare`, `tests/check-bare.sh`, what a CI job runs): the whole `make check` with an empty
+Windows tree and empty config, data, state and cache homes and HOME (fresh temporary directories; no `LHDE_DATA`, no ReactOS
+ISO), where every test must pass or skip with a message; a test that fails for lack of resources is a bug. It is not part of
+`make check`, being as long (about 3 minutes, most of it the headless scripts).
 
 ## The three trees, lhde-import and lhde-theme explain
 

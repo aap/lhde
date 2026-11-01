@@ -15,7 +15,6 @@ imported is the free baseline. Left:
 * The ReactOS styles' start panel user pane is a blank white band (no StartPanel UserPane art?); check against ReactOS.
 * Cursors: an X cursor theme in XP's shapes (free ones exist); ReactOS's are user32.dll resources.
 * Sounds, wallpaper: a generated classic wallpaper (the teal), none for sounds.
-* make check-free tests only-ReactOS; an empty Windows tree (nothing imported at all) is not a test configuration yet.
 
 ## 2. Free visual styles
 * Community XP styles: licences vary; the installer can import any .msstyles the user has (lhde-import --style exists).
