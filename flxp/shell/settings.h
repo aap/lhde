@@ -9,32 +9,41 @@
 // preferences, the theme's keys come from the session theme's record
 // (shell::theme_setting, lhtheme.h).
 #pragma once
+#include <memory>
 #include <string>
 #include <vector>
+
+struct lhde_ini;   // liblhde's line-keeping ini document (lhde/settings.h)
 
 namespace shell {
 namespace store {
 
-// An ini file kept line by line: set() rewrites a value in place (indentation
-// and a trailing "; comment" kept), else appends the key to its section, else
-// the section to the file. Sections and keys compare case-insensitively.
+// An ini file kept line by line: liblhde's lhde_ini (the reader and writer of
+// settings.ini for every program). Sections and keys compare case-insensitively;
+// a duplicate key: the last one counts. set() rewrites a value in place
+// (indentation and a trailing comment kept, an earlier duplicate dropped), else
+// appends the key to its section, else the section to the file. Move-only.
 struct Ini {
-    std::vector<std::string> lines;
-    bool load(const std::string& path);           // false if unreadable (lines left empty)
+    Ini();
+    bool load(const std::string& path);           // false if unreadable (the document left empty)
     void parse(const std::string& text);
     std::string text() const;
-    bool save(const std::string& path) const;     // atomic, mkdir -p
+    bool save(const std::string& path) const;     // atomic, through a symlink, mkdir -p
     bool has(const std::string& section, const std::string& key) const;
+    // "" (absent or empty) -> fallback
     std::string get(const std::string& section, const std::string& key, const std::string& fallback = "") const;
     void set(const std::string& section, const std::string& key, const std::string& value);
     void remove(const std::string& section, const std::string& key);   // and the section when no key is left
     std::vector<std::string> keys(const std::string& section) const;
+private:
+    struct Free { void operator()(lhde_ini* d) const; };
+    std::unique_ptr<lhde_ini, Free> doc;
 };
 
 std::string dir();                                // liblhde's lhde_config_dir(): ~/.config/lhde
 std::string path();                               // lhde_settings_path(): dir()/settings.ini ($LHDE_SETTINGS)
 
-// settings.ini's value (re-read when the file changed); "" = unset -> fallback
+// settings.ini's value (lhde_settings_get: re-read when the file changed); "" = unset -> fallback
 std::string get(const std::string& section, const std::string& key, const std::string& fallback = "");
 struct Edit { std::string section, key, value; };   // value "" removes the key
 // through liblhde's store (lhde_settings_set: unknown keys, comments, order kept)

@@ -189,6 +189,13 @@ int main()
     store::set("fonts", "smoothing", "cleartype");
     CHECK_EQ(font_smoothing(), "cleartype");
     CHECK_EQ(store::path(), T + "/config/lhde/settings.ini");
+    // store::Ini is liblhde's ini document: comments and order kept, the last of a duplicate key counts, an emptied value unset
+    store::Ini ini;
+    ini.parse("; top\n[a]\nk = 1   ; why\nk = 2\nempty =\n\n[b]\nx = y ; c\n");
+    CHECK_EQ(ini.get("A", "K") + " " + ini.get("a", "empty", "fb") + " " + (ini.has("a", "empty") ? "has" : "") + " " + ini.get("b", "x"), "2 fb has y");
+    ini.set("a", "k", "3"); ini.set("b", "z", "w"); ini.remove("b", "x"); ini.set("c", "n", "1");
+    CHECK_EQ(ini.text(), "; top\n[a]\nk = 3\nempty =\n\n[b]\nz = w\n\n[c]\nn = 1\n");
+    CHECK_EQ(std::to_string(ini.keys("a").size()), "2");
 
     // fonts, wallpapers, styles by name
     std::vector<std::string> fd = default_font_dirs();

@@ -41,7 +41,8 @@ imports), `XDG_DATA_HOME` (where `lhde-windows` is).
 
 ## settings.ini
 
-An ini file (`[section]`, `key = value`, `;` or `#` comments at the start of a line or after whitespace). Every writer keeps the
+An ini file (`[section]`, `key = value`, `;` or `#` comments at the start of a line or after whitespace; of a key given twice the
+last one counts, for every reader: liblhde's `lhde_ini`, which flxp's `shell::store` wraps, and luxshell's). Every writer keeps the
 comments, the order and the keys it does not know: it reads the whole file, changes its keys and writes it back atomically
 (through a symlink; liblhde `lhde_settings_set`, luxshell `lh.settings_set`, flxp `shell::store`, `lhde-theme setting SEC KEY
 [VALUE]`).

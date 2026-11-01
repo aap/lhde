@@ -26,47 +26,6 @@ namespace store {
 
 namespace {
 
-// where a value ends: a ';' or '#' after whitespace starts a comment
-size_t value_end(const std::string& line, size_t from)
-{
-    for (size_t i = from + 1; i < line.size(); i++)
-        if ((line[i] == ';' || line[i] == '#') && (line[i - 1] == ' ' || line[i - 1] == '\t')) return i;
-    return line.size();
-}
-
-// classify a line: 0 other, 1 section (name), 2 key (key, value, position of '=')
-int classify(const std::string& raw, std::string& a, std::string& b, size_t* eqpos = nullptr)
-{
-    std::string t = trim(raw);
-    if (t.empty() || t[0] == ';' || t[0] == '#') return 0;
-    if (t[0] == '[') {
-        size_t e = t.find(']');
-        a = trim(t.substr(1, e == std::string::npos ? std::string::npos : e - 1));
-        return 1;
-    }
-    size_t eq = raw.find('=');
-    if (eq == std::string::npos) return 0;
-    a = trim(raw.substr(0, eq));
-    b = trim(raw.substr(eq + 1, value_end(raw, eq) - eq - 1));
-    if (eqpos) *eqpos = eq;
-    return 2;
-}
-
-struct Cache { Ini ini; std::string path; time_t mtime = 0; off_t size = -1; long nsec = -1; };
-Cache g_cache;
-
-const Ini& current()
-{
-    std::string p = path();
-    struct stat st;
-    if (stat(p.c_str(), &st) != 0) { g_cache.ini.lines.clear(); g_cache.path = p; g_cache.size = -1; return g_cache.ini; }
-    if (p != g_cache.path || st.st_mtime != g_cache.mtime || st.st_size != g_cache.size || st.st_mtim.tv_nsec != g_cache.nsec) {
-        g_cache.ini.load(p);
-        g_cache.path = p; g_cache.mtime = st.st_mtime; g_cache.size = st.st_size; g_cache.nsec = st.st_mtim.tv_nsec;
-    }
-    return g_cache.ini;
-}
-
 Display* open_display()
 {
     const char* d = getenv("DISPLAY");
@@ -100,122 +59,58 @@ bool send_changed(Display* dpy, const std::string& hint)
 
 } // namespace
 
-// ---- Ini -------------------------------------------------------------------------
+// ---- Ini: liblhde's lhde_ini ---------------------------------------------------------
 
-void Ini::parse(const std::string& text)
-{
-    lines.clear();
-    size_t i = 0;
-    while (i < text.size()) {
-        size_t j = text.find('\n', i);
-        if (j == std::string::npos) j = text.size();
-        lines.push_back(text.substr(i, j - i));
-        i = j + 1;
-    }
-}
+void Ini::Free::operator()(lhde_ini* d) const { lhde_ini_free(d); }
+
+Ini::Ini() : doc(lhde_ini_new()) {}
+
+void Ini::parse(const std::string& text) { doc.reset(lhde_ini_parse(text.c_str())); }
 
 bool Ini::load(const std::string& p)
 {
-    std::string t;
-    lines.clear();
-    if (!read_file(p, t)) return false;
-    parse(t);
-    return true;
+    FILE* f = fopen(p.c_str(), "r");
+    if (f) fclose(f);
+    doc.reset(f ? lhde_ini_load(p.c_str()) : lhde_ini_new());
+    return f && doc;
 }
 
 std::string Ini::text() const
 {
-    std::string out;
-    for (const std::string& l : lines) { out += l; out += '\n'; }
+    char* t = lhde_ini_text(doc.get());
+    std::string out = t ? t : "";
+    free(t);
     return out;
 }
 
-bool Ini::save(const std::string& p) const { return write_file_atomic(p, text()); }
+bool Ini::save(const std::string& p) const { return lhde_ini_save(doc.get(), p.c_str()) == 0; }
 
 bool Ini::has(const std::string& section, const std::string& key) const
 {
-    std::string cur, a, b;
-    for (const std::string& l : lines) {
-        int k = classify(l, a, b);
-        if (k == 1) cur = a;
-        else if (k == 2 && iequal(cur, section) && iequal(a, key)) return true;
-    }
-    return false;
+    char b[8];   // only whether it is there
+    return lhde_ini_get(doc.get(), section.c_str(), key.c_str(), b, sizeof b) != nullptr;
 }
 
 std::string Ini::get(const std::string& section, const std::string& key, const std::string& fallback) const
 {
-    std::string cur, a, b;
-    for (const std::string& l : lines) {
-        int k = classify(l, a, b);
-        if (k == 1) cur = a;
-        else if (k == 2 && iequal(cur, section) && iequal(a, key)) return b.empty() ? fallback : b;
-    }
-    return fallback;
+    char b[4096];
+    const char* v = lhde_ini_get(doc.get(), section.c_str(), key.c_str(), b, sizeof b);
+    return v && *v ? v : fallback;
 }
 
 std::vector<std::string> Ini::keys(const std::string& section) const
 {
     std::vector<std::string> out;
-    std::string cur, a, b;
-    for (const std::string& l : lines) {
-        int k = classify(l, a, b);
-        if (k == 1) cur = a;
-        else if (k == 2 && iequal(cur, section)) out.push_back(a);
-    }
+    lhde_ini_keys(doc.get(), section.c_str(), [](const char* k, const char*, void* ud) { ((std::vector<std::string>*)ud)->push_back(k); }, &out);
     return out;
 }
 
 void Ini::set(const std::string& section, const std::string& key, const std::string& value)
 {
-    std::string cur, a, b;
-    long sec_last = -1;   // the section's last key line (or its header)
-    for (size_t i = 0; i < lines.size(); i++) {
-        size_t eq = 0;
-        int k = classify(lines[i], a, b, &eq);
-        if (k == 1) { cur = a; if (iequal(cur, section)) sec_last = (long)i; continue; }
-        if (k != 2 || !iequal(cur, section)) continue;
-        sec_last = (long)i;
-        if (!iequal(a, key)) continue;
-        std::string& l = lines[i];
-        size_t ve = value_end(l, eq);
-        std::string comment = ve < l.size() ? " " + l.substr(ve) : "";
-        size_t ind = 0;
-        while (ind < l.size() && (l[ind] == ' ' || l[ind] == '\t')) ind++;
-        l = l.substr(0, ind) + key + " = " + value + comment;
-        return;
-    }
-    std::string line = key + " = " + value;
-    if (sec_last >= 0) { lines.insert(lines.begin() + sec_last + 1, line); return; }
-    while (!lines.empty() && trim(lines.back()).empty()) lines.pop_back();
-    if (!lines.empty()) lines.push_back("");
-    lines.push_back("[" + section + "]");
-    lines.push_back(line);
+    lhde_ini_set(doc.get(), section.c_str(), key.c_str(), value.c_str());
 }
 
-void Ini::remove(const std::string& section, const std::string& key)
-{
-    std::string cur, a, b;
-    long header = -1;
-    int left = 0;
-    for (size_t i = 0; i < lines.size(); i++) {
-        int k = classify(lines[i], a, b);
-        if (k == 1) {
-            if (header >= 0) break;
-            cur = a;
-            if (iequal(cur, section)) header = (long)i;
-            continue;
-        }
-        if (k != 2 || header < 0) continue;
-        if (iequal(a, key)) { lines.erase(lines.begin() + (long)i); i--; }
-        else left++;
-    }
-    if (header >= 0 && left == 0) {
-        lines.erase(lines.begin() + header);
-        // the blank line before it goes too
-        if (header > 0 && header <= (long)lines.size() && trim(lines[(size_t)header - 1]).empty()) lines.erase(lines.begin() + header - 1);
-    }
-}
+void Ini::remove(const std::string& section, const std::string& key) { lhde_ini_set(doc.get(), section.c_str(), key.c_str(), nullptr); }
 
 // ---- settings.ini ----------------------------------------------------------------
 
@@ -224,7 +119,9 @@ std::string path() { char b[PATH_MAX]; return lhde_settings_path(b, sizeof b) ? 
 
 std::string get(const std::string& section, const std::string& key, const std::string& fallback)
 {
-    return current().get(section, key, fallback);
+    char b[4096];
+    const char* v = lhde_settings_get(section.c_str(), key.c_str(), b, sizeof b);   // NULL: absent or empty
+    return v ? v : fallback;
 }
 
 bool set(const std::vector<Edit>& edits)
@@ -233,7 +130,6 @@ bool set(const std::vector<Edit>& edits)
     lhde_settings_reload();   // another writer (luxshell) may have changed it since
     for (const Edit& e : edits)
         ok = lhde_settings_set(e.section.c_str(), e.key.c_str(), e.value.empty() ? nullptr : e.value.c_str()) >= 0 && ok;
-    g_cache.size = -1;   // re-read next time
     return ok;
 }
 
