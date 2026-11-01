@@ -5,7 +5,7 @@
 		* center buttons mode for plex and concepts
 	* context menus are wuxtheme's painter now (menupaint.c); 4074's own Avalon ContextMenu looked different
 		(lh4074-091929: white plate, 1 px #919191 frame + 1 px shadow, 18 px MENUHILIGHT bar with lighter top / bottom rows,
-		text 17 px in): if wanted back, an option (say [shell] menus = avalon) drawing that from the painter's layout; the
+		text 17 px in): if wanted back, an option (say [effects] menus = avalon) drawing that from the painter's layout; the
 		scene-node drawing is menu.lua before the commit that moved it onto the painter
 
 * sidebar

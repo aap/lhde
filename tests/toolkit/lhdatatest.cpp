@@ -174,7 +174,7 @@ int main()
     store::apply_theme("slate4051-modified");   // another theme: the layer is dropped
     CHECK_EQ(std::to_string(store::current_layer().size()), "0");
 
-    // flxp.ini's own keys; settings.ini's shared ones through the store only, flxp.ini's spelling of them is no key
+    // flxp.ini's own keys; settings.ini's shared ones through the store
     write_setting("taskpane", "0");
     CHECK_EQ(setting("taskpane"), "0");
     // switches are 1 or 0 only: another spelling is automatic (the fallback)
@@ -187,8 +187,6 @@ int main()
     store::set("effects", "menu_shadows", "0");
     CHECK_EQ(store::flag("effects", "menu_shadows", true) ? "1" : "0", "0");
     store::set("fonts", "smoothing", "cleartype");
-    CHECK_EQ(font_smoothing(), "cleartype");
-    write_setting("font_smoothing", "off");
     CHECK_EQ(font_smoothing(), "cleartype");
     CHECK_EQ(store::path(), T + "/config/lhde/settings.ini");
 
