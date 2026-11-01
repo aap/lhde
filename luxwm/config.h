@@ -73,18 +73,18 @@
 #define FOCUS_ON_CLICK true
 #define WARP_POINTER false
 
-/* luxwm: interactive move/resize applies the pointer position at most every DRAG_INTERVAL ms (README "Performance") */
+/* luxwm: interactive move/resize applies the pointer position at most every DRAG_INTERVAL ms (LUXWM.md "Performance") */
 #define DRAG_INTERVAL 16
 /* luxwm: a caption press becomes a move only once the pointer has left a DRAG_THRESHOLD px square around the press (Windows'
    SM_CXDRAG/SM_CYDRAG = 4): hand jitter in a double-click must not move, and so un-maximise, a maximised window */
 #define DRAG_THRESHOLD 4
-/* luxwm: minimise/restore/maximise animations (README "Animations"). With a compositor picom animates (picom-glass.conf);
+/* luxwm: minimise/restore/maximise animations (LUXWM.md "Animations"). With a compositor picom animates (picom-glass.conf);
    without one luxwm flies the caption to/from the taskbar button like XP's DrawAnimatedRects (IDANI_CAPTION, 250 ms),
    or draws XOR zoom rectangles when ANIMATE_WIREFRAME is true */
 #ifndef ANIMATE
 #define ANIMATE true
 #endif
-/* luxwm: the maximise/restore plate crossfade of DWM themes with plate_max (README "Maximised mode"), in ms. 0 (the default, aap's
+/* luxwm: the maximise/restore plate crossfade of DWM themes with plate_max (LUXWM.md "Maximised mode"), in ms. 0 (the default, aap's
    choice): no fade, the plate switches in the same paint as the geometry change, no timer; e.g. 400 fades in step with
    luxshell's black layers (which are instant too) */
 #ifndef MAX_FADE_MS
@@ -93,7 +93,7 @@
 #ifndef ANIMATE_WIREFRAME
 #define ANIMATE_WIREFRAME false
 #endif
-/* luxwm: which compositor animation set picom-glass.conf applies (the value luxwm writes to _LHWM_ANIMATE; README "Animations",
+/* luxwm: which compositor animation set picom-glass.conf applies (the value luxwm writes to _LHWM_ANIMATE; LUXWM.md "Animations",
    COMPOSITION.md 14): ANIM_4074 = Longhorn 4074's DWM (open and restore from minimised fade in over 350 ms with a slight scale-in
    standing in for the 3D swing; minimise, close, maximise instant), ANIM_5048 = the April 2005 uDWM curve (266 ms, sqrt progress),
    ANIM_INVENTED = luxwm's own 250 ms shrink to the bottom edge on minimise and picom's geometry animation on maximise (not

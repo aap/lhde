@@ -1,4 +1,4 @@
-/* Stand-in for flxp-desktop (focus tests, README "EWMH and the shell"): an unmanaged ARGB _NET_WM_WINDOW_TYPE_DESKTOP window over
+/* Stand-in for flxp-desktop (focus tests, LUXWM.md "EWMH and the shell"): an unmanaged ARGB _NET_WM_WINDOW_TYPE_DESKTOP window over
    the whole screen that takes the input focus itself on every click (XSetInputFocus, as flxp-desktop does) and pops an
    override-redirect "context menu" on a right click, which grabs pointer and keyboard until the next click.
    cc -o desktopwin desktopwin.c -lX11 ; DISPLAY=:3 ./desktopwin */

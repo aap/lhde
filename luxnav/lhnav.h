@@ -1,4 +1,4 @@
-/* lhnav: the Longhorn navigation bar as a component (../NAVBAR.md).
+/* luxnav: the Longhorn navigation bar as a component (docs/NAVBAR.md).
 
    The title / back-forward / breadcrumb / search header of a Longhorn Explorer window, as the concept art drew it, for any
    client: layout, painting, hit-testing and visual state live here so the header looks the same in every program; what a click
@@ -130,7 +130,7 @@ typedef struct lhnav_metrics {
     int address_field;  /* the breadcrumb box's field: 0 never (only while editing), 1 on hover, 2 always */
     int search_field;   /* the search box's field: 0 hover, 1 always */
     double field_alpha; /* the fields' white at rest (translucent on glass) */
-    /* the variant and the hand placement (nav.ini "[preset NAME]" sections; ../NAVBAR.md "Presets") */
+    /* the variant and the hand placement (nav.ini "[preset NAME]" sections; docs/NAVBAR.md "Presets") */
     int variant;        /* LHNAV_SMALL, LHNAV_BIG */
     int header_h;       /* the whole header, frame rows (LHNAV_AUTO: deco_h + orb row + gap) */
     lhnav_place orb;    /* the back/forward pair's top-left (w, h unused: orb_h scales it) */

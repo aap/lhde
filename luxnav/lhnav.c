@@ -1,4 +1,4 @@
-/* lhnav: the Longhorn navigation bar as a component. API and geometry: lhnav.h, ../NAVBAR.md.
+/* luxnav: the Longhorn navigation bar as a component. API and geometry: lhnav.h, docs/NAVBAR.md.
    Dependencies: libuxtheme only (art, and all text through its DrawThemeText: the GDI text of flxp), libpng (art_dir strips);
    the pixels are lhnav_px.c's, not cairo's. */
 #include "lhnav.h"

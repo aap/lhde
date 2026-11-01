@@ -1,4 +1,4 @@
-/* A _NET_WM_WINDOW_TYPE_DOCK window with a bottom _NET_WM_STRUT_PARTIAL, for the work area tests (README "EWMH and the shell").
+/* A _NET_WM_WINDOW_TYPE_DOCK window with a bottom _NET_WM_STRUT_PARTIAL, for the work area tests (LUXWM.md "EWMH and the shell").
    strutdock X Y W H : the window at X,Y WxH, bottom strut = screen height - Y over the x-range X..X+W-1.
    cc -o strutdock strutdock.c -lX11 ; DISPLAY=:3 ./strutdock 0 770 1280 30 & DISPLAY=:3 ./strutdock 1131 600 149 170 & */
 #include <X11/Xlib.h>

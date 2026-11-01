@@ -1,4 +1,4 @@
-/* luxwm: the libuxtheme theme source (frame_ut.c; README "libuxtheme source"). Internal to frame.c / frame_ut.c.
+/* luxwm: the libuxtheme theme source (frame_ut.c; LUXWM.md "libuxtheme source"). Internal to frame.c / frame_ut.c.
    Without HAVE_UXTHEME every function is a stub that reports "no library", so frame.c falls back to the PNG cache. */
 #ifndef LHWM_FRAME_UT_H
 #define LHWM_FRAME_UT_H

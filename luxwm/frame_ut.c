@@ -1,4 +1,4 @@
-/* luxwm: frames from the .msstyles itself through libuxtheme (wuxtheme/ut.h; README "libuxtheme source").
+/* luxwm: frames from the .msstyles itself through libuxtheme (wuxtheme/ut.h; LUXWM.md "libuxtheme source").
    Classic msstyles mode: the Window parts (CAPTION, MAXCAPTION, FRAMELEFT/RIGHT/BOTTOM, the caption buttons with their glyphs) are
    drawn at paint time with ut_draw_background (Wine's DrawThemeBackground: nine-grid, TRUESIZE, transparency, IMAGEGLYPH selection),
    the metrics, caption font and colours come from [SysMetrics]; text, shadows, geometry and hit testing stay in frame.c.

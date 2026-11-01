@@ -8,7 +8,7 @@ enum hit { HIT_NONE, HIT_CAPTION, HIT_CLOSE, HIT_MAX, HIT_MIN,
            HIT_L, HIT_R, HIT_T, HIT_B, HIT_TL, HIT_TR, HIT_BL, HIT_BR };
 enum btn { BTN_CLOSE, BTN_MAX, BTN_MIN, BTN_RESTORE, BTN_LAST };
 enum { THEME_DWM, THEME_MSSTYLES };
-/* classic msstyles parts (uxtheme WP_*), see README "classic msstyles mode" */
+/* classic msstyles parts (uxtheme WP_*), see LUXWM.md "classic msstyles mode" */
 enum mspart_id { MP_CAPTION, MP_MAXCAPTION, MP_SMALLCAPTION, MP_FRAMELEFT, MP_FRAMERIGHT, MP_FRAMEBOTTOM,
               MP_CLOSE, MP_MAX, MP_MIN, MP_RESTORE, MP_HELP, MP_SMALLCLOSE, MP_LAST };
 struct mspart {
@@ -20,7 +20,7 @@ struct mspart {
     int tile;                           /* SIZINGTYPE = TILE (else STRETCH) */
     int sh_type[2], sh_dx[2], sh_dy[2]; /* text shadow per frame state (active, inactive): 0 none, 1 single, 2 continuous */
     double sh_rgb[2][3];
-    int ut_part;                        /* libuxtheme: the Window part id (0 = none; README "libuxtheme source") */
+    int ut_part;                        /* libuxtheme: the Window part id (0 = none; LUXWM.md "libuxtheme source") */
     int ut_live;                        /* drawn by ut_draw_background; 0: from img[][] (the library's bitmaps for IMAGEGLYPH buttons) */
 };
 
@@ -46,7 +46,7 @@ struct theme {
     char fallback[256];                 /* fallback_theme: used instead of a DWM theme while no compositor runs */
     int ext_r0, ext_r1;                 /* extend_rows: caption-band source rows [r0, r1) stretched by an extended top (default 2, m_t - 2) */
     /* Explorer plate (LgFrameExplorer, msstyles STREAM 484): used instead of plate[] for an extended frame whose top reaches into the
-       client (README "Explorer plate"). NULL = none (the normal plate's caption rows are stretched as before) */
+       client (LUXWM.md "Explorer plate"). NULL = none (the normal plate's caption rows are stretched as before) */
     cairo_surface_t *plate_x[2];        /* active, inactive */
     int xi_t, xi_r, xi_b, xi_l;         /* explorer_insets: its 9-grid (desksrv: top 73, the rest like the normal plate) */
     int x_r0, x_r1, x_line;             /* explorer_rows: band rows [r0, r1) stretched to fit the header, inner light/dark lines at
@@ -55,7 +55,7 @@ struct theme {
                                         /* glass_alpha: plate alpha factor (plates only; 1 = as the texture says) */
     int fog_on;                         /* theme key fog = 1: draw captionfog.png over extended headers (COMPOSITION.md 15: 4074 has no fog band; default 0) */
     int glass_square;                   /* glass_alpha_mode = square: plate alpha a -> a * a (5048's double application), then * glass_alpha */
-    /* maximised plates (README "Maximised mode"): LGFRAMEMAX / MAXEXPLORER (msstyles STREAM 493 / 494) drawn instead of the
+    /* maximised plates (LUXWM.md "Maximised mode"): LGFRAMEMAX / MAXEXPLORER (msstyles STREAM 493 / 494) drawn instead of the
        squared normal plate while maximised. NULL = none (the squared normal plate) */
     cairo_surface_t *plate_m[2], *plate_mx[2];   /* active, inactive */
     int mi_t, mi_r, mi_b, mi_l;         /* max_insets (default: plate_insets) */
@@ -63,29 +63,29 @@ struct theme {
     int mx_r0, mx_r1, mx_line;          /* max_explorer_rows: as explorer_rows, for the MAXEXPLORER texture */
     int mbtn_right, mbtn_top;           /* max_button_right / max_button_top: button offsets while maximised (default: button_right/top) */
     int overlay_on;                     /* overlay = 0: no LGFRAMEOVERLAY edge highlight (Jade 4066: none visible; default 1) */
-    /* vision header (README "Aero vision", ../NAVBAR.md): header_mode = crop (x_crop) draws the Explorer / MAXEXPLORER plate's rows
+    /* vision header (LUXWM.md "Aero vision", docs/NAVBAR.md): header_mode = crop (x_crop) draws the Explorer / MAXEXPLORER plate's rows
        1:1 from the top down to the header and puts the texture's inner lines on its last two rows (never scaled vertically; rows past
        the band repeat its last row); deco_h > 0: the frame's own decoration is the top deco_h rows (the caption buttons' hit
        rectangles and _LHWM_CAPTION_RECT are clipped to it; _LHWM_FRAME_METRICS field 18); cap_border >= 0: the rows kept above a
        CLIENT_CAPTION client instead of the side border (theme_caption_border). Defaults 0, 0, -1: the old behaviour */
     int x_crop, deco_h, cap_border;
     unsigned gen;                       /* load count (frame.c: identifies the theme in the crossfade cache) */
-    /* maximised caption text (README "Maximised caption text"): text_max_active / text_max_inactive / glow_max (default: the
+    /* maximised caption text (LUXWM.md "Maximised caption text"): text_max_active / text_max_inactive / glow_max (default: the
        normal colours; glow_max = none: no TextGlow while maximised). DWM themes fade them with the plate crossfade */
     double text_ma[3], text_mi[3], glow_m[3];
     int glow_m_none;
     /* default window icon for clients without one (default_icon = FILE..., or default_icon.png): DWM CompositedWindow DEFAULTICON,
        classic/Luna the XP application icon (shell32 #3) */
     cairo_surface_t *defic[4]; int ndefic;
-    /* libuxtheme source (README "libuxtheme source"): the open style (ut_theme *), NULL = the theme directory's PNG cache. msstyles
+    /* libuxtheme source (LUXWM.md "libuxtheme source"): the open style (ut_theme *), NULL = the theme directory's PNG cache. msstyles
        mode then draws the Window parts live (frame_ut.c), DWM mode took its textures from the CompositedWindow streams */
     void *ut;
     int ut_fmt;                         /* 3 XP, 4 Longhorn-compiled */
     char ut_src[1200];                  /* "PATH (colour, size, vN)" for the logs */
     /* the visual style the theme names (the spec's, else theme.ini's msstyles/color/size; "" = none): a DWM theme's own classic frame
-       is this style in msstyles mode, "|style|color|size" (path.frames_classic empty or "style", README "Classic fallback") */
+       is this style in msstyles mode, "|style|color|size" (path.frames_classic empty or "style", LUXWM.md "Classic fallback") */
     char style[1024], style_color[64], style_size[64];
-    /* Windows Classic (README "Windows Classic frames"; theme spec "|classic|KEY=VALUE;..."): no visual style, the frame drawn
+    /* Windows Classic (LUXWM.md "Windows Classic frames"; theme spec "|classic|KEY=VALUE;..."): no visual style, the frame drawn
        like user32's non-client painting from the classic system colours and metrics. mode is THEME_MSSTYLES (its geometry:
        cnBorders = 3 + ms_border, caption ms_cap_h + 1), t->ut is NULL; the caption buttons are cl_capw - 2 wide */
     int classic;
@@ -106,7 +106,7 @@ struct frame_ext { int l, r, t, b, sheet; unsigned flags; };
 /* spec: a theme directory (theme.ini + PNG cache), optionally followed by a visual style: "DIR|STYLE.msstyles|COLOR|SIZE"; or the
    style alone, "|STYLE.msstyles|COLOR|SIZE" (msstyles mode, no directory: every tuning key at its default). The style is the spec's,
    else theme.ini's msstyles / color / size (relative to the directory). With libuxtheme (frame_uxtheme_available) a style is read
-   live (README "libuxtheme source"); without it, or with frame_theme_source = FRAME_SRC_DIR, the directory's PNGs are used. */
+   live (LUXWM.md "libuxtheme source"); without it, or with frame_theme_source = FRAME_SRC_DIR, the directory's PNGs are used. */
 int  theme_load(struct theme *t, const char *spec);
 enum { FRAME_SRC_AUTO, FRAME_SRC_DIR, FRAME_SRC_LIB };
 extern int frame_theme_source;          /* AUTO: the library when present and a style is named; DIR: the PNG cache; LIB: the library or fail */
@@ -156,7 +156,7 @@ cairo_surface_t *frame_header_image(const struct theme *t, int w, int h, int x0,
                                     int maximized, const struct frame_ext *ext);
 extern unsigned long frame_upload_serial;   /* request serial of the last frame_paint_ex4 upload (first request of it) */
 /* when set, the next frame_paint_ex3 uploads to an offscreen pixmap, calls frame_pre_upload(frame_pre_upload_arg) (the caller's
-   window resize), then sets the shape and copies the pixels into the window; reset by that paint (README "Resize without flicker") */
+   window resize), then sets the shape and copies the pixels into the window; reset by that paint (LUXWM.md "Resize without flicker") */
 extern void (*frame_pre_upload)(void *); extern void *frame_pre_upload_arg;
 extern double frame_prof_ms[4];   /* LHWM_PROF: paint, shape, upload ms (accumulated), paint count */
 #endif

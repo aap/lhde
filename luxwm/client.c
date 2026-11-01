@@ -291,7 +291,7 @@ main(int argc, char **argv)
     }
 
     if (argc < 2) usage(stderr);
-    /* luxwm: re-read the theme in use (README "Live-editing a theme"): the root ClientMessage _LHWM_RELOAD */
+    /* luxwm: re-read the theme in use (LUXWM.md "Live-editing a theme"): the root ClientMessage _LHWM_RELOAD */
     if (strcmp(argv[1], "reload-theme") == 0 || strcmp(argv[1], "reload_theme") == 0) {
         XEvent ev;
         if (!(display = XOpenDisplay(NULL))) { fprintf(stderr, "cannot open display\n"); return EXIT_FAILURE; }

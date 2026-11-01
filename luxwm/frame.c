@@ -314,7 +314,7 @@ void frame_fonts_report(const struct theme *t) {
     pango_font_description_free(fd); g_object_unref(ctx);
 }
 
-/* ---- Windows Classic (README "Windows Classic frames"): no visual style; the non-client area as user32 paints it (Windows 2000/XP
+/* ---- Windows Classic (LUXWM.md "Windows Classic frames"): no visual style; the non-client area as user32 paints it (Windows 2000/XP
    with the classic look: xxxDrawCaptionBar, DrawEdge, DrawFrame, DrawFrameControl(DFC_CAPTION), xxxDrawCaptionTemp) from the
    classic system colours and metrics of the theme record (Colors.*, Metrics.*; docs/THEME-FORMAT.md section 2a).
    Geometry (sizable overlapped window, WS_EX_WINDOWEDGE): DrawEdge(EDGE_RAISED) 2 px, the sizing border Metrics.borderwidth px in
@@ -627,7 +627,7 @@ int theme_load(struct theme *t, const char *spec) {
             else if (!strcmp(key, "text_max_inactive")) { parse_color(val, t->text_mi); set_mi = 1; }
             else if (!strcmp(key, "glow_max")) { t->glow_m_none = !strcmp(val, "none"); if (!t->glow_m_none) parse_color(val, t->glow_m); set_gm = 1; }
             else if (!strcmp(key, "default_icon")) snprintf(defic, sizeof defic, "%s", val);
-            /* the visual style this directory caches (README "libuxtheme source"); relative to the data directories (styles/NAME) */
+            /* the visual style this directory caches (LUXWM.md "libuxtheme source"); relative to the data directories (styles/NAME) */
             else if (!strcmp(key, "msstyles")) lhde_data_resolve(val, ini_style, sizeof ini_style);
             else if (!strcmp(key, "color")) snprintf(ini_color, sizeof ini_color, "%.63s", val);
             else if (!strcmp(key, "size")) snprintf(ini_size, sizeof ini_size, "%.63s", val);
@@ -936,7 +936,7 @@ static void plate_ext(cairo_t *cr, const struct theme *t, cairo_surface_t *img, 
     }
 }
 
-/* header_mode = crop (README "Aero vision"): the first two row segments of an Explorer / MAXEXPLORER grid (the 1:1 top rows and the
+/* header_mode = crop (LUXWM.md "Aero vision"): the first two row segments of an Explorer / MAXEXPLORER grid (the 1:1 top rows and the
    stretched band) become the texture's rows [0, c) copied 1:1 onto the header's rows [0, c), c = min(H - 2, ln), and, only when the
    header is taller than the band (H - 2 > ln), the band's last row repeated over [c, H - 2). The inner lines [ln, ln + 2) stay on the
    header's last two rows H - 2, H - 1 (as in stretch mode), so the client's body starts on row H either way. */
@@ -947,7 +947,7 @@ static void crop_rows(double *sy0, double *sy1, double *dy0, double *dy1, double
     sy0[1] = ln - 1; sy1[1] = ln; dy0[1] = c; dy1[1] = H - 2;   /* empty unless the header outgrows the band */
 }
 
-/* the Explorer plate (LgFrameExplorer, README "Explorer plate") under an extended frame whose top reaches into the client. x as in
+/* the Explorer plate (LgFrameExplorer, LUXWM.md "Explorer plate") under an extended frame whose top reaches into the client. x as in
    plate_ext. y: the outer rows [0, x_r0) 1:1 (aero: the caption-button pill), the band [x_r0, x_r1) stretched into the header down to
    its last two rows, which get the texture's inner light/dark lines [x_line, x_line + 2); below that the body from x_line + 2 and the
    bottom edge exactly as plate_ext. Header H = m_t + t: for t = xi_t - m_t (aero: 73 - 27 = 46) the band is copied 1:1. */
@@ -968,7 +968,7 @@ static void plate_explorer(cairo_t *cr, const struct theme *t, cairo_surface_t *
     }
 }
 
-/* the plate painted (shape: its pattern, raw texture alpha) with glass_alpha / glass_alpha_mode (README "Glass accuracy"). The
+/* the plate painted (shape: its pattern, raw texture alpha) with glass_alpha / glass_alpha_mode (LUXWM.md "Glass accuracy"). The
    factor is applied here and not to the textures because the raw alpha is also the overlay's mask: the overlay, buttons and fog
    keep their own alpha. Square: source masked by its own alpha, (a c, a) -> (a^2 c, a^2), i.e. straight alpha a -> a^2. */
 static void plate_draw(cairo_t *cr, const struct theme *t, cairo_pattern_t *shape, double k) {
@@ -1049,7 +1049,7 @@ void frame_paint_ex3(Display *dpy, Visual *vis, const struct theme *t, Window de
 }
 
 /* the part of the frame's client area that the client leaves free (size hints: a maximised terminal is a whole number of character
-   cells, smaller than the work area by the remainder; README "Size hints"). DWM plates are painted under the client anyway, so the
+   cells, smaller than the work area by the remainder; LUXWM.md "Size hints"). DWM plates are painted under the client anyway, so the
    remainder shows the plate's own client-area texture. msstyles frames leave the client area transparent: there it is filled with
    the colour of the frame border (FRAMELEFT drawn cnBorders x 64 in its frame state, sampled in the middle; button face grey without
    one), as if the border went on around the client */
@@ -1085,7 +1085,7 @@ void frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window de
     double t0 = prof_now();
     cairo_surface_t *img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
     cairo_t *cr = cairo_create(img);
-    /* hole: the part covered by an opaque client. It is neither painted nor uploaded (README "Performance"); it keeps clear of
+    /* hole: the part covered by an opaque client. It is neither painted nor uploaded (LUXWM.md "Performance"); it keeps clear of
        the 24 top/bottom rows that frame_shape_rects reads, and the clip is pixel-aligned, so the painted pixels are the same */
     int hx = 0, hy = 0, hw = 0, hh = 0;
     if (hole) {
@@ -1107,7 +1107,7 @@ void frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window de
     unsigned long sum = (unsigned long)n;
     for (int i = 0; i < n; i++) sum = sum * 31 + rects[i].x * 7 + rects[i].y * 13 + rects[i].width * 17 + rects[i].height;
     int slot = (int)(dec % 256);
-    /* frame_pre_upload (README "Resize without flicker"): the pixels go to an offscreen pixmap first; then the hook resizes the
+    /* frame_pre_upload (LUXWM.md "Resize without flicker"): the pixels go to an offscreen pixmap first; then the hook resizes the
        windows, and the shape and a copy into the window follow at once, so the server gets the new geometry and the new pixels as
        one short batch (a compositor never sees the window at the new size with the old or half-uploaded pixels) */
     void (*pre)(void *) = frame_pre_upload; frame_pre_upload = NULL;
@@ -1340,7 +1340,7 @@ cairo_surface_t *frame_header_image(const struct theme *t, int w, int h, int x0,
     return img;
 }
 
-/* the caption icon's cell (the window menu's click target; README "The window menu"), frame coordinates; the painters place the icon
+/* the caption icon's cell (the window menu's click target; LUXWM.md "The window menu"), frame coordinates; the painters place the icon
    there (ms_paint: SM_CXSMICON at cnBorders + 2; DWM: icon_x, centred in the caption) */
 void frame_icon_rect(const struct theme *t, int w, int maximized, int *x, int *y, int *iw, int *ih) {
     (void)w;

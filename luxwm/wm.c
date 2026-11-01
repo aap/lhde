@@ -114,7 +114,7 @@ static bool theme_comp_off = false;    /* Glass.composition = off, or no glass f
 static bool theme_announce = false;    /* a switch was asked for: republish _LHWM_COMPOSITED and _LHWM_FRAME_METRICS even if unchanged */
 static char lh_theme_cur[256];   /* the _LH_THEME name applied last */
 static Atom lh_theme_atom;
-static Atom lhwm_reload_atom;          /* _LHWM_RELOAD: root ClientMessage or property, re-read the current theme (README "Live-editing a theme") */
+static Atom lhwm_reload_atom;          /* _LHWM_RELOAD: root ClientMessage or property, re-read the current theme (LUXWM.md "Live-editing a theme") */
 static int lh_theme_selfwrite;         /* _LH_THEME writes of luxwm's own (alias -> name) whose PropertyNotify is not a reload request */
 static bool theme_force;               /* theme_select: load and apply even when the spec is the one in use (reload) */
 static void theme_reload(const char *why);
@@ -134,13 +134,13 @@ static char *root_string_alloc(Atom a);
 static const char *theme_opt = NULL;   /* -t THEME */
 /* extended frames (CLIENT-PROTOCOL.md): client properties, and the root properties clients read */
 static Atom lhwm_ext_atom, lhwm_flags_atom, lhwm_comp_atom, lhwm_metrics_atom, lhwm_deco_atom;
-/* _LHWM_ANIMATE value while a maximise/restore geometry animation runs (picom-glass.conf): ANIM_INVENTED only (README "Animations") */
+/* _LHWM_ANIMATE value while a maximise/restore geometry animation runs (picom-glass.conf): ANIM_INVENTED only (LUXWM.md "Animations") */
 #define ANIM_BUSY 2
 /* maximise/restore crossfade of the DWM frame plate, as luxshell's black layers (SHELL-DESIGN.md 2.4.3: 400 ms, 25 ms tick) */
 #define XFADE_MS (MAX_FADE_MS > 0 ? (double)MAX_FADE_MS : 400.0)   /* config.h MAX_FADE_MS; 0 = no fade at all (max_transition) */
 #define XFADE_TICK 25
 static Atom lhwm_anim_atom, net_icon_geom_atom;   /* _LHWM_ANIMATE (picom-glass.conf animation rules), _NET_WM_ICON_GEOMETRY */
-/* the animation style in use (README "Animations"): ../SETTINGS.md [theme] animations, LHWM_ANIMATIONS, else config.h ANIMATE_STYLE;
+/* the animation style in use (LUXWM.md "Animations"): ../SETTINGS.md [theme] animations, LHWM_ANIMATIONS, else config.h ANIMATE_STYLE;
    ANIM_NONE: no _LHWM_ANIMATE property and no animation of luxwm's own. Reloaded on the root ClientMessage _LH_SETTINGS_CHANGED. */
 #define ANIM_NONE 0
 static long anim_style = ANIMATE_STYLE;
@@ -527,8 +527,8 @@ draw_text(struct client *c, bool focused)
     } else if (flags & FRAME_MAX_DISABLED) {   /* glass without an extension: only the disabled maximise */
         memset(&ext, 0, sizeof ext); ext.flags = FRAME_MAX_DISABLED; e = &ext;
     }
-    /* an opaque client hides the plate under it: that part is neither painted nor uploaded (README "Performance") */
-    /* the client's rectangle: the hinted size, which may leave part of the frame's client area free (README "Size hints") */
+    /* an opaque client hides the plate under it: that part is neither painted nor uploaded (LUXWM.md "Performance") */
+    /* the client's rectangle: the hinted size, which may leave part of the frame's client area free (LUXWM.md "Size hints") */
     XRectangle hole, crect, *hp = NULL;
     { int ax, ay, aw, ah; client_area(c, c->geom.width, c->geom.height, &ax, &ay, &aw, &ah);
       crect.x = (short)ax; crect.y = (short)ay; crect.width = (unsigned short)aw; crect.height = (unsigned short)ah; }
@@ -632,7 +632,7 @@ margins_for(struct client *c, const struct theme *th, int max, int *l, int *r, i
     if (c->ext_flags & FRAME_CLIENT_CAPTION) *t = MIN(*t, theme_caption_border(th, max));
 }
 
-/* ---- size hints (README "Size hints"): WM_NORMAL_HINTS, ICCCM 4.1.2.3 ----
+/* ---- size hints (LUXWM.md "Size hints"): WM_NORMAL_HINTS, ICCCM 4.1.2.3 ----
    Read at map time and on every PropertyNotify of WM_NORMAL_HINTS. ICCCM's defaults: without PBaseSize the minimum is the base,
    without PMinSize the base is the minimum. A maximum below the minimum is raised to it. */
 static void
@@ -742,7 +742,7 @@ static void
 client_decorations_create(struct client *c)
 {
     /* no background and NorthWest bit gravity: a resize neither clears the frame nor discards its pixels, so nothing but the old
-       frame can show before the new one is copied in (README "Resize without flicker") */
+       frame can show before the new one is copied in (LUXWM.md "Resize without flicker") */
     XSetWindowAttributes a = { .colormap = argb_cmap, .border_pixel = 0, .background_pixmap = None, .bit_gravity = NorthWestGravity,
         .event_mask = ExposureMask|EnterWindowMask|LeaveWindowMask|PointerMotionMask|ButtonPressMask|ButtonReleaseMask };
     c->decorated = true;
@@ -936,7 +936,7 @@ get_client_from_window(Window w)
     return NULL;
 }
 
-/* _NET_RESTACK_WINDOW (EWMH; README "Restack requests"): data.l[0] source indication, l[1] sibling, l[2] detail (Above 0, Below 1,
+/* _NET_RESTACK_WINDOW (EWMH; LUXWM.md "Restack requests"): data.l[0] source indication, l[1] sibling, l[2] detail (Above 0, Below 1,
    TopIf 2, BottomIf 3, Opposite 4). The client and its frame are restacked together (c_list order, client_raise), the focus is not
    touched: a drag source (flxp's XDND drag, CLIENT-PROTOCOL.md "Requests to the wux side") raises the window under the pointer while
    it holds an active pointer grab, and the window being dragged from keeps the focus. Above with no sibling = raise to the top,
@@ -983,7 +983,7 @@ handle_client_message(XEvent *e)
     XClientMessageEvent *cme = &e->xclient;
     long cmd, *data;
 
-    if (cme->message_type == lhwm_reload_atom && lhwm_reload_atom != None) {   /* luxwmc reload-theme (README "Live-editing a theme") */
+    if (cme->message_type == lhwm_reload_atom && lhwm_reload_atom != None) {   /* luxwmc reload-theme (LUXWM.md "Live-editing a theme") */
         theme_reload("_LHWM_RELOAD message");
     } else if (cme->message_type == lh_settings_atom && lh_settings_atom != None) {   /* ../SETTINGS.md "Change notification" */
         LOGP("_LH_SETTINGS_CHANGED serial %ld", cme->data.l[0]);
@@ -1137,7 +1137,7 @@ handle_button_press(XEvent *e)
     c = get_client_from_window(bev->window);
     if (c == NULL) {
         /* a click on the bare root (no desktop window over it): nothing is active any more, as on a click on the desktop
-           (README "Focus and the desktop") */
+           (LUXWM.md "Focus and the desktop") */
         if (bev->window == root && f_client != NULL) {
             XSetInputFocus(display, nofocus, RevertToPointerRoot, bev->time);
             focus_set_active(false);
@@ -1162,7 +1162,7 @@ handle_button_press(XEvent *e)
     }
     if (bev->window == c->dec && c->decorated) {
         int hit = client_hit(c, bev->x, bev->y);
-        /* the window menu (README "The window menu"): a click on the caption icon opens it under the caption (a double click there
+        /* the window menu (LUXWM.md "The window menu"): a click on the caption icon opens it under the caption (a double click there
            closes the window), a right click on the caption opens it where the button is released (WM_CONTEXTMENU on the up) */
         if (bev->button == 1 && hit == HIT_CAPTION && client_on_icon(c, bev->x, bev->y)) { wmmenu_at_caption(c, 0, 1, true); return; }
         if (bev->button == 3 && hit == HIT_CAPTION) {
@@ -1312,7 +1312,7 @@ focus_set_active(bool on)
 }
 
 /* luxwm only sets the focus itself, but an unmanaged window can take it (flxp-desktop on a click, a dock for its menus):
-   follow the real input focus (README "Focus and the desktop"). Focus on f_client (or inside it): active; on a window luxwm
+   follow the real input focus (LUXWM.md "Focus and the desktop"). Focus on f_client (or inside it): active; on a window luxwm
    does not manage, the root, PointerRoot or None: inactive; on another managed client (one that focused itself) or inside
    an override-redirect window (menus, tooltips): unchanged. */
 static void
@@ -1375,7 +1375,7 @@ handle_property_notify(XEvent *e)
         if (ip != c->icon_pm || im != c->icon_mask) { c->icon_pm = ip; c->icon_mask = im; client_set_icon(c); draw_text(c, client_active(c)); }
         return;
     }
-    if (ev->atom == XA_WM_NORMAL_HINTS) {   /* set, changed or deleted: re-read and refit (README "Size hints") */
+    if (ev->atom == XA_WM_NORMAL_HINTS) {   /* set, changed or deleted: re-read and refit (LUXWM.md "Size hints") */
         client_read_hints(c);
         if (c->fullscreen)
             ;
@@ -1471,7 +1471,7 @@ handle_configure_request(XEvent *e)
         int l, r, t, b; margins(c, &l, &r, &t, &b);
         if (ev->value_mask & (CWX|CWY))
             client_move_relative(c, (ev->value_mask & CWX) ? wc.x - l - c->geom.x : 0, (ev->value_mask & CWY) ? wc.y - t - c->geom.y : 0);
-        if (ev->value_mask & (CWWidth|CWHeight))   /* the frame is fitted around the hinted size (README "Size hints") */
+        if (ev->value_mask & (CWWidth|CWHeight))   /* the frame is fitted around the hinted size (LUXWM.md "Size hints") */
             client_resize_relative(c, (ev->value_mask & CWWidth) ? wc.width + l + r - c->geom.width : 0,
                                    (ev->value_mask & CWHeight) ? wc.height + t + b - c->geom.height : 0);
         client_refresh(c);
@@ -2744,7 +2744,7 @@ refresh_config(void)
 }
 
 /* a geometry change of client and decoration window, sent by frame_paint_ex3 between the offscreen paint and the copy into the
-   window (README "Resize without flicker"); move: x, y are the frame's position, else only the sizes change */
+   window (LUXWM.md "Resize without flicker"); move: x, y are the frame's position, else only the sizes change */
 struct geom_req { struct client *c; bool move; int x, y, cw, ch, dw, dh; };
 struct drag_cl;
 static struct drag_cl *geom_probe;   /* drag_bg_probe's samples to take around the next geom_apply (under its server grab) */
@@ -2780,7 +2780,7 @@ static void
 client_resize_absolute(struct client *c, int w, int h)
 {
     client_unmax_margins(c);
-    /* size hints: the frame is fitted around the client's hinted size (README "Size hints"); width and height are the frame's */
+    /* size hints: the frame is fitted around the client's hinted size (LUXWM.md "Size hints"); width and height are the frame's */
     w = MAX(w, MINIMUM_DIM); h = MAX(h, MINIMUM_DIM);
     frame_fit(c, &w, &h);
     int cx, cy, dw, dh; client_area(c, w, h, &cx, &cy, &dw, &dh);
@@ -3081,7 +3081,7 @@ setup(void)
         argb_cmap = XCreateColormap(display, root, argb_visual, AllocNone);
         /* -t / LHWM_THEME: a theme name, an alias or a theme directory; only used when the session has no _LH_THEME yet */
         const char *td = theme_opt ? theme_opt : getenv("LHWM_THEME"); if (!td || !*td) td = "aero-patch";
-        /* LHWM_THEME_SOURCE=dir: the theme directories' PNG caches even with libuxtheme; lib: the styles only (README "libuxtheme
+        /* LHWM_THEME_SOURCE=dir: the theme directories' PNG caches even with libuxtheme; lib: the styles only (LUXWM.md "libuxtheme
            source"); default: the style through the library when it is built in and the theme names one */
         const char *tsrc = getenv("LHWM_THEME_SOURCE");
         frame_theme_source = tsrc && !strcmp(tsrc, "dir") ? FRAME_SRC_DIR : tsrc && !strcmp(tsrc, "lib") ? FRAME_SRC_LIB : FRAME_SRC_AUTO;
@@ -3638,7 +3638,7 @@ static void ewmh_set_frame_extents(struct client *c)
     LOGN("Setting client frame extents");
 
     /* the frame around the client as it lies: with size hints a maximised client may leave a remainder at the right and bottom,
-       which counts as frame (README "Size hints"); written only on change */
+       which counts as frame (LUXWM.md "Size hints"); written only on change */
     int x, y, w, h;
     client_area(c, c->geom.width, c->geom.height, &x, &y, &w, &h);
     left = x; top = y; right = MAX(c->geom.width - x - w, 0); bottom = MAX(c->geom.height - y - h, 0);
@@ -4290,7 +4290,7 @@ theme_select(void)
         fprintf(stderr, "luxwm: could not load theme from %s\n", eff);
         if (theme_cur[0]) { theme_free(&nt); theme_publish(); composited_publish(); return false; }   /* keep what is there */
     }
-    /* the classic frame (README "Classic fallback"): a path.frames_classic directory; frames_classic empty or "style": the
+    /* the classic frame (LUXWM.md "Classic fallback"): a path.frames_classic directory; frames_classic empty or "style": the
        theme's own visual style in msstyles mode ("|STYLE|COLOR|SIZE", drawn live through libuxtheme), and if that does not load (no
        Window class, no library) the theme.ini fallback_theme; _LHWM_THEME set directly (theme_req_classic ""): fallback_theme, where
        "style" is the own style too */
@@ -4430,8 +4430,8 @@ lh_theme_apply(const char *arg, char *canon, size_t n)
     const char *color = TV("VisualStyle.color"), *size = TV("VisualStyle.size"), *comp = TV("Glass.composition");
     /* the frame: Windows Classic for style = classic (and for a theme with neither a frame set nor a visual style): the classic
        colours and metrics of the record (Colors.*, Metrics.*: the scheme, the current layer) in the theme spec, "|classic|KEY=VALUE;..."
-       (frame.c classic_load; README "Windows Classic frames"); the glass set with the theme's visual style (theme_load reads the style
-       live through libuxtheme and takes only the tuning keys from the directory; README "libuxtheme source"); without glass the
+       (frame.c classic_load; LUXWM.md "Windows Classic frames"); the glass set with the theme's visual style (theme_load reads the style
+       live through libuxtheme and takes only the tuning keys from the directory; LUXWM.md "libuxtheme source"); without glass the
        classic set (or the style alone), always */
     if (!strcmp(TV("style.kind"), "classic") || (!frames[0] && !classic[0] && !style[0])) {
         static const char *metrics[] = { "borderwidth", "captionwidth", "captionheight", "captionfont", "menufont" };
@@ -4545,7 +4545,7 @@ lh_resolved_property(void)
     if (differs && !strcmp(name, lh_theme_cur)) theme_recheck("_LH_THEME_RESOLVED republished");
 }
 
-/* re-read the theme in use from disk, in place (README "Live-editing a theme"): _LH_THEME resolved again,
+/* re-read the theme in use from disk, in place (LUXWM.md "Live-editing a theme"): _LH_THEME resolved again,
    then theme_select with the same spec forced: theme.ini and its PNGs, or the .msstyles through libuxtheme, are loaded anew; every
    frame is re-placed around its client with the new margins (client_retheme keeps the client rectangle) and repainted, the
    header pixmaps are rendered again (new theme generation), _LHWM_FRAME_METRICS and _LHWM_COMPOSITED are republished. */
@@ -4647,7 +4647,7 @@ static void shell_command(const char *cmd) {
     XChangeProperty(display, root, p, u, 8, PropModeReplace, (const unsigned char *)cmd, (int)strlen(cmd)); XFlush(display);
 }
 
-/* ---- show desktop (EWMH _NET_SHOWING_DESKTOP), as Windows' Win+D (README "Show desktop"): on, the visible windows of the current
+/* ---- show desktop (EWMH _NET_SHOWING_DESKTOP), as Windows' Win+D (LUXWM.md "Show desktop"): on, the visible windows of the current
    desktop are really minimised (iconic, task buttons stay) and remembered by window id with the focused one; they stay minimised.
    Off again (Win+D, or a _NET_SHOWING_DESKTOP 0 message) restores exactly that set and the old focus, but only while nothing has
    changed in between: a window restored, activated, newly mapped or closed (showing_changed) ends the mode without restoring
@@ -4711,7 +4711,7 @@ static void showing_desktop(int mode) {
 }
 
 static bool super_down; bool super_other;
-/* ---- Alt+Tab as Windows' (README "Alt+Tab"): while the binding's modifier (Alt, or Super for Mod4+Tab) is held the keyboard is
+/* ---- Alt+Tab as Windows' (LUXWM.md "Alt+Tab"): while the binding's modifier (Alt, or Super for Mod4+Tab) is held the keyboard is
    luxwm's; the candidates are the current desktop's windows in stacking order (top first), then the minimised ones. Each Tab
    (Shift+Tab: backwards, wrapping) previews the next candidate by raising it, client and frame, over the others without focusing
    it; the previous candidate goes back to where it was (the whole set is restacked to the order from before Alt+Tab, then the new
@@ -4926,7 +4926,7 @@ frame_resize_drag(struct client *c, int hit, XButtonPressedEvent *bev)
     drag_run(c, hit, bev->x_root, bev->y_root, bev->button, false);
 }
 
-/* ---- the window menu (README "The window menu"): XP's system menu, drawn by menu.c ---- */
+/* ---- the window menu (LUXWM.md "The window menu"): XP's system menu, drawn by menu.c ---- */
 enum { SC_RESTORE_ID, SC_MOVE_ID, SC_SIZE_ID, SC_MINIMIZE_ID, SC_MAXIMIZE_ID, SC_SEP_ID, SC_CLOSE_ID, SC_DESKMENU_ID, SC_DESK_ID /* + desktop */ };
 
 /* the caption icon is drawn (client or theme default icon, no NO_ICON, a caption of the frame's own) and (x, y) lies on it */
@@ -5075,7 +5075,7 @@ drag_resize_step(struct client *c, struct drag_cl *d, int hit, int ox, int oy, i
     if (nw < 120) nw = 120;
     if (nh < 60) nh = 60;
     /* size hints: the client gets base + n * increment (rounded down), min/max, aspect; the frame follows, and a left/top drag
-       keeps the opposite edge where it was (README "Size hints") */
+       keeps the opposite edge where it was (LUXWM.md "Size hints") */
     { bool was = c->mono; c->mono = false; frame_fit(c, &nw, &nh); c->mono = was; }
     if (left) nx = ox + ow - nw;
     if (top) ny = oy + oh - nh;
@@ -5097,7 +5097,7 @@ drag_resize_step(struct client *c, struct drag_cl *d, int hit, int ox, int oy, i
     client_set_status(c);
 }
 
-/* ---- the client's side of an interactive resize (README "Resize without flicker") ----
+/* ---- the client's side of an interactive resize (LUXWM.md "Resize without flicker") ----
    bit gravity: NorthWest while the drag lasts, so the server keeps the client's pixels on a resize (ForgetGravity would discard
    them and show the background until the client repaints); afterwards the client's own value again and, when that was Forget,
    one synthetic full Expose, so a client that repaints only exposed areas redraws the whole window once at its final size.
@@ -5345,7 +5345,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
     double p_start = now_ms(), p_step = 0, p_max = 0; int p_n = 0, p_ev = 0; memset(frame_prof_ms, 0, sizeof frame_prof_ms);
     /* motion is coalesced (only the latest position counts) and applied at most every DRAG_INTERVAL ms: each step resizes the
        frame and client and repaints the frame, so a 1000 Hz mouse would otherwise queue far more work than the screen can show.
-       A position held back is applied when the interval is over or the drag ends (README "Performance"). */
+       A position held back is applied when the interval is over or the drag ends (LUXWM.md "Performance"). */
     bool pend = false; int pend_x = 0, pend_y = 0; double last_step = 0; Time pend_time = CurrentTime;
     bool moved = keyboard || hit != HIT_CAPTION;   /* mouse moves start past DRAG_THRESHOLD (see handle_button_press) */
     bool kb_end = false;                           /* ended (or cancelled) from the keyboard: the pointer goes back */
@@ -5619,7 +5619,7 @@ composited_publish(void)
                 if (c->has_ext || c->ext_flags) draw_text(c, client_active(c));
 }
 
-/* ---- animations (README "Animations", config.h ANIMATE) ---- */
+/* ---- animations (LUXWM.md "Animations", config.h ANIMATE) ---- */
 
 /* _LHWM_ANIMATE on the client and its frame: anim_style (settings_load; picom-glass.conf picks the rule set by the value: 1 = 4074,
    5 = 5048, 3 = invented, 7 = 4074PLUS; ANIM_NONE deletes it), ANIM_BUSY (2, ANIM_INVENTED only) = the geometry change of a maximise/restore that is starting. Only with ANIMATE. */
@@ -5701,7 +5701,7 @@ anim_expire(void)
     return next < 0 ? -1 : (int)next + 1;
 }
 
-/* the maximise crossfade (README "Maximised mode"): the weight of the maximised plate for frame_paint_ex3, linear over XFADE_MS like luxshell's
+/* the maximise crossfade (LUXWM.md "Maximised mode"): the weight of the maximised plate for frame_paint_ex3, linear over XFADE_MS like luxshell's
    black layers (runtime.lua: lh.animate(..., 400), linear, 25 ms tick); -1 = by state (no fade running; a finished one is cleared) */
 static double
 xfade_weight(struct client *c)

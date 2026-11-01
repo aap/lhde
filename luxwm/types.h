@@ -47,7 +47,7 @@ struct client {
     long cap_rect[4];                   /* _LHWM_CAPTION_RECT last written (CLIENT_CAPTION) */
     bool cap_rect_set;
     bool cap_rect_mono;                 /* c->mono when it was last written: republished on every maximise/restore */
-    /* WM_NORMAL_HINTS (ICCCM 4.1.2.3; README "Size hints"), read at map and on PropertyNotify: base, increments, min, max (0: none),
+    /* WM_NORMAL_HINTS (ICCCM 4.1.2.3; LUXWM.md "Size hints"), read at map and on PropertyNotify: base, increments, min, max (0: none),
        aspect as h/w minimum (min_a) and w/h maximum (max_a), 0: none */
     int base_w, base_h, inc_w, inc_h, min_w, min_h, max_w, max_h;
     float min_a, max_a;
@@ -106,10 +106,10 @@ enum atoms_net {
     NetWorkarea,
     NetWMWindowTypeDesktop,
     NetWMMoveResizeDrag,   /* _NET_WM_MOVERESIZE (NetWMMoveResize is berry's _NET_MOVERESIZE_WINDOW) */
-    NetWMSyncRequest,      /* basic frame sync during interactive resizes (README "Resize without flicker") */
+    NetWMSyncRequest,      /* basic frame sync during interactive resizes (LUXWM.md "Resize without flicker") */
     NetWMSyncRequestCounter,
     NetShowingDesktop,     /* _NET_SHOWING_DESKTOP (root property + client message) */
-    NetRestackWindow,      /* _NET_RESTACK_WINDOW (client message; README "Restack requests") */
+    NetRestackWindow,      /* _NET_RESTACK_WINDOW (client message; LUXWM.md "Restack requests") */
     NetGtkShowWindowMenu,  /* _GTK_SHOW_WINDOW_MENU (client message: the window menu at a point; CLIENT-PROTOCOL.md) */
     NetLast
 };
