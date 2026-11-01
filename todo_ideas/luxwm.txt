@@ -2,3 +2,9 @@
 
 * make check-luxwm (frame regression) stops at the first frame set whose style is not imported ("libuxtheme cannot open
   .../styles/aero-patch.msstyles" with a Windows tree that has no aero-patch): skip such sets with a note, as check-free does
+
+* luxwm does not reap the programs it starts: four `flxp <defunct>` zombies hang under the live luxwm on :1 (started from
+	the shell's Run or a key binding); a SIGCHLD handler with waitpid(-1, WNOHANG)
+* session: the :1 sessions leak their D-Bus daemon: 32 `dbus-daemon --session` with LHDE_MODE=real and DISPLAY=:1 from
+	Oct 31 17:30 to Nov 1 09:58, one per start, so lhde-session's bus_stop is not reached on the way aap ends a session
+	(the X server going away first? the taskbar's Log Off?); find the path and end the bus on it too
