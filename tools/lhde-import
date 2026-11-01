@@ -14,11 +14,12 @@ usage:
   lhde-import --wim FILE [--source ID]        layout), the files of share/sources/<build>.ini packed into a temporary pack and
   lhde-import --dir PATH [--source ID]        imported from there (one code path with --pack); PATH = a Windows directory
   lhde-import --style FILE [NAME]             drop one visual style in (local/themes/NAME.msstyles: the style's name, the one
-                                              theme files ask for, e.g. aero-patch for the Aero reconstruction), with its Shell/
-                                              when it has one beside it, and run the recipes that read it (aero-patch: the frame
-                                              sets aero-patch and aerovision). Without NAME the file's stem is used and printed;
-                                              a stem that is already a source's style (aero.msstyles: Vista's aero) is
-                                              refused: give the NAME
+                                              theme files ask for, e.g. realaero for RealAero, Lucas Brooks' Aero for 4074), with
+                                              its Shell/ when it has one beside it, and run the recipes that read it (realaero:
+                                              the frame sets realaero and aerovision). Without NAME the file's stem is used and
+                                              printed; a stem that is already a source's style (aero.msstyles: Vista's aero) is
+                                              refused: give the NAME. A RealAero file is recognised (its release is printed and
+                                              annotated) and called realaero without a NAME; the old name aero-patch is realaero
   lhde-import --styles DIR [-n]               every visual style below DIR (a downloaded themes folder), also inside .zip, .rar,
                                               .7z and .exe files (theme installers, unpacked with 7z or unrar, never run), as --style
                                               does it, NAME from the file's stem; the same file twice is taken once, two styles
@@ -32,7 +33,8 @@ usage:
   lhde-import --regenerate                    delete generated/ and make it again from the imported files
   lhde-import --annotate                      write the file annotations (extended attributes, docs/ANNOTATIONS.md) a tree lacks:
                                               originals, generated files, directories; keeps attributes that are there; idempotent
-  lhde-import --reindex                       make index/ again (after moving or deleting files by hand)
+  lhde-import --reindex                       make index/ again (after moving or deleting files by hand); renames a style
+                                              dropped in under an old name (local/themes/aero-patch.msstyles -> realaero)
   lhde-import --list                          what the Windows tree holds
   lhde-import --clean [--yes]                 delete the Windows tree (every source, local/, generated/, index/) after asking
                                               on the terminal, or without asking with --yes: before importing a clean set
@@ -93,7 +95,7 @@ def from_workspace(ws, W, force, copyres):
         if os.path.isdir(os.path.join(W, b)) and not os.path.exists(os.path.join(W, b, 'source.ini')) and T.shipped_source_ini(b):
             shutil.copyfile(T.shipped_source_ini(b), os.path.join(W, b, 'source.ini'))
     G = os.path.join(W, 'generated')
-    names = {'aero': 'aero-patch', 'jade': 'jade4074', 'luna-blue': 'luna4051-blue', 'luna-olive': 'luna4051-olive', 'luna-silver': 'luna4051-silver'}
+    names = {'aero': 'realaero', 'jade': 'jade4074', 'luna-blue': 'luna4051-blue', 'luna-olive': 'luna4051-olive', 'luna-silver': 'luna4051-silver'}
     for d in sorted(os.listdir(os.path.join(X, 'lhwm', 'themes'))):
         n = names.get(d, d)
         src = os.path.join(X, 'lhwm', 'themes', d)
@@ -232,8 +234,14 @@ def main():
         T.reindex(data)
         return 0
     if mode == 'style':
-        name = extra[0] if extra else os.path.basename(arg).rsplit('.', 1)[0].lower()
-        if not extra:
+        rel = T.style_release(arg) if os.path.isfile(arg) else None
+        if rel:
+            L.log('--style: %s is %s' % (arg, rel[0]))
+        name = extra[0] if extra else 'realaero' if rel else os.path.basename(arg).rsplit('.', 1)[0].lower()
+        if name in T.STYLE_RENAMED:
+            L.log('--style: %s is called %s now' % (name, T.STYLE_RENAMED[name]))
+            name = T.STYLE_RENAMED[name]
+        if not extra and not rel:
             L.log('--style: no NAME given, the style is called %s (from the file name); lhde-import --style FILE NAME names it' % name)
             have = os.path.join(data, 'index', 'styles', name + '.msstyles')
             mine = os.path.realpath(os.path.join(data, 'local', 'themes', name + '.msstyles'))
@@ -242,6 +250,7 @@ def main():
                       'give the style its own NAME (lhde-import --style %s NAME)' % (name, os.path.relpath(os.path.realpath(have), data), name, arg))
         rep = {'copied': 0, 'kept': 0}
         L.copy_file(arg, os.path.join(data, 'local', 'themes', name + '.msstyles'), o['force'], rep)
+        T.annotate_local_style(os.path.join(data, 'local', 'themes', name + '.msstyles'))   # a RealAero file: which release
         shell = os.path.join(os.path.dirname(arg), 'Shell')
         if os.path.isdir(shell):
             L.copy_tree(shell, os.path.join(data, 'local', 'themes', name, 'Shell'), o['force'], rep)

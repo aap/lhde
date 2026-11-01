@@ -219,7 +219,7 @@ struct lhnav {
     /* art */
     struct art back[4], fwd[4];        /* variants: active, inactive, maximised, maximised inactive (missing ones = active) */
     int fwd_x, split, art_w, art_h;    /* forward image's x relative to back (ANIMATIONBUTTONRECT), source rows used, size */
-    int full_h;                        /* the full art's height (aero-patch 54) */
+    int full_h;                        /* the full art's height (realaero 54) */
     int menu_x[2][2];                  /* the drop-down boxes' columns [back, fwd][first, end) in source pixels (hot art, rows >= split) */
     /* Vista's TravelBand (5048, 5112): a plate (TRAVELBACKGROUNDS: both wells and the history chevron; its states are the
        chevron's) under the glyph strip (TRAVELBUTTONS: back | forward, one image per state; back[0] / fwd[0] hold the halves).
@@ -646,7 +646,7 @@ static void load_art(lhnav *n)
             if (i < 2 && !has_class(t, tb[i])) continue;
             int p = ut_part(t, "Toolbar", "SPLITBUTTONHORZARROW"), w, h;
             uint32_t *px = p > 0 ? ut_get_bitmap(t, tb[i], p, 0, ut_prop(t, "GLYPHIMAGEFILE"), &w, &h) : NULL;
-            if (px) {   /* states stacked: the first square; the second (aero-patch: a down arrow) is the open look */
+            if (px) {   /* states stacked: the first square; the second (realaero: a down arrow) is the open look */
                 n->sep = lhnav__px_img_from(px, w, h, h % w == 0 ? w : h);
                 if (h % w == 0 && h >= 2 * w) n->sep_down = lhnav__px_img_from(px + (size_t)w * w, w, h - w, w);
                 ut_free(px);
@@ -702,7 +702,7 @@ static void load_art(lhnav *n)
         if (t) {
             int hb = has_class(t, "TravelBack::AnimationButton"), hf = has_class(t, "TravelFwd::AnimationButton"), hv = has_class(t, "TravelBand");
             snprintf(msg, sizeof msg, "%s has no travel art: %s%s%s%s (4051-4074, aero patch) / %s (Vista 5048, 5112); drawn orbs "
-                     "(nav.ini art_style = aero-patch takes another style's)", sl,
+                     "(nav.ini art_style = realaero takes another style's)", sl,
                      hb && hf ? "TravelBack/TravelFwd::AnimationButton unusable" : "no ", hb ? "" : "TravelBack::AnimationButton",
                      !hb && !hf ? ", " : "", hf ? "" : "TravelFwd::AnimationButton",
                      hv ? "TravelBand without usable TRAVELBACKGROUNDS + TRAVELBUTTONS" : "no TravelBand");
@@ -1041,7 +1041,7 @@ static void fonts_load(lhnav *n)
 #ifdef HAVE_UXTHEME
     struct ut_theme *t = n->ut;
     if (!t) { note("no visual style: no text is drawn (lhnav's text comes from libuxtheme's theme fonts)"); return; }
-    /* the breadcrumb's: the composited toolbar's FONT (aero-patch: Segoe UI -12), else Segoe UI 12 px (an explicit font) */
+    /* the breadcrumb's: the composited toolbar's FONT (realaero: Segoe UI -12), else Segoe UI 12 px (an explicit font) */
     static const char *const fcs[3] = { "CompositedBreadcrumbBar::Toolbar", "BreadcrumbBarToolbar::Toolbar", "BB::Toolbar" };
     struct tfont base; memset(&base, 0, sizeof base);
     const char *fc = NULL;

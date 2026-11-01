@@ -103,7 +103,7 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    first (in `--tmp`, about 400 MB, deleted after) and profiles it, so both ways give the same pack. `lhde-theme explain --files`
    must be built (`make build/bin/lhde-theme`); it is also what you run to see what one theme reads:
    `lhde-theme explain --files luna` (one real path per line, relative to the Windows tree).
-   **`local/`** (the files dropped in by hand: the Aero reconstruction `aero-patch.msstyles` that `aero4074` and `aerovision`
+   **`local/`** (the files dropped in by hand: RealAero, the Aero reconstruction `realaero.msstyles` that `aero4074` and `aerovision`
    use, other styles from `lhde-import --style`, hand-copied schemes, resources, fonts, wallpapers, icon packs) is a source of
    its own in both profiles: the pack's `local/` mirrors the Windows tree's `local/` (default the tree's own, `$LHDE_WINDOWS`;
    `--local DIR` another, `--no-local` none; with `--from-pack` the tree's only when the pack has no `local/`), its MANIFEST lines
@@ -157,14 +157,14 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    Sizes (the tarball as `tar` + `xz -9e`): **museum** 418 MB raw (377 MB stored once), 57 MB compressed; **essentials** for the
    14 shipped Windows themes 169 MB raw (164 MB stored once), 36 MB compressed, in 5 builds (4051 4074 5048 5112 xp) and the 2k
    icon DLLs. About 20 s from the ISOs, 10 s `--from-pack` (the tarball's xz is most of it).
-   Themes that need a file no medium has (`aero4074`, `aerovision`: `aero-patch.msstyles`) are complete in a pack made where
+   Themes that need a file no medium has (`aero4074`, `aerovision`: `realaero.msstyles`, "Installing RealAero" below) are complete in a pack made where
    that file is in the Windows tree's `local/` (above); otherwise they report it missing in `lhde-theme explain`, and the style
    goes in with `lhde-import --style` (below).
 2. **`lhde-import`** (every user): the pack into the Windows tree (`$LHDE_WINDOWS`, else `~/.local/share/lhde-windows`;
    docs/LAYOUT.md "The three trees"):
    ```
    lhde-import --pack lhde-resources-DATE.tar.xz               # or the directory
-   lhde-import --style ~/aero.msstyles aero-patch              # a style dropped in by hand (the 4074 Aero patch: aero4074, aerovision);
+   lhde-import --style ~/aero.msstyles realaero                # a style dropped in by hand (RealAero: aero4074, aerovision);
                                                                # NAME is the style's name for the themes; without it the file's stem
                                                                # is used and printed, and a stem that is a source's style is refused
    lhde-import --style ~/styles/Royale/Royale.msstyles royale  # an XP style with its Shell/ directory beside the file: both go in
@@ -181,7 +181,7 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    shellstyle.dll per colour scheme, with it when it lies beside the file) and then shows on Display Properties' Appearance tab
    ("Windows and buttons") beside the styles the shipped themes use; choosing it there gives "THEME (Modified)", and Save As
    on the Themes tab makes it a theme of its own. The pack's `local/` goes to the tree's `local/` (indexed as if dropped in by
-   hand, and the recipes of its styles run: aero-patch's frame sets). `index/` holds the names the programs ask
+   hand, and the recipes of its styles run: realaero's frame sets). `index/` holds the names the programs ask
    for, as relative symlinks: `styles/<name>.msstyles` (build-qualified: jade4074, slate4051, aero5112, luna = XP's own, whose
    `styles/luna/` is XP's `themes/Luna/` with `Shell/<Scheme>/shellstyle.dll`; luna4051 / luna4074 = Longhorn's copies),
    `resources/<source>`, `fonts/<source>`, `wallpapers/<source>`, `icons/<pack>`, `frames` and `packs` (-> `generated/`). Then the recipes of
@@ -233,7 +233,7 @@ lhde-import --styles ~/Downloads/xp-themes          # then for real (into $LHDE_
   reported as one that would not open.
 - **What it takes.** The style as `local/themes/NAME.msstyles`; its `Shell/` directory when one lies beside the file (as
   `local/themes/NAME/Shell/`, the colour folders spelled as the style spells its colour schemes, `shellstyle.dll` in lower
-  case); the recipes that read NAME (only `aero-patch` has some). From a `.theme` file beside the style (in its folder or the
+  case); the recipes that read NAME (only `realaero` has some; a RealAero file is called `realaero` whatever its stem). From a `.theme` file beside the style (in its folder or the
   one above) whose `[VisualStyles] Path` names it, the wallpaper it names, when the download has that file: into
   `local/wallpapers/NAME/`, which the Desktop tab lists under the style's name.
 - **What it ignores.** Everything else: what a `.theme` says besides the wallpaper (the colour scheme and size, chosen on the
@@ -310,7 +310,7 @@ in the Windows tree is also a bare theme (an XP style imported with `lhde-import
 
 | Name (aliases, from the file's `[Theme] aliases`) | Frames: glass / classic | Taskbar, pack | Compositor |
 | --- | --- | --- | --- |
-| `aero4074` (`aero-patch`, `aero`) | Aero glass (`aero-patch`, the 4074 Aero patch style) / `jade4074-classic` | Avalon, `4074-aero` | auto: glass with picom, Jade classic frames without |
+| `aero4074` (`realaero`, `aero-patch`, `aero`) | Aero glass (`realaero`, Lucas Brooks' RealAero style) / `jade4074-classic` | Avalon, `4074-aero` | auto: glass with picom, Jade classic frames without |
 | `aerovision` | Aero vision glass (`aerovision`) / `jade4074-classic`; the luxnav "vision" header | Avalon, `4074-aerovision` (glowing taskbar text) | auto |
 | `jade4074` (`jade`, `jade4074-classic`) | - / Jade msstyles frames (`jade4074-classic`) | Avalon, `4074-aero` | off |
 | `slate4074` (`slate4074-classic`) | - / Slate 4074 msstyles frames | Avalon, `4074-slate` (30 px bar, nearest-neighbour scaling) | off |

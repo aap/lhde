@@ -19,7 +19,7 @@ The concept art (lh_concepts/1456384117.or.45878.png) shows a pill about 13 px h
 buttons of about 26/25/37 px; ours keep aero's 27/25/43 because the pill is baked into the plate texture at that width.
 
 usage: python3 -I build_aerovision.py [--drop-row N] AERO_DIR OUT_DIR
-       (AERO_DIR = the aero-patch frame set's sprites, pixel-identical to aero-patch.msstyles' LGCLOSEBTN/LGMAXBTN/... streams)
+       (AERO_DIR = the realaero frame set's sprites, pixel-identical to realaero.msstyles' LGCLOSEBTN/LGMAXBTN/... streams)
 """
 import sys, os
 from PIL import Image

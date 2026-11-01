@@ -15,7 +15,8 @@ Decisions in force (from that history):
   current layer (`settings.ini [current]`, shown as "NAME (Modified)", section 3); Save As writes a theme file; selecting
   another theme drops the layer.
 - Frame set names are kept as the importer and the frame regression know them (`jade4074-classic`, `slate4074-classic`,
-  `luna4051-*`, `aero-patch`, ...).
+  `luna4051-*`, `realaero`, ...); `realaero` (Lucas Brooks' RealAero, docs/USAGE.md "Installing RealAero") was called
+  `aero-patch`, which stays an alias of the `aero4074` theme.
 
 ## 1. Two layers
 **Components**, each chosen independently and referenced by **name**:
@@ -33,7 +34,7 @@ Decisions in force (from that history):
 | resources | `resources/BUILD/` | the build's DLLs (shell32, imageres, explorer, browseui, Avalon) |
 
 Names: `[a-z0-9._-]+` (wallpapers: plus one `/`). Importers name by build (`aero5048`, `aero5112`,
-`aero-patch`, `jade4074`, `slate4051`); a hand-dropped file keeps its stem unless that collides.
+`realaero`, `jade4074`, `slate4051`); a hand-dropped file keeps its stem unless that collides.
 A path (absolute or `~/`) is accepted in the user's own theme files only.
 
 **Theme files** tie them together, like Windows `.theme` files: shipped in
@@ -212,8 +213,8 @@ settings.ini write: `_LH_SETTINGS_CHANGED`, and every client resolves the sessio
 | `slate4051` | slate4051 | - / slate4051 | off | 4051-slate | 4051 | 4051 field |
 | `slate4074` | slate4074 | - / slate4074 | off | 4074-slate | 4074 (4 sizes) | 4074/Bliss (leaves) |
 | `jade4074` | jade4074 | - / jade4074 | off | 4074-aero | 4074 | 4074/Bliss |
-| `aero4074` | aero-patch | aero-patch / jade4074 | auto | 4074-aero | 4074 | Aero Enmeshed |
-| `aerovision` | aero-patch | aerovision / jade4074 | auto | 4074-aerovision (jade for now) | vision (small, big) | chadDesktop demo |
+| `aero4074` | realaero (RealAero by Lucas Brooks, imported by the user) | realaero / jade4074 | auto | 4074-aero | 4074 | Aero Enmeshed |
+| `aerovision` | realaero (RealAero) | aerovision / jade4074 | auto | 4074-aerovision (jade for now) | vision (small, big) | chadDesktop demo |
 | `slatevision` (TODO) | slate4074 | - / slatevision (Aero caption buttons) | off | 4074-slate | vision | cherry blossom |
 | `metalvision` (?) | jade4074 | - / metalvision | off | 4074-aero | vision | ? |
 | `basic5048` / `aero5048` | aero5048 | aero5048 / jade4074 | off / on (`aero5048: base = basic5048`) | - (classic bar) | vision | 5048's own |

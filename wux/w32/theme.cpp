@@ -238,7 +238,7 @@ void session_theme_refresh()
     } else {
         // flxp: classic with another scheme, size or Advanced edit: the system colours and metrics again
         if (classic_look) { apply_classic_look(t); EnumWindows(post_settings_changed, 0); }
-        // the same style (aero4074 and aerovision both load aero-patch): still a theme
+        // the same style (aero4074 and aerovision both load realaero): still a theme
         // change for the windows (chrome, navbar, icons, luxwm's frame)
         EnumWindows(post_theme_changed, 1);
     }

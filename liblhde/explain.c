@@ -12,6 +12,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #include <unistd.h>
 
 int lhde_explain(const char *name);
@@ -101,6 +102,23 @@ static void input_one(const char *k, const char *v, void *ud)
     else snprintf(w, sizeof w, "%s (not imported)", k);
     snprintf(x->buf + l, sizeof x->buf - l, "%s%s", l ? ", " : "", w);
 }
+/* [about]: an input that is no Microsoft file, by release (lhde-import's lhdetree.style_release: "RealAero 0.2 by Lucas Brooks") */
+static void about_one(const char *k, const char *v, void *ud) { more(ud, "%s is %s", k, v); }
+/* a style file that is no Microsoft release: its annotation (docs/ANNOTATIONS.md; lhde-import writes user.lux.author and
+   user.lux.desc for RealAero), "" when it has none or is Microsoft's */
+static const char *style_about(const char *path, char *out, size_t n)
+{
+    char real[PATH_MAX], au[128];
+    out[0] = 0;
+    if (!path || !path[0] || !realpath(path, real)) return out;
+    ssize_t k = getxattr(real, "user.lux.author", au, sizeof au - 1);
+    if (k <= 0) return out;
+    au[k] = 0;
+    if (!strcmp(au, "microsoft")) return out;
+    k = getxattr(real, "user.lux.desc", out, n - 1);
+    out[k > 0 ? k : 0] = 0;
+    return out;
+}
 static void manifest(struct row *r, const char *path, const char *label)
 {
     lhde_ini *m = lhde_ini_load(path);
@@ -111,6 +129,7 @@ static void manifest(struct row *r, const char *path, const char *label)
     struct kv x; x.buf[0] = 0;
     lhde_ini_keys(m, "inputs", input_one, &x);
     more(r, "%s: recipe %s %s (%s) <- %s", label, kind, args, when, x.buf[0] ? x.buf : "?");
+    lhde_ini_keys(m, "about", about_one, r);
     lhde_ini_free(m);
 }
 
@@ -135,7 +154,7 @@ static void frames_detail(struct row *r, const char *name, const char *dir, cons
         }
     if (!strcmp(mode, "dwm")) {
         /* luxwm (frame.c theme_png): a texture comes from the open style's CompositedWindow streams when it has them (4042-4093
-           styles, aero-patch), else from the PNGs (5048's uDWM bitmaps, 5112's DWMWindow composition) */
+           styles, realaero), else from the PNGs (5048's uDWM bitmaps, 5112's DWMWindow composition) */
         if (si->composited)
             more(r, "glass: luxwm reads the CompositedWindow streams live from the visual style (%s); the PNGs below only serve "
                  "LHWM_THEME_SOURCE=dir", si->path[0] ? where(si->path, w, sizeof w) : "the style");
@@ -210,7 +229,8 @@ int lhde_explain(const char *name)
         if (classic) { snprintf(r->status, sizeof r->status, "ok"); more(r, "Windows Classic: no visual style; wuxtheme and luxwm draw user32's look from [Colors]/[Metrics]"); }
         else if (si.kind == LHDE_STYLE_MISSING) snprintf(r->status, sizeof r->status, "missing");
         else { file(r, G("path.style")); more(r, "%s style%s%s, family %s%s", si.kind == LHDE_STYLE_XP ? "XP (v3)" : si.kind == LHDE_STYLE_DWM ? "DWM (v4, DWMWindow)" : "Longhorn (v4)",
-                    si.build[0] ? ", build " : "", si.build, si.family, si.composited ? ", with CompositedWindow (glass parts)" : ""); }
+                    si.build[0] ? ", build " : "", si.build, si.family, si.composited ? ", with CompositedWindow (glass parts)" : "");
+               char ab[512]; if (style_about(G("path.style"), ab, sizeof ab)[0]) more(r, "%s", ab); }
     }
     if (G("path.shellstyle")[0]) more(r, "shellstyle: %s", where(G("path.shellstyle"), w, sizeof w));
     if (classic) {

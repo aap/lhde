@@ -28,7 +28,7 @@ fontconfig, xft, cairo, cairo-xlib, pangocairo, liblhde and the tree's libwuxthe
     luxwm [-d] [-t THEME] [-c AUTOSTART] [-f FONT] [-h] [-v]
 
 - `-t THEME` (or `LHWM_THEME=THEME`): a theme name liblhde resolves (docs/THEME-FORMAT.md: a theme file, a bare style), an alias
-  (`aero`, `jade`) or a path whose last component is one; default `aero-patch` (aero4074). It counts only while the root has no
+  (`aero`, `jade`) or a path whose last component is one; default `aero4074`. It counts only while the root has no
   `_LH_THEME` yet ("Themes and frame sets").
 - `-d` logs what luxwm does (`hints 0x...`, refused restacks, ...); `-c` berry's autostart script, default
   `~/.config/lhde/luxwm-autostart`, run only when it exists; `-f` berry's font.
@@ -118,9 +118,10 @@ unchanged, so clients get one PropertyNotify of each per switch (`composited_pub
 **Frame sets** are `share/frames/NAME/theme.ini` (and `nav.ini` for aerovision): the tuning keys and, as `msstyles`/`color`/`size`, the
 style they belong to. Their PNG caches lie in the Windows tree (`generated/frames/NAME`, written by `lhde-import`: the DWM sets'
 textures from the style's streams, the classic sets through `tools/msstyles2theme.py`), found through liblhde. Two modes, `mode = dwm`
-(glass) and `mode = msstyles` (classic). Shipped: `aero-patch` (the patched 4074 Aero plates), `jade4074` (4074's Jade plates, blended
-as build 4066 shows them; no shipped theme uses it), `aero5048`, `aero5112`, `aerovision` (glass); `slate4074-classic`,
-`jade4074-classic`, `slate4051-classic`, `luna4051-blue|olive|silver` (classic).
+(glass) and `mode = msstyles` (classic). Shipped: `realaero` (the 4074 Aero plates of RealAero, Lucas Brooks' reconstruction:
+USAGE.md "Installing RealAero"; the set was called `aero-patch`), `jade4074` (4074's Jade plates, blended as build 4066 shows them;
+no shipped theme uses it), `aero5048`, `aero5112`, `aerovision` (glass); `slate4074-classic`, `jade4074-classic`,
+`slate4051-classic`, `luna4051-blue|olive|silver` (classic).
 
 **Theme specs** (`wm_theme_load`): a directory; `DIR|STYLE.msstyles|COLOR|SIZE` (the style given explicitly); `|STYLE.msstyles|COLOR|SIZE`
 (no directory: msstyles mode, every tuning key at its default); `|classic|KEY=VALUE;...` (Windows Classic). Without a style in the
@@ -276,7 +277,7 @@ the pixels are wuxtheme's popup menu painter (`ut_menu_layout` / `ut_menu_draw` 
 code that draws every user32 menu of the wux side (flxp's context menus, menu bars, the start menu cascades), so the window menu and an
 Explorer context menu are the same pixels. luxwm keeps the geometry on screen, the shadow and the input. The painter gets the frame
 theme's visual style (`flat = -1`, the style's MENUFONT) or, for Windows Classic, the scheme's colours and `Metrics.menufont`:
-- styles with a `Menu` class (`POPUPITEM` present: the 4074 Slate, Jade and Aero-patch styles, also under the DWM themes; Vista's
+- styles with a `Menu` class (`POPUPITEM` present: the 4074 Slate, Jade and RealAero styles, also under the DWM themes; Vista's
   aero5048/aero5112): `POPUPBORDERS` over the whole menu (else `POPUPBACKGROUND` and a 1 px BTNSHADOW line), `POPUPGUTTER` when the style
   has one, `POPUPITEM` state 2 (hot) / 4 (disabled hot) under the selected item, `SEPARATOR` / `POPUPSEPARATOR` at its true height plus
   its content margins, the text colours of `POPUPITEM` states 1-4, item height = text height + `POPUPITEM` content margins, `CHECK` /
@@ -387,7 +388,7 @@ the button pill is a low-alpha well at x=701..793, y=2..14, ending at the dark l
 100 px of `plate_insets` keep it unstretched: frametest at 500, 1000 and 1280 px wide and 607 high (every row 1:1), plate alone, active
 and inactive, both sources: the right 100 columns equal the texture's columns 701..800 with 0 differing pixels. The original
 (`4074-dwm.png`, Documents window) ends the button sprites 5 px before the frame edge (sprite col 41, the bright end line, 7 px from
-it; the texture's dark line 9 px): aero-patch `button_right = 5`; jade4074 `button_right = 6` (fitted to 4066, "Glass accuracy"). In
+it; the texture's dark line 9 px): realaero `button_right = 5`; jade4074 `button_right = 6` (fitted to 4066, "Glass accuracy"). In
 the original the min/max/close dividers are 27/27/42 px apart (-104/-77/-50/-8 from the frame's right edge on the bright line at w-2)
 while the 4074 sprites are 25/25/40; `button_gap` (default 0) widens each cell: sprite cols 0..3 stay at the cell's left, col 4 is
 repeated over the gap, the rest sits at the right end; `button_rect` (drawing and `wm_frame_hit`) uses the cell. The shipped sets use
@@ -553,7 +554,7 @@ Log: `luxwm: no compositor: DIR|STYLE|... -> |STYLE|COLOR|SIZE (the theme's own 
 `_LHWM_THEME` then publishes the `|STYLE|...` spec, `_LHWM_COMPOSITED` 0. basic5048 / aero5048 and basic5112 / aero5112 use it: both
 styles have the whole Window class (CAPTION, MAXCAPTION, MINCAPTION, SMALLCAPTION, FRAMELEFT/RIGHT/BOTTOM, MIN/MAX/CLOSE/RESTORE/
 HELPBUTTON): 5048 CAPTIONBARHEIGHT 18, no SIZINGBORDERWIDTH (margins 4/4/23/4), 5112 CAPTIONBARHEIGHT 19, SIZINGBORDERWIDTH 4 (margins
-7/7/27/7), both CAPTIONFONT Segoe UI 9 ClearType-Natural (`compare_aero_classic_fallback.png`). aero-patch's style has a Window class
+7/7/27/7), both CAPTIONFONT Segoe UI 9 ClearType-Natural (`compare_aero_classic_fallback.png`). realaero's style has a Window class
 too (CAPTION with SIZINGMARGINS 100/200), but aero4074 keeps `frames_classic = jade4074-classic`.
 
 ## Windows Classic frames (`style = classic`)
@@ -638,12 +639,12 @@ Computer 1 0 none ICON` against the screenshot's rows 33-55 (all 800 columns, th
   lines 78/79, body from 80. No caption-button pill in either. desksrv 4074 loads them as PNG 122/123 with texture margins (0, 27) (0, 0)
   and (0, 71) (0, 0) (left, top) (right, bottom) at `0x6f733560`/`0x6f733578` (4066: `0x6cc43588`/`0x6cc435a0`), so the whole width
   stretches; the second margin set of those calls, (12, 8) (12, 0), presumably the plate's outset around the window, is not modelled.
-  aero-patch: `max_insets = 27 0 0 0`, `max_explorer_insets = 80 0 0 0`, `max_explorer_rows = 0 78 78` (the lines lie 7 rows below
+  realaero: `max_insets = 27 0 0 0`, `max_explorer_insets = 80 0 0 0`, `max_explorer_rows = 0 78 78` (the lines lie 7 rows below
   desksrv's 71, the offset of the Explorer plate's 73 vs 80). **jade4074**: 4074's 493 and 494 are byte-identical to its 483 (the flat
   801x1214 normal plate; COMPOSITION.md 18.1): `max_insets = 27 9 9 9`, `max_explorer_insets = 73 9 9 9`, corners squared. Build 4066's
   own Jade LGFRAMEMAX (787x1198, the flat colours (112,144,112) / (139,160,139) at alpha 213, square corners, split 607/591) is not used.
 - Buttons maximised: `aero_max.png` (1920x1080, work area 0..1769) has the sprites end with close's bright column at x 1766, 3 px further
-  right than on a normal frame; a fit over gap 0..2, right 0..7, top 0..3 is best at gap 2, right 2, top 2: aero-patch `max_button_right
+  right than on a normal frame; a fit over gap 0..2, right 0..7, top 0..3 is best at gap 2, right 2, top 2: realaero `max_button_right
   = 2`. Caption text maximised: "Maximised caption text".
 - **One step.** A maximise or restore is one geometry change: `client_geom_max()` moves and resizes frame and client to their final
   rectangles with the final margins and paints once (restore fits the restore rectangle); with a compositor the server is grabbed from
@@ -696,7 +697,7 @@ default icon (XP's indentation). `LHWM_DEBUG=1` logs `icon 0x...: client | appli
 ### Maximised caption text
 
 `text_max_active`, `text_max_inactive`, `glow_max` (defaults `text_active`, `text_inactive`, `glow`; `glow_max = none` drops the
-TextGlow). `CompositedWindow` has no text colour at all in 4074 Jade, the patched Aero and 4093 (every part is a single
+TextGlow). `CompositedWindow` has no text colour at all in 4074 Jade, RealAero and 4093 (every part is a single
 `PNGSTREAM`/`D3DXSTREAM`; COMPOSITION.md 19). The maximised look lives elsewhere in the style: Explorer's header title and breadcrumbs
 turn white (255,255,255) from navy (0,2,92) with the white glow dropped, inactive maximised text stays grey (98,100,105), and
 `aero_max.png` shows the white title on the dark LGFRAMEMAX header. The DWM sets: `text_max_active = #ffffff`,
@@ -723,7 +724,7 @@ selected before they are first read).
 
 - `wm_frame_paint_ex4`/`wm_frame_paint_cr3` take a `struct frame_ext`; NULL, or all zero with no flags, is the plain path. `plate_ext` paints
   the plate on a 7x7 grid: per axis outer edge | band (stretched by the extension) | inner lines | middle | inner lines | band | outer
-  edge, so the inner dark/light lines move in by the extension. The caption rows that stretch are `extend_rows` (aero-patch `15 25`,
+  edge, so the inner dark/light lines move in by the extension. The caption rows that stretch are `extend_rows` (realaero `15 25`,
   below the pill). With `fog = 1`, `fog_band` paints `captionfog.png` over the caption row and the extended top unless `NO_FOG`.
   Maximised: the same on the `w x (h + bottom margin)` plate, then `square_corners`. An extended top > 0 uses the Explorer plate when
   the set has one (below).
@@ -762,7 +763,7 @@ selected before they are first read).
 ### Explorer plate (`plate_explorer`, `explorer_insets`, `explorer_rows`)
 
 4074's desksrv has a separate part for Explorer windows, `LgFrameExplorer` (STREAM 484, desksrv's built-in 112), 9-gridded with texture
-margins (9, 73) (100, 9) instead of LgFrame's (9, 27) (100, 9) (COMPOSITION.md 15.1). aero-patch's `plate_explorer_active.png` /
+margins (9, 73) (100, 9) instead of LgFrame's (9, 27) (100, 9) (COMPOSITION.md 15.1). realaero's `plate_explorer_active.png` /
 `plate_explorer_inactive.png` are the two 801x607 halves of `aero.msstyles` STREAM 484 (active top). Jade's 484 is byte-identical to its
 483, a flat green plate, used the same way.
 
@@ -788,7 +789,7 @@ The caption fog is off by default (`fog = 1` re-enables it; clients' `NO_FOG` is
 ### Aero vision (`header_mode`, `deco_h`, `caption_border`, `button_files`)
 
 The experimental frame set `aerovision` for the concept-art navigation bar (docs/NAVBAR.md, `luxnav/`, `examples/navdemo.c`;
-CLIENT-PROTOCOL.md "Vision header"; a "vision" theme, i.e. taste, not a build): aero-patch's plates and glass with:
+CLIENT-PROTOCOL.md "Vision header"; a "vision" theme, i.e. taste, not a build): realaero's plates and glass with:
 - `header_mode = crop` (frame.c `crop_rows`, used by `plate_explorer` and the MAXEXPLORER branch of `plate_max`): the Explorer plate's
   rows are copied 1:1 down to the header's last two rows instead of stretching the band [15, 71); the texture's line pair (rows 78/79:
   light, then black) goes on the header's last two rows. aap's idea ("we never scale the tall titlebar plate vertically ... redraw a 1px
@@ -810,7 +811,7 @@ Everything else (normal windows, maximised, the classic frame `jade4074-classic`
 
 ## Glass accuracy
 
-**aero** (aero-patch) is fitted to the patched 4074 screenshot `4074-dwm.png` (its textures are the 5048 art of the aero zip,
+**aero** (realaero) is fitted to the 4074 screenshot `4074-dwm.png` with RealAero (its textures are the 5048 art of aero-4074.zip, RealAero pre-0.1,
 COMPOSITION.md 15; wallpaper `longhorn.jpg` stretched to 1280x1024), **jade** (jade4074) to build 4066's `4066-MIL-Effects.png` (the
 shipped Jade plate through desksrv's fixed-function path, COMPOSITION.md 18).
 
@@ -834,7 +835,7 @@ shipped Jade plate through desksrv's fixed-function path, COMPOSITION.md 18).
   `cairo_paint_with_alpha`, or the plate masked by its own alpha for `square`), not to the loaded textures, whose raw alpha is also the
   overlay's mask; `shape_alpha` is mapped through the same factor so the corner cut stays put. Fit (inactive Documents header rows 2..72
   at x 560..900 over the wallpaper blurred sigma 1.2; rmse in levels): Explorer plate with `NO_FOG`, glass_alpha 1.0: 29.2; 0.5: 6.3;
-  `square`: 5.6 (the texture model alone 5.2; best free factor 0.40: 4.3); the fog adds ~30. aero-patch ships `square` with 1.0.
+  `square`: 5.6 (the texture model alone 5.2; best free factor 0.40: 4.3); the fog adds ~30. realaero ships `square` with 1.0.
 - **Jade** (COMPOSITION.md 18.1/18.6). The 4066 Explorer window (frame 810x600 at 33,51, 77-row header) shows one flat plate colour,
   (104,138,121), over the flat (58,110,165) wallpaper: the theme's (112,144,112) at alpha 213/255 = 0.835 blended straight, no squared
   alpha, no factor, no overlay, no fog, buttons min 27 + max 25 + close 43 abutting, 2 px below the top, ending 6 px before the right

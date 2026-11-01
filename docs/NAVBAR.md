@@ -124,7 +124,7 @@ the crop; `header_mode = crop`, `deco_h = 15`, `caption_border = 2`, `_LHWM_FRAM
 Smaller buttons fitting the 15-row deco: aero's sprites (4 frames of 14 rows, at `button_top = 2`, which would end on row 15) with
 one sprite row dropped, 13 rows ending on row 14 with the pill; the widths stay (27 + 25 + 43 fill the plate's pill with
 `button_right = 5`). `tools/build_aerovision.py [--drop-row N]` (default 11: the light inner line above the dark bottom line) cuts
-them from the aero-patch sprites; `lhde-import` runs it into the Windows tree, and theme.ini names them with `button_files =
+them from the realaero sprites; `lhde-import` runs it into the Windows tree, and theme.ini names them with `button_files =
 vision_close.png vision_max.png vision_min.png vision_restore.png` (not close.png etc., which the style's CompositedWindow streams
 replace). The concept shows a ~13-row pill hanging from the top edge with buttons of ~26/25/37 px; ours keep aero's widths because
 the pill is baked into the plate texture.
@@ -159,9 +159,9 @@ of the file's `preset =` wins over `p` again; `NAVDEMO_DEBUG=1` prints every fin
 ## The big variant
 
 `variant = big` (preset `big`): the full `TravelBack`/`TravelFwd::AnimationButton` art, not cropped: 38x54 + 27x54, forward at x 38
-(`ANIMATIONBUTTONRECT`), unscaled (`orb_h = 0`: the art's height; another value scales it). In the aero-patch art NORMAL/DISABLED
+(`ANIMATIONBUTTONRECT`), unscaled (`orb_h = 0`: the art's height; another value scales it). In the realaero art NORMAL/DISABLED
 have no drop-down (orb and well only), HOT/PRESSED show the drop-down box with the arrow below the orb (rows ~36..53, the split
-`CUSTOMSPLITRECT.top` 44); `SPLITPRESSED` is used where the style has it (aero-patch: PRESSED instead). Button and arrow part are one
+`CUSTOMSPLITRECT.top` 44); `SPLITPRESSED` is used where the style has it (realaero: PRESSED instead). Button and arrow part are one
 image: hot when either is hovered (as 4074's browseui), pressed / split-pressed by the part pressed. Measured (720 px, frame rows):
 
 | | big |
@@ -207,7 +207,7 @@ the chevron after "«" is `LHNAV_SEP + hidden - 1`; the one after the last segme
 or 2 (default) while the breadcrumb is hovered, 0 never. `LHNAV_OVERFLOW` ("«") is a drop-down too. Hot: the style's
 `SPLITBUTTONDROPDOWN` HOT over the chevron cell and the segment's `SPLITBUTTON` HOT (the split pair); pressed or open
 (`lhnav_set_open(n, part)` while the client's list is up): both PRESSED and the chevron turned down (the second image of
-`SPLITBUTTONHORZARROW`'s glyph strip; aero-patch: a down arrow); without the style's art a drawn box and triangle.
+`SPLITBUTTONHORZARROW`'s glyph strip; realaero: a down arrow); without the style's art a drawn box and triangle.
 
 navdemo: a chevron lists segment i's subfolders (sorted case-insensitively, dot folders left out, at most 500) under the
 breadcrumb box, segment i + 1's folder bold and selected (Vista's way); "«" lists the collapsed ancestors, the nearest first. One
@@ -227,7 +227,7 @@ All desktop text goes through wuxtheme's GDI-faithful text, so luxnav's text loo
   `lhnav_text` / `lhnav_text_size`) is rendered once as an 8-bit coverage mask with `ut_draw_text_mask` and composited in luxnav's
   colour; on glass the same mask is box-blurred twice (radius = glow size), times `glow_strength`, in the glow colour, under the
   text; not composited: plain text in `plain_rgb` (the caption colour). Fonts: the breadcrumb's is the style's part font
-  (`CompositedBreadcrumbBar::Toolbar` FONT, aero-patch Segoe UI -12; no such class: Segoe UI 12 px); `crumb_font` / `title_font`
+  (`CompositedBreadcrumbBar::Toolbar` FONT, realaero Segoe UI -12; no such class: Segoe UI 12 px); `crumb_font` / `title_font`
   become explicit `ut_font`s (`ut_draw_text_mask(..., font)`, `ut_text_extent_font`); the placeholder is the crumb font in GDI's
   synthesized italic, bold list items the crumb font at weight 700. Widths: `ut_text_extent` / `ut_text_extent_font` (advance,
   `DT_SINGLELINE | DT_NOPREFIX`), cached per (font, text) in a 512-entry table; the cell from `ut_get_text_metrics` (ascent,
@@ -258,7 +258,7 @@ without travel art is logged once (`luxnav: STYLE has no travel art: ...; drawn 
   tool 0       search field: the field: drawn; its magnifier: drawn
 ```
 
-| Element | 4051/4074 styles, aero patch | Vista TravelBand (5048, 5112) | nothing usable |
+| Element | 4051/4074 styles, RealAero | Vista TravelBand (5048, 5112) | nothing usable |
 | --- | --- | --- | --- |
 | back / forward | `TravelBack`/`TravelFwd::AnimationButton` ABBACKGROUND IMAGEFILE, DISABLED NORMAL HOT PRESSED (+SPLITPRESSED), Inactive/Max/MaxInactive variants; small: the rows above `CUSTOMSPLITRECT.top` (44), scaled to `orb_h`, HOT/PRESSED synthesized inside the orb; forward at `ANIMATIONBUTTONRECT.left` (38) | `TravelBand` TRAVELBUTTONS: one image per state, back = left half, forward = right half, each in its own state; unscaled | drawn orbs (38x44 + 27x44 at 38, arrows pointing back left, forward right), scaled like the art |
 | plate behind them | (part of the button art) | `TravelBand` TRAVELBACKGROUNDS, unscaled, centred on the orb part; its state is the chevron's (DISABLED: neither direction possible) | none |
@@ -283,15 +283,15 @@ the plate, then each half of the glyph strip in its button's state. Placement: w
 half of the content width (5112: back at x 1, forward at 29, the wells' centres); without (5048) the strip sits at x 4, y 2,
 measured on `~/fun/longhorn/screenshots/WindowsVista-6.0.5048-Explorer.png` (plate at 8,25, back glyph at 12,27; template match,
 mean error 2 of 765). The band is never scaled: small, centred in the 30-row orb row; big, centred on the 44-row orb part (header
-69 rows as with the aero patch). 5112's TRAVELBUTTONS(DISABLED) bitmap comes out of wuxtheme with straight alpha (colour above
+69 rows as with RealAero). 5112's TRAVELBUTTONS(DISABLED) bitmap comes out of wuxtheme with straight alpha (colour above
 alpha in 976 pixels); luxnav premultiplies such an image and logs it.
 
 **`art_style`** (nav.ini, global or per preset; the shipped files set `auto`): `auto` = the theme's own style; a NAME =
-`styles/NAME.msstyles` in lhde's data directories (`lhde_data_find`), e.g. `aero-patch` for the patched aero art under 5048/5112;
+`styles/NAME.msstyles` in lhde's data directories (`lhde_data_find`), e.g. `realaero` for RealAero's art under 5048/5112;
 an absolute path = that file. It replaces the travel, favorites and breadcrumb art; text (fonts, colours, glow) stays the theme
 style's. A name that is not found or not a style falls back to `auto` with a log line. For 5048/5112 the small preset with `auto`
-(crisp unscaled Vista orbs) is closer to the builds; the big preset is drawn for the aero patch's 54-row orbs and looks emptier
-with the 27/28-row band, so there `aero-patch` fills it better (taste).
+(crisp unscaled Vista orbs) is closer to the builds; the big preset is drawn for RealAero's 54-row orbs and looks emptier
+with the 27/28-row band, so there `realaero` fills it better (taste).
 
 Which nav.ini a client reads: navdemo, the frame set's (`_LHWM_THEME`), else the theme's `path.navbar` when its `Explorer.navbar`
 is `vision` (aero5048, aero5112 have no nav.ini of their own); flxp, the theme's `path.navbar` when `Explorer.navbar = vision`,

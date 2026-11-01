@@ -63,7 +63,7 @@ static int probe(const char *path, lhde_style_info *o)
     const char *b = strrchr(path, '/'); b = b ? b + 1 : path;
     o->format = 4;
     if (!strncmp(b, "luna.", 5) || !strncmp(b, "royale", 6)) { o->format = 3; snprintf(o->family, sizeof o->family, "luna"); snprintf(o->color, sizeof o->color, "NormalColor"); snprintf(o->size, sizeof o->size, "NormalSize"); return 1; }
-    if (!strncmp(b, "jade", 4) || !strncmp(b, "aero-patch", 10)) { o->composited = o->sidebar = 1; snprintf(o->family, sizeof o->family, !strncmp(b, "jade", 4) ? "jade" : "aero"); }
+    if (!strncmp(b, "jade", 4) || !strncmp(b, "realaero", 8)) { o->composited = o->sidebar = 1; snprintf(o->family, sizeof o->family, !strncmp(b, "jade", 4) ? "jade" : "aero"); }
     else if (!strncmp(b, "slate", 5) || !strncmp(b, "luna4051", 8)) { o->sidebar = 1; snprintf(o->family, sizeof o->family, !strncmp(b, "slate", 5) ? "slate" : "luna"); }
     else if (!strncmp(b, "aero5112", 8)) { o->dwm = 1; snprintf(o->family, sizeof o->family, "aero"); }
     else if (!strncmp(b, "aero5048", 8)) snprintf(o->family, sizeof o->family, "aero");
@@ -106,7 +106,7 @@ int main(void)
     lhde_style_set_probe(probe);
 
     /* the fake import */
-    const char *styles[] = { "jade4074", "slate4074", "slate4051", "aero5048", "aero5112", "luna4051", "aero-patch", "royale", NULL };
+    const char *styles[] = { "jade4074", "slate4074", "slate4051", "aero5048", "aero5112", "luna4051", "realaero", "royale", NULL };
     for (int i = 0; styles[i]; i++) { char r[200]; snprintf(r, sizeof r, "data/styles/%s.msstyles", styles[i]); put(r, "x"); }
     put("data/frames/jade4074/theme.ini", "mode = dwm\n"); put("data/frames/jade4074/plate_active.png", "x");
     put("data/frames/aero5112/theme.ini", "mode = dwm\n"); put("data/frames/aero5112/cache/plate_active.png", "x");   /* manifest-first: cache/ */

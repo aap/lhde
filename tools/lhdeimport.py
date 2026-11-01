@@ -788,8 +788,8 @@ def theme_files(M, themes, tmp):
 
 
 def pack_local(local, pack):
-    """the Windows tree's local/ (styles dropped in by hand with lhde-import --style, such as the Aero reconstruction
-    aero-patch.msstyles; schemes, resources, fonts, wallpapers, icons copied there by hand) into pack/local/, every file with
+    """the Windows tree's local/ (styles dropped in by hand with lhde-import --style, such as RealAero, the Aero
+    reconstruction realaero.msstyles; schemes, resources, fonts, wallpapers, icons copied there by hand) into pack/local/, every file with
     its relative path; returns the MANIFEST lines (source `local`, in-image path local:<path>). Not deduplicated against the
     sources here: finish() links identical files."""
     import lhdetree
@@ -1051,8 +1051,8 @@ def import_pack(pack, W, force=False, recipes=True):
         for s in todo:
             run_recipes(W, s.id, s.ini, force)
         if os.path.isdir(local):   # the styles of the pack's local/ feed recipes too (as lhde-import --style runs them)
-            for name, rs in STYLE_RECIPES.items():
-                if os.path.isfile(os.path.join(local, 'themes', name + '.msstyles')):
+            for name, rs in STYLE_RECIPES.items():   # in W: reindex has given an older pack's style its current name
+                if os.path.isfile(os.path.join(W, 'local', 'themes', name + '.msstyles')):
                     for kind, target, spec in rs:
                         run_recipe(os.path.join(W, 'index'), kind, target, spec, 'style', force)
             lhdetree.reindex(W, True)
@@ -1098,7 +1098,8 @@ def tool(name):
     return shutil.which(name)
 
 
-def write_manifest(dirpath, recipe, args, inputs, outputs):
+def write_manifest(dirpath, recipe, args, inputs, outputs, data=None):
+    import lhdetree
     os.makedirs(dirpath, exist_ok=True)
     with open(os.path.join(dirpath, 'manifest.ini'), 'w') as f:
         f.write('; lhde-import recipe: the files here are derived from the imported files below and may be deleted;\n'
@@ -1106,6 +1107,10 @@ def write_manifest(dirpath, recipe, args, inputs, outputs):
         f.write('[recipe]\nkind = %s\nargs = %s\nwhen = %s\noutputs = %d\n\n[inputs]\n' % (recipe, args, datetime.date.today(), outputs))
         for p, h in inputs:
             f.write('%s = %s\n' % (p, h))
+        about = [(p, lhdetree.style_release(os.path.join(data, p), h)) for p, h in inputs if data and p.endswith('.msstyles')]
+        about = [(p, a[0]) for p, a in about if a]
+        if about:   # an input that is no Microsoft file, by release (lhde-theme explain shows it)
+            f.write('\n[about]\n' + ''.join('%s = %s\n' % x for x in about))
 
 
 def recipe_inputs(data, rels):
@@ -1172,7 +1177,7 @@ def r_frames_composited(data, target, args):
 
 
 def r_frames_vision(data, target, args):
-    """Aero vision: the CompositedWindow sprites of the base style (aero-patch), cut by tools/build_aerovision.py"""
+    """Aero vision: the CompositedWindow sprites of the base style (realaero), cut by tools/build_aerovision.py"""
     style = args[0]
     out = os.path.join(data, 'frames', target)
     with tempfile.TemporaryDirectory() as t:
@@ -1458,7 +1463,7 @@ def run_recipe(data, kind, target, spec, origin, force=False):
     try:
         ins, n = fn(data, tdir, args)
         os.makedirs(mdir, exist_ok=True)
-        write_manifest(mdir, recipe, ' '.join(args), [(r, sha256(os.path.join(data, r))) for r in ins], n)
+        write_manifest(mdir, recipe, ' '.join(args), [(r, sha256(os.path.join(data, r))) for r in ins], n, data)
         if mname != 'manifest.ini':
             os.replace(os.path.join(mdir, 'manifest.ini'), os.path.join(mdir, mname))
         log('  %s/%s: %s %s -> %d file%s' % (kind, target, recipe, ' '.join(args), n, '' if n == 1 else 's'))
@@ -1493,5 +1498,6 @@ def regenerate(W, force=True):
     log('regenerated %s from %d sources' % (os.path.join(W, 'generated'), n))
 
 
-# the recipes a style dropped in by hand feeds (lhde-import --style NAME; regenerate): kind, target, spec
-STYLE_RECIPES = {'aero-patch': [('frames', 'aero-patch', 'composited aero-patch'), ('frames', 'aerovision', 'vision aero-patch')]}
+# the recipes a style dropped in by hand feeds (lhde-import --style NAME; regenerate): kind, target, spec. realaero is Lucas
+# Brooks' RealAero (lhdetree.REALAERO: its releases; once called aero-patch, lhdetree.STYLE_RENAMED)
+STYLE_RECIPES = {'realaero': [('frames', 'realaero', 'composited realaero'), ('frames', 'aerovision', 'vision realaero')]}

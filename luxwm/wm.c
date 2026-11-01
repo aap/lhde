@@ -3081,7 +3081,7 @@ setup(void)
         else { argb_visual = DefaultVisual(display, screen); argb_depth = DefaultDepth(display, screen); LOGN("no ARGB visual, frames will be opaque"); }
         argb_cmap = XCreateColormap(display, root, argb_visual, AllocNone);
         /* -t / LHWM_THEME: a theme name, an alias or a theme directory; only used when the session has no _LH_THEME yet */
-        const char *td = theme_opt ? theme_opt : getenv("LHWM_THEME"); if (!td || !*td) td = "aero-patch";
+        const char *td = theme_opt ? theme_opt : getenv("LHWM_THEME"); if (!td || !*td) td = "aero4074";
         /* LHWM_THEME_SOURCE=dir: the theme directories' PNG caches even with libuxtheme; lib: the styles only (LUXWM.md "libuxtheme
            source"); default: the style through the library when it is built in and the theme names one */
         const char *tsrc = getenv("LHWM_THEME_SOURCE");
@@ -4412,7 +4412,7 @@ record_body(const char *rec)
     return out;
 }
 
-/* a theme name (a theme file, a bare style, an alias such as aero-patch or jade4074-classic; also a path whose last component is
+/* a theme name (a theme file, a bare style, an alias such as aero (aero4074) or jade4074-classic; also a path whose last component is
    one) through liblhde: sets theme_req, theme_req_classic, theme_comp_off, the fonts and theme_anim; canon gets the theme's
    name. Nothing changes when it is unknown. publish: write _LH_THEME_RESOLVED when it does not describe this record yet. */
 static bool

@@ -21,7 +21,7 @@ usage: lhde-pack [--profile essentials|museum] [--themes A,B,C] [--isos DIR]... 
                   says tree:<path>); then profiled like --from-pack. The way to pack the tree a desktop runs on
   --local DIR     the files dropped in by hand that the pack carries as local/ (default: the Windows tree's local/ when there
                   is one; with --from-pack only when the pack has no local/ of its own): styles imported with lhde-import
-                  --style (the Aero reconstruction aero-patch.msstyles that aero4074 and aerovision use), schemes,
+                  --style (RealAero, the Aero reconstruction realaero.msstyles that aero4074 and aerovision use), schemes,
                   resources, fonts, wallpapers, icons. museum takes all of it, essentials what the themes name
   --no-local      no local/ in the pack
   --isos DIR      where the ISOs are (several allowed; default $LHDE_ISOS, a :-list, else .); each source

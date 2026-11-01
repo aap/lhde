@@ -8,8 +8,8 @@
    - plain C, no window system, no cairo, no pango: liblhnav depends on libuxtheme (and libpng); pixels are 32-bit premultiplied
      ARGB in native byte order (cairo's CAIRO_FORMAT_ARGB32, a 32-bit DIB section's), rows `stride` bytes apart; lhnav_paint
      composites OVER what is in the buffer (glass: transparent; opaque: the header pixmap);
-   - theme art comes from the visual style through libuxtheme (TravelBack/TravelFwd::AnimationButton of 4051-4074 and the aero
-     patch, or Vista's TravelBand of 5048/5112; the breadcrumb toolbar's SPLITBUTTON and SPLITBUTTONHORZARROW glyph,
+   - theme art comes from the visual style through libuxtheme (TravelBack/TravelFwd::AnimationButton of 4051-4074 and
+     RealAero, or Vista's TravelBand of 5048/5112; the breadcrumb toolbar's SPLITBUTTON and SPLITBUTTONHORZARROW glyph,
      CompositedBreadcrumbBar::Toolbar's font and glow) with drawn fallbacks for styles that lack them (nav.ini `art_style`
      takes the art from another style; lhnav_art_sources says where each piece came from); all text is libuxtheme's DrawThemeText (GDI text on FreeType, as flxp draws it) in theme fonts
      (lhnav_add_font_dir for the theme's font directories); with no style there is no text;
@@ -87,7 +87,7 @@ enum {
 enum {
     LHNAV_SMALL = 0,    /* the orb only: the travel art's rows above CUSTOMSPLITRECT.top, scaled to orb_h (NAVBAR.md, 47 rows) */
     LHNAV_BIG = 1       /* the full travel art with the drop-down arrow part (hot/pressed show the box), scaled to orb_h
-                           (0 = the art's own height, aero-patch 54: unscaled); boxes centred against the orb part */
+                           (0 = the art's own height, realaero 54: unscaled); boxes centred against the orb part */
 };
 
 /* "automatic" for the hand-placement keys (nav.ini: an empty value or `auto`) */
@@ -151,7 +151,7 @@ typedef struct lhnav_metrics {
                            pressed, stacked vertically) overriding the style's travel art; "" = none */
     char art_style[256];/* nav.ini `art_style`: where the travel, favorites and breadcrumb art comes from. "" or "auto" = the
                            style given to lhnav_new / lhnav_set_style (the theme's own); a NAME = styles/NAME.msstyles in lhde's
-                           data directories (lhde_data_find; e.g. aero-patch), an absolute path = that file. Text (fonts, the
+                           data directories (lhde_data_find; e.g. realaero), an absolute path = that file. Text (fonts, the
                            breadcrumb's colours and glow) stays the theme's style's. A style that cannot be opened: auto, logged */
 } lhnav_metrics;
 

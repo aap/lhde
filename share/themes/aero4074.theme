@@ -1,17 +1,18 @@
-; The longhorn.ms "Aero" patch style for 4074 (not a Microsoft file; styles/aero-patch.msstyles) with 4074's glass, as the
-; x11 lab tuned it (alias aero-patch)
+; RealAero, Lucas Brooks' reconstruction of the Aero theme for 4074 (styles/realaero.msstyles: built from Microsoft resources,
+; imported by the user, docs/USAGE.md "Installing RealAero"), with 4074's glass, as the x11 lab tuned it. Aliases: realaero, and
+; aero-patch, the name lhde gave it before
 [Theme]
 name     = Aero (4074)
 build    = 4074
-aliases  = aero-patch aero
+aliases  = realaero aero-patch aero
 
 [VisualStyle]
-style    = aero-patch
+style    = realaero
 color    = Default
 size     = Normal
 
 [Glass]
-frames         = aero-patch
+frames         = realaero
 frames_classic = jade4074-classic
 composition    = auto
 

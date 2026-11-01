@@ -1,11 +1,11 @@
-; Aero vision (docs/NAVBAR.md): the aero patch style with the vision header drawn by luxnav (15 px top deco, the Explorer plate
+; Aero vision (docs/NAVBAR.md): RealAero (as aero4074) with the vision header drawn by luxnav (15 px top deco, the Explorer plate
 ; cropped at the client's header, 13-row caption buttons); the aero bars with glowing taskbar text (packs/4074-aerovision)
 [Theme]
 name     = Aero vision
 build    = 4074
 
 [VisualStyle]
-style    = aero-patch
+style    = realaero
 color    = Default
 size     = Normal
 

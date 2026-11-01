@@ -73,8 +73,8 @@ stays (it is the session's). A client treats a missing `_LHWM_COMPOSITED` as 0 (
 | 17 | reserved | 0 |
 | 18 | `deco_h` | DWM themes with the key `deco_h`: the rows at the frame's top that are the frame's own decoration (aerovision: 15, the caption buttons); else `caption_h` |
 
-Examples: aero4074 (aero-patch frames) `27 9 9 9 ... 27 0 0 0 9 0` (fields 0..3, 8..13), slate4074 `24 4 4 4 ... 20 0 0 0 4 0`,
-luna `30 4 4 4 ... 26 0 0 0 4 0`; fields 14..17 of aero-patch / jade4074: `0xffffff 0x626469 0xffffffff 0` (the Explorer header
+Examples: aero4074 (realaero frames) `27 9 9 9 ... 27 0 0 0 9 0` (fields 0..3, 8..13), slate4074 `24 4 4 4 ... 20 0 0 0 4 0`,
+luna `30 4 4 4 ... 26 0 0 0 4 0`; fields 14..17 of realaero / jade4074: `0xffffff 0x626469 0xffffffff 0` (the Explorer header
 flips its text when zoomed).
 
 ## Extended frames: `_LHWM_EXTEND_FRAME`
@@ -88,7 +88,7 @@ behaviour inside the client is the client's ("Caption behaviour in the client").
 
 Painting while composited (`frame.c` `plate_ext`, `fog_band`):
 
-- Top, frame sets with a `plate_explorer` (aero-patch, aerovision, jade4074: Longhorn's `LgFrameExplorer`, msstyles STREAM 484,
+- Top, frame sets with a `plate_explorer` (realaero, aerovision, jade4074: Longhorn's `LgFrameExplorer`, msstyles STREAM 484,
   a 73-row caption band): that plate instead of the normal one. `explorer_rows = r0 r1 line` (15 71 78): rows 0..14 stay 1:1, the
   band [r0, r1) is stretched to the header's height minus 2, the texture's inner light/dark lines (rows 78/79) go on the header's
   last two rows; a 46 px extension (27 + 46 = 73) copies the band 1:1. With `header_mode = crop` the band is never stretched
@@ -187,7 +187,7 @@ Bit 3 of `_LHWM_FRAME_FLAGS`. Longhorn's Explorer puts its header (folder icon, 
 leaving only the caption buttons to the frame. With the bit set:
 
 - **Placement**: the client's top edge is at the frame's border row `border_t` (field 12; maximised field 13 = 0), so
-  `_NET_FRAME_EXTENTS` top is `border_t`: the client window grows upward by `caption_h - border_t` (aero-patch/jade4074 18,
+  `_NET_FRAME_EXTENTS` top is `border_t`: the client window grows upward by `caption_h - border_t` (realaero/jade4074 18,
   slate4074 20, luna 26; maximised `max_caption_h - max_border_t`: 27, 20, 26). luxwm resizes it. A window mapped with the flag gets
   the frame a normal window would have, its client taller; setting or clearing the flag later keeps the frame and resizes the
   client; after a WM restart the frame is put around the client as it is. `_LHWM_EXTEND_FRAME` top still counts from the client's
@@ -200,7 +200,7 @@ leaving only the caption buttons to the frame. With the bit set:
   resize itself on a theme switch to compensate.
 - **`_LHWM_CAPTION_RECT`** (CARDINAL[4] `x y w h`, client coordinates, on the client): the union of the caption buttons' hit
   rectangles (msstyles: the button rects exactly; DWM: with `wm_frame_hit_ex`'s 2/3 px slop, clipped to `deco_h` where the theme has
-  one), clipped to the client (aero-patch at 640 px: `541, 0, 99, 10`, the buttons reach above the client into the border).
+  one), clipped to the client (realaero at 640 px: `541, 0, 99, 10`, the buttons reach above the client into the border).
   Written when it changes and on every maximise and restore (also when a drag un-maximises), even unchanged, always after
   `_NET_WM_STATE`, with no intermediate rectangle during a maximise; deleted when the flag goes. A client relayouts its header on
   that PropertyNotify (reading `_NET_WM_STATE` then) and sets its new `_LHWM_EXTEND_FRAME`.

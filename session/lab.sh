@@ -29,7 +29,7 @@ startpicom() {
 themename() { lhde_themename "$1"; }
 # what luxwm gets as LHWM_THEME: the theme's name, or a frame set that is no theme. luxwm only uses it while the
 # display has no _LH_THEME yet (the session's setting wins; `theme` / LAB_THEME on restart-wm change that)
-wmtheme() { n=$(themename "${LAB_THEME:-aero-patch}"); if [ -n "$n" ]; then echo "$n"; else lhde_resolve "frames/$LAB_THEME"; fi; }
+wmtheme() { n=$(themename "${LAB_THEME:-aero4074}"); if [ -n "$n" ]; then echo "$n"; else lhde_resolve "frames/$LAB_THEME"; fi; }
 killlab() { for pid in $(pgrep -x "$1"); do tr '\0' '\n' < /proc/$pid/environ 2>/dev/null | grep -qx "DISPLAY=$LAB" && kill "$pid"; done; }
 startwm() {
   if [ "${LAB_WM:-luxwm}" = fvwm ]; then (DISPLAY=$LAB fvwm2 -f "$LHDE_SESSION_DIR/lab.fvwm2rc" >"$LOG/fvwm.log" 2>&1 &)

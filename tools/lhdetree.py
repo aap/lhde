@@ -107,8 +107,79 @@ def _link(target, link):
     return True
 
 
+# styles dropped in by hand that lhde used to call by another name: old -> new. reindex renames local/themes/OLD.msstyles
+# (and OLD/ with its Shell/) to NEW when NEW is not there, so a tree imported before the rename keeps working; the frame
+# sets made from the old name are made again under the new one by lhde-import --regenerate (docs/USAGE.md "Installing RealAero")
+STYLE_RENAMED = {'aero-patch': 'realaero'}
+
+
+def migrate_local_styles(W):
+    lt = os.path.join(W, 'local', 'themes')
+    for old, new in STYLE_RENAMED.items():
+        for a, b in ((old + '.msstyles', new + '.msstyles'), (old, new)):
+            p, q = os.path.join(lt, a), os.path.join(lt, b)
+            if not os.path.lexists(p) or (a == old and not os.path.isdir(p)):
+                continue
+            if os.path.lexists(q):
+                log('local/themes/%s: the style is called %s now, and local/themes/%s is there too: %s is not used (delete it)'
+                    % (a, new, b, a))
+                continue
+            os.rename(p, q)
+            log('local/themes/%s renamed to %s (the style is called %s now; lhde-import --regenerate makes its frame sets '
+                'under the new name)' % (a, b, new))
+
+
+# ---------------------------------------------------------------- styles that are no Microsoft release
+# RealAero by Lucas Brooks (https://betawiki.net/wiki/User:Lucas_Brooks/RealAero): a reconstruction of Microsoft's private
+# Aero theme for Longhorn 4074, built from Microsoft resources (never in the repository or the free pack; the user imports it
+# as `realaero`). Each known aero.msstyles by sha256: (release, where it was published). They differ only in CompositedWindow
+# PNG streams (docs/USAGE.md "Installing RealAero").
+REALAERO_URL = 'https://betawiki.net/wiki/User:Lucas_Brooks/RealAero'
+REALAERO = {
+    'fa153e6b15ad7682bd06c15982864b5bf710138f3aa54a476e93835911325c3e': ('pre-0.1', 'longhorn.ms aero-4074.zip, 2021-10-08'),
+    'a8e100222f45dbbac7569bda814901f1949eaa559873cf0c32538f40ba1aac78': ('0.2', 'pre-release of 2021-11-10, RealAero_V0.20.rar'),
+    'cd6f61a1aae1d83871f36a348882516a3e3c2e9d05caf00d74d07eb3595675c3': ('0.3', 'test build, RealAero0.3Test.rar'),
+}
+# what an unknown release still carries: the private Aero's DemoCheck path (DEMOCHECK of [documentation], also in Microsoft's
+# own 5048 aero.msstyles) together with the 4074 CompositedWindow class (which 5048's has not)
+DEMOCHECK = '\\\\cloak2\\drop\\bin\\enlist.txt'.encode('utf-16-le')
+
+
+def _sha256(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for b in iter(lambda: f.read(1 << 20), b''):
+            h.update(b)
+    return h.hexdigest()
+
+
+def style_release(path, sha=None):
+    """(title, attributes) of a visual style that is a known non-Microsoft release (RealAero), else None"""
+    try:
+        sha = sha or _sha256(path)
+        known = REALAERO.get(sha)
+        if not known:
+            with open(path, 'rb') as f:
+                d = f.read()
+            if DEMOCHECK not in d or 'CompositedWindow'.encode('utf-16-le') not in d:
+                return None
+    except OSError:
+        return None
+    if known:
+        title, author = 'RealAero %s by Lucas Brooks' % known[0], 'Lucas Brooks'
+        where = '%s (%s)' % (known[1], REALAERO_URL)
+    else:   # TrueAero, TWIWMTB's Aero and other 4074 reconstructions may carry the same two
+        title, author = 'RealAero, unknown release', 'unknown'
+        where = 'not a known RealAero file (sha256 %s): it has the private Aero\'s DemoCheck and 4074 CompositedWindow parts, as ' \
+                'RealAero and the reconstructions it builds on do (%s)' % (sha, REALAERO_URL)
+    return title, {A_AUTHOR: author, A_BUILD: '4074', A_SOURCE: where, A_TAGS: 'style',
+                   A_DESC: '%s: the Aero visual style for Longhorn 4074, a reconstruction from Microsoft resources' % title}
+
+
 def reindex(W, quiet=False):
     """(re)make W/index from what the tree holds: relative symlinks only, so W can be moved; index/ is rebuilt whole"""
+    migrate_local_styles(W)
     for g in ('frames', 'packs', 'schemes', 'aurora'):
         os.makedirs(os.path.join(W, 'generated', g), exist_ok=True)
     new = os.path.join(W, '.index.new')
@@ -381,6 +452,29 @@ def _annotate_generated_dir(W, d, kind, mpath, build_of):
             xput(os.path.join(r, f), attrs)
 
 
+def _xget(path, k):
+    try:
+        return os.getxattr(path, k).decode('utf-8', 'replace')
+    except (OSError, AttributeError):
+        return None
+
+
+def annotate_local_style(f):
+    """a style dropped in by hand: which release it is when it is a known one (RealAero; looked at when the file is new, or
+    called realaero, whose description follows the file: a 0.2 imported over 0.3 says 0.2), else its name"""
+    if not ANNOTATE['on']:
+        return
+    name = os.path.basename(f)[:-9]
+    generic = '%s visual style (dropped in with lhde-import --style)' % name
+    desc = _xget(f, A_DESC)
+    rel = style_release(f) if desc is None or name in STYLE_RENAMED.values() else None
+    if rel:
+        ours = desc is None or desc.startswith('RealAero') or re.search(r' visual style \((dropped in with )?lhde-import --styles?\)$', desc)
+        xput(f, rel[1], replace=ours)
+    else:
+        xput(f, {A_DESC: generic, A_TAGS: 'style'})
+
+
 def annotate_tree(W):
     """annotate whatever the Windows tree holds that lacks annotations (lhde-import --annotate, and the end of an import)"""
     if not ANNOTATE['on'] or not os.path.isdir(W):
@@ -451,7 +545,7 @@ def annotate_tree(W):
                      A_SOURCE: 'generated by recipe schemes (lhdeschemes) from %s' % (origin or 'a hive INF')})
     L = os.path.join(W, 'local')
     for f in sorted(glob.glob(os.path.join(L, 'themes', '*.msstyles'))):
-        xput(f, {A_DESC: '%s visual style (dropped in with lhde-import --style)' % os.path.basename(f)[:-9], A_TAGS: 'style'})
+        annotate_local_style(f)
     for f in sorted(glob.glob(os.path.join(L, 'schemes', '*.scheme'))):
         xput(f, {A_DESC: 'classic Appearance scheme %s' % os.path.basename(f)[:-7], A_TAGS: 'scheme'})
     for k in ('resources', 'fonts', 'wallpapers'):

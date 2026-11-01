@@ -152,7 +152,7 @@ pack directory works too). By hand:
     tools/lhde-pack --isos DIR --out PACKS                  a resource pack (raw files) from the ISOs in DIR
     tools/lhde-import --pack PACKS/lhde-resources-DATE.tar.xz   the pack into the Windows tree, recipes run
     tools/lhde-import --iso FILE | --wim FILE | --dir WINDOWS   the same from one medium (build detected)
-    tools/lhde-import --style FILE NAME                     a style dropped in (the Aero patch: aero-patch)
+    tools/lhde-import --style FILE NAME                     a style dropped in (RealAero: realaero)
     tools/lhde-import --styles DIR [-n]                     every style of a downloaded folder (installers unpacked, not run)
     tools/lhde-import --regenerate                          generated/ made again from the imported files
     tools/lhde-import --list                                what is there

@@ -1,7 +1,7 @@
 # Luxwm things
 
 * make check-luxwm (frame regression) stops at the first frame set whose style is not imported ("libuxtheme cannot open
-  .../styles/aero-patch.msstyles" with a Windows tree that has no aero-patch): skip such sets with a note, as check-free does
+  .../styles/realaero.msstyles" with a Windows tree that has no realaero): skip such sets with a note, as check-free does
 
 * luxwm does not reap the programs it starts: four `flxp <defunct>` zombies hang under the live luxwm on :1 (started from
 	the shell's Run or a key binding); a SIGCHLD handler with waitpid(-1, WNOHANG)
