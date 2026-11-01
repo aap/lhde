@@ -159,7 +159,7 @@ and Minimize are greyed. luxshell's task buttons send it on a right click.
 
 While `_LHWM_COMPOSITED` is 0 a client with `_LHWM_EXTEND_FRAME` or `CLIENT_CAPTION` (and without `NO_HEADER_PIXMAP`) cannot show
 glass, and rebuilding the theme's caption band itself is fragile, so luxwm renders it: a PIXMAP of the client's visual and depth,
-published as `_LHWM_HEADER_PIXMAP` (PIXMAP) on the client (`wm.c` `header_update`, `frame.c` `frame_header_image`).
+published as `_LHWM_HEADER_PIXMAP` (PIXMAP) on the client (`wm.c` `header_update`, `frame.c` `wm_frame_header_image`).
 
 - Size: width = the client's; height = the current top frame margin (`_NET_FRAME_EXTENTS` top: `caption_h` normally,
   `CAPTIONBARHEIGHT + 1` maximised, `border_t` with CLIENT_CAPTION) + the extension's `top` (clamped to the client; sheet of glass
@@ -199,7 +199,7 @@ leaving only the caption buttons to the frame. With the bit set:
   640x420: 438 rows under aero4074/jade4074, 440 under slate4074, 446 under luna), and its bottom never moves. A client must not
   resize itself on a theme switch to compensate.
 - **`_LHWM_CAPTION_RECT`** (CARDINAL[4] `x y w h`, client coordinates, on the client): the union of the caption buttons' hit
-  rectangles (msstyles: the button rects exactly; DWM: with `frame_hit_ex`'s 2/3 px slop, clipped to `deco_h` where the theme has
+  rectangles (msstyles: the button rects exactly; DWM: with `wm_frame_hit_ex`'s 2/3 px slop, clipped to `deco_h` where the theme has
   one), clipped to the client (aero-patch at 640 px: `541, 0, 99, 10`, the buttons reach above the client into the border).
   Written when it changes and on every maximise and restore (also when a drag un-maximises), even unchanged, always after
   `_NET_WM_STATE`, with no intermediate rectangle during a maximise; deleted when the flag goes. A client relayouts its header on
@@ -214,7 +214,7 @@ leaving only the caption buttons to the frame. With the bit set:
   `_NET_WM_STATE`).
 - **Resizing from the top**: (1) luxwm's zone, all `border_t` rows above the client (9 on DWM, 4 on msstyles, 2 on aerovision),
   with the top corners where the frame has its corner zones (DWM: the side border columns; msstyles: one caption height along the
-  edge), except where the caption buttons reach into them (`client_hit()` in wm.c on top of `frame_hit_ex`); (2) the client's
+  edge), except where the caption buttons reach into them (`client_hit()` in wm.c on top of `wm_frame_hit_ex`); (2) the client's
   zone: it may start a top resize from its own top rows with `_NET_WM_MOVERESIZE` direction 1 (0/2 for the corners), ignored while
   maximised (`extendframe -c`: its top 4 rows outside the rect, `top_side` cursor; luxnav: `resize_rows`, 3).
 

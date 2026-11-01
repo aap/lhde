@@ -31,9 +31,9 @@ struct look {
 struct geom { int w, h, pad, y[64], ih[64]; };
 
 /* the system's font smoothing, as wux's GDI has it for flxp's menus (flxp shell::setup_fonts): settings.ini [fonts] smoothing, else
-   the session theme's Fonts.smoothing (wmmenu_set_theme_smoothing); -1 when neither says */
+   the session theme's Fonts.smoothing (wm_menu_set_theme_smoothing); -1 when neither says */
 static char theme_smoothing[16];
-void wmmenu_set_theme_smoothing(const char *v) { snprintf(theme_smoothing, sizeof theme_smoothing, "%s", v ? v : ""); }
+void wm_menu_set_theme_smoothing(const char *v) { snprintf(theme_smoothing, sizeof theme_smoothing, "%s", v ? v : ""); }
 static int sys_smoothing(void) {
     char b[32]; const char *v = lhde_settings_get("fonts", "smoothing", b, sizeof b);
     if (!v || !*v) v = theme_smoothing;
@@ -41,7 +41,7 @@ static int sys_smoothing(void) {
     return !strcasecmp(v, "cleartype") ? 2 : !strcasecmp(v, "off") || !strcasecmp(v, "none") || !strcmp(v, "0") ? 0 : 1;
 }
 
-static void look_build(const struct theme *t, const struct wmmenu_item *items, int n, struct look *L) {
+static void look_build(const struct theme *t, const struct wm_menu_item *items, int n, struct look *L) {
     memset(L, 0, sizeof *L);
     ut_menu_spec *s = &L->spec;
     if (t->classic) {
@@ -100,7 +100,7 @@ static int cues_always(void) {
     return v && strcmp(v, "1") == 0;
 }
 
-cairo_surface_t *wmmenu_render(const struct theme *t, const struct wmmenu_item *items, int n, int sel, unsigned flags, int *w, int *h) {
+cairo_surface_t *wm_menu_render(const struct theme *t, const struct wm_menu_item *items, int n, int sel, unsigned flags, int *w, int *h) {
     struct look L; struct geom g; look_build(t, items, n, &L); measure(&L, &g);
     cairo_surface_t *img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, g.w + SHADOW, g.h + SHADOW);
     cairo_t *cr = cairo_create(img);
@@ -119,7 +119,7 @@ cairo_surface_t *wmmenu_render(const struct theme *t, const struct wmmenu_item *
 
 /* ---- the popup ---- */
 struct run {
-    const struct wmmenu_env *env; const struct wmmenu_item *items; int n;
+    const struct wm_menu_env *env; const struct wm_menu_item *items; int n;
     struct look L; struct geom g; Window win; int x, y, W, H; int sel, cues;
     cairo_surface_t *under;             /* no compositor: the screen under the menu + shadow, for the blended shadow */
 };
@@ -136,7 +136,7 @@ static void run_paint(struct run *r) {
     cairo_set_source_rgb(cr, 0, 0, 0); cairo_mask_surface(cr, sh, 0, 0); cairo_surface_destroy(sh);
     paint(cr, &r->L, &r->g, r->sel, r->cues);
     cairo_destroy(cr);
-    const struct wmmenu_env *e = r->env;
+    const struct wm_menu_env *e = r->env;
     cairo_surface_t *xs = cairo_xlib_surface_create(e->dpy, r->win, e->visual, r->W, r->H); cairo_t *xc = cairo_create(xs);
     cairo_set_operator(xc, CAIRO_OPERATOR_SOURCE); cairo_set_source_surface(xc, img, 0, 0); cairo_paint(xc);
     cairo_destroy(xc); cairo_surface_flush(xs); cairo_surface_destroy(xs); cairo_surface_destroy(img);
@@ -198,11 +198,11 @@ static bool menu_grab(Display *dpy, Window w, Window root, bool keyboard) {
     return false;
 }
 
-static int popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_item *items, int n, unsigned flags, unsigned button, struct run *parent);
+static int popup(const struct wm_menu_env *e, int x, int y, const struct wm_menu_item *items, int n, unsigned flags, unsigned button, struct run *parent);
 
 /* open the submenu of item i of r beside it; returns what the submenu returned (>= 0: chosen, r is done) */
 static int open_sub(struct run *r, int i, bool keyboard) {
-    const struct wmmenu_item *it = &r->items[i];
+    const struct wm_menu_item *it = &r->items[i];
     if (!it->sub || it->nsub <= 0 || (it->flags & WMMENU_DISABLED)) return WMMENU_CANCEL;
     r->sel = i; run_paint(r);
     int res = popup(r->env, r->x + r->g.w - 3, r->y + r->g.y[i] - r->g.pad, it->sub, it->nsub, keyboard ? WMMENU_KEYBOARD : 0, 0, r);
@@ -210,12 +210,12 @@ static int open_sub(struct run *r, int i, bool keyboard) {
     return res;
 }
 
-int wmmenu_popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_item *items, int n, unsigned flags, unsigned button) {
+int wm_menu_popup(const struct wm_menu_env *e, int x, int y, const struct wm_menu_item *items, int n, unsigned flags, unsigned button) {
     int r = popup(e, x, y, items, n, flags, button, NULL);
     return r == SUB_ALL || r == SUB_BACK ? WMMENU_CANCEL : r;
 }
 
-static int popup(const struct wmmenu_env *e, int x, int y, const struct wmmenu_item *items, int n, unsigned flags, unsigned button, struct run *parent) {
+static int popup(const struct wm_menu_env *e, int x, int y, const struct wm_menu_item *items, int n, unsigned flags, unsigned button, struct run *parent) {
     struct run r; memset(&r, 0, sizeof r);
     if (n <= 0) return WMMENU_CANCEL;
     if (n > 64) n = 64;

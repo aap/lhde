@@ -67,7 +67,7 @@ struct theme {
        1:1 from the top down to the header and puts the texture's inner lines on its last two rows (never scaled vertically; rows past
        the band repeat its last row); deco_h > 0: the frame's own decoration is the top deco_h rows (the caption buttons' hit
        rectangles and _LHWM_CAPTION_RECT are clipped to it; _LHWM_FRAME_METRICS field 18); cap_border >= 0: the rows kept above a
-       CLIENT_CAPTION client instead of the side border (theme_caption_border). Defaults 0, 0, -1: the old behaviour */
+       CLIENT_CAPTION client instead of the side border (wm_theme_caption_border). Defaults 0, 0, -1: the old behaviour */
     int x_crop, deco_h, cap_border;
     unsigned gen;                       /* load count (frame.c: identifies the theme in the crossfade cache) */
     /* maximised caption text (LUXWM.md "Maximised caption text"): text_max_active / text_max_inactive / glow_max (default: the
@@ -105,58 +105,58 @@ struct frame_ext { int l, r, t, b, sheet; unsigned flags; };
 
 /* spec: a theme directory (theme.ini + PNG cache), optionally followed by a visual style: "DIR|STYLE.msstyles|COLOR|SIZE"; or the
    style alone, "|STYLE.msstyles|COLOR|SIZE" (msstyles mode, no directory: every tuning key at its default). The style is the spec's,
-   else theme.ini's msstyles / color / size (relative to the directory). With libuxtheme (frame_uxtheme_available) a style is read
-   live (LUXWM.md "libuxtheme source"); without it, or with frame_theme_source = FRAME_SRC_DIR, the directory's PNGs are used. */
-int  theme_load(struct theme *t, const char *spec);
+   else theme.ini's msstyles / color / size (relative to the directory). With libuxtheme (wm_frame_uxtheme_available) a style is read
+   live (LUXWM.md "libuxtheme source"); without it, or with wm_frame_theme_source = FRAME_SRC_DIR, the directory's PNGs are used. */
+int  wm_theme_load(struct theme *t, const char *spec);
 enum { FRAME_SRC_AUTO, FRAME_SRC_DIR, FRAME_SRC_LIB };
-extern int frame_theme_source;          /* AUTO: the library when present and a style is named; DIR: the PNG cache; LIB: the library or fail */
-int  frame_uxtheme_available(void);
-void theme_free(struct theme *t);
-void theme_margins(const struct theme *t, int *l, int *r, int *top, int *b);
-void theme_margins_ex(const struct theme *t, int maximized, int *l, int *r, int *top, int *b);
+extern int wm_frame_theme_source;          /* AUTO: the library when present and a style is named; DIR: the PNG cache; LIB: the library or fail */
+int  wm_frame_uxtheme_available(void);
+void wm_theme_free(struct theme *t);
+void wm_theme_margins(const struct theme *t, int *l, int *r, int *top, int *b);
+void wm_theme_margins_ex(const struct theme *t, int maximized, int *l, int *r, int *top, int *b);
 /* hole (dec-relative, may be NULL): the area an opaque client covers; it is not painted or uploaded.
    maxfade (the maximise crossfade): weight of the maximised plate, 0 = the normal plate, 1 = the maximised one, in between a cross-dissolve of
    the two; < 0 = by state (maximized). Painted over the geometry given by maximized. */
-void frame_paint_ex3(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
+void wm_frame_paint_ex3(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
                      int focused, int hover, int pressed, int maximized, const struct frame_ext *ext, const XRectangle *hole, double maxfade);
 /* client (dec-relative, may be NULL): where the client window lies; with size hints it may leave part of the frame's client area free
    (a maximised terminal), which an msstyles frame then fills with its border colour (DWM plates lie under the client anyway) */
-void frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
+void wm_frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
                      int focused, int hover, int pressed, int maximized, const struct frame_ext *ext, const XRectangle *hole, double maxfade,
                      const XRectangle *client);
-void frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover,
+void wm_frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover,
                      int pressed, int maximized, const struct frame_ext *ext, double maxfade);
 /* client icons, both scaled with CAIRO_FILTER_BEST to want x want (aspect kept, centred): _NET_WM_ICON picks the smallest image
    >= want (else the largest); WM_HINTS icon_pixmap (+ icon_mask): depth 1 = black on white, other depths through the default
    visual (32: ARGB). NULL when there is nothing usable. */
-cairo_surface_t *frame_icon_from_netwm(const unsigned long *data, unsigned long n, int want);
-cairo_surface_t *frame_icon_from_pixmap(Display *dpy, Pixmap icon, Pixmap mask, int want);
+cairo_surface_t *wm_frame_icon_from_netwm(const unsigned long *data, unsigned long n, int want);
+cairo_surface_t *wm_frame_icon_from_pixmap(Display *dpy, Pixmap icon, Pixmap mask, int want);
 /* the theme's default icon nearest >= want (not a new reference; NULL when the theme has none) */
-cairo_surface_t *theme_default_icon(const struct theme *t, int want);
+cairo_surface_t *wm_theme_default_icon(const struct theme *t, int want);
 /* fonts: the theme's path.fonts, font directories/files (';' separated, absolute), registered as fontconfig application
-   fonts together with the next theme_load's font_files (the set is replaced, so a theme without them does not see them) */
-void frame_fonts_set(const char *list);
+   fonts together with the next wm_theme_load's font_files (the set is replaced, so a theme without them does not see them) */
+void wm_frame_fonts_set(const char *list);
 /* LHWM_DEBUG: log the face fontconfig/pango resolve the theme's caption font to */
-void frame_fonts_report(const struct theme *t);
-void frame_paint_cr(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized);
+void wm_frame_fonts_report(const struct theme *t);
+void wm_frame_paint_cr(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized);
 /* the caption icon's cell in frame coordinates (whether an icon is drawn there is the caller's: FRAME_NO_ICON) */
-void frame_icon_rect(const struct theme *t, int w, int maximized, int *x, int *y, int *iw, int *ih);
-int  frame_hit(const struct theme *t, int w, int h, int x, int y);
-int  frame_hit_ex(const struct theme *t, int w, int h, int x, int y, int maximized);
+void wm_frame_icon_rect(const struct theme *t, int w, int maximized, int *x, int *y, int *iw, int *ih);
+int  wm_frame_hit(const struct theme *t, int w, int h, int x, int y);
+int  wm_frame_hit_ex(const struct theme *t, int w, int h, int x, int y, int maximized);
 /* window shape from the painted alpha (corners): fills up to max rects, returns the count */
-int  frame_shape_rects(const struct theme *t, cairo_surface_t *img, int maximized, XRectangle *r, int max);
+int  wm_frame_shape_rects(const struct theme *t, cairo_surface_t *img, int maximized, XRectangle *r, int max);
 /* CLIENT_CAPTION (experimental, CLIENT-PROTOCOL.md "Client content over the caption rows"): the frame rows left above a client that grows up into
    the caption (msstyles: cnBorders; DWM: the side border width; maximised: 0) */
-int  theme_caption_border(const struct theme *t, int maximized);
+int  wm_theme_caption_border(const struct theme *t, int maximized);
 /* the union of the caption buttons' hit rectangles, frame coordinates (_LHWM_CAPTION_RECT before the client offset) */
-void frame_buttons_rect(const struct theme *t, int w, int maximized, int *x, int *y, int *bw, int *bh);
+void wm_frame_buttons_rect(const struct theme *t, int w, int maximized, int *x, int *y, int *bw, int *bh);
 /* the header band for _LHWM_HEADER_PIXMAP: the frame (w x h) painted with ext (its top extension continues the caption band; title
    and icon left out), cropped to columns [x0, x0 + cw) and rows [0, band_h). Caller destroys it. */
-cairo_surface_t *frame_header_image(const struct theme *t, int w, int h, int x0, int cw, int band_h, int focused, int hover, int pressed,
+cairo_surface_t *wm_frame_header_image(const struct theme *t, int w, int h, int x0, int cw, int band_h, int focused, int hover, int pressed,
                                     int maximized, const struct frame_ext *ext);
-extern unsigned long frame_upload_serial;   /* request serial of the last frame_paint_ex4 upload (first request of it) */
-/* when set, the next frame_paint_ex3 uploads to an offscreen pixmap, calls frame_pre_upload(frame_pre_upload_arg) (the caller's
+extern unsigned long wm_frame_upload_serial;   /* request serial of the last wm_frame_paint_ex4 upload (first request of it) */
+/* when set, the next wm_frame_paint_ex3 uploads to an offscreen pixmap, calls wm_frame_pre_upload(wm_frame_pre_upload_arg) (the caller's
    window resize), then sets the shape and copies the pixels into the window; reset by that paint (LUXWM.md "Resize without flicker") */
-extern void (*frame_pre_upload)(void *); extern void *frame_pre_upload_arg;
-extern double frame_prof_ms[4];   /* LHWM_PROF: paint, shape, upload ms (accumulated), paint count */
+extern void (*wm_frame_pre_upload)(void *); extern void *wm_frame_pre_upload_arg;
+extern double wm_frame_prof_ms[4];   /* LHWM_PROF: paint, shape, upload ms (accumulated), paint count */
 #endif

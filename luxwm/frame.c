@@ -20,8 +20,8 @@
 #include <unistd.h>
 #include <math.h>
 
-int frame_theme_source = FRAME_SRC_AUTO;
-int frame_uxtheme_available(void) { return fut_available(); }
+int wm_frame_theme_source = FRAME_SRC_AUTO;
+int wm_frame_uxtheme_available(void) { return wm_fut_available(); }
 
 static cairo_surface_t *load_png(const char *dir, const char *name) {
     /* the frame set's text (theme.ini) and its pixels may lie in different data directories (lhde/data.h): the file beside
@@ -31,9 +31,9 @@ static cairo_surface_t *load_png(const char *dir, const char *name) {
     if (cairo_surface_status(s) != CAIRO_STATUS_SUCCESS) { cairo_surface_destroy(s); fprintf(stderr, "luxwm: missing %s\n", p); return NULL; }
     return s;
 }
-/* a theme texture: from the open style's CompositedWindow streams (frame_ut.c fut_png), else the directory's file */
+/* a theme texture: from the open style's CompositedWindow streams (frame_ut.c wm_fut_png), else the directory's file */
 static cairo_surface_t *theme_png(const struct theme *t, const char *dir, const char *name) {
-    cairo_surface_t *s = fut_png(t, name);
+    cairo_surface_t *s = wm_fut_png(t, name);
     if (s) return s;
     if (!dir[0]) { fprintf(stderr, "luxwm: %s: not in the style and no theme directory\n", name); return NULL; }
     return load_png(dir, name);
@@ -175,7 +175,7 @@ static void ms_part(cairo_t *cr, const struct theme *t, int p, int idx, int x, i
     const struct mspart *m = &t->ms[p];
     if (idx >= m->count) idx = m->count - 1;
     if (idx < 0) idx = 0;
-    if (t->ut && m->ut_live) fut_ms_draw(cr, t, p, idx + 1, x, y, w, h);
+    if (t->ut && m->ut_live) wm_fut_ms_draw(cr, t, p, idx + 1, x, y, w, h);
     else ms_draw(cr, m->img[0][idx], x, y, w, h, m->sm, m->tile);
 }
 
@@ -265,12 +265,12 @@ static void ms_paint(cairo_t *cr, const struct theme *t, int w, int h, const cha
     #undef MSIMG
 }
 
-/* fonts: the theme's `path.fonts` (frame_fonts_set: directories or files, ';' separated) plus the theme.ini `font_files` (files,
+/* fonts: the theme's `path.fonts` (wm_frame_fonts_set: directories or files, ';' separated) plus the theme.ini `font_files` (files,
    space separated; Luna's Trebuchet MS) are the process's fontconfig application fonts. The set is replaced whenever it changes
    (FcConfigAppFontClear, then add each), so switching to a theme without the 4074 Fonts directory gives the stock fallback again;
    afterwards pango's default font map is dropped so the next layout sees the new set. */
 static char fonts_reg[2048], fonts_applied[4600];
-void frame_fonts_set(const char *list) { snprintf(fonts_reg, sizeof fonts_reg, "%s", list ? list : ""); }
+void wm_frame_fonts_set(const char *list) { snprintf(fonts_reg, sizeof fonts_reg, "%s", list ? list : ""); }
 static void font_add(const char *f0, const char *what) {
     struct stat st; int ok; char fb[4200]; const char *f = lhde_data_resolve(f0, fb, sizeof fb);   /* fonts/4074/trebuc.ttf: the data directories */
     if (stat(f, &st) != 0) { fprintf(stderr, "luxwm: %s: %s does not exist\n", what, f); return; }
@@ -286,13 +286,13 @@ static void fonts_apply(const char *files) {
     for (char *save = NULL, *f = strtok_r(buf, ";", &save); f; f = strtok_r(NULL, ";", &save)) {
         while (*f == ' ' || *f == '\t') f++;
         size_t n = strlen(f); while (n && (f[n - 1] == ' ' || f[n - 1] == '\t')) f[--n] = 0;
-        if (*f) { font_add(f, "fonts"); fut_add_font_dir(f); }   /* libuxtheme's own text (ut_draw_text) sees them too */
+        if (*f) { font_add(f, "fonts"); wm_fut_add_font_dir(f); }   /* libuxtheme's own text (ut_draw_text) sees them too */
     }
     char fb[400]; snprintf(fb, sizeof fb, "%s", files ? files : "");
     for (char *save = NULL, *f = strtok_r(fb, " ", &save); f; f = strtok_r(NULL, " ", &save)) font_add(f, "font_files");
     pango_cairo_font_map_set_default(NULL);
 }
-void frame_fonts_report(const struct theme *t) {
+void wm_frame_fonts_report(const struct theme *t) {
     const char *name = t->mode == THEME_MSSTYLES ? t->ms_font : t->font;
     PangoFontMap *fm = pango_cairo_font_map_get_default(); PangoContext *ctx = pango_font_map_create_context(fm);
     PangoFontDescription *fd = pango_font_description_from_string(name);
@@ -392,9 +392,9 @@ static void cl_marlett(void) {
             closedir(b);
         }
         closedir(d);
-        if (*found) { fut_add_font_dir(found); return; }
+        if (*found) { wm_fut_add_font_dir(found); return; }
     }
-    if (*free_) fut_add_font_dir(free_);
+    if (*free_) wm_fut_add_font_dir(free_);
 }
 
 static int classic_load(struct theme *t, const char *spec) {
@@ -430,7 +430,7 @@ static int classic_load(struct theme *t, const char *spec) {
     memcpy(t->text_ma, t->text_a, sizeof t->text_ma); memcpy(t->text_mi, t->text_i, sizeof t->text_mi);
     t->shape_alpha = 1;
     t->m_t = 3 + t->ms_border + t->ms_cap_h + 1; t->m_l = t->m_r = t->m_b = 3 + t->ms_border;
-    /* the parts the msstyles geometry looks at (frame_buttons_rect, frame_hit_ex): present, drawn by classic_paint */
+    /* the parts the msstyles geometry looks at (wm_frame_buttons_rect, wm_frame_hit_ex): present, drawn by classic_paint */
     t->ms[MP_CAPTION].count = t->ms[MP_CLOSE].count = t->ms[MP_MAX].count = t->ms[MP_MIN].count = t->ms[MP_RESTORE].count = 1;
     /* the default icon (XP's application icon, shell32 #3): the first that exists, and a 32 px one beside it */
     for (char *save = NULL, *fn = strtok_r(icons, " ", &save); fn && !t->ndefic; fn = strtok_r(NULL, " ", &save)) {
@@ -547,7 +547,7 @@ static void classic_paint(cairo_t *cr, const struct theme *t, int w, int h, cons
     }
 }
 
-static unsigned theme_gen_next;   /* theme_load count: identifies a loaded theme for the crossfade cache */
+static unsigned theme_gen_next;   /* wm_theme_load count: identifies a loaded theme for the crossfade cache */
 /* "DIR|STYLE|COLOR|SIZE" -> its four fields (missing ones empty) */
 static void spec_split(const char *spec, char *dir, char *style, char *color, char *size) {
     char *out[4] = { dir, style, color, size }; size_t cap[4] = { 1024, 1024, 64, 64 };
@@ -559,7 +559,7 @@ static void spec_split(const char *spec, char *dir, char *style, char *color, ch
     }
 }
 
-int theme_load(struct theme *t, const char *spec) {
+int wm_theme_load(struct theme *t, const char *spec) {
     char dir[1024], style[1024], color[64], size[64], ini_style[1024] = "", ini_color[64] = "", ini_size[64] = "";
     spec_split(spec, dir, style, color, size);
     { size_t n = strlen(dir); while (n > 1 && dir[n - 1] == '/') dir[--n] = 0; }
@@ -645,14 +645,14 @@ int theme_load(struct theme *t, const char *spec) {
     if (!style[0]) { snprintf(style, sizeof style, "%s", ini_style); snprintf(color, sizeof color, "%s", ini_color); snprintf(size, sizeof size, "%s", ini_size); }
     snprintf(t->style, sizeof t->style, "%s", style); snprintf(t->style_color, sizeof t->style_color, "%s", color);
     snprintf(t->style_size, sizeof t->style_size, "%s", size);
-    if (style[0] && frame_theme_source != FRAME_SRC_DIR && fut_available()) {
-        if (!fut_open(t, style, color, size) && (frame_theme_source == FRAME_SRC_LIB || !dir[0])) return 0;
+    if (style[0] && wm_frame_theme_source != FRAME_SRC_DIR && wm_fut_available()) {
+        if (!wm_fut_open(t, style, color, size) && (wm_frame_theme_source == FRAME_SRC_LIB || !dir[0])) return 0;
         if (!t->ut) fprintf(stderr, "luxwm: %s: using the PNG cache in %s\n", style, dir);
-    } else if (frame_theme_source == FRAME_SRC_LIB || !dir[0]) {
-        fprintf(stderr, "luxwm: %s: %s\n", spec, !style[0] ? "no msstyles named" : !fut_available() ? "luxwm was built without libuxtheme" : "library source disabled");
+    } else if (wm_frame_theme_source == FRAME_SRC_LIB || !dir[0]) {
+        fprintf(stderr, "luxwm: %s: %s\n", spec, !style[0] ? "no msstyles named" : !wm_fut_available() ? "luxwm was built without libuxtheme" : "library source disabled");
         return 0;
     }
-    if (t->ut && t->mode == THEME_MSSTYLES && !fut_ms_load(t, ms_aa_set, ms_hint_set)) {
+    if (t->ut && t->mode == THEME_MSSTYLES && !wm_fut_ms_load(t, ms_aa_set, ms_hint_set)) {
         fprintf(stderr, "luxwm: %s has no Window.CAPTION\n", t->ut_src); return 0; }
     if (!set_ma) memcpy(t->text_ma, t->text_a, sizeof t->text_ma);
     if (!set_mi) memcpy(t->text_mi, t->text_i, sizeof t->text_mi);
@@ -662,7 +662,7 @@ int theme_load(struct theme *t, const char *spec) {
         char buf[400]; snprintf(buf, sizeof buf, "%s", defic[0] ? defic : "default_icon.png");
         for (char *save = NULL, *fn = strtok_r(buf, " ", &save); fn && t->ndefic < 4; fn = strtok_r(NULL, " ", &save)) {
             char q[4200]; if (strchr(fn, '/')) lhde_data_resolve(fn, q, sizeof q); else lhde_data_find_in(dir, fn, q, sizeof q);
-            cairo_surface_t *ic = !defic[0] ? fut_png(t, fn) : NULL;   /* DEFAULTICON from the style */
+            cairo_surface_t *ic = !defic[0] ? wm_fut_png(t, fn) : NULL;   /* DEFAULTICON from the style */
             if (ic) { t->defic[t->ndefic++] = ic; continue; }
             if (!dir[0] || (!defic[0] && access(q, R_OK) != 0)) break;
             ic = cairo_image_surface_create_from_png(q);
@@ -684,7 +684,7 @@ int theme_load(struct theme *t, const char *spec) {
     if (t->mbtn_top == -1000) t->mbtn_top = t->btn_top;
     if (t->shape_alpha < 0) t->shape_alpha = t->mode == THEME_MSSTYLES ? 1 : 32;
     if (t->mode == THEME_MSSTYLES) {
-        int ok = t->ut ? 1 : ms_load(t, dir);   /* the library source filled t->ms in fut_ms_load */
+        int ok = t->ut ? 1 : ms_load(t, dir);   /* the library source filled t->ms in wm_fut_ms_load */
         t->m_t = 3 + t->ms_border + t->ms_cap_h + 1; t->m_l = t->m_r = t->m_b = 3 + t->ms_border;
         return ok;
     }
@@ -709,7 +709,7 @@ int theme_load(struct theme *t, const char *spec) {
     return t->plate[0] != NULL;
 }
 
-void theme_free(struct theme *t) {
+void wm_theme_free(struct theme *t) {
     cairo_surface_t **all[] = { &t->plate[0], &t->plate[1], &t->plate_x[0], &t->plate_x[1], &t->plate_m[0], &t->plate_m[1],
                                 &t->plate_mx[0], &t->plate_mx[1], &t->overlay, &t->fog, &t->glow_btn, &t->glow_close,
                                 &t->btn[0], &t->btn[1], &t->btn[2], &t->btn[3] };
@@ -720,11 +720,11 @@ void theme_free(struct theme *t) {
         for (int p = 0; p < MP_LAST; p++) for (int v = 0; v < 6; v++) for (int k = 0; k < 10; k++) if (t->ms[p].img[v][k]) cairo_surface_destroy(t->ms[p].img[v][k]);
         free(t->ms); t->ms = NULL;
     }
-    fut_close(t);
+    wm_fut_close(t);
 }
 
-void theme_margins(const struct theme *t, int *l, int *r, int *top, int *b) { theme_margins_ex(t, 0, l, r, top, b); }
-void theme_margins_ex(const struct theme *t, int maximized, int *l, int *r, int *top, int *b) {
+void wm_theme_margins(const struct theme *t, int *l, int *r, int *top, int *b) { wm_theme_margins_ex(t, 0, l, r, top, b); }
+void wm_theme_margins_ex(const struct theme *t, int maximized, int *l, int *r, int *top, int *b) {
     if (t->mode == THEME_MSSTYLES) {   /* cnBorders = 3 + SIZINGBORDERWIDTH on all sides, caption = cnBorders + CAPTIONBARHEIGHT + 1;
                                           full-screen maximised: the borders lie off-screen, only CAPTIONBARHEIGHT + 1 remains */
         int cnb = 3 + t->ms_border;
@@ -778,7 +778,7 @@ static int hit_of_slot(const struct theme *t, int i) { int b = t->order[i]; retu
 /* the shape of the decoration window: rows near the top and bottom lose their leading/trailing pixels whose alpha is below
    shape_alpha (the plate's / caption's rounded corners). Without this a compositor blurs and shadows the full rectangle, so the
    square corner shows through around the rounded plate, and without a compositor those pixels are not transparent at all. */
-int frame_shape_rects(const struct theme *t, cairo_surface_t *img, int maximized, XRectangle *r, int max) {
+int wm_frame_shape_rects(const struct theme *t, cairo_surface_t *img, int maximized, XRectangle *r, int max) {
     cairo_surface_flush(img);
     int w = cairo_image_surface_get_width(img), h = cairo_image_surface_get_height(img), st = cairo_image_surface_get_stride(img);
     const unsigned char *d = cairo_image_surface_get_data(img); int n = 0, zone = 24, lim = 40, prev_l = -1, prev_r = -1;
@@ -851,7 +851,7 @@ static void square_corners(cairo_surface_t *img, int k) {
     cairo_surface_mark_dirty(img);
 }
 
-void frame_paint_cr2(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized, const struct frame_ext *ext);
+static void frame_paint_cr2(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized, const struct frame_ext *ext);
 static void plate_ext(cairo_t *cr, const struct theme *t, cairo_surface_t *img, double w, double h, const struct frame_ext *e);
 static void plate_explorer(cairo_t *cr, const struct theme *t, cairo_surface_t *img, double w, double h, const struct frame_ext *e);
 static void plate_max(cairo_t *cr, const struct theme *t, cairo_surface_t *img, double w, double h, const struct frame_ext *e, int explorer);
@@ -1031,10 +1031,10 @@ static void fog_band(cairo_t *cr, cairo_surface_t *fog, double x, double y, doub
 
 static struct { Window win; int w, h, n; unsigned long sum; } shape_cache[256];
 
-/* profiling (LHWM_PROF): accumulated milliseconds of the last frame_paint_ex4 calls: [0] cairo paint, [1] shape, [2] upload */
-unsigned long frame_upload_serial;
-void (*frame_pre_upload)(void *); void *frame_pre_upload_arg;
-double frame_prof_ms[4];   /* [3]: number of paints */
+/* profiling (LHWM_PROF): accumulated milliseconds of the last wm_frame_paint_ex4 calls: [0] cairo paint, [1] shape, [2] upload */
+unsigned long wm_frame_upload_serial;
+void (*wm_frame_pre_upload)(void *); void *wm_frame_pre_upload_arg;
+double wm_frame_prof_ms[4];   /* [3]: number of paints */
 #include <time.h>
 static double prof_now(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6; }
 
@@ -1043,9 +1043,9 @@ static void put_rect(Display *dpy, Drawable win, GC gc, XImage *xi, int x, int y
     if (w > 0 && h > 0) XPutImage(dpy, win, gc, xi, x, y, x, y, (unsigned)w, (unsigned)h);
 }
 
-void frame_paint_ex3(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
+void wm_frame_paint_ex3(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
                      int focused, int hover, int pressed, int maximized, const struct frame_ext *ext, const XRectangle *hole, double maxfade) {
-    frame_paint_ex4(dpy, vis, t, dec, w, h, title, icon, focused, hover, pressed, maximized, ext, hole, maxfade, NULL);
+    wm_frame_paint_ex4(dpy, vis, t, dec, w, h, title, icon, focused, hover, pressed, maximized, ext, hole, maxfade, NULL);
 }
 
 /* the part of the frame's client area that the client leaves free (size hints: a maximised terminal is a whole number of character
@@ -1054,7 +1054,7 @@ void frame_paint_ex3(Display *dpy, Visual *vis, const struct theme *t, Window de
    the colour of the frame border (FRAMELEFT drawn cnBorders x 64 in its frame state, sampled in the middle; button face grey without
    one), as if the border went on around the client */
 static void ms_gap_fill(cairo_t *cr, const struct theme *t, int w, int h, int focused, int maximized, const XRectangle *cl) {
-    int l, r, tp, b; theme_margins_ex(t, maximized, &l, &r, &tp, &b);
+    int l, r, tp, b; wm_theme_margins_ex(t, maximized, &l, &r, &tp, &b);
     int x0 = cl->x, y0 = cl->y, x1 = w - r, y1 = h - b;
     if (x1 <= x0 || y1 <= y0) return;
     if (cl->x + cl->width >= x1 && cl->y + cl->height >= y1) return;   /* nothing left free */
@@ -1078,7 +1078,7 @@ static void ms_gap_fill(cairo_t *cr, const struct theme *t, int w, int h, int fo
     cairo_restore(cr);
 }
 
-void frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
+void wm_frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
                      int focused, int hover, int pressed, int maximized, const struct frame_ext *ext, const XRectangle *hole, double maxfade,
                      const XRectangle *client) {
     /* paint offscreen, then copy: no flicker, and the alpha gives the window shape */
@@ -1086,7 +1086,7 @@ void frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window de
     cairo_surface_t *img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
     cairo_t *cr = cairo_create(img);
     /* hole: the part covered by an opaque client. It is neither painted nor uploaded (LUXWM.md "Performance"); it keeps clear of
-       the 24 top/bottom rows that frame_shape_rects reads, and the clip is pixel-aligned, so the painted pixels are the same */
+       the 24 top/bottom rows that wm_frame_shape_rects reads, and the clip is pixel-aligned, so the painted pixels are the same */
     int hx = 0, hy = 0, hw = 0, hh = 0;
     if (hole) {
         hx = hole->x; hy = hole->y < 24 ? 24 : hole->y; hw = hole->width;
@@ -1099,18 +1099,18 @@ void frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window de
         cairo_rectangle(cr, 0, 0, w, h); cairo_rectangle(cr, hx, hy, hw, hh); cairo_clip(cr);
         cairo_set_fill_rule(cr, CAIRO_FILL_RULE_WINDING);
     }
-    frame_paint_cr3(cr, t, w, h, title, icon, focused, hover, pressed, maximized, ext, maxfade);
+    wm_frame_paint_cr3(cr, t, w, h, title, icon, focused, hover, pressed, maximized, ext, maxfade);
     if (client && t->mode == THEME_MSSTYLES) ms_gap_fill(cr, t, w, h, focused, maximized, client);
     cairo_destroy(cr);
     double t1 = prof_now();
-    XRectangle rects[128]; int n = frame_shape_rects(t, img, maximized, rects, 128);
+    XRectangle rects[128]; int n = wm_frame_shape_rects(t, img, maximized, rects, 128);
     unsigned long sum = (unsigned long)n;
     for (int i = 0; i < n; i++) sum = sum * 31 + rects[i].x * 7 + rects[i].y * 13 + rects[i].width * 17 + rects[i].height;
     int slot = (int)(dec % 256);
-    /* frame_pre_upload (LUXWM.md "Resize without flicker"): the pixels go to an offscreen pixmap first; then the hook resizes the
+    /* wm_frame_pre_upload (LUXWM.md "Resize without flicker"): the pixels go to an offscreen pixmap first; then the hook resizes the
        windows, and the shape and a copy into the window follow at once, so the server gets the new geometry and the new pixels as
        one short batch (a compositor never sees the window at the new size with the old or half-uploaded pixels) */
-    void (*pre)(void *) = frame_pre_upload; frame_pre_upload = NULL;
+    void (*pre)(void *) = wm_frame_pre_upload; wm_frame_pre_upload = NULL;
     Pixmap stage = pre ? XCreatePixmap(dpy, dec, (unsigned)w, (unsigned)h, 32) : None;
     Drawable dst = stage != None ? stage : dec;
     static GC gc = None;
@@ -1121,7 +1121,7 @@ void frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window de
             shape_cache[slot].win = dec; shape_cache[slot].w = w; shape_cache[slot].h = h; shape_cache[slot].sum = sum; } } while (0)
     if (stage == None) SEND_SHAPE();
     double t2 = prof_now();
-    frame_upload_serial = NextRequest(dpy);   /* the pixels go out from here on: Expose events older than this are covered */
+    wm_frame_upload_serial = NextRequest(dpy);   /* the pixels go out from here on: Expose events older than this are covered */
     if (hw > 0) {   /* only the four bands around the hole, straight XPutImage of the painted rows */
         cairo_surface_flush(img);
         XImage *xi = XCreateImage(dpy, vis, 32, ZPixmap, 0, (char *)cairo_image_surface_get_data(img), (unsigned)w, (unsigned)h, 32,
@@ -1146,9 +1146,9 @@ void frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window de
            drag of two, the client resized but the frame's right band not yet copied */
         XSync(dpy, False);
         XGrabServer(dpy);
-        pre(frame_pre_upload_arg);
+        pre(wm_frame_pre_upload_arg);
         SEND_SHAPE();
-        frame_upload_serial = NextRequest(dpy);   /* the Expose events of the resize are older: covered */
+        wm_frame_upload_serial = NextRequest(dpy);   /* the Expose events of the resize are older: covered */
         if (hw > 0) {
             XCopyArea(dpy, stage, dec, gc, 0, 0, (unsigned)w, (unsigned)hy, 0, 0);
             if (h - hy - hh > 0) XCopyArea(dpy, stage, dec, gc, 0, hy + hh, (unsigned)w, (unsigned)(h - hy - hh), 0, hy + hh);
@@ -1161,16 +1161,16 @@ void frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window de
     }
     #undef SEND_SHAPE
     cairo_surface_destroy(img);
-    frame_prof_ms[0] += t1 - t0; frame_prof_ms[1] += t2 - t1; frame_prof_ms[2] += prof_now() - t2; frame_prof_ms[3] += 1;
+    wm_frame_prof_ms[0] += t1 - t0; wm_frame_prof_ms[1] += t2 - t1; wm_frame_prof_ms[2] += prof_now() - t2; wm_frame_prof_ms[3] += 1;
 }
 
-void frame_paint_cr(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized) { frame_paint_cr2(cr, t, w, h, title, icon, focused, hover, pressed, maximized, NULL); }
+void wm_frame_paint_cr(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized) { frame_paint_cr2(cr, t, w, h, title, icon, focused, hover, pressed, maximized, NULL); }
 
-void frame_paint_cr2(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized, const struct frame_ext *ext) {
-    frame_paint_cr3(cr, t, w, h, title, icon, focused, hover, pressed, maximized, ext, -1);
+static void frame_paint_cr2(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover, int pressed, int maximized, const struct frame_ext *ext) {
+    wm_frame_paint_cr3(cr, t, w, h, title, icon, focused, hover, pressed, maximized, ext, -1);
 }
 
-void frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover,
+void wm_frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const char *title, cairo_surface_t *icon, int focused, int hover,
                      int pressed, int maximized, const struct frame_ext *ext, double maxfade) {
     /* classic msstyles frames have no glass: NO_TITLE / NO_ICON apply, an extension only continues the caption band (header pixmap) */
     if (t->classic) { classic_paint(cr, t, w, h, title, icon, focused, hover, pressed, maximized, ext); return; }
@@ -1220,7 +1220,7 @@ void frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const cha
     }
     /* 1b. extended top: the caption fog as a soft light band behind the caption row and the client's header (NO_FOG: none) */
     if (extended && !ext->sheet && ext->t > 0 && !(flags & FRAME_NO_FOG) && t->fog_on) {
-        int ml, mr, mt, mb; theme_margins_ex(t, maximized, &ml, &mr, &mt, &mb);
+        int ml, mr, mt, mb; wm_theme_margins_ex(t, maximized, &ml, &mr, &mt, &mb);
         fog_band(cr, t->fog, ml + ext->l, 0, w - ml - mr - ext->l - ext->r, mt + ext->t);
     }
     /* 2. caption buttons with glow plates for hot/pressed */
@@ -1301,13 +1301,13 @@ void frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const cha
 }
 
 /* ---- CLIENT_CAPTION and the header pixmap (CLIENT-PROTOCOL.md "Client content over the caption rows") ---- */
-int theme_caption_border(const struct theme *t, int maximized) {
+int wm_theme_caption_border(const struct theme *t, int maximized) {
     if (maximized) return 0;   /* the borders of a maximised frame lie off-screen (msstyles) or are dropped (DWM) */
     if (t->cap_border >= 0) return t->cap_border;   /* caption_border (vision: the plate's 2 outer rows) */
     return t->mode == THEME_MSSTYLES ? 3 + t->ms_border : t->m_l;
 }
 
-void frame_buttons_rect(const struct theme *t, int w, int maximized, int *x, int *y, int *bw, int *bh) {
+void wm_frame_buttons_rect(const struct theme *t, int w, int maximized, int *x, int *y, int *bw, int *bh) {
     int x0 = 1 << 30, y0 = 1 << 30, x1 = -(1 << 30), y1 = -(1 << 30), n = t->mode == THEME_MSSTYLES ? 3 : t->norder;
     for (int i = 0; i < n; i++) {
         int bx, by, w1, h1;
@@ -1316,7 +1316,7 @@ void frame_buttons_rect(const struct theme *t, int w, int maximized, int *x, int
             if (!t->ms[part].count) continue;
             ms_btn_rect(t, w, i, maximized, &bx, &by, &w1, &h1);
         }
-        else { button_rect(t, w, i, maximized, &bx, &by, &w1, &h1); bx -= 2; by -= 3; w1 += 4; h1 += 6; }   /* frame_hit_ex's slop */
+        else { button_rect(t, w, i, maximized, &bx, &by, &w1, &h1); bx -= 2; by -= 3; w1 += 4; h1 += 6; }   /* wm_frame_hit_ex's slop */
         if (bx < x0) x0 = bx;
         if (by < y0) y0 = by;
         if (bx + w1 > x1) x1 = bx + w1;
@@ -1327,7 +1327,7 @@ void frame_buttons_rect(const struct theme *t, int w, int maximized, int *x, int
     *x = x0; *y = y0 < 0 ? 0 : y0; *bw = x1 - x0; *bh = y1 - *y;
 }
 
-cairo_surface_t *frame_header_image(const struct theme *t, int w, int h, int x0, int cw, int band_h, int focused, int hover, int pressed,
+cairo_surface_t *wm_frame_header_image(const struct theme *t, int w, int h, int x0, int cw, int band_h, int focused, int hover, int pressed,
                                     int maximized, const struct frame_ext *ext) {
     if (cw <= 0 || band_h <= 0) return NULL;
     cairo_surface_t *img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, cw, band_h);
@@ -1342,7 +1342,7 @@ cairo_surface_t *frame_header_image(const struct theme *t, int w, int h, int x0,
 
 /* the caption icon's cell (the window menu's click target; LUXWM.md "The window menu"), frame coordinates; the painters place the icon
    there (ms_paint: SM_CXSMICON at cnBorders + 2; DWM: icon_x, centred in the caption) */
-void frame_icon_rect(const struct theme *t, int w, int maximized, int *x, int *y, int *iw, int *ih) {
+void wm_frame_icon_rect(const struct theme *t, int w, int maximized, int *x, int *y, int *iw, int *ih) {
     (void)w;
     if (t->classic) {   /* the caption-height icon slot, SM_CXSMICON one pixel right of its centre */
         int cnb = 3 + t->ms_border, o = maximized ? -cnb : 0, sm = cl_smicon(t);
@@ -1359,14 +1359,14 @@ void frame_icon_rect(const struct theme *t, int w, int maximized, int *x, int *y
     *x = t->icon_x; *y = (t->m_t - t->icon_size) / 2; *iw = *ih = t->icon_size;
 }
 
-int frame_hit(const struct theme *t, int w, int h, int x, int y) { return frame_hit_ex(t, w, h, x, y, 0); }
-int frame_hit_ex(const struct theme *t, int w, int h, int x, int y, int maximized) {
+int wm_frame_hit(const struct theme *t, int w, int h, int x, int y) { return wm_frame_hit_ex(t, w, h, x, y, 0); }
+int wm_frame_hit_ex(const struct theme *t, int w, int h, int x, int y, int maximized) {
     if (t->mode == THEME_MSSTYLES) {
         for (int slot = 0; slot < 3; slot++) {
             int bx, by, bw, bh; ms_btn_rect(t, w, slot, maximized, &bx, &by, &bw, &bh);
             if (x >= bx && x < bx + bw && y >= by && y < by + bh) return ms_slot_hit(slot);
         }
-        int l, r, tp, b; theme_margins_ex(t, maximized, &l, &r, &tp, &b);
+        int l, r, tp, b; wm_theme_margins_ex(t, maximized, &l, &r, &tp, &b);
         if (maximized) return y < tp ? HIT_CAPTION : HIT_NONE;
         int cnb = l, corner = tp, L = x < cnb, R = x >= w - cnb, T = y < cnb, B = y >= h - cnb;   /* corners: one caption height along each edge */
         if ((T && x < corner) || (L && y < corner)) return HIT_TL;
@@ -1408,7 +1408,7 @@ static cairo_surface_t *icon_fit(cairo_surface_t *src, int want) {
     cairo_destroy(cr); cairo_surface_destroy(src); return out;
 }
 
-cairo_surface_t *frame_icon_from_netwm(const unsigned long *data, unsigned long n, int want) {
+cairo_surface_t *wm_frame_icon_from_netwm(const unsigned long *data, unsigned long n, int want) {
     /* the smallest image >= want (downscaling a little loses less than upscaling), else the largest */
     unsigned long i = 0; const unsigned long *best = NULL; unsigned long bw = 0, bh = 0;
     while (i + 2 <= n) {
@@ -1432,7 +1432,7 @@ static int mshift(unsigned long m) { int k = 0; if (!m) return 0; while (!(m & 1
 static unsigned mchan(unsigned long p, unsigned long m) { if (!m) return 0; unsigned long mx = m >> mshift(m); return (unsigned)(((p & m) >> mshift(m)) * 255 / (mx ? mx : 1)); }
 static int quiet_err(Display *d, XErrorEvent *e) { (void)d; (void)e; return 0; }
 
-cairo_surface_t *frame_icon_from_pixmap(Display *dpy, Pixmap icon, Pixmap mask, int want) {
+cairo_surface_t *wm_frame_icon_from_pixmap(Display *dpy, Pixmap icon, Pixmap mask, int want) {
     if (!icon) return NULL;
     /* the pixmaps belong to the client and may be freed under us: errors are swallowed for these few requests */
     XSync(dpy, False); int (*old)(Display *, XErrorEvent *) = XSetErrorHandler(quiet_err);
@@ -1463,7 +1463,7 @@ cairo_surface_t *frame_icon_from_pixmap(Display *dpy, Pixmap icon, Pixmap mask, 
     return icon_fit(s, want);
 }
 
-cairo_surface_t *theme_default_icon(const struct theme *t, int want) {
+cairo_surface_t *wm_theme_default_icon(const struct theme *t, int want) {
     cairo_surface_t *best = NULL; int bsz = 0;
     for (int i = 0; i < t->ndefic; i++) {
         int w = cairo_image_surface_get_width(t->defic[i]), h = cairo_image_surface_get_height(t->defic[i]), sz = w > h ? w : h;

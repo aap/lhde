@@ -112,7 +112,7 @@ textures from the style's streams, the classic sets through `tools/msstyles2them
 as build 4066 shows them; no shipped theme uses it), `aero5048`, `aero5112`, `aerovision` (glass); `slate4074-classic`,
 `jade4074-classic`, `slate4051-classic`, `luna4051-blue|olive|silver` (classic).
 
-**Theme specs** (`theme_load`): a directory; `DIR|STYLE.msstyles|COLOR|SIZE` (the style given explicitly); `|STYLE.msstyles|COLOR|SIZE`
+**Theme specs** (`wm_theme_load`): a directory; `DIR|STYLE.msstyles|COLOR|SIZE` (the style given explicitly); `|STYLE.msstyles|COLOR|SIZE`
 (no directory: msstyles mode, every tuning key at its default); `|classic|KEY=VALUE;...` (Windows Classic). Without a style in the
 spec the directory's own theme.ini `msstyles`/`color`/`size` count (relative to the data directories).
 
@@ -240,7 +240,7 @@ under the pointer after its ~500 ms hover.
 ## The window menu
 
 XP's system menu, drawn by luxwm (`menu.c`, `menu.h`). **Opened by** Alt+Space (`sysmenu`), a right click on the caption (on the
-release, like `WM_CONTEXTMENU`, at the pointer; it flips left/up at the monitor edge), a click on the caption icon (`frame_icon_rect()`;
+release, like `WM_CONTEXTMENU`, at the pointer; it flips left/up at the monitor edge), a click on the caption icon (`wm_frame_icon_rect()`;
 a double click there, the second press within 500 ms, closes the window as XP's), and a `_GTK_SHOW_WINDOW_MENU` client message
 (CLIENT-PROTOCOL.md: luxshell's task buttons, GTK's client-side headers) at the point it names, also for a minimised window. Alt+Space
 and the icon put it under the caption at the frame's left border. Items, mnemonics and greying as `mnsys.c` `xxxSetSysMenu`:
@@ -261,7 +261,7 @@ it does not fit); Left or Esc closes only the submenu, the pointer back over ano
 parent takes over, a click outside both, Alt or F10 close everything. The submenu shares the parent's keyboard grab and hands the
 pointer grab back when it closes.
 
-**Rendering** (`wmmenu_popup`: an override-redirect ARGB window, `_NET_WM_WINDOW_TYPE_POPUP_MENU`, `_LHWM_MENU`, WM_CLASS `lhwm-menu`):
+**Rendering** (`wm_menu_popup`: an override-redirect ARGB window, `_NET_WM_WINDOW_TYPE_POPUP_MENU`, `_LHWM_MENU`, WM_CLASS `lhwm-menu`):
 the pixels are wuxtheme's popup menu painter (`ut_menu_layout` / `ut_menu_draw` in `<wuxtheme/ut.h>`, over `wuxtheme/menu.cpp`), the
 code that draws every user32 menu of the wux side (flxp's context menus, menu bars, the start menu cascades), so the window menu and an
 Explorer context menu are the same pixels. luxwm keeps the geometry on screen, the shadow and the input. The painter gets the frame
@@ -294,11 +294,11 @@ otherwise blended over a copy of the screen taken before the map, as XP does; no
 Against the 4074 Slate menu, border, plate, highlight, separator, bullet and arrow colours and positions, item pitch (19), text start
 (x 22) and text rows are identical; the reference's ClearType fringes are BGR-ordered, the painter's RGB.
 
-**API** (`menu.h`, meant for lux-style context menus too): `struct wmmenu_item { text ("&Move"), accel, flags (WMMENU_DISABLED,
-SEPARATOR, DEFAULT, CHECKED), glyph, id, cb(arg, id), arg, sub, nsub }`; `wmmenu_popup(env, x, y, items, n, flags, button)` runs the
+**API** (`menu.h`, meant for lux-style context menus too): `struct wm_menu_item { text ("&Move"), accel, flags (WMMENU_DISABLED,
+SEPARATOR, DEFAULT, CHECKED), glyph, id, cb(arg, id), arg, sub, nsub }`; `wm_menu_popup(env, x, y, items, n, flags, button)` runs the
 menu (flags `WMMENU_KEYBOARD`, `WMMENU_FLIP`; `button`: the button still held) and returns the chosen index after calling its `cb`, or
-`WMMENU_CANCEL` / `WMMENU_DBLCLICK`; `struct wmmenu_env` carries the display, ARGB visual, theme, compositor flag, monitor rectangle, a
-dispatcher for other windows' events and the double-click rectangle. wm.c's `wmmenu_open(client, x, y, flags, button, from_icon)`
+`WMMENU_CANCEL` / `WMMENU_DBLCLICK`; `struct wm_menu_env` carries the display, ARGB visual, theme, compositor flag, monitor rectangle, a
+dispatcher for other windows' events and the double-click rectangle. wm.c's `wm_menu_open(client, x, y, flags, button, from_icon)`
 builds the system menu; `sysmenu_command()`, its callback, looks the window up again (one that went away while the menu was open is
 left alone).
 
@@ -363,7 +363,7 @@ one. luxwm's own alias rewrite of `_LH_THEME` is counted (`lh_theme_selfwrite`) 
 
 ## Window shape
 
-`frame_paint_ex4()` paints into an image surface, copies it to the decoration window and derives an X Shape bounding region from its
+`wm_frame_paint_ex4()` paints into an image surface, copies it to the decoration window and derives an X Shape bounding region from its
 alpha: in the top and bottom 24 rows, leading/trailing pixels with alpha below `shape_alpha` (theme.ini; default 32 for DWM sets, 1 for
 msstyles) are cut out. The DWM plate is rounded (its corner pixels have alpha 0..0x30); a full rectangle would let picom blur and shadow
 the square corner as a notch around the rounded highlight (`compare_dwm_corners.png`). Without a compositor the shape is what makes the
@@ -380,7 +380,7 @@ and inactive, both sources: the right 100 columns equal the texture's columns 70
 it; the texture's dark line 9 px): aero-patch `button_right = 5`; jade4074 `button_right = 6` (fitted to 4066, "Glass accuracy"). In
 the original the min/max/close dividers are 27/27/42 px apart (-104/-77/-50/-8 from the frame's right edge on the bright line at w-2)
 while the 4074 sprites are 25/25/40; `button_gap` (default 0) widens each cell: sprite cols 0..3 stay at the cell's left, col 4 is
-repeated over the gap, the rest sits at the right end; `button_rect` (drawing and `frame_hit`) uses the cell. The shipped sets use
+repeated over the gap, the rest sits at the right end; `button_rect` (drawing and `wm_frame_hit`) uses the cell. The shipped sets use
 `button_gap = 0`. The Explorer plate (STREAM 484) has its pill at the same place (x=701..793 at rows 2..5, narrowing to 787..792 at row
 11), so the same inset and button layout apply.
 
@@ -409,14 +409,14 @@ theme.ini keys (written by the converter; with the library only the tuning keys 
   (IMAGECOUNT), `.variants` (`@n:WxH`), `.sizing_margins`, `.content_margins` (left right top bottom), `.caption_margins`, `.sizing`
   (stretch|tile), `.transparent`, `.content_alignment`, `.shadow.<1 active|2 inactive> = none|single|continuous dx dy #rrggbb`.
 
-Geometry and drawing (frame.c `ms_paint`, `ms_btn_rect`, `theme_margins_ex`):
+Geometry and drawing (frame.c `ms_paint`, `ms_btn_rect`, `wm_theme_margins_ex`):
 - cnBorders = 3 + border_width on all sides (4 px for the Longhorn styles), caption = cnBorders + caption_height + 1 (24 px); CAPTION over
   the full width, FRAMELEFT/RIGHT (cnBorders wide, from the caption to the bottom frame) and FRAMEBOTTOM (full width) stretched into
   their rects; frame state 1 active / 2 inactive.
 - Nine-grid as ninegrid2.cpp: 32.32 fixed-point nearest neighbour starting half a step in, corners 1:1 while a middle remains, otherwise
   the corners share the size in proportion to their margins (the 29 px Slate caption with margins 20/8 is shrunk into 24 rows that way).
   A part drawn taller than its bitmap whose SIZINGMARGINS cover every row (Luna Silver's 26-row MAXCAPTION, margins 9 + 17; only luxwm
-  asks for that, in a maximised caption continued into a header) repeats source row `top` in between (`ng_map`, `fut_ms_draw`).
+  asks for that, in a maximised caption continued into a header) repeats source row `top` in between (`ng_map`, `wm_fut_ms_draw`).
 - Buttons: (MulDiv(caption_height, close.w, close.h) - 4) x (caption_height - 4) = 15x15, close 2 px left of the right border, then
   max/restore and min 2 px apart, top = cnBorders + 2. Strip index = framestate * (images / 2) + {normal, hot, pushed, disabled}: the
   Longhorn 10-image strips have 5 per frame state (the 5th, a deep red/blue "default" look, is unused: nothing in nctheme selects it);
@@ -439,7 +439,7 @@ Geometry and drawing (frame.c `ms_paint`, `ms_btn_rect`, `theme_margins_ex`):
   ReactOS styles' CAPTION has three transparent top rows; Watercolor Lite's tiled CAPTION is shorter than the band): the window starts
   below them, as on XP (`2k3-205316.png`). Frames are opaque and the client area left transparent, so the mode looks the same with and
   without picom.
-- `frame_hit`: buttons exactly their rects, borders cnBorders wide, corners one caption height along each edge.
+- `wm_frame_hit`: buttons exactly their rects, borders cnBorders wide, corners one caption height along each edge.
 - `_LHWM_FRAME_FLAGS` `NO_TITLE` / `NO_ICON` apply here too; everything else about extended frames in this mode is the header pixmap
   ("Extended frames").
 
@@ -497,7 +497,7 @@ NormalSize, v3))` or `(msstyles, PNG cache)`.
   whole button rect, XP's imagefile.cpp for the content rect (in a 21x21 Luna button the 19x19 glyph instead of the 13x13).
 - metadata: IMAGECOUNT, the true size (`ut_part_size` TS_TRUE: the button aspect), SIZINGMARGINS (shape rows), CONTENTMARGINS,
   CAPTIONMARGINS (CAPTION's for parts without their own), SIZINGTYPE, TEXTSHADOWTYPE/OFFSET/COLOR per caption state; the caption's
-  active image at its true size for the shape's corner rows (`frame_shape_rects`).
+  active image at its true size for the shape's corner rows (`wm_frame_shape_rects`).
 - [SysMetrics]: SIZINGBORDERWIDTH (default 1), CAPTIONBARHEIGHT, CAPTIONFONT (`ut_get_font`, as a pango description
   `FACE[,Tahoma][ Bold][ Italic] PXpx`), CAPTIONTEXT, INACTIVECAPTIONTEXT (`ut_get_color`).
 - defaults unless theme.ini sets them: `text_hinting = none` for a `Quality:ClearType-Natural` CAPTIONFONT, `text_antialias = none` for
@@ -607,7 +607,7 @@ Computer 1 0 none ICON` against the screenshot's rows 33-55 (all 800 columns, th
   restore cleared before the restore geometry (also when a drag un-maximises: `client_unmax_margins`), so a tracer of root
   PropertyNotify and the client's ConfigureNotify sees the mode first, with and without picom.
 - DWM sets maximised: the frame fills the work area, margins `0 0 m_t 0` (`_NET_FRAME_EXTENTS` follows), the client fills the work area
-  below the caption; no resize edges (`frame_hit_ex`: buttons and caption only), window shape the full rectangle. The caption keeps its
+  below the caption; no resize edges (`wm_frame_hit_ex`: buttons and caption only), window shape the full rectangle. The caption keeps its
   height, text and button layout (the aero pill and buttons sit in the side margin, so the borders cannot be pushed off-window without
   clipping the close button). With `plate_max` the frame draws 4074's `LGFRAMEMAX` plate (STREAM 493; `LGFRAMEMAXEXPLORER`, 494, under an
   Explorer-style header, i.e. `_LHWM_EXTEND_FRAME` top > 0). Without it the normal plate is 9-sliced as `w x (h + bottom margin)` (bottom
@@ -642,7 +642,7 @@ Computer 1 0 none ICON` against the screenshot's rows 33-55 (all 800 columns, th
   desktop fades the plate at its new rectangle: from the normal plate (squared, maximised geometry) to the maximised one, or back (the
   maximised plate stretched over the restored frame), linear like luxshell's black layers (`lh.animate(..., 400)`), repainted on a 25 ms
   grid by the main loop's poll timeout, its clock starting at the ungrab and one tick in. A second maximise/restore reverses it from
-  where it is; a drag that un-maximises ends it. frame.c's `frame_paint_ex3`/`frame_paint_cr3` take the weight `maxfade` (0 normal .. 1
+  where it is; a drag that un-maximises ends it. frame.c's `wm_frame_paint_ex3`/`wm_frame_paint_cr3` take the weight `maxfade` (0 normal .. 1
   maximised, < 0 by state) and paint a cross-dissolve `(1 - t) normal + t maximised` (premultiplied, `OPERATOR_ADD` in a group, then over
   the background), so Jade's translucent plate ends at its own alpha; the overlay fades with `1 - t`, the caption text colour and glow
   with t. The three layers (normal plate, maximised plate, masked overlay) are rendered once per fade (`fade_layer`, keyed by size,
@@ -664,7 +664,7 @@ Computer 1 0 none ICON` against the screenshot's rows 33-55 (all 800 columns, th
 
 ### Window icons
 
-`client_set_icon`, `client_icon`, frame.c `frame_icon_from_netwm`, `frame_icon_from_pixmap`, `theme_default_icon`. The caption icon is:
+`client_set_icon`, `client_icon`, frame.c `wm_frame_icon_from_netwm`, `wm_frame_icon_from_pixmap`, `wm_theme_default_icon`. The caption icon is:
 1. `_NET_WM_ICON` (read up to 16M items): the smallest image at least the icon size (`icon_size`, msstyles 16), else the largest, scaled
    once to the size with `CAIRO_FILTER_BEST` (aspect kept, centred);
 2. else `WM_HINTS` `icon_pixmap` + `icon_mask` (depth 1: black on white as the classic X icon box; other depths through the default
@@ -694,7 +694,7 @@ MAXCAPTION, but no shipped style defines a MAXCAPTION text colour (`Window.MAXCA
 
 ### Fonts
 
-The theme's font directories (`path.fonts`, from `[Fonts] fonts`; frame.c `frame_fonts_set`) plus the set's `font_files` (files or
+The theme's font directories (`path.fonts`, from `[Fonts] fonts`; frame.c `wm_frame_fonts_set`) plus the set's `font_files` (files or
 directories) are registered at every theme load as the process's fontconfig application fonts, replacing the previous set
 (`FcConfigAppFontClear`, then `FcConfigAppFontAddDir`/`AddFile`, then pango's default font map is dropped; only when the set changed).
 `LHWM_DEBUG=1` logs the resolved face per load, e.g. `caption font "Segoe UI 9" -> "Segoe UI 9" (.../Fonts/seguibk.ttf)`;
@@ -708,7 +708,7 @@ the client leaves that part transparent. The reference client is `examples/exten
 Documents window). The client properties are read at map time and on every PropertyNotify, deletion included (PropertyChangeMask is
 selected before they are first read).
 
-- `frame_paint_ex4`/`frame_paint_cr3` take a `struct frame_ext`; NULL, or all zero with no flags, is the plain path. `plate_ext` paints
+- `wm_frame_paint_ex4`/`wm_frame_paint_cr3` take a `struct frame_ext`; NULL, or all zero with no flags, is the plain path. `plate_ext` paints
   the plate on a 7x7 grid: per axis outer edge | band (stretched by the extension) | inner lines | middle | inner lines | band | outer
   edge, so the inner dark/light lines move in by the extension. The caption rows that stretch are `extend_rows` (aero-patch `15 25`,
   below the pill). With `fog = 1`, `fog_band` paints `captionfog.png` over the caption row and the extended top unless `NO_FOG`.
@@ -727,19 +727,19 @@ selected before they are first read).
 - **Header pixmap** (without composition: classic sets, with or without picom): the decoration window keeps the normal frame (the
   extension does not change it; `NO_TITLE`/`NO_ICON` apply), and `header_update()` (end of every `draw_text`) publishes
   `_LHWM_HEADER_PIXMAP` on the client: a pixmap of the client's depth and visual (created on the root, so a client destroyed meanwhile
-  cannot make `XCreatePixmap` fail), client width x (top frame margin + header rows), painted by `frame_header_image()`: the whole frame
+  cannot make `XCreatePixmap` fail), client width x (top frame margin + header rows), painted by `wm_frame_header_image()`: the whole frame
   painted with the extension, `ms_paint` nine-gridding the CAPTION (maximised: MAXCAPTION) bitmap over `caption + extension` rows and
   starting the side frames below it, title and icon left out, cropped to the client's columns and rows 0..band; its last row lies
   against the bottom of the client's header. Rendered again only when size, focus, maximised state, extension, theme generation or, with
   `CLIENT_CAPTION`, button hover/press change (new pixmap, property replaced, old one freed). Deleted when composited, when the
   extension goes, on unmanage, on a clean exit, and while `NO_HEADER_PIXMAP` is set (`FRAME_NO_HEADER_PIXMAP`, wm.c's only).
   `examples/extendframe` copies it.
-- **`CLIENT_CAPTION`** (experimental): `margins_for()` cuts the top margin to `theme_caption_border()` (msstyles cnBorders, DWM the side
+- **`CLIENT_CAPTION`** (experimental): `margins_for()` cuts the top margin to `wm_theme_caption_border()` (msstyles cnBorders, DWM the side
   border `m_l` or the set's `caption_border`, maximised 0), so the client covers the caption; geometry, `_NET_FRAME_EXTENTS`, drags and
   theme switches go through it. A new window keeps a normal frame's size and its client grows by the caption; toggling the flag at
   runtime keeps the frame and resizes the client; adoption puts the frame around the client as it is. A theme switch keeps the logical
   rectangle (frame minus the normal margins), so a client toggling the flag per theme does not drift. `_LHWM_CAPTION_RECT` (client
-  coordinates, the union of the button hit rectangles from `frame_buttons_rect()`, clipped to the client) is written on change and on
+  coordinates, the union of the button hit rectangles from `wm_frame_buttons_rect()`, clipped to the client) is written on change and on
   every maximise/restore, after `_NET_WM_STATE` (`header_hold` keeps the intermediate paint in `client_apply_max` from publishing). The
   decoration window under the client is unchanged, so buttons and hit-testing stay luxwm's and work through the client's input-shape
   hole. Composited, the extension's top counts from the client's top, and the plate band is stretched from the normal caption bottom to
@@ -781,9 +781,9 @@ CLIENT-PROTOCOL.md "Vision header"; a "vision" theme, i.e. taste, not a build): 
   light, then black) goes on the header's last two rows. aap's idea ("we never scale the tall titlebar plate vertically ... redraw a 1px
   black frame on top and use the inside for the client area"). A header taller than the band (more than 80 rows) repeats the band's last
   row; any client header height works (small 47 rows: lines on frame rows 47/48; big 69: lines 69/70, body from 71).
-- `deco_h = 15`: the decoration ends on row 15, under the buttons. `frame_hit_ex` and `frame_buttons_rect` clip the buttons' hit slop to
+- `deco_h = 15`: the decoration ends on row 15, under the buttons. `wm_frame_hit_ex` and `wm_frame_buttons_rect` clip the buttons' hit slop to
   it (so `_LHWM_CAPTION_RECT` ends there too); `_LHWM_FRAME_METRICS` field 18.
-- `caption_border = 2` (`theme_caption_border`): a `CLIENT_CAPTION` client starts on frame row 2, so it can draw a small title with the
+- `caption_border = 2` (`wm_theme_caption_border`): a `CLIENT_CAPTION` client starts on frame row 2, so it can draw a small title with the
   baseline on row 15 (with the side border, 9, its top 3..4 glyph rows would lie above the client).
 - `button_files = vision_close.png vision_max.png vision_min.png vision_restore.png`, `button_frame_h = 13`: 13-row caption buttons
   (rows 2..14, ending with the pill and the deco), made by `tools/build_aerovision.py` from the aero sprites by dropping sprite row 11
@@ -837,7 +837,7 @@ shipped Jade plate through desksrv's fixed-function path, COMPOSITION.md 18).
 What keeps drags fast (with `LHWM_PROF=1`: an xterm right-edge drag of 200 motion events applies 40..49 steps with as many paints, one
 paint 1.0 ms cairo + 2.4..4.6 ms upload; an ARGB extended window 7..8 ms cairo + 13..19 ms upload):
 - **Expose coalescing.** Each resize of the decoration window, and each shape change, exposes it. An Expose whose serial is older than
-  the first upload request of the last paint is ignored (`frame_upload_serial`: that paint covers it); newer ones mark the frame dirty
+  the first upload request of the last paint is ignored (`wm_frame_upload_serial`: that paint covers it); newer ones mark the frame dirty
   and `paint_dirty()` repaints once when the event queue is empty (main loop, and in the drag loop before it blocks).
 - **Throttled steps.** `drag_run` coalesces motion and applies a step at most every `DRAG_INTERVAL` ms (config.h, 16); a position held
   back is applied when the interval is over (poll with a timeout on the X connection) or when the drag ends, so the final geometry is
@@ -855,7 +855,7 @@ paint 1.0 ms cairo + 2.4..4.6 ms upload; an ARGB extended window 7..8 ms cairo +
 ### Resize without flicker
 
 Under Composite a window's newly added area shows whatever it holds until it is painted. What luxwm does about it (wm.c
-`drag_client_begin` .. `drag_client_end`, `geom_paint`, frame.c `frame_pre_upload`):
+`drag_client_begin` .. `drag_client_end`, `geom_paint`, frame.c `wm_frame_pre_upload`):
 - **Order of a step.** The frame is painted at the new size first and uploaded into an offscreen pixmap; then, under a short
   `XGrabServer`, client and decoration window are resized (client first; a left/top edge is one `XMoveResizeWindow` each), the shape
   set and the pixmap copied into the frame (the four bands, or all of it for ARGB/extended clients). Upload, then `XSync`, so the grab
@@ -907,7 +907,7 @@ cells and no strip they never repaint.
 - **Maximised remainder.** The X11 way, not Windows' (Windows gives the client the whole area and terminals paint the rest): the frame
   fills the work area, the client is `base + n * inc`, and the frame paints what lies under the remainder (right and bottom). DWM sets
   paint the plate there (the opaque-client hole is the client's real rectangle): aero's dark LGFRAMEMAX body, jade's green glass.
-  msstyles frames leave the client area transparent, so `frame_paint_ex4` (its `client` rect; `ms_gap_fill`) fills the free part with the
+  msstyles frames leave the client area transparent, so `wm_frame_paint_ex4` (its `client` rect; `ms_gap_fill`) fills the free part with the
   border's colour (FRAMELEFT drawn in its frame state, sampled in the middle; button-face grey without the part; Windows Classic
   `btnface`), as if the border went on around the client. `_NET_FRAME_EXTENTS` is the frame around the client as it lies (a maximised
   urxvt: `0 4 27 2` on aero4074, `0 4 20 9` on slate4074), written only when it changes.

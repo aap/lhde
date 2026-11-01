@@ -13,7 +13,7 @@ plate's pill exactly with button_right = 5, aap's tuning of aero), so the only c
 
 Output: vision_close.png, vision_max.png, vision_min.png, vision_restore.png in OUT_DIR (4 frames of 13 rows). They are not
 named close.png etc. on purpose: those names are replaced by the style's CompositedWindow streams when luxwm reads the msstyles
-through libuxtheme (frame_ut.c fut_png); theme.ini names them with `button_files`.
+through libuxtheme (frame_ut.c wm_fut_png); theme.ini names them with `button_files`.
 
 The concept art (lh_concepts/1456384117.or.45878.png) shows a pill about 13 px high hanging from the top edge with three
 buttons of about 26/25/37 px; ours keep aero's 27/25/43 because the pill is baked into the plate texture at that width.

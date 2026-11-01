@@ -10,10 +10,9 @@
 #define LOGN(msg)      do { if (debug) fprintf(stderr, "luxwm: " msg "\n"); } while (0)
 #define LOGP(msg, ...) do { if (debug) fprintf(stderr, "luxwm: " msg "\n", __VA_ARGS__); } while (0)
 
-#include <stdio.h>   /* declares asprintf/vasprintf (glibc, POSIX 2024); utils.c provides them elsewhere */
-#if !defined(__GLIBC__)
-int asprintf(char **buf, const char *fmt, ...);
-int vasprintf(char **buf, const char *fmt, va_list args);
-#endif
+#include <stdio.h>
+/* asprintf / vasprintf under luxwm's own names (utils.c), so the C99 build needs no feature macros */
+int wm_asprintf(char **buf, const char *fmt, ...);
+int wm_vasprintf(char **buf, const char *fmt, va_list args);
 
 #endif

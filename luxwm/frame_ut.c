@@ -13,21 +13,21 @@
 #include <stdint.h>
 
 #ifndef HAVE_UXTHEME
-int  fut_available(void) { return 0; }
-int  fut_open(struct theme *t, const char *path, const char *color, const char *size) { (void)t; (void)path; (void)color; (void)size; return 0; }
-void fut_close(struct theme *t) { (void)t; }
-int  fut_ms_load(struct theme *t, int aa_set, int hint_set) { (void)t; (void)aa_set; (void)hint_set; return 0; }
-void fut_ms_draw(cairo_t *cr, const struct theme *t, int p, int state, int x, int y, int w, int h) {
+int  wm_fut_available(void) { return 0; }
+int  wm_fut_open(struct theme *t, const char *path, const char *color, const char *size) { (void)t; (void)path; (void)color; (void)size; return 0; }
+void wm_fut_close(struct theme *t) { (void)t; }
+int  wm_fut_ms_load(struct theme *t, int aa_set, int hint_set) { (void)t; (void)aa_set; (void)hint_set; return 0; }
+void wm_fut_ms_draw(cairo_t *cr, const struct theme *t, int p, int state, int x, int y, int w, int h) {
     (void)cr; (void)t; (void)p; (void)state; (void)x; (void)y; (void)w; (void)h; }
-cairo_surface_t *fut_png(const struct theme *t, const char *name) { (void)t; (void)name; return NULL; }
-void fut_add_font_dir(const char *dir) { (void)dir; }
+cairo_surface_t *wm_fut_png(const struct theme *t, const char *name) { (void)t; (void)name; return NULL; }
+void wm_fut_add_font_dir(const char *dir) { (void)dir; }
 #else
 #include <wuxtheme/ut.h>
 
-int fut_available(void) { return 1; }
+int wm_fut_available(void) { return 1; }
 
-int fut_open(struct theme *t, const char *path, const char *color, const char *size) {
-    fut_close(t);
+int wm_fut_open(struct theme *t, const char *path, const char *color, const char *size) {
+    wm_fut_close(t);
     ut_theme *u = ut_open(path, color && *color ? color : NULL, size && *size ? size : NULL);
     if (!u) { fprintf(stderr, "luxwm: libuxtheme cannot open %s\n", path); return 0; }
     /* ut_open takes an unknown scheme/size as the style's first: say so, a typo in a theme file should not go unnoticed */
@@ -38,12 +38,12 @@ int fut_open(struct theme *t, const char *path, const char *color, const char *s
     return 1;
 }
 
-void fut_close(struct theme *t) {
+void wm_fut_close(struct theme *t) {
     if (t->ut) ut_close((ut_theme *)t->ut);
     t->ut = NULL;
 }
 
-void fut_add_font_dir(const char *dir) { ut_add_font_dir(dir); }
+void wm_fut_add_font_dir(const char *dir) { ut_add_font_dir(dir); }
 
 static const char *ms_part_names[MP_LAST] = { "CAPTION", "MAXCAPTION", "SMALLCAPTION", "FRAMELEFT", "FRAMERIGHT", "FRAMEBOTTOM",
                                               "CLOSEBUTTON", "MAXBUTTON", "MINBUTTON", "RESTOREBUTTON", "HELPBUTTON", "SMALLCLOSEBUTTON" };
@@ -100,7 +100,7 @@ static void load_strip(ut_theme *u, struct mspart *m, int id, int k, int prop, i
     ut_free(px);
 }
 
-int fut_ms_load(struct theme *t, int aa_set, int hint_set) {
+int wm_fut_ms_load(struct theme *t, int aa_set, int hint_set) {
     ut_theme *u = t->ut; if (!u) return 0;
     int v; uint32_t c; char fs[256] = "";
     t->ms_border = ut_get_int(u, "sysmetrics", 0, 0, P("SIZINGBORDERWIDTH"), &v) ? v : 1;   /* system default 1 when absent */
@@ -156,7 +156,7 @@ int fut_ms_load(struct theme *t, int aa_set, int hint_set) {
                 m->sh_type[s] = ty; m->sh_dx[s] = dx; m->sh_dy[s] = dy; rgb_of(col, m->sh_rgb[s]);
             }
             /* the active image at its own size: the part's presence for ms_paint and the window shape's corner rows
-               (frame_shape_rects takes the caption's top rows 1:1 from it) */
+               (wm_frame_shape_rects takes the caption's top rows 1:1 from it) */
             m->img[0][0] = part_image(u, id, 1, cx, cy);
         }
     }
@@ -164,7 +164,7 @@ int fut_ms_load(struct theme *t, int aa_set, int hint_set) {
     return t->ms[MP_CAPTION].img[0][0] != NULL;
 }
 
-void fut_ms_draw(cairo_t *cr, const struct theme *t, int p, int state, int x, int y, int w, int h) {
+void wm_fut_ms_draw(cairo_t *cr, const struct theme *t, int p, int state, int x, int y, int w, int h) {
     const struct mspart *m = &t->ms[p];
     if (!t->ut || w <= 0 || h <= 0 || m->ut_part <= 0) return;
     int sh = m->vh[0], top = m->sm[2], bot = m->sm[3];
@@ -219,7 +219,7 @@ static cairo_status_t mem_read(void *closure, unsigned char *data, unsigned int 
     return CAIRO_STATUS_SUCCESS;
 }
 
-cairo_surface_t *fut_png(const struct theme *t, const char *name) {
+cairo_surface_t *wm_fut_png(const struct theme *t, const char *name) {
     ut_theme *u = t->ut; if (!u || !name) return NULL;
     size_t i; for (i = 0; i < sizeof pngmap / sizeof pngmap[0]; i++) if (!strcmp(name, pngmap[i].file)) break;
     if (i == sizeof pngmap / sizeof pngmap[0]) return NULL;

@@ -146,6 +146,7 @@ static Atom lhwm_anim_atom, net_icon_geom_atom;   /* _LHWM_ANIMATE (picom-glass.
 static long anim_style = ANIMATE_STYLE;
 static Atom lh_settings_atom;   /* _LH_SETTINGS_CHANGED */
 static void settings_load(bool startup);
+static bool super_other;   /* something else happened while Super was held (Super alone: the start menu on its release) */
 #define ANIM_ON (ANIMATE && anim_style != ANIM_NONE)
 static Atom lhwm_desklayer_atom;                  /* _LHWM_DESKTOP_LAYER: order of the desktop windows (docks_raise) */
 /* a dock changed its struts or state: _NET_WORKAREA and the refit of maximised windows wait until the event queue is drained,
@@ -169,8 +170,8 @@ static void header_update(struct client *c, bool focused);
 static void client_read_ext(struct client *c);
 static void composited_publish(void);
 static void drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboard);
-static void wmmenu_open(struct client *c, int x, int y, unsigned flags, unsigned button, bool from_icon);
-static void wmmenu_at_caption(struct client *c, unsigned flags, unsigned button, bool from_icon);
+static void wm_menu_open(struct client *c, int x, int y, unsigned flags, unsigned button, bool from_icon);
+static void wm_menu_at_caption(struct client *c, unsigned flags, unsigned button, bool from_icon);
 static bool client_on_icon(struct client *c, int x, int y);
 static unsigned long next_seq = 1;
 static bool adopting = false;
@@ -511,7 +512,7 @@ draw_text(struct client *c, bool focused)
     /* extended frame: only while composited (glass); in client pixels, clamped to the client */
     if ((c->has_ext || pf) && comp) {
         int l, r, t, b; margins(c, &l, &r, &t, &b);
-        int nl, nr, nt, nb; theme_margins_ex(&theme, c->mono, &nl, &nr, &nt, &nb);
+        int nl, nr, nt, nb; wm_theme_margins_ex(&theme, c->mono, &nl, &nr, &nt, &nb);
         int ax, ay, aw, ah; client_area(c, c->geom.width, c->geom.height, &ax, &ay, &aw, &ah);
         long cw = MAX(aw, 0), ch = MAX(ah, 0);
         memset(&ext, 0, sizeof ext); ext.flags = flags; e = &ext;
@@ -536,9 +537,9 @@ draw_text(struct client *c, bool focused)
         if (crect.width >= MINIMUM_DIM && crect.height >= MINIMUM_DIM && crect.x + crect.width <= c->geom.width && crect.y + crect.height <= c->geom.height) {
             hole = crect; hp = &hole; }
     }
-    frame_paint_ex4(display, argb_visual, &theme, c->dec, c->geom.width, c->geom.height, c->title, client_icon(c), focused, c->hover, c->pressed, c->mono, e, hp,
+    wm_frame_paint_ex4(display, argb_visual, &theme, c->dec, c->geom.width, c->geom.height, c->title, client_icon(c), focused, c->hover, c->pressed, c->mono, e, hp,
                     xfade_weight(c), &crect);
-    c->paint_serial = frame_upload_serial; c->dirty = false;
+    c->paint_serial = wm_frame_upload_serial; c->dirty = false;
     header_update(c, focused);
     XFlush(display);   /* XNextEvent will not flush while events keep arriving */
 }
@@ -557,7 +558,7 @@ header_update(struct client *c, bool focused)
     int cw, ch, ax, ay; client_area(c, c->geom.width, c->geom.height, &ax, &ay, &cw, &ch);
     /* the caption-button area in client coordinates, which the client keeps free (and out of its input shape) */
     if (cc && c->decorated && cw > 0 && ch > 0) {
-        int bx, by, bw, bh; frame_buttons_rect(&theme, c->geom.width, c->mono, &bx, &by, &bw, &bh);
+        int bx, by, bw, bh; wm_frame_buttons_rect(&theme, c->geom.width, c->mono, &bx, &by, &bw, &bh);
         long rc[4] = { bx - l, by - t, bw, bh };
         if (rc[0] < 0) { rc[2] += rc[0]; rc[0] = 0; }
         if (rc[1] < 0) { rc[3] += rc[1]; rc[1] = 0; }
@@ -580,7 +581,7 @@ header_update(struct client *c, bool focused)
         if (c->hdr_pix) { XDeleteProperty(display, c->window, lhwm_hdrpix_atom); XFreePixmap(display, c->hdr_pix); c->hdr_pix = None; c->hdr_key = 0; }
         return;
     }
-    int nl, nr, nt, nb; theme_margins_ex(&theme, c->mono, &nl, &nr, &nt, &nb);
+    int nl, nr, nt, nb; wm_theme_margins_ex(&theme, c->mono, &nl, &nr, &nt, &nb);
     long et = 0;
     if (c->has_ext) et = (c->ext[0] & c->ext[1] & c->ext[2] & c->ext[3] & 0xFFFFFFFFUL) == 0xFFFFFFFFUL ? ch : MIN((long)c->ext[2], (long)ch);
     int band = t + (int)et;
@@ -592,7 +593,7 @@ header_update(struct client *c, bool focused)
     long kv[] = { c->geom.width, c->geom.height, cw, band, focused, hov, prs, c->mono, theme_gen, pe.t, l };
     for (size_t i = 0; i < sizeof kv / sizeof kv[0]; i++) key = (key ^ (unsigned long)kv[i]) * 1099511628211UL;
     if (c->hdr_pix && key == c->hdr_key) return;
-    cairo_surface_t *img = frame_header_image(&theme, c->geom.width, c->geom.height, l, cw, band, focused, hov, prs, c->mono, &pe);
+    cairo_surface_t *img = wm_frame_header_image(&theme, c->geom.width, c->geom.height, l, cw, band, focused, hov, prs, c->mono, &pe);
     if (!img) return;
     Pixmap pix = XCreatePixmap(display, root, (unsigned)cw, (unsigned)band, (unsigned)c->depth);   /* root: the client may be gone already */
     cairo_surface_t *xs = cairo_xlib_surface_create(display, pix, c->visual, cw, band);
@@ -628,8 +629,8 @@ static void
 margins_for(struct client *c, const struct theme *th, int max, int *l, int *r, int *t, int *b)
 {
     if (!c->decorated) { *l = *r = *t = *b = 0; return; }
-    theme_margins_ex(th, max, l, r, t, b);
-    if (c->ext_flags & FRAME_CLIENT_CAPTION) *t = MIN(*t, theme_caption_border(th, max));
+    wm_theme_margins_ex(th, max, l, r, t, b);
+    if (c->ext_flags & FRAME_CLIENT_CAPTION) *t = MIN(*t, wm_theme_caption_border(th, max));
 }
 
 /* ---- size hints (LUXWM.md "Size hints"): WM_NORMAL_HINTS, ICCCM 4.1.2.3 ----
@@ -1063,7 +1064,7 @@ handle_client_message(XEvent *e)
         /* the window menu at a root point (data.l[1], l[2]; l[0] the device): a client's own caption, the taskbar's button of
            the window (XP's task button menu is the window's system menu; minimised windows too) */
         struct client *c = get_client_from_window(cme->window);
-        if (c) wmmenu_open(c, (int)cme->data.l[1], (int)cme->data.l[2], WMMENU_FLIP, 0, false);
+        if (c) wm_menu_open(c, (int)cme->data.l[1], (int)cme->data.l[2], WMMENU_FLIP, 0, false);
 
     } else if (cme->message_type == net_atom[NetWMDesktop]) {
         /* EWMH: a pager (luxshell, flxp) moves a window to another desktop; the current desktop stays (0xFFFFFFFF, all desktops, is
@@ -1127,7 +1128,7 @@ handle_button_press(XEvent *e)
     XEvent ev;
     struct client *c;
     int x, y, ocx, ocy, nx, ny, nw, nh, di, ocw, och;
-    extern bool super_other; super_other = true;   /* a click while Super is held: no start menu on its release */
+    super_other = true;   /* a click while Super is held: no start menu on its release */
     unsigned int dui, state;
     Window dummy;
     Time current_time, last_motion;
@@ -1164,7 +1165,7 @@ handle_button_press(XEvent *e)
         int hit = client_hit(c, bev->x, bev->y);
         /* the window menu (LUXWM.md "The window menu"): a click on the caption icon opens it under the caption (a double click there
            closes the window), a right click on the caption opens it where the button is released (WM_CONTEXTMENU on the up) */
-        if (bev->button == 1 && hit == HIT_CAPTION && client_on_icon(c, bev->x, bev->y)) { wmmenu_at_caption(c, 0, 1, true); return; }
+        if (bev->button == 1 && hit == HIT_CAPTION && client_on_icon(c, bev->x, bev->y)) { wm_menu_at_caption(c, 0, 1, true); return; }
         if (bev->button == 3 && hit == HIT_CAPTION) {
             int rx = bev->x_root, ry = bev->y_root;
             if (XGrabPointer(display, c->dec, False, MOUSEMASK, GrabModeAsync, GrabModeAsync, None, None, CurrentTime) == GrabSuccess) {
@@ -1176,7 +1177,7 @@ handle_button_press(XEvent *e)
                 XUngrabPointer(display, CurrentTime);
             }
             struct client *k = get_client_from_window(c->window);
-            if (k == c) wmmenu_open(c, rx, ry, WMMENU_FLIP, 0, false);
+            if (k == c) wm_menu_open(c, rx, ry, WMMENU_FLIP, 0, false);
             return;
         }
         if (bev->button != 1 && hit == HIT_CAPTION) return;
@@ -2164,7 +2165,7 @@ manage_new_window(Window w, XWindowAttributes *wa)
     client_read_ext(c);
     client_read_hints(c);   /* WM_NORMAL_HINTS: the size is fitted by the client_refresh below */
     { int l, r, t, b; margins(c, &l, &r, &t, &b);
-      if (!adopting && c->decorated) theme_margins(&theme, &l, &r, &t, &b);   /* new: normal margins, CLIENT_CAPTION then grows the client up into the caption */
+      if (!adopting && c->decorated) wm_theme_margins(&theme, &l, &r, &t, &b);   /* new: normal margins, CLIENT_CAPTION then grows the client up into the caption */
       c->geom.x = wa->x;
       c->geom.y = wa->y;
       c->geom.width = wa->width + l + r;
@@ -2743,7 +2744,7 @@ refresh_config(void)
     }
 }
 
-/* a geometry change of client and decoration window, sent by frame_paint_ex3 between the offscreen paint and the copy into the
+/* a geometry change of client and decoration window, sent by wm_frame_paint_ex3 between the offscreen paint and the copy into the
    window (LUXWM.md "Resize without flicker"); move: x, y are the frame's position, else only the sizes change */
 struct geom_req { struct client *c; bool move; int x, y, cw, ch, dw, dh; };
 struct drag_cl;
@@ -2771,9 +2772,9 @@ geom_apply(void *arg)
 static void
 geom_paint(struct client *c, struct geom_req *g)
 {
-    frame_pre_upload = geom_apply; frame_pre_upload_arg = g;
+    wm_frame_pre_upload = geom_apply; wm_frame_pre_upload_arg = g;
     draw_text(c, client_active(c));
-    if (frame_pre_upload) { frame_pre_upload = NULL; geom_apply(g); }   /* nothing was painted */
+    if (wm_frame_pre_upload) { wm_frame_pre_upload = NULL; geom_apply(g); }   /* nothing was painted */
 }
 
 static void
@@ -2787,7 +2788,7 @@ client_resize_absolute(struct client *c, int w, int h)
 
     /*LOGN("Resizing client main window");*/
     if (c->decorated) {
-        /* the frame is painted at the new size first; the resize of both windows goes out together with its pixels (frame_pre_upload) */
+        /* the frame is painted at the new size first; the resize of both windows goes out together with its pixels (wm_frame_pre_upload) */
         struct geom_req g = { c, false, 0, 0, dw, dh, w, h };
         c->geom.width = w; c->geom.height = h;
         geom_paint(c, &g);
@@ -2949,7 +2950,7 @@ client_set_icon(struct client *c)
     /* _NET_WM_ICON first (the whole array: 1L << 24 longs; a 256 px icon set alone is 87k), then WM_HINTS icon_pixmap/icon_mask
        (xterm, xclock, Xt/Motif/FOX programs: they have no _NET_WM_ICON). Without either the frame shows the theme's default icon */
     if (XGetWindowProperty(display, c->window, net_atom[NetWMIcon], 0, 1L << 24, False, XA_CARDINAL, &ty, &fmt, &n, &after, &d) == Success && d) {
-        if (fmt == 32 && n > 2) c->icon = frame_icon_from_netwm((unsigned long *)d, n, want);
+        if (fmt == 32 && n > 2) c->icon = wm_frame_icon_from_netwm((unsigned long *)d, n, want);
         XFree(d);
     }
     XWMHints *h = XGetWMHints(display, c->window);
@@ -2957,10 +2958,10 @@ client_set_icon(struct client *c)
     if (h) {
         if (h->flags & IconPixmapHint) c->icon_pm = h->icon_pixmap;
         if (h->flags & IconMaskHint) c->icon_mask = h->icon_mask;
-        if (!c->icon && c->icon_pm) c->icon = frame_icon_from_pixmap(display, c->icon_pm, c->icon_mask, want);
+        if (!c->icon && c->icon_pm) c->icon = wm_frame_icon_from_pixmap(display, c->icon_pm, c->icon_mask, want);
         XFree(h);
     }
-    if (getenv("LHWM_DEBUG")) fprintf(stderr, "luxwm: icon 0x%lx: %s\n", c->window, c->icon ? "client" : app_icon(want) ? "application" : theme_default_icon(&theme, want) ? "theme default" : "none");
+    if (getenv("LHWM_DEBUG")) fprintf(stderr, "luxwm: icon 0x%lx: %s\n", c->window, c->icon ? "client" : app_icon(want) ? "application" : wm_theme_default_icon(&theme, want) ? "theme default" : "none");
 }
 
 /* the generic application icon (shell32 #3, user32's IDI_APPLICATION art) from an imported build's pack, 16 and 32 px: what a
@@ -2991,7 +2992,7 @@ client_icon(struct client *c)
     if (c->icon) return (cairo_surface_t *)c->icon;
     int want = theme.mode == THEME_MSSTYLES ? 16 : theme.icon_size;
     cairo_surface_t *a = app_icon(want);
-    return a ? a : theme_default_icon(&theme, want);
+    return a ? a : wm_theme_default_icon(&theme, want);
 }
 
 static void
@@ -3084,9 +3085,9 @@ setup(void)
         /* LHWM_THEME_SOURCE=dir: the theme directories' PNG caches even with libuxtheme; lib: the styles only (LUXWM.md "libuxtheme
            source"); default: the style through the library when it is built in and the theme names one */
         const char *tsrc = getenv("LHWM_THEME_SOURCE");
-        frame_theme_source = tsrc && !strcmp(tsrc, "dir") ? FRAME_SRC_DIR : tsrc && !strcmp(tsrc, "lib") ? FRAME_SRC_LIB : FRAME_SRC_AUTO;
-        fprintf(stderr, "luxwm: libuxtheme %s\n", !frame_uxtheme_available() ? "not built in: theme directories only" :
-                frame_theme_source == FRAME_SRC_DIR ? "built in, LHWM_THEME_SOURCE=dir: theme directories only" : "built in: visual styles are read live");
+        wm_frame_theme_source = tsrc && !strcmp(tsrc, "dir") ? FRAME_SRC_DIR : tsrc && !strcmp(tsrc, "lib") ? FRAME_SRC_LIB : FRAME_SRC_AUTO;
+        fprintf(stderr, "luxwm: libuxtheme %s\n", !wm_frame_uxtheme_available() ? "not built in: theme directories only" :
+                wm_frame_theme_source == FRAME_SRC_DIR ? "built in, LHWM_THEME_SOURCE=dir: theme directories only" : "built in: visual styles are read live");
         snprintf(theme_req, sizeof theme_req, "%s", td);
         /* DWM themes need a compositor (_NET_WM_CM_S<screen> owned); XFixes reports when one comes or goes */
         char cm[32]; snprintf(cm, sizeof cm, "_NET_WM_CM_S%d", screen);
@@ -3535,7 +3536,7 @@ client_set_status(struct client *c)
 
     if (conf.json_status) {
         mon = ws_m_list[c->ws];
-        size = asprintf(&str,
+        size = wm_asprintf(&str,
                 "{"
                     "\"window\":\"0x%08x\","
                     "\"geom\":{"
@@ -3558,7 +3559,7 @@ client_set_status(struct client *c)
                 mon, m_list[mon].x, m_list[mon].y, m_list[mon].width, m_list[mon].height,
                 state, decorated);
     } else {
-        size = asprintf(&str,
+        size = wm_asprintf(&str,
                 "0x%08x, " // window id
                 "%d, " // x
                 "%d, " // y
@@ -3576,7 +3577,7 @@ client_set_status(struct client *c)
     }
 
     if (size == -1) {
-        LOGN("asprintf returned -1, could not report window status");
+        LOGN("wm_asprintf returned -1, could not report window status");
         return;
     }
 
@@ -3686,7 +3687,7 @@ static void ewmh_set_desktop_names(void)
 {
     char** list = calloc(WORKSPACE_NUMBER, sizeof(char*));
     for (int i = 0; i < WORKSPACE_NUMBER; i++)
-        asprintf(&list[i], "%d", i);
+        wm_asprintf(&list[i], "%d", i);
     XTextProperty text_prop;
     Xutf8TextListToTextProperty(display, list, WORKSPACE_NUMBER, XUTF8StringStyle, &text_prop);
     XSetTextProperty(display, root, &text_prop, XInternAtom(display, "_NET_DESKTOP_NAMES", False));
@@ -4216,7 +4217,7 @@ maxmode_update(void)
 }
 
 /* a theme name without '/' is a sibling of the requested theme's directory (fallback_theme = jade4074-classic); base may be a theme
-   spec "DIR|STYLE|COLOR|SIZE" (frame.h theme_load): its directory part counts */
+   spec "DIR|STYLE|COLOR|SIZE" (frame.h wm_theme_load): its directory part counts */
 static void
 theme_sibling(char *out, size_t n, const char *base, const char *name)
 {
@@ -4236,7 +4237,7 @@ theme_publish(void)
 /* after a theme change: keep the client's logical rectangle where it was (new margins around it), keep the restore geometry's
    client rectangle too, refit maximised frames to the work area, repaint.
    The logical rectangle is the client without the CLIENT_CAPTION extension, i.e. the frame minus the theme's normal margins
-   (theme_margins_ex, not margins_for): the frame is computed from it with the new theme's normal margins, and only then is the
+   (wm_theme_margins_ex, not margins_for): the frame is computed from it with the new theme's normal margins, and only then is the
    client window placed with margins() (CLIENT_CAPTION: up into the caption by the new theme's caption_h - border, once).
    Keeping the client window's own rectangle (caption rows included) instead would move the logical rectangle by the difference
    of the two themes' caption_h - border on every switch, and with the CLIENT_CAPTION toggle path (which keeps the frame, i.e. the
@@ -4247,8 +4248,8 @@ client_retheme(struct client *c, const struct theme *old)
     if (!c->decorated)
         return;
     int ol, or_, ot, ob, nl, nr, nt, nb;
-    theme_margins_ex(old, c->mono, &ol, &or_, &ot, &ob);
-    theme_margins_ex(&theme, c->mono, &nl, &nr, &nt, &nb);
+    wm_theme_margins_ex(old, c->mono, &ol, &or_, &ot, &ob);
+    wm_theme_margins_ex(&theme, c->mono, &nl, &nr, &nt, &nb);
     int x = (c->hidden ? c->x_hide : c->geom.x) + ol - nl, y = c->geom.y + ot - nt;
     int w = MAX(c->geom.width - ol - or_ + nl + nr, MINIMUM_DIM), h = MAX(c->geom.height - ot - ob + nt + nb, MINIMUM_DIM);
     /* size hints: the client's size is kept exactly, so this only fits a client that did not conform yet; not for CLIENT_CAPTION,
@@ -4261,8 +4262,8 @@ client_retheme(struct client *c, const struct theme *old)
     XMoveResizeWindow(display, c->dec, px, y, w, h);
     XMoveResizeWindow(display, c->window, px + cx, y + cy, (unsigned)cw, (unsigned)ch);
     if (c->mono) {   /* c->prev is a frame rectangle of the unmaximised window */
-        theme_margins_ex(old, 0, &ol, &or_, &ot, &ob);
-        theme_margins_ex(&theme, 0, &nl, &nr, &nt, &nb);
+        wm_theme_margins_ex(old, 0, &ol, &or_, &ot, &ob);
+        wm_theme_margins_ex(&theme, 0, &nl, &nr, &nt, &nb);
         c->prev.x += ol - nl; c->prev.y += ot - nt;
         c->prev.width += nl + nr - ol - or_; c->prev.height += nt + nb - ot - ob;
         long g[4] = { c->prev.x, c->prev.y, c->prev.width, c->prev.height };
@@ -4286,9 +4287,9 @@ theme_select(void)
 {
     char eff[2200]; struct theme nt;
     snprintf(eff, sizeof eff, "%s", theme_req);
-    if (!theme_load(&nt, eff)) {
+    if (!wm_theme_load(&nt, eff)) {
         fprintf(stderr, "luxwm: could not load theme from %s\n", eff);
-        if (theme_cur[0]) { theme_free(&nt); theme_publish(); composited_publish(); return false; }   /* keep what is there */
+        if (theme_cur[0]) { wm_theme_free(&nt); theme_publish(); composited_publish(); return false; }   /* keep what is there */
     }
     /* the classic frame (LUXWM.md "Classic fallback"): a path.frames_classic directory; frames_classic empty or "style": the
        theme's own visual style in msstyles mode ("|STYLE|COLOR|SIZE", drawn live through libuxtheme), and if that does not load (no
@@ -4307,29 +4308,29 @@ theme_select(void)
         }
         for (int i = 0; i < nc; i++) {
             struct theme ft;
-            if (theme_load(&ft, cand[i])) {
+            if (wm_theme_load(&ft, cand[i])) {
                 fprintf(stderr, "luxwm: %s: %s -> %s%s\n", compositor ? "composition = 0" : "no compositor", theme_req, cand[i],
                         !strcmp(cand[i], own) ? " (the theme's own msstyles)" : "");
-                theme_free(&nt); nt = ft; snprintf(eff, sizeof eff, "%s", cand[i]);
+                wm_theme_free(&nt); nt = ft; snprintf(eff, sizeof eff, "%s", cand[i]);
                 break;
             }
-            theme_free(&ft); fprintf(stderr, "luxwm: classic frame %s did not load%s\n", cand[i], i + 1 < nc ? ", trying the next" : ", keeping the glass frame");
+            wm_theme_free(&ft); fprintf(stderr, "luxwm: classic frame %s did not load%s\n", cand[i], i + 1 < nc ? ", trying the next" : ", keeping the glass frame");
         }
     }
     if (theme_cur[0] && !strcmp(eff, theme_cur) && !theme_force) {
-        theme_free(&nt); theme_publish(); composited_publish(); return true;
+        wm_theme_free(&nt); theme_publish(); composited_publish(); return true;
     }
     struct theme old = theme;
     theme = nt; theme_gen++;
     for (int i = 0; i < WORKSPACE_NUMBER; i++)
         for (struct client *c = c_list[i]; c != NULL; c = c->next)
             client_retheme(c, &old);
-    theme_free(&old);
+    wm_theme_free(&old);
     snprintf(theme_cur, sizeof theme_cur, "%s", eff);
-    { int ml, mr, mt, mb; theme_margins(&theme, &ml, &mr, &mt, &mb);
+    { int ml, mr, mt, mb; wm_theme_margins(&theme, &ml, &mr, &mt, &mb);
       fprintf(stderr, "luxwm: theme %s (%s, %s) margins t=%d r=%d b=%d l=%d font=%s\n", theme_cur, theme.mode == THEME_MSSTYLES ? "msstyles" : "dwm",
               theme.ut ? theme.ut_src : "PNG cache", mt, mr, mb, ml, theme.mode == THEME_MSSTYLES ? theme.ms_font : theme.font); }
-    if (getenv("LHWM_DEBUG")) frame_fonts_report(&theme);
+    if (getenv("LHWM_DEBUG")) wm_frame_fonts_report(&theme);
     theme_publish();
     composited_publish();
     XFlush(display);
@@ -4430,7 +4431,7 @@ lh_theme_apply(const char *arg, char *canon, size_t n)
     const char *color = TV("VisualStyle.color"), *size = TV("VisualStyle.size"), *comp = TV("Glass.composition");
     /* the frame: Windows Classic for style = classic (and for a theme with neither a frame set nor a visual style): the classic
        colours and metrics of the record (Colors.*, Metrics.*: the scheme, the current layer) in the theme spec, "|classic|KEY=VALUE;..."
-       (frame.c classic_load; LUXWM.md "Windows Classic frames"); the glass set with the theme's visual style (theme_load reads the style
+       (frame.c classic_load; LUXWM.md "Windows Classic frames"); the glass set with the theme's visual style (wm_theme_load reads the style
        live through libuxtheme and takes only the tuning keys from the directory; LUXWM.md "libuxtheme source"); without glass the
        classic set (or the style alone), always */
     if (!strcmp(TV("style.kind"), "classic") || (!frames[0] && !classic[0] && !style[0])) {
@@ -4454,8 +4455,8 @@ lh_theme_apply(const char *arg, char *canon, size_t n)
         snprintf(theme_req_classic, sizeof theme_req_classic, "%s", classic[0] ? classic : "style");
         theme_comp_off = true;
     }
-    wmmenu_set_theme_smoothing(TV("Fonts.smoothing"));   /* the menus' text, with settings.ini [fonts] smoothing over it */
-    frame_fonts_set(TV("path.fonts"));   /* registered by the theme_load that follows */
+    wm_menu_set_theme_smoothing(TV("Fonts.smoothing"));   /* the menus' text, with settings.ini [fonts] smoothing over it */
+    wm_frame_fonts_set(TV("path.fonts"));   /* registered by the wm_theme_load that follows */
     snprintf(theme_anim, sizeof theme_anim, "%s", TV("Glass.animations"));
     if (canon) snprintf(canon, n, "%s", TV("theme"));
     if (!strncmp(theme_req, "|classic|", 9))
@@ -4707,7 +4708,7 @@ static void showing_desktop(int mode) {
     LOGP("showing desktop %d", sd_on);
 }
 
-static bool super_down; bool super_other;
+static bool super_down;
 /* ---- Alt+Tab as Windows' (LUXWM.md "Alt+Tab"): while the binding's modifier (Alt, or Super for Mod4+Tab) is held the keyboard is
    luxwm's; the candidates are the current desktop's windows in stacking order (top first), then the minimised ones. Each Tab
    (Shift+Tab: backwards, wrapping) previews the next candidate by raising it, client and frame, over the others without focusing
@@ -4838,7 +4839,7 @@ static void handle_key_press(XEvent *e) {
         else if (!strcmp(a, "cycle")) cycle_run(ev, keys[i].mods, (keys[i].mods & ShiftMask) != 0);   /* Alt+Tab (Shift: backwards) */
         else if (!strcmp(a, "maximize") && client_active(f_client)) { client_monocle(f_client); draw_text(f_client, true); }
         else if (!strcmp(a, "minimize") && client_active(f_client)) client_minimize(f_client);
-        else if (!strcmp(a, "sysmenu") && client_active(f_client)) wmmenu_at_caption(f_client, WMMENU_KEYBOARD, 0, false);
+        else if (!strcmp(a, "sysmenu") && client_active(f_client)) wm_menu_at_caption(f_client, WMMENU_KEYBOARD, 0, false);
         else if (!strcmp(a, "workspace")) switch_ws(atoi(keys[i].arg));
         else if (!strcmp(a, "showdesktop")) showing_desktop(2);
         else if (!strcmp(a, "shell")) shell_command(keys[i].arg);
@@ -4852,19 +4853,19 @@ int get_dec_height(struct client *c)    { int l, r, t, b; margins(c, &l, &r, &t,
 
 /* ---- frame input: buttons, hover, edge resize ---- */
 
-/* frame_hit_ex for c's decoration window. CLIENT_CAPTION (not maximised): the client covers the frame from the top border down,
-   so the decoration only gets events in the border rows above it; all of them resize (top, or the corner where frame_hit_ex has
+/* wm_frame_hit_ex for c's decoration window. CLIENT_CAPTION (not maximised): the client covers the frame from the top border down,
+   so the decoration only gets events in the border rows above it; all of them resize (top, or the corner where wm_frame_hit_ex has
    its corner zones on the outer edge), not just the outer 6 DWM rows with a 3-row move strip below them. The buttons keep their
-   hit rectangles (they reach into the border). The zone is not shrunk by the client: frame_hit_ex itself does not know about it. */
+   hit rectangles (they reach into the border). The zone is not shrunk by the client: wm_frame_hit_ex itself does not know about it. */
 static int
 client_hit(struct client *c, int x, int y)
 {
-    int hit = frame_hit_ex(&theme, c->geom.width, c->geom.height, x, y, c->mono);
+    int hit = wm_frame_hit_ex(&theme, c->geom.width, c->geom.height, x, y, c->mono);
     if (client_fixed(c) && (hit == HIT_MAX || (hit >= HIT_L && hit <= HIT_BR))) return HIT_NONE;   /* HTBORDER: a fixed frame */
     if (hit == HIT_CAPTION && (c->ext_flags & FRAME_CLIENT_CAPTION) && !c->mono) {
         int l, r, t, b; margins(c, &l, &r, &t, &b);
         if (y < t) {
-            int e = frame_hit_ex(&theme, c->geom.width, c->geom.height, x, 0, 0);
+            int e = wm_frame_hit_ex(&theme, c->geom.width, c->geom.height, x, 0, 0);
             return e == HIT_TL || e == HIT_TR ? e : HIT_T;
         }
     }
@@ -4931,7 +4932,7 @@ static bool
 client_on_icon(struct client *c, int x, int y)
 {
     if (!c->decorated || (c->ext_flags & (FRAME_NO_ICON | FRAME_CLIENT_CAPTION)) || !client_icon(c)) return false;
-    int ix, iy, iw, ih; frame_icon_rect(&theme, c->geom.width, c->mono, &ix, &iy, &iw, &ih);
+    int ix, iy, iw, ih; wm_frame_icon_rect(&theme, c->geom.width, c->mono, &ix, &iy, &iw, &ih);
     return x >= ix && x < ix + iw && y >= iy && y < iy + ih;
 }
 
@@ -4977,7 +4978,7 @@ sysmenu_command(void *arg, int id)
    (the taskbar's menu): Move, Size and Minimize, Restore the default item. Close is the default item otherwise (bold), with its
    accelerator. */
 static void
-wmmenu_open(struct client *c, int x, int y, unsigned flags, unsigned button, bool from_icon)
+wm_menu_open(struct client *c, int x, int y, unsigned flags, unsigned button, bool from_icon)
 {
     if (c == NULL || (c->hidden && !c->minimized)) return;   /* minimised: hidden too */
     Window w = c->window; void *arg = (void *)(uintptr_t)w;
@@ -4985,13 +4986,13 @@ wmmenu_open(struct client *c, int x, int y, unsigned flags, unsigned button, boo
     unsigned mx = c->mono && !mini ? WMMENU_DISABLED : 0, mn = mini ? WMMENU_DISABLED : 0;
     /* luxwm's own: the desktops by number (Desktop 1 is desktop 0, as the Mod4+1 key), the window's own one checked */
     static char desk_text[WORKSPACE_NUMBER][24];
-    struct wmmenu_item desk[WORKSPACE_NUMBER];
+    struct wm_menu_item desk[WORKSPACE_NUMBER];
     for (int i = 0; i < WORKSPACE_NUMBER; i++) {
         if (i < 9) snprintf(desk_text[i], sizeof desk_text[i], "Desktop &%d", i + 1);
         else snprintf(desk_text[i], sizeof desk_text[i], "Desktop %d&%d", (i + 1) / 10, (i + 1) % 10);
-        desk[i] = (struct wmmenu_item){ desk_text[i], NULL, i == c->ws ? WMMENU_CHECKED : 0, WMMENU_GLYPH_NONE, SC_DESK_ID + i, sysmenu_command, arg, NULL, 0 };
+        desk[i] = (struct wm_menu_item){ desk_text[i], NULL, i == c->ws ? WMMENU_CHECKED : 0, WMMENU_GLYPH_NONE, SC_DESK_ID + i, sysmenu_command, arg, NULL, 0 };
     }
-    struct wmmenu_item it[] = {
+    struct wm_menu_item it[] = {
         { "&Restore",  NULL,     mini ? WMMENU_DEFAULT : c->mono ? 0 : WMMENU_DISABLED, WMMENU_GLYPH_RESTORE, SC_RESTORE_ID, sysmenu_command, arg, NULL, 0 },
         { "&Move",     NULL,     mx | mn,                       WMMENU_GLYPH_NONE,     SC_MOVE_ID,     sysmenu_command, arg, NULL, 0 },
         { "&Size",     NULL,     mx | mn | (fixed ? WMMENU_DISABLED : 0), WMMENU_GLYPH_NONE, SC_SIZE_ID, sysmenu_command, arg, NULL, 0 },
@@ -5001,27 +5002,27 @@ wmmenu_open(struct client *c, int x, int y, unsigned flags, unsigned button, boo
         { NULL,        NULL,     WMMENU_SEPARATOR,              WMMENU_GLYPH_NONE,     SC_SEP_ID,      NULL, NULL, NULL, 0 },
         { "&Close",    "Alt+F4", mini ? 0 : WMMENU_DEFAULT,     WMMENU_GLYPH_CLOSE,    SC_CLOSE_ID,    sysmenu_command, arg, NULL, 0 },
     };
-    struct wmmenu_env e = { .dpy = display, .screen = screen, .root = root, .visual = argb_visual, .cmap = argb_cmap, .depth = argb_depth,
+    struct wm_menu_env e = { .dpy = display, .screen = screen, .root = root, .visual = argb_visual, .cmap = argb_cmap, .depth = argb_depth,
                             .theme = &theme, .composited = compositor && argb_depth == 32, .dispatch = menu_dispatch };
     int mon = ws_m_list[c->ws];
     if (m_list && mon >= 0 && mon < m_count) { e.bx = m_list[mon].x; e.by = m_list[mon].y; e.bw = m_list[mon].width; e.bh = m_list[mon].height; }
     else { e.bx = 0; e.by = 0; e.bw = display_width; e.bh = display_height; }
     if (from_icon) {
-        int ix, iy, iw, ih; frame_icon_rect(&theme, c->geom.width, c->mono, &ix, &iy, &iw, &ih);
+        int ix, iy, iw, ih; wm_frame_icon_rect(&theme, c->geom.width, c->mono, &ix, &iy, &iw, &ih);
         e.dbl_x = c->geom.x + ix; e.dbl_y = c->geom.y + iy; e.dbl_w = iw; e.dbl_h = ih; e.dbl_ms = 500;
     }
     LOGP("window menu for 0x%lx at %d,%d%s", w, x, y, flags & WMMENU_KEYBOARD ? " (keyboard)" : "");
-    int r = wmmenu_popup(&e, x, y, it, (int)(sizeof it / sizeof it[0]), flags, button);
+    int r = wm_menu_popup(&e, x, y, it, (int)(sizeof it / sizeof it[0]), flags, button);
     if (r == WMMENU_DBLCLICK) sysmenu_command(arg, SC_CLOSE_ID);
 }
 
 /* the window menu at its own place: below the caption at the frame's left border (Alt+Space, the caption icon) */
 static void
-wmmenu_at_caption(struct client *c, unsigned flags, unsigned button, bool from_icon)
+wm_menu_at_caption(struct client *c, unsigned flags, unsigned button, bool from_icon)
 {
     int l, r, t, b; margins(c, &l, &r, &t, &b);
-    if (c->ext_flags & FRAME_CLIENT_CAPTION) theme_margins_ex(&theme, c->mono, &l, &r, &t, &b);
-    wmmenu_open(c, c->geom.x + l, c->geom.y + t, flags, button, from_icon);
+    if (c->ext_flags & FRAME_CLIENT_CAPTION) wm_theme_margins_ex(&theme, c->mono, &l, &r, &t, &b);
+    wm_menu_open(c, c->geom.x + l, c->geom.y + t, flags, button, from_icon);
 }
 
 /* ---- the frame drag, shared by edge/corner presses on the frame and _NET_WM_MOVERESIZE ----
@@ -5130,7 +5131,7 @@ pixel_at(Window w, int x, int y, unsigned long *px)
 /* the first step that grows the client by 4 px or more tells a client with background None (its new strip is a copy of the
    screen) from one with a background pixel (the strip is that pixel). drag_bg_probe picks two points 3 px into the strip, i.e. on
    the old frame's glass border, not on its uniform inner line; drag_bg_sample reads the screen there before the resize and the
-   client's strip after it, both inside geom_apply under frame_paint_ex3's server grab, so neither the client nor the compositor
+   client's strip after it, both inside geom_apply under wm_frame_paint_ex3's server grab, so neither the client nor the compositor
    can have drawn in between. Any doubt leaves the client alone. */
 static void
 drag_bg_probe(struct client *c, struct drag_cl *d, int nx, int ny, int nw, int nh)
@@ -5339,7 +5340,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
     }
     vx = px; vy = py;
     LOGP("drag %s hit=%d from %d,%d button %u%s", hit == HIT_CAPTION ? "move" : "resize", hit, px, py, button, keyboard ? " (keyboard)" : "");
-    double p_start = now_ms(), p_step = 0, p_max = 0; int p_n = 0, p_ev = 0; memset(frame_prof_ms, 0, sizeof frame_prof_ms);
+    double p_start = now_ms(), p_step = 0, p_max = 0; int p_n = 0, p_ev = 0; memset(wm_frame_prof_ms, 0, sizeof wm_frame_prof_ms);
     /* motion is coalesced (only the latest position counts) and applied at most every DRAG_INTERVAL ms: each step resizes the
        frame and client and repaints the frame, so a 1000 Hz mouse would otherwise queue far more work than the screen can show.
        A position held back is applied when the interval is over or the drag ends (LUXWM.md "Performance"). */
@@ -5537,7 +5538,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
     if (prof && p_n)
         fprintf(stderr, "luxwm prof: drag %s %.0f ms, %d motion events, %d steps, step avg %.2f max %.2f ms (incl. XSync); "
                 "%.0f frame_paints, each: paint %.2f shape %.2f upload %.2f ms\n", hit == HIT_CAPTION ? "move" : "resize",
-                now_ms() - p_start, p_ev, p_n, p_step / p_n, p_max, frame_prof_ms[3], frame_prof_ms[0] / frame_prof_ms[3], frame_prof_ms[1] / frame_prof_ms[3], frame_prof_ms[2] / frame_prof_ms[3]);
+                now_ms() - p_start, p_ev, p_n, p_step / p_n, p_max, wm_frame_prof_ms[3], wm_frame_prof_ms[0] / wm_frame_prof_ms[3], wm_frame_prof_ms[1] / wm_frame_prof_ms[3], wm_frame_prof_ms[2] / wm_frame_prof_ms[3]);
     if (kb_end) XWarpPointer(display, None, root, 0, 0, 0, 0, rx0, ry0);   /* movesize.c: ptRestore when the keyboard ended it */
     XUngrabPointer(display, CurrentTime);
     if (keyboard) { XUngrabKeyboard(display, CurrentTime); if (!repeat_was) XkbSetDetectableAutoRepeat(display, False, NULL); }
@@ -5583,15 +5584,15 @@ composited_publish(void)
     static long last_m[METRICS_N]; static bool have_m = false;
     bool force = theme_announce; theme_announce = false;   /* one PropertyNotify of each per theme switch (6.1) */
     int comp = compositor && theme.mode == THEME_DWM;
-    int l, r, t, b; theme_margins(&theme, &l, &r, &t, &b);
+    int l, r, t, b; wm_theme_margins(&theme, &l, &r, &t, &b);
     #define RGB(v) ((long)((int)((v)[0] * 255 + 0.5) << 16 | (int)((v)[1] * 255 + 0.5) << 8 | (int)((v)[2] * 255 + 0.5)))
     double glow[3] = { 0, 0, 0 };
     if (theme.mode == THEME_DWM) memcpy(glow, theme.glow, sizeof glow);
     else if (theme.ms && theme.ms[MP_CAPTION].sh_type[0]) memcpy(glow, theme.ms[MP_CAPTION].sh_rgb[0], sizeof glow);
-    int ml, mr, mt, mb; theme_margins_ex(&theme, 1, &ml, &mr, &mt, &mb);   /* maximised: DWM caption with no borders, msstyles MAXCAPTION */
+    int ml, mr, mt, mb; wm_theme_margins_ex(&theme, 1, &ml, &mr, &mt, &mb);   /* maximised: DWM caption with no borders, msstyles MAXCAPTION */
     long m[METRICS_N] = { t, l, r, b, RGB(theme.text_a), RGB(glow), RGB(theme.text_i), 0,
                           mt, ml, mr, mb,                                     /* the maximised frame margins */
-                          theme_caption_border(&theme, 0), theme_caption_border(&theme, 1),   /* top border kept above a CLIENT_CAPTION client */
+                          wm_theme_caption_border(&theme, 0), wm_theme_caption_border(&theme, 1),   /* top border kept above a CLIENT_CAPTION client */
                           RGB(theme.text_ma), RGB(theme.text_mi), 0, 0,     /* maximised caption text (text_max_*; default the normal ones) */
                           theme.mode == THEME_DWM && theme.deco_h > 0 ? theme.deco_h : t };   /* 18: deco_h (vision: 15), else the caption */
     /* 16: the maximised glow (glow_max; 0xFFFFFFFF = none); msstyles: MAXCAPTION's text shadow, else CAPTION's (field 5) */
@@ -5698,7 +5699,7 @@ anim_expire(void)
     return next < 0 ? -1 : (int)next + 1;
 }
 
-/* the maximise crossfade (LUXWM.md "Maximised mode"): the weight of the maximised plate for frame_paint_ex3, linear over XFADE_MS like luxshell's
+/* the maximise crossfade (LUXWM.md "Maximised mode"): the weight of the maximised plate for wm_frame_paint_ex3, linear over XFADE_MS like luxshell's
    black layers (runtime.lua: lh.animate(..., 400), linear, 25 ms tick); -1 = by state (no fade running; a finished one is cleared) */
 static double
 xfade_weight(struct client *c)
@@ -5862,7 +5863,7 @@ anim_classic(struct client *c, int fx, int fy, int fw, int fh, int tx, int ty, i
         cairo_surface_t *img = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, gw, t);
         cairo_t *cr = cairo_create(img);
         cairo_rectangle(cr, 0, 0, gw, t); cairo_clip(cr);
-        frame_paint_cr(cr, &theme, gw, gh, c->title, client_icon(c), 1, 0, 0, c->mono);
+        wm_frame_paint_cr(cr, &theme, gw, gh, c->title, client_icon(c), 1, 0, 0, c->mono);
         cairo_destroy(cr);
         Pixmap pm = XCreatePixmap(display, root, (unsigned)sw, (unsigned)cy, (unsigned)depth);
         cairo_surface_t *xs = cairo_xlib_surface_create(display, pm, DefaultVisual(display, scr), sw, cy);
