@@ -1,11 +1,9 @@
 # examples: reference clients
 
-    make            build/examples/extendframe, navdemo, glassdemo, aurorademo (not installed)
+    make            build/examples/extendframe, navdemo, aurorademo (not installed)
 
 - extendframe.c: luxwm's extended glass frame client (docs/CLIENT-PROTOCOL.md): an Explorer-style 60 px glass header.
 - navdemo.c: luxnav's reference client (docs/NAVBAR.md): a small file browser with the vision header (`aerovision` theme).
-- glassdemo.c: an ARGB window that is its own glass frame; its art (the aero-patch plate and overlay, the demo aurora strip)
-  comes from lhde's data directories (tools/lhde-import).
 - aurorademo.c: Longhorn's preview-pane and desktop aurora, played from their original numbers. Those are read from your
   own Windows files: lhde-import's `[aurora]` recipes (share/sources/4074.ini: jade.msstyles' PreviewPane.AURORA stream and
   Microsoft.Windows.WCPClient.dll's desktopaurora.baml, decoded by tools/lhdebaml.py) write the Windows tree's

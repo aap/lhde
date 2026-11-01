@@ -27,7 +27,7 @@ the client needs to know only *where* the glass is, not how it is drawn.
 | --- | --- | --- | --- | --- |
 | `_LHWM_EXTEND_FRAME` | client toplevel | client | CARDINAL[4] | "Extended frames" |
 | `_LHWM_FRAME_FLAGS` | client toplevel | client | CARDINAL | "Frame flags" |
-| `_LHWM_SELF_FRAMED` | client toplevel | client | CARDINAL 1 | the client draws its whole frame itself (glassdemo); luxwm adds none |
+| `_LHWM_SELF_FRAMED` | client toplevel | client | CARDINAL 1 | the client draws its whole frame itself (luxshell's surfaces); luxwm adds none |
 | `_LHWM_HEADER_PIXMAP` | client toplevel | luxwm | PIXMAP | "Header background without composition" |
 | `_LHWM_CAPTION_RECT` | client toplevel | luxwm | CARDINAL[4] | "Client content over the caption rows" |
 | `_LHWM_DESKTOP_LAYER` | desktop window | client | CARDINAL | "Desktop windows" |
@@ -261,7 +261,7 @@ slate4074, jade4074, the luna and basic* themes, classic) keep `_LHWM_COMPOSITED
 ## What the client does
 
 1. Create the toplevel with a 32-bit TrueColor visual and its own colormap (`XMatchVisualInfo(..., 32, TrueColor, ...)`,
-   `CWColormap|CWBorderPixel|CWBackPixel` as in `examples/glassdemo.c`).
+   `CWColormap|CWBorderPixel|CWBackPixel` as in `examples/extendframe.c`).
 2. Set `_LHWM_EXTEND_FRAME` (e.g. `0 0 60 0`) and `_LHWM_FRAME_FLAGS` (`NO_TITLE`) before mapping; normal WM hints otherwise
    (`WM_NAME`, `_NET_WM_ICON`, `WM_NORMAL_HINTS`, ...).
 3. Paint: clear the header to transparent black and draw the content on top with proper alpha (OVER); the rest opaque. When

@@ -314,7 +314,7 @@ function S.default_command(name)
   elseif name == "shutdown" then return "loginctl poweroff"
   elseif name == "restart" then return "loginctl reboot"
   elseif name == "lock" then return have("xlock") and "xlock" or have("slock") and "slock" or nil
-  elseif name == "screenshot" or name == "screenshot_window" or name == "screenshot_region" then   -- luxwm's Print keys
+  elseif name == "screenshot" or name == "screenshot_window" or name == "screenshot_region" then   -- luxwm's Super+Shift+F/W/S keys
     local p = lh.bin_dir .. "/luxshot"
     return (exists(p) and q(p) or "luxshot") .. " --" .. (name:match("_(%a+)$") or "screen")
   end

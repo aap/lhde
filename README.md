@@ -46,7 +46,7 @@ Then a session, from a text console (`startx`, display :1) or nested in a Xephyr
     lhde-session start --nested [THEME]
     lhde-session theme NAME                  switch live; lhde-theme list shows what is complete
 
-The sidebar's Start, the Print key for a screenshot (`luxshot`), `flxp DIR` for an explorer window,
+The sidebar's Start, Super+Shift+S for a screenshot (`luxshot`), `flxp DIR` for an explorer window,
 `flxp-settings` for Display Properties.
 
 ### Installing Windows themes
