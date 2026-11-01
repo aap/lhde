@@ -43,6 +43,9 @@ result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"
 # Display Properties' Desktop lists (flxp-settings --list desktop, no window) on a scratch home and Windows tree
 tests/settings-lists.sh > "$T/settings-lists.log" 2>&1
 result "settings-lists ($(tail -n 1 "$T/settings-lists.log"))" $? "$T/settings-lists.log"
+# lhde-import's Aero patches (by sha256, the unknown one by its bytes) on stand-in files
+python3 -I tests/aero-patches.py > "$T/aero-patches.log" 2>&1
+result "aero-patches ($(tail -n 1 "$T/aero-patches.log"))" $? "$T/aero-patches.log"
 # libwuxtheme through its own API: every style the user imported
 styles=${LHDE_STYLES:-$(build/bin/lhde-theme find styles 2>/dev/null)}   # liblhde's lookup: the Windows tree's index/styles (docs/LAYOUT.md)
 n=0

@@ -109,7 +109,7 @@ def _link(target, link):
 
 # styles dropped in by hand that lhde used to call by another name: old -> new. reindex renames local/themes/OLD.msstyles
 # (and OLD/ with its Shell/) to NEW when NEW is not there, so a tree imported before the rename keeps working; the frame
-# sets made from the old name are made again under the new one by lhde-import --regenerate (docs/USAGE.md "Installing RealAero")
+# sets made from the old name are made again under the new one by lhde-import --regenerate (docs/USAGE.md "The Aero patches for 4074")
 STYLE_RENAMED = {'aero-patch': 'realaero'}
 
 
@@ -130,19 +130,31 @@ def migrate_local_styles(W):
 
 
 # ---------------------------------------------------------------- styles that are no Microsoft release
-# RealAero by Lucas Brooks (https://betawiki.net/wiki/User:Lucas_Brooks/RealAero): a reconstruction of Microsoft's private
-# Aero theme for Longhorn 4074, built from Microsoft resources (never in the repository or the free pack; the user imports it
-# as `realaero`). Each known aero.msstyles by sha256: (release, where it was published). They differ only in CompositedWindow
-# PNG streams (docs/USAGE.md "Installing RealAero").
+# The Aero patches for Longhorn 4074 (docs/USAGE.md "The Aero patches for 4074"): visual styles made by others from Microsoft's
+# own (never in the repository or the free pack; the user imports them with lhde-import --style). Each known file by sha256:
+# name, author, the style name lhde-import gives it, what it is, release, where it was published. RealAero (Lucas Brooks) is the
+# one lhde's realaero frame set is fitted to; its releases differ only in CompositedWindow PNG streams.
 REALAERO_URL = 'https://betawiki.net/wiki/User:Lucas_Brooks/RealAero'
-REALAERO = {
-    'fa153e6b15ad7682bd06c15982864b5bf710138f3aa54a476e93835911325c3e': ('pre-0.1', 'longhorn.ms aero-4074.zip, 2021-10-08'),
-    'a8e100222f45dbbac7569bda814901f1949eaa559873cf0c32538f40ba1aac78': ('0.2', 'pre-release of 2021-11-10, RealAero_V0.20.rar'),
-    'cd6f61a1aae1d83871f36a348882516a3e3c2e9d05caf00d74d07eb3595675c3': ('0.3', 'test build, RealAero0.3Test.rar'),
+_REALAERO = ('RealAero', 'Lucas Brooks', 'realaero', 'the Aero visual style for Longhorn 4074, a reconstruction from Microsoft resources')
+_TWIWMTB = ('TWIWMTB Aero', 'BOFH', 'twiwmtb-aero', "Longhorn 4074's Jade visual style with its six CompositedWindow plate streams "
+            "redrawn (grey glass, the client area clear)")
+AERO_PATCHES = {
+    'fa153e6b15ad7682bd06c15982864b5bf710138f3aa54a476e93835911325c3e':
+        _REALAERO + ('pre-0.1', 'longhorn.ms aero-4074.zip, 2021-10-08 (%s)' % REALAERO_URL),
+    'a8e100222f45dbbac7569bda814901f1949eaa559873cf0c32538f40ba1aac78':
+        _REALAERO + ('0.2', 'pre-release of 2021-11-10, RealAero_V0.20.rar (%s)' % REALAERO_URL),
+    'cd6f61a1aae1d83871f36a348882516a3e3c2e9d05caf00d74d07eb3595675c3':
+        _REALAERO + ('0.3', 'test build, RealAero0.3Test.rar (%s)' % REALAERO_URL),
+    '75d2a14b37863cd415aeba4da0f81139fcb4439370fdfbb2837ff19d3ac948b7':
+        _TWIWMTB + ('', 'longhorn.ms dwm-aero-theme-for-4074.rar ("DWM Aero theme for 4074" of the "Aurora & Aero" article, from '
+                        'the TWIWMTB modded 4074 image), Aero/Aero.msstyles of 2004-08-04: Jade with modified CompositedWindow streams'),
 }
-# what an unknown release still carries: the private Aero's DemoCheck path (DEMOCHECK of [documentation], also in Microsoft's
-# own 5048 aero.msstyles) together with the 4074 CompositedWindow class (which 5048's has not)
+# what an unknown patch may still carry: the private Aero's DemoCheck path (DEMOCHECK of [documentation], also in Microsoft's
+# own 5048 aero.msstyles) together with 4074's CompositedWindow class (which 5048's has not); RealAero and the reconstructions it
+# builds on (TrueAero and kin) carry both. A Jade-based patch (TWIWMTB's) has no DemoCheck: only its hash names it.
 DEMOCHECK = '\\\\cloak2\\drop\\bin\\enlist.txt'.encode('utf-16-le')
+COMPOSITED = 'CompositedWindow'.encode('utf-16-le')
+UNKNOWN_PATCH = 'an Aero patch for 4074 (unknown)'
 
 
 def _sha256(path):
@@ -154,27 +166,51 @@ def _sha256(path):
     return h.hexdigest()
 
 
+def has_composited(path):
+    """a visual style with 4074's CompositedWindow class (the glass frame parts: Jade, the Aero patches; 4051's and 5048's
+    styles have none), which the composited frame recipe reads"""
+    try:
+        with open(path, 'rb') as f:
+            return COMPOSITED in f.read()
+    except OSError:
+        return False
+
+
+def patch_title(p):
+    """an AERO_PATCHES row's title: 'RealAero 0.2 by Lucas Brooks', 'TWIWMTB Aero by BOFH'"""
+    return '%s%s by %s' % (p[0], ' ' + p[4] if p[4] else '', p[1])
+
+
+def known_patch(path, sha=None):
+    """the AERO_PATCHES row of a file (name, author, style name, what, release, where), else None"""
+    try:
+        return AERO_PATCHES.get(sha or _sha256(path))
+    except OSError:
+        return None
+
+
 def style_release(path, sha=None):
-    """(title, attributes) of a visual style that is a known non-Microsoft release (RealAero), else None"""
+    """(title, attributes) of a visual style that is a known Aero patch, or an unknown one (DemoCheck and CompositedWindow),
+    else None"""
     try:
         sha = sha or _sha256(path)
-        known = REALAERO.get(sha)
+        known = AERO_PATCHES.get(sha)
         if not known:
             with open(path, 'rb') as f:
                 d = f.read()
-            if DEMOCHECK not in d or 'CompositedWindow'.encode('utf-16-le') not in d:
+            if DEMOCHECK not in d or COMPOSITED not in d:
                 return None
     except OSError:
         return None
     if known:
-        title, author = 'RealAero %s by Lucas Brooks' % known[0], 'Lucas Brooks'
-        where = '%s (%s)' % (known[1], REALAERO_URL)
-    else:   # TrueAero, TWIWMTB's Aero and other 4074 reconstructions may carry the same two
-        title, author = 'RealAero, unknown release', 'unknown'
-        where = 'not a known RealAero file (sha256 %s): it has the private Aero\'s DemoCheck and 4074 CompositedWindow parts, as ' \
-                'RealAero and the reconstructions it builds on do (%s)' % (sha, REALAERO_URL)
-    return title, {A_AUTHOR: author, A_BUILD: '4074', A_SOURCE: where, A_TAGS: 'style',
-                   A_DESC: '%s: the Aero visual style for Longhorn 4074, a reconstruction from Microsoft resources' % title}
+        title = patch_title(known)
+        attrs = {A_AUTHOR: known[1], A_SOURCE: known[5], A_DESC: '%s: %s' % (title, known[3])}
+    else:   # no author named: RealAero's other releases, TrueAero and other reconstructions carry the same two
+        title = UNKNOWN_PATCH
+        attrs = {A_AUTHOR: 'unknown', A_SOURCE: 'not a known Aero patch (sha256 %s)' % sha,
+                 A_DESC: "%s: the private Aero's DemoCheck with 4074's CompositedWindow parts" % title}
+    attrs.update({A_BUILD: '4074', A_TAGS: 'style'})
+    return title, attrs
 
 
 def reindex(W, quiet=False):
@@ -459,18 +495,26 @@ def _xget(path, k):
         return None
 
 
+def _patch_desc(desc):
+    """a description annotate_local_style wrote for an Aero patch (any release, 'RealAero, unknown release' of before)"""
+    return desc.startswith(tuple({p[0] for p in AERO_PATCHES.values()}) + (UNKNOWN_PATCH,))
+
+
 def annotate_local_style(f):
-    """a style dropped in by hand: which release it is when it is a known one (RealAero; looked at when the file is new, or
-    called realaero, whose description follows the file: a 0.2 imported over 0.3 says 0.2), else its name"""
+    """a style dropped in by hand: which Aero patch it is when it is one (looked at when the file is new, called like a known
+    patch, or described as one: the description follows the file, a RealAero 0.2 imported over 0.3 says 0.2), else its name"""
     if not ANNOTATE['on']:
         return
     name = os.path.basename(f)[:-9]
     generic = '%s visual style (dropped in with lhde-import --style)' % name
     desc = _xget(f, A_DESC)
-    rel = style_release(f) if desc is None or name in STYLE_RENAMED.values() else None
+    look = desc is None or name in {p[2] for p in AERO_PATCHES.values()} or _patch_desc(desc)
+    rel = style_release(f) if look else None
     if rel:
-        ours = desc is None or desc.startswith('RealAero') or re.search(r' visual style \((dropped in with )?lhde-import --styles?\)$', desc)
+        ours = desc is None or _patch_desc(desc) or re.search(r' visual style \((dropped in with )?lhde-import --styles?\)$', desc)
         xput(f, rel[1], replace=ours)
+    elif desc is not None and _patch_desc(desc):   # was described as a patch, is none now (replaced by another file)
+        xput(f, {A_DESC: generic, A_TAGS: 'style'}, replace=True)
     else:
         xput(f, {A_DESC: generic, A_TAGS: 'style'})
 

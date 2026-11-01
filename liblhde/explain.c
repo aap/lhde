@@ -102,10 +102,10 @@ static void input_one(const char *k, const char *v, void *ud)
     else snprintf(w, sizeof w, "%s (not imported)", k);
     snprintf(x->buf + l, sizeof x->buf - l, "%s%s", l ? ", " : "", w);
 }
-/* [about]: an input that is no Microsoft file, by release (lhde-import's lhdetree.style_release: "RealAero 0.2 by Lucas Brooks") */
+/* [about]: an input that is no Microsoft file, an Aero patch (lhde-import's lhdetree.style_release: "RealAero 0.2 by Lucas Brooks") */
 static void about_one(const char *k, const char *v, void *ud) { more(ud, "%s is %s", k, v); }
 /* a style file that is no Microsoft release: its annotation (docs/ANNOTATIONS.md; lhde-import writes user.lux.author and
-   user.lux.desc for RealAero), "" when it has none or is Microsoft's */
+   user.lux.desc for an Aero patch), "" when it has none or is Microsoft's */
 static const char *style_about(const char *path, char *out, size_t n)
 {
     char real[PATH_MAX], au[128];

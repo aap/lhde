@@ -16,10 +16,11 @@ usage:
   lhde-import --style FILE [NAME]             drop one visual style in (local/themes/NAME.msstyles: the style's name, the one
                                               theme files ask for, e.g. realaero for RealAero, Lucas Brooks' Aero for 4074), with
                                               its Shell/ when it has one beside it, and run the recipes that read it (realaero:
-                                              the frame sets realaero and aerovision). Without NAME the file's stem is used and
-                                              printed; a stem that is already a source's style (aero.msstyles: Vista's aero) is
-                                              refused: give the NAME. A RealAero file is recognised (its release is printed and
-                                              annotated) and called realaero without a NAME; the old name aero-patch is realaero
+                                              the frame sets realaero and aerovision). Without NAME the file's stem is used
+                                              and printed; a stem that is already a source's style (aero.msstyles: Vista's aero) is
+                                              refused: give the NAME. A known Aero patch is recognised (which one is printed and
+                                              annotated: docs/USAGE.md "The Aero patches for 4074") and gets its own name without a
+                                              NAME (realaero, twiwmtb-aero); the old name aero-patch is realaero
   lhde-import --styles DIR [-n]               every visual style below DIR (a downloaded themes folder), also inside .zip, .rar,
                                               .7z and .exe files (theme installers, unpacked with 7z or unrar, never run), as --style
                                               does it, NAME from the file's stem; the same file twice is taken once, two styles
@@ -237,11 +238,12 @@ def main():
         rel = T.style_release(arg) if os.path.isfile(arg) else None
         if rel:
             L.log('--style: %s is %s' % (arg, rel[0]))
-        name = extra[0] if extra else 'realaero' if rel else os.path.basename(arg).rsplit('.', 1)[0].lower()
+        known = T.known_patch(arg) if rel else None   # a known Aero patch has its name (realaero, twiwmtb-aero)
+        name = extra[0] if extra else known[2] if known else os.path.basename(arg).rsplit('.', 1)[0].lower()
         if name in T.STYLE_RENAMED:
             L.log('--style: %s is called %s now' % (name, T.STYLE_RENAMED[name]))
             name = T.STYLE_RENAMED[name]
-        if not extra and not rel:
+        if not extra and not known:
             L.log('--style: no NAME given, the style is called %s (from the file name); lhde-import --style FILE NAME names it' % name)
             have = os.path.join(data, 'index', 'styles', name + '.msstyles')
             mine = os.path.realpath(os.path.join(data, 'local', 'themes', name + '.msstyles'))
@@ -250,7 +252,7 @@ def main():
                       'give the style its own NAME (lhde-import --style %s NAME)' % (name, os.path.relpath(os.path.realpath(have), data), name, arg))
         rep = {'copied': 0, 'kept': 0}
         L.copy_file(arg, os.path.join(data, 'local', 'themes', name + '.msstyles'), o['force'], rep)
-        T.annotate_local_style(os.path.join(data, 'local', 'themes', name + '.msstyles'))   # a RealAero file: which release
+        T.annotate_local_style(os.path.join(data, 'local', 'themes', name + '.msstyles'))   # an Aero patch: which one
         shell = os.path.join(os.path.dirname(arg), 'Shell')
         if os.path.isdir(shell):
             L.copy_tree(shell, os.path.join(data, 'local', 'themes', name, 'Shell'), o['force'], rep)

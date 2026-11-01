@@ -157,7 +157,7 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    Sizes (the tarball as `tar` + `xz -9e`): **museum** 418 MB raw (377 MB stored once), 57 MB compressed; **essentials** for the
    14 shipped Windows themes 169 MB raw (164 MB stored once), 36 MB compressed, in 5 builds (4051 4074 5048 5112 xp) and the 2k
    icon DLLs. About 20 s from the ISOs, 10 s `--from-pack` (the tarball's xz is most of it).
-   Themes that need a file no medium has (`aero4074`, `aerovision`: `realaero.msstyles`, "Installing RealAero" below) are complete in a pack made where
+   Themes that need a file no medium has (`aero4074`, `aerovision`: `realaero.msstyles`, "The Aero patches for 4074" below) are complete in a pack made where
    that file is in the Windows tree's `local/` (above); otherwise they report it missing in `lhde-theme explain`, and the style
    goes in with `lhde-import --style` (below).
 2. **`lhde-import`** (every user): the pack into the Windows tree (`$LHDE_WINDOWS`, else `~/.local/share/lhde-windows`;
@@ -256,23 +256,35 @@ lhde-import --styles ~/Downloads/xp-themes          # then for real (into $LHDE_
   patched `uxtheme.dll`); importing them is the user's act, as with the Windows files, and nothing of them belongs in a resource
   pack meant for others (`lhde-pack --from-tree` packs `local/` too: `--no-local` leaves it out).
 
-### Installing RealAero (the Aero theme for 4074)
-`aero4074` and `aerovision` are drawn with **RealAero**, Lucas Brooks' reconstruction of Microsoft's private Aero theme for
-the M7 builds of pre-reset Longhorn, made for build 4074 x86fre (https://betawiki.net/wiki/User:Lucas_Brooks/RealAero). It is
-not Microsoft's own Aero (which was never released) nor one of the other "Aero patches" for Longhorn: it builds on the same
-author's TrueAeroPlus (2021-05-26) and takes some resources from TrueAero and TWIWMTB's Aero. It is made by resource
-replacement in Microsoft's 4074 styles, so it is Microsoft's art underneath: lhde cannot ship it, in the repository or in the
-free pack; you download it yourself from the BetaWiki page and import its `aero.msstyles`:
+### The Aero patches for 4074
+Microsoft's Aero theme for the M7 builds of pre-reset Longhorn was never released. What exists are "Aero patches": visual
+styles others made by replacing resources in Microsoft's 4074 styles, so Microsoft's art underneath: lhde cannot ship any of
+them, in the repository or in the free pack; you download them yourself and import them with `lhde-import --style`. The
+importer knows these files by their sha256 (`tools/lhdetree.py` `AERO_PATCHES`) and writes which one a file is into its
+annotations (`user.lux.author`, `user.lux.desc`, `user.lux.source`: docs/ANNOTATIONS.md) and into the frame sets' `manifest.ini`
+(`[about]`); `lhde-theme explain` shows both:
+
+| Patch | Author | Where | sha256 (start), size | lhde's name |
+| --- | --- | --- | --- | --- |
+| RealAero pre-0.1, 0.2, 0.3 | Lucas Brooks | BetaWiki, longhorn.ms (the releases below) | below | `realaero` |
+| TWIWMTB Aero | BOFH | longhorn.ms `dwm-aero-theme-for-4074.rar` ("DWM Aero theme for 4074" of the "Aurora & Aero" article, from the TWIWMTB modded 4074 image): `Aero/Aero.msstyles` and `Explorer Glass.txt`, both dated 2004-08-04 | `75d2a14b37863cd4`, 6,422,672 bytes | `twiwmtb-aero` |
+
+An `.msstyles` the importer does not know that carries the private Aero's DemoCheck path (`\\cloak2\drop\bin\enlist.txt`, also
+in Microsoft's own 5048 `aero.msstyles`) together with 4074's CompositedWindow class is "an Aero patch for 4074 (unknown)",
+with no author named: RealAero, TrueAero and their kin carry both. A Jade-based patch such as TWIWMTB's carries no DemoCheck and
+is known only by its hash.
+
+**RealAero** (https://betawiki.net/wiki/User:Lucas_Brooks/RealAero) is Lucas Brooks' reconstruction of the private Aero,
+made for build 4074 x86fre. It builds on the same author's TrueAeroPlus (2021-05-26) and, by its 0.2 readme, takes some
+resources from TrueAero and TWIWMTB's Aero. `aero4074` and `aerovision` are drawn with it, and lhde's `realaero` frame set
+(`share/frames/realaero/theme.ini`: insets, the Explorer and maximised rows, the button places) is fitted to its pre-0.1
+release:
 ```
-lhde-import --style aero.msstyles realaero    # NAME may be left out: a RealAero file is recognised and called realaero
+lhde-import --style aero.msstyles realaero    # NAME may be left out: a known patch is recognised and gets its name
 lhde-theme explain aero4074                   # the visual style row names the release ("RealAero 0.2 by Lucas Brooks")
 ```
 `--style` copies it to `local/themes/realaero.msstyles` and makes the frame sets `realaero` (the CompositedWindow PNG streams
-under luxwm's names) and `aerovision` (its caption buttons, `tools/build_aerovision.py`). The importer knows three releases by
-their sha256 and writes which one it is into the file's annotations (`user.lux.author = Lucas Brooks`, `user.lux.desc`,
-`user.lux.source`: docs/ANNOTATIONS.md) and into the frame sets' `manifest.ini` (`[about]`); an `aero.msstyles` it does not
-know that carries the private Aero's DemoCheck and 4074 CompositedWindow parts is "RealAero, unknown release" (TrueAero and
-other reconstructions carry both too).
+under luxwm's names) and `aerovision` (its caption buttons, `tools/build_aerovision.py`).
 
 | Release | Where | sha256 (start), size | What changed (frames lhde draws) |
 | --- | --- | --- | --- |
@@ -288,6 +300,21 @@ but 4074 draws a style's own CompositedWindow streams and uses the built-ins onl
 0.2's built-ins are its style's streams again, 0.3's are 4074's stock Jade ones, so lhde reads the style and imports no
 desksrv.dll. Nor does the desktop aurora come from the 0.3 package's `Microsoft.Windows.WCPClient.dll`: the aurora recipe reads
 a source's `resources/<build>/` (`lhde-import --iso`), and `lhde-import --dir` takes Windows directories, not a theme package.
+
+**TWIWMTB Aero** is older and simpler. Its `Explorer Glass.txt`: "This is the jade theme with some resources in the STREAM
+folder modified. -BOFH" (and, for 4074 itself, a `MILExplorer` DWORD of 1 under `HKLM\Software\Microsoft\Windows\CurrentVersion\Explorer`
+and the DWM turned on). Measured against 4074's `jade.msstyles` (`ut-dump --extract-streams`, 496 streams each), exactly six
+streams differ, all CompositedWindow plates: LGFRAME, LGFRAMEEXPLORER, LGFRAMEMAX, LGFRAMEMAXEXPLORER, SMFRAME and BORDERONLY.
+In Jade these six are one picture (801x1214, flat green 112,144,112 at alpha 213); in TWIWMTB's they are one picture again, of
+the same size and layout: grey glass, the caption a gradient from grey 128 to 88 at alpha 102 (40 %), the borders a little
+more opaque, the client area clear (alpha 0; in the Explorer plate from row 78). There is no caption-button pill in the plate,
+and the buttons, overlays, shadows, caption fog and default icon are Jade's. None of its streams is in RealAero: no
+CompositedWindow stream of pre-0.1, 0.2 or 0.3 is byte- or pixel-equal to one of TWIWMTB's six plates (the streams the three
+share are Jade's own art), so what RealAero took from "TWIWMTB's Aero" is not this file's frames.
+```
+lhde-import --style Aero.msstyles             # recognised: local/themes/twiwmtb-aero.msstyles
+lhde-theme explain twiwmtb-aero               # a bare style (no theme file)
+```
 
 A tree imported before lhde called the style `realaero` holds `local/themes/aero-patch.msstyles` and the frame set
 `generated/frames/aero-patch`: every import renames the file (`lhde-import --reindex` does only that), and

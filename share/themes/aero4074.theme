@@ -1,5 +1,5 @@
 ; RealAero, Lucas Brooks' reconstruction of the Aero theme for 4074 (styles/realaero.msstyles: built from Microsoft resources,
-; imported by the user, docs/USAGE.md "Installing RealAero"), with 4074's glass, as the x11 lab tuned it. Aliases: realaero, and
+; imported by the user, docs/USAGE.md "The Aero patches for 4074"), with 4074's glass, as the x11 lab tuned it. Aliases: realaero, and
 ; aero-patch, the name lhde gave it before
 [Theme]
 name     = Aero (4074)

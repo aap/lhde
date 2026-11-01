@@ -119,7 +119,7 @@ unchanged, so clients get one PropertyNotify of each per switch (`composited_pub
 style they belong to. Their PNG caches lie in the Windows tree (`generated/frames/NAME`, written by `lhde-import`: the DWM sets'
 textures from the style's streams, the classic sets through `tools/msstyles2theme.py`), found through liblhde. Two modes, `mode = dwm`
 (glass) and `mode = msstyles` (classic). Shipped: `realaero` (the 4074 Aero plates of RealAero, Lucas Brooks' reconstruction:
-USAGE.md "Installing RealAero"; the set was called `aero-patch`), `jade4074` (4074's Jade plates, blended as build 4066 shows them;
+USAGE.md "The Aero patches for 4074"; the set was called `aero-patch`), `jade4074` (4074's Jade plates, blended as build 4066 shows them;
 no shipped theme uses it), `aero5048`, `aero5112`, `aerovision` (glass); `slate4074-classic`, `jade4074-classic`,
 `slate4051-classic`, `luna4051-blue|olive|silver` (classic).
 

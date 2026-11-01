@@ -15,7 +15,7 @@ Decisions in force (from that history):
   current layer (`settings.ini [current]`, shown as "NAME (Modified)", section 3); Save As writes a theme file; selecting
   another theme drops the layer.
 - Frame set names are kept as the importer and the frame regression know them (`jade4074-classic`, `slate4074-classic`,
-  `luna4051-*`, `realaero`, ...); `realaero` (Lucas Brooks' RealAero, docs/USAGE.md "Installing RealAero") was called
+  `luna4051-*`, `realaero`, ...); `realaero` (Lucas Brooks' RealAero, docs/USAGE.md "The Aero patches for 4074") was called
   `aero-patch`, which stays an alias of the `aero4074` theme.
 
 ## 1. Two layers

@@ -65,7 +65,7 @@ Themes whose style is not imported are hidden from the lists; `lhde-import --sty
 style as a theme of its own, and `lhde-import --styles DIR` every style of a downloaded themes folder (also inside the theme
 installers' .exe files, which are unpacked, never run; `-n` lists first). The Aero themes (`aero4074`, `aerovision`) need
 RealAero, Lucas Brooks' Aero for 4074, which you download from BetaWiki and add with `lhde-import --style aero.msstyles realaero`
-(docs/USAGE.md "Installing RealAero"). docs/USAGE.md "Getting the Windows resources" has the details, docs/LICENSING.md says which
+(docs/USAGE.md "The Aero patches for 4074"). docs/USAGE.md "Getting the Windows resources" has the details, docs/LICENSING.md says which
 licence covers what.
 
 ## About the project
