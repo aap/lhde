@@ -46,8 +46,16 @@ n=0
 for f in "$styles"/*.msstyles "$styles"/*/*.msstyles; do
     [ -f "$f" ] || continue
     n=$((n + 1))
-    build/bin/ut-dump "$f" --list > "$T/ut-dump.log" 2>&1
-    result "ut-dump $(basename "$f")" $? "$T/ut-dump.log"
+    build/bin/ut-dump "$f" --list > "$T/ut-dump.log" 2>&1; st=$?
+    # the true size of every frame part without a rect, as luxwm asks for it (a part absent or without a size exits 1; a crash
+    # on IMAGESELECTTYPE = SIZE without a rect was 139)
+    for p in CAPTION MAXCAPTION SMALLCAPTION FRAMELEFT FRAMERIGHT FRAMEBOTTOM CLOSEBUTTON MAXBUTTON MINBUTTON RESTOREBUTTON HELPBUTTON \
+             SMALLCLOSEBUTTON; do
+        [ $st = 0 ] || break
+        build/bin/ut-dump "$f" --size-of WINDOW $p 1 true >> "$T/ut-dump.log" 2>&1; r=$?
+        [ $r -le 1 ] || { echo "ut-dump --size-of WINDOW $p 1 true: exit $r" >> "$T/ut-dump.log"; st=$r; }
+    done
+    result "ut-dump $(basename "$f")" $st "$T/ut-dump.log"
 done
 [ $n = 0 ] && skip ut-dump "no visual styles in ${styles:-the Windows tree (nothing imported: tools/lhde-import)}"
 

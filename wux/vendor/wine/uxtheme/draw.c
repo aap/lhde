@@ -228,7 +228,10 @@ static PTHEME_PROPERTY UXTHEME_SelectImage(HTHEME hTheme, int iPartId, int iStat
         /* If an image couldn't be selected, choose the first one */
         tp = MSSTYLES_FindProperty(hTheme, iPartId, iStateId, TMT_FILENAME, TMT_IMAGEFILE1);
     }
-    else if(imageselecttype == IST_SIZE) {
+    /* lhde: no rect (GetThemePartSize(..., NULL, TS_TRUE), as luxwm asks for a part's true size) selects IMAGEFILE, as XP's
+       SelectCorrectImageFile does without one; Wine read through the NULL rect (community styles with IMAGESELECTTYPE = SIZE
+       caption buttons and no glyph crashed luxwm) */
+    else if(imageselecttype == IST_SIZE && pRect) {
         POINT size = {pRect->right-pRect->left, pRect->bottom-pRect->top};
         POINT reqsize;
         for (i = 7; i >= 1; i--)
