@@ -2293,7 +2293,8 @@ static void usage(FILE* f)
         "usage: flxp [options] [DIR|FILE...]\n"
         "Open DIR in an Explorer window (default: the current directory); a FILE is\n"
         "opened with its default application instead.\n"
-        "  --theme NAME|PATH   visual style (luna, a name in the theme directories, a .msstyles file)\n"
+        "  --theme NAME|PATH   visual style for this run, not the session theme's (luna, a name in\n"
+        "                      the theme directories, a .msstyles file; FLXP_THEME the same)\n"
         "  --classic           no visual style\n"
         "  --icons NAME|PATH   icon theme: xp, 2k, longhorn, wine or a .theme file\n"
         "  --small-toolbar     small toolbar buttons\n"
@@ -2319,7 +2320,7 @@ static void print_info()
     if (!st.name.empty()) printf("session      %s (%s, followed; style %s, chrome %s, navbar %s %s)\n", st.name.c_str(), st.value("file").c_str(),
                                  st.msstyles.empty() ? "classic" : st.msstyles.c_str(), st.value("Explorer.chrome").c_str(),
                                  st.value("Explorer.navbar").c_str(), st.value("Explorer.navbar_preset").c_str());
-    else printf("session      %s\n", shell::follows_session_theme() ? "(no _LH_THEME)" : "(not followed: theme_follow=0 or --theme)");
+    else printf("session      %s\n", shell::follows_session_theme() ? "(no _LH_THEME, no settings.ini [theme] name)" : "(not followed: --theme or FLXP_THEME)");
     printf("framelets    %s\n", header::framelet_source().c_str());
     printf("%s", shell::lhde_report().c_str());   // lhde's data directories: what each lookup found
     const shell::IconTheme& it = shell::icon_theme();

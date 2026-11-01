@@ -15,7 +15,7 @@ Two directories, one rule each. liblhde gives every path (`lhde_config_file`, `l
 | --- | --- |
 | `settings.ini` | the selected theme, its current layer and the per-user keys (below); `$LHDE_SETTINGS` names another file |
 | `themes/NAME.theme` | the user's theme files (docs/THEME-FORMAT.md), written by Save As (Display Properties, luxshell's flyout, `lhde-theme save-as`) |
-| `flxp.ini` | flxp's own preferences (`[flxp]` key = value: views, header, thumbnails, the terminal, dialog sizes, ...); written with every key empty (= automatic) and its comment on first run; any key also as `FLXP_<KEY>` in the environment for one run. Nothing the desktop shares: flxp reads the keys below from settings.ini, the theme's from the session theme |
+| `flxp.ini` | flxp's own preferences (`[flxp]` key = value: views, header, thumbnails, the terminal, dialog sizes, ...); written with every key empty (= automatic) and its comment on first run; any key also as `FLXP_<KEY>` in the environment for one run. Nothing the desktop shares: flxp reads the keys below from settings.ini, the theme's from the session theme (`_LH_THEME`, without a session `[theme] name`; `--theme` / `FLXP_THEME` gives one run a fixed visual style) |
 | `keys` | luxwm's key bindings, one per line (`Mod4+Return exec urxvt`; LUXWM.md "Running and testing") |
 | `quicklaunch/` | the Quick Launch tile's `.desktop` files (`[quicklaunch] dir` names another folder) |
 | anything else | a shipped file overridden under its own relative name (`navbar/4074.ini`, `frames/jade4074/theme.ini`, `packs/4074-aero/shell.lua`): this directory is the first tree of every data lookup (docs/LAYOUT.md "The three trees") |

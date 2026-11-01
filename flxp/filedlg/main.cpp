@@ -126,10 +126,6 @@ int main(int argc, char** argv)
 
     if (shell::setup_fonts) shell::setup_fonts();
     if (shell::setup_theme) shell::setup_theme();
-    else if (!getenv("FLXP_THEME")) {
-        std::string t = shell::setting("theme");
-        if (!t.empty()) setenv("FLXP_THEME", t.c_str(), 1);
-    }
     w32::init();
 
     filedlg::Result r = filedlg::run(nullptr, o);

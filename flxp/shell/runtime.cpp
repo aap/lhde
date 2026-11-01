@@ -36,7 +36,7 @@ static std::vector<std::string> split_path(const std::string& s)
 
 static const char template_text[] =
     "# flxp settings. An empty value means automatic. Any key can be overridden\n"
-    "# for one run by the environment variable FLXP_<KEY> (FLXP_THEME=classic).\n"
+    "# for one run by the environment variable FLXP_<KEY> (FLXP_TERMINAL=xterm).\n"
     "[flxp]\n"
     "\n"
     "# Every Windows file comes from the imported Windows tree through the session\n"
@@ -53,16 +53,9 @@ static const char template_text[] =
     "# icons, frame, taskbar_kind, wallpaper and wallpaper_mode are ignored; for\n"
     "# one run FLXP_ICONS, FLXP_FRAME (--frame), ... still count.\n"
     "\n"
-    "# Visual style: luna, another name found in the theme directories, a\n"
-    "# .msstyles path, or classic. Auto: luna if it can be found, else classic.\n"
-    "theme =\n"
-    "# Colour scheme and size inside the .msstyles (auto: the style's default).\n"
-    "theme_color =\n"
-    "theme_size =\n"
-    "# Follow the session theme (the root property _LH_THEME, a theme file that\n"
-    "# liblhde resolves): its visual style replaces theme= and changes live with it;\n"
-    "# 0 = keep theme= (auto: 1). --theme for one run does not follow either.\n"
-    "theme_follow =\n"
+    "# The visual style is the session theme's (settings.ini [theme] name, the\n"
+    "# root's _LH_THEME), followed live. For one run: --theme STYLE or FLXP_THEME\n"
+    "# (luna, a .msstyles path, classic), which does not follow.\n"
     "\n"
     "# Toolbar buttons: large or small (auto: large).\n"
     "toolbar_icons =\n"
@@ -326,12 +319,16 @@ static void export_env(const char* var, const std::string& v)
 
 std::string setup_theme()
 {
-    // the Longhorn session theme wins over theme= unless theme_follow = 0 or
-    // a theme was given for this run
+    // the session theme (_LH_THEME, else settings.ini [theme] name) unless a style was given for this run (--theme, FLXP_THEME)
     if (follows_session_theme()) {
         SessionTheme t;
         std::string err;
         bool got = read_session_theme(t, &err);
+        if (!got && (err == "no _LH_THEME" || err == "no display")) {
+            // no lhde session on this display: the theme the user selected
+            std::string sel = store::get("theme", "name");
+            if (!sel.empty()) { got = resolve_theme(sel, t, &err); if (!got) err = sel + ": " + err; }
+        }
         if (getenv("FLXP_DEBUG"))
             fprintf(stderr, "flxp: session theme %s (%s): style.kind %s, path.style %s\n", got ? t.name.c_str() : "-",
                     err.c_str(), t.value("style.kind").c_str(), t.value("path.style").c_str());
@@ -344,7 +341,7 @@ std::string setup_theme()
                 return "";
             }
             if (t.msstyles.empty())
-                fprintf(stderr, "flxp: session theme %s: no visual style (%s: %s); using theme=\n", t.name.c_str(),
+                fprintf(stderr, "flxp: session theme %s: no visual style (%s: %s); using luna\n", t.name.c_str(),
                         t.value("VisualStyle.style").c_str(), t.why.count("path.style") ? t.why.at("path.style").c_str() : "not found");
             else {
                 export_env("FLXP_THEME", t.msstyles);
@@ -354,25 +351,24 @@ std::string setup_theme()
                 return t.msstyles;
             }
         } else if (err != "no _LH_THEME" && err != "no display")
-            fprintf(stderr, "flxp: session theme: %s; using theme=\n", err.c_str());
+            fprintf(stderr, "flxp: session theme: %s; using luna\n", err.c_str());
     }
     if (getenv("FLXP_THEME_FOLLOWED")) {
         // inherited from a parent that followed a session theme that is gone now
         unsetenv("FLXP_THEME"); unsetenv("FLXP_THEME_COLOR"); unsetenv("FLXP_THEME_SIZE"); unsetenv("FLXP_THEME_FOLLOWED");
     }
-    std::string want = setting("theme");
+    const char* env = getenv("FLXP_THEME");   // --theme, or the caller's for this run
+    std::string want = env ? env : "";
     bool asked = !want.empty();
     if (!asked) want = "luna";
     std::string path;
     if (strcasecmp(want.c_str(), "classic") && strcasecmp(want.c_str(), "none") && strcasecmp(want.c_str(), "off")) {
         path = find_msstyles(want);
         if (path.empty() && asked)
-            fprintf(stderr, "flxp: visual style \"%s\" not found (lhde's styles/, theme_path= in %s); using classic\n",
-                    want.c_str(), settings_path().c_str());
+            fprintf(stderr, "flxp: visual style \"%s\" not found (lhde's styles/); using classic\n", want.c_str());
     }
     export_env("FLXP_THEME", path);
-    export_env("FLXP_THEME_COLOR", path.empty() ? "" : setting("theme_color"));
-    export_env("FLXP_THEME_SIZE", path.empty() ? "" : setting("theme_size"));
+    if (path.empty()) { unsetenv("FLXP_THEME_COLOR"); unsetenv("FLXP_THEME_SIZE"); }   // else the caller's, if any (the style's default)
     return path;
 }
 

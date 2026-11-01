@@ -250,8 +250,6 @@ std::string font_smoothing()
 
 static bool follows_now()
 {
-    std::string f = setting("theme_follow", "1");
-    if (f == "0" || f == "no" || f == "off" || f == "false") return false;
     // FLXP_THEME from --theme or the caller's environment is explicit; the one
     // setup_theme exported for a followed theme (FLXP_THEME_FOLLOWED) is not
     const char* t = getenv("FLXP_THEME");

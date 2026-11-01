@@ -68,8 +68,8 @@ std::string theme_setting(const std::string& key, const std::string& fallback = 
 // settings.ini [fonts] smoothing (the user's), else the theme's Fonts.smoothing; "" = neither (off | standard | cleartype)
 std::string font_smoothing();
 
-// True if flxp follows the session theme: theme_follow (default 1) and no
-// explicit theme for this run (--theme / FLXP_THEME that setup_theme did not
+// True if flxp follows the session theme: no explicit visual style for this
+// run (--theme / FLXP_THEME that setup_theme did not
 // put there itself).
 bool follows_session_theme();
 

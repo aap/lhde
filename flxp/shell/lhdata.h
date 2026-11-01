@@ -5,7 +5,7 @@
 // $XDG_DATA_DIRS/lhde, the source tree's data/. flxp.ini's path keys stay as
 // overrides (theme_setting, setting); these are the defaults under them.
 //
-//   styles/NAME.msstyles  visual styles by name (theme= without a session theme)
+//   styles/NAME.msstyles  visual styles by name (--theme / FLXP_THEME)
 //   resources/<build>     a build's system32 (longhorn_system32's default: the
 //                         session theme's build), its Microsoft.Windows.Client.dll
 //   resources/demo        the PDC demo's images (the task band's aurora)
