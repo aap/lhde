@@ -8,7 +8,7 @@
 -- the Longhorn Aero images. The 5112 tray background (TrayNotifyHoriz bitmap#528, packs/5112/imageres/tray_bg.png) has no node in
 -- runtime.lua yet.
 return {
-  name = "5112-aero", font = "Segoe UI 9", imageres = "5112/imageres",
+  font = "Segoe UI 9", imageres = "5112/imageres",
   -- HackImage scaling in 4074: nearest-neighbour (1179 78x28 drawn 79x29: lh4074-181415.png fits nearest with error 129 per
   -- pixel, bilinear 266; 4074-dwm.png 1868 / 2047 over the glass). scene.c applies it to stretched nine-grid pieces and to
   -- magnified images; shrinking (clock layers, icons) stays smooth.

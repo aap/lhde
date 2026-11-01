@@ -14,7 +14,7 @@
 -- comma: text.c would otherwise read "Medium" as the weight (family "Franklin Gothic", not found).
 local S = function(part) return "plex-sidebar-" .. part end
 local P = {
-  name = "4042-plex", build = 4042, imageres = "4042/imageres",
+  build = 4042, imageres = "4042/imageres",
   font = "Franklin Gothic Medium,Tahoma 12px",       -- the stylesheet's tile, task, notify and PIDL text: Franklin Gothic Medium 12, white
   filter = "bilinear",                        -- Avalon 6.0.3708 draws images through MIL scaling (not nearest); not measured
   default_icon = "4042/shell32/16/3.png",     -- IDI_APPLICATION of 4042 main's shell32 (packs/4042/shell32)

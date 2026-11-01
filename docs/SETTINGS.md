@@ -51,8 +51,8 @@ comments, the order and the keys it does not know: it reads the whole file, chan
 [current]     theme = aero4074           ; the current layer, Windows' "NAME (Modified)": the theme it belongs to
               Section.key = value        ; and the theme keys changed but not saved (Desktop.wallpaper = 2k/blulac16, ...)
 [desktop]     wallpaper = none           ; the picture off in every theme (luxshell's "Show the wallpaper"); absent: the theme's
-              desktop_black = 0          ; 1: maximised mode also blacks out the desktop layer (luxshell)
-[shell]       max_fade_ms = 0            ; the bars' black layers in maximised mode: 0 at once, else a fade in ms (luxshell)
+              black = 0                  ; 1: maximised mode also blacks out the desktop layer (luxshell)
+              max_fade_ms = 0            ; the bars' black layers in maximised mode: 0 at once, else a fade in ms (luxshell)
 [taskbar]     autohide = 0 ; rows = 1    ; 0 | 1; 1..3 (the top-edge drag)
               start_menu = panel         ; the classic bar's Start button: panel (XP's start panel) | classic (the popup menu) (flxp-taskbar)
 [sidebar]     mode = full                ; full | minimized | pinned (absent: the theme's Shell.sidebar)
@@ -61,7 +61,7 @@ comments, the order and the keys it does not know: it reads the whole file, chan
               with_classic = 0           ; 1: the sidebar stays with the classic taskbar
               yield_bottom = 1           ; 1: ends above another dock's bottom strut | 0
               locked = 0                 ; 1: Lock the Sidebar (no width drag)
-[clock]       pinned = 1 ; pinned_pack = 4074-aero ; layout = default   ; the clock tile; pinned holds for the pack it was chosen in
+[clock]       pinned = 1 ; pack = 4074-aero ; layout = default   ; the clock tile; pinned holds for the pack it was chosen in
 [quicklaunch] dir = ~/some/dir           ; the Quick Launch tile's folder (default ~/.config/lhde/quicklaunch/)
 [start]       pinned = a.desktop;b.desktop ; flxp's start panel: the pinned programs (desktop ids, terminal, explorer, commands)
 [commands]    logoff = ... ; standby ; shutdown ; restart ; lock ; picom ; taskbar ; filemanager ; run ; search   ; luxshell, flxp's start panel (logoff, shutdown)
@@ -77,8 +77,8 @@ and taken as unset (the default). One parser each: flxp's `shell::flag_value` (`
 compositor when the theme has glass frames), `VisualStyle.shellstyle`, `Explorer.chrome`, `Explorer.navbar_preset`; in
 flxp.ini an empty value is automatic for every key.
 
-luxshell writes the defaults of `[desktop] desktop_black`, `[taskbar] autohide rows`, `[sidebar] width with_classic stacking`,
-`[clock] layout` and `[shell] max_fade_ms` when they are missing. `[desktop] wallpaper = none` is the one per-user key the
+luxshell writes the defaults of `[desktop] black max_fade_ms`, `[taskbar] autohide rows`, `[sidebar] width with_classic stacking`
+and `[clock] layout` when they are missing. `[desktop] wallpaper = none` is the one per-user key the
 theme resolver applies (below the current layer; source `settings` in `lhde-theme resolve --why`); every other theme key is
 the theme's. The current layer is written by Display Properties, Set as Desktop Background, luxshell's flyout and
 `_LHSHELL_COMMAND taskbar` (liblhde `lhde_current_set` / `lhde_current_set_key`; a key the theme gives anyway is dropped);

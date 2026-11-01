@@ -17,7 +17,6 @@
 -- pixel-identical to 4074 Slate's streams, so nothing changes there.
 local here = debug.getinfo(1, "S").source:match("^@(.*)/[^/]+/[^/]+$") or "themes"
 local P = dofile(lh.data_find("packs/4074-slate/shell.lua") or (here .. "/4074-slate/shell.lua"))
-P.name = "4051-slate"
 P.build = 4051
 P.filter = "bilinear"
 P.imageres = "4051/imageres"

@@ -818,8 +818,8 @@ luxshell keeps the button pressed from the click (or Super) until the panel's wi
 | --- | --- | --- |
 | `[theme]` | `name` | the session theme: a theme file's name, an alias or a bare style (mirrors `_LH_THEME`) |
 | `[desktop]` | `wallpaper` | absent (default: the theme's `Desktop.wallpaper`) or `none` (no picture in any theme, solid #3a6ea5; `LHSHELL_WALLPAPER=0` forces it) |
-| `[desktop]` | `desktop_black` * | `0` (default): a maximised window darkens only its own frame (luxwm) and the bars' black layers; `1`: the whole desktop also turns black |
-| `[shell]` | `max_fade_ms` * | `0` (default): the bars' black layers switch at once when a window is maximised or restored; a number: a fade in ms (4074: 400) |
+| `[desktop]` | `black` * | `0` (default): a maximised window darkens only its own frame (luxwm) and the bars' black layers; `1`: the whole desktop also turns black |
+| `[desktop]` | `max_fade_ms` * | `0` (default): the bars' black layers switch at once when a window is maximised or restored; a number: a fade in ms (4074: 400) |
 | `[taskbar]` | `start_menu` | the menu the classic bar's Start button opens: `panel` (XP's start panel, default) or `classic` (the classic popup menu); flxp-taskbar reads it at every open. Next to the Avalon bar the start menu is the panel. |
 | `[taskbar]` | `autohide` * | `0` (default) or `1` |
 | `[taskbar]` | `rows` * | 1 (default), 2 or 3: the top-edge drag writes it |
@@ -829,7 +829,7 @@ luxshell keeps the button pressed from the click (or Super) until the panel's wi
 | `[sidebar]` | `with_classic` * | `0` (default: no sidebar while the classic taskbar runs; its mode returns with the Avalon one) or `1` (the sidebar stays, above the classic bar) |
 | `[sidebar]` | `yield_bottom` | `1` (default: the sidebar ends above another dock's bottom strut, e.g. the classic taskbar) or `0` |
 | `[sidebar]` | `locked` | `1`: the width sizer does not drag (the sidebar menu's *Lock the Sidebar*) |
-| `[clock]` | `pinned`, `pinned_pack` | `1` (pinned at the bottom) or `0` (a tile in the list), chosen in the pack `pinned_pack` (the clock's menu writes both); other packs use their own default: pinned in 4074-aero, 4074-slate and 5112-aero, a tile in 4051-slate |
+| `[clock]` | `pinned`, `pack` | `1` (pinned at the bottom) or `0` (a tile in the list), chosen in the pack `pack` (the clock's menu writes both); other packs use their own default: pinned in 4074-aero, 4074-slate and 5112-aero, a tile in 4051-slate |
 | `[clock]` | `layout` * | `default`, `digtime`, `digtimemonthday`, `digtimeweekday`, `minical`, `cal` |
 | `[start]` | `pinned` | flxp's start panel's pinned programs, `a.desktop;b.desktop` (desktop ids, `terminal`, `explorer` or a command line; default `terminal;explorer`) |
 | `[quicklaunch]` | `dir` | the Quick Launch tile's folder (default `~/.config/lhde/quicklaunch/`) |

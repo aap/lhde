@@ -2,7 +2,7 @@
 -- Selected by the session theme: a theme's `[Shell] pack = 4074-aero`, SHELL-DESIGN 5;
 -- swapped live on a _LH_THEME change (runtime.lua rebuild_shell), so keep everything the pack decides in this table.
 return {
-  name = "4074-aero", font = "Segoe UI 9",
+  font = "Segoe UI 9",
   -- HackImage scaling in 4074: nearest-neighbour (1179 78x28 drawn 79x29: lh4074-181415.png fits nearest with error 129 per
   -- pixel, bilinear 266; 4074-dwm.png 1868 / 2047 over the glass). scene.c applies it to stretched nine-grid pieces and to
   -- magnified images; shrinking (clock layers, icons) stays smooth.

@@ -649,8 +649,8 @@ A pack is `data/packs/NAME/shell.lua` (text only); its images are under `packs/<
 
 `R(id)` gives the pack's image for an Aero imageres id: the pack's `ids` remap, then the pack's own `imageres` directory when it
 has that image (4051: the 34 PNGs of 4051's imageres.dll that differ from 4074's or are missing there, e.g. tile arrow
-1105/1106, tile restore/close 1058-1062, toast parts 4003-4011), else `packs/4074/imageres`. Keys: `name` (the pack's
-directory name), `family` (`slate` in both Slate packs: Slate's opaque flyouts, toasts and borders), `font`, `filter`,
+1105/1106, tile restore/close 1058-1062, toast parts 4003-4011), else `packs/4074/imageres`. The pack's name is its
+directory's. Keys: `family` (`slate` in both Slate packs: Slate's opaque flyouts, toasts and borders), `font`, `filter`,
 `default_icon`, `taskbar = { height, bg_grid, bg_filter }`, `taskbar_text`, `taskbar_glow`, `taskbar_dy`, `start = { w, h }`,
 `start_dy`, `start_alpha`, `start_extend_bottom`, `start_compose`, `toggle`, `toggle_minimized`, `taskbutton = { max_w, fill_w,
 margin, grid, content, icon_margin, font, images }`, `sidebar = { width, bg_grid, sizer, title }`, `tile_bg`, `tile_chrome`,
@@ -839,7 +839,7 @@ and `stay_open`. An open flyout or menu keeps an autohide taskbar shown.
 ### 8.1 Clock (`tiles/clock.lua`)
 
 `[clock] pinned = 1` (4074: the pinned host at the bottom) | `0` (4051: a tile in the list: ~96 px face at tile y 22, "6:37 AM,
-Oct 23" in Tahoma 10 at tile y 142, tile 160 high). The choice holds for the pack it was made in (`[clock] pinned_pack`; a
+Oct 23" in Tahoma 10 at tile y 142, tile 160 high). The choice holds for the pack it was made in (`[clock] pack`; a
 pack's `clock_pack` shares another's: aerovision → aero); other packs use their `clock_pinned` (nil = pinned). `[clock] layout`
 = the six `clocksidebar*.xaml` views: `default` (80 px analog + LongTime), `digtime`, `digtimemonthday`, `digtimeweekday`
 (analog + bold DigitalTime #D8E4FF / #9EB5BB + DigitalText lines; the AnalogClockPanel has no size in these XAMLs: 56 px, 40 px
@@ -933,11 +933,11 @@ composited frame. Condition: the active window is maximised or fullscreen, or, w
 desktop is. luxshell uses the property and falls back to the same rule over EWMH (`MAXIMIZED_VERT`+`HORZ`, fullscreen) under
 another WM.
 
-- **Black layers.** `TaskbarBlackLayer` / `SidebarBlackLayer` go to opacity 1 / 0. `[shell] max_fade_ms = 0` (default): in the
+- **Black layers.** `TaskbarBlackLayer` / `SidebarBlackLayer` go to opacity 1 / 0. `[desktop] max_fade_ms = 0` (default): in the
   same repaint (the bar is dark ~80 ms after Super+Up on the lab, picom included); a number = SetMaximizedWindow's fade (4074:
   400 ms). luxwm's `MAX_FADE_MS` is 0 too. The task text's 400 ms brush animation to white is not done (the text is white).
 - **Desktop layer.** `luxshell-desktop`: full screen, `_NET_WM_WINDOW_TYPE_DESKTOP`, sticky + below, no struts, kept at the bottom
-  of the stack, normally unmapped (the wallpaper is the root background). `[desktop] desktop_black = 1` maps it black in
+  of the stack, normally unmapped (the wallpaper is the root background). `[desktop] black = 1` maps it black in
   maximised mode: its X background is set to opaque black and it is lowered before the map, so the server paints it black with
   the map (no transparent first frame), and it is unmapped at once on restore. It is 24-bit: it is only ever mapped while black,
   and picom blurs behind every ARGB window (a full-screen one cost ~150-300 ms per frame on the xrender lab). It is the future
@@ -1028,13 +1028,13 @@ the start-menu provider check, `[theme] name` (liblhde `lhde_theme_select`, whic
 
 **Settings.** settings.ini (`~/.config/lhde/settings.ini`, liblhde's store: unknown keys, comments and order kept, nothing
 written when a value is unchanged) holds the user's choices; luxshell's keys: `[taskbar] autohide rows`,
-`[sidebar] mode width stacking with_classic yield_bottom locked`, `[clock] pinned pinned_pack layout`, `[desktop] wallpaper
-= none, desktop_black`, `[shell] max_fade_ms`, `[quicklaunch] dir`, `[commands]`, `[fonts] smoothing` (menus); missing
+`[sidebar] mode width stacking with_classic yield_bottom locked`, `[clock] pinned pack layout`, `[desktop] wallpaper
+= none, black, max_fade_ms`, `[quicklaunch] dir`, `[commands]`, `[fonts] smoothing` (menus); missing
 defaults are written on first run. After a write luxshell sends one root ClientMessage `_LH_SETTINGS_CHANGED` per handled event:
 `l[0]` = serial (root CARDINAL `_LH_SETTINGS_SERIAL` + 1, written first, never below the highest serial seen or the clock seed),
 `l[1]` = the section's atom when only one changed, else 0. On a received message (its own too) it re-reads the file 50 ms after
 the burst and applies every key that differs from what runs (theme, current layer, composition, taskbar, autohide, rows, sidebar
-mode / width / stacking / with_classic / locked, clock pinned and layout, desktop_black, max_fade_ms, wallpaper, the start
+mode / width / stacking / with_classic / locked, clock pinned and layout, desktop black, max_fade_ms, wallpaper, the start
 provider); an open settings flyout is rebuilt. Runtime state stays in `~/.local/state/lhde/luxshell-state.ini` (`[sidebar] tiles
 tiles_base`; `LHSHELL_STATE` overrides the path).
 

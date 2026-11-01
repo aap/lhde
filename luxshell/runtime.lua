@@ -132,13 +132,13 @@ apply_fonts(theme_entry)
 --   stacking = top|bottom (top: 4074, the sidebar is above the windows (_NET_WM_STATE_ABOVE) with its strut, runs full height and
 --   the taskbar yields to it; bottom: part of the desktop, under the windows (_NET_WM_STATE_BELOW) with no strut, the taskbar runs
 --   the full width over it and the sidebar ends at its top; Win+S = _LHSHELL_COMMAND "sidebar-stacking toggle" flips it at once).
---   [clock] pinned = 1|0 with pinned_pack = the pack it was chosen in (other packs use their own default, T.clock_pinned), layout
---   [desktop] wallpaper = none (the picture off in every theme; else the theme's), desktop_black = 0|1 (0 = maximised mode only switches the bars' black layers; 1 = also the
---   full-screen black of the desktop layer)   [shell] max_fade_ms = 0 (the black layers switch at once) or the fade in ms
+--   [clock] pinned = 1|0 with pack = the pack it was chosen in (other packs use their own default, T.clock_pinned), layout
+--   [desktop] wallpaper = none (the picture off in every theme; else the theme's), black = 0|1 (0 = maximised mode only switches the bars' black layers; 1 = also the
+--   full-screen black of the desktop layer), max_fade_ms = 0 (the black layers switch at once) or the fade in ms
 --   (LHSHELL_WALLPAPER=0 forces the wallpaper off). Runtime state (the tile order) stays in state.ini.
-for _, d in ipairs{ { "desktop", "desktop_black", "0" }, { "taskbar", "autohide", "0" }, { "taskbar", "rows", "1" },
+for _, d in ipairs{ { "desktop", "black", "0" }, { "taskbar", "autohide", "0" }, { "taskbar", "rows", "1" },
                     { "sidebar", "width", "150" }, { "sidebar", "with_classic", "0" }, { "sidebar", "stacking", "top" },
-                    { "clock", "layout", "default" }, { "shell", "max_fade_ms", "0" } } do
+                    { "clock", "layout", "default" }, { "desktop", "max_fade_ms", "0" } } do
   if not S.has(d[1], d[2]) then S.set(d[1], d[2], d[3]) end
 end
 local SB_MIN, SB_MAX = 100, 600         -- _ValidateSize(v, 100, 150, 600) (2.4.2, L53528)
@@ -152,10 +152,10 @@ local cfg = {
   sb_bottom = S.get("sidebar", "stacking") == "bottom",   -- [sidebar] stacking = bottom: the sidebar under the windows
   composition = "auto",                                   -- set below from the per-theme chain: auto | 1 | 0
   -- maximised windows do not black out the whole desktop (luxwm crossfades the frame to its dark maximised plate; only
-  -- the bars' black layers fade). desktop_black = 1: the full-screen black of the desktop layer too
-  desktop_black = S.flag("desktop", "desktop_black", false),
-  -- [shell] max_fade_ms: the black layers' fade in maximised mode; 0 (default) = switched in the same repaint, no fade
-  max_fade_ms = math.max(0, math.floor(tonumber(S.get("shell", "max_fade_ms") or "") or 0)),
+  -- the bars' black layers fade). [desktop] black = 1: the full-screen black of the desktop layer too
+  black_desktop = S.flag("desktop", "black", false),
+  -- [desktop] max_fade_ms: the black layers' fade in maximised mode; 0 (default) = switched in the same repaint, no fade
+  max_fade_ms = math.max(0, math.floor(tonumber(S.get("desktop", "max_fade_ms") or "") or 0)),
 }
 -- [taskbar] kind: avalon = luxshell's taskbar; classic = no taskbar surface, struts or _NET_WM_ICON_GEOMETRY of ours, the
 -- classic flxp-taskbar runs instead (started and stopped by us); none = neither.
@@ -188,11 +188,11 @@ cfg.sb_locked = S.flag("sidebar", "locked", false)
 local function sb_hidden() return cfg.taskbar == "classic" and cfg.with_classic ~= true end
 lh.sidebar_hidden = sb_hidden
 if cfg.sidebar_w then cfg.sidebar_w = clamp(math.floor(cfg.sidebar_w), SB_MIN, SB_MAX) end
--- [clock] pinned: the user's choice (the clock's menu) holds for the pack it was made in ([clock] pinned_pack); any other pack
--- (and a state.ini from before pinned_pack existed) uses the pack's default T.clock_pinned (nil = pinned, the 4074 look)
+-- [clock] pinned: the user's choice (the clock's menu) holds for the pack it was made in ([clock] pack); any other pack
+-- (and a settings.ini without [clock] pack) uses the pack's default T.clock_pinned (nil = pinned, the 4074 look)
 local function pack_key() return T.clock_pack or (pack_dir or ""):match("([^/]+)/*$") or "" end   -- T.clock_pack: a pack that shares another's choice (4074-aerovision: 4074-aero)
 local function clock_pinned()
-  local v, at = S.flag_value(S.get("clock", "pinned"), "settings.ini [clock] pinned"), S.get("clock", "pinned_pack")
+  local v, at = S.flag_value(S.get("clock", "pinned"), "settings.ini [clock] pinned"), S.get("clock", "pack")
   if v ~= nil and at == pack_key() then return v end
   return T.clock_pinned ~= false
 end
@@ -232,7 +232,7 @@ local black_on = false  -- maximised mode (set_maximized below); new black layer
 
 ------------------------------------------------------------------ desktop layer (SHELL-DESIGN 11)
 -- full screen, _NET_WM_WINDOW_TYPE_DESKTOP, sticky + below, no struts, at the bottom of the stack. Unmapped normally (the
--- wallpaper is the root background); with [shell] desktop_black = 1 it is mapped black at once in maximised mode (no fade)
+-- wallpaper is the root background); with [desktop] black = 1 it is mapped black at once in maximised mode (no fade)
 -- and unmapped at once on restore; the default (0) leaves it unmapped. Future home of the Aurora.
 -- LHSHELL_DESKTOP=0 leaves it out entirely, for when another program owns the desktop (flxp-desktop draws
 -- the wallpaper and icons and does the maximised-mode black fade itself; lhde-session sets it while flxp-desktop runs).
@@ -634,14 +634,14 @@ function sb.tile_rect(tile) local x, y, w, h = tile.node:bounds(); return sb.geo
 function lh.set_maximized(on)
   if on == black_on then return end
   black_on = on
-  if not dk or not cfg.desktop_black then   -- default: the desktop layer stays unmapped (its future Aurora role only)
+  if not dk or not cfg.black_desktop then   -- default: the desktop layer stays unmapped (its future Aurora role only)
   elseif on then
     dk.black.opacity = 1; dk.black:set{ opacity = 1 }
     dk.surface:background("#ff000000"); dk.surface:lower(); dk.surface:show()   -- lower first: mapping keeps the stacking position
   else
     dk.surface:hide(); dk.surface:background(nil); dk.black.opacity = 0; dk.black:set{ opacity = 0 }
   end
-  -- [shell] max_fade_ms (default 0): 0 = the layers switch in the same repaint (lh.animate with 0 ms cancels a running fade and
+  -- [desktop] max_fade_ms (default 0): 0 = the layers switch in the same repaint (lh.animate with 0 ms cancels a running fade and
   -- sets the value at once); otherwise SetMaximizedWindow's fade (400 ms in 4074)
   lh.animate(tb.black, "opacity", on and 1 or 0, cfg.max_fade_ms); lh.animate(sb.black, "opacity", on and 1 or 0, cfg.max_fade_ms)
 end
@@ -1109,7 +1109,7 @@ lh.on("surface-press", function(x, y, button, win)
 end)
 -- [clock] pinned: the clock between the 4074 pinned host (bottom) and the 4051 tile list
 lh.on("clock-pinned", function(on)
-  cfg.clock_pinned = on and true or false; S.set("clock", "pinned", on and "1" or "0"); S.set("clock", "pinned_pack", pack_key())
+  cfg.clock_pinned = on and true or false; S.set("clock", "pinned", on and "1" or "0"); S.set("clock", "pack", pack_key())
   if mode ~= "full" then return end
   build_sidebar(); build_tiles(); after_tiles(); place_sidebar()
 end)
@@ -1590,8 +1590,8 @@ local function reload_settings()
     if mode == "full" then build_sidebar(); build_tiles(); after_tiles(); place_sidebar() end
   end
   lh._emit("clock-layout", S.get("clock", "layout") or "default")
-  cfg.desktop_black = S.flag("desktop", "desktop_black", false)
-  cfg.max_fade_ms = math.max(0, math.floor(tonumber(S.get("shell", "max_fade_ms") or "") or 0))
+  cfg.black_desktop = S.flag("desktop", "black", false)
+  cfg.max_fade_ms = math.max(0, math.floor(tonumber(S.get("desktop", "max_fade_ms") or "") or 0))
   publish_resolved(theme_entry)                          -- [desktop] wallpaper / mode / icons, [theme] animations
   local v = effective(theme_entry); local key = v.wallpaper .. "|" .. v.mode
   if key ~= wp_applied then set_wallpaper(theme_entry) end
