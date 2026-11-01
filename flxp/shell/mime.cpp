@@ -10,6 +10,7 @@
 #include <map>
 #include <set>
 #include "config.h"
+#include "util.h"
 #include "mime.h"
 
 namespace shell {
@@ -31,8 +32,6 @@ struct Db {
 };
 
 Db db;
-
-std::string lower(std::string s) { for (char& c : s) if (c >= 'A' && c <= 'Z') c += 32; return s; }
 
 bool has_wild(const std::string& s) { return s.find_first_of("*?[") != std::string::npos; }
 

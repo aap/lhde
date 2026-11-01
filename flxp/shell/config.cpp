@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "config.h"
+#include "util.h"
 
 namespace shell {
 
@@ -55,14 +56,6 @@ static std::vector<std::string> split_dirs(const char* var, const char* fallback
 
 std::vector<std::string> config_dirs() { return split_dirs("XDG_CONFIG_DIRS", "/etc/xdg"); }
 std::vector<std::string> data_dirs() { return split_dirs("XDG_DATA_DIRS", "/usr/local/share:/usr/share"); }
-
-static std::string trim(const std::string& s)
-{
-    size_t a = 0, b = s.size();
-    while (a < b && (s[a] == ' ' || s[a] == '\t' || s[a] == '\r')) a++;
-    while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t' || s[b - 1] == '\r')) b--;
-    return s.substr(a, b - a);
-}
 
 std::string file_setting(const std::string& key, const std::string& fallback)
 {
@@ -250,18 +243,6 @@ std::string base_of(const std::string& path)
     if (path == "/") return "/";
     size_t i = path.find_last_of('/');
     return i == std::string::npos ? path : path.substr(i + 1);
-}
-
-bool read_file(const std::string& path, std::string& out)
-{
-    FILE* f = fopen(path.c_str(), "rb");
-    if (!f) return false;
-    out.clear();
-    char buf[65536];
-    size_t n;
-    while ((n = fread(buf, 1, sizeof buf, f)) > 0) out.append(buf, n);
-    fclose(f);
-    return true;
 }
 
 bool make_dirs(const std::string& dir)

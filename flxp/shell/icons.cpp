@@ -9,6 +9,7 @@
 #include <map>
 #include "icons.h"
 #include "config.h"
+#include "util.h"
 #include "lhdata.h"
 #include "lhtheme.h"
 #include "gdi/bmp.h"
@@ -22,8 +23,6 @@ static bool g_loaded;
 static std::string g_requested;   // the name select_icon_theme was given
 static int g_generation;
 
-static bool exists(const std::string& p) { struct stat st; return stat(p.c_str(), &st) == 0; }
-
 static const std::string& icon_dir()
 {
     if (g_dir.empty()) {
@@ -31,12 +30,6 @@ static const std::string& icon_dir()
         if (g_dir.empty()) g_dir = "res/icons";
     }
     return g_dir;
-}
-
-static std::string trim(const std::string& s)
-{
-    size_t a = s.find_first_not_of(" \t\r\n"), b = s.find_last_not_of(" \t\r\n");
-    return a == std::string::npos ? "" : s.substr(a, b - a + 1);
 }
 
 static std::string expand(const std::string& v)

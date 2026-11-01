@@ -7,6 +7,7 @@
 #include <fontconfig/fontconfig.h>
 #include "runtime.h"
 #include "config.h"
+#include "util.h"
 #include "gdi/font.h"
 #include "lhtheme.h"
 #include "lhdata.h"
@@ -14,8 +15,6 @@
 #include "win/window.h"   // win::set_drop_shadows (SPI_SETDROPSHADOW)
 
 namespace shell {
-
-static bool exists(const std::string& p) { struct stat st; return stat(p.c_str(), &st) == 0; }
 
 static const char template_text[] =
     "# flxp settings. An empty value means automatic; a switch is 1 or 0 (no other\n"

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <set>
 #include "config.h"
+#include "util.h"
 #include "lhtheme.h"
 extern "C" {
 #include "lhde/data.h"
@@ -16,9 +17,6 @@ extern "C" {
 namespace shell {
 
 namespace {
-
-bool is_dir(const std::string& p) { struct stat st; return !p.empty() && stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode); }
-bool is_file(const std::string& p) { struct stat st; return !p.empty() && stat(p.c_str(), &st) == 0 && S_ISREG(st.st_mode); }
 
 // the first run of 4 digits in s ("slate4051" -> "4051"), "" if none
 std::string digits4(const std::string& s)

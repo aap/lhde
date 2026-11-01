@@ -66,7 +66,6 @@ void set_window_icon(HWND frame, const std::string& key);
 
 // ---- the list --------------------------------------------------------------------
 
-std::string lower(const std::string& s);   // ASCII lower case (the filter's comparison)
 
 struct Browser {
     virtual ~Browser();                              // unfollow()

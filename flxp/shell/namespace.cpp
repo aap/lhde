@@ -10,6 +10,7 @@
 #include "namespace.h"
 #include "details.h"
 #include "mime.h"
+#include "util.h"
 
 namespace shell {
 
@@ -21,8 +22,6 @@ static std::string basename_of(const std::string& p)
     size_t i = p.find_last_of('/');
     return i == std::string::npos ? p : p.substr(i + 1);
 }
-
-static std::string lower(std::string s) { for (char& c : s) if (c >= 'A' && c <= 'Z') c += 32; return s; }
 
 static std::string extension(const std::string& name)
 {

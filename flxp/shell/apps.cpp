@@ -17,6 +17,7 @@
 #include <set>
 #include "apps.h"
 #include "config.h"
+#include "util.h"
 #include "mime.h"
 
 namespace shell {
@@ -34,14 +35,6 @@ struct KeyFile {
         return nullptr;
     }
 };
-
-std::string trim(const std::string& s)
-{
-    size_t a = 0, b = s.size();
-    while (a < b && (s[a] == ' ' || s[a] == '\t' || s[a] == '\r')) a++;
-    while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t' || s[b - 1] == '\r')) b--;
-    return s.substr(a, b - a);
-}
 
 bool parse_keyfile(const std::string& path, KeyFile& kf)
 {
@@ -100,8 +93,6 @@ std::vector<std::string> split_list(const std::string& v)
 }
 
 bool truthy(const std::string& v) { return v == "true" || v == "1"; }
-
-std::string lower(std::string s) { for (char& c : s) if (c >= 'A' && c <= 'Z') c += 32; return s; }
 
 bool in_path(const std::string& prog)
 {

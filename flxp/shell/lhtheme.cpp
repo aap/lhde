@@ -10,6 +10,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include "config.h"
+#include "util.h"
 #include "gdi/font.h"
 #include "settings.h"
 extern "C" {
@@ -21,8 +22,6 @@ namespace shell {
 namespace {
 
 SessionTheme g_theme;
-
-bool is_dir(const std::string& p) { struct stat st; return !p.empty() && stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode); }
 
 std::string root_string(Display* dpy, const char* prop)
 {

@@ -41,6 +41,7 @@
 #include "commands.h"
 #include "gdi/png.h"
 #include "shell/config.h"
+#include "shell/util.h"
 #include "shell/lhdata.h"
 #include "shell/lhtheme.h"
 #include "shell/netres.h"
@@ -125,7 +126,7 @@ std::u16string W(const std::string& s) { return w32::utf16_of(s.c_str()); }
 inline int imax(int a, int b) { return a > b ? a : b; }
 inline int imin(int a, int b) { return a < b ? a : b; }
 
-bool exists(const std::string& p) { struct stat st; return stat(p.c_str(), &st) == 0; }
+using shell::exists;
 
 // 4051 draws the pane in Tahoma
 HFONT tahoma(int px, bool underline)

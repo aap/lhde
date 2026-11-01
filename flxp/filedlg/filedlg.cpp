@@ -24,6 +24,7 @@
 #include "shell/namespace.h"
 #include "shell/icons.h"
 #include "shell/config.h"
+#include "shell/util.h"
 #include "shell/lhtheme.h"
 #include "shell/mime.h"
 #include "shell/bookmarks.h"
@@ -78,14 +79,9 @@ static std::string text_of(HWND h)
     return w32::utf8_of(buf.data());
 }
 
-static bool is_dir(const std::string& p) { struct stat st; return stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode); }
-static bool exists(const std::string& p) { struct stat st; return stat(p.c_str(), &st) == 0; }
-
-static std::string trim(const std::string& s)
-{
-    size_t a = s.find_first_not_of(" \t"), b = s.find_last_not_of(" \t");
-    return a == std::string::npos ? "" : s.substr(a, b - a + 1);
-}
+using shell::is_dir;
+using shell::exists;
+const char* const BLANKS = " \t";   // what a typed name loses at its ends (shell::trim's default would take CR and LF too)
 
 // "/a/./b/../c" -> "/a/c"; keeps a leading "/"
 static std::string normalize(const std::string& p)
@@ -958,8 +954,8 @@ static std::vector<std::string> split_names(const std::string& s)
     size_t i = 0;
     while (i < s.size()) {
         size_t a = s.find('"', i);
-        if (a == std::string::npos) { std::string rest = trim(s.substr(i)); if (!rest.empty()) out.push_back(rest); break; }
-        std::string before = trim(s.substr(i, a - i));
+        if (a == std::string::npos) { std::string rest = shell::trim(s.substr(i), BLANKS); if (!rest.empty()) out.push_back(rest); break; }
+        std::string before = shell::trim(s.substr(i, a - i), BLANKS);
         if (!before.empty()) out.push_back(before);
         size_t b = s.find('"', a + 1);
         if (b == std::string::npos) { out.push_back(s.substr(a + 1)); break; }
@@ -998,7 +994,7 @@ static void error(Dlg& d, const std::string& text)
 static void on_ok(Dlg& d)
 {
     std::vector<int> sel = selected_indices(d);
-    std::string text = trim(text_of(d.name_edit));
+    std::string text = shell::trim(text_of(d.name_edit), BLANKS);
     // Open/Save with a single folder selected in the view (or an empty name): open the folder
     if (d.o->mode != Mode::Folder && sel.size() == 1 && d.items[(size_t)sel[0]].is_folder() && (GetFocus() == d.list || text.empty())) {
         navigate(d, d.items[(size_t)sel[0]].path, true);
@@ -1640,7 +1636,7 @@ static void lh_paint(Dlg& d, HDC dc)
 {
     if (d.o->mode != Mode::Save) return;
     RECT band = lh_band_rect(d);
-    std::string name = trim(text_of(d.name_edit));
+    std::string name = shell::trim(text_of(d.name_edit), BLANKS);
     std::string key = name.empty() ? "document" : shell::icon_key(shell::base_of(name), false);
     int img = icon_for(d.icons, key);
     ImageList_Draw(d.icons.large, img, dc, 24, band.top + 16, ILD_TRANSPARENT);

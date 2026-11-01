@@ -3,6 +3,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "util.h"   // trim, lower, iequal, exists, is_dir, is_file, read_file
 
 namespace shell {
 
@@ -50,7 +51,6 @@ std::string percent_decode(const std::string& s);
 std::string shell_quote(const std::string& s);         // 'it'\''s'
 std::string dir_of(const std::string& path);           // "/a/b" -> "/a", "/a" -> "/"
 std::string base_of(const std::string& path);          // "/a/b" -> "b"
-bool read_file(const std::string& path, std::string& out);
 bool write_file_atomic(const std::string& path, const std::string& data);   // tmp + rename, mkdir -p the parent
 bool make_dirs(const std::string& dir);
 

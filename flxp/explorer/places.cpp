@@ -12,6 +12,7 @@
 #include "shell/apps.h"
 #include "shell/bookmarks.h"
 #include "shell/config.h"
+#include "shell/util.h"
 #include "shell/icons.h"
 #include "shell/lhdata.h"
 #include "shell/namespace.h"
@@ -361,7 +362,7 @@ static bool placeholder_part(HTHEME th, int part, int state, int w, int h, size_
     return true;
 }
 
-static std::string lower(std::string s) { for (char& c : s) if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a'); return s; }
+using shell::lower;
 
 // style.uix of themes/themedir/shellstyle/{blue,homestead,metallic,classic}
 static void load_look(HWND h)

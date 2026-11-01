@@ -23,6 +23,7 @@
 #include "gdi/image.h"
 #include "shell/apps.h"
 #include "shell/config.h"
+#include "shell/util.h"
 #include "shell/settings.h"
 #include "sys/sys.h"
 #include "taskbar.h"
@@ -87,24 +88,9 @@ Panel* P;
 
 std::string home() { return shell::home_dir(); }
 
-bool is_dir(const std::string& p)
-{
-    struct stat st;
-    return !p.empty() && stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
-}
-
-bool is_file(const std::string& p)
-{
-    struct stat st;
-    return !p.empty() && stat(p.c_str(), &st) == 0 && S_ISREG(st.st_mode);
-}
-
-std::string trim(std::string s)
-{
-    s.erase(0, s.find_first_not_of(" \t"));
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r')) s.pop_back();
-    return s;
-}
+using shell::is_dir;
+using shell::is_file;
+using shell::trim;
 
 // XDG user dirs ($XDG_CONFIG_HOME/user-dirs.dirs), "" when unset or missing
 std::string user_dir(const char* key, const char* fallback)

@@ -9,6 +9,7 @@
 #include <math.h>
 #include "shell/namespace.h"
 #include "shell/config.h"
+#include "shell/util.h"
 #include "shell/details.h"
 #include "shell/lhtheme.h"
 #include "shell/dirwatch.h"
@@ -299,12 +300,7 @@ void forget_all()
 
 // ---- the list ------------------------------------------------------------------------
 
-std::string lower(const std::string& s)
-{
-    std::string out = s;
-    for (char& c : out) if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
-    return out;
-}
+using shell::lower;
 
 // ---- XP's infotip -------------------------------------------------------------------
 // comctl32's own (LVS_EX_INFOTIP, LVN_GETINFOTIP) is not in Wine's list view: a tooltip

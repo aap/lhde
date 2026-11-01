@@ -13,6 +13,7 @@
 #include <X11/Xatom.h>
 #include "apps.h"
 #include "config.h"
+#include "util.h"
 #include "lhtheme.h"
 extern "C" {
 #include "lhde/settings.h"
@@ -24,22 +25,6 @@ namespace shell {
 namespace store {
 
 namespace {
-
-std::string trim(const std::string& s)
-{
-    size_t a = s.find_first_not_of(" \t\r");
-    if (a == std::string::npos) return "";
-    size_t b = s.find_last_not_of(" \t\r");
-    return s.substr(a, b - a + 1);
-}
-
-bool iequal(const std::string& a, const std::string& b)
-{
-    if (a.size() != b.size()) return false;
-    for (size_t i = 0; i < a.size(); i++)
-        if (tolower((unsigned char)a[i]) != tolower((unsigned char)b[i])) return false;
-    return true;
-}
 
 // where a value ends: a ';' or '#' after whitespace starts a comment
 size_t value_end(const std::string& line, size_t from)
