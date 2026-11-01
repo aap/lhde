@@ -2,7 +2,15 @@
 
 ## text editor
 
-* do something with scintilla?
+* luxpad first: ReactOS's notepad (base/applications/notepad, 3.3k lines of C on the stock Edit control, GPL-2+/LGPL-2.1+)
+	on wux via apps/; wux lacks FindText/ReplaceText/ChooseFont (write them on wux's dialog manager: three functions, two
+	templates), DragAcceptFiles, Get/SetWindowPlacement, file mapping (POSIX), IsTextUnicode; drop printing.c and PageSetup
+* then luxpad++ on SciTE (permissive licence; platform code behind Platform.h and GUI, win32 and gtk frontends over one src/):
+	Scintilla's win32 variant on wux's GDI (SurfaceGDI only, DISABLE_D2D, OLE drag-drop stubbed, IME is no-ops anyway), the
+	SciTEWin frontend on wux; needs real RegisterClipboardFormat and the remaining GDI calls, CreateProcess/CreatePipe shimmed
+	for the tool runner; Scintilla and Lexilla are not in ~/othersrc/scite yet (expected beside it). This is the test of wux's
+	drawing path at volume (owner-drawn text, caret, timers, popup list, DIB sections, alpha) that flxp's stock controls are not
+* not Notepad++: GPL-3 (incompatible with lhde's GPL-2) and 159k lines of raw Win32 (docking, subclassing, COM, plugins)
 
 ## image viewer
 
