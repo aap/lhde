@@ -166,10 +166,16 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    hand, and the recipes of its styles run: aero-patch's frame sets). `index/` holds the names the programs ask
    for, as relative symlinks: `styles/<name>.msstyles` (build-qualified: jade4074, slate4051, aero5112, luna = XP's own, whose
    `styles/luna/` is XP's `themes/Luna/` with `Shell/<Scheme>/shellstyle.dll`; luna4051 / luna4074 = Longhorn's copies),
-   `resources/<source>`, `fonts/<source>`, `wallpapers/<source>`, `icons/<pack>`, `frames` and `packs` (-> `generated/`). Then
-   the recipes of each source run: frame sets (CompositedWindow streams, `msstyles2theme.py`, 5048's uDWM bitmaps,
-   `build_aero5112.py`, `build_aerovision.py`) and luxshell's pack images (imageres PNGs, shell32 icons, start panels, the 5112
-   taskbar) into `generated/frames/<set>/` and `generated/packs/<build>/`, each with a manifest naming its inputs and their sha256.
+   `resources/<source>`, `fonts/<source>`, `wallpapers/<source>`, `icons/<pack>`, `frames` and `packs` (-> `generated/`). Then the recipes of
+   each source run: frame sets (CompositedWindow streams, `msstyles2theme.py`, 5048's uDWM bitmaps, `build_aero5112.py`,
+   `build_aerovision.py`) and luxshell's pack images (imageres PNGs, shell32 icons, start panels, the 5112 taskbar) into
+   `generated/frames/<set>/` and `generated/packs/<build>/`, and the aurora scenes as layer lists (`[aurora]`: Jade's
+   PreviewPane.AURORA stream and Microsoft.Windows.WCPClient.dll's desktopaurora.baml, decoded by `tools/lhdebaml.py`) into
+   `generated/aurora/<scene>-<source>.json` (indexed as `aurora/`), each with a manifest naming its inputs and their sha256.
+   `make examples` builds examples/aurorademo from `aurora/previewpane-4074.json` and `aurora/desktop-4074.json`. The DLL
+   is in the 4066, 4074, 4074r2 and 4093 recipes (a museum pack has it; an essentials pack does not, as no theme reads it); a
+   tree imported before it was there gets it, and the desktop aurora, with `lhde-import --iso longhorn4074.iso` (files that
+   are there are kept, the recipes run again).
    Developer paths through the same rules: `lhde-import --iso FILE`, `--wim FILE`, `--dir WINDOWS-DIR` detect the build from
    explorer.exe's version (6.5.40xx Longhorn, 6.0.5048/5112, 6.0.3790 Server 2003, 5.0 Windows 2000) and the layout, pack into a
    temporary pack and import it (`--source ID` skips the detection). `--from-workspace DIR` copies aap's research workspace

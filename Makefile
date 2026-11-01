@@ -107,7 +107,8 @@ check-free: build/bin/lhde-theme build/luxwm/tests/frametest
 # BINDIR.
 SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh \
                 picom-glass.conf picom-glass-fvwm.conf lab.fvwm2rc
-TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py lhdeschemes.py lhdetree.py wim0108.py
+TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py lhdeschemes.py lhdetree.py wim0108.py \
+                lhdebaml.py lhdeaurora.py
 install-data:
 	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(BINDIR) \
 	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \

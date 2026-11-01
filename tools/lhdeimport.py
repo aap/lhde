@@ -6,9 +6,9 @@ Two stages, one code path:
                (sha256, size, pack path, source, in-image path); a directory and lhde-resources-<date>.tar.zst (or .tar.xz)
   lhde-import  a pack (or an ISO / WIM / directory: packed into a temporary pack first)  -->  the Windows tree
                ($LHDE_WINDOWS, default ~/.local/share/lhde-windows; lhdetree.py): each <source>/ of the pack copied as it is,
-               the index/ of symlinks the programs look things up through, then the recipes of [frames] and [packs] (frame
-               sets, luxshell's pack images) run on those files into generated/ with a manifest each: derived pixels are
-               always regenerated (lhde-import --regenerate), never packed.
+               the index/ of symlinks the programs look things up through, then the recipes of [frames], [packs] and
+               [aurora] (frame sets, luxshell's pack images, the aurora scenes as layer lists) run on those files into
+               generated/ with a manifest each: derived data is always regenerated (lhde-import --regenerate), never packed.
 
 Run with python3 -I. Needs 7z (ISO, WIM, the compressed *.XX_ files of an I386/AMD64 layout; cabextract also works for those),
 Pillow, and lhde's ut-dump (build/bin or PATH) for the CompositedWindow and StartPanel recipes. Build 4015's pre-release WIM
@@ -443,16 +443,28 @@ class CabImage(Image):
         return list(self.map)
 
     def fetch(self, members, tmp):
+        """the members' files; CABINET::MEMBER (a [files] pattern for one file inside a multi-file cabinet such as 4066's
+        I386/WINDOWS.CAB) is that file, taken out of the cabinet"""
         raw = os.path.join(tmp, '.raw')
+        outer = sorted(set(m.split('::')[0] for m in members))
         if os.path.isdir(self.medium):
-            got = {m: os.path.join(self.medium, m) for m in members}
+            got = {m: os.path.join(self.medium, m) for m in outer}
         else:
-            got = self.a.extract(members, raw)
+            got = self.a.extract(outer, raw)
         out = {}
         for m in members:
-            if m not in got:
+            cab, inner = m.split('::', 1) if '::' in m else (m, None)
+            if cab not in got:
                 continue
-            out[m] = expand(got[m], os.path.join(tmp, os.path.dirname(m), '.x', os.path.basename(m))) if m.endswith('_') else got[m]
+            if inner is not None:
+                d = os.path.join(tmp, '.cab', cab, os.path.dirname(inner))
+                os.makedirs(d, exist_ok=True)
+                subprocess.run(['7z', 'e', '-y', '-o' + d, got[cab], inner], capture_output=True)
+                q = os.path.join(d, os.path.basename(inner))
+                if os.path.isfile(q):
+                    out[m] = q
+            else:
+                out[m] = expand(got[m], os.path.join(tmp, os.path.dirname(m), '.x', os.path.basename(m))) if m.endswith('_') else got[m]
         return out
 
 
@@ -484,11 +496,14 @@ def match_rules(src, members):
     for dest, pats in src.rules():
         hit = False
         for pat in pats:
+            pat, inner = pat.split('::', 1) if '::' in pat else (pat, None)   # CABINET::MEMBER: one file inside a cabinet
             rx = glob_re(pat)
             for m in members:
                 if rx.match(m):
                     hit = True
-                    if dest.endswith('/'):
+                    if inner is not None:
+                        out.append((dest, m + '::' + inner, None))
+                    elif dest.endswith('/'):
                         rel = m[len(literal_prefix(pat)):] if m.lower().startswith(literal_prefix(pat).lower()) else os.path.basename(m)
                         out.append((dest + rel, m, dest))
                     else:
@@ -1038,20 +1053,21 @@ def import_schemes(W, sid, ini, force):
 
 
 def run_recipes(W, sid, ini, force):
-    """a source's [frames] and [packs]: from the shipped sources/<sid>.ini when there is one (the recipes of this version),
-    else from the copy imported with it"""
+    """a source's [frames], [packs] and [aurora]: from the shipped sources/<sid>.ini when there is one (the recipes of this
+    version), else from the copy imported with it"""
     import lhdetree
     p = lhdetree.shipped_source_ini(sid)
     if p:
         ini = read_ini(p)
-    for kind in ('frames', 'packs'):
+    for kind in ('frames', 'packs', 'aurora'):
         for target, spec in (list(ini.items(kind)) if ini.has_section(kind) else []):
             run_recipe(os.path.join(W, 'index'), kind, target, spec, sid, force)
 
 
-# ---------------------------------------------------------------- recipes (derived pixels: generated/ + manifest.ini)
+# ---------------------------------------------------------------- recipes (derived data: generated/ + manifest.ini)
 # Every recipe gets `data` = the Windows tree's index/: it reads its inputs by their index names (styles/NAME.msstyles,
-# resources/<build>/imageres.dll) and writes below data/frames/<set>/ or data/packs/<build>/, i.e. into generated/.
+# resources/<build>/imageres.dll) and writes below data/frames/<set>/, data/packs/<build>/ or data/aurora/, i.e. into
+# generated/.
 def tool(name):
     """lhde's programs: the build tree's build/bin, beside an installed tools/ (<prefix>/bin), PATH"""
     for d in (os.path.join(HERE, '..', 'build', 'bin'), os.path.join(HERE, '..', '..', '..', 'bin')):
@@ -1364,11 +1380,40 @@ def r_packs_plexbars(data, target, args):
     return [rel], n + 2
 
 
+def r_aurora_previewpane(data, target, args):
+    """aurora/<target>.json: the Explorer preview pane's aurora, the 2003 BAML of a style's PreviewPane.AURORA stream
+    (args: style, STREAM id) flattened to its layer list (tools/lhdeaurora.py, tools/lhdebaml.py)"""
+    import lhdeaurora
+    style, sid = args[0], int(args[1])
+    rel = style_rel(data, style)
+    baml = PE(os.path.join(data, rel)).get('STREAM', sid)
+    if baml is None:
+        raise RuntimeError('%s has no STREAM %d' % (rel, sid))
+    lhdeaurora.write_json(lhdeaurora.baml_layers(baml, '%s STREAM %d' % (rel, sid)), os.path.join(data, 'aurora', target + '.json'))
+    return [rel], 1
+
+
+def r_aurora_desktop(data, target, args):
+    """aurora/<target>.json: the desktop aurora, the 2004 BAML resource of a build's Microsoft.Windows.WCPClient.dll
+    (args: source [resource name, default xaml/sidebar/desktopaurora.baml]) flattened to its layer list"""
+    import lhdeaurora
+    import lhdebaml
+    name = args[1] if len(args) > 1 else 'xaml/sidebar/desktopaurora.baml'
+    rel = 'resources/%s/Microsoft.Windows.WCPClient.dll' % args[0]
+    recipe_inputs(data, [rel])
+    res = lhdebaml.net_resources(os.path.join(data, rel))
+    if name not in res:
+        raise RuntimeError('%s has no resource %s' % (rel, name))
+    lhdeaurora.write_json(lhdeaurora.baml_layers(res[name], '%s %s' % (rel, name)), os.path.join(data, 'aurora', target + '.json'))
+    return [rel], 1
+
+
 RECIPES = {
     ('frames', 'composited'): r_frames_composited, ('frames', 'vision'): r_frames_vision, ('frames', 'classic'): r_frames_classic,
     ('frames', 'udwm'): r_frames_udwm, ('frames', 'dwmwindow'): r_frames_dwmwindow,
     ('packs', 'imageres'): r_packs_imageres, ('packs', 'shell32'): r_packs_shell32,
     ('packs', 'aero5112'): r_packs_aero5112, ('packs', 'plexbars'): r_packs_plexbars,
+    ('aurora', 'previewpane'): r_aurora_previewpane, ('aurora', 'desktop'): r_aurora_desktop,
 }
 
 
@@ -1378,16 +1423,16 @@ def shipped_data_dirs():
 
 
 def run_recipe(data, kind, target, spec, origin, force=False):
-    """[frames] / [packs] TARGET = RECIPE ARG... of a source; the manifest goes beside the cache (frames/TARGET/manifest.ini,
-    packs/TARGET/manifest-RECIPE[-ARG].ini)"""
+    """[frames] / [packs] / [aurora] TARGET = RECIPE ARG... of a source; the manifest goes beside the cache
+    (frames/TARGET/manifest.ini, packs/TARGET/manifest-RECIPE[-ARG].ini, aurora/manifest-TARGET.ini beside aurora/TARGET.json)"""
     parts = spec.split()
     recipe, args = parts[0], parts[1:]
     fn = RECIPES.get((kind, recipe))
     if not fn:
         log('  %s %s: unknown recipe %s' % (kind, target, recipe))
         return False
-    tdir = target if kind == 'frames' else target.split('/')[0]   # packs: packs/<build>/..., the key's /suffix only names it
-    mdir = os.path.join(data, kind, tdir)
+    tdir = target.split('/')[0] if kind == 'packs' else target   # packs: packs/<build>/..., the key's /suffix only names it
+    mdir = os.path.join(data, kind) if kind == 'aurora' else os.path.join(data, kind, tdir)
     mname = 'manifest.ini' if kind == 'frames' else 'manifest-%s.ini' % target.replace('/', '-')
     try:
         ins, n = fn(data, tdir, args)
