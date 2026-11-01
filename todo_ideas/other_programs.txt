@@ -30,8 +30,8 @@
 	terminology); Haiku's are ShowImage, StyledEdit, Terminal, BePDF (small single-window programs, no toolbar clutter: the
 	closest models for an XP-era image viewer, Notepad-class editor and mupf)
 * what lhde lacks that both have and a user misses first: a launcher with search (E's "everything": apps, files, settings,
-	calculator, clipboard history; flxp-startmenu's search box is the seed), a volume mixer and a notification history, a
-	screenshot tool (E's shot: small, and the lab wants one), a clipboard manager, a screen lock and logout/suspend menu,
+	calculator, clipboard history; flxp-startmenu's search box is the seed), a volume mixer and a notification history,
+	a clipboard manager, a screen lock and logout/suspend menu,
 	a themed terminal; Haiku's Expander (archives), ActivityMonitor (Task Manager), DiskProbe
 * Haiku's lesson for the annotations: People, Mail and bookmarks are attributed files that Tracker and Find query; keep the
 	catalogue idea aimed at that (data as attributed files), not only at speed

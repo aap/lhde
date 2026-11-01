@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <vector>
@@ -87,9 +88,9 @@ static bool write_rows(FILE* f, const Bitmap* b, png_byte* row, png_text* chunks
     return true;
 }
 
-bool write_png(const Bitmap* b, const std::string& path, const PngText& text)
+// fopen(path) or open_memstream: the rows into f
+static bool write_to(FILE* f, const Bitmap* b, const PngText& text)
 {
-    if (!b || b->width <= 0 || b->height <= 0) return false;
     std::vector<png_byte> row((size_t)b->width * 4);
     std::vector<png_text> chunks(text.size());
     for (size_t i = 0; i < text.size(); i++) {
@@ -99,10 +100,31 @@ bool write_png(const Bitmap* b, const std::string& path, const PngText& text)
         chunks[i].text = (png_charp)text[i].second.c_str();
         chunks[i].text_length = text[i].second.size();
     }
+    return write_rows(f, b, row.data(), chunks.data(), (int)chunks.size());
+}
+
+bool write_png(const Bitmap* b, const std::string& path, const PngText& text)
+{
+    if (!b || b->width <= 0 || b->height <= 0) return false;
     FILE* f = fopen(path.c_str(), "wb");
     if (!f) return false;
-    bool ok = write_rows(f, b, row.data(), chunks.data(), (int)chunks.size());
+    bool ok = write_to(f, b, text);
     return fclose(f) == 0 && ok;
+}
+
+bool encode_png(const Bitmap* b, std::string& out, const PngText& text)
+{
+    out.clear();
+    if (!b || b->width <= 0 || b->height <= 0) return false;
+    char* buf = nullptr;
+    size_t len = 0;
+    FILE* f = open_memstream(&buf, &len);
+    if (!f) return false;
+    bool ok = write_to(f, b, text);
+    ok = fclose(f) == 0 && ok;
+    if (ok) out.assign(buf, len);
+    free(buf);
+    return ok;
 }
 
 } // namespace gdi

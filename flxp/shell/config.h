@@ -14,6 +14,9 @@ std::string state_file(const char* name);     // $XDG_STATE_HOME/lhde/NAME: what
 std::string data_home();                      // $XDG_DATA_HOME or ~/.local/share
 std::vector<std::string> config_dirs();       // $XDG_CONFIG_DIRS or /etc/xdg
 std::vector<std::string> data_dirs();         // $XDG_DATA_DIRS or /usr/local/share:/usr/share
+// An XDG user directory (xdg-user-dirs: $XDG_<NAME>_DIR, else XDG_<NAME>_DIR in $XDG_CONFIG_HOME/user-dirs.dirs, $HOME
+// expanded; NAME is "PICTURES", "DOCUMENTS", "DESKTOP", ...), else $HOME/fallback ("Pictures"); not created
+std::string user_dir(const std::string& name, const std::string& fallback);
 
 // flxp settings: $XDG_CONFIG_HOME/lhde/flxp.ini (docs/SETTINGS.md "Files"), plain "key=value" lines
 // ([sections] and #/; comments ignored). An environment variable

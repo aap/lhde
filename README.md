@@ -15,10 +15,11 @@ one build, for the parts that were separate projects:
 | `luxshell/` | the Avalon bars, sidebar, tiles, toasts, start menu: C core + Lua (`*.lua`, `tiles/`), `shellpack*.sh` | x11 `lhshell/` (without `assets/`) |
 | `liblhde/`  | liblhde (`<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`): the three trees and every lookup in them, the theme resolver, the settings store; `lhde-theme` (with `explain` and `dirs`); `tests/resolve.c` | new (was `lhtheme/`) |
 | `session/`  | `lhde-session` (start, theme, taskbar, shell, picom, desktop, stop), `lab.sh` (the headless bench), `lhwall.sh`, theme-reload/-watch, picom configs | x11 `xinitrc.lab`, `second-display.sh`, `lab.sh`, ... |
+| `apps/`     | lhde's applications on the public entry point (`wux/wux.h`, `shell/shell.h`, the recipe `apps/app.mk`; docs/APPLICATIONS.md): `luxshot` (screenshots), `skeleton` (the one to copy) | new |
 | `examples/` | extendframe, navdemo, glassdemo, aurorademo (its tables made at build time from the Windows tree) | x11 `examples/`, `glassdemo.c` |
 | `tools/`    | `lhde-pack` (a resource pack of raw Windows files from ISOs), `lhde-import` (a pack, ISO, WIM or Windows directory into the Windows tree, the recipes), `lhdeimport.py`, `lhdetree.py` (the Windows tree, its index, the migration), `wim0108.py`, `lhdebaml.py` + `lhdeaurora.py` (the aurora: BAML decoders, layer lists, aurorademo's tables), recipe builders (`msstyles2theme.py`, `build_aerovision.py`, `build_aero5112.py`) | x11 `lhwm/tools/` |
 | `share/`    | text only: `themes/*.theme` (the shipped themes), `navbar/*.ini`, `icons/*.theme`, `sources/*.ini` (what lhde-pack takes from each Windows build), `frames/*/theme.ini`, `packs/*/shell.lua` | x11 `themes.ini`, `wallpapers.ini`, `lhwm/themes/*/*.ini`, `lhshell/themes/` |
-| `docs/`     | `ARCHITECTURE.md` (the map), `LAYOUT.md` (asset policy, the three trees), `THEME-FORMAT.md`, `SETTINGS.md`, `CLIENT-PROTOCOL.md`, `USAGE.md`, `LUXWM.md`, `NAVBAR.md`, `SHELL-DESIGN.md`, `MSSTYLES-FORMAT.md`, `ANNOTATIONS.md`, `LICENSING.md`; `docs/README.md` lists them; `history/` holds the journals (flxp-NOTES, THEMES, the merge plan, the theme-format status) | |
+| `docs/`     | `ARCHITECTURE.md` (the map), `LAYOUT.md` (asset policy, the three trees), `THEME-FORMAT.md`, `SETTINGS.md`, `CLIENT-PROTOCOL.md`, `USAGE.md`, `LUXWM.md`, `NAVBAR.md`, `SHELL-DESIGN.md`, `MSSTYLES-FORMAT.md`, `ANNOTATIONS.md`, `LICENSING.md`, `APPLICATIONS.md`; `docs/README.md` lists them; `history/` holds the journals (flxp-NOTES, THEMES, the merge plan, the theme-format status) | |
 
 No Microsoft files are in this repository, and none may be added
 (docs/LAYOUT.md, "Asset policy"): no `.msstyles`, DLLs, fonts, wallpapers,
@@ -73,16 +74,18 @@ What `make` builds:
     build/lib/libluxnav.a, libluxnav.so.1 (+ .so), pkgconfig/luxnav.pc   luxnav (flxp links the .a)
     build/bin/flxp flxp-desktop flxp-taskbar flxp-settings flxp-filedialog flxp-portal ut-dump
     build/bin/luxwm luxwmc luxshell
+    build/bin/luxshot skeleton           the applications (apps/; skeleton is not installed)
+    build/lib/libflxpshell.a             the shell facilities an application links (apps/app.mk)
     build/examples/extendframe navdemo glassdemo aurorademo
     build/tests/..., build/tests/w32/... test programs and demos (tests/demo.sh runs some)
     build/luxwm/tests/frametest menutest desktopwin dockorder strutdock, build/luxshell/tests/trayicon
 
 The programs run uninstalled from `build/bin` (they find `flxp/res`, `luxshell/` and `share/` in the source
 tree). Per component: `make wux`, `make wuxtheme`, `make flxp`, `make tests`, `make luxnav`, `make luxwm`,
-`make luxshell`, `make examples`.
+`make luxshell`, `make examples`, `make apps`.
 
 `make install` installs program files only (docs/LAYOUT.md "The three trees"): `bin/` (the six flxp programs, ut-dump,
-luxwm, luxwmc, luxshell, lhde-theme, lhde-session, lhde-import, lhde-pack, lhde-schemes), `lib/` (`libwuxtheme`, `libluxnav`, `liblhde` `.so.1` + `.so`, `liblhde.a`, `pkgconfig/`),
+luxwm, luxwmc, luxshell, luxshot, lhde-theme, lhde-session, lhde-import, lhde-pack, lhde-schemes), `lib/` (`libwuxtheme`, `libluxnav`, `liblhde` `.so.1` + `.so`, `liblhde.a`, `pkgconfig/`),
 `lib/lhde/` (`PKGLIBDIR`: the code that is not a binary: `luxshell/` the Lua, `session/` lhde-session's helpers and lab.sh,
 `tools/` lhde-import's Python), `share/lhde/` (`DATADIR`: our shipped text, `themes/ navbar/ icons/ sources/ frames/*/theme.ini
 packs/*/shell.lua`, flxp's `res/icons`), `include/`,

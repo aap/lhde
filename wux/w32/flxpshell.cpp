@@ -5,6 +5,7 @@
 #include "w32.h"
 #include "image.h"
 #include "shell/xclip.h"
+#include "gdi/png.h"
 extern "C" {
 #include "flxp_shell.h"
 }
@@ -88,6 +89,27 @@ BOOL WINAPI FlxpSetSelectionText(BOOL primary, const WCHAR* text, INT len)
     if (text) { size_t n = 0; if (len < 0) while (text[n]) n++; else n = (size_t)len; t.assign(text, text + n); }
     t.push_back(0);
     return shell::xclip::set_text(w32::utf8_of(t.data()), primary != FALSE);
+}
+
+BOOL WINAPI FlxpClipboardOwned(void) { return shell::xclip::owned(); }
+
+BOOL WINAPI FlxpWritePng(HBITMAP bitmap, const char* path)
+{
+    w32::Bitmap* b = w32::as<w32::Bitmap>((HANDLE)bitmap, w32::T_BITMAP);
+    if (!b || !b->bmp || !path) return FALSE;
+    return gdi::write_png(b->bmp, path, {});
+}
+
+HGLOBAL WINAPI FlxpEncodePng(HBITMAP bitmap)
+{
+    w32::Bitmap* b = w32::as<w32::Bitmap>((HANDLE)bitmap, w32::T_BITMAP);
+    std::string bytes;
+    if (!b || !b->bmp || !gdi::encode_png(b->bmp, bytes, {})) return nullptr;
+    HGLOBAL hg = GlobalAlloc(GMEM_MOVEABLE, bytes.size());
+    if (!hg) return nullptr;
+    memcpy(GlobalLock(hg), bytes.data(), bytes.size());
+    GlobalUnlock(hg);
+    return hg;
 }
 
 HGLOBAL WINAPI FlxpGetSelectionText(BOOL primary)

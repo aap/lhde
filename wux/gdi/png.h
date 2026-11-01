@@ -17,5 +17,7 @@ Bitmap* decode_png(const uint8_t* data, size_t size);   // null on bad input
 PngText read_png_text(const uint8_t* data, size_t size);
 // 8-bit RGBA, the text as tEXt chunks; false on any error (nothing is removed).
 bool write_png(const Bitmap* b, const std::string& path, const PngText& text);
+// The same file's bytes in memory (the clipboard's image/png)
+bool encode_png(const Bitmap* b, std::string& out, const PngText& text);
 
 } // namespace gdi

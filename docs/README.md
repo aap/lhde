@@ -16,6 +16,7 @@ the design journals of the merge and before are in `history/` (kept unchanged, n
 | `SHELL-DESIGN.md` | luxshell: the three shells reproduced, fact sheets, the architecture, the milestone designs |
 | `MSSTYLES-FORMAT.md` | the `.msstyles` file format as wuxtheme reads it |
 | `LICENSING.md` | which licence covers which part: lhde's GPL-2, Wine's vendored code and resources (LGPL), berry's (MIT), what the user imports |
+| `APPLICATIONS.md` | writing an application: the three layers, the headers (`wux/wux.h`, `shell/shell.h`), the recipe (`apps/app.mk`), the entry point, what is not public yet |
 | `ANNOTATIONS.md` | file annotations as extended attributes (lhde-import, lhde-pack) |
 | `history/` | journals: `flxp-NOTES.md` (flxp's implementation notes), `THEMES.md` (the registry before theme files), `LAYOUT-draft.md` (the merge plan and the step reports), `THEME-FORMAT-status.md` (open points, decisions, status of the theme format), `CLASSIC-DECO-NOTES.md` |
 

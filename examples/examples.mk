@@ -21,9 +21,9 @@ build/examples/navdemo: examples/navdemo.c luxnav/lhnav.h $(LUXNAVA) $(LHDEA) $(
 	@mkdir -p $(dir $@)
 	$(CC) -std=gnu11 -O2 -g -Wall -Wextra -DHAVE_UXTHEME -Iluxnav -Iliblhde -idirafter . $(shell pkg-config --cflags $(EXAMPLES_PKGS) fontconfig) \
 	    -o $@ $< $(LUXNAVA) $(LHDEA) -Lbuild/lib -lwuxtheme '-Wl,-rpath,$$ORIGIN/../lib' $(shell pkg-config --libs $(EXAMPLES_PKGS) fontconfig libpng) -lm
-build/examples/glassdemo: examples/glassdemo.c $(O)/liblhde/data.o
+build/examples/glassdemo: examples/glassdemo.c $(LHDEA)
 	@mkdir -p $(dir $@)
-	$(CC) -std=gnu11 -O2 -g -Wall -Iliblhde $(shell pkg-config --cflags cairo-xlib x11) -o $@ $< $(O)/liblhde/data.o $(shell pkg-config --libs cairo-xlib x11) -lm
+	$(CC) -std=gnu11 -O2 -g -Wall -Iliblhde $(shell pkg-config --cflags cairo-xlib x11) -o $@ $< $(LHDEA) $(shell pkg-config --libs cairo-xlib x11) -lm
 build/examples/aurora_data.h: tools/lhdeaurora.py build/bin/lhde-theme aurora-data-always
 	@mkdir -p $(dir $@)
 	@python3 -I tools/lhdeaurora.py header $@ "$$(build/bin/lhde-theme find aurora/previewpane-4074.json)" \

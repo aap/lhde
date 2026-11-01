@@ -4,7 +4,7 @@
 # failures. Tests that need assets skip when these are absent:
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
-#   headless/*   Xvfb and xdotool (clipboard.sh also xclip); displays :71-:73,
+#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh getfattr and setfattr); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
 fails=0
@@ -65,6 +65,8 @@ else
     tests/headless/lvtiles.sh "$2" > "$T/lvtiles.log" 2>&1; result "headless/lvtiles.sh ($(tail -n 1 "$T/lvtiles.log"))" $? "$T/lvtiles.log"
     tests/headless/modkeys.sh "$1" > "$T/modkeys.log" 2>&1; result headless/modkeys.sh $? "$T/modkeys.log"
     tests/headless/filedlg.sh "$3" > "$T/filedlg.log" 2>&1; result headless/filedlg.sh $? "$T/filedlg.log"
+    tests/headless/luxshot.sh "$1" > "$T/luxshot.log" 2>&1; rc=$?
+    result "headless/luxshot.sh$(grep -m1 '^skip' "$T/luxshot.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxshot.log"
 fi
 
 [ $fails = 0 ] && echo "check: all passed" || echo "check: $fails failed"

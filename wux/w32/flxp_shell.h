@@ -1,5 +1,6 @@
-/* flxp extensions for shell programs (the desktop): an EWMH desktop window and
-   the window manager's root properties. Include after windows.h.
+/* wux's additions to the Win32 API (flxp extensions, for the shell programs and every application: wux/wux.h includes
+   this): an EWMH desktop and dock window, the window manager's root properties, file drag and drop, the X selections,
+   typed clipboard data, PNG files. Include after windows.h.
 
    CreateWindowEx with WS_EX_FLXP_DESKTOP and WS_POPUP makes a toplevel of
    type _NET_WM_WINDOW_TYPE_DESKTOP: no decorations, sticky, kept below the
@@ -77,6 +78,19 @@ BOOL WINAPI FlxpSetRootString(const char *name, const char *value);
    NUL-terminated UTF-16 string (GlobalFree it), NULL if there is none. */
 BOOL WINAPI FlxpSetSelectionText(BOOL primary, const WCHAR *text, INT len);
 HGLOBAL WINAPI FlxpGetSelectionText(BOOL primary);
+
+/* Typed data on the X CLIPBOARD: SetClipboardData with a format registered under a MIME type's name
+   (RegisterClipboardFormatW(L"image/png"); L"PNG", the name Windows programs use, stands for image/png) offers its bytes
+   (GlobalAlloc, GlobalSize long) under that target at CloseClipboard, with the text formats if set too. The X clipboard
+   lives as long as its owner: FlxpClipboardOwned is TRUE while what this process put there last is still on CLIPBOARD,
+   and a program that copied something keeps answering (its message loop or a wait on this) until it turns FALSE. */
+BOOL WINAPI FlxpClipboardOwned(void);
+
+/* PNG files of a bitmap (a DIB section or any HBITMAP; 8-bit RGBA, the bitmap's alpha as it is). FlxpWritePng writes
+   path (FALSE on any error); FlxpEncodePng returns the file's bytes as a
+   GlobalAlloc'd block (GlobalSize long; GlobalFree it, or hand it to SetClipboardData), NULL on error. */
+BOOL WINAPI FlxpWritePng(HBITMAP bitmap, const char *path);
+HGLOBAL WINAPI FlxpEncodePng(HBITMAP bitmap);
 
 #ifdef __cplusplus
 }
