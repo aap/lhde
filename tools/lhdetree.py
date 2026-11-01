@@ -8,7 +8,7 @@ The Windows tree, $LHDE_WINDOWS (default ${XDG_DATA_HOME:-~/.local/share}/lhde-w
   local/         files that come from no source: themes/NAME.msstyles (+ NAME/Shell) dropped in with lhde-import --style,
                  schemes/ (lhde-schemes), resources/NAME/, wallpapers/NAME/, fonts/NAME/ copied by hand or from aap's workspace
   generated/     everything derived: frames/<set>/ (PNGs, manifest.ini, theme.ini of a set we do not ship),
-                 packs/<build>/ (PNGs, startpanel.ini, manifest-*.ini), schemes/*.scheme (from a source's HIVEDEF.INF).
+                 packs/<build>/ (PNGs, manifest-*.ini), schemes/*.scheme (from a source's HIVEDEF.INF).
                  Deleting it is always safe: lhde-import --regenerate makes it again from the sources' recipes.
   index/         relative symlinks under the names programs ask for (made by reindex, never edited):
                  styles/NAME.msstyles, styles/NAME (the style's directory with Shell/), styles/NAME.scheme,
@@ -702,9 +702,6 @@ def _annotate_generated_dir(W, d, kind, mpath, build_of):
         desc = 'frame set %s: %s' % (setname, RECIPE_DESC.get(recipe, recipe))
     elif recipe == 'shell32':
         desc = 'shell32.dll icons for luxshell (%s)' % (args[0] if args else setname)
-    elif recipe == 'startpanel':
-        desc = 'start panel parts of style %s (%s)' % (args[1] if len(args) > 1 else '?', args[0] if args else setname)
-        tags += ',startpanel'
     else:
         desc = 'imageres.dll PNG resources for luxshell (%s)' % (' over '.join(args[:2]) if args else setname)
     attrs = {A_AUTHOR: 'lhde-import', A_DESC: desc, A_TAGS: tags,
@@ -759,8 +756,7 @@ def annotate_tree(W):
             pd = os.path.dirname(s)
             ini = read_ini(s)
             rec = ini.get('recipe', 'kind', fallback='')
-            args = ini.get('recipe', 'args', fallback='').split()
-            sub = 'startpanel-' + args[0] if rec == 'startpanel' and args else 'shell32' if rec == 'shell32' else 'imageres'
+            sub = 'shell32' if rec == 'shell32' else 'imageres'
             if os.path.isdir(os.path.join(pd, sub)):
                 _annotate_generated_dir(W, os.path.join(pd, sub), 'packs', s, build_of)
             xput(s, {A_AUTHOR: 'lhde-import', A_DESC: 'manifest of the %s recipe' % rec, A_TAGS: 'generated'})

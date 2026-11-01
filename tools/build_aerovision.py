@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the caption buttons of lhwm/themes/aerovision (../../NAVBAR.md "Vision caption buttons").
+"""Build the caption buttons of the aerovision frame set (docs/NAVBAR.md "Vision caption buttons").
 
 Aero vision's frame decoration ends 15 px below the frame's top edge, right under the caption buttons (aap's todo: "the actual
 frame decoration should end exactly below the 3 buttons, no space below, i count 15 pixels from the top"). The aero sprites
@@ -12,14 +12,14 @@ plate's pill exactly with button_right = 5, aap's tuning of aero), so the only c
                    and the glossy top half are untouched; 0..13)
 
 Output: vision_close.png, vision_max.png, vision_min.png, vision_restore.png in OUT_DIR (4 frames of 13 rows). They are not
-named close.png etc. on purpose: those names are replaced by the style's CompositedWindow streams when lhwm reads the msstyles
+named close.png etc. on purpose: those names are replaced by the style's CompositedWindow streams when luxwm reads the msstyles
 through libuxtheme (frame_ut.c fut_png); theme.ini names them with `button_files`.
 
 The concept art (lh_concepts/1456384117.or.45878.png) shows a pill about 13 px high hanging from the top edge with three
 buttons of about 26/25/37 px; ours keep aero's 27/25/43 because the pill is baked into the plate texture at that width.
 
 usage: python3 -I build_aerovision.py [--drop-row N] AERO_DIR OUT_DIR
-       (AERO_DIR = lhwm/themes/aero, whose sprites are pixel-identical to aero-patch.msstyles' LGCLOSEBTN/LGMAXBTN/... streams)
+       (AERO_DIR = the aero-patch frame set's sprites, pixel-identical to aero-patch.msstyles' LGCLOSEBTN/LGMAXBTN/... streams)
 """
 import sys, os
 from PIL import Image

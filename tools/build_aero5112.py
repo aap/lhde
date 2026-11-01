@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build lhwm/themes/aero5112 from the DWMWindow class of the Vista 5112 aero.msstyles (COMPOSITION.md 21).
-5112 has no frame bitmaps in uDWM.dll any more: uDWM reads the frame through GetThemeStream from DWMWindow parts whose DISKSTREAM
+"""Build the aero5112 frame set from the DWMWindow class of the Vista 5112 aero.msstyles (COMPOSITION.md 21).
+5112 has no frame bitmaps in uDWM.dll: uDWM reads the frame through GetThemeStream from DWMWindow parts whose DISKSTREAM
 property names an RT 'STREAM' PNG (straight alpha, IMAGECOUNT states stacked vertically). The frame is piecewise (top / left /
-right / bottom, DWMGlass:: or DWMMetal:: variant); lhwm wants one nine-sliced plate per state, so the pieces are composed into an
+right / bottom, DWMGlass:: or DWMMetal:: variant); luxwm wants one nine-sliced plate per state, so the pieces are composed into an
 801x607 plate (5048's size). Buttons: a sprite of 4 frames (normal, hot, pressed, inactive) = the button plate state + its glyph.
 usage: build_aero5112.py RES_DIR OUT_DIR   (RES_DIR = res/5112/aero.msstyles, the tools/peres.py dump)"""
 import sys, os

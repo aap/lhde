@@ -22,7 +22,7 @@ usage:
                                               Pack) into local/icons/NAME/ as .ico files (16-256 px), for icon recipes that
                                               name files (file:NAME/PATH.ico; data/icons/xp-hires.theme)
   lhde-import --from-workspace DIR [--copy-resources]   aap's research workspace (~/fun/longhorn)
-  lhde-import --regenerate                    delete generated/ and make it again from the imported files (--rebuild-cache)
+  lhde-import --regenerate                    delete generated/ and make it again from the imported files
   lhde-import --annotate                      write the file annotations (extended attributes, docs/ANNOTATIONS.md) a tree lacks:
                                               originals, generated files, directories; keeps attributes that are there; idempotent
   lhde-import --reindex                       make index/ again (after moving or deleting files by hand)
@@ -33,8 +33,7 @@ usage:
   lhde-import --clean [--yes]                 delete the Windows tree (every source, local/, generated/, index/) after asking
                                               on the terminal, or without asking with --yes: before importing a clean set
                                               (make install-resources-free / -windows / -full)
-options: --windows DIR (default $LHDE_WINDOWS, else ${XDG_DATA_HOME:-~/.local/share}/lhde-windows; --data DIR is the old
-         spelling), --force (replace files that exist), --no-recipes (raw files only), --tmp DIR (scratch for an extracted WIM;
+options: --windows DIR (default $LHDE_WINDOWS, else ${XDG_DATA_HOME:-~/.local/share}/lhde-windows), --force (replace files that exist), --no-recipes (raw files only), --tmp DIR (scratch for an extracted WIM;
          default beside the Windows tree), --no-annotate (write no extended attributes: the importer annotates what it writes,
          best effort, docs/ANNOTATIONS.md), --old DIR (--migrate: the old directory, default ${XDG_DATA_HOME:-~/.local/share}/lhde)
 """
@@ -49,8 +48,7 @@ import lhdetree as T
 
 
 def from_workspace(ws, W, force, copyres):
-    """the research workspace's resources/ and x11/ (generated frame sets, lhshell/assets), as the first lhde-import did: the
-    styles into local/themes, fonts/wallpapers/system32 per build into W/<build>/ (other names into local/), the x11 frame sets'
+    """the research workspace's resources/ and x11/ (generated frame sets, lhshell/assets): the styles into local/themes, fonts/wallpapers/system32 per build into W/<build>/ (other names into local/), the x11 frame sets'
     and lhshell assets' PNGs into generated/"""
     R, X = os.path.join(ws, 'resources'), os.path.join(ws, 'x11')
     if not (os.path.isdir(os.path.join(R, 'msstyles')) and os.path.isdir(os.path.join(X, 'lhwm', 'themes'))):
@@ -171,7 +169,7 @@ def main():
             extra.append(a.pop(0) if a and not a[0].startswith('--') else '')
         elif x == '--licence': o['licence'] = a.pop(0)
         elif x == '--source': o['source'] = a.pop(0)
-        elif x in ('--windows', '--data'): o['data'] = a.pop(0)
+        elif x == '--windows': o['data'] = a.pop(0)
         elif x == '--old': o['old'] = a.pop(0)
         elif x in ('-n', '--dry-run'): o['dry'] = True
         elif x == '--migrate': mode = 'migrate'
@@ -186,7 +184,7 @@ def main():
         elif x == '--list': mode = 'list'
         elif x == '--clean': mode = 'clean'
         elif x in ('-y', '--yes'): o['yes'] = True
-        elif x in ('--regenerate', '--rebuild-cache'): mode = 'rebuild'
+        elif x == '--regenerate': mode = 'rebuild'
         elif x in ('-h', '--help'): print(__doc__); return 0
         elif not x.startswith('-') and mode is None: mode, arg = ('pack' if os.path.isdir(x) or '.tar' in x or x.lower().endswith('.zip') else 'iso' if x.lower().endswith('.iso') else 'wim' if x.lower().endswith('.wim') else 'pack'), x
         else: L.die('unknown argument %s (--help)' % x)

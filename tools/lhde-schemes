@@ -7,8 +7,8 @@ into generated/schemes); this is the stand-alone way.
 usage:
   lhde-schemes [--windows DIR] [--force] FILE...
 FILE: a HIVEDEF.INF, or an install ISO (its I386/ or AMD64/HIVEDEF.INF is read with 7z).
---windows DIR: the Windows tree (default $LHDE_WINDOWS, else ${XDG_DATA_HOME:-~/.local/share}/lhde-windows); --data is the old
-spelling. The files go to DIR/local/schemes, and DIR/index is made again.
+--windows DIR: the Windows tree (default $LHDE_WINDOWS, else ${XDG_DATA_HOME:-~/.local/share}/lhde-windows). The files go to
+DIR/local/schemes, and DIR/index is made again.
 --force: replace scheme files that exist.
 """
 import os
@@ -35,7 +35,7 @@ def main():
     a = sys.argv[1:]
     while a:
         x = a.pop(0)
-        if x in ('--windows', '--data') and a:
+        if x == '--windows' and a:
             data = a.pop(0)
         elif x == '--force':
             force = True
