@@ -944,7 +944,7 @@ Result def_proc(Window* w, uint32_t msg, WParam wp, LParam lp)
     }
 }
 
-// ---- window manager frames (lhwm/CLIENT-PROTOCOL.md) --------------------
+// ---- window manager frames (docs/CLIENT-PROTOCOL.md) --------------------
 
 bool set_argb(Window* w, bool on)
 {

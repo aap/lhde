@@ -98,7 +98,7 @@ bool init()
     a_header_pixmap = XInternAtom(dpy, "_LHWM_HEADER_PIXMAP", False);
     a_caption_rect = XInternAtom(dpy, "_LHWM_CAPTION_RECT", False);
     have_argb_visual = XMatchVisualInfo(dpy, screen, 32, TrueColor, &argb_visual) != 0;
-    // the window manager's frame state (lhwm/CLIENT-PROTOCOL.md) lives on the root
+    // the window manager's frame state (docs/CLIENT-PROTOCOL.md) lives on the root
     XWindowAttributes ra;
     XGetWindowAttributes(dpy, root, &ra);
     XSelectInput(dpy, root, ra.your_event_mask | PropertyChangeMask);
@@ -177,7 +177,7 @@ static void make_xwindow(NativeWindow* w)
     Visual* visual = CopyFromParent;
     int depth = CopyFromParent;
     if (w->argb) {
-        // as x11/glassdemo.c: own colormap, border and background pixel 0
+        // as examples/glassdemo.c: own colormap, border and background pixel 0
         // (transparent until the first present; None would show garbage)
         if (!w->cmap) w->cmap = XCreateColormap(dpy, root, argb_visual.visual, AllocNone);
         attr.colormap = w->cmap;
@@ -273,7 +273,7 @@ void destroy_window(NativeWindow* w)
     delete w;
 }
 
-// ---- lhwm frame protocol (lhwm/CLIENT-PROTOCOL.md) ------------------------
+// ---- lhwm frame protocol (docs/CLIENT-PROTOCOL.md) ------------------------
 
 void set_frame_extension(NativeWindow* w, const int32_t* ltrb)
 {
@@ -314,7 +314,7 @@ static void read_frame_info()
     long v = 0;
     frame.composited = get_cardinals(a_composited, &v, 1) && v == 1;
     long m[18];
-    int got = read_cardinals(a_metrics, m, 18);   // 8, 14 or 18 items by lhwm's age (CLIENT-PROTOCOL.md)
+    int got = read_cardinals(a_metrics, m, 18);   // 8, 14 or 18 items (docs/CLIENT-PROTOCOL.md)
     frame.have_metrics = got >= 8;
     frame.have_max = got >= 17;
     if (frame.have_max) {
@@ -1472,7 +1472,7 @@ static bool translate(XEvent& x, Event& ev)
         ev.time = (uint32_t)x.xproperty.time;
         return true;
     }
-    // a root client message of a watched type (_LH_SETTINGS_CHANGED, x11/SETTINGS.md)
+    // a root client message of a watched type (_LH_SETTINGS_CHANGED, docs/SETTINGS.md)
     // is reported like a change of a root property of that name
     if (x.type == ClientMessage && x.xclient.window == root) {
         for (size_t i = 0; i < watched.size(); i++)
