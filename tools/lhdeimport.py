@@ -1351,8 +1351,6 @@ def r_packs_plexbars(data, target, args):
         raise RuntimeError('needs ut-dump (make)')
     out = os.path.join(data, 'packs', target, 'imageres')
     os.makedirs(out, exist_ok=True)
-    for old in glob.glob(os.path.join(out, 'plex-*.png')):     # earlier versions of this recipe wrote XP TaskBar renders
-        os.remove(old)
     n = 0
     with tempfile.TemporaryDirectory() as t:
         run([ut, os.path.join(data, rel), '--extract-streams', t])
