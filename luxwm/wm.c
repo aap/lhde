@@ -4589,6 +4589,7 @@ static struct keybind keys[64]; static int nkeys = 0;
 static const char *default_keys[] = {
     "Mod4+Return exec urxvt", "Mod4+t exec xterm", "Mod4+e exec if command -v flxp >/dev/null; then exec flxp; else exec rox; fi",
     "Mod4+r shell run", "Mod4+d showdesktop", "Mod4+s shell sidebar-stacking toggle",
+    "Print shell screenshot", "Mod1+Print shell screenshot_window", "Shift+Print shell screenshot_region",
     "Mod4+q close", "Mod1+F4 close", "Mod1+space sysmenu", "Mod4+Tab cycle", "Mod1+Tab cycle", "Mod4+Shift+Tab cycle", "Mod1+Shift+Tab cycle", "Mod4+Up maximize", "Mod4+Down minimize",
     "Mod4+1 workspace 0", "Mod4+2 workspace 1", "Mod4+3 workspace 2", "Mod4+4 workspace 3", "Super_L start", "Super_R start", NULL };
 
@@ -4619,9 +4620,11 @@ static void keys_setup(void) {
        that binds none, so the start menu key works there too; "Super_L none" in the file turns it off */
     bool has_start = false; for (int i = 0; i < nkeys; i++) if (keys[i].sym == XK_Super_L || keys[i].sym == XK_Super_R) has_start = true;
     if (!has_start) { keys_add("Super_L start"); keys_add("Super_R start"); }
-    /* newer defaults (show desktop, run, the sidebar's stacking toggle) apply to a user's keys file only where the key is unbound there */
+    /* newer defaults (show desktop, run, the sidebar's stacking toggle, the screenshot keys) apply to a user's keys file only where
+       the key is unbound there */
     if (f) for (int i = 0; default_keys[i]; i++) {
         if (strncmp(default_keys[i], "Mod4+d ", 7) && strncmp(default_keys[i], "Mod4+r ", 7) && strncmp(default_keys[i], "Mod4+s ", 7) &&
+            strncmp(default_keys[i], "Print ", 6) && strncmp(default_keys[i], "Mod1+Print ", 11) && strncmp(default_keys[i], "Shift+Print ", 12) &&
             strncmp(default_keys[i], "Mod1+space ", 11) && strncmp(default_keys[i], "Mod1+Shift+Tab ", 15) &&
             strncmp(default_keys[i], "Mod4+Shift+Tab ", 15)) continue;
         bool bound = false; int before = nkeys; keys_add(default_keys[i]);

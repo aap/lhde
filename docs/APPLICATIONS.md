@@ -32,7 +32,7 @@ them (and the list at the end says what still is not).
 
 - Sources: every `apps/NAME/*.cpp` (`$(call app_objs,NAME)`) is Win32 code compiled with the shim's flags (`APP_CXXFLAGS`:
   16-bit `WCHAR`, Wine's headers, the CRT redirections); a `*_native.cpp` is plain C++ without the Win32 headers, for code that
-  talks to Xlib or anything else whose macros clash with them.
+  talks to Xlib or anything else whose macros clash with them (luxshot's `capture_native.cpp`).
 - Resources: `NAME.rc` (dialog templates in dialog units for "MS Shell Dlg" 8, flxp's metrics: `flxp/rc/explorer.rc`) is
   compiled to `NAME.res` by mingw's windres when the .rc changes; the .res is checked in, so a build needs no windres.
 - Linking: `$(app_link)` links the objects with `libwux.a` and `build/lib/libflxpshell.a` (the shell facilities: flxp/shell's
@@ -81,7 +81,7 @@ way a double click opens); `shell::details::write(path, *shell::details::propert
 `LAB=:9 session/lab.sh start`, `session/lab.sh shell`, then `DISPLAY=:9 build/bin/NAME`; `session/lab.sh theme luna` and
 `session/lab.sh theme jade4074` switch the theme under it; `session/lab.sh shot FILE` takes a screenshot; `session/lab.sh stop`
 ends everything the lab started. A headless test goes in `tests/headless/` (its own HOME and XDG directories, xdotool to drive
-the window) and into `tests/check.sh`.
+the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
 
 ## Not public yet: what an application cannot reach
 
@@ -93,6 +93,9 @@ What the first applications needed and the public surface lacks, the list of wha
 - **wux depends on the shell layer**: the session theme (`flxp/shell/lhtheme`, `runtime`: fonts and the visual style) and the X
   clipboard (`flxp/shell/xclip`) are called from wux/w32, so libwux.a does not link without libflxpshell.a. Those three belong in
   wux (or liblhde).
+- **Reading the screen**: wux has no screen DC (`GetDC(NULL)` + `BitBlt` does not read the screen), so luxshot reads the root
+  window with Xlib itself, as it finds the active window (`_NET_ACTIVE_WINDOW`), luxwm's frame (`_NET_FRAME_EXTENTS`) and drags
+  its rectangle over an override-redirect window.
 - **Shell icons as HICON**: `shell/icons.h` names the file or resource of an icon key; loading it into an image list is the
   Explorer's (`flxp/explorer/uiicons`). `shell/thumbs.h` and `icons.h` hand out `gdi::Bitmap`, wux's internal type.
 - **The X clipboard is not INCR**: typed data larger than the server's request size (16 MB with BIG-REQUESTS) is refused.

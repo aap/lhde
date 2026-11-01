@@ -1,0 +1,32 @@
+/* luxshot's window, in dialog units for "MS Shell Dlg" 8 with the metrics of flxp's dialogs (flxp/rc/explorer.rc: Edit
+ * Description's 7-unit margins, 8-unit labels, 12-unit edit boxes, 50 x 14 buttons 4 units apart). Windows XP had no
+ * screenshot tool; the layout follows the Scanner and Camera Wizard's last pages (a picture over its name and place) and
+ * Paint's Save As (File name, the folder, Browse...): a taste choice where XP gives no model.
+ * Build: make apps/luxshot/luxshot.res (mingw windres; the .res is checked in); embedded by luxshot.cpp. */
+#include <windows.h>
+#include "resource.h"
+
+LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
+
+IDD_LUXSHOT DIALOGEX 0, 0, 290, 267
+STYLE DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "Save Screenshot"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    CONTROL         "", IDC_PREVIEW, "Static", SS_OWNERDRAW, 7, 7, 276, 150, WS_EX_CLIENTEDGE
+    LTEXT           "", IDC_INFO, 7, 161, 276, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    LTEXT           "File &name:", -1, 7, 178, 50, 8
+    EDITTEXT        IDC_NAME, 60, 176, 223, 12, ES_AUTOHSCROLL
+    LTEXT           "Save &in:", -1, 7, 195, 50, 8
+    EDITTEXT        IDC_FOLDER, 60, 193, 169, 12, ES_AUTOHSCROLL
+    PUSHBUTTON      "&Browse...", IDC_BROWSE, 233, 192, 50, 14
+    LTEXT           "&Description:", -1, 7, 212, 50, 8
+    EDITTEXT        IDC_DESC, 60, 210, 223, 12, ES_AUTOHSCROLL
+    LTEXT           "&Tags:", -1, 7, 229, 50, 8
+    EDITTEXT        IDC_TAGS, 60, 227, 223, 12, ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "&Save", IDOK, 125, 246, 50, 14
+    PUSHBUTTON      "&Copy", IDC_COPY, 179, 246, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 233, 246, 50, 14
+    PUSHBUTTON      "Open &Folder", IDC_OPENFOLDER, 7, 246, 56, 14
+END

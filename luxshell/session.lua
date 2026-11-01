@@ -31,7 +31,8 @@
 --                              current event is handled (several sets: one message); value nil removes it (S.unset)
 --   S.reload()                 forget the cached file (on _LH_SETTINGS_CHANGED from another writer)
 --   S.state_get(sec, key)      / S.state_set(sec, key, value): luxshell-state.ini, runtime state only (LHSHELL_STATE overrides the path)
---   S.command(name)            the shell command for logoff | standby | shutdown | restart | lock (settings.ini [commands] or
+--   S.command(name)            the shell command for logoff | standby | shutdown | restart | lock | screenshot |
+--                              screenshot_window | screenshot_region (settings.ini [commands] or
 --                              the defaults below); S.run(name) runs it
 local S = {}
 
@@ -312,7 +313,11 @@ function S.default_command(name)
   elseif name == "standby" then return have("zzz") and "zzz" or "loginctl suspend"
   elseif name == "shutdown" then return "loginctl poweroff"
   elseif name == "restart" then return "loginctl reboot"
-  elseif name == "lock" then return have("xlock") and "xlock" or have("slock") and "slock" or nil end
+  elseif name == "lock" then return have("xlock") and "xlock" or have("slock") and "slock" or nil
+  elseif name == "screenshot" or name == "screenshot_window" or name == "screenshot_region" then   -- luxwm's Print keys
+    local p = lh.bin_dir .. "/luxshot"
+    return (exists(p) and q(p) or "luxshot") .. " --" .. (name:match("_(%a+)$") or "screen")
+  end
   return nil
 end
 function S.command(name) return S.get("commands", name) or S.default_command(name) end

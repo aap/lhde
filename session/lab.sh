@@ -65,7 +65,8 @@ theme) n=$(themename "$2"); [ -n "$n" ] || { echo "no such theme; have: $(lhde_t
   DISPLAY=$LAB xprop -root -f _LH_THEME 8u -set _LH_THEME "$n" && echo "theme $n on $LAB" ;;
 restart-picom) if [ "${LAB_PICOM:-1}" = 0 ]; then startpicom; else killlab picom; sleep 0.5; startpicom; echo "picom restarted on $LAB"; fi ;;
 stop)
-  for n in picom fvwm2 glassdemo navdemo extendframe xterm luxshell luxwm flxp-desktop flxp-taskbar flxp-startmenu flxp flxp-settings flxp-filedialog; do killlab $n; done
+  for n in picom fvwm2 glassdemo navdemo extendframe xterm luxshell luxwm flxp-desktop flxp-taskbar flxp-startmenu flxp flxp-settings flxp-filedialog \
+           luxshot skeleton; do killlab $n; done
   for p in $(pgrep -x Xvfb) $(pgrep -x Xephyr); do tr '\0' '\n' </proc/$p/cmdline | grep -qx -- "$LAB" && kill -9 $p; done; echo "lab stopped" ;;
 *) echo "usage: $0 start [xephyr] | ensure | shell [on|off] | demo | shot [file] | theme NAME | restart-wm | restart-picom | stop" ;;
 esac

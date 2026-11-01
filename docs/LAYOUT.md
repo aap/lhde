@@ -35,7 +35,7 @@ $PREFIX/lib/lhde/                    code that is not a binary (PKGLIBDIR)
   luxshell/                            luxshell's Lua (runtime.lua, tiles/, ...)
   session/                             lhde-session's helpers: lhde-paths.sh, lhwall.sh, lab.sh, theme-*.sh, picom configs
   tools/                               lhde-import's Python: lhdeimport.py, lhdetree.py, lhdeschemes.py, recipe builders
-$PREFIX/bin/                         luxwm luxshell flxp* lhde-theme lhde-session lhde-import lhde-pack lhde-schemes ut-dump
+$PREFIX/bin/                         luxwm luxshell luxshot flxp* lhde-theme lhde-session lhde-import lhde-pack lhde-schemes ut-dump
 
 WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows
 ~/.local/share/lhde-windows/

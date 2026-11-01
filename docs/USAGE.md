@@ -375,6 +375,7 @@ Default keys, override in `~/.config/lhde/keys` (one binding per line; docs/LUXW
 | Super+e | flxp Explorer (ROX-Filer when flxp is not installed) |
 | Super+d | show desktop, as Windows' Win+D: minimises the visible windows (they stay minimised); Super+d again brings exactly those back, but only if nothing changed in between (no window restored, activated, opened or closed); otherwise it is a new "show desktop" |
 | Super+r | Run box (luxshell's own, via `_LHSHELL_COMMAND run`; or `Mod4+r exec rofi -show run` in your keys file) |
+| Print, Alt+Print, Shift+Print | a screenshot of the screen, of the active window with its frame, of a rectangle dragged with the mouse (luxshot, "Screenshots" below; `_LHSHELL_COMMAND screenshot`, `screenshot_window`, `screenshot_region`, settings.ini `[commands]` of those names to run something else) |
 | Super+s | sidebar under the windows (part of the desktop) ⇄ on top of them, at once (`_LHSHELL_COMMAND sidebar-stacking toggle`; saved as `[sidebar] stacking`) |
 | Super+q or Alt+F4 | close window |
 | Alt+Space | the window menu (Restore, Move, Size, Minimize, Maximize, Close; arrows, mnemonics, Enter, Esc); also a right click on the caption or a click on the caption icon (double click there: close) |
@@ -593,6 +594,26 @@ How to edit:
 They travel with the file where its attributes travel: a move on the same file system, flxp's own copy and move (also across
 file systems), `cp -a` (or `--preserve=xattr`), `rsync -X`, `tar --xattrs`. They do not travel with `cp` without `-a`, most
 archive and sync tools by default, or git.
+
+## Screenshots (luxshot)
+
+Print takes the whole screen, Alt+Print the active window with its frame (luxwm's frame, from the window's
+`_NET_FRAME_EXTENTS`), Shift+Print a rectangle: the screen freezes, the pointer becomes a crosshair, drag the rectangle (Escape
+or the right button cancel). A window comes up at once with the picture scaled to fit and its size, and:
+
+- **File name** `Screenshot YYYY-MM-DD HHMMSS.png` (" (2)" when that second has one already) and **Save in** your pictures
+  folder (`XDG_PICTURES_DIR`, from `~/.config/user-dirs.dirs`, else `~/Pictures`; made when missing); **Browse...** is the Save As
+  dialog. A name without `.png` gets it; a name with a `/` is a path of its own.
+- **Description** and **Tags**: written on the file as the Explorer writes them (`user.lux.desc`, `user.xdg.tags`; tags separated
+  by commas or semicolons, "Descriptions and tags" above), so the Explorer shows them at once. An empty box writes nothing.
+- **Save** (Enter) writes the PNG and closes; a file of that name is replaced only after asking. **Copy** puts the picture on the
+  clipboard as `image/png` (paste it into GIMP, a browser, a chat); luxshot then stays, without a window, until another program
+  takes the clipboard, since an X clipboard lives in the program that offers it. **Open Folder** opens the folder in the Explorer
+  with the file selected (`flxp --select FILE`) once it is saved. **Cancel** (Escape) discards the picture.
+
+From a script: `luxshot [--screen | --window [--no-frame] | --region] [--delay S] [--desc TEXT] [--tags A,B] FILE.png` writes
+FILE.png (with the description and tags) and exits without a window; without FILE the window comes up. Exit status 0 saved or
+copied, 1 cancelled or failed, 2 a usage error. `session/lab.sh shot` keeps using ImageMagick's `import` (it needs nothing built).
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell, docs/SHELL-DESIGN.md 6.4, 7.3, 13)
 
