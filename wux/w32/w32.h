@@ -112,13 +112,11 @@ int utf16_len(const WCHAR* s);
 DC* create_window_dc(gdi::DC* base, HWND hwnd);       // wraps a gdi::DC obtained from win::get_dc/begin_paint
 void destroy_window_dc(DC* dc);                        // does not free the underlying gdi::DC
 void apply_clip(DC* dc);                               // recompute dc->dc clip from base_clip ∩ clip
-Font* stock_font();                                    // DEFAULT_GUI_FONT object
 
 // User shim (user.cpp)
 struct Class;
 struct Window;                                         // per-window shim data, hangs off win::Window::w32
 Window* wdata(HWND h);
-void init_user();
 HMODULE comctl32_module();                             // comctl.cpp: embedded comctl32 resources
 void init_theme();                                     // theme.cpp
 bool set_theme(const char* msstyles_path, const char* color, const char* size);

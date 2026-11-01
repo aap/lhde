@@ -26,8 +26,6 @@ std::string unix_path(const WCHAR* s);
 
 // Registry helpers for tests and setup code.
 LONG reg_set_string(HKEY root, const char* path, const char* name, const char* value);
-LONG reg_set_dword(HKEY root, const char* path, const char* name, DWORD value);
-void reg_clear();                               // drop every key and value
 
 // Debug channels: (re)parse a WINEDEBUG-style option string; channels that
 // were already initialised keep their flags. Default is WINEDEBUG from the

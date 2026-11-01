@@ -690,38 +690,4 @@ void text_out(DC* dc, Point pos, const Font* f, const char* s, int32_t len, Colo
     draw_text(dc, pos, f, s, len, fg, true, opaque, bg);
 }
 
-void glow_text(DC* dc, Point pos, const Font* f, const char* s, int32_t len, Color glow, int32_t radius)
-{
-    if (!f) return;
-    std::vector<const Glyph*> glyphs;
-    for_each_cp(s, len, [&](uint32_t cp) { glyphs.push_back(get_glyph(f, cp)); });
-    // bounds of all glyph masks, relative to pos
-    int32_t x0 = 0, y0 = 0, x1 = 0, y1 = f->tm.height, x = 0;
-    for (const Glyph* g : glyphs) {
-        if (g->w) {
-            int32_t gx = x + g->left, gy = f->tm.ascent - g->top;
-            if (gx < x0) x0 = gx;
-            if (gy < y0) y0 = gy;
-            if (gx + g->w > x1) x1 = gx + g->w;
-            if (gy + g->h > y1) y1 = gy + g->h;
-        }
-        x += g->advance;
-    }
-    int32_t w = x1 - x0, h = y1 - y0;
-    if (w <= 0 || h <= 0) return;
-    std::vector<uint8_t> mask((size_t)w * h, 0);
-    x = 0;
-    for (const Glyph* g : glyphs) {
-        int32_t gx = x + g->left - x0, gy = f->tm.ascent - g->top - y0;
-        for (int32_t yy = 0; yy < g->h; yy++)
-            for (int32_t xx = 0; xx < g->w; xx++) {
-                uint8_t c = g->mask[(size_t)yy * g->w + xx];
-                uint8_t& t = mask[(size_t)(gy + yy) * w + gx + xx];
-                if (t < c) t = c;
-            }
-        x += g->advance;
-    }
-    glow_mask(dc, Point{pos.x + x0, pos.y + y0}, mask.data(), w, h, w, glow, radius);
-}
-
 } // namespace gdi

@@ -40,11 +40,6 @@ void text_out(DC* dc, Point pos, const Font* f, const char* utf8, int32_t len, C
 // if opaque is null (ETO_OPAQUE).
 void text_out(DC* dc, Point pos, const Font* f, const char* utf8, int32_t len, Color fg, Color bg, const Rect* opaque);
 
-// Longhorn TextGlow: a soft halo of `glow` (about `radius` px) around the
-// glyphs of the string at pos, without the text itself; draw it with
-// text_out afterwards. Works on opaque and alpha-tracking surfaces.
-void glow_text(DC* dc, Point pos, const Font* f, const char* utf8, int32_t len, Color glow, int32_t radius = 3);
-
 // searched before the system fonts (a directory or one font file). fallback: a tier of its own asked after the
 // others (ReactOS's free faces), so a family it shares with them comes from them: fontconfig breaks ties between
 // same-family faces of one config by its own scoring, not by the order the directories were added in.

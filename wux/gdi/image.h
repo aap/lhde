@@ -16,7 +16,6 @@ namespace gdi {
 // EXIF rotation). Null on anything unreadable.
 Bitmap* decode_image(const uint8_t* data, size_t size, int max_size = 0, int* orig_w = nullptr, int* orig_h = nullptr);
 Bitmap* load_image(const std::string& path, int max_size = 0, int* orig_w = nullptr, int* orig_h = nullptr);
-bool is_image_data(const uint8_t* data, size_t size);       // a signature decode_image knows
 bool webp_supported();                                      // built with libwebp
 
 Bitmap* decode_jpeg(const uint8_t* data, size_t size, int max_size = 0, int* orig_w = nullptr, int* orig_h = nullptr);

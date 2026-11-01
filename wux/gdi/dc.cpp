@@ -83,13 +83,6 @@ void set_pixel(DC* dc, Point lp, Color c)
     dc->target->row(p.y)[p.x] = pack(c);
 }
 
-Color get_pixel(const DC* dc, Point lp)
-{
-    Point p = lp + dc->origin;
-    if (!dc->target->rect().contains(p)) return rgb(0, 0, 0, 0);
-    return unpack(dc->target->row(p.y)[p.x]);
-}
-
 void line(DC* dc, Point a, Point b, Color c)
 {
     if (a.y == b.y) {
@@ -192,28 +185,6 @@ void blit_alpha(DC* dc, Point dst, const Bitmap* src, const Rect& src_rect, uint
             }
         }
     });
-}
-
-void stretch_blit(DC* dc, const Rect& ldst, const Bitmap* src, const Rect& src_rect)
-{
-    Rect sr = intersect(src_rect, src->rect());
-    if (sr.empty() || ldst.empty()) return;
-    Rect dr = offset(ldst, dc->origin.x, dc->origin.y);
-    if (!overlaps(dr, dc->clip_box)) return;
-    int32_t dw = dr.width(), dh = dr.height(), sw = sr.width(), sh = sr.height();
-    for (const Rect& cr : dc->clip.rects()) {
-        Rect i = intersect(dr, cr);
-        if (i.empty()) continue;
-        for (int32_t y = i.top; y < i.bottom; y++) {
-            int32_t sy = sr.top + (int64_t)(y - dr.top) * sh / dh;
-            const uint32_t* sp = src->row(sy);
-            uint32_t* dp = dc->target->row(y);
-            for (int32_t x = i.left; x < i.right; x++) {
-                int32_t sx = sr.left + (int64_t)(x - dr.left) * sw / dw;
-                dp[x] = sp[sx];
-            }
-        }
-    }
 }
 
 void blend_mask(DC* dc, Point lp, const uint8_t* mask, int32_t w, int32_t h, int32_t stride, Color fg)

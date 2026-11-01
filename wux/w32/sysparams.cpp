@@ -166,7 +166,6 @@ BOOL WINAPI AdjustWindowRectExForDpi(RECT* rect, DWORD style, BOOL menu, DWORD e
 
 BOOL WINAPI SystemParametersInfoW(UINT action, UINT param, void* pv, UINT)
 {
-    gdi::Size ss = sys::screen_size();
     switch (action) {
     case SPI_GETNONCLIENTMETRICS: {
         NONCLIENTMETRICSW* p = (NONCLIENTMETRICSW*)pv;

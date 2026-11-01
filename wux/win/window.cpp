@@ -167,8 +167,6 @@ static gdi::Region visible_region(Window* w, bool client)
     return r;
 }
 
-gdi::Region visible_client_region(Window* w) { return visible_region(w, true); }
-
 static void mark_dirty(Window* w, const gdi::Region& dev)
 {
     toplevel_of(w)->top->dirty.add(dev);
@@ -544,13 +542,6 @@ Point map_point(Window* from, Window* to, Point p)
     if (from) p = client_to_screen(from, p);
     if (to) p = screen_to_client(to, p);
     return p;
-}
-
-Window* child_from_point(Window* w, Point p)
-{
-    for (Window* c = w->child; c; c = c->next)
-        if ((c->style & WS_VISIBLE) && c->rect.contains(p)) return c;
-    return nullptr;
 }
 
 // Deepest visible window under a point given in w's client coords; windows

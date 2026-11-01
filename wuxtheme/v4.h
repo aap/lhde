@@ -89,7 +89,6 @@ int part_id(const Style&, const std::string& cls, const std::string& name);     
 int state_id(const Style&, const std::string& cls, int part, const std::string& name);
 int prop_id(const Style&, const std::string& name);
 std::string enum_name(const Style&, const std::string& prop, int value);
-std::string type_of(const Style&, int prop_id);         // "INT", "PNGSTREAM", ...; "" if unknown
 // A stream/blob value ("#id" or "*n" as the record text gives it).
 bool stream(const Style&, const std::u16string& value, const uint8_t** data, size_t* size);
 
