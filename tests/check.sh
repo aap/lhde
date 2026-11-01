@@ -37,6 +37,9 @@ result "viewmodeltest ($(tail -n 1 "$T/viewmodel.log"))" $? "$T/viewmodel.log"
 # the details model (shell/details.h): XP's Details lines, 4051's band values
 build/tests/detailstest > "$T/details.log" 2>&1
 result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"
+# lhde-import's overwrite policy (kept without --force, written with it) on a scratch tree and a stand-in file
+tests/import-policy.sh > "$T/import.log" 2>&1
+result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"
 # libwuxtheme through its own API: every style the user imported
 styles=${LHDE_STYLES:-$(build/bin/lhde-theme find styles 2>/dev/null)}   # liblhde's lookup: the Windows tree's index/styles (docs/LAYOUT.md)
 n=0

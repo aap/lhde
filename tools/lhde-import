@@ -31,9 +31,12 @@ usage:
   lhde-import --clean [--yes]                 delete the Windows tree (every source, local/, generated/, index/) after asking
                                               on the terminal, or without asking with --yes: before importing a clean set
                                               (make install-resources-free / -windows / -full)
-options: --windows DIR (default $LHDE_WINDOWS, else ${XDG_DATA_HOME:-~/.local/share}/lhde-windows), --force (replace files that exist), --no-recipes (raw files only), --tmp DIR (scratch for an extracted WIM;
-         default beside the Windows tree), --no-annotate (write no extended attributes: the importer annotates what it writes,
-         best effort, docs/ANNOTATIONS.md)
+options: --windows DIR (default $LHDE_WINDOWS, else ${XDG_DATA_HOME:-~/.local/share}/lhde-windows),
+         --force (write every file again; without it a file that is in the Windows tree is kept as it is, whatever its size
+         or contents, and the run says how many it kept, so a second run changes nothing; a source.ini is always the pack's,
+         the recipes' frame sets, pack images and aurora scenes are made again), --no-recipes (raw files only), --tmp DIR
+         (scratch for an extracted WIM; default beside the Windows tree), --no-annotate (write no extended attributes: the
+         importer annotates what it writes, best effort, docs/ANNOTATIONS.md)
 """
 import os
 import shutil

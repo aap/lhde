@@ -902,12 +902,14 @@ def shared(p):
 
 def copy_file(src, dst, force, rep):
     import lhdetree
-    if os.path.exists(dst) and not force and os.path.getsize(dst) == os.path.getsize(src):
+    if os.path.lexists(dst) and not force:   # kept, whatever it holds (docs/USAGE.md "Getting the Windows resources")
         rep['kept'] += 1
         if not shared(src):
             lhdetree.copy_xattrs(src, dst)
         return
     os.makedirs(os.path.dirname(dst), exist_ok=True)
+    if os.path.islink(dst):
+        os.unlink(dst)   # replaced, not written through
     shutil.copyfile(src, dst)   # a hard link or symlink of a deduplicated pack: a normal file of its own here
     if not shared(src):
         lhdetree.copy_xattrs(src, dst)   # a pack's annotations (docs/ANNOTATIONS.md)
@@ -961,7 +963,7 @@ def import_icons(src, W, name, force=False, licence=None):
                 n += 1
             elif low.endswith('.png'):
                 out = os.path.join(dst, rel[:-4] + '.ico')
-                if os.path.exists(out) and not force and os.path.getmtime(out) >= os.path.getmtime(s):
+                if os.path.exists(out) and not force:
                     kept += 1
                     continue
                 try:

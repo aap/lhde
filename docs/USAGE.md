@@ -176,6 +176,13 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    is in the 4066, 4074, 4074r2 and 4093 recipes (a museum pack has it; an essentials pack does not, as no theme reads it); a
    tree imported before it was there gets it, and the desktop aurora, with `lhde-import --iso longhorn4074.iso` (files that
    are there are kept, the recipes run again).
+   **Files that are already there:** without `--force` a file that exists in the Windows tree is kept as it is, whatever its
+   size or contents (also one you changed by hand), and each step says how many it copied and kept (`4074 (...): 2 files copied,
+   43 kept`); with `--force` every file is written again from the pack, the style or the icon pack. So an import run twice
+   changes nothing the second time. Two things are not copies and follow their inputs instead: a source's `source.ini` is
+   always the pack's, and the recipes make their frame sets, pack images and aurora scenes again on every run (each manifest
+   records the sha256 of the files it was made from; `--regenerate` remakes all of `generated/`). The same rule holds for the
+   classic schemes in `generated/schemes` and the `.ico` files of `--icons`.
    Developer paths through the same rules: `lhde-import --iso FILE`, `--wim FILE`, `--dir WINDOWS-DIR` detect the build from
    explorer.exe's version (6.5.40xx Longhorn, 6.0.5048/5112, 6.0.3790 Server 2003, 5.0 Windows 2000) and the layout, pack into a
    temporary pack and import it (`--source ID` skips the detection). `--from-workspace DIR` copies aap's research workspace
