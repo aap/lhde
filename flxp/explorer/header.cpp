@@ -38,10 +38,8 @@
 #include "verbs.h"
 #include "w32/user.h"
 #include <sys/stat.h>
-#ifdef FLXP_HAVE_LHNAV
 #include "wuxtheme/ut.h"
-#include <lhnav.h>      // LHNAV_DIR (Makefile)
-#endif
+#include <lhnav.h>      // luxnav (flxp.mk)
 extern "C" {
 #include "commctrl.h"
 #include "w32/flxp_dwmapi.h"
@@ -165,7 +163,6 @@ const int MAG_W = 30, MAG_H = 32, MAG_CX = 19, MAG_CY = 12;   // the lens centre
 // The vision mode: the header's contents through lhnav (NAVBAR.md "Porting
 // lhnav into flxp", NOTES "The vision header"), when the frame theme has a
 // nav.ini (header_engine = auto | lhnav | flxp). Its code is below ("vision").
-#ifdef FLXP_HAVE_LHNAV
 struct Vision {
     bool on = false;
     lhnav* nav = nullptr;
@@ -185,10 +182,6 @@ struct Vision {
 Vision g_v;
 bool vision() { return g_v.on; }
 #define LHNAV_SEP_OF(i) (LHNAV_SEP + (i))
-#else
-bool vision() { return false; }
-#define LHNAV_SEP_OF(i) 0
-#endif
 void vision_layout();
 void vision_paint(HDC dc);
 bool vision_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp, LRESULT* r);
@@ -1768,9 +1761,7 @@ void end_edit(bool go)
     std::string text = w32::utf8_of(buf.data());
     bool had_focus = GetFocus() == g_addr;
     ShowWindow(g_addr, SW_HIDE);
-#ifdef FLXP_HAVE_LHNAV
     if (vision()) lhnav_set_field(g_v.nav, LHNAV_ADDRESS, nullptr, -1, 0);
-#endif
     invalidate_field();
     if (had_focus) SetFocus(GetParent(g_wnd));       // the frame gives it to the list
     while (!text.empty() && (text.back() == ' ' || text.back() == '\t')) text.pop_back();
@@ -1973,7 +1964,6 @@ void set_nav_hot(int part)
 // and the background under it (glass, lhwm's _LHWM_HEADER_PIXMAP, else the
 // theme's navigation bar). The header window covers lhnav_extend_top() rows:
 // the header plus the two rows on which lhwm draws the plate's line pair.
-#ifdef FLXP_HAVE_LHNAV
 
 // lhwm's frame theme directory (_LHWM_THEME "DIR|STYLE|COLOR|SIZE"), "" without lhwm
 std::string frame_theme_dir()
@@ -2637,23 +2627,6 @@ bool vision_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp, LRESULT* r)
     return false;
 }
 
-#else  // no lhnav: the classic header only
-
-bool vision_children_menu() { return false; }
-bool vision_update() { return false; }
-int vision_extend() { return 0; }
-void vision_layout() {}
-void vision_paint(HDC) {}
-bool vision_proc(HWND, UINT, WPARAM, LPARAM, LRESULT*) { return false; }
-void vision_menu_begin(int, int*) {}
-void vision_menu_end() {}
-void vision_begin_edit() {}
-void vision_open_search() {}
-void vision_metrics() {}
-void vision_on() {}
-
-#endif
-
 LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 {
     if (msg == WM_KEYDOWN && (wp == VK_RETURN || wp == VK_ESCAPE)) {
@@ -2959,12 +2932,7 @@ int extend_top()
 
 bool resize_hit(int x, int y)
 {
-#ifdef FLXP_HAVE_LHNAV
     return vision() && g_v.nav && lhnav_hit(g_v.nav, x, y) == LHNAV_RESIZE_TOP;
-#else
-    (void)x; (void)y;
-    return false;
-#endif
 }
 
 void caption_changed()
@@ -3073,9 +3041,7 @@ HWND create(HWND frame, const Callbacks& cb)
 
 void destroy()
 {
-#ifdef FLXP_HAVE_LHNAV
     if (vision()) vision_off();
-#endif
     g_fixed_title.clear();
     set_tools({});
     if (g_wnd) DestroyWindow(g_wnd);      // the search box with it
@@ -3121,12 +3087,10 @@ void set_folder(const std::shared_ptr<shell::Folder>& f)
     g_crumbs = chain;
     g_hot = -1;
     if (g_editing) { g_editing = false; ShowWindow(g_addr, SW_HIDE); }
-#ifdef FLXP_HAVE_LHNAV
     if (vision()) {
         lhnav_set_field(g_v.nav, LHNAV_ADDRESS, nullptr, -1, 0);
         vision_metrics();
     }
-#endif
     layout();
 }
 
@@ -3144,13 +3108,11 @@ void clear_filter()
     g_quiet = true;
     SetWindowTextW(g_edit, L"");
     g_quiet = false;
-#ifdef FLXP_HAVE_LHNAV
     if (vision() && !g_v.search_on) {
         lhnav_set_field(g_v.nav, LHNAV_SEARCH, nullptr, -1, 0);
         if (lhnav_search_open(g_v.nav)) { lhnav_set_search_open(g_v.nav, 0); layout(); }
         else vision_invalidate(LHNAV_SEARCH);
     }
-#endif
 }
 
 void relayout(int width, int height)
@@ -3216,9 +3178,7 @@ void open_search()
 
 void theme_changed()
 {
-#ifdef FLXP_HAVE_LHNAV
     g_v.style_path.clear();     // the style again on the refit (another colour of the same file too)
-#endif
     free_shrunk();
     for (int i = 0; i < 2; i++)
         for (int s = 0; s < 4; s++) { if (g_nav[i][s]) DeleteObject(g_nav[i][s]); g_nav[i][s] = nullptr; }
@@ -3261,7 +3221,6 @@ std::string buttons_source()
 // (nav.ini, preset, its rows) or flxp's own, and why
 static std::string engine_info()
 {
-#ifdef FLXP_HAVE_LHNAV
     std::string ini, why;
     bool want = vision_wanted(&ini, &why);
     std::string out = "header engine " + why;
@@ -3283,9 +3242,6 @@ static std::string engine_info()
         out += "; the flxp header's rows below apply when it is not used";
     }
     return out + "\n";
-#else
-    return "header engine flxp (lhnav unavailable: built without it, LHNAV_DIR not found at build time)\n";
-#endif
 }
 
 // The header's rows and buttons at each size as they are (or would be) laid
@@ -3354,13 +3310,11 @@ void set_history(bool can_back, bool can_forward)
 {
     if (g_can[0] == can_back && g_can[1] == can_forward) return;
     g_can[0] = can_back; g_can[1] = can_forward;
-#ifdef FLXP_HAVE_LHNAV
     if (vision()) {
         lhnav_set_history(g_v.nav, can_back, can_forward);
         vision_invalidate(LHNAV_BACK);
         return;
     }
-#endif
     if (g_nav_hot != NONE && !g_can[is_back(g_nav_hot) ? 0 : 1]) g_nav_hot = NONE;
     if (g_wnd) invalidate_nav();
 }
@@ -3428,7 +3382,6 @@ void enable_tool(int id, bool on)
 
 bool tool_rect(int id, RECT* screen)
 {
-#ifdef FLXP_HAVE_LHNAV
     if (vision() && g_wnd) {
         for (size_t i = 0; i < g_v.tool_ids.size(); i++) {
             int x, y, w, h;
@@ -3439,7 +3392,6 @@ bool tool_rect(int id, RECT* screen)
         }
         return false;
     }
-#endif
     for (ToolBtn& b : g_tools)
         if (b.t.id == id && g_wnd) { *screen = b.r; MapWindowPoints(g_wnd, nullptr, (POINT*)screen, 2); return true; }
     return false;
