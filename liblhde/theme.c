@@ -781,7 +781,7 @@ static lhde_theme *resolve_ex(const char *name, int flags, const char *const *kv
     if (!has(t, "Theme.build") || !get(t, "Theme.build")[0]) {
         char b[16]; snprintf(b, sizeof b, "%s", si.build);
         if (!b[0] && si.kind == LHDE_STYLE_CLASSIC) snprintf(b, sizeof b, "xp");
-        put(t, "Theme.build", b, LHDE_FROM_DEFAULT, "default: the style's build (its build-qualified name; v3: xp)");
+        put(t, "Theme.build", b, LHDE_FROM_DEFAULT, "default: the style's build (its build-qualified name; CompositedWindow: 4074; v3: xp)");
     }
     apply_defaults(t, &si, si.kind == LHDE_STYLE_CLASSIC ? NULL : style_c);
     apply_fallbacks(t, &si);

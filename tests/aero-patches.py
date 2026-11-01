@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# lhde-import's Aero patches (tools/lhdetree.py AERO_PATCHES; docs/USAGE.md "The Aero patches for 4074"), on stand-in files of our own (no
+# lhde-import's Aero patches (tools/lhdetree.py AERO_PATCHES; docs/USAGE.md "The Aero patches for 4074") and the frame set an
+# imported style with 4074's CompositedWindow parts gets (tools/lhdeimport.py style_recipes), on stand-in files of our own (no
 # Microsoft or third-party style: the known patches are looked up by their sha256 passed in, the unknown one is recognised by
 # its bytes) in a scratch Windows tree. Usage: tests/aero-patches.py
 import os
@@ -10,6 +11,7 @@ import tempfile
 
 TOP = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.join(TOP, 'tools'))
+import lhdeimport as L   # noqa: E402
 import lhdetree as T     # noqa: E402
 
 fails = 0
@@ -60,7 +62,7 @@ try:
     check('CompositedWindow without DemoCheck: not recognised', None, T.style_release(jadeish))
     check('has_composited', [True, True, False], [T.has_composited(patch), T.has_composited(jadeish), T.has_composited(stand)])
 
-    # ---- lhde-import --style on a scratch tree: names, annotations
+    # ---- lhde-import --style on a scratch tree: names, annotations, which recipes run
     W = os.path.join(t, 'w')
     env = dict(os.environ, LHDE_WINDOWS=W)
 
@@ -85,6 +87,16 @@ try:
         check('--style: another style annotated by name', 'zzplain visual style (dropped in with lhde-import --style)', d)
     else:
         print('skip annotations: no user extended attributes in %s' % t)
+    check('recipes: realaero', L.STYLE_RECIPES['realaero'], L.style_recipes(W, 'realaero'))
+    check('recipes: a CompositedWindow style gets its frame set, realaero\'s geometry',
+          [('frames', 'zzglass', 'composited zzglass realaero')], L.style_recipes(W, 'zzglass'))
+    check('recipes: the unknown patch too', [('frames', 'aero_demo', 'composited aero_demo realaero')], L.style_recipes(W, 'aero_demo'))
+    check('recipes: none without CompositedWindow', [], L.style_recipes(W, 'zzplain'))
+    shutil.copyfile(jadeish, os.path.join(W, 'local', 'themes', 'jade4074.msstyles'))
+    check('recipes: none for a name a shipped frame set has', [], L.style_recipes(W, 'jade4074'))
+    os.makedirs(os.path.join(W, 'generated', 'frames', 'zzglass'), exist_ok=True)
+    open(os.path.join(W, 'generated', 'frames', 'zzglass', 'manifest.ini'), 'w').write('[recipe]\nkind = udwm\nargs = 5048\n')
+    check('recipes: none over another recipe\'s frame set', [], L.style_recipes(W, 'zzglass'))
 finally:
     shutil.rmtree(t, ignore_errors=True)
 print('%d failed' % fails)

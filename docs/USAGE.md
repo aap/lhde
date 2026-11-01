@@ -181,7 +181,8 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    shellstyle.dll per colour scheme, with it when it lies beside the file) and then shows on Display Properties' Appearance tab
    ("Windows and buttons") beside the styles the shipped themes use; choosing it there gives "THEME (Modified)", and Save As
    on the Themes tab makes it a theme of its own. The pack's `local/` goes to the tree's `local/` (indexed as if dropped in by
-   hand, and the recipes of its styles run: realaero's frame sets). `index/` holds the names the programs ask
+   hand, and the recipes of its styles run: realaero's frame sets, the frame set of any other style with 4074's
+   CompositedWindow parts). `index/` holds the names the programs ask
    for, as relative symlinks: `styles/<name>.msstyles` (build-qualified: jade4074, slate4051, aero5112, luna = XP's own, whose
    `styles/luna/` is XP's `themes/Luna/` with `Shell/<Scheme>/shellstyle.dll`; luna4051 / luna4074 = Longhorn's copies),
    `resources/<source>`, `fonts/<source>`, `wallpapers/<source>`, `icons/<pack>`, `frames` and `packs` (-> `generated/`). Then the recipes of
@@ -312,9 +313,17 @@ and the buttons, overlays, shadows, caption fog and default icon are Jade's. Non
 CompositedWindow stream of pre-0.1, 0.2 or 0.3 is byte- or pixel-equal to one of TWIWMTB's six plates (the streams the three
 share are Jade's own art), so what RealAero took from "TWIWMTB's Aero" is not this file's frames.
 ```
-lhde-import --style Aero.msstyles             # recognised: local/themes/twiwmtb-aero.msstyles
-lhde-theme explain twiwmtb-aero               # a bare style (no theme file)
+lhde-import --style Aero.msstyles             # recognised: local/themes/twiwmtb-aero.msstyles, the frame set twiwmtb-aero
+lhde-theme explain twiwmtb-aero               # a bare style (no theme file): glass frames, build 4074
 ```
+
+**Any other patch**, or any style with 4074's CompositedWindow class dropped in under a name of its own (`--style FILE NAME`,
+`--styles DIR`), gets a frame set of that name in `generated/frames/NAME/` from its own streams (the recipe
+`composited NAME realaero`, made again by `--regenerate`). The streams are the style's own, the geometry is not: its
+`theme.ini` is `realaero`'s, with `msstyles` naming the style (and, when the style's maximised plates have the normal plate's
+layout, as Jade's and TWIWMTB's do, the normal and Explorer plates' insets and rows for the maximised ones); the `theme.ini`
+header and the manifest's `geometry` say so. A bare style then resolves with `Glass.frames = NAME` (THEME-FORMAT.md section 5)
+and `Theme.build = 4074`. Only `realaero` has the shipped, fitted set and `aerovision`.
 
 A tree imported before lhde called the style `realaero` holds `local/themes/aero-patch.msstyles` and the frame set
 `generated/frames/aero-patch`: every import renames the file (`lhde-import --reindex` does only that), and

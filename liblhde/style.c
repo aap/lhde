@@ -190,6 +190,9 @@ int lhde_style_probe(const char *name, lhde_style_info *o)
     else {
         lhde__build_of(base, o->build, sizeof o->build);
         if (!o->build[0] && strchr(name, '/')) lhde__build_of(path, o->build, sizeof o->build);
+        /* a style named without a build (an Aero patch dropped in as twiwmtb-aero) with CompositedWindow: 4074's, the one build
+           whose styles have that class (4051's and 5048's have none) */
+        if (!o->build[0] && o->composited) snprintf(o->build, sizeof o->build, "4074");
         int b = atoi(o->build);
         if (o->dwm || (!o->composited && b >= 5000)) o->kind = LHDE_STYLE_DWM;
         else o->kind = LHDE_STYLE_LONGHORN;

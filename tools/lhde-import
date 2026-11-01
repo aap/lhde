@@ -16,7 +16,8 @@ usage:
   lhde-import --style FILE [NAME]             drop one visual style in (local/themes/NAME.msstyles: the style's name, the one
                                               theme files ask for, e.g. realaero for RealAero, Lucas Brooks' Aero for 4074), with
                                               its Shell/ when it has one beside it, and run the recipes that read it (realaero:
-                                              the frame sets realaero and aerovision). Without NAME the file's stem is used
+                                              the frame sets realaero and aerovision; any other style with 4074's CompositedWindow
+                                              parts: the frame set NAME, realaero's geometry). Without NAME the file's stem is used
                                               and printed; a stem that is already a source's style (aero.msstyles: Vista's aero) is
                                               refused: give the NAME. A known Aero patch is recognised (which one is printed and
                                               annotated: docs/USAGE.md "The Aero patches for 4074") and gets its own name without a
@@ -258,7 +259,7 @@ def main():
             L.copy_tree(shell, os.path.join(data, 'local', 'themes', name, 'Shell'), o['force'], rep)
         L.log('local/themes/%s.msstyles (%d copied, %d kept)' % (name, rep['copied'], rep['kept']))
         T.reindex(data)
-        for kind, target, spec in L.STYLE_RECIPES.get(name, []):
+        for kind, target, spec in L.style_recipes(data, name):
             if o['recipes']:
                 L.run_recipe(os.path.join(data, 'index'), kind, target, spec, 'style', o['force'])
         T.annotate_tree(data)

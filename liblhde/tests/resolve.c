@@ -63,7 +63,7 @@ static int probe(const char *path, lhde_style_info *o)
     const char *b = strrchr(path, '/'); b = b ? b + 1 : path;
     o->format = 4;
     if (!strncmp(b, "luna.", 5) || !strncmp(b, "royale", 6)) { o->format = 3; snprintf(o->family, sizeof o->family, "luna"); snprintf(o->color, sizeof o->color, "NormalColor"); snprintf(o->size, sizeof o->size, "NormalSize"); return 1; }
-    if (!strncmp(b, "jade", 4) || !strncmp(b, "realaero", 8)) { o->composited = o->sidebar = 1; snprintf(o->family, sizeof o->family, !strncmp(b, "jade", 4) ? "jade" : "aero"); }
+    if (!strncmp(b, "jade", 4) || !strncmp(b, "realaero", 8) || !strncmp(b, "zzpatch", 7)) { o->composited = o->sidebar = 1; snprintf(o->family, sizeof o->family, !strncmp(b, "jade", 4) ? "jade" : "aero"); }
     else if (!strncmp(b, "slate", 5) || !strncmp(b, "luna4051", 8)) { o->sidebar = 1; snprintf(o->family, sizeof o->family, !strncmp(b, "slate", 5) ? "slate" : "luna"); }
     else if (!strncmp(b, "aero5112", 8)) { o->dwm = 1; snprintf(o->family, sizeof o->family, "aero"); }
     else if (!strncmp(b, "aero5048", 8)) snprintf(o->family, sizeof o->family, "aero");
@@ -106,12 +106,17 @@ int main(void)
     lhde_style_set_probe(probe);
 
     /* the fake import */
-    const char *styles[] = { "jade4074", "slate4074", "slate4051", "aero5048", "aero5112", "luna4051", "realaero", "royale", NULL };
+    const char *styles[] = { "jade4074", "slate4074", "slate4051", "aero5048", "aero5112", "luna4051", "realaero", "royale",
+                             "zzpatch", "zzpatch-bare", NULL };
     for (int i = 0; styles[i]; i++) { char r[200]; snprintf(r, sizeof r, "data/styles/%s.msstyles", styles[i]); put(r, "x"); }
     put("data/frames/jade4074/theme.ini", "mode = dwm\n"); put("data/frames/jade4074/plate_active.png", "x");
     put("data/frames/aero5112/theme.ini", "mode = dwm\n"); put("data/frames/aero5112/cache/plate_active.png", "x");   /* manifest-first: cache/ */
     put("data/frames/aero5048/theme.ini", "mode = dwm\n");                                                            /* text only: not imported */
     put("data/frames/jade4074-classic/theme.ini", "mode = msstyles\n");
+    /* an Aero patch dropped in under its own name (lhde-import --style FILE zzpatch): the frame set lhde-import's style_recipes
+       makes, theme.ini borrowed from realaero, a manifest, no PNG needed (luxwm reads the streams live); zzpatch-bare has none */
+    put("data/frames/zzpatch/theme.ini", "mode = dwm\nmsstyles = styles/zzpatch.msstyles\n");
+    put("data/frames/zzpatch/manifest.ini", "[recipe]\nkind = composited\nargs = zzpatch realaero\n");
     put("data/packs/4074-aero/shell.lua", "return {}\n"); put("data/packs/4074-slate/shell.lua", "return {}\n");
     put("data/packs/4051-slate/shell.lua", "return {}\n"); put("data/packs/4074/imageres/1167.png", "x");             /* no packs/4051 */
     put("data/wallpapers/4074/Bliss.bmp", "x"); put("data/wallpapers/5112/Longhorn.jpg", "x");
@@ -130,6 +135,18 @@ int main(void)
     CHECK(lhde_theme_source(t, "Explorer.navbar") == LHDE_FROM_DEFAULT);
     HAS(G(t, "path.wallpaper"), "/data/wallpapers/4074/Bliss.bmp"); HAS(G(t, "path.fonts"), "/data/fonts/4074");
     HAS(G(t, "path.resources"), "/data/resources/4074"); HAS(G(t, "path.icons"), "icons/longhorn4074.theme");
+    lhde_theme_free(t);
+
+    /* a bare Aero patch: its generated frame set by name, the build 4074 from its CompositedWindow class */
+    t = R("zzpatch");
+    CHECK(t);
+    EQ(G(t, "file"), ""); EQ(G(t, "VisualStyle.style"), "zzpatch"); EQ(G(t, "Theme.build"), "4074");
+    EQ(G(t, "Glass.frames"), "zzpatch"); HAS(W(t, "Glass.frames"), "named like the style"); HAS(G(t, "path.frames"), "frames/zzpatch");
+    EQ(G(t, "Glass.frames_classic"), "none"); HAS(G(t, "path.fonts"), "/data/fonts/4074");
+    lhde_theme_free(t);
+    t = R("zzpatch-bare");
+    CHECK(t);
+    EQ(G(t, "Theme.build"), "4074"); EQ(G(t, "Glass.frames"), "none"); EQ(G(t, "path.frames"), "");
     lhde_theme_free(t);
 
     t = R("slate4074");
@@ -260,7 +277,7 @@ int main(void)
     void cnt_cb(const char *n, const char *ti, const char *f, int g, void *ud);
     lhde_theme_list(cnt_cb, &cnt);
     CHECK(cnt.user == 1); CHECK(cnt.shipped >= 9);
-    CHECK(cnt.style == 8);   /* the 9 styles but luna, which luna.theme claims */
+    CHECK(cnt.style == 10);   /* the 11 styles but luna, which luna.theme claims */
 
     /* ---- serialize / parse ---- */
     t = R("aero");
@@ -348,7 +365,7 @@ int main(void)
         void count_scheme(const char *n, const char *ti, const char *pa, void *ud);
         void count_style(const char *n, const char *pa, void *ud);
         CHECK(lhde_scheme_list(count_scheme, &ns) == 1 && ns == 1);
-        CHECK(lhde_style_list(count_style, &nst) == 9 && nst == 9);
+        CHECK(lhde_style_list(count_style, &nst) == 11 && nst == 11);
         /* Save As: base = jade + the layer, selected, the layer gone */
         CHECK(lhde_theme_save_as("jade", "Jade", e2, sizeof e2) == -1); HAS(e2, "built-in");
         CHECK(lhde_theme_save_as("My Jade", "x", e2, sizeof e2) == -1);

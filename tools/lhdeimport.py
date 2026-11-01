@@ -1098,13 +1098,14 @@ def tool(name):
     return shutil.which(name)
 
 
-def write_manifest(dirpath, recipe, args, inputs, outputs, data=None):
+def write_manifest(dirpath, recipe, args, inputs, outputs, data=None, extra=None):
     import lhdetree
     os.makedirs(dirpath, exist_ok=True)
     with open(os.path.join(dirpath, 'manifest.ini'), 'w') as f:
         f.write('; lhde-import recipe: the files here are derived from the imported files below and may be deleted;\n'
                 '; lhde-import --regenerate makes them again (tools/lhdeimport.py)\n')
-        f.write('[recipe]\nkind = %s\nargs = %s\nwhen = %s\noutputs = %d\n\n[inputs]\n' % (recipe, args, datetime.date.today(), outputs))
+        f.write('[recipe]\nkind = %s\nargs = %s\nwhen = %s\noutputs = %d\n' % (recipe, args, datetime.date.today(), outputs))
+        f.write(''.join('%s = %s\n' % kv for kv in (extra or {}).items()) + '\n[inputs]\n')
         for p, h in inputs:
             f.write('%s = %s\n' % (p, h))
         about = [(p, lhdetree.style_release(os.path.join(data, p), h)) for p, h in inputs if data and p.endswith('.msstyles')]
@@ -1170,10 +1171,46 @@ def composited_pngs(data, style, out, only=None):
 
 
 def r_frames_composited(data, target, args):
+    """the CompositedWindow PNG streams of a style (args: style [geometry]). With a geometry (the frame set whose theme.ini is
+    borrowed: realaero for an Aero patch dropped in under its own name, style_recipes) and no shipped theme.ini of the target,
+    the target's theme.ini is that set's, msstyles naming this style; the manifest says whose geometry it is"""
     style = args[0] if args else target
     out = os.path.join(data, 'frames', target)
     n = composited_pngs(data, style, out)
-    return [style_rel(data, style)], n
+    if n == 0:
+        raise RuntimeError('styles/%s.msstyles has no CompositedWindow PNG streams' % style)
+    if len(args) < 2:
+        return [style_rel(data, style)], n
+    geo = args[1]
+    if any(os.path.isfile(os.path.join(d, 'frames', target, 'theme.ini')) for d in shipped_data_dirs()):
+        return [style_rel(data, style)], n
+    src = next((os.path.join(d, 'frames', geo, 'theme.ini') for d in shipped_data_dirs()
+                if os.path.isfile(os.path.join(d, 'frames', geo, 'theme.ini'))), None)
+    if not src:
+        raise RuntimeError('needs the shipped frame set %s (frames/%s/theme.ini) for its geometry' % (geo, geo))
+    lines = open(src).read().splitlines()
+    while lines and lines[0].startswith('#'):   # the borrowed set's own header (what its source is)
+        lines.pop(0)
+    txt = '\n'.join(lines) + '\n'
+    txt = re.sub(r'(?m)^msstyles = .*$', 'msstyles = styles/%s.msstyles' % style, txt)
+    from PIL import Image
+    mx, pl = (os.path.join(out, f) for f in ('plate_max_active.png', 'plate_active.png'))
+    note = ''
+    if os.path.isfile(mx) and os.path.isfile(pl) and Image.open(mx).size == Image.open(pl).size:
+        # the maximised plates are the normal plate's layout (Jade's, TWIWMTB's: 801x1214, not RealAero's 787x1198 dark art):
+        # 9-grid them as the normal and Explorer plates
+        ins = dict(re.findall(r'(?m)^(plate_insets|explorer_insets|explorer_rows) = (.*)$', txt))
+        for k, v in (('max_insets', ins.get('plate_insets')), ('max_explorer_insets', ins.get('explorer_insets')),
+                     ('max_explorer_rows', ins.get('explorer_rows'))):
+            if v:
+                txt = re.sub(r'(?m)^%s = .*$' % k, '%s = %s' % (k, v), txt)
+        note = ('# the maximised plates of this style have the normal plate\'s layout: max_insets, max_explorer_insets and\n'
+                '# max_explorer_rows are the normal and Explorer plates\' values\n')
+    head = ('# luxwm frame set made by lhde-import (recipe composited %s %s) from styles/%s.msstyles\' CompositedWindow streams.\n'
+            '# The geometry is the %s frame set\'s (frames/%s/theme.ini, its rows fitted to that set\'s style), not measured on\n'
+            '# this style: lhde-import --regenerate writes it again\n' % (style, geo, style, geo, geo)) + note
+    open(os.path.join(out, 'theme.ini'), 'w').write(head + txt)
+    return [style_rel(data, style)], n, {'geometry': 'frames/%s/theme.ini (the %s set\'s, not measured on this style)' % (geo, geo)}
 
 
 def r_frames_vision(data, target, args):
@@ -1461,9 +1498,11 @@ def run_recipe(data, kind, target, spec, origin, force=False):
     mdir = os.path.join(data, kind) if kind == 'aurora' else os.path.join(data, kind, tdir)
     mname = 'manifest.ini' if kind == 'frames' else 'manifest-%s.ini' % target.replace('/', '-')
     try:
-        ins, n = fn(data, tdir, args)
+        res = fn(data, tdir, args)
+        ins, n = res[0], res[1]
         os.makedirs(mdir, exist_ok=True)
-        write_manifest(mdir, recipe, ' '.join(args), [(r, sha256(os.path.join(data, r))) for r in ins], n, data)
+        write_manifest(mdir, recipe, ' '.join(args), [(r, sha256(os.path.join(data, r))) for r in ins], n, data,
+                       res[2] if len(res) > 2 else None)
         if mname != 'manifest.ini':
             os.replace(os.path.join(mdir, 'manifest.ini'), os.path.join(mdir, mname))
         log('  %s/%s: %s %s -> %d file%s' % (kind, target, recipe, ' '.join(args), n, '' if n == 1 else 's'))
@@ -1489,15 +1528,37 @@ def regenerate(W, force=True):
         if p:
             run_recipes(W, sid, read_ini(p), True)
             n += 1
-    for name, recipes in STYLE_RECIPES.items():
-        if os.path.isfile(os.path.join(W, 'local', 'themes', name + '.msstyles')):
-            for kind, target, spec in recipes:
-                run_recipe(os.path.join(W, 'index'), kind, target, spec, 'style', True)
+    for f in sorted(glob.glob(os.path.join(W, 'local', 'themes', '*.msstyles'))):
+        for kind, target, spec in style_recipes(W, os.path.basename(f)[:-9]):
+            run_recipe(os.path.join(W, 'index'), kind, target, spec, 'style', True)
     lhdetree.reindex(W)
     lhdetree.annotate_tree(W)
     log('regenerated %s from %d sources' % (os.path.join(W, 'generated'), n))
 
 
-# the recipes a style dropped in by hand feeds (lhde-import --style NAME; regenerate): kind, target, spec. realaero is Lucas
-# Brooks' RealAero (lhdetree.REALAERO: its releases; once called aero-patch, lhdetree.STYLE_RENAMED)
+# the recipes a style dropped in by hand feeds (lhde-import --style NAME, --styles; regenerate): kind, target, spec. realaero is
+# Lucas Brooks' RealAero (lhdetree.AERO_PATCHES: its releases; once called aero-patch, lhdetree.STYLE_RENAMED), the one style
+# whose frame sets ship (share/frames/realaero, aerovision); every other style with 4074's CompositedWindow parts (an Aero patch
+# under its own name: twiwmtb-aero, ...) gets style_recipes' frame set of its name
 STYLE_RECIPES = {'realaero': [('frames', 'realaero', 'composited realaero'), ('frames', 'aerovision', 'vision realaero')]}
+
+
+def style_recipes(W, name):
+    """the recipes of the style local/themes/NAME.msstyles: STYLE_RECIPES', else, for a style with 4074's CompositedWindow
+    class, the frame set frames/NAME from its streams with the realaero set's geometry (composited NAME realaero); none when
+    the index's styles/NAME is another file (a source's style) or frames/NAME is a shipped set or another recipe's"""
+    import lhdetree
+    if name in STYLE_RECIPES:
+        return STYLE_RECIPES[name]
+    f = os.path.join(W, 'local', 'themes', name + '.msstyles')
+    ix = os.path.join(W, 'index', 'styles', name + '.msstyles')
+    if not lhdetree.has_composited(f) or (os.path.lexists(ix) and os.path.realpath(ix) != os.path.realpath(f)):
+        return []
+    if any(os.path.isdir(os.path.join(d, 'frames', name)) for d in shipped_data_dirs()):
+        return []
+    m = os.path.join(W, 'generated', 'frames', name, 'manifest.ini')
+    if os.path.isfile(m):
+        ini = read_ini(m)
+        if ini.get('recipe', 'kind', fallback='') != 'composited' or ini.get('recipe', 'args', fallback='').split()[:1] != [name]:
+            return []
+    return [('frames', name, 'composited %s realaero' % name)]

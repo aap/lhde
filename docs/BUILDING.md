@@ -104,8 +104,8 @@ header (the step-2 `LUXNAV_DIR` hook and build/compat are gone).
 
 `tests/check.sh` runs what needs no Microsoft files: kerneltest (the shim's
 kernel/CRT/registry/resource/usp10 parts), gditest, fileops_test, `tests/settings-lists.sh` (Display Properties' Desktop
-lists without a window: the backgrounds' order and selection, the icon sets), `tests/aero-patches.py` (lhde-import's table of
-Aero patches, on stand-in files), and the
+lists without a window: the backgrounds' order and selection, the icon sets), `tests/aero-patches.py` (lhde-import's table of Aero
+patches and which styles get a frame set, on stand-in files), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
 incl. GTK, the file dialog in both looks, the modifier keys across a focus change) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when

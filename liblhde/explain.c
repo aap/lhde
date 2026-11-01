@@ -129,6 +129,9 @@ static void manifest(struct row *r, const char *path, const char *label)
     struct kv x; x.buf[0] = 0;
     lhde_ini_keys(m, "inputs", input_one, &x);
     more(r, "%s: recipe %s %s (%s) <- %s", label, kind, args, when, x.buf[0] ? x.buf : "?");
+    char geo[300] = "";   /* a frame set whose theme.ini is another set's (an Aero patch's: realaero's geometry) */
+    lhde_ini_get(m, "recipe", "geometry", geo, sizeof geo);
+    if (geo[0]) more(r, "geometry: %s", geo);
     lhde_ini_keys(m, "about", about_one, r);
     lhde_ini_free(m);
 }

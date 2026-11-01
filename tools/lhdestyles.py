@@ -457,7 +457,7 @@ def report(s, rows, W, top, force, recipes, dry):
             T.reindex(W)
             if recipes:
                 for x in rows['import'] + rows['again']:
-                    for kind, target, spec in L.STYLE_RECIPES.get(x['name'], []):
+                    for kind, target, spec in L.style_recipes(W, x['name']):
                         L.run_recipe(os.path.join(W, 'index'), kind, target, spec, 'style', force)
             T.annotate_tree(W)
         with open(os.path.join(W, 'import.log'), 'a') as f:

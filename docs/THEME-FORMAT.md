@@ -166,11 +166,12 @@ complete. The lists ask `lhde_theme_has_style(NAME)` (the files only, without th
 | --- | --- | --- | --- | --- | --- | --- |
 | v3 (XP format) | xp | none | classic | - | none | xp |
 | v4 with CompositedWindow, 4051 | longhorn | 4051 | avalon if `<build>-<family>` exists, else classic | `4051-slate` | none | longhorn4074 |
-| v4 with CompositedWindow, 4074 | longhorn | 4074 | as above | `4074-slate` or `4074-aero` by family (slate -> slate, jade/aero -> aero) | the frame set named like the style, else none | longhorn4074 |
+| v4 with CompositedWindow, 4074 | longhorn | 4074 | as above | `4074-slate` or `4074-aero` by family (slate -> slate, jade/aero -> aero) | the frame set named like the style (an Aero patch dropped in under its own name: the one lhde-import makes, docs/USAGE.md "The Aero patches for 4074"), else none | longhorn4074 |
 | v4 with DWMWindow/uDWM (5048, 5112) | longhorn | vision (aap: Vista falls back to luxnav with the patched aero resources) | classic | - | the frame set named like the style | longhorn4074 |
 | classic | xp | none | classic | - | none | xp |
 `composition` defaults to `auto`, `animations` to the build's own, fonts and resources
-to the build.
+to the build. The build is the style's build-qualified name's (`jade4074`); a v4 style named without one that has
+CompositedWindow (`twiwmtb-aero`) is 4074's, the one build whose styles have that class.
 
 ## 6. Fallbacks (never fail, look plainer, report it)
 frames missing or no compositor -> `frames_classic`, else the style's decorations; pack missing ->
