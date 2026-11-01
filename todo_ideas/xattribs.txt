@@ -11,6 +11,11 @@ Future: synchronize local metadata catalog with local and remote filesystems
 
 For existing xattr tooling see ~/src/luxfs [note: perhaps move into lhde? or separate repo...]
 
-Initial features for flxp:
-* not necessarily tag-filtering in the first version yet
-* not necessarily tied into the task pane yet
+Phase 1 is in (columns, the 4051 band's editable rows with invitations, the infotip, Edit Description / Add Tag / Remove
+Tag; docs/USAGE.md "Descriptions and tags"). Next phases (todo_ideas/XATTR-DESIGN_CLAUDE.md sections 3-4):
+* per-folder column memory as XP had it (columns are remembered globally now); the band editing a multiple selection
+* the invitation colour in the 4051 band and the Choose Details dialog's layout are unmeasured choices
+* "Filter by" over tags and descriptions in the left pane; saved filters later; an index only if walking xattrs gets slow
+* tasks as data (a task table with experiences and per-selection names; the research's TASKS-SUMMARY)
+* the property registry's defaults in a shipped data file with user overrides (the shape is there, no loading yet)
+* luxfs: move into lhde or keep separate

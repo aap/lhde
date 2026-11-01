@@ -30,12 +30,9 @@
 * copy/move: Cancel rolls the current top-level item back (a folder copied half-way is removed again); XP keeps
 	what was copied. fileops' choice (all or nothing per item), kept for now
 
-* see xatttribs.txt idea
-
 ### details and task pane
 
-* also for longhorn flxp, but more complicated:
-	* 4074: (I) icon in the top right to flip between details and "tasks" (but no winfs?)
+* 4074's (i) icon in the band's top right to flip between details and tasks (4051 is the target; undecided)
 
 ## misc
 

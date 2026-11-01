@@ -6,3 +6,14 @@
 
 * docs still carrying dated journal sections under current headings: SETTINGS.md, CLIENT-PROTOCOL.md, SHELL-DESIGN.md, NAVBAR.md
 	(docs/README.md names them); one pass each that keeps the description and drops the diary
+
+## before the first push
+* a LICENSE for our own code (the vendored Wine code is LGPL with its MANIFEST and patches; ReactOS is only imported, never
+	vendored); the licence of the xattr/ReactOS/icon-pack material we read is theirs
+* a README for the public: what lhde is, the screenshots question (none of Microsoft art in the repo: link or describe),
+	how to get the resources (the three install targets), what works without Microsoft files
+* check the tree for Microsoft-derived data beyond recipes and numbers: examples/aurora_data.h holds the aurora's numbers
+	extracted from jade.msstyles' STREAM 481 (a recipe by the asset policy's letter, but decide); wux/rc/*.res and
+	wux/w32/stdres.res are built from Wine's sources (fine); no .msstyles, .dll, fonts, wallpapers, bitmaps or screenshots
+	(grep the history too: the repo started fresh, so only the tree matters)
+* the agents' worktrees and .claude/ are untracked; .gitignore covers build/, packs and pycache; add .claude/
