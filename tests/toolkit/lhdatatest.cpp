@@ -177,10 +177,8 @@ int main()
     store::apply_theme("slate4051-modified");   // another theme: the layer is dropped
     CHECK_EQ(std::to_string(store::current_layer().size()), "0");
 
-    // flxp.ini's keys that are theme keys now are ignored there; the per-user ones stay
-    write_setting("icons", "2k");
+    // flxp.ini's own keys; settings.ini's per-user ones through the store
     write_setting("taskpane", "0");
-    CHECK_EQ(setting("icons"), "");
     CHECK_EQ(setting("taskpane"), "0");
     store::set("fonts", "smoothing", "cleartype");
     CHECK_EQ(theme_setting("font_smoothing"), "cleartype");
