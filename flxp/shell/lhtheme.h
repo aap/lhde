@@ -57,7 +57,6 @@ void set_session_theme(const SessionTheme& t);
 //   icons              Desktop.icons (longhorn4074 -> longhorn while flxp's res/icons has no file of that name)
 //   frame              Explorer.chrome (auto | xp | longhorn; navbar none -> xp)
 //   taskbar_kind       Shell.taskbar
-//   start_menu         flxp.ini's start_menu (panel | classic: the user's)
 //   longhorn_system32  flxp.ini, else path.resources when it is a Longhorn build's (resources/NNNN)
 //   menubar_style      flxp.ini, else document for chrome = longhorn
 //   header_engine      flxp.ini, else Explorer.navbar: vision -> lhnav, 4051 | 4074 -> flxp

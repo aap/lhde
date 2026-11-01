@@ -2427,13 +2427,6 @@ int main(int argc, char** argv)
         else if (a.size() > 1 && a[0] == '-') { fprintf(stderr, "flxp: unknown option %s\n", a.c_str()); usage(stderr); return 2; }
         else args.push_back(a);
     }
-    // legacy test form: explorer DIR QUIT_MS
-    struct stat st0;
-    if (args.size() == 2 && stat(args[1].c_str(), &st0) != 0 && !args[1].empty() && strspn(args[1].c_str(), "0123456789") == args[1].size()) {
-        quit_ms = atoi(args[1].c_str());
-        args.pop_back();
-    }
-
     if (shell::write_settings_template() && !info)
         fprintf(stderr, "flxp: wrote %s (every setting, empty = automatic)\n", shell::settings_path().c_str());
 

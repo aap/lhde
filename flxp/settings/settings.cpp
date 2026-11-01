@@ -195,7 +195,7 @@ std::string source_text(const std::string& key)
     }
     if (why.compare(0, 7, "default") == 0) return "The style's default";
     if (why.compare(0, 9, "fallback:") == 0) return "Fallback:" + why.substr(9);
-    if (why.compare(0, 9, "settings:") == 0) return "A legacy settings.ini override";
+    if (why.compare(0, 9, "settings:") == 0) return "Switched off for every theme (Show the wallpaper)";
     if (why.compare(0, 7, "scheme ") == 0) return "From the scheme";
     return why;
 }

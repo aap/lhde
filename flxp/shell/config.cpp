@@ -75,18 +75,6 @@ static std::string store_or(const std::string& key, const std::string& fallback)
     return v.empty() ? fallback : v;
 }
 
-// flxp.ini keys that duplicated theme keys (docs/THEME-FORMAT.md: the theme decides, Display Properties writes
-// NAME-modified.theme): ignored in flxp.ini, with one note per key and process. FLXP_<KEY> (a run's option) still counts.
-static const char* retired_key(const std::string& key)
-{
-    static const char* const keys[][2] = {
-        { "icons", "Desktop.icons" }, { "frame", "Explorer.chrome" }, { "taskbar_kind", "Shell.taskbar" },
-        { "wallpaper", "Desktop.wallpaper" }, { "wallpaper_mode", "Desktop.mode" }, { "themes_ini", "the theme files" },
-    };
-    for (auto& k : keys) if (key == k[0]) return k[1];
-    return nullptr;
-}
-
 std::string file_setting(const std::string& key, const std::string& fallback)
 {
     std::string text;
@@ -102,15 +90,6 @@ std::string file_setting(const std::string& key, const std::string& fallback)
         if (eq == std::string::npos) continue;
         if (trim(line.substr(0, eq)) == key) {
             std::string v = trim(line.substr(eq + 1));
-            if (const char* now = retired_key(key)) {
-                static std::string noted;
-                if (!v.empty() && noted.find(" " + key + " ") == std::string::npos) {
-                    noted += " " + key + " ";
-                    fprintf(stderr, "flxp: %s's %s = %s is ignored: the theme's %s decides (Display Properties)\n",
-                            settings_path().c_str(), key.c_str(), v.c_str(), now);
-                }
-                return store_or(key, fallback);
-            }
             return v.empty() ? store_or(key, fallback) : v;   // "key =" means automatic
         }
     }

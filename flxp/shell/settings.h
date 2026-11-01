@@ -46,7 +46,7 @@ bool set_shared(const std::vector<Edit>& edits);
 
 // settings.ini's value for a flxp.ini key, the per-user ones only: font_smoothing ([fonts] smoothing),
 // pinned ([start] pinned). "" if not mapped or not set. The theme keys (icons, frame, taskbar_kind,
-// start_menu, wallpaper) are the theme's: shell::theme_setting, the session theme's record.
+// wallpaper) are the theme's: shell::theme_setting, the session theme's record.
 std::string value_for(const std::string& flxp_key);
 // the (section, key) a flxp key maps to; false if none
 bool mapping(const std::string& flxp_key, std::string& section, std::string& key);

@@ -527,7 +527,7 @@ void paint_start(HWND hwnd, HDC hdc)
     if (owned) DeleteObject(f);
 }
 
-std::string start_menu_mode() { return setting("start_menu", "panel"); }   // panel, classic (own)
+std::string start_menu_mode() { return setting("start_menu", "panel"); }   // panel, classic
 
 // Our menu is the display's start menu: own _LH_STARTMENU_S<screen> so that luxshell forwards its Avalon Start button and
 // the Super key to us
@@ -550,7 +550,7 @@ void open_start_menu(const RECT* anchor = nullptr)
     }
     std::string mode = start_menu_mode();
     // both publish _LH_STARTMENU_OPEN while they are up (xwm::set_start_menu_open)
-    if (mode == "classic" || mode == "own") startmenu::show(anchor ? *anchor : r, anchor != nullptr);
+    if (mode == "classic") startmenu::show(anchor ? *anchor : r, anchor != nullptr);
     else startpanel::show(anchor ? *anchor : r, anchor != nullptr);
     start_down = false;
     start_hot = false;
