@@ -5,6 +5,7 @@ the design journals of the merge and before are in `history/` (kept unchanged, n
 
 | file | what |
 | --- | --- |
+| `BUILDING.md` | building, installing and running: the prerequisites (one command for Void), what `make` builds and installs, the sessions, the settings that reach the Windows files |
 | `ARCHITECTURE.md` | the map: the components, what runs in a session, how they talk, where to look first |
 | `LAYOUT.md` | the files on disk: the asset policy and the three trees (program files, the Windows tree, the user's) |
 | `THEME-FORMAT.md` | the theme files: components, the file, inheritance, the resolver, defaults, fallbacks, the shipped themes |

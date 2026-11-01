@@ -1,7 +1,7 @@
 # lhde
 
 The Longhorn desktop environment: a Windows XP / Longhorn-era desktop for X11. Read docs/ARCHITECTURE.md first (the map),
-then README.md (build, install, run). docs/README.md lists every document.
+then docs/BUILDING.md (build, install, run). docs/README.md lists every document.
 
 ## Rules
 
