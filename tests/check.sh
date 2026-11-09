@@ -4,7 +4,8 @@
 # failures. Tests that need assets skip when these are absent:
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
-#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh and luxattr.sh getfattr and setfattr); displays :71-:73,
+#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh and luxattr.sh getfattr and setfattr, filter.sh setfattr
+#                and the jade4074 style); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
 fails=0
@@ -37,6 +38,9 @@ result "viewmodeltest ($(tail -n 1 "$T/viewmodel.log"))" $? "$T/viewmodel.log"
 # the details model (shell/details.h): XP's Details lines, 4051's band values
 build/tests/detailstest > "$T/details.log" 2>&1
 result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"
+# the Details columns' layout (shell/columns.h) and the per-folder records of flxp-views, on a scratch state directory
+build/tests/columnstest > "$T/columns.log" 2>&1
+result "columnstest ($(tail -n 1 "$T/columns.log"))" $? "$T/columns.log"
 # lhde-import's overwrite policy (kept without --force, written with it) on a scratch tree and a stand-in file
 tests/import-policy.sh > "$T/import.log" 2>&1
 result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"
@@ -79,6 +83,8 @@ else
     tests/headless/lvtiles.sh "$2" > "$T/lvtiles.log" 2>&1; result "headless/lvtiles.sh ($(tail -n 1 "$T/lvtiles.log"))" $? "$T/lvtiles.log"
     tests/headless/modkeys.sh "$1" > "$T/modkeys.log" 2>&1; result headless/modkeys.sh $? "$T/modkeys.log"
     tests/headless/filedlg.sh "$3" > "$T/filedlg.log" 2>&1; result headless/filedlg.sh $? "$T/filedlg.log"
+    tests/headless/filter.sh "$2" > "$T/filter.log" 2>&1; rc=$?
+    result "headless/filter.sh$(grep -m1 '^skip' "$T/filter.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/filter.log"
     tests/headless/luxshot.sh "$1" > "$T/luxshot.log" 2>&1; rc=$?
     result "headless/luxshot.sh$(grep -m1 '^skip' "$T/luxshot.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxshot.log"
     tests/headless/luxattr.sh "$2" > "$T/luxattr.log" 2>&1; rc=$?

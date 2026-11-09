@@ -28,7 +28,9 @@ Two directories, one rule each. liblhde gives every path (`lhde_config_file`, `l
 | `luxshell-mfu.ini` | launch counts (`[mfu]` desktop id = count last-launch-epoch) |
 | `luxshell-notifications` | the notification history (tab-separated, newest last, at most 100) |
 | `luxshell-icons/<size>/` | icons converted to square PNGs (ImageMagick) |
-| `flxp-views`, `flxp-view-sizes`, `flxp-columns` | the view remembered per folder, the size each view had last, the Details columns |
+| `flxp-views` | per folder, one line: `PATH<tab>VIEW` (`icons@48`, `details`, `tiles@48+nonames`, ...), and `<tab>columns=LAYOUT` when the folder's Details columns differ from the default (VIEW may then be empty) |
+| `flxp-columns` | the default Details columns, one LAYOUT: every column in order, a hidden one with `-`, each with its width (`name:180 size:96 type:120 modified:120 -description:180 tags:120 -comment:150`); a column it does not name is hidden |
+| `flxp-view-sizes` | the size each view had last |
 | `flxp-desktop-positions` | the desktop's icon positions |
 | `flxp-mfu`, `flxp-run-history` | the start panel's launch counts, the Run box's history |
 

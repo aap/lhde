@@ -107,6 +107,26 @@ bool remove_tag(const std::string& path, const std::string& tag, std::string* er
 // Description, Tags and Comment when set (from it.xattrs, read when empty)
 std::string infotip(const Item& it);
 
+// ---- the Filter box ------------------------------------------------------------------
+// What the Longhorn hosts' "Filter by" box (and the header's search box) keep of
+// the folder: the items every word of the text matches, each word anywhere in the
+// name, the description, a tag or the comment, as a part of the value, ASCII case
+// ignored ("red" finds "Red sunset.png" and the tag "reddish"). A word written
+// field:text looks at that field only: tag: (also tags:), desc: (description:),
+// comment:, name:; a field with nothing after it matches the items where that
+// field is set ("tag:" keeps the tagged ones). Double quotes make one word of
+// several ("a red", tag:"to do"). A word with another prefix ("http:") is a
+// plain word. Words are separated by spaces; an empty text is no filter.
+struct Filter {
+    enum Field { Any, Name, Desc, Tags, Comment };
+    struct Word { Field field = Any; std::string text; };   // text in lower case
+    std::vector<Word> words;
+    bool empty() const { return words.empty(); }
+    bool stored() const;                // a word looks at the stored properties (they must be read)
+};
+Filter parse_filter(const std::string& text);
+bool filter_matches(const Filter& f, const Item& it);   // the stored properties from it.xattrs (read_stored)
+
 // What the file system says about an item beyond shell::Item (probe() reads it)
 struct Facts {
     enum Kind { Other, Picture, Audio, Drive, System } kind = Other;

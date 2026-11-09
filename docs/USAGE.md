@@ -610,8 +610,8 @@ Details, Ctrl+2 Tiles, Ctrl+3, 4, 5 Large, Medium, Small Icons (4074's five slid
 Ctrl+plus, Ctrl+minus, Ctrl+wheel and View > Zoom make the view shown a step bigger or smaller within its range (4051's levels 16
 21 27 36 48 64 84 111 147 194 256 and the range's ends). Each of the five stops remembers the size it was last shown at, and
 "Icons" is the icon stop used last, so going back to a view brings its size back; the sizes are kept for every window in
-`~/.local/state/lhde/flxp-view-sizes`. Every folder keeps its own view, size and Hide File Names in `flxp-views` beside it
-(`remember_views`, Tools > Folder Options); a folder never opened gets `default_view_longhorn` (Icons at 48 px unless Folder
+`~/.local/state/lhde/flxp-view-sizes`. Every folder keeps its own view, size and Hide File Names (and its Details columns, "Descriptions
+and tags") in `flxp-views` beside it (`remember_views`, Tools > Folder Options); a folder never opened gets `default_view_longhorn` (Icons at 48 px unless Folder
 Options says otherwise).
 
 The breadcrumb names your home folder "Home" (Home > Documents), as the namespace places it under the Desktop. Folder Options'
@@ -712,9 +712,17 @@ Description, Add Tag, Remove Tag and the task band's editor change nothing and s
 Where they show:
 - **Details view columns.** Right-click the column header for a check per column (Name, Size, Type, Date Modified, Description,
   Tags, Comment) and More..., or View > Choose Details... (XP's dialog: check, Move Up / Move Down, Show / Hide, the selected
-  column's width). A click on a column header sorts by it (files without a value first). The columns, their order and widths
-  are remembered in `~/.local/state/lhde/flxp-columns`; the attributes are only read while one of their columns is shown or
-  sorted by.
+  column's width); drag a column header to move the column. A click on a column header sorts by it (files without a value first).
+  As in XP every column keeps its place in the order and its width whether it is shown or not: hiding one takes it out, showing
+  it again puts it back where it was, at its width, and nothing else moves. Choose Details lists the columns in that order, the
+  hidden ones at their places, so Move Up / Move Down also place a hidden one. Name is always shown. The attributes are only read
+  while one of their columns is shown or sorted by (or the filter looks at them).
+- **Columns per folder.** As XP's view state, each folder keeps its own columns: what you change in one folder (the set, the
+  order, the widths) stays with that folder, in its line of `~/.local/state/lhde/flxp-views` beside its view (only when it
+  differs from the default); a folder of its own gets the default, `~/.local/state/lhde/flxp-columns`. Tools > Folder Options'
+  Apply to All Folders makes the current folder's columns the default and forgets every folder's own, Reset All Folders goes
+  back to XP's four (Name, Size, Type, Date Modified) and forgets them too. With "Remember each folder's view settings" off
+  (`remember_views = 0`) the columns are one set for every folder, kept in `flxp-columns`.
 - **The infotip.** Resting the pointer on an item shows XP's tip: Type, Date Modified and Size, then Description, Tags and
   Comment when they are set.
 - **The panes.** XP's Details rollout lists them when set (read-only, as XP's did); 4051's task band shows them for one item,
@@ -741,6 +749,17 @@ How to edit:
 - **The task band:** click a value or its invitation, type, Enter (or click elsewhere) keeps it, Escape drops it.
 - From a terminal: `x desc FILE "text"`, `x +tag FILE a b`, `lsx -t DIR` (luxfs), or `setfattr` / `getfattr`. The Explorer
   follows a change made elsewhere (inotify reports attribute changes).
+
+**Filtering.** The Longhorn frame's "Filter by" box at the top of the left pane (4074's) and the header's
+search box keep the list to the items that match what is typed, narrowing it in place at every key (the view and the sort stay).
+Each word, separated by spaces, must match somewhere: in the name, the description, a tag or the comment, as a part of the value,
+ASCII upper and lower case alike (`red work` finds a file tagged `red,work` and one named `redwork.txt` whose comment says "work"). A
+word can name the field it looks in: `tag:x` (or `tags:`) a tag containing x, `desc:x` (`description:`), `comment:x`, `name:x`;
+the field alone (`tag:`) keeps the items where it is set. Double quotes make one word of several (`desc:"red sunset"`); any
+other `word:` is a plain word. While a filter is on the status bar says "N of M items". Escape in the box empties it and the
+whole folder shows again; Enter goes back to the list keeping the filter; another folder starts unfiltered. The filter belongs to
+the window and is not remembered. The attributes are read once per folder when a word needs them (or a column shows them) and
+follow changes on disk.
 
 They travel with the file where its attributes travel: a move on the same file system, flxp's own copy and move (also across
 file systems), `cp -a` (or `--preserve=xattr`), `rsync -X`, `tar --xattrs`. They do not travel with `cp` without `-a`, most

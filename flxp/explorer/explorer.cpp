@@ -591,7 +591,9 @@ static void update_status()
             else if (const shell::App* a = shell::default_app(mime)) text += "   Opens with: " + a->name;
         }
     } else {
-        snprintf(buf, sizeof buf, "%d object%s", (int)g.items.size(), g.items.size() == 1 ? "" : "s");
+        // the filter on: how many of the folder's items it leaves (the Filter box's own wording, ours)
+        if (!g.filter.empty()) snprintf(buf, sizeof buf, "%d of %d items", (int)g.items.size(), browser::unfiltered_count(g));
+        else snprintf(buf, sizeof buf, "%d object%s", (int)g.items.size(), g.items.size() == 1 ? "" : "s");
         text = buf;
         for (const Item& it : g.items) if (!it.is_folder()) bytes += it.size;
     }
@@ -1818,12 +1820,14 @@ static void fo_apply_all(dialogs::FolderOptions& o)
     int v = o.current_view;
     browser::views::set_default(g.zoomable, v == browser::views::builtin_default(g.zoomable) ? -1 : v);
     browser::views::forget_all();
+    browser::columns_apply_all(g);   // the Details columns too (XP's view state holds both)
 }
 
 static void fo_reset_all(dialogs::FolderOptions&)
 {
     browser::views::set_default(g.zoomable, -1);
     browser::views::forget_all();
+    browser::columns_reset_all(g);
 }
 
 static void fo_applied(dialogs::FolderOptions& o)
@@ -1871,7 +1875,7 @@ static void on_command(int id)
         if (g.header) header::open_search();
         break;
     case ID_FILTER_CLEAR:
-        if (!g.filter.empty()) { header::clear_filter(); g.filter.clear(); apply_filter(); }
+        if (!g.filter.empty()) { header::clear_filter(); places::clear_filter(); browser::set_filter(g, ""); }
         break;
     case ID_DETAILS_TOGGLE: on_command(ID_VIEW_PREVIEW); break;   // the 4051 bar's preview pane button
     case ID_STOP: thumbview::stop(); lhtool::changed(); break;
@@ -2086,7 +2090,7 @@ static void set_frame_mode(bool lh)
         g_viewstrip = nullptr;
         header::destroy();
         g.header = nullptr;
-        if (!g.filter.empty()) { g.filter.clear(); apply_filter(); }
+        if (!g.filter.empty()) browser::set_filter(g, "");
         browser::unextend_frame(frame);                 // luxwm's own caption with title and icon again
         SendMessageW(g.rebar, RB_SHOWBAND, (WPARAM)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_TOOLBAR, 0), TRUE);
         SendMessageW(g.rebar, RB_SHOWBAND, (WPARAM)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_ADDRESS, 0), TRUE);

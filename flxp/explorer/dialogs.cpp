@@ -653,15 +653,19 @@ static void fill(HWND dlg, int select)
     g_filling = false;
 }
 
+static bool is_name(int i) { return i >= 0 && (size_t)i < cols->size() && (*cols)[(size_t)i].id == 0; }
+
 static void sync(HWND dlg)
 {
     int i = current(dlg);
     bool sel = i >= 0;
-    // Name stays first and shown (XP's is greyed)
-    EnableWindow(GetDlgItem(dlg, IDC_CDT_UP), i > 1);
-    EnableWindow(GetDlgItem(dlg, IDC_CDT_DOWN), i > 0 && i + 1 < (int)cols->size());
-    EnableWindow(GetDlgItem(dlg, IDC_CDT_SHOW), i > 0 && !(*cols)[(size_t)i].shown);
-    EnableWindow(GetDlgItem(dlg, IDC_CDT_HIDE), i > 0 && (*cols)[(size_t)i].shown);
+    // Name stays shown (XP's check is greyed) and where it is (a header drag moves it);
+    // the others move past it and past the hidden ones, which keep their places
+    bool name = sel && is_name(i);
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_UP), sel && !name && i > 0);
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_DOWN), sel && !name && i + 1 < (int)cols->size());
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_SHOW), sel && !name && !(*cols)[(size_t)i].shown);
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_HIDE), sel && !name && (*cols)[(size_t)i].shown);
     EnableWindow(GetDlgItem(dlg, IDC_CDT_WIDTH), sel);
     g_filling = true;
     set_text(dlg, IDC_CDT_WIDTH, sel ? std::to_string((*cols)[(size_t)i].width) : "");
@@ -670,7 +674,7 @@ static void sync(HWND dlg)
 
 static void show(HWND dlg, int i, bool on)
 {
-    if (i <= 0 || i >= (int)cols->size()) return;
+    if (i < 0 || i >= (int)cols->size() || is_name(i)) return;
     (*cols)[(size_t)i].shown = on;
     g_filling = true;
     set_check(GetDlgItem(dlg, IDC_CDT_LIST), i, on);
@@ -698,7 +702,7 @@ static INT_PTR CALLBACK proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         NMLISTVIEW* lv = (NMLISTVIEW*)nm;
         if ((lv->uChanged & LVIF_STATE) && ((lv->uNewState ^ lv->uOldState) & LVIS_STATEIMAGEMASK) && lv->iItem >= 0) {
             bool on = get_check(nm->hwndFrom, lv->iItem);
-            if (lv->iItem == 0 && !on) { g_filling = true; set_check(nm->hwndFrom, 0, TRUE); g_filling = false; }
+            if (is_name(lv->iItem) && !on) { g_filling = true; set_check(nm->hwndFrom, lv->iItem, TRUE); g_filling = false; }
             else if ((size_t)lv->iItem < cols->size()) (*cols)[(size_t)lv->iItem].shown = on;
         }
         sync(dlg);
@@ -708,10 +712,10 @@ static INT_PTR CALLBACK proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         int i = current(dlg);
         switch (LOWORD(wp)) {
         case IDC_CDT_UP:
-            if (i > 1) { std::swap((*cols)[(size_t)i], (*cols)[(size_t)i - 1]); fill(dlg, i - 1); sync(dlg); }
+            if (i > 0 && !is_name(i)) { std::swap((*cols)[(size_t)i], (*cols)[(size_t)i - 1]); fill(dlg, i - 1); sync(dlg); }
             return TRUE;
         case IDC_CDT_DOWN:
-            if (i > 0 && i + 1 < (int)cols->size()) { std::swap((*cols)[(size_t)i], (*cols)[(size_t)i + 1]); fill(dlg, i + 1); sync(dlg); }
+            if (i >= 0 && !is_name(i) && i + 1 < (int)cols->size()) { std::swap((*cols)[(size_t)i], (*cols)[(size_t)i + 1]); fill(dlg, i + 1); sync(dlg); }
             return TRUE;
         case IDC_CDT_SHOW: show(dlg, i, true); return TRUE;
         case IDC_CDT_HIDE: show(dlg, i, false); return TRUE;

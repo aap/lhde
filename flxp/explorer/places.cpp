@@ -1055,7 +1055,9 @@ static void scroll_to(int pos)
     InvalidateRect(g_wnd, nullptr, FALSE);
 }
 
-// the Longhorn Filter box
+// the Longhorn Filter box: every change of its text goes to the host as typed
+// (browser::set_filter: the list narrowed in place); Escape empties it (the whole
+// folder again), Enter goes back to the list keeping the filter
 static WNDPROC g_filter_old;
 
 static LRESULT CALLBACK filter_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)

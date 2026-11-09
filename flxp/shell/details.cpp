@@ -485,6 +485,79 @@ std::string tag_list(const std::string& v)
     return out;
 }
 
+// ---- the Filter box ----------------------------------------------------------------
+
+static std::string ascii_lower(std::string s)
+{
+    for (char& c : s) if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+    return s;
+}
+
+bool Filter::stored() const
+{
+    for (const Word& w : words) if (w.field != Name) return true;
+    return false;
+}
+
+Filter parse_filter(const std::string& text)
+{
+    static const struct { const char* prefix; Filter::Field field; } FIELDS[] = {
+        { "tag:", Filter::Tags }, { "tags:", Filter::Tags }, { "desc:", Filter::Desc }, { "description:", Filter::Desc },
+        { "comment:", Filter::Comment }, { "name:", Filter::Name },
+    };
+    Filter f;
+    size_t i = 0, n = text.size();
+    while (i < n) {
+        while (i < n && (text[i] == ' ' || text[i] == '\t')) i++;
+        if (i >= n) break;
+        // a word: up to the next space outside double quotes
+        std::string raw;
+        bool quoted = false;
+        for (; i < n && (quoted || (text[i] != ' ' && text[i] != '\t')); i++) {
+            if (text[i] == '"') { quoted = !quoted; continue; }
+            raw += text[i];
+        }
+        Filter::Word w;
+        std::string low = ascii_lower(raw);
+        bool fielded = false;
+        for (const auto& fd : FIELDS) {
+            size_t len = strlen(fd.prefix);
+            if (low.compare(0, len, fd.prefix) == 0) { w.field = fd.field; w.text = low.substr(len); fielded = true; break; }
+        }
+        if (!fielded) w.text = low;
+        if (w.field == Filter::Any && w.text.empty()) continue;   // "" alone: nothing to look for
+        f.words.push_back(w);
+    }
+    return f;
+}
+
+static bool has(const std::string& value, const std::string& word) { return ascii_lower(value).find(word) != std::string::npos; }
+
+static bool word_matches(const Filter::Word& w, const Item& it)
+{
+    static const Property* desc = property("description");
+    static const Property* tags = property("tags");
+    static const Property* comment = property("comment");
+    auto field = [&](Filter::Field f) -> bool {
+        if (f == Filter::Name) return w.text.empty() ? true : has(it.name, w.text);
+        const Property* p = f == Filter::Desc ? desc : f == Filter::Tags ? tags : comment;
+        if (!p) return false;
+        const std::string& v = it.stored(p->xattr);
+        if (w.text.empty()) return !v.empty();
+        if (f != Filter::Tags) return has(v, w.text);
+        for (const std::string& t : split_list(v)) if (has(t, w.text)) return true;   // within one tag, not across the commas
+        return false;
+    };
+    if (w.field != Filter::Any) return field(w.field);
+    return field(Filter::Name) || field(Filter::Desc) || field(Filter::Tags) || field(Filter::Comment);
+}
+
+bool filter_matches(const Filter& f, const Item& it)
+{
+    for (const Filter::Word& w : f.words) if (!word_matches(w, it)) return false;
+    return true;
+}
+
 // ---- the two presentations ----------------------------------------------------------
 
 std::string xp_title(const Info& in) { return in.kind == Kind::Many ? "" : in.name; }

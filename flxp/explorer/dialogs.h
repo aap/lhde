@@ -49,9 +49,9 @@ struct FolderOptions {
 };
 void folder_options(HWND owner, FolderOptions& o);
 
-// XP's Choose Details: the columns in their order, each shown or not and its width;
-// the user checks, moves and sizes them; true on OK (cols changed then). The first
-// one (Name) stays shown and first.
+// XP's Choose Details: the columns in their order (the hidden ones at their places),
+// each shown or not and its width; the user checks, moves and sizes them; true on OK
+// (cols changed then). Name (id 0) stays shown and where it is.
 struct DetailColumn { int id; std::string label; bool shown; int width; };
 bool choose_details(HWND owner, std::vector<DetailColumn>& cols);
 
