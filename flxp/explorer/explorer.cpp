@@ -1820,12 +1820,14 @@ static void fo_apply_all(dialogs::FolderOptions& o)
     int v = o.current_view;
     browser::views::set_default(g.zoomable, v == browser::views::builtin_default(g.zoomable) ? -1 : v);
     browser::views::forget_all();
+    browser::columns_apply_all(g);   // the Details columns too (XP's view state holds both)
 }
 
 static void fo_reset_all(dialogs::FolderOptions&)
 {
     browser::views::set_default(g.zoomable, -1);
     browser::views::forget_all();
+    browser::columns_reset_all(g);
 }
 
 static void fo_applied(dialogs::FolderOptions& o)

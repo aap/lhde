@@ -38,6 +38,9 @@ result "viewmodeltest ($(tail -n 1 "$T/viewmodel.log"))" $? "$T/viewmodel.log"
 # the details model (shell/details.h): XP's Details lines, 4051's band values
 build/tests/detailstest > "$T/details.log" 2>&1
 result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"
+# the Details columns' layout (shell/columns.h) and the per-folder records of flxp-views, on a scratch state directory
+build/tests/columnstest > "$T/columns.log" 2>&1
+result "columnstest ($(tail -n 1 "$T/columns.log"))" $? "$T/columns.log"
 # lhde-import's overwrite policy (kept without --force, written with it) on a scratch tree and a stand-in file
 tests/import-policy.sh > "$T/import.log" 2>&1
 result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"

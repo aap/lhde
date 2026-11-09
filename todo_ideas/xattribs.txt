@@ -13,7 +13,7 @@ For existing xattr tooling see ~/src/luxfs [note: perhaps move into lhde? or sep
 
 Phase 1 is in (columns, the 4051 band's editable rows with invitations, the infotip, Edit Description / Add Tag / Remove
 Tag; docs/USAGE.md "Descriptions and tags"). Next phases (todo_ideas/XATTR-DESIGN_CLAUDE.md sections 3-4):
-* per-folder column memory as XP had it (columns are remembered globally now); the band editing a multiple selection
+* the band editing a multiple selection
 * the invitation colour in the 4051 band and the Choose Details dialog's layout are unmeasured choices
 * saved filters (the Filter box's text kept by name, 4051's "All Photos" queries); an index only if walking xattrs gets slow
 * while a filter is on, 4051's band still says "N items in this folder" for the items shown (the status bar says "N of M items")

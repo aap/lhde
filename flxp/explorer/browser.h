@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include "shell/namespace.h"
+#include "shell/columns.h"
 #include "shell/details.h"
 #include "shell/dirwatch.h"
 #include "shell/viewmodel.h"
@@ -108,11 +109,16 @@ struct Browser {
     bool follow_armed = false;                       // the coalescing timer runs
     std::map<std::string, bool> collapsed;           // groups folded by the user, by title
     std::vector<std::string> group_titles;           // the list's groups as last filled (by id)
-    // the Details columns, by SortBy value (Name first, always), and their widths by id;
-    // choose_columns: the header's right-click menu and Choose Details (the explorer),
-    // remembered in $XDG_STATE_HOME/lhde/flxp-columns
+    // the Details columns: the layout (shell/columns.h: every known column in the user's
+    // order, shown or hidden, with its width) and what the list's columns show by index
+    // (SortBy values, Name first: the item's text; the header shows them in the layout's
+    // order). choose_columns: the header's right-click menu, a drag of the header and
+    // Choose Details change the layout (the explorer); remembered per folder in flxp-views
+    // when it differs from column_default ($XDG_STATE_HOME/lhde/flxp-columns), or, with
+    // remember_views off, as the default
+    shell::columns::Layout column_layout = shell::columns::builtin();
+    shell::columns::Layout column_default = shell::columns::builtin();
     std::vector<int> columns = { 0, 1, 2, 3 };
-    std::map<int, int> column_widths;
     bool choose_columns = false;
     bool infotips = false;                           // XP's infotip over an item (details::infotip)
 
@@ -141,17 +147,21 @@ void attach_list(Browser& b);          // a list the host made itself: the widge
 // Name, Size, Type, Date Modified (derived) and Description, Tags, Comment (the stored
 // properties of shell/details.h, read from the files only while one of them is shown or
 // sorted by); ids are shell::SortBy values. XP's View > Choose Details and the header's
-// right-click menu (a check per column, then More...) choose them.
+// right-click menu (a check per column, then More...) choose them; a column hidden and
+// shown again comes back at its own place with its width; a drag of the header moves one.
 struct Column { int id; const char* label; int width; int fmt; };
 const std::vector<Column>& all_columns();
 const Column* column(int id);
 int column_index(const Browser& b, int id);   // the list's column showing id (-1: not shown)
 int column_id(const Browser& b, int index);   // the id the list's column index shows (Name for none)
-// Name first; the list refilled; remembered (choose_columns). take: the widths the user
-// dragged the columns to are kept first (false: b.column_widths as they are)
-void set_columns(Browser& b, const std::vector<int>& ids, bool take = true);
-void load_columns(Browser& b);                // the remembered set and widths, applied
-void save_columns(Browser& b);                // the set and the widths now
+// The layout applied to the list (Name always shown; the list refilled). user: a change the
+// user made, remembered (choose_columns: for the folder, or as the default)
+void set_layout(Browser& b, const shell::columns::Layout& l, bool user = true);
+void take_layout(Browser& b);                 // the widths and the order the user dragged the header to, into b.column_layout
+void load_columns(Browser& b);                // the default layout (flxp-columns), applied
+void save_columns(Browser& b);                // the layout now: the folder's (flxp-views) or the default
+void columns_apply_all(Browser& b);           // Apply to All Folders: this layout the default, every folder's own forgotten
+void columns_reset_all(Browser& b);           // Reset All Folders: the built-in default, every folder's own forgotten
 bool wants_stored(const Browser& b);          // a stored column shown or sorted by, or the filter looking at them
 void column_menu(Browser& b, HWND owner, int x, int y);   // the header's menu at screen (x, y)
 void choose_details(Browser& b, HWND owner);  // XP's Choose Details dialog
