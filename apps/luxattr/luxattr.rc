@@ -1,0 +1,89 @@
+/* luxattr's property sheet pages, in dialog units for "MS Shell Dlg" 8 (Tahoma 8 under every style). The pages are
+ * 227 x 215, XP's file Properties pages (shell32's General page, docprop's Summary page). General is flxp's Properties
+ * page (flxp/rc/explorer.rc IDD_PROPERTIES, without its Change... button: an application does not reach the Explorer's
+ * Open With dialog). Summary follows XP's Summary page in its two views (the simple one's labelled edits, Advanced >>'s
+ * property list); XP's own coordinates were not measured (no reference screenshot of it), so the metrics are the
+ * resource conventions: a 7-unit margin, 14-unit edits 4 units apart, labels 8 units high centred on them, 50 x 14
+ * buttons in the bottom-right corner.
+ * Build: make apps/luxattr/luxattr.res (mingw windres; the .res is checked in); embedded by luxattr.cpp. */
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
+
+IDD_GENERAL DIALOGEX 0, 0, 227, 215
+STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "General"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            "", IDC_GICON, 7, 7, 21, 20
+    EDITTEXT        IDC_NAME, 53, 11, 167, 12, ES_AUTOHSCROLL | ES_READONLY
+    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 32, 213, 1
+    LTEXT           "Type of file:", IDC_TYPEL, 7, 40, 58, 8
+    LTEXT           "", IDC_TYPE, 70, 40, 150, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    LTEXT           "Opens with:", IDC_OPENSL, 7, 55, 58, 8
+    LTEXT           "", IDC_OPENS, 70, 55, 150, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 72, 213, 1
+    LTEXT           "Location:", -1, 7, 80, 58, 8
+    LTEXT           "", IDC_LOCATION, 70, 80, 150, 8, SS_NOPREFIX | SS_PATHELLIPSIS
+    LTEXT           "Size:", -1, 7, 94, 58, 8
+    LTEXT           "", IDC_GSIZE, 70, 94, 150, 8, SS_NOPREFIX
+    LTEXT           "Contains:", IDC_CONTAINSL, 7, 108, 58, 8
+    LTEXT           "", IDC_CONTAINS, 70, 108, 150, 8, SS_NOPREFIX
+    CONTROL         "", IDC_SEP3, "Static", SS_ETCHEDHORZ, 7, 124, 213, 1
+    LTEXT           "Modified:", IDC_MODIFIEDL, 7, 132, 58, 8
+    LTEXT           "", IDC_MODIFIED, 70, 132, 150, 8, SS_NOPREFIX
+    LTEXT           "Accessed:", IDC_ACCESSEDL, 7, 146, 58, 8
+    LTEXT           "", IDC_ACCESSED, 70, 146, 150, 8, SS_NOPREFIX
+    LTEXT           "Changed:", IDC_CHANGEDL, 7, 160, 58, 8
+    LTEXT           "", IDC_CHANGED, 70, 160, 150, 8, SS_NOPREFIX
+    CONTROL         "", IDC_SEP4, "Static", SS_ETCHEDHORZ, 7, 176, 213, 1
+    LTEXT           "Permissions:", IDC_PERMSL, 7, 184, 58, 8
+    LTEXT           "", IDC_PERMS, 70, 184, 150, 8, SS_NOPREFIX
+    LTEXT           "", IDC_EXTRAL, 7, 198, 58, 8
+    LTEXT           "", IDC_EXTRA, 70, 198, 150, 8, SS_NOPREFIX | SS_PATHELLIPSIS
+END
+
+IDD_SUMMARY DIALOGEX 0, 0, 227, 215
+STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "Summary"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "&Description:", IDC_LABEL0 + 0, 7, 10, 52, 8
+    EDITTEXT        IDC_FIELD0 + 0, 62, 7, 158, 14, ES_AUTOHSCROLL
+    LTEXT           "&Tags:", IDC_LABEL0 + 1, 7, 28, 52, 8
+    EDITTEXT        IDC_FIELD0 + 1, 62, 25, 158, 14, ES_AUTOHSCROLL
+    LTEXT           "Co&mment:", IDC_LABEL0 + 2, 7, 46, 52, 8
+    EDITTEXT        IDC_FIELD0 + 2, 62, 43, 158, 14, ES_AUTOHSCROLL
+    LTEXT           "A&uthor:", IDC_LABEL0 + 3, 7, 64, 52, 8
+    EDITTEXT        IDC_FIELD0 + 3, 62, 61, 158, 14, ES_AUTOHSCROLL
+    LTEXT           "&Source:", IDC_LABEL0 + 4, 7, 82, 52, 8
+    EDITTEXT        IDC_FIELD0 + 4, 62, 79, 158, 14, ES_AUTOHSCROLL
+    LTEXT           "&Build:", IDC_LABEL0 + 5, 7, 100, 52, 8
+    EDITTEXT        IDC_FIELD0 + 5, 62, 97, 158, 14, ES_AUTOHSCROLL
+    LTEXT           "&Notes:", IDC_LABEL0 + 6, 7, 118, 52, 8
+    EDITTEXT        IDC_FIELD0 + 6, 62, 115, 158, 14, ES_AUTOHSCROLL
+    LTEXT           "T&o do:", IDC_LABEL0 + 7, 7, 136, 52, 8
+    EDITTEXT        IDC_FIELD0 + 7, 62, 133, 158, 14, ES_AUTOHSCROLL
+    LTEXT           "Tags are separated by commas. An emptied value removes the attribute.", IDC_NOTE, 7, 158, 213, 18, SS_NOPREFIX
+    PUSHBUTTON      "Ad&vanced >>", IDC_ADVANCED, 170, 194, 50, 14
+    CONTROL         "", IDC_LIST, "SysListView32", LVS_REPORT | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP | NOT WS_VISIBLE,
+                    7, 7, 213, 180
+    PUSHBUTTON      "&New Attribute...", IDC_NEW, 7, 194, 66, 14, NOT WS_VISIBLE
+    PUSHBUTTON      "&Remove", IDC_REMOVE, 77, 194, 50, 14, NOT WS_VISIBLE
+    PUSHBUTTON      "<< &Simple", IDC_SIMPLE, 170, 194, 50, 14, NOT WS_VISIBLE
+END
+
+IDD_NEWATTR DIALOGEX 0, 0, 220, 70
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "New Attribute"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "&Name:", -1, 7, 10, 40, 8
+    EDITTEXT        IDC_ATTRNAME, 50, 7, 163, 14, ES_AUTOHSCROLL
+    LTEXT           "&Value:", -1, 7, 28, 40, 8
+    EDITTEXT        IDC_ATTRVALUE, 50, 25, 163, 14, ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK", IDOK, 109, 49, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 163, 49, 50, 14
+END

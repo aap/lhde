@@ -29,6 +29,12 @@ its length (its size first), and takes only "not set" (`ENODATA`) or "no user at
 other read error a change (a new tag merged in, an edited description) is refused, not written over the unseen value. `author`, `build`, `source`,
 `notes` and `todo` are this research's own and flxp does not show them.
 
+luxattr (`apps/luxattr`, docs/USAGE.md "Descriptions and tags") is the GUI for all of them: a Properties sheet whose Summary
+page edits `desc`, `tags`, `comment` and `author`, `source`, `build`, `notes`, `todo`, and whose Advanced view lists, edits,
+adds and removes any `user.*` attribute, on one file or several at once. It writes through the same code as flxp
+(`shell::details::write`; any name the registry does not know as a text, trimmed), lists the names with
+`shell::details::list_attrs`, and needs no session (flxp's context menu runs it as Attributes...).
+
 ## Where they are set
 - `lhde-import` annotates what it writes into the Windows tree: originals get `author = microsoft`,
   `build`, `source` (image and in-image path), `desc`; generated files get `author = lhde-import`,

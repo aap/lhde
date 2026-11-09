@@ -178,6 +178,36 @@ Read read_attr(const std::string& path, const std::string& xattr, std::string* v
     return Read::Failed;
 }
 
+Read list_attrs(const std::string& path, std::vector<std::string>* names, int* error)
+{
+    names->clear();
+    if (error) *error = 0;
+    for (int tries = 0; tries < 8; tries++) {
+        ssize_t n = listxattr(path.c_str(), nullptr, 0);
+        std::string buf;
+        if (n > 0) {
+            buf.resize((size_t)n);
+            n = listxattr(path.c_str(), &buf[0], buf.size());
+            if (n < 0 && errno == ERANGE) continue;   // grew in between
+        }
+        if (n < 0) {
+            int e = errno;
+            if (e == ENOTSUP || e == ENOENT) return Read::Missing;
+            if (error) *error = e;
+            return Read::Failed;
+        }
+        for (size_t a = 0; a < (size_t)n;) {   // NUL-separated names
+            size_t b = buf.find('\0', a);
+            if (b == std::string::npos || b > (size_t)n) b = (size_t)n;
+            if (buf.compare(a, 5, "user.") == 0) names->push_back(buf.substr(a, b - a));
+            a = b + 1;
+        }
+        return names->empty() ? Read::Missing : Read::Value;
+    }
+    if (error) *error = ERANGE;
+    return Read::Failed;
+}
+
 Stored read_stored(const std::string& path)
 {
     Stored out;

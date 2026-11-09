@@ -89,6 +89,9 @@ Read read_attr(const std::string& path, const std::string& xattr, std::string* v
 // a sentence for the message box ("The tags of 'a' could not be read ...")
 bool read_current(const std::string& path, const Property& p, std::string* value, std::string* err);
 Stored read_stored(const std::string& path);                         // the registry's attributes that are set (Value only)
+// The names of every user.* attribute on path (any program's, not only the registry's), in the file system's order.
+// Missing: none, no user attributes on that file system (ENOTSUP) or no such file; Failed: *error the errno.
+Read list_attrs(const std::string& path, std::vector<std::string>* names, int* error = nullptr);
 void read_stored(Item& it);                                          // into it.xattrs (a file-system item)
 std::vector<std::string> split_list(const std::string& text);        // "a, b;c\n" -> a, b, c (commas, semicolons, newlines)
 std::string join_list(const std::vector<std::string>& items);        // -> "a,b,c", as stored

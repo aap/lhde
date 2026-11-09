@@ -1,5 +1,10 @@
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <algorithm>
 #include "verbs.h"
 #include "uiicons.h"
@@ -14,6 +19,7 @@
 #include "shell/mime.h"
 #include "shell/xclip.h"
 #include "w32/user.h"
+#include "sys/sys.h"
 extern "C" {
 #include "commctrl.h"
 #include "w32/flxp_shell.h"
@@ -331,6 +337,61 @@ static void remove_tag(const std::vector<Item>& items, const std::string& tag)
     if (!err.empty()) error_box(err);
 }
 
+// Attributes...: luxattr (apps/luxattr) on the selection, found beside our own binary, else on PATH. It runs as a
+// program of its own; a pipe whose write end only it holds says when it exits (EOF), and then the host takes the
+// change as Edit Description's (stored_changed: the rows and the panes' details; inotify's IN_ATTRIB brings the
+// rows alone). An exec failure comes back on the pipe as its errno.
+struct AttrRun { Host* host; pid_t pid; std::vector<std::string> paths; };
+
+static void attributes_done(int fd, void* user)
+{
+    AttrRun* r = (AttrRun*)user;
+    int e = 0;
+    ssize_t n;
+    while ((n = read(fd, &e, sizeof e)) < 0 && errno == EINTR) {}
+    if (n < 0 && errno == EAGAIN) return;
+    sys::unwatch_fd(fd);
+    close(fd);
+    while (waitpid(r->pid, nullptr, 0) < 0 && errno == EINTR) {}
+    if (n == (ssize_t)sizeof e) error_box("luxattr: " + std::string(strerror(e)));
+    else r->host->stored_changed(r->paths);
+    delete r;
+}
+
+static void edit_attributes(const std::vector<Item>& items)
+{
+    std::vector<std::string> paths;
+    for (const Item& it : items) if (is_fs(it)) paths.push_back(it.path);
+    if (paths.empty()) { MessageBeep(0); return; }
+    std::string prog = shell::exe_dir() + "/luxattr";
+    if (access(prog.c_str(), X_OK) != 0) prog = "luxattr";
+    std::vector<char*> args = { (char*)prog.c_str(), (char*)"--" };
+    for (const std::string& p : paths) args.push_back((char*)p.c_str());
+    args.push_back(nullptr);
+    int fds[2];
+    if (pipe2(fds, O_CLOEXEC | O_NONBLOCK) != 0) { error_box(std::string("luxattr: ") + strerror(errno)); return; }
+    pid_t pid = fork();
+    if (pid < 0) { close(fds[0]); close(fds[1]); error_box(std::string("luxattr: ") + strerror(errno)); return; }
+    if (pid == 0) {
+        setsid();
+        long maxfd = sysconf(_SC_OPEN_MAX);
+        if (maxfd < 0 || maxfd > 4096) maxfd = 4096;
+        for (int fd = 3; fd < maxfd; fd++) if (fd != fds[1]) close(fd);   // not our X connection
+        fcntl(fds[1], F_SETFL, 0);
+        fcntl(fds[1], F_SETFD, 0);       // held open by luxattr until it exits
+        sigset_t none; sigemptyset(&none); sigprocmask(SIG_SETMASK, &none, nullptr);
+        signal(SIGPIPE, SIG_DFL); signal(SIGCHLD, SIG_DFL);
+        int dev = open("/dev/null", O_RDONLY);
+        if (dev >= 0) { dup2(dev, 0); if (dev != 0) close(dev); }
+        execvp(args[0], args.data());
+        int e = errno;
+        (void)!write(fds[1], &e, sizeof e);
+        _exit(127);
+    }
+    close(fds[1]);
+    sys::watch_fd(fds[0], attributes_done, new AttrRun{ g_host, pid, paths });
+}
+
 void add_bookmark(const std::string& dir)
 {
     if (dir.empty()) { MessageBeep(0); return; }
@@ -405,6 +466,7 @@ bool run(int id)
     case ID_RENAME: g_host->begin_rename(); return true;
     case ID_EDIT_DESC: if (items.size() == 1) edit_description(items[0]); return true;
     case ID_ADD_TAG: add_tag(items); return true;
+    case ID_ATTRIBUTES: edit_attributes(items); return true;
     case ID_PROPERTIES:
         if (items.empty()) g_host->background_properties();
         else show_properties(items[0]);
@@ -560,6 +622,7 @@ void build_item_menu(HMENU m)
         AppendMenuW(rm, MF_STRING, (UINT_PTR)(ID_TAG_REMOVE_FIRST + (int)k), (LPCWSTR)t.c_str());
     }
     AppendMenuW(m, MF_POPUP | (g_tags.empty() ? MF_GRAYED : 0), (UINT_PTR)rm, L"Remo&ve Tag");
+    AppendMenuW(m, MF_STRING, ID_ATTRIBUTES, L"Attr&ibutes...");
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m, MF_STRING | single, ID_PROPERTIES, L"P&roperties");
 }
