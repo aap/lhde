@@ -431,7 +431,7 @@ int column_id(const Browser& b, int index) { return index >= 0 && (size_t)index 
 
 bool wants_stored(const Browser& b)
 {
-    if (shell::details::column_property(b.sort)) return true;
+    if (shell::details::column_property(b.sort) || b.query.stored()) return true;
     for (int id : b.columns) if (shell::details::column_property((shell::SortBy)id)) return true;
     return false;
 }
@@ -628,6 +628,7 @@ static void make_groups(Browser& b, std::vector<int>& group_of)
 }
 
 static void put_tile_lines(Browser& b, size_t i);
+static void trace_count(const Browser& b);
 
 // list item i from b.items[i] (lParam i): inserted, or set again (a change on disk)
 static void put_item(Browser& b, size_t i, int group, bool insert)
@@ -688,6 +689,7 @@ void fill_list(Browser& b)
     InvalidateRect(b.list, nullptr, TRUE);
     b.filled();
     b.filling = false;
+    trace_count(b);
 }
 
 // XP defview _SetSortFeedback: the sort column gets HDF_SORTUP/DOWN in the
@@ -708,13 +710,37 @@ void sort_feedback(Browser& b)
     SendMessageW(b.list, LVM_SETSELECTEDCOLUMN, (WPARAM)col, 0);
 }
 
-// The list shows the folder's items whose names contain the search box's text
-// (ASCII case-insensitive, as you type; 4074's "Filter by" box).
+// The filter narrows the list in place as the user types, every key at once (the
+// list refilled, the view and its scroll kept as fill_list keeps them). 4074's
+// screenshots show the "Filter by" box only empty (lh4074-180309.png, 4074-dwm.png)
+// and 4051's code shows it only in views at least 300 px wide (_ShouldShowFilters);
+// what it did to the list was a WinFS query not seen in the references, so the
+// narrowing in place, the words and their fields are our choice (shell/details.h).
+bool passes(const Browser& b, const Item& it)
+{
+    return const_cast<Browser&>(b).visible(it) && (b.query.empty() || shell::details::filter_matches(b.query, it));
+}
+
+int unfiltered_count(const Browser& b)
+{
+    int n = 0;
+    for (const Item& it : b.all_items) if (const_cast<Browser&>(b).visible(it)) n++;
+    return n;
+}
+
+// testing (tests/headless/filter.sh): the list's item count after every change, "list: N of M"
+static void trace_count(const Browser& b)
+{
+    static bool on = getenv("FLXP_TRACE_LIST") != nullptr;
+    if (!on || !b.list) return;
+    fprintf(stderr, "list: %d of %d\n", (int)SendMessageW(b.list, LVM_GETITEMCOUNT, 0, 0), unfiltered_count(b));
+    fflush(stderr);
+}
+
 void apply_filter(Browser& b)
 {
     b.items.clear();
-    for (const Item& it : b.all_items)
-        if (b.visible(it) && (b.filter.empty() || lower(it.name).find(b.filter) != std::string::npos)) b.items.push_back(it);
+    for (const Item& it : b.all_items) if (passes(b, it)) b.items.push_back(it);
     fill_list(b);
 }
 
@@ -722,7 +748,10 @@ bool set_filter(Browser& b, const std::string& text)
 {
     std::string f = lower(text);
     if (f == b.filter) return false;
+    bool had = wants_stored(b);
     b.filter = f;
+    b.query = shell::details::parse_filter(text);
+    if (!had && wants_stored(b)) read_stored(b, b.all_items);   // once per folder, while the filter needs them
     apply_filter(b);
     return true;
 }
@@ -827,8 +856,7 @@ void update(Browser& b)
     if (!b.folder->enumerate(all, b.show_hidden) && all.empty()) return;
     read_stored(b, all);
     std::vector<Item> items;
-    for (const Item& it : all)
-        if (b.visible(it) && (b.filter.empty() || lower(it.name).find(b.filter) != std::string::npos)) items.push_back(it);
+    for (const Item& it : all) if (passes(b, it)) items.push_back(it);
     shell::sort_items(items, b.sort, b.ascending);
     std::map<std::string, size_t> at_new, at_old;
     for (size_t i = 0; i < items.size(); i++) at_new[items[i].path] = i;
@@ -907,6 +935,7 @@ void update(Browser& b)
     InvalidateRect(b.list, nullptr, TRUE);
     b.filling = false;
     b.changed_on_disk();
+    trace_count(b);
 }
 
 bool navigate(Browser& b, const std::string& path, bool record)
@@ -915,7 +944,10 @@ bool navigate(Browser& b, const std::string& path, bool record)
     if (!f) return false;
     bool changed = !b.folder || b.folder->path() != f->path();
     if (record && b.folder && (changed || b.record_same)) { b.back.push_back(b.folder->path()); b.forward.clear(); }
-    if (b.folder && changed && !b.filter.empty()) { b.filter.clear(); header::clear_filter(); places::clear_filter(); b.filter_cleared(); }
+    if (b.folder && changed && !b.filter.empty()) {
+        b.filter.clear(); b.query = shell::details::Filter();
+        header::clear_filter(); places::clear_filter(); b.filter_cleared();
+    }
     if (changed) thumbview::folder_changed();
     if (changed && b.folder && b.remember_views) views::leaving(b.folder->path(), view_code(b));
     std::string from = b.folder ? b.folder->path() : "";

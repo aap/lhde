@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include "shell/namespace.h"
+#include "shell/details.h"
 #include "shell/dirwatch.h"
 #include "shell/viewmodel.h"
 #include "w32/w32.h"
@@ -75,7 +76,8 @@ struct Browser {
     std::shared_ptr<shell::Folder> folder;
     std::vector<Item> items;                         // what the list shows: all_items through visible() and the filter
     std::vector<Item> all_items;
-    std::string filter;                              // the header's search box (lower case), "" = all
+    std::string filter;                              // the Filter / search box's text (lower case), "" = all
+    shell::details::Filter query;                    // that text's words (shell/details.h: name, desc:, tag:, comment:)
     std::vector<std::string> back, forward;
     int view = LVS_REPORT;
     shell::SortBy sort = shell::SortBy::Name;
@@ -150,14 +152,22 @@ int column_id(const Browser& b, int index);   // the id the list's column index 
 void set_columns(Browser& b, const std::vector<int>& ids, bool take = true);
 void load_columns(Browser& b);                // the remembered set and widths, applied
 void save_columns(Browser& b);                // the set and the widths now
-bool wants_stored(const Browser& b);          // a stored column shown or sorted by
+bool wants_stored(const Browser& b);          // a stored column shown or sorted by, or the filter looking at them
 void column_menu(Browser& b, HWND owner, int x, int y);   // the header's menu at screen (x, y)
 void choose_details(Browser& b, HWND owner);  // XP's Choose Details dialog
 void sort_by_column(Browser& b, int index);   // a header click: that column, again the other way round
 void fill_list(Browser& b);            // the list from b.items (sorted), the selection after refresh
 void sort_feedback(Browser& b);        // the header's sort arrow and the tinted column
+// The filter (4074's "Filter by" box in the left pane, the header's search box): the
+// items every word of the text matches (shell::details::Filter: the name, the
+// description, the tags, the comment; tag:x, desc:x, comment:x, name:x). The stored
+// properties are read once per folder when a word needs them (wants_stored), then
+// kept up to date by update() (inotify's attribute changes). Per window, cleared when
+// the folder changes, never remembered.
 void apply_filter(Browser& b);         // b.items from b.all_items, then fill_list
 bool set_filter(Browser& b, const std::string& text);   // the boxes' text (live): true if it changed the list
+bool passes(const Browser& b, const Item& it);          // visible() and the filter
+int unfiltered_count(const Browser& b);                 // the items the folder shows without the filter (visible())
 void refresh(Browser& b);              // enumerate the folder again, fill, then shown(); follow()
 // The folder shown is followed on disk (b.follow_disk): refresh() watches it with inotify,
 // changes come as update() 150 ms after the first of a burst, a deleted or moved folder

@@ -250,6 +250,39 @@ int main(int, char** argv)
     Item ftip = sub; ftip.xattrs = { { "user.xdg.comment", "fonts" } };
     check("infotip folder", "Date Modified: 10/23/2026 2:24 PM\nComment: fonts", infotip(ftip));
 
+    // the Filter box: words, fields, quotes; every word matches somewhere, case ignored
+    {
+        auto words = [](const std::string& text) {
+            std::string s;
+            for (const Filter::Word& w : parse_filter(text).words) s += (s.empty() ? "" : "|") + std::to_string((int)w.field) + w.text;
+            return s;
+        };
+        check("filter words", "0red|0sun", words("  Red   sun "));
+        check("filter fields", "3red|1x|2to do|4", words("TAG:red name:x desc:\"to do\" comment:"));
+        check("filter other prefix", "0http://a", words("http://a"));
+        check("filter quotes", "0a red", words("\"a red\" \"\""));
+        check("filter empty", 1, parse_filter("   ").empty());
+        check("filter name only reads nothing", 0, parse_filter("name:a").stored());
+        check("filter word reads the attributes", 1, parse_filter("a").stored());
+        Item a = file("alpha.txt", 1, 0, "Text"), g = file("gamma.png", 1, 0, "PNG");
+        a.xattrs = { { "user.xdg.tags", "red,work" } };
+        g.xattrs = { { "user.lux.desc", "A Red sunset" }, { "user.xdg.comment", "tagged later" } };
+        auto hits = [&](const std::string& text) {
+            Filter f = parse_filter(text);
+            return std::string(filter_matches(f, a) ? "a" : "") + (filter_matches(f, g) ? "g" : "");
+        };
+        check("filter any field", "ag", hits("red"));
+        check("filter every word", "a", hits("red work"));
+        check("filter tag: tags only", "a", hits("tag:red"));
+        check("filter tag: within one tag", "", hits("tag:red,work"));
+        check("filter tag: set", "a", hits("tag:"));
+        check("filter desc:", "g", hits("desc:SUN"));
+        check("filter comment: not the tags", "g", hits("comment:tag"));
+        check("filter name:", "a", hits("name:alp"));
+        check("filter none", "ag", hits(""));
+        check("filter no match", "", hits("blue"));
+    }
+
     // the write path on a scratch file (skipped where the file system keeps no user attributes)
     {
         // $TMPDIR or /tmp (tmpfs keeps user attributes on current kernels), else beside this program (the build tree)

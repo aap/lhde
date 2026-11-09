@@ -109,7 +109,8 @@ appearance --pick STYLE`: classic, a bare style with and without a frame set, ba
 `jade4074.msstyles` copied under other names, skipped without it), `tests/aero-patches.py` (lhde-import's table of Aero
 patches and which styles get a frame set, on stand-in files), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
-incl. GTK, the file dialog in both looks, the modifier keys across a focus change) on displays :71-:73
+incl. GTK, the file dialog in both looks, the modifier keys across a focus change, the Explorer's Filter box under jade4074 over
+names and attributes, skipped without that style or user xattrs) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).

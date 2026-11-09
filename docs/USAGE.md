@@ -728,6 +728,17 @@ How to edit:
 - From a terminal: `x desc FILE "text"`, `x +tag FILE a b`, `lsx -t DIR` (luxfs), or `setfattr` / `getfattr`. The Explorer
   follows a change made elsewhere (inotify reports attribute changes).
 
+**Filtering.** The Longhorn frame's "Filter by" box at the top of the left pane (4074's) and the header's
+search box keep the list to the items that match what is typed, narrowing it in place at every key (the view and the sort stay).
+Each word, separated by spaces, must match somewhere: in the name, the description, a tag or the comment, as a part of the value,
+ASCII upper and lower case alike (`red work` finds a file tagged `red,work` and one named `redwork.txt` whose comment says "work"). A
+word can name the field it looks in: `tag:x` (or `tags:`) a tag containing x, `desc:x` (`description:`), `comment:x`, `name:x`;
+the field alone (`tag:`) keeps the items where it is set. Double quotes make one word of several (`desc:"red sunset"`); any
+other `word:` is a plain word. While a filter is on the status bar says "N of M items". Escape in the box empties it and the
+whole folder shows again; Enter goes back to the list keeping the filter; another folder starts unfiltered. The filter belongs to
+the window and is not remembered. The attributes are read once per folder when a word needs them (or a column shows them) and
+follow changes on disk.
+
 They travel with the file where its attributes travel: a move on the same file system, flxp's own copy and move (also across
 file systems), `cp -a` (or `--preserve=xattr`), `rsync -X`, `tar --xattrs`. They do not travel with `cp` without `-a`, most
 archive and sync tools by default, or git.
