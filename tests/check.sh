@@ -4,7 +4,8 @@
 # failures. Tests that need assets skip when these are absent:
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
-#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh getfattr and setfattr); displays :71-:73,
+#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh setfattr
+#                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
 fails=0
@@ -37,6 +38,9 @@ result "viewmodeltest ($(tail -n 1 "$T/viewmodel.log"))" $? "$T/viewmodel.log"
 # the details model (shell/details.h): XP's Details lines, 4051's band values
 build/tests/detailstest > "$T/details.log" 2>&1
 result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"
+# the Details columns' layout (shell/columns.h) and the per-folder records of flxp-views, on a scratch state directory
+build/tests/columnstest > "$T/columns.log" 2>&1
+result "columnstest ($(tail -n 1 "$T/columns.log"))" $? "$T/columns.log"
 # lhde-import's overwrite policy (kept without --force, written with it) on a scratch tree and a stand-in file
 tests/import-policy.sh > "$T/import.log" 2>&1
 result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"
@@ -78,13 +82,25 @@ else
     tests/headless/dnd.sh "$2" > "$T/dnd.log" 2>&1; result headless/dnd.sh $? "$T/dnd.log"
     tests/headless/lvtiles.sh "$2" > "$T/lvtiles.log" 2>&1; result "headless/lvtiles.sh ($(tail -n 1 "$T/lvtiles.log"))" $? "$T/lvtiles.log"
     tests/headless/modkeys.sh "$1" > "$T/modkeys.log" 2>&1; result headless/modkeys.sh $? "$T/modkeys.log"
+    tests/headless/typing.sh "$3" > "$T/typing.log" 2>&1; result headless/typing.sh $? "$T/typing.log"
+    tests/headless/msgbox.sh "$3" > "$T/msgbox.log" 2>&1; result headless/msgbox.sh $? "$T/msgbox.log"
     tests/headless/filedlg.sh "$3" > "$T/filedlg.log" 2>&1; result headless/filedlg.sh $? "$T/filedlg.log"
+    tests/headless/filter.sh "$2" > "$T/filter.log" 2>&1; rc=$?
+    result "headless/filter.sh$(grep -m1 '^skip' "$T/filter.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/filter.log"
+    tests/headless/alttab.sh "$2" > "$T/alttab.log" 2>&1; rc=$?
+    result "headless/alttab.sh$(grep -m1 '^skip' "$T/alttab.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/alttab.log"
     # a click outside an open menu ends it and acts where it was made (docs/CLIENT-PROTOCOL.md "Menus and clicks"), under luxwm
     tests/headless/menus.sh "$3" > "$T/menus.log" 2>&1; result headless/menus.sh $? "$T/menus.log"
     # the task band's picture of a folder with two JPEGs is the Icons view's square (folderpictest)
     tests/headless/folderpic.sh "$2" > "$T/folderpic.log" 2>&1; result headless/folderpic.sh $? "$T/folderpic.log"
     tests/headless/luxshot.sh "$1" > "$T/luxshot.log" 2>&1; rc=$?
     result "headless/luxshot.sh$(grep -m1 '^skip' "$T/luxshot.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxshot.log"
+    tests/headless/luxattr.sh "$2" > "$T/luxattr.log" 2>&1; rc=$?
+    result "headless/luxattr.sh$(grep -m1 '^skip' "$T/luxattr.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxattr.log"
+    tests/headless/luxpad.sh "$3" > "$T/luxpad.log" 2>&1; rc=$?
+    result "headless/luxpad.sh$(grep -m1 '^skip' "$T/luxpad.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxpad.log"
+    tests/headless/properties.sh "$3" > "$T/properties.log" 2>&1; rc=$?
+    result "headless/properties.sh$(grep -m1 '^skip' "$T/properties.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/properties.log"
 fi
 
 [ $fails = 0 ] && echo "check: all passed" || echo "check: $fails failed"

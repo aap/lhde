@@ -4,6 +4,8 @@
 // size selection follow Wine's win32u/freetype.c.
 #pragma once
 #include <stdint.h>
+#include <string>
+#include <vector>
 #include "geom.h"
 #include "color.h"
 #include "dc.h"
@@ -59,6 +61,15 @@ void set_shell_dlg_face(const char* family);
 const char* shell_dlg_face();
 // a face of this family is installed (in the font directories or the system's), not a fallback to another family
 bool have_family(const char* family);
+// The installed scalable faces (the theme's directory, the add_font_dir ones, the system's), one entry per family and
+// style, sorted by family (case ignored) then weight and slant; a family that several sources have is listed once, from
+// the first. What EnumFontFamiliesEx enumerates.
+struct FaceInfo {
+    std::string family, style;     // "Lucida Console", "Regular"
+    int32_t weight;                // OpenType weight (400, 700)
+    bool italic, fixed_pitch;
+};
+std::vector<FaceInfo> list_faces();
 void set_font_smoothing(int mode);        // SMOOTH_* (true = Standard, false = off)
 int font_smoothing();
 

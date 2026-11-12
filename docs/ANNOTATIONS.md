@@ -21,13 +21,20 @@ Tags in use (extend freely): `reference` (real Windows screenshots and originals
 
 ## The shared names
 `desc`, `tags` and `comment` are general: flxp shows and edits them as the Explorer's Description, Tags and Comment (Details
-columns, the infotip, XP's Details rollout, 4051's task band, the context menu's Edit Description... / Add Tag... / Remove Tag;
+columns, the infotip, XP's Details rollout, 4051's task band, the context menu's Add Tag... and the Properties sheet;
 docs/USAGE.md "Descriptions and tags"); its property registry (`flxp/shell/details.cpp`) maps each property to its attribute.
 flxp writes them as `x` does: a description trimmed, without a trailing newline; tags split at commas (flxp also takes
 semicolons), trimmed, without duplicates, in their order; an emptied value removes the attribute. It reads a value whatever
 its length (its size first), and takes only "not set" (`ENODATA`) or "no user attributes here" (`ENOTSUP`) as no value: on any
 other read error a change (a new tag merged in, an edited description) is refused, not written over the unseen value. `author`, `build`, `source`,
 `notes` and `todo` are this research's own and flxp does not show them.
+
+The Properties sheet (`shell::properties` in `flxp/shell/ui`, docs/USAGE.md "Descriptions and tags": the Explorer's Properties,
+and `luxattr` from a terminal) is the GUI for all of them: its Summary
+page edits `desc`, `tags`, `comment` and `author`, `source`, `build`, `notes`, `todo`, and whose Advanced view lists, edits,
+adds and removes any `user.*` attribute, on one file or several at once. It writes through the same code as flxp
+(`shell::details::write`; any name the registry does not know as a text, trimmed), lists the names with
+`shell::details::list_attrs`, and luxattr needs no session.
 
 ## Where they are set
 - `lhde-import` annotates what it writes into the Windows tree: originals get `author = microsoft`,

@@ -96,6 +96,14 @@ int main(int, char** argv)
     check("long date", "Friday, August 24, 2001, 12:00 AM", friendly_date(at(2001, 8, 24, 0, 0), now));
     check("day with zero", "Thursday, October 02, 2003, 5:36 PM", friendly_date(at(2003, 10, 2, 17, 36), now));
     check("short date", "8/24/2001", short_date(at(2001, 8, 24, 10, 0)));
+    // the Properties sheet's General page: StrFormatByteSize and the exact count, the long date with seconds
+    check("thousands", "1,331", thousands(1331));
+    check("thousands small", "999", thousands(999));
+    check("thousands big", "10,737,418,240", thousands(10737418240ULL));
+    check("size and bytes", "1.29 KB (1,331 bytes)", size_and_bytes(1331));
+    check("size and bytes small", "198 bytes (198 bytes)", size_and_bytes(198));
+    check("properties date", "Thursday, October 02, 2003, 5:36:09 PM", long_date(at(2003, 10, 2, 17, 36) + 9));
+    check("properties midnight", "Friday, August 24, 2001, 12:00:00 AM", long_date(at(2001, 8, 24, 0, 0)));
 
     // attributes: read-only only for files, hidden for both, never archive
     check("attr none", "", attributes(file("a", 1, 0, "")));
@@ -249,6 +257,39 @@ int main(int, char** argv)
     check("infotip", "Type: BAK File\nDate Modified: 10/23/2026 2:24 PM\nSize: 198 bytes\nDescription: The old boot file\nTags: boot, backup", infotip(tip));
     Item ftip = sub; ftip.xattrs = { { "user.xdg.comment", "fonts" } };
     check("infotip folder", "Date Modified: 10/23/2026 2:24 PM\nComment: fonts", infotip(ftip));
+
+    // the Filter box: words, fields, quotes; every word matches somewhere, case ignored
+    {
+        auto words = [](const std::string& text) {
+            std::string s;
+            for (const Filter::Word& w : parse_filter(text).words) s += (s.empty() ? "" : "|") + std::to_string((int)w.field) + w.text;
+            return s;
+        };
+        check("filter words", "0red|0sun", words("  Red   sun "));
+        check("filter fields", "3red|1x|2to do|4", words("TAG:red name:x desc:\"to do\" comment:"));
+        check("filter other prefix", "0http://a", words("http://a"));
+        check("filter quotes", "0a red", words("\"a red\" \"\""));
+        check("filter empty", 1, parse_filter("   ").empty());
+        check("filter name only reads nothing", 0, parse_filter("name:a").stored());
+        check("filter word reads the attributes", 1, parse_filter("a").stored());
+        Item a = file("alpha.txt", 1, 0, "Text"), g = file("gamma.png", 1, 0, "PNG");
+        a.xattrs = { { "user.xdg.tags", "red,work" } };
+        g.xattrs = { { "user.lux.desc", "A Red sunset" }, { "user.xdg.comment", "tagged later" } };
+        auto hits = [&](const std::string& text) {
+            Filter f = parse_filter(text);
+            return std::string(filter_matches(f, a) ? "a" : "") + (filter_matches(f, g) ? "g" : "");
+        };
+        check("filter any field", "ag", hits("red"));
+        check("filter every word", "a", hits("red work"));
+        check("filter tag: tags only", "a", hits("tag:red"));
+        check("filter tag: within one tag", "", hits("tag:red,work"));
+        check("filter tag: set", "a", hits("tag:"));
+        check("filter desc:", "g", hits("desc:SUN"));
+        check("filter comment: not the tags", "g", hits("comment:tag"));
+        check("filter name:", "a", hits("name:alp"));
+        check("filter none", "ag", hits(""));
+        check("filter no match", "", hits("blue"));
+    }
 
     // the write path on a scratch file (skipped where the file system keeps no user attributes)
     {

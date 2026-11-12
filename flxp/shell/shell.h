@@ -2,7 +2,7 @@
 // Explorer without borrowing its internals. C++, namespace shell; linked from build/lib/libflxpshell.a (apps/app.mk's
 // WUX_APP_LINK). Include it after <wux/wux.h>. Every header named here is public; the rest of flxp/ is not.
 //
-//   util.h        trim, lower, iequal, exists, is_dir, is_file, read_file
+//   util.h        trim, lower, iequal, exists, is_dir, is_file, read_file, program_name (the warnings' prefix)
 //   config.h      XDG directories (config_home, data_home, user_dir("PICTURES", "Pictures")), flxp.ini settings, URIs,
 //                 shell quoting, dir_of / base_of, write_file_atomic, make_dirs
 //   settings.h    lhde's settings store, settings.ini (shell::store::get / set, the _LH_SETTINGS_CHANGED notification)
@@ -15,16 +15,19 @@
 //                 the terminal
 //   details.h     the property registry and the annotations: details::property("description" | "tags" | "comment"),
 //                 details::write (as the Explorer writes user.lux.desc / user.xdg.tags / user.xdg.comment),
-//                 read_stored, add_tags, infotip
+//                 read_stored, read_attr, list_attrs (every user.* name on a file), add_tags, infotip; the
+//                 Properties formats (size_and_bytes, long_date, thousands)
 //   fileops.h     Trash, rename, new folder; fileops_job.h the copy/move/delete engine
 //   dirwatch.h    a directory followed with inotify
 //   thumbs.h      freedesktop thumbnails (made and cached; gdi::Bitmap results)
 //   icons.h       the icon theme: which file or resource an icon key names
 //   bookmarks.h   the GTK bookmarks
 //   xclip.h       files and text on the X CLIPBOARD (the clipboard API in wux.h goes through it)
-//   filedlg.h     the Open/Save dialog itself (filedlg::run, filedlg::message_box: the XP message box, since the shim's
-//                 MessageBoxW is a stub). GetOpenFileNameW / GetSaveFileNameW reach the same dialog; either needs
-//                 $(WUX_APP_FILEDIALOG) on the link line (apps/app.mk)
+//   ui.h          the win32 part: message_box (MessageBoxW with UTF-8 strings), load_image / icon_for_key / icon_for
+//                 (an icon theme's source or a file's icon as an HICON), properties (the Properties sheet: General,
+//                 Summary)
+//   filedlg.h     the Open/Save dialog itself (filedlg::run). GetOpenFileNameW / GetSaveFileNameW reach the same dialog;
+//                 either needs $(WUX_APP_FILEDIALOG) on the link line (apps/app.mk)
 #pragma once
 #include "shell/util.h"
 #include "shell/config.h"
@@ -42,4 +45,5 @@
 #include "shell/icons.h"
 #include "shell/bookmarks.h"
 #include "shell/xclip.h"
+#include "shell/ui.h"
 #include "filedlg/filedlg.h"

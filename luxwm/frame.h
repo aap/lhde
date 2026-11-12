@@ -3,6 +3,7 @@
 #define LHWM_FRAME_H
 #include <X11/Xlib.h>
 #include <cairo/cairo.h>
+#include <stdint.h>
 
 enum hit { HIT_NONE, HIT_CAPTION, HIT_CLOSE, HIT_MAX, HIT_MIN,
            HIT_L, HIT_R, HIT_T, HIT_B, HIT_TL, HIT_TR, HIT_BL, HIT_BR };
@@ -133,6 +134,9 @@ cairo_surface_t *wm_frame_icon_from_netwm(const unsigned long *data, unsigned lo
 cairo_surface_t *wm_frame_icon_from_pixmap(Display *dpy, Pixmap icon, Pixmap mask, int want);
 /* the theme's default icon nearest >= want (not a new reference; NULL when the theme has none) */
 cairo_surface_t *wm_theme_default_icon(const struct theme *t, int want);
+/* the 31 system colours (COLOR_* order, 0xRRGGBB) of the theme: Windows Classic the scheme's, a visual style its [SysMetrics] over
+   Windows Standard */
+void wm_theme_syscolors(const struct theme *t, uint32_t out[31]);
 /* fonts: the theme's path.fonts, font directories/files (';' separated, absolute), registered as fontconfig application
    fonts together with the next wm_theme_load's font_files (the set is replaced, so a theme without them does not see them) */
 void wm_frame_fonts_set(const char *list);

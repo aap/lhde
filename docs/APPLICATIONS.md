@@ -36,9 +36,9 @@ them (and the list at the end says what still is not).
 - Resources: `NAME.rc` (dialog templates in dialog units for "MS Shell Dlg" 8, flxp's metrics: `flxp/rc/explorer.rc`) is
   compiled to `NAME.res` by mingw's windres when the .rc changes; the .res is checked in, so a build needs no windres.
 - Linking: `$(app_link)` links the objects with `libwux.a` and `build/lib/libflxpshell.a` (the shell facilities: flxp/shell's
-  objects and liblhde's, the same objects flxp's programs link) whole, then `libwuxtheme.a`. `WUX_APP_DEPS` are those archives;
-  `WUX_APP_FILEDIALOG` adds the Open/Save dialog (`GetOpenFileNameW`, `GetSaveFileNameW`, `filedlg::run`,
-  `filedlg::message_box`); without it those calls fail with `CDERR_INITIALIZATION`. An application that draws the Longhorn
+  objects with its win32 part flxp/shell/ui and liblhde's, the same objects flxp's programs link) whole, then `libwuxtheme.a`.
+  `WUX_APP_DEPS` are those archives; `WUX_APP_FILEDIALOG` adds the Open/Save dialog (`GetOpenFileNameW`, `GetSaveFileNameW`,
+  `filedlg::run`); without it those calls fail with `CDERR_INITIALIZATION`. An application that draws the Longhorn
   navigation bar adds `$(LUXNAVA)` to its prerequisites and `-Iluxnav` to its flags. `WUX_APP_LINK` is the same link line for a
   rule written by hand.
 
@@ -60,8 +60,20 @@ int main(int argc, char** argv)
 `wux/wux.h` is `<windows.h>`, `<commctrl.h>`, `<commdlg.h>`, `<uxtheme.h>` with `<vsstyle.h>`, `<shellapi.h>` and wux's own
 additions (`wux/w32/flxp_shell.h`: desktop and dock windows, root properties, file drag and drop, the X selections, typed
 clipboard data, `FlxpWritePng` / `FlxpEncodePng`), plus `WuxWide` / `WuxUtf8` / `WuxWindowText` for the UTF-8 the shell layer
-speaks. Strings to the API are UTF-16 (`L"..."` is 16-bit here). `MessageBoxW` is a stub: `filedlg::message_box` is the XP
-message box.
+speaks. Strings to the API are UTF-16 (`L"..."` is 16-bit here; a character above U+FFFF is a surrogate pair, and typed it
+arrives as two `WM_CHAR`s, as on Windows); the A functions and the A text messages (`SendMessageA`'s `WM_SETTEXT`,
+`WM_GETTEXT`) read "ANSI" as UTF-8. `MessageBoxW` (and `MessageBoxA`, `MessageBoxIndirectW`) is
+Wine's message box (`wux/vendor/wine/user32/msgbox.c`): the icon, the text and the buttons the flags ask for, laid out by the
+text's size, in the message font (the style's MsgBoxFont, Tahoma 8 under XP), Escape giving Cancel, or OK in an OK box.
+
+Besides the windows and controls, wux has what a document program reaches for: accelerator tables (`LoadAcceleratorsW`,
+`TranslateAcceleratorW`), a class's menu (`lpszMenuName`, also by number), `GetWindowPlacement` / `SetWindowPlacement` (the
+normal rectangle while maximised; minimising is the window manager's), `DragAcceptFiles` with `WM_DROPFILES` and
+`DragQueryFileW` (wux's X drop: a file dragged from flxp or any XDND source), `IsTextUnicode`, `FormatMessageW` (from a string,
+an argument array), the common dialogs `GetOpenFileNameW` / `GetSaveFileNameW` (flxp's dialog; a custom template without stc32
+and its hook: the controls go under the dialog's own, the hook gets `WM_INITDIALOG` and `CDN_FILEOK`), `ChooseFontW`,
+`FindTextW`, `ReplaceTextW` (Wine's comdlg32, over `EnumFontFamiliesExW` and fontconfig) and `GetFileTitleW`. An owned window
+with a caption (a modeless Find dialog) is its owner's transient, as XP keeps owned windows above their owner.
 
 The look needs nothing from the application: WuxInit loads the session theme's visual style, colours, metrics and fonts, and
 the program follows a theme switch by itself (`WM_THEMECHANGED`, the system colours), as every flxp program does. Controls are
@@ -71,10 +83,16 @@ themed by the style; a dialog in "MS Shell Dlg" gets the theme's dialog font.
 
 `shell::user_dir("PICTURES", "Pictures")` and the other XDG directories; `shell::spawn` and `shell::open_files` (launching, the
 way a double click opens); `shell::details::write(path, *shell::details::property("description"), text, &err)` and `"tags"`,
-`"comment"` (the annotations, written exactly as the Explorer writes them: docs/ANNOTATIONS.md), `read_stored`, `infotip`;
+`"comment"` (the annotations, written exactly as the Explorer writes them: docs/ANNOTATIONS.md), `read_stored`, `read_attr`,
+`list_attrs` (every `user.*` name on a file), `infotip`, the Properties formats (`size_and_bytes`: "1.29 KB (1,331 bytes)",
+`long_date` with seconds, `thousands`);
 `shell::store::get` / `set` (settings.ini, with the change notification); `shell::session_theme()` (the theme's record);
 `shell::mime_type`; `shell::trash`, the copy engine (`fileops_job.h`); `shell::thumbs`; the Explorer itself as a program:
-`flxp DIR`, `flxp --select FILE`.
+`flxp DIR`, `flxp --select FILE`. The win32 part (`shell/ui.h`): `shell::message_box(owner, title, text, MB_OK |
+MB_ICONEXCLAMATION)` (MessageBoxW with UTF-8 strings), `shell::icon_for(path, 32)` and `icon_for_key(key, px)` (the icon the
+Explorer shows, as an HICON), `load_image` (an icon theme's source, an .ico or "pe:FILE#ID", with LoadImageW),
+`shell::properties(owner, paths, options)` (the Properties sheet: General and Summary, as the Explorer's Properties opens it). The shell
+layer's warnings on stderr start with the program's name (`shell::program_name()`, argv[0]'s basename).
 
 ## Trying it in the lab
 
@@ -83,6 +101,26 @@ way a double click opens); `shell::details::write(path, *shell::details::propert
 ends everything the lab started. A headless test goes in `tests/headless/` (its own HOME and XDG directories, xdotool to drive
 the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
 
+## Three worked examples
+
+- **luxshot** (`apps/luxshot`): a dialog program with an Xlib part (`capture_native.cpp`), the Open/Save dialog for Browse...,
+  the annotations written with `shell::details::write`, PNG encoding and the clipboard (`FlxpWritePng`, `FlxpEncodePng`).
+- **luxattr** (`apps/luxattr`): the shell layer's Properties sheet (`shell::properties`, `shell/ui.h`) from a terminal, a main
+  of fifty lines. The sheet itself (`flxp/shell/ui/properties.cpp`, its templates in `flxp/rc/shell.rc`) is the example of a
+  property sheet: `PropertySheetW` of wux's comctl32 with two `PROPSHEETPAGEW` from an embedded .res, a report list view with
+  an edit subclassed over a cell for in-place editing, a modal dialog of its own, cue banners (`EM_SETCUEBANNER`), the shell
+  layer's `details::list_attrs` / `read_attr` / `write`, `file_info`, `type_name`, `mime_type`, `default_app`,
+  `icon_for_key`, `message_box`, and a hook for its caller (`change_program`: the Explorer's Open With). luxattr is the test that an application needs no session: with `LHDE_WINDOWS=/nonexistent`
+  and an empty HOME, WuxInit and the shell layer fall back by themselves (fontconfig's fonts, the classic look, the Wine icon
+  recipe with a warning on stderr), and `tests/headless/luxattr.sh` runs it that way.
+- **luxpad** (`apps/luxpad`): a port, ReactOS's Notepad nearly as it is (its C as C++ on the W functions, its resources and
+  ReactOS's header comments kept): a main window with a class menu, accelerators, a subclassed Edit control and a status bar,
+  the modeless Find and Replace dialogs (`FindTextW`, the `FINDMSGSTRING` message, `IsDialogMessageW` in the loop), `ChooseFontW`,
+  a modal Go To dialog, the Save As dialog with notepad's own Encoding boxes under it (`OFN_ENABLETEMPLATE | OFN_ENABLEHOOK`),
+  `WM_DROPFILES`, the window placement; what Windows had and lhde does not became POSIX (files through `open`/`mmap`/`write`
+  for `CreateFile`/`CreateFileMapping`, the registry as two ini files through liblhde's `lhde_ini`, `errno` for
+  `GetLastError`/`FormatMessage`). `tests/headless/luxpad.sh` drives it, the status bar read from `LUXPAD_TRACE=1`.
+
 ## Not public yet: what an application cannot reach
 
 What the first applications needed and the public surface lacks, the list of what to move:
@@ -90,12 +128,17 @@ What the first applications needed and the public surface lacks, the list of wha
 - **The Open/Save dialog is built on the Explorer's browsing widget** (`flxp/filedlg/filedlg.cpp` uses `flxp/explorer/browser`,
   the headers, the task band), so `WUX_APP_FILEDIALOG` links all of `flxp/explorer` but its main, and luxnav. The dialog and the
   widget it needs belong with the shell facilities.
+- **No font fallback**: wux's GDI draws a character its font lacks as the font's missing glyph (Windows XP's GDI did too), so
+  an emoji in luxpad's Lucida Console is a box although it is stored, saved and reloaded right; Uniscribe's and fontconfig's
+  fallback to a face that has it is not there.
+- **No printing**: no `PrintDlgW`, `PageSetupDlgW` or printer DC; luxpad's printing was left out.
 - **wux depends on the shell layer**: the session theme (`flxp/shell/lhtheme`, `runtime`: fonts and the visual style) and the X
   clipboard (`flxp/shell/xclip`) are called from wux/w32, so libwux.a does not link without libflxpshell.a. Those three belong in
   wux (or liblhde).
 - **Reading the screen**: wux has no screen DC (`GetDC(NULL)` + `BitBlt` does not read the screen), so luxshot reads the root
   window with Xlib itself, as it finds the active window (`_NET_ACTIVE_WINDOW`), luxwm's frame (`_NET_FRAME_EXTENTS`) and drags
   its rectangle over an override-redirect window.
-- **Shell icons as HICON**: `shell/icons.h` names the file or resource of an icon key; loading it into an image list is the
-  Explorer's (`flxp/explorer/uiicons`). `shell/thumbs.h` and `icons.h` hand out `gdi::Bitmap`, wux's internal type.
+- **Shell images as `gdi::Bitmap`**: `shell/thumbs.h` (thumbnails) and `icons.h` (`load_art`: toolbar strips, Windows art by
+  resource id) hand out `gdi::Bitmap`, wux's internal type; only icons have a win32 handle (`shell::icon_for`, `load_image`). The
+  image lists of every icon at 16 and 32 px, one index per key, are still the Explorer's (`flxp/explorer/uiicons`).
 - **The X clipboard is not INCR**: typed data larger than the server's request size (16 MB with BIG-REQUESTS) is refused.

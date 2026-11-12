@@ -71,7 +71,7 @@ int main(int argc, char** argv)
     o.lpstrInitialDir = dir ? (LPCWSTR)d16.c_str() : nullptr;
     o.Flags = OFN_EXPLORER | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
     if (!strcmp(what, "save")) {
-        wcscpy(file, L"Untitled.txt");
+        memcpy(file, L"Untitled.txt", sizeof L"Untitled.txt");   // glibc's wcscpy takes 32-bit units
         o.lpstrDefExt = L"txt";
         o.nFilterIndex = 1;
         o.Flags |= OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;

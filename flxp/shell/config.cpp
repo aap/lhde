@@ -11,6 +11,22 @@
 
 namespace shell {
 
+const char* program_name()
+{
+    const char* n = program_invocation_short_name;   // <errno.h>, glibc and musl: argv[0]'s basename
+    if (n && strcmp(n, "exe") == 0) {
+        // started as /proc/self/exe (flxp opening another window): the binary's own name
+        static std::string self;
+        if (self.empty()) {
+            char buf[4096];
+            ssize_t k = readlink("/proc/self/exe", buf, sizeof buf - 1);
+            if (k > 0) { buf[k] = 0; self = base_of(buf); }
+        }
+        if (!self.empty()) return self.c_str();
+    }
+    return n && *n ? n : "lhde";
+}
+
 std::string home_dir()
 {
     const char* h = getenv("HOME");
@@ -119,7 +135,7 @@ int flag_value(const std::string& v, const std::string& where)
     for (const std::string& t : told) seen = seen || t == where;
     if (!seen) {
         told.push_back(where);
-        fprintf(stderr, "flxp: %s = %s: a switch is 0 or 1; automatic\n", where.c_str(), v.c_str());
+        fprintf(stderr, "%s: %s = %s: a switch is 0 or 1; automatic\n", shell::program_name(), where.c_str(), v.c_str());
     }
     return -1;
 }

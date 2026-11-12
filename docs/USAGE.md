@@ -620,8 +620,8 @@ Details, Ctrl+2 Tiles, Ctrl+3, 4, 5 Large, Medium, Small Icons (4074's five slid
 Ctrl+plus, Ctrl+minus, Ctrl+wheel and View > Zoom make the view shown a step bigger or smaller within its range (4051's levels 16
 21 27 36 48 64 84 111 147 194 256 and the range's ends). Each of the five stops remembers the size it was last shown at, and
 "Icons" is the icon stop used last, so going back to a view brings its size back; the sizes are kept for every window in
-`~/.local/state/lhde/flxp-view-sizes`. Every folder keeps its own view, size and Hide File Names in `flxp-views` beside it
-(`remember_views`, Tools > Folder Options); a folder never opened gets `default_view_longhorn` (Icons at 48 px unless Folder
+`~/.local/state/lhde/flxp-view-sizes`. Every folder keeps its own view, size and Hide File Names (and its Details columns, "Descriptions
+and tags") in `flxp-views` beside it (`remember_views`, Tools > Folder Options); a folder never opened gets `default_view_longhorn` (Icons at 48 px unless Folder
 Options says otherwise).
 
 The breadcrumb names your home folder "Home" (Home > Documents), as the namespace places it under the Desktop. Folder Options'
@@ -719,27 +719,62 @@ itself (`user.lux.desc`, `user.xdg.tags`, `user.xdg.comment`; the names luxfs's 
 there is no database: they need a file system that keeps user attributes (ext4, btrfs, xfs, zfs, tmpfs; not FAT or many network
 mounts, where editing says so). Tags are stored comma-separated (`reference,4051`); typed, they may be separated by commas or
 semicolons, spaces around them are dropped, a tag given twice is kept once. Emptying a value removes the attribute. A value
-of any length is read whole; when an item's current value cannot be read (not readable by you, an I/O error), Edit
-Description, Add Tag, Remove Tag and the task band's editor change nothing and say so, rather than replace what they did not see.
+of any length is read whole; when an item's current value cannot be read (not readable by you, an I/O error), Add Tag, the
+Properties sheet and the task band's editor change nothing and say so, rather than replace what they did not see.
 
 Where they show:
 - **Details view columns.** Right-click the column header for a check per column (Name, Size, Type, Date Modified, Description,
   Tags, Comment) and More..., or View > Choose Details... (XP's dialog: check, Move Up / Move Down, Show / Hide, the selected
-  column's width). A click on a column header sorts by it (files without a value first). The columns, their order and widths
-  are remembered in `~/.local/state/lhde/flxp-columns`; the attributes are only read while one of their columns is shown or
-  sorted by.
+  column's width); drag a column header to move the column. A click on a column header sorts by it (files without a value first).
+  As in XP every column keeps its place in the order and its width whether it is shown or not: hiding one takes it out, showing
+  it again puts it back where it was, at its width, and nothing else moves. Choose Details lists the columns in that order, the
+  hidden ones at their places, so Move Up / Move Down also place a hidden one. Name is always shown. The attributes are only read
+  while one of their columns is shown or sorted by (or the filter looks at them).
+- **Columns per folder.** As XP's view state, each folder keeps its own columns: what you change in one folder (the set, the
+  order, the widths) stays with that folder, in its line of `~/.local/state/lhde/flxp-views` beside its view (only when it
+  differs from the default); a folder of its own gets the default, `~/.local/state/lhde/flxp-columns`. Tools > Folder Options'
+  Apply to All Folders makes the current folder's columns the default and forgets every folder's own, Reset All Folders goes
+  back to XP's four (Name, Size, Type, Date Modified) and forgets them too. With "Remember each folder's view settings" off
+  (`remember_views = 0`) the columns are one set for every folder, kept in `flxp-columns`.
 - **The infotip.** Resting the pointer on an item shows XP's tip: Type, Date Modified and Size, then Description, Tags and
   Comment when they are set.
 - **The panes.** XP's Details rollout lists them when set (read-only, as XP's did); 4051's task band shows them for one item,
   with "Add a description", "Add tags", "Add comments" when empty.
 
 How to edit:
-- **The context menu** (Explorer and desktop): Edit Description... (one item), Add Tag... (one or several items: each keeps its
-  tags and gets the new ones; the drop-down offers the tags used in the folder), and Remove Tag (a submenu of the selection's
-  tags, removed from every selected item that has it).
+- **The context menu** (Explorer and desktop): Add Tag... (one or several items: each keeps its tags and gets the new ones; the
+  drop-down offers the tags used in the folder) and Properties (one or several items: the sheet below; the rest of the editing
+  is there).
+- **Properties**, the item's Properties sheet (XP's file Properties, titled "a.txt Properties", or "a.txt, b.txt, ...
+  Properties" for several): General, where it opens as XP's does, shows the icon, name, type, Opens with and its Change...
+  button (XP's Open With), location, size ("1.29 KB (1,331 bytes)"), what a folder contains and the dates (several items:
+  "N Files, M Folders", "All of type ..." or "Multiple Types", "All in ..." or "Various Folders", the total size). Summary, one
+  tab away, has an edit for Description, Tags ("a, b"), Comment and luxfs's Author, Source, Build, Notes and To do
+  (docs/ANNOTATIONS.md); Advanced >> shows every `user.*` attribute on the files with its stored value, any program's: F2 or a double click edits a value in place (Enter
+  keeps it, Escape drops it), New Attribute... adds one (a name without `user.` gets it), Remove or Delete removes the
+  selected ones, << Simple goes back. With several files a value they share is shown, else the edit is empty with "(several
+  values)" in grey, and what is typed is written to every file. OK writes and closes, Apply writes and stays, Cancel or Escape
+  drops; an emptied value removes the attribute. It writes as the Explorer does (the same code), so tags typed "a; b" are
+  stored `a,b`; a file it cannot change (read-only, not yours, no user attributes there) is named in a message box and the
+  sheet stays. After OK the Explorer refreshes the rows and the panes.
+- **luxattr**, the same sheet from a terminal: `luxattr FILE...` opens it on Summary (`--general` on General), for the files
+  given (a folder is a file too), without Change... It needs no session and nothing imported: on a bare X display it draws in
+  wux's classic defaults; in a session it follows the theme like every lhde program. Exit status: 0 something was written,
+  1 nothing, 2 a usage error or a missing file.
 - **The task band:** click a value or its invitation, type, Enter (or click elsewhere) keeps it, Escape drops it.
 - From a terminal: `x desc FILE "text"`, `x +tag FILE a b`, `lsx -t DIR` (luxfs), or `setfattr` / `getfattr`. The Explorer
   follows a change made elsewhere (inotify reports attribute changes).
+
+**Filtering.** The Longhorn frame's "Filter by" box at the top of the left pane (4074's) and the header's
+search box keep the list to the items that match what is typed, narrowing it in place at every key (the view and the sort stay).
+Each word, separated by spaces, must match somewhere: in the name, the description, a tag or the comment, as a part of the value,
+ASCII upper and lower case alike (`red work` finds a file tagged `red,work` and one named `redwork.txt` whose comment says "work"). A
+word can name the field it looks in: `tag:x` (or `tags:`) a tag containing x, `desc:x` (`description:`), `comment:x`, `name:x`;
+the field alone (`tag:`) keeps the items where it is set. Double quotes make one word of several (`desc:"red sunset"`); any
+other `word:` is a plain word. While a filter is on the status bar says "N of M items". Escape in the box empties it and the
+whole folder shows again; Enter goes back to the list keeping the filter; another folder starts unfiltered. The filter belongs to
+the window and is not remembered. The attributes are read once per folder when a word needs them (or a column shows them) and
+follow changes on disk.
 
 They travel with the file where its attributes travel: a move on the same file system, flxp's own copy and move (also across
 file systems), `cp -a` (or `--preserve=xattr`), `rsync -X`, `tar --xattrs`. They do not travel with `cp` without `-a`, most
@@ -765,6 +800,35 @@ file can bind it ("Keys in the session" above). A window comes up at once with t
 From a script: `luxshot [--screen | --window [--no-frame] | --region] [--delay S] [--desc TEXT] [--tags A,B] FILE.png` writes
 FILE.png (with the description and tags) and exits without a window; without FILE the window comes up. Exit status 0 saved or
 copied, 1 cancelled or failed, 2 a usage error. `session/lab.sh shot` keeps using ImageMagick's `import` (it needs nothing built).
+
+## luxpad, the notepad
+
+`luxpad [FILE]` is XP's Notepad (ReactOS's, ported to wux): the title "Untitled - luxpad" or the file's name, File (New,
+Open..., Save, Save As..., Exit), Edit (Undo, Cut, Copy, Paste, Delete, Find..., Find Next F3, Replace..., Go To..., Select
+All, Time/Date F5: XP's "11:41 PM 11/12/2026"), Format (Word Wrap, Font...), View (Status Bar), XP's keys (Ctrl+N, O, S, F, H,
+G, A; Shift+F3 finds upward; Ctrl+Shift+N a new window). A file that starts with `.LOG` gets the time and date appended when it
+opens. Closing with unsaved changes asks; a file dropped on the window (from the Explorer, any XDND source) opens.
+`luxpad.desktop` (installed) claims `text/plain`, so the Explorer's Open With lists it and a double click on a `.txt` opens it
+when no other default is set (`mimeapps.list`).
+
+Encodings, as Notepad's, with one difference: **ANSI means UTF-8 here** (the code page wux reads "ANSI" in), so "ANSI (UTF-8)"
+and "UTF-8" write the same bytes. A file opens as: Unicode (UTF-16 LE) or Unicode big endian or UTF-8 with BOM when it starts
+with that byte-order mark; else UTF-8 when it is plain ASCII or valid UTF-8 without NUL bytes; else UTF-16 when Notepad's
+statistics say so (`IsTextUnicode`); else ANSI: a file that is not valid UTF-8 (Latin-1, a broken download), whose bytes that
+are not UTF-8 are kept as they were and written back unchanged (they show as boxes). Save As has Notepad's **Encoding** box
+under "Save as type" (ANSI, Unicode, Unicode big endian, UTF-8, UTF-8 with BOM) and ReactOS's **Line endings** box (Windows
+CR + LF, Unix LF, Mac CR). The line ends are kept as read: a file's own kind is written back for every line (a file mixing
+them gets its most common). The status bar says, from the left, Ln and Col (XP's: lines of the text, a column counted in
+UTF-16 units from 1), the line ends and the encoding; XP hides it while Word Wrap is on, and so does luxpad (Go To is greyed
+then too). A character above U+FFFF (an emoji, 𝄞) is typed, saved and reloaded intact; the caret and Backspace take it as one.
+NUL characters in a file become spaces (the Edit control's text ends at a NUL), as Notepad does.
+
+The font is Lucida Console 10 as XP's (a monospaced face when the Windows fonts are not imported: `fc-match monospace`);
+Font... is comdlg32's Font dialog over every installed family. What luxpad keeps: `~/.config/lhde/luxpad.ini` (`[luxpad]`
+`font`, `font_size`, `font_weight`, `font_italic`, `wrap`, `statusbar`; what you chose) and `~/.local/state/lhde/luxpad.ini`
+(`[window]` `x`, `y`, `width`, `height`, `maximized`; `[search]` `find`, `replace`, `match_case`, `whole_word`, `down`; what it
+remembers), both written when it exits (docs/SETTINGS.md). No printing, no Help Topics; About is a message box.
+`LUXPAD_TRACE=1` prints every status bar text on stdout (`status pos Ln 2, Col 3`), for scripts.
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell, docs/SHELL-DESIGN.md 6.4, 7.3, 13)
 

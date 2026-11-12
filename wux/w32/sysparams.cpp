@@ -450,16 +450,6 @@ DWORD WINAPI GetClipboardSequenceNumber(void) { return (DWORD)g_clip.size(); }
 
 // ---- misc -----------------------------------------------------------------
 
-INT WINAPI MessageBoxW(HWND, LPCWSTR text, LPCWSTR caption, UINT)
-{
-    fprintf(stderr, "MessageBox: [%s] %s\n", caption ? utf8_of(caption).c_str() : "", text ? utf8_of(text).c_str() : "");
-    return IDOK;
-}
-INT WINAPI MessageBoxA(HWND, LPCSTR text, LPCSTR caption, UINT)
-{
-    fprintf(stderr, "MessageBox: [%s] %s\n", caption ? caption : "", text ? text : "");
-    return IDOK;
-}
 BOOL WINAPI MessageBeep(UINT) { return TRUE; }
 HWND WINAPI GetShellWindow(void) { return nullptr; }
 BOOL WINAPI IsGUIThread(BOOL) { return TRUE; }

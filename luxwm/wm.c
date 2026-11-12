@@ -33,6 +33,7 @@
 #include "utils.h"
 #include "frame.h"
 #include "menu.h"
+#include "switcher.h"
 #include <lhde/data.h>
 #include <lhde/theme.h>
 #include <lhde/settings.h>
@@ -1578,6 +1579,7 @@ client_forget(struct client *c)
     if (f_client == c)
         f_client = NULL;
     if (c->icon) cairo_surface_destroy((cairo_surface_t *)c->icon);
+    if (c->icon32) cairo_surface_destroy((cairo_surface_t *)c->icon32);
     if (c->hdr_pix) XFreePixmap(display, c->hdr_pix);
     free(c);
     client_raise(f_client);
@@ -2967,6 +2969,7 @@ client_set_icon(struct client *c)
     Atom ty; int fmt; unsigned long n, after; unsigned char *d = NULL;
     int want = theme.mode == THEME_MSSTYLES ? 16 : theme.icon_size;   /* msstyles: SM_CXSMICON */
     if (c->icon) { cairo_surface_destroy((cairo_surface_t *)c->icon); c->icon = NULL; }
+    if (c->icon32) { cairo_surface_destroy((cairo_surface_t *)c->icon32); c->icon32 = NULL; }
     /* _NET_WM_ICON first (the whole array: 1L << 24 longs; a 256 px icon set alone is 87k), then WM_HINTS icon_pixmap/icon_mask
        (xterm, xclock, Xt/Motif/FOX programs: they have no _NET_WM_ICON). Without either the frame shows the theme's default icon */
     if (XGetWindowProperty(display, c->window, net_atom[NetWMIcon], 0, 1L << 24, False, XA_CARDINAL, &ty, &fmt, &n, &after, &d) == Success && d) {
@@ -3013,6 +3016,25 @@ client_icon(struct client *c)
     int want = theme.mode == THEME_MSSTYLES ? 16 : theme.icon_size;
     cairo_surface_t *a = app_icon(want);
     return a ? a : wm_theme_default_icon(&theme, want);
+}
+
+/* the Alt+Tab switcher's icon (LUXWM.md "Task switcher"): as the caption's, at 32 px (XP's ICON_BIG, else the class icon, else
+   IDI_APPLICATION): _NET_WM_ICON, WM_HINTS icon_pixmap, the generic application icon, the theme's default icon; kept until the
+   caption icon is read again */
+static cairo_surface_t *
+client_icon32(struct client *c)
+{
+    if (c->icon32) return (cairo_surface_t *)c->icon32;
+    cairo_surface_t *ic = NULL;
+    Atom ty; int fmt; unsigned long n, after; unsigned char *d = NULL;
+    if (XGetWindowProperty(display, c->window, net_atom[NetWMIcon], 0, 1L << 24, False, XA_CARDINAL, &ty, &fmt, &n, &after, &d) == Success && d) {
+        if (fmt == 32 && n > 2) ic = wm_frame_icon_from_netwm((unsigned long *)d, n, 32);
+        XFree(d);
+    }
+    if (!ic && c->icon_pm) ic = wm_frame_icon_from_pixmap(display, c->icon_pm, c->icon_mask, 32);
+    if (!ic) { ic = app_icon(32); if (!ic) ic = wm_theme_default_icon(&theme, 32); if (ic) cairo_surface_reference(ic); }
+    c->icon32 = ic;
+    return ic;
 }
 
 static void
@@ -4732,13 +4754,12 @@ static void showing_desktop(int mode) {
 }
 
 static bool super_down;
-/* ---- Alt+Tab as Windows' (LUXWM.md "Alt+Tab"): while the binding's modifier (Alt, or Super for Mod4+Tab) is held the keyboard is
-   luxwm's; the candidates are the current desktop's windows in stacking order (top first), then the minimised ones. Each Tab
-   (Shift+Tab: backwards, wrapping) previews the next candidate by raising it, client and frame, over the others without focusing
-   it; the previous candidate goes back to where it was (the whole set is restacked to the order from before Alt+Tab, then the new
-   candidate put on top of it). A minimised candidate is not shown (it is restored only if it is chosen). Releasing the modifier
-   restores the original order and focuses and raises the candidate for real (client_manage_focus: restored if minimised), so
-   every other window keeps its place; Esc puts the original order back and leaves the focus alone. ---- */
+/* ---- Alt+Tab as Windows' (LUXWM.md "Alt+Tab", "Task switcher"): while the binding's modifier (Alt, or Super for Mod4+Tab) is held
+   the keyboard is luxwm's and XP's switcher window (switcher.c) shows the candidates: the current desktop's switchable windows in
+   stacking order (top first), then the minimised ones. Each Tab (Shift+Tab: backwards, wrapping) and the arrow keys move the
+   selection, the pointer over an item selects it; nothing is restacked meanwhile. Releasing the modifier, Enter or a click on an
+   item focuses and raises the selected window (client_manage_focus: restored if minimised); Esc closes the switcher and leaves
+   the focus alone. ---- */
 static unsigned keycode_modmask(KeyCode kc) {
     XModifierKeymap *mm = XGetModifierMapping(display); unsigned m = 0;
     if (!mm) return 0;
@@ -4746,42 +4767,68 @@ static unsigned keycode_modmask(KeyCode kc) {
     XFreeModifiermap(mm);
     return m;
 }
-/* the current desktop's client and frame windows in the server's stacking order, top first */
-static int cycle_snapshot(Window *out, int max) {
-    Window rr, pr, *kids = NULL; unsigned nk = 0; int n = 0;
-    if (!XQueryTree(display, root, &rr, &pr, &kids, &nk)) return 0;
-    for (int i = (int)nk - 1; i >= 0 && n < max; i--) {
-        struct client *c = get_client_from_window(kids[i]);
-        if (c && c->ws == curr_ws && !c->hidden) out[n++] = kids[i];
+/* XP's IsAltTabWindow in EWMH terms: a normal or dialog window (no type counts as normal), not _NET_WM_STATE_SKIP_TASKBAR or
+   _SKIP_PAGER (WS_EX_TOOLWINDOW) */
+static bool cycle_listed(struct client *c) {
+    Atom ty; int fmt; unsigned long n = 0, after; unsigned char *d = NULL; bool ok = true;
+    if (XGetWindowProperty(display, c->window, net_atom[NetWMWindowType], 0, 32, False, XA_ATOM, &ty, &fmt, &n, &after, &d) == Success && d) {
+        if (fmt == 32 && n) {
+            Atom normal = XInternAtom(display, "_NET_WM_WINDOW_TYPE_NORMAL", False); ok = false;
+            for (unsigned long i = 0; i < n; i++) if (((Atom *)d)[i] == normal || ((Atom *)d)[i] == net_atom[NetWMWindowTypeDialog]) ok = true;
+        }
+        XFree(d); d = NULL;
     }
-    if (kids) XFree(kids);
-    return n;
+    if (ok && XGetWindowProperty(display, c->window, net_atom[NetWMState], 0, 64, False, XA_ATOM, &ty, &fmt, &n, &after, &d) == Success && d) {
+        Atom st = XInternAtom(display, "_NET_WM_STATE_SKIP_TASKBAR", False), sp = XInternAtom(display, "_NET_WM_STATE_SKIP_PAGER", False);
+        for (unsigned long i = 0; fmt == 32 && i < n; i++) if (((Atom *)d)[i] == st || ((Atom *)d)[i] == sp) ok = false;
+        XFree(d);
+    }
+    return ok;
 }
-/* restack the snapshot (only windows that still belong to a client), with cand (client + frame) on top of it when given */
-static void cycle_restack(const Window *orig, int no, struct client *cand) {
-    Window w[1024]; int n = 0;
-    if (cand && !cand->hidden && !cand->minimized) { w[n++] = cand->window; if (cand->decorated && cand->dec != None) w[n++] = cand->dec; }
-    for (int i = 0; i < no && n < 1024; i++) {
-        struct client *c = get_client_from_window(orig[i]);
-        if (!c || c->hidden || c->minimized || c == cand) continue;
-        w[n++] = orig[i];
+/* the candidates, top first, minimised ones last; an owner whose transient (WM_TRANSIENT_FOR) is listed and not minimised is left
+   out, its popup stands for it (XP: GetLastActivePopup of the root owner) */
+static int cycle_candidates(Window *cand, int max) {
+    struct client *l[256]; int n = 0;
+    for (int pass = 0; pass < 2; pass++)
+        for (struct client *c = c_list[curr_ws]; c && n < 256; c = c->next)
+            if ((pass ? c->minimized : !c->minimized && !c->hidden) && cycle_listed(c)) l[n++] = c;
+    bool owner[256] = { false };
+    for (int i = 0; i < n; i++) {
+        Window o = None;
+        if (l[i]->minimized || !XGetTransientForHint(display, l[i]->window, &o) || o == None || o == l[i]->window) continue;
+        for (int j = 0; j < n; j++) if (l[j]->window == o) owner[j] = true;
     }
-    /* the first window stays where it is and the others go under it: on a preview the candidate (raised first), on the restore
-       the original top window, under which the candidate falls back into its old place */
-    if (cand && n) XRaiseWindow(display, w[0]);
-    if (n > 1) XRestackWindows(display, w, n);
-    docks_raise();
+    int k = 0;
+    for (int i = 0; i < n && k < max; i++) if (!owner[i]) cand[k++] = l[i]->window;
+    return k;
+}
+static struct wm_switcher *cycle_switcher(const Window *cand, int n, int sel) {
+    struct wm_switcher_item it[256];
+    for (int i = 0; i < n; i++) {
+        struct client *c = get_client_from_window(cand[i]);
+        it[i].title = c ? c->title : ""; it[i].icon = c ? client_icon32(c) : NULL; it[i].window = cand[i];
+    }
+    struct wm_switcher_env e = { .dpy = display, .screen = screen, .root = root, .theme = &theme };
+    int mon = ws_m_list[curr_ws];
+    if (m_list && mon >= 0 && mon < m_count) { e.bx = m_list[mon].x; e.by = m_list[mon].y; e.bw = m_list[mon].width; e.bh = m_list[mon].height; }
+    else { e.bx = 0; e.by = 0; e.bw = display_width; e.bh = display_height; }
+    return wm_switcher_open(&e, it, n, sel);
 }
 static void cycle_run(XKeyEvent *kev, unsigned mods, bool reverse) {
-    Window cand[256]; int n = 0;
-    for (struct client *c = c_list[curr_ws]; c && n < 256; c = c->next) if (!c->minimized && !c->hidden) cand[n++] = c->window;
-    for (struct client *c = c_list[curr_ws]; c && n < 256; c = c->next) if (c->minimized) cand[n++] = c->window;
+    Window cand[256]; int n = cycle_candidates(cand, 256);
     if (!n) return;
-    Window orig[1024]; int no = cycle_snapshot(orig, 1024);
+    unsigned need = mods & ~(unsigned)ShiftMask;
+    if (n == 1) {   /* one window: switched to at once, no switcher (appswitch.c ProcessHotKey) */
+        struct client *c = get_client_from_window(cand[0]);
+        if (c && c->window == cand[0]) client_manage_focus(c);
+        if (need & Mod4Mask) super_down = false;
+        ewmh_update_stacking();
+        LOGP("alt+tab: one candidate 0x%lx", cand[0]);
+        return;
+    }
     /* the first Tab: the window under the active one (the active one is first); from the desktop (nothing active) the top one */
     bool from_active = client_active(f_client) && f_client->window == cand[0];
-    int idx = reverse ? n - 1 : (from_active && n > 1 ? 1 : 0);
-    unsigned need = mods & ~(unsigned)ShiftMask;
+    int idx = reverse ? n - 1 : (from_active ? 1 : 0);
     bool cancel = false, done = false;
     int gr = XGrabKeyboard(display, root, True, GrabModeAsync, GrabModeAsync, kev->time);
     if (gr != GrabSuccess) { done = true; LOGP("alt+tab: keyboard grab failed (%d): one step", gr); }
@@ -4790,39 +4837,46 @@ static void cycle_run(XKeyEvent *kev, unsigned mods, bool reverse) {
         XQueryPointer(display, root, &d1, &d2, &i1, &i2, &i3, &i4, &st);
         if (need && !(st & need)) { done = true; LOGP("alt+tab: modifier 0x%x already up (state 0x%x): one step", need, st); }
     }
-    struct client *pc = get_client_from_window(cand[idx]);
-    if (!done) { cycle_restack(orig, no, pc && pc->window == cand[idx] ? pc : NULL); XFlush(display); }
+    struct wm_switcher *sw = done ? NULL : cycle_switcher(cand, n, idx);
+    Window sww = wm_switcher_window(sw);
     LOGP("alt+tab: %d candidates, first 0x%lx", n, cand[idx]);
     while (!done) {
         XEvent ev;
         if (!XPending(display)) paint_dirty();
         XNextEvent(display, &ev);
+        int was = idx;
         if (ev.type == KeyPress) {
             KeySym sym = XkbKeycodeToKeysym(display, ev.xkey.keycode, 0, 0);
             if (sym == XK_Escape) { cancel = done = true; break; }
-            if (sym != XK_Tab && sym != XK_ISO_Left_Tab) continue;
-            bool back = (ev.xkey.state & ShiftMask) != 0;
-            for (int k = 0; k < n; k++) {   /* the next candidate that still exists */
-                idx = (idx + (back ? n - 1 : 1)) % n;
-                if (get_client_from_window(cand[idx])) break;
+            if (sym == XK_Return || sym == XK_KP_Enter) { done = true; break; }
+            int row = idx / SWITCH_COLS, col = idx % SWITCH_COLS, rows = (n + SWITCH_COLS - 1) / SWITCH_COLS;
+            if (sym == XK_Tab || sym == XK_ISO_Left_Tab) idx = (idx + ((ev.xkey.state & ShiftMask) ? n - 1 : 1)) % n;
+            else if (sym == XK_Left || sym == XK_KP_Left) idx = (idx + n - 1) % n;
+            else if (sym == XK_Right || sym == XK_KP_Right) idx = (idx + 1) % n;
+            else if (sym == XK_Up || sym == XK_KP_Up || sym == XK_Down || sym == XK_KP_Down) {   /* the column, wrapping over the rows */
+                row = (row + ((sym == XK_Up || sym == XK_KP_Up) ? rows - 1 : 1)) % rows;
+                idx = row * SWITCH_COLS + col; if (idx >= n) idx = n - 1;
             }
-            struct client *c = get_client_from_window(cand[idx]);
-            cycle_restack(orig, no, c && c->window == cand[idx] ? c : NULL);
-            XFlush(display);
-            LOGP("alt+tab: candidate 0x%lx", cand[idx]);
         } else if (ev.type == KeyRelease) {
             unsigned m = keycode_modmask(ev.xkey.keycode);
             if (need ? ((m & need) && !((ev.xkey.state & need) & ~m)) : true) {
                 done = true; LOGP("alt+tab: release of keycode %u (modifier 0x%x, state 0x%x)", ev.xkey.keycode, m, ev.xkey.state); }
+        } else if (sww && ev.xany.window == sww) {   /* the pointer over an item selects it, a click on one chooses it */
+            if (ev.type == MotionNotify) { int i = wm_switcher_item_at(sw, ev.xmotion.x, ev.xmotion.y); if (i >= 0) idx = i; }
+            else if (ev.type == ButtonRelease && ev.xbutton.button == Button1) {
+                int i = wm_switcher_item_at(sw, ev.xbutton.x, ev.xbutton.y);
+                if (i >= 0) { idx = i; done = true; }
+            }
         } else if (xfixes_ev >= 0 && ev.type == xfixes_ev + XFixesSelectionNotify) {
             compositor_check();
         } else if (ev.type < LASTEvent && event_handler[ev.type]) {
             event_handler[ev.type](&ev);
         }
+        if (idx != was) { wm_switcher_select(sw, idx); LOGP("alt+tab: candidate 0x%lx", cand[idx]); }
     }
     XUngrabKeyboard(display, CurrentTime);
+    wm_switcher_close(sw);
     if (need & Mod4Mask) super_down = false;   /* the Super release was ours: no start menu, and the next Super press is not a repeat */
-    cycle_restack(orig, no, NULL);
     struct client *c = cancel ? NULL : get_client_from_window(cand[idx]);
     if (c && c->window == cand[idx]) {
         if (c->ws != curr_ws) switch_ws(c->ws);

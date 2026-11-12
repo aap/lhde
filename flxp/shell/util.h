@@ -35,6 +35,9 @@ inline bool iequal(const std::string& a, const std::string& b)
     return true;
 }
 
+// argv[0]'s basename ("flxp", "luxattr"): what the shell layer's warnings on stderr start with (config.cpp)
+const char* program_name();
+
 // the path names something (stat follows symlinks: a dangling link does not exist)
 inline bool exists(const std::string& p) { struct stat st; return stat(p.c_str(), &st) == 0; }
 inline bool is_dir(const std::string& p) { struct stat st; return stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode); }

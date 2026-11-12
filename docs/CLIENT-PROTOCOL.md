@@ -32,6 +32,7 @@ the client needs to know only *where* the glass is, not how it is drawn.
 | `_LHWM_CAPTION_RECT` | client toplevel | luxwm | CARDINAL[4] | "Client content over the caption rows" |
 | `_LHWM_DESKTOP_LAYER` | desktop window | client | CARDINAL | "Desktop windows" |
 | `_LH_DROP_SHADOW` | override-redirect window | client | CARDINAL | "Drop shadows" |
+| `_LHWM_SWITCHER` | luxwm's Alt+Tab switcher window | luxwm | CARDINAL[4] | "The task switcher window" |
 | `_NET_FRAME_EXTENTS` | client toplevel | luxwm | CARDINAL[4] | the real frame margins outside the client; an extension (inside the client) does not change them |
 | `_LHWM_COMPOSITED` | root | luxwm | CARDINAL 0/1 | "Root properties" |
 | `_LHWM_THEME` | root | luxwm | STRING | "Root properties" |
@@ -318,6 +319,14 @@ shadow's alpha; without one it is a copy of the screen under it, taken before th
 | Property | Type | Meaning |
 | --- | --- | --- |
 | `_LH_DROP_SHADOW` | CARDINAL | on an override-redirect window: 1 = a popup whose drop shadow is its client's own (or none, when the setting is off), 2 = such a shadow window. The compositor adds no shadow of its own and does not blur behind either (`picom-glass.conf`, `picom-glass-fvwm.conf`). |
+
+## The task switcher window: `_LHWM_SWITCHER`
+
+While Alt+Tab is held luxwm shows XP's switcher (docs/LUXWM.md "Task switcher"): an override-redirect window of WM_CLASS
+`lhwm-switcher`/`lhwm`, named "lhwm task switcher", which carries `_LHWM_SWITCHER` (CARDINAL[4]): the selected entry (0-based),
+the number of entries, the first entry shown (more than 7 x 3 entries scroll), the selected client window. It is written before
+the map and on every change of the selection, for tests (`tests/headless/alttab.sh`) and the compositor: `picom-glass.conf` gives
+the window no shadow, no blur and no fade, as XP shows and hides it at once.
 
 ## Start menu state: `_LH_STARTMENU_OPEN`
 

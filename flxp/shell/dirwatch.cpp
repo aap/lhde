@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/inotify.h>
 #include "dirwatch.h"
+#include "util.h"
 
 namespace shell {
 
@@ -28,7 +29,7 @@ bool DirWatch::watch(const std::string& dir)
     if (fd_ < 0) {
         if (failed_) return false;
         fd_ = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
-        if (fd_ < 0) { failed_ = true; fprintf(stderr, "flxp: no inotify (%s): folders are not updated by themselves (F5 refreshes)\n", strerror(errno)); return false; }
+        if (fd_ < 0) { failed_ = true; fprintf(stderr, "%s: no inotify (%s): folders are not updated by themselves (F5 refreshes)\n", shell::program_name(), strerror(errno)); return false; }
     }
     // IN_ATTRIB: permissions, ownership and touch(1)'s times; IN_CLOSE_WRITE: a file written
     // (not every IN_MODIFY of a copy in progress); IN_ONLYDIR: not a directory (any more)
@@ -38,7 +39,7 @@ bool DirWatch::watch(const std::string& dir)
         static bool told;
         if (errno == ENOSPC && !told) {
             told = true;
-            fprintf(stderr, "flxp: the inotify watch limit is reached (fs.inotify.max_user_watches): %s is not followed (F5 refreshes)\n", dir.c_str());
+            fprintf(stderr, "%s: the inotify watch limit is reached (fs.inotify.max_user_watches): %s is not followed (F5 refreshes)\n", shell::program_name(), dir.c_str());
         }
         return false;
     }

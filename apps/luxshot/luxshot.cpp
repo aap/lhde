@@ -137,7 +137,7 @@ std::string target_path(const std::string& folder, std::string name)
 
 void error_box(HWND dlg, const std::string& text)
 {
-    filedlg::message_box(dlg, "Save Screenshot", text, MB_OK | MB_ICONEXCLAMATION);
+    shell::message_box(dlg, "Save Screenshot", text, MB_OK | MB_ICONEXCLAMATION);
 }
 
 void set_text(HWND dlg, int id, const std::string& s) { SetDlgItemTextW(dlg, id, (LPCWSTR)WuxWide(s).c_str()); }
@@ -150,7 +150,7 @@ bool save(HWND dlg)
     struct stat st;
     if (stat(path.c_str(), &st) == 0) {
         if (S_ISDIR(st.st_mode)) { error_box(dlg, shell::base_of(path) + " is a folder."); return false; }
-        if (filedlg::message_box(dlg, "Save Screenshot", shell::base_of(path) + " already exists.\nDo you want to replace it?",
+        if (shell::message_box(dlg, "Save Screenshot", shell::base_of(path) + " already exists.\nDo you want to replace it?",
                                  MB_YESNO | MB_ICONEXCLAMATION) != IDYES) return false;
     }
     shell::make_dirs(shell::dir_of(path));

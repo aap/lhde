@@ -14,9 +14,10 @@
 #
 # The headers: "wux/wux.h" (the Win32 surface and wux's additions, WuxInit) and "shell/shell.h" (the shell facilities).
 
-# libflxpshell.a: the shell facilities (flxp/shell, with liblhde's objects), the same objects flxp's programs link
+# libflxpshell.a: the shell facilities (flxp/shell with its win32 part flxp/shell/ui, and liblhde's objects), the same
+# objects flxp's programs link
 SHELLA = build/lib/libflxpshell.a
-$(SHELLA): $(SHELLOBJS)
+$(SHELLA): $(SHELLOBJS) $(SHELLUIOBJS)
 	@mkdir -p $(dir $@)
 	rm -f $@; ar rcs $@ $^
 

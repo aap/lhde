@@ -52,17 +52,3 @@ BEGIN
     PUSHBUTTON      "Cancel", IDCANCEL, 384, 278, 50, 14, WS_GROUP
     CONTROL         "&Hide Explorer", IDC_FD_HIDE, "Button", BS_OWNERDRAW | WS_TABSTOP, 7, 312, 70, 12
 END
-
-/* A message box (the shim's MessageBoxW is a stub): XP's user32 layout,
- * icon at 7,7, text at 41; resized to the text at run time. */
-IDD_FD_MESSAGE DIALOGEX 0, 0, 240, 62
-STYLE DS_MODALFRAME | DS_SHELLFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION ""
-FONT 8, "MS Shell Dlg"
-BEGIN
-    ICON            "", IDC_FD_MSG_ICON, 7, 7, 21, 20
-    LTEXT           "", IDC_FD_MSG_TEXT, 41, 9, 192, 28, SS_NOPREFIX
-    DEFPUSHBUTTON   "&Yes", IDYES, 66, 41, 50, 14
-    PUSHBUTTON      "&No", IDNO, 120, 41, 50, 14
-    PUSHBUTTON      "OK", IDOK, 95, 41, 50, 14
-END

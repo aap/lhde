@@ -507,6 +507,7 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_WINDOWPOSCHANGED: {
         const WINDOWPOS* p = (const WINDOWPOS*)lp;
+        if (!w->parent) note_normal_rect(h);   // GetWindowPlacement's normal rectangle
         if (!(p->flags & SWP_NOCLIENTSIZE) && !(p->flags & SWP_NOSIZE))
             SendMessageW(h, WM_SIZE, SIZE_RESTORED, MAKELONG(w->client.width(), w->client.height()));
         if (!(p->flags & SWP_NOCLIENTMOVE) && !(p->flags & SWP_NOMOVE))
@@ -582,10 +583,23 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         if (!w->parent) publish_icons(h);
         return (LRESULT)old;
     }
+    case win::WM_FLXP_DRAGOVER:     // drops: a window that accepts files (DragAcceptFiles) copies them, as Windows' shell
+    case win::WM_FLXP_DROP: {       // drop target does; it gets WM_DROPFILES (shellapi.cpp)
+        const win::DropInfo* f = (const win::DropInfo*)lp;
+        if ((w->ex_style & WS_EX_ACCEPTFILES) && f && f->count) {
+            enum { COPY = 1, MOVE = 2, LINK = 4 };   // DROPEFFECT_*
+            DWORD effect = (f->allowed & COPY) ? COPY : (f->allowed & LINK) ? LINK : (f->allowed & MOVE) ? MOVE : 0;
+            if (msg == win::WM_FLXP_DROP && effect) {
+                HDROP d = make_hdrop(h, f->x, f->y, f->paths, f->count);
+                if (d && !PostMessageW(h, WM_DROPFILES, (WPARAM)d, 0)) GlobalFree((HGLOBAL)d);
+            }
+            return effect;
+        }
+        if (w->parent) return SendMessageW(hwnd_of(w->parent), msg, wp, lp);   // the frame answers for its controls
+        return 0;
+    }
     case WM_MOUSEWHEEL:
-    case win::WM_FLXP_DRAGOVER:     // drops: the frame answers for its controls
     case win::WM_FLXP_DRAGLEAVE:
-    case win::WM_FLXP_DROP:
         if (w->parent) return SendMessageW(hwnd_of(w->parent), msg, wp, lp);
         return 0;
     default:

@@ -4,6 +4,7 @@
 #include "uiicons.h"
 #include "shell/icons.h"
 #include "w32/flxp_shell.h"
+#include "shell/ui.h"
 
 namespace uiicons {
 
@@ -18,7 +19,6 @@ static std::map<int, HIMAGELIST> g_sized;
 static std::vector<std::string> g_by_index;
 static int g_generation = -1;
 
-static std::u16string W(const std::string& s) { return w32::utf16_of(s.c_str()); }
 
 void init(int large_px)
 {
@@ -78,30 +78,9 @@ HIMAGELIST at_size(int px)
     return il;
 }
 
-static HINSTANCE module_for(const std::string& path)
-{
-    static std::map<std::string, HINSTANCE> cache;
-    auto it = cache.find(path);
-    if (it != cache.end()) return it->second;
-    std::u16string w = W(path);
-    HINSTANCE h = LoadLibraryExW((LPCWSTR)w.c_str(), nullptr, LOAD_LIBRARY_AS_DATAFILE);
-    cache[path] = h;
-    return h;
-}
-
 HANDLE load_themed(const std::string& src, UINT type, int cx, int cy, UINT extra)
 {
-    if (src.empty()) return nullptr;
-    UINT depth_flag = (type == IMAGE_ICON && shell::icon_theme().depth <= 4) ? LR_VGACOLOR : 0;   // bitmaps keep their colour key
-    if (src.rfind("pe:", 0) == 0) {
-        size_t hash = src.rfind('#');
-        if (hash == std::string::npos) return nullptr;
-        HINSTANCE h = module_for(src.substr(3, hash - 3));
-        if (!h) return nullptr;
-        return LoadImageW(h, MAKEINTRESOURCEW(atoi(src.c_str() + hash + 1)), type, cx, cy, depth_flag | extra);
-    }
-    std::u16string w = W(src);
-    return LoadImageW(nullptr, (LPCWSTR)w.c_str(), type, cx, cy, LR_LOADFROMFILE | depth_flag | extra);
+    return shell::load_image(src, type, cx, cy, extra);
 }
 
 int index(const std::string& key)
@@ -160,9 +139,7 @@ int native_size(const std::string& key, int want)
 
 HICON load_icon(const std::string& key, int size)
 {
-    HICON h = (HICON)load_themed(shell::icon_file(key), IMAGE_ICON, size, size, 0);
-    if (!h && key != "document") h = (HICON)load_themed(shell::icon_file("document"), IMAGE_ICON, size, size, 0);
-    return h;
+    return shell::icon_for_key(key, size);
 }
 
 } // namespace uiicons

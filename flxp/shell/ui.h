@@ -1,0 +1,55 @@
+// ui.h: the shell layer's win32 part (flxp/shell/ui/, compiled on wux and linked with it: libflxpshell.a, flxp's
+// programs; not the native toolkit tests). What a program shows of the shell: the message box, a shell icon as an HICON,
+// the Properties sheet. Include it after the win32 headers (wux/wux.h, or w32/w32.h inside flxp); shell/shell.h does.
+#pragma once
+#pragma push_macro("min")
+#pragma push_macro("max")
+#undef min
+#undef max      // windef.h's, before the library headers
+#include <functional>
+#include <string>
+#include <vector>
+#pragma pop_macro("max")
+#pragma pop_macro("min")
+
+namespace shell {
+
+// A message box (wux's MessageBoxW: the icon, the text and the buttons of `type`, MB_OK | MB_ICONEXCLAMATION, MB_YESNO |
+// MB_ICONQUESTION, ...) with UTF-8 strings; returns IDOK, IDYES, IDNO, IDCANCEL, ... owner may be null.
+int message_box(HWND owner, const std::string& title, const std::string& text, unsigned type);
+
+// An icon theme's source (shell/icons.h: an .ico or image file, or "pe:FILE#ID", a resource of a PE file read as data) as
+// a HICON / HBITMAP of cx x cy (LoadImageW's type and flags; a theme of depth 4, the Windows 2000 look, adds LR_VGACOLOR to
+// icons). Null when the source is missing. The caller destroys it.
+HANDLE load_image(const std::string& src, UINT type, int cx, int cy, UINT flags = 0);
+// The icon of an icon key (shell::icon_key, "folder", "document", ...) at px, "document"'s when the key has none; null
+// when neither loads. The caller destroys it (DestroyIcon).
+HICON icon_for_key(const std::string& key, int px);
+// The icon the Explorer shows for a file or folder (its icon key by name and type) at px.
+HICON icon_for(const std::string& path, int px);
+
+// The Properties sheet of files and folders (XP's file Properties; flxp's Properties verb, luxattr), titled "NAME
+// Properties" ("a.txt, b.txt, ... Properties" for several), modal to owner (null: a window of its own). Two pages:
+//   General   the icon, the name, the type (with the MIME type), Opens with (Change... when change_program is set), the
+//             location, size ("1.29 KB (1,331 bytes)"), what a folder contains, the three dates with seconds, the
+//             permissions and owner, a link's target; for several items XP's "N Files, M Folders", "All of type X" /
+//             "Multiple Types", "All in DIR" / "Various Folders" and the total size.
+//   Summary   the stored properties (shell/details.h: Description, Tags, Comment) and luxfs's names (Author, Source, Build,
+//             Notes, To do: user.lux.*), one edit each; Advanced >> lists every user.* attribute with its value, edited in
+//             place (F2, a double click), New Attribute..., Remove. Several files: a shared value shows, else "(several
+//             values)", and what is typed goes to every file.
+// OK writes and closes, Apply writes and stays, Cancel drops; every value through details::write (as the Explorer writes
+// it); an error (read-only, not yours, no user attributes) in a message box, the sheet staying. True when something was
+// written.
+struct PropertiesOptions {
+    int page = 0;                     // the page shown first: 0 General (XP's), 1 Summary
+    std::string name;                 // one item: its name as the caller shows it (else the file's name)
+    std::string type;                 // one item: its type as the caller shows it (else shell::type_name)
+    std::string icon_key;             // one item: its icon key (else shell::icon_key of the name)
+    // General's Change... beside "Opens with" (one file, not a folder), shown when set: called with the sheet's page as the
+    // owner and the file's MIME type; true when the default program changed (the page shows the new one)
+    std::function<bool(HWND page, const std::string& path, const std::string& mime)> change_program;
+};
+bool properties(HWND owner, const std::vector<std::string>& paths, const PropertiesOptions& o = PropertiesOptions());
+
+} // namespace shell

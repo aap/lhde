@@ -53,6 +53,10 @@ struct wm_menu_env {
    does not say, as for flxp's menus */
 void wm_menu_set_theme_smoothing(const char *v);
 
+/* the text smoothing of luxwm's own user32-drawn text (menus, the task switcher): 0 off, 1 standard, 2 ClearType (ut_set_font_smoothing):
+   settings.ini [fonts] smoothing, else the theme's */
+int wm_menu_text_smoothing(const struct theme *t);
+
 int wm_menu_popup(const struct wm_menu_env *env, int x, int y, const struct wm_menu_item *items, int n, unsigned flags, unsigned button);
 
 /* LHWM_MENUTEST: render the menu as wm_menu_popup would draw it (selected item sel, -1 none) into a new image (caller destroys it),

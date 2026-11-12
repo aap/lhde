@@ -48,6 +48,20 @@ static void focus_rect(HDC dc, HBRUSH pat, RECT r)
     SelectObject(dc, old);
 }
 
+struct Enum { int families, named; WCHAR first[LF_FACESIZE]; };
+static INT CALLBACK enum_family(const LOGFONTW* lf, const TEXTMETRICW*, DWORD type, LPARAM lp)
+{
+    Enum* e = (Enum*)lp;
+    if (!e->families++) memcpy(e->first, lf->lfFaceName, sizeof e->first);
+    return type == TRUETYPE_FONTTYPE;
+}
+static INT CALLBACK enum_style(const LOGFONTW* lf, const TEXTMETRICW*, DWORD, LPARAM lp)
+{
+    Enum* e = (Enum*)lp;
+    if (!memcmp(lf->lfFaceName, e->first, sizeof e->first)) e->named++;
+    return 1;
+}
+
 int main(int argc, char** argv)
 {
     const char* out = argc > 1 ? argv[1] : "gditest.ppm";
@@ -99,6 +113,40 @@ int main(int argc, char** argv)
     CHECK(GetTextExtentExPointW(dc, hello, 5, sz.cx - 1, &fit, dx, NULL));
     CHECK(fit == 4 && dx[4] == sz.cx);
     printf("extent(Hello) = %dx%d\n", (int)sz.cx, (int)sz.cy);
+
+    // The A functions read "ANSI" as UTF-8 through the one conversion pair: é (Latin-1's range, two bytes) and 𝄞 (four
+    // bytes, a surrogate pair) measure as their UTF-16; the per-byte widths of GetTextExtentExPointA land on the last byte
+    // of each character. Read as Latin-1, the six bytes would be six characters.
+    static const char mixA[] = "\xc3\xa9x\xf0\x9d\x84\x9e";   // é x 𝄞
+    static const WCHAR mixW[] = {0xe9, 'x', 0xd834, 0xdd1e};
+    SIZE sa, sw;
+    CHECK(GetTextExtentPoint32A(dc, mixA, 7, &sa) && GetTextExtentPoint32W(dc, mixW, 4, &sw));
+    CHECK(sa.cx == sw.cx && sa.cy == sw.cy && sw.cx > 0);
+    INT dxa[7], dxw[4], fa = 0, fw = 0;
+    CHECK(GetTextExtentExPointA(dc, mixA, 7, 10000, &fa, dxa, NULL) && GetTextExtentExPointW(dc, mixW, 4, 10000, &fw, dxw, NULL));
+    CHECK(fw == 4 && dxa[1] == dxw[0] && dxa[2] == dxw[1] && dxa[6] == dxw[3]);
+    printf("extent(é x 𝄞): A %dx%d, W %dx%d\n", (int)sa.cx, (int)sa.cy, (int)sw.cx, (int)sw.cy);
+
+    // EnumFontFamiliesEx (fontconfig's families): one call per family, then a named family's styles
+    Enum en = {};
+    LOGFONTW all = {};
+    all.lfCharSet = DEFAULT_CHARSET;
+    EnumFontFamiliesExW(dc, &all, enum_family, (LPARAM)&en, 0);
+    LOGFONTW one = {};
+    one.lfCharSet = DEFAULT_CHARSET;
+    memcpy(one.lfFaceName, en.first, sizeof en.first);
+    EnumFontFamiliesExW(dc, &one, enum_style, (LPARAM)&en, 0);
+    CHECK(en.families > 0 && en.named > 0);
+    printf("EnumFontFamiliesExW: %d families, %d styles of the first\n", en.families, en.named);
+
+    // a face that is not installed, asked for with fixed pitch (notepad's Lucida Console without the Windows fonts): a
+    // monospaced one, as the font mapper weighs the pitch
+    HFONT fixed = CreateFontW(-13, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH | FF_MODERN, L"No Such Face Here");
+    HGDIOBJ of = SelectObject(dc, fixed);
+    SIZE si, sW;
+    CHECK(GetTextExtentPoint32W(dc, L"iiii", 4, &si) && GetTextExtentPoint32W(dc, L"WWWW", 4, &sW) && si.cx == sW.cx);
+    SelectObject(dc, of);
+    DeleteObject(fixed);
 
     // Rectangle: black pen, light gray brush
     SelectObject(dc, GetStockObject(BLACK_PEN));

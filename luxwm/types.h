@@ -28,6 +28,7 @@ struct client {
     struct client *next, *f_next;
     int hover, pressed;
     void *icon;   /* cairo_surface_t* */
+    void *icon32;                       /* cairo_surface_t*: the Alt+Tab switcher's 32 px icon (made on first use, dropped with icon) */
     unsigned long icon_pm, icon_mask;   /* WM_HINTS icon_pixmap / icon_mask last read (PropertyNotify re-reads the icon when they change) */
     bool has_ext;                       /* _LHWM_EXTEND_FRAME set (CLIENT-PROTOCOL.md) */
     unsigned long ext[4];               /* its left right top bottom, client pixels (all 0xFFFFFFFF: sheet of glass) */

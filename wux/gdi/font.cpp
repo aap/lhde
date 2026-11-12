@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
+#include <ctype.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_TRUETYPE_TABLES_H
@@ -147,6 +149,59 @@ bool have_family(const char* family)
     }
     FcPatternDestroy(pat);
     return ok;
+}
+
+std::vector<FaceInfo> list_faces()
+{
+    std::vector<FaceInfo> out;
+    if (!init_freetype()) return out;
+    std::vector<std::string> seen_in_earlier;   // families of the sources already listed (lower case)
+    FcConfig* configs[4] = { theme_config, app_config, fallback_config, nullptr };
+    for (int c = 0; c < 4; c++) {
+        if (c < 3 && !configs[c]) continue;
+        FcPattern* pat = FcPatternCreate();
+        FcPatternAddBool(pat, FC_SCALABLE, FcTrue);
+        FcObjectSet* os = FcObjectSetBuild(FC_FAMILY, FC_STYLE, FC_WEIGHT, FC_SLANT, FC_SPACING, (char*)nullptr);
+        FcFontSet* fs = FcFontList(c < 3 ? configs[c] : FcConfigGetCurrent(), pat, os);
+        std::vector<std::string> here;
+        for (int i = 0; fs && i < fs->nfont; i++) {
+            FcPattern* p = fs->fonts[i];
+            FcChar8* fam = nullptr;
+            if (FcPatternGetString(p, FC_FAMILY, 0, &fam) != FcResultMatch || !fam || !*fam || *fam == '.') continue;
+            std::string lower = (const char*)fam;
+            for (char& ch : lower) ch = (char)tolower((unsigned char)ch);
+            bool earlier = false;
+            for (const std::string& e : seen_in_earlier) if (e == lower) { earlier = true; break; }
+            if (earlier) continue;
+            here.push_back(lower);
+            FaceInfo f;
+            f.family = (const char*)fam;
+            FcChar8* st = nullptr;
+            f.style = FcPatternGetString(p, FC_STYLE, 0, &st) == FcResultMatch && st ? (const char*)st : "Regular";
+            int w = FC_WEIGHT_REGULAR, sl = FC_SLANT_ROMAN, sp = FC_PROPORTIONAL;
+            FcPatternGetInteger(p, FC_WEIGHT, 0, &w);
+            FcPatternGetInteger(p, FC_SLANT, 0, &sl);
+            FcPatternGetInteger(p, FC_SPACING, 0, &sp);
+            f.weight = FcWeightToOpenType(w);
+            f.italic = sl != FC_SLANT_ROMAN;
+            f.fixed_pitch = sp == FC_MONO || sp == FC_CHARCELL;
+            bool dup = false;
+            for (const FaceInfo& o : out)
+                if (!strcasecmp(o.family.c_str(), f.family.c_str()) && o.weight == f.weight && o.italic == f.italic) { dup = true; break; }
+            if (!dup) out.push_back(f);
+        }
+        if (fs) FcFontSetDestroy(fs);
+        FcObjectSetDestroy(os);
+        FcPatternDestroy(pat);
+        seen_in_earlier.insert(seen_in_earlier.end(), here.begin(), here.end());
+    }
+    std::stable_sort(out.begin(), out.end(), [](const FaceInfo& a, const FaceInfo& b) {
+        int k = strcasecmp(a.family.c_str(), b.family.c_str());
+        if (k) return k < 0;
+        if (a.weight != b.weight) return a.weight < b.weight;
+        return !a.italic && b.italic;
+    });
+    return out;
 }
 
 // Returns true and fills file/index. The add_font_dir directories win over

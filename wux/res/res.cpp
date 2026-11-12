@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "res.h"
+#include "w32/utf.h"
 
 namespace res {
 
@@ -28,54 +29,9 @@ Id::Id(const char16_t* s)
     if (s) name = s;
 }
 
-Id::Id(const char* s)
-{
-    const uint8_t* p = (const uint8_t*)(s ? s : "");
-    while (*p) {
-        uint32_t c = *p++;
-        int more = 0;
-        if (c >= 0xf0) { c &= 0x07; more = 3; }
-        else if (c >= 0xe0) { c &= 0x0f; more = 2; }
-        else if (c >= 0xc0) { c &= 0x1f; more = 1; }
-        else if (c >= 0x80) c = 0xfffd;
-        for (; more > 0 && (*p & 0xc0) == 0x80; more--) c = c << 6 | (*p++ & 0x3f);
-        if (more) c = 0xfffd;
-        if (c >= 0x10000) {
-            c -= 0x10000;
-            name += (char16_t)(0xd800 | c >> 10);
-            name += (char16_t)(0xdc00 | (c & 0x3ff));
-        } else
-            name += (char16_t)c;
-    }
-}
+Id::Id(const char* s) : name(w32::utf16_of(s ? s : "")) {}
 
-static void put_utf8(std::string& o, uint32_t c)
-{
-    if (c < 0x80) o += (char)c;
-    else if (c < 0x800) { o += (char)(0xc0 | c >> 6); o += (char)(0x80 | (c & 0x3f)); }
-    else if (c < 0x10000) {
-        o += (char)(0xe0 | c >> 12); o += (char)(0x80 | (c >> 6 & 0x3f)); o += (char)(0x80 | (c & 0x3f));
-    } else {
-        o += (char)(0xf0 | c >> 18); o += (char)(0x80 | (c >> 12 & 0x3f));
-        o += (char)(0x80 | (c >> 6 & 0x3f)); o += (char)(0x80 | (c & 0x3f));
-    }
-}
-
-static std::string utf16_to_utf8(const char16_t* s, size_t n)
-{
-    std::string o;
-    for (size_t i = 0; i < n; i++) {
-        uint32_t c = s[i];
-        if (c >= 0xd800 && c < 0xdc00 && i + 1 < n && s[i + 1] >= 0xdc00 && s[i + 1] < 0xe000)
-            c = 0x10000 + ((c - 0xd800) << 10) + (s[++i] - 0xdc00);
-        else if (c >= 0xd800 && c < 0xe000)
-            c = 0xfffd;
-        put_utf8(o, c);
-    }
-    return o;
-}
-
-std::string to_utf8(const std::u16string& s) { return utf16_to_utf8(s.data(), s.size()); }
+std::string to_utf8(const std::u16string& s) { return w32::utf8_of(s); }
 
 std::string to_utf8(const Id& id)
 {

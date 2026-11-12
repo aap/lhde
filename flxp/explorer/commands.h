@@ -43,12 +43,10 @@ enum {
     ID_OPEN = 500, ID_EXPLORE, ID_OPENWITH_CHOOSE, ID_TERMINAL, ID_ADD_BOOKMARK, ID_CUT, ID_COPY, ID_PASTE,
     ID_DELETE, ID_RENAME, ID_PROPERTIES, ID_NEW_FOLDER, ID_NEW_TEXT, ID_EXPAND,
     ID_COPY_PATH,                     // Copy as Path: the paths as text on the CLIPBOARD (Vista's Shift+right-click verb)
-    ID_EDIT_DESC,                     // Edit Description... (one item: user.lux.desc)
     ID_ADD_TAG,                       // Add Tag... (the selection: user.xdg.tags, the others kept)
     ID_WALL_STRETCH = 520, ID_WALL_CENTER, ID_WALL_TILE, ID_WALL_FILL,   // Set as Desktop Background
     ID_BM_ADD = 600, ID_BM_ORGANIZE, ID_BM_FIRST = 700, ID_BM_LAST = 799,
     ID_OPENWITH_FIRST = 800, ID_OPENWITH_LAST = 899,
-    ID_TAG_REMOVE_FIRST = 1100, ID_TAG_REMOVE_LAST = 1199,   // Remove Tag: the selection's tags
     // the desktop's own (Arrange Icons By, Properties)
     ID_DESK_AUTOARRANGE = 900, ID_DESK_ALIGN, ID_DESK_PROPERTIES, ID_DESK_BACKGROUND, ID_DESK_PASTELINK,
     IDC_REBAR = 1000, IDC_TOOLBAR, IDC_ADDRESS, IDC_TREE, IDC_LIST, IDC_STATUS, IDC_MENUBAND, IDC_BRAND, IDC_BANDSITE, IDC_BANDCLOSE,

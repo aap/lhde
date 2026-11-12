@@ -14,6 +14,7 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <X11/keysym.h>
+#include <xkbcommon/xkbcommon.h>
 #include <X11/extensions/shape.h>
 #include "sys.h"
 
@@ -1653,7 +1654,14 @@ static bool translate(XEvent& x, Event& ev)
         ev.keysym = (uint32_t)ks;
         ev.mods = mods_from_state(x.xkey.state);
         ev.time = (uint32_t)x.xkey.time;
-        if (n > 0 && x.type == KeyPress) memcpy(ev.text, buf, (size_t)n);
+        if (x.type == KeyPress) {
+            // The text in UTF-8. XLookupString answers in the C locale's Latin-1 and not at all for a keysym outside it
+            // (Cyrillic_a, the Unicode keysyms 0x1000000 + U that xdotool type and the compose tables use), so it
+            // gives only the keysym and the ASCII control characters (Ctrl+A is 0x01); the rest is the keysym's
+            // character (xkbcommon's table, which is X's keysym-to-UCS mapping).
+            if (n == 1 && (unsigned char)buf[0] < 0x80) ev.text[0] = buf[0];
+            else if (ks && xkb_keysym_to_utf8((xkb_keysym_t)ks, ev.text, sizeof ev.text) <= 0) ev.text[0] = 0;
+        }
         return true;
     }
     case FocusIn:  ev.kind = EventKind::FocusGained;  return true;
