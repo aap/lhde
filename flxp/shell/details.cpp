@@ -530,6 +530,7 @@ Info describe(const std::vector<Item>& sel, const std::vector<Facts>& facts, con
         in.path = it.path;
         in.rows = rows_for(it, f, now);
         in.xp_preview = !it.is_folder() && f.thumbnail && !f.network;
+        in.folder = it.is_folder();
         if (!it.is_folder() && f.thumbnail) in.previews.push_back(it.path);
         return in;
     }

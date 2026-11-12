@@ -30,6 +30,9 @@ build/tests/w32/filedlgtest: $(O)/tests/w32/filedlgtest.o $(FILEDLGLIB) $(EXPLSH
 build/tests/w32/fileopuitest: $(O)/tests/w32/fileopuitest.o $(FILEDLGLIB) $(EXPLSHARED) $(W32DEPS)
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $< $(FILEDLGLIB) $(EXPLSHARED) $(W32LINK) $(LDLIBS) -no-pie
+build/tests/w32/folderpictest: $(O)/tests/w32/folderpictest.o $(FILEDLGLIB) $(EXPLSHARED) $(W32DEPS)
+	@mkdir -p $(dir $@)
+	$(CXX) -o $@ $< $(FILEDLGLIB) $(EXPLSHARED) $(W32LINK) $(LDLIBS) -no-pie
 
 # kerneltest's resources beside it: test.res and comdlg32.res. tests/w32/test.res is checked in like every .res in the tree
 # (windres only when test.rc or pal.bmp changes)

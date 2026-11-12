@@ -137,6 +137,7 @@ struct Info {
     std::vector<Row> rows;
     uint64_t total = 0;                 // Many: the files' bytes (0 for more than 100 items, as XP)
     bool xp_preview = false;            // XP's mini preview (a single non-folder that has a thumbnail)
+    bool folder = false;                // One: the item is a folder (4051's band shows its picture as the Icons view composes it)
     std::vector<std::string> previews;  // 4051's pictures (One: the item; Many: up to 7)
 };
 

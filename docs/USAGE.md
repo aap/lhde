@@ -683,14 +683,17 @@ selected it describes the folder itself (its name in bold, "File Folder", Date M
 Disk", File System, Free Space, Total Size); with one item its name, type and its kind's lines in XP's order and wording ("Date
 Modified: Today, October 31, 2026, 12:45 PM", "Size: 23.1 KB", "Dimensions: 800 x 600", "Attributes: Read-only, Hidden"), the
 extended attributes when they are set; a picture gets its thumbnail above the name (at most 150 x 100), except in the Thumbnails
-view and where thumbnails are off (`thumbnails = 0`, or a network mount without `thumbnails_network = 1`). Several items: "N items
+view and where thumbnails are off (`thumbnails = 0`, or a network mount without `thumbnails_network = 1`); a folder gets none, as
+in XP (its mini previewer is for items that are not folders). Several items: "N items
 selected." and the files' "Total File Size" (for up to 100 items). Like XP the section starts folded except in My Computer; its
 chevron folds and opens it, and from then on it stays as it was left (`places_details = 0|1` in `flxp.ini`).
 
 **Longhorn frame: the task band** (View > Task Band, `taskpane = 1` or `--taskpane`). Build 4051's band under the command bar:
 left to right the preview, the details and the tasks. Nothing selected: the folder's image faded at the left with "N items / in this
 folder" over it, and the folder's tasks (Make a new folder, Search, Open a terminal here, Add to Bookmarks, folder Properties) in
-columns, "more" opening the rest of the folder's menu. One item: its thumbnail in a white frame (a picture) or its 128 px icon,
+columns, "more" opening the rest of the folder's menu. One item: its thumbnail in a white frame (a picture) or its 128 px icon (48
+in the compact band), a folder the picture the Icons view shows for it (the folder with up to four of the pictures inside, or
+4074's photo standing in the open folder), made at that size from the same recipe and thumbnail cache in the background,
 hanging a little below the band over the left pane, then its name, its values in two columns (size, date, type; a picture's size,
 date and dimensions) with "Add a description", "Add tags", "Add comments" where those attributes are empty, and "all properties..."
 (the Properties dialog). The description, tags and comment, or their invitations, are editable: a click opens an edit box in the

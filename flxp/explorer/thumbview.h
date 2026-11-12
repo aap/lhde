@@ -23,6 +23,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "gdi/bitmap.h"
 #include "shell/namespace.h"
 #include "w32/w32.h"
 extern "C" {
@@ -52,5 +53,12 @@ void stop();                          // Stop: drop what is pending
 void fill(const std::vector<shell::Item>& items);
 void folder_changed();                // navigation: drop pending work and the cached images
 void on_ready();                      // WM_THUMBS
+
+// A folder's picture as the view composes it, at any size and outside the view (the task band's preview): the
+// folder icon with up to four pictures of it fitted into folder_mini_size(size, lh) cells (Loader::request with
+// folder = true gives them), or under the Longhorn style with the build's art 4074's photo standing in the open folder;
+// lh: on transparency, else on the window colour. Null when it cannot be made.
+int folder_mini_size(int size, bool lh);
+gdi::Bitmap* folder_picture(const std::string& icon_key, const std::vector<gdi::Bitmap*>& minis, int size, bool lh);
 
 }

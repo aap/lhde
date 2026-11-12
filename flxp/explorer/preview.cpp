@@ -3,6 +3,7 @@
 #include "preview.h"
 #include "gdi/image.h"
 #include "shell/thumbs.h"
+#include "thumbview.h"
 
 namespace preview {
 
@@ -16,7 +17,36 @@ struct Pictures::Impl {
     std::map<std::string, gdi::Bitmap*> got;             // straight alpha, as the loader made them
     struct Fitted { HBITMAP bmp = nullptr; int w = 0, h = 0, max_w = 0, max_h = 0; };
     std::map<std::string, Fitted> fitted;
+    // the folder (want_folder)
+    shell::thumbs::Loader* floader = nullptr;
+    uint32_t fgen = 0;
+    std::string fpath, fkey;
+    int fsize = 0;
+    bool flh = false;
+    HBITMAP fbmp = nullptr;                              // composed, premultiplied
+    int fw = 0, fh = 0;
 };
+
+static HBITMAP premultiplied_dib(const gdi::Bitmap* use, int* w, int* h)
+{
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+    bi.bmiHeader.biWidth = use->width; bi.bmiHeader.biHeight = -use->height;
+    bi.bmiHeader.biPlanes = 1; bi.bmiHeader.biBitCount = 32;
+    void* bits = nullptr;
+    HBITMAP bmp = CreateDIBSection(nullptr, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    if (!bmp || !bits) { if (bmp) DeleteObject(bmp); return nullptr; }
+    for (int y = 0; y < use->height; y++) {
+        const uint32_t* sp = ((gdi::Bitmap*)use)->row(y);
+        uint32_t* d = (uint32_t*)bits + (size_t)y * use->width;
+        for (int x = 0; x < use->width; x++) {     // straight -> premultiplied
+            uint32_t q = sp[x], a = q >> 24;
+            d[x] = a << 24 | (((q >> 16) & 0xff) * a / 255) << 16 | (((q >> 8) & 0xff) * a / 255) << 8 | (q & 0xff) * a / 255;
+        }
+    }
+    *w = use->width; *h = use->height;
+    return bmp;
+}
 
 static void notify(void* ctx)   // a worker thread
 {
@@ -41,6 +71,8 @@ static void drop_fitted(Pictures::Impl* p, const std::string& path)
 Pictures::~Pictures()
 {
     if (impl_->loader) { impl_->loader->cancel(); delete impl_->loader; }
+    if (impl_->floader) { impl_->floader->cancel(); delete impl_->floader; }
+    if (impl_->fbmp) DeleteObject(impl_->fbmp);
     for (auto& kv : impl_->got) gdi::destroy_bitmap(kv.second);
     for (auto& kv : impl_->fitted) if (kv.second.bmp) DeleteObject(kv.second.bmp);
     delete impl_;
@@ -71,11 +103,43 @@ void Pictures::want(const std::vector<std::string>& paths, int size)
     }
 }
 
+void Pictures::want_folder(const std::string& path, const std::string& icon_key, int size, bool longhorn)
+{
+    Impl* p = impl_;
+    if (path == p->fpath && icon_key == p->fkey && size == p->fsize && longhorn == p->flh) return;
+    p->fpath = path; p->fkey = icon_key; p->fsize = size; p->flh = longhorn;
+    if (p->fbmp) DeleteObject(p->fbmp);
+    p->fbmp = nullptr;
+    if (p->floader) p->fgen = p->floader->cancel();
+    struct stat st;
+    if (path.empty() || size < 16 || stat(path.c_str(), &st) != 0) return;
+    if (!p->floader) { p->floader = new shell::thumbs::Loader(notify, p, 1); p->fgen = p->floader->generation(); }
+    p->floader->request(p->fgen, 0, path, (int64_t)st.st_mtime, size, true, thumbview::folder_mini_size(size, longhorn));
+}
+
+HBITMAP Pictures::get_folder(const std::string& path, int size, int* w, int* h)
+{
+    Impl* p = impl_;
+    if (!p->fbmp || path != p->fpath || size != p->fsize) return nullptr;
+    *w = p->fw; *h = p->fh;
+    return p->fbmp;
+}
+
 bool Pictures::take()
 {
     Impl* p = impl_;
     bool any = false;
     shell::thumbs::Loader::Result r;
+    while (p->floader && p->floader->take(r)) {   // the folder: composed here (icons and GDI on this thread)
+        if (r.gen == p->fgen && r.path == p->fpath && !p->fbmp) {
+            if (gdi::Bitmap* b = thumbview::folder_picture(p->fkey, r.minis, p->fsize, p->flh)) {
+                p->fbmp = premultiplied_dib(b, &p->fw, &p->fh);
+                gdi::destroy_bitmap(b);
+                any = p->fbmp != nullptr;
+            }
+        }
+        shell::thumbs::free_result(r);
+    }
     while (p->loader && p->loader->take(r)) {
         bool wanted = false;
         for (const std::string& q : p->paths) wanted |= q == r.path;
@@ -103,23 +167,7 @@ HBITMAP Pictures::get(const std::string& path, int max_w, int max_h, int* w, int
         gdi::fit_size(src->width, src->height, max_w, max_h, false, &fw, &fh);
         gdi::Bitmap* s = (fw == src->width && fh == src->height) ? nullptr : gdi::resample(src, fw, fh);
         const gdi::Bitmap* use = s ? s : src;
-        BITMAPINFO bi = {};
-        bi.bmiHeader.biSize = sizeof bi.bmiHeader;
-        bi.bmiHeader.biWidth = use->width; bi.bmiHeader.biHeight = -use->height;
-        bi.bmiHeader.biPlanes = 1; bi.bmiHeader.biBitCount = 32;
-        void* bits = nullptr;
-        f.bmp = CreateDIBSection(nullptr, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
-        if (f.bmp && bits) {
-            for (int y = 0; y < use->height; y++) {
-                const uint32_t* sp = ((gdi::Bitmap*)use)->row(y);
-                uint32_t* d = (uint32_t*)bits + (size_t)y * use->width;
-                for (int x = 0; x < use->width; x++) {     // straight -> premultiplied
-                    uint32_t q = sp[x], a = q >> 24;
-                    d[x] = a << 24 | (((q >> 16) & 0xff) * a / 255) << 16 | (((q >> 8) & 0xff) * a / 255) << 8 | (q & 0xff) * a / 255;
-                }
-            }
-            f.w = use->width; f.h = use->height;
-        }
+        f.bmp = premultiplied_dib(use, &f.w, &f.h);
         f.max_w = max_w; f.max_h = max_h;
         if (s) gdi::destroy_bitmap(s);
     }

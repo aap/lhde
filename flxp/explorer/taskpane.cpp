@@ -18,7 +18,8 @@
 //   stack's front one 1 - (n-1)/6 * 0.3 of that, the ones behind it 7 and 6 px
 //   further up and left each (ShellViewMultiSelectPreviewer: up to 7, the scale
 //   stepping down; its opacity steps do not show in 152420: drawn opaque).
-// - an icon: 128 px expanded, 48 compact, its bottom 11 px below the band.
+// - an icon: 128 px expanded, 48 compact, its bottom 11 px below the band; a
+//   folder the Icons view's picture of it (thumbview::folder_picture) at that size.
 // - WelcomePane: "N" 18 pt, " items" 12 pt, "in this folder" 10 pt, from the
 //   left 18 and the bottom 14; compact on one line ("in this folder" 5 px
 //   after).
@@ -37,6 +38,7 @@
 #include "taskpane.h"
 #include "lhbar.h"
 #include "preview.h"
+#include "thumbview.h"
 #include "uiicons.h"
 #include "commands.h"
 #include "gdi/png.h"
@@ -424,12 +426,19 @@ void draw_icon(HDC dc, const std::string& key, int size, int x, int y, int alpha
     DestroyIcon(ic);
 }
 
+// a selected folder: its picture as the Icons view composes it, at the icon's size (128, compact 48)
+bool folder_picture() { return g_pictures_ok && g_info.kind == Kind::One && g_info.folder && !g_info.path.empty() && g_info.path[0] == '/'; }
+int icon_size() { return small() ? 48 : 128; }
+
 void notify_pictures()
 {
     std::vector<std::string> want;
     if (g_pictures_ok) want = g_info.previews;
-    if (!g_pics && !want.empty() && g_wnd) g_pics = new preview::Pictures(g_wnd, WM_PICTURE);
-    if (g_pics) g_pics->want(want, 256);
+    bool folder = folder_picture();
+    if (!g_pics && (!want.empty() || folder) && g_wnd) g_pics = new preview::Pictures(g_wnd, WM_PICTURE);
+    if (!g_pics) return;
+    g_pics->want(want, 256);
+    g_pics->want_folder(folder ? g_info.path : "", g_info.icon, icon_size(), thumbview::longhorn());
 }
 
 // one framed picture: 2 px white around it, a 3 px shadow right and below;
@@ -469,9 +478,13 @@ void draw_preview(HDC dc)
         if (p.bmp) pics.push_back(p);
     }
     if (pics.empty()) {
-        // hanging 11 px out of the band: below it (at the top of the window), above it (at the bottom)
-        int size = small() ? 48 : 128, y = g_bottom ? -11 : H + 11 - size;
-        draw_icon(dc, g_info.icon, size, bx + (bw - size) / 2, y, 255);
+        // hanging 11 px out of the band: below it (at the top of the window), above it (at the bottom); a folder's
+        // picture where it has one (as the Icons view shows it: the pictures inside), else the icon
+        int size = icon_size(), y = g_bottom ? -11 : H + 11 - size;
+        HBITMAP fb = nullptr; int fw = 0, fh = 0;
+        if (g_pics && folder_picture()) fb = g_pics->get_folder(g_info.path, size, &fw, &fh);
+        if (fb) preview::blend(dc, fb, bx + (bw - fw) / 2, y + size - fh, fw, fh);
+        else draw_icon(dc, g_info.icon, size, bx + (bw - size) / 2, y, 255);
         hang_add(bx + (bw - size) / 2, y, bx + (bw + size) / 2, y + size);
         return;
     }
@@ -814,7 +827,7 @@ void set_room(int rows)
 {
     g_room = rows;
     int h = effective();
-    if (h != H) { H = h; if (g_wnd) layout(); }
+    if (h != H) { H = h; if (g_wnd) { notify_pictures(); layout(); } }   // compact or not: the folder picture's size
 }
 
 void set_compact(bool on)
@@ -822,7 +835,7 @@ void set_compact(bool on)
     g_compact = on;
     H = effective();
     shell::write_setting("taskpane_compact", on ? "1" : "0");
-    if (g_wnd) layout();
+    if (g_wnd) { notify_pictures(); layout(); }
 }
 
 HWND create(HWND frame, const Callbacks& cb)

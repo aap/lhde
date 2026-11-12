@@ -110,7 +110,7 @@ appearance --pick STYLE`: classic, a bare style with and without a frame set, ba
 patches and which styles get a frame set, on stand-in files), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
 incl. GTK, the file dialog in both looks, the modifier keys across a focus change, clicks outside open menus under
-luxwm: `tests/headless/menus.sh`) on displays :71-:73
+luxwm: `tests/headless/menus.sh`, the task band's folder picture against the Icons view's: `tests/headless/folderpic.sh`) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).

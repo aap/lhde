@@ -49,6 +49,8 @@ struct Square {
     HDC dc = nullptr;
     HBITMAP bmp = nullptr, old = nullptr;
     uint32_t* bits = nullptr;   // top-down 0xAARRGGBB, straight alpha
+    int size = 0;               // size x size
+    bool lh = false;            // the Longhorn style: transparent, icons composed with their alpha
 };
 
 static COLORREF background()
@@ -57,12 +59,14 @@ static COLORREF background()
     return c == CLR_NONE ? GetSysColor(COLOR_WINDOW) : c;
 }
 
-static bool begin(Square& sq)
+static bool begin_at(Square& sq, int size, bool lh, COLORREF bk)
 {
+    sq.size = size;
+    sq.lh = lh;
     BITMAPINFO bi = {};
     bi.bmiHeader.biSize = sizeof bi.bmiHeader;
-    bi.bmiHeader.biWidth = g_size;
-    bi.bmiHeader.biHeight = -g_size;
+    bi.bmiHeader.biWidth = size;
+    bi.bmiHeader.biHeight = -size;
     bi.bmiHeader.biPlanes = 1;
     bi.bmiHeader.biBitCount = 32;
     void* bits = nullptr;
@@ -72,11 +76,13 @@ static bool begin(Square& sq)
     sq.dc = CreateCompatibleDC(nullptr);
     sq.old = (HBITMAP)SelectObject(sq.dc, sq.bmp);
     // XP: the window colour; Longhorn: nothing behind the image
-    COLORREF bk = background();
-    uint32_t px = g_lh ? 0 : 0xff000000u | (uint32_t)GetRValue(bk) << 16 | (uint32_t)GetGValue(bk) << 8 | GetBValue(bk);
-    for (int i = 0; i < g_size * g_size; i++) sq.bits[i] = px;
+    uint32_t px = lh ? 0 : 0xff000000u | (uint32_t)GetRValue(bk) << 16 | (uint32_t)GetGValue(bk) << 8 | GetBValue(bk);
+    for (int i = 0; i < size * size; i++) sq.bits[i] = px;
     return true;
 }
+
+// a square of the view's size and style
+static bool begin(Square& sq) { return begin_at(sq, g_size, g_lh, background()); }
 
 // p (straight alpha) over q (straight alpha)
 static inline uint32_t over(uint32_t p, uint32_t q)
@@ -107,25 +113,42 @@ static void put_into(uint32_t* dst, int w, int h, const gdi::Bitmap* b, int x, i
     }
 }
 
-static void put(Square& sq, const gdi::Bitmap* b, int x, int y) { put_into(sq.bits, g_size, g_size, b, x, y); }
+static void put(Square& sq, const gdi::Bitmap* b, int x, int y) { put_into(sq.bits, sq.size, sq.size, b, x, y); }
 
 static void fill_rect(Square& sq, int x, int y, int w, int h, uint32_t argb)
 {
+    int n = sq.size;
     for (int j = y; j < y + h; j++) {
-        if (j < 0 || j >= g_size) continue;
+        if (j < 0 || j >= n) continue;
         for (int i = x; i < x + w; i++)
-            if (i >= 0 && i < g_size) sq.bits[(size_t)j * g_size + i] = over(argb, sq.bits[(size_t)j * g_size + i]);
+            if (i >= 0 && i < n) sq.bits[(size_t)j * n + i] = over(argb, sq.bits[(size_t)j * n + i]);
     }
 }
 
-static int finish(Square& sq)
+static void end(Square& sq)
 {
-    if (!g_lh) for (int i = 0; i < g_size * g_size; i++) sq.bits[i] |= 0xff000000u;   // opaque: no mask needed
+    if (!sq.lh) for (int i = 0; i < sq.size * sq.size; i++) sq.bits[i] |= 0xff000000u;   // opaque: no mask needed
     SelectObject(sq.dc, sq.old);
     DeleteDC(sq.dc);
+}
+
+// into the view's image list
+static int finish(Square& sq)
+{
+    end(sq);
     int idx = ImageList_Add(g_il, sq.bmp, nullptr);
     DeleteObject(sq.bmp);
     return idx;
+}
+
+// as a bitmap (straight alpha)
+static gdi::Bitmap* finish_bitmap(Square& sq)
+{
+    end(sq);
+    gdi::Bitmap* b = gdi::create_bitmap(sq.size, sq.size);
+    if (b) for (int y = 0; y < sq.size; y++) memcpy(b->row(y), sq.bits + (size_t)y * sq.size, (size_t)sq.size * 4);
+    DeleteObject(sq.bmp);
+    return b;
 }
 
 // an icon's pixels at px, straight alpha (the mask where it has no alpha); null if none
@@ -162,7 +185,7 @@ static void draw_icon(Square& sq, const std::string& key, int px, int x, int y)
 {
     HICON ic = uiicons::load_icon(key, px);
     if (!ic) return;
-    if (g_lh) {   // composed with its alpha (DrawIconEx would flatten it onto the transparency)
+    if (sq.lh) {   // composed with its alpha (DrawIconEx would flatten it onto the transparency)
         if (gdi::Bitmap* b = icon_pixels(ic, px)) { put(sq, b, x, y); gdi::destroy_bitmap(b); }
     } else DrawIconEx(sq.dc, x, y, ic, px, px, 0, nullptr, DI_NORMAL);
     DestroyIcon(ic);
@@ -238,9 +261,9 @@ static bool have_folder_art()
 
 static void put_art(Square& sq, int id)
 {
-    HICON ic = (HICON)uiicons::load_themed(folder_art(id), IMAGE_ICON, g_size, g_size, 0);
+    HICON ic = (HICON)uiicons::load_themed(folder_art(id), IMAGE_ICON, sq.size, sq.size, 0);
     if (!ic) return;
-    if (gdi::Bitmap* b = icon_pixels(ic, g_size)) { put(sq, b, 0, 0); gdi::destroy_bitmap(b); }
+    if (gdi::Bitmap* b = icon_pixels(ic, sq.size)) { put(sq, b, 0, 0); gdi::destroy_bitmap(b); }
     DestroyIcon(ic);
 }
 
@@ -288,23 +311,20 @@ static gdi::Bitmap* photo_layer(const gdi::Bitmap* img)
     return out;
 }
 
-static int folder_photo_image(const gdi::Bitmap* photo)
+static void folder_photo(Square& sq, const gdi::Bitmap* photo)
 {
-    Square sq;
-    if (!begin(sq)) return -1;
     put_art(sq, 389);
     if (photo) {
         if (gdi::Bitmap* layer = photo_layer(photo)) {
-            if (gdi::Bitmap* small = gdi::resample(layer, g_size, g_size)) { put(sq, small, 0, 0); gdi::destroy_bitmap(small); }
+            if (gdi::Bitmap* small = gdi::resample(layer, sq.size, sq.size)) { put(sq, small, 0, 0); gdi::destroy_bitmap(small); }
             gdi::destroy_bitmap(layer);
         }
     }
     put_art(sq, 390);
-    return finish(sq);
 }
 
 // the 4074 folder for folders at this size (else the folder icon with the minis)
-static bool folder_photos() { return g_lh && g_size >= 32 && have_folder_art(); }
+static bool folder_photos_at(int size, bool lh) { return lh && size >= 32 && have_folder_art(); }
 
 // ---- default images ---------------------------------------------------------------------
 
@@ -343,23 +363,43 @@ static int default_image(const std::string& key, bool folder)
 
 // XP folderthumb.cpp: the folder icon at thumbnail size, the pictures in a
 // 2x2 layout (96: 40 px cells at x 7/49, y 11/52; scaled for other sizes)
-static int mini_size() { return (40 * g_size + 48) / 96; }
+static int mini_size_at(int size) { return (40 * size + 48) / 96; }
+
+// a folder's square: 4074's photo in the open folder, or the folder icon with the pictures on it
+static void compose_folder(Square& sq, const std::string& key, const std::vector<gdi::Bitmap*>& minis)
+{
+    // a folder of the theme's own (a custom icon) keeps it; the plain folder is 4074's
+    if (folder_photos_at(sq.size, sq.lh) && (key.empty() || key == "folder")) { folder_photo(sq, minis.empty() ? nullptr : minis[0]); return; }
+    draw_icon(sq, key.empty() ? "folder" : key, sq.size, 0, 0);
+    static const int xs[2] = { 7, 49 }, ys[2] = { 11, 52 };
+    int cell = mini_size_at(sq.size);
+    for (size_t i = 0; i < minis.size() && i < 4; i++) {
+        const gdi::Bitmap* b = minis[i];
+        int cx = xs[i & 1] * sq.size / 96, cy = ys[i >> 1] * sq.size / 96;
+        put(sq, b, cx + (cell - b->width) / 2, cy + (cell - b->height) / 2);
+    }
+}
 
 static int folder_image(const std::string& key, const std::vector<gdi::Bitmap*>& minis)
 {
-    // a folder of the theme's own (a custom icon) keeps it; the plain folder is 4074's
-    if (folder_photos() && (key.empty() || key == "folder")) return folder_photo_image(minis.empty() ? nullptr : minis[0]);
     Square sq;
     if (!begin(sq)) return -1;
-    draw_icon(sq, key.empty() ? "folder" : key, g_size, 0, 0);
-    static const int xs[2] = { 7, 49 }, ys[2] = { 11, 52 };
-    int cell = mini_size();
-    for (size_t i = 0; i < minis.size() && i < 4; i++) {
-        const gdi::Bitmap* b = minis[i];
-        int cx = xs[i & 1] * g_size / 96, cy = ys[i >> 1] * g_size / 96;
-        put(sq, b, cx + (cell - b->width) / 2, cy + (cell - b->height) / 2);
-    }
+    compose_folder(sq, key, minis);
     return finish(sq);
+}
+
+int folder_mini_size(int size, bool lh)
+{
+    // 4074's photo: one picture, big enough for the folder's front at this size
+    return folder_photos_at(size, lh) ? (size < 64 ? 64 : size > 256 ? 256 : size) : mini_size_at(size);
+}
+
+gdi::Bitmap* folder_picture(const std::string& key, const std::vector<gdi::Bitmap*>& minis, int size, bool lh)
+{
+    Square sq;
+    if (size < 16 || !begin_at(sq, size, lh, GetSysColor(COLOR_WINDOW))) return nullptr;
+    compose_folder(sq, key, minis);
+    return finish_bitmap(sq);
 }
 
 static int picture_image(const gdi::Bitmap* b)
@@ -488,9 +528,7 @@ void fill(const std::vector<shell::Item>& items)
             if (g_size < (g_lh ? 32 : 48)) continue;   // the folder's icon: no pictures in it at this size
             g_asked[it.path] = it.mtime;
             g_keys[it.path] = it.icon;
-            // 4074's photo: one picture, big enough for the folder's front at this size
-            int mini = folder_photos() ? (g_size < 64 ? 64 : g_size > 256 ? 256 : g_size) : mini_size();
-            g_loader->request(gen, (int)i, it.path, it.mtime, g_size, true, mini);
+            g_loader->request(gen, (int)i, it.path, it.mtime, g_size, true, folder_mini_size(g_size, g_lh));
         } else if (shell::thumbs::can_thumbnail(it.path)) {
             g_asked[it.path] = it.mtime;
             g_loader->request(gen, (int)i, it.path, it.mtime, g_lh ? picture_box() : g_size);
