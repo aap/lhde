@@ -68,10 +68,6 @@ struct Result {
 // owner: an HWND of this process (or null). Blocks until the dialog closes.
 Result run(void* owner, const Options& o);
 
-// A message box in the XP layout (the shim's MessageBoxW is a stub).
-// type: MB_OK / MB_YESNO | MB_ICONEXCLAMATION / MB_ICONINFORMATION / ...; returns IDOK/IDYES/IDNO.
-int message_box(void* owner, const std::string& title, const std::string& text, unsigned type);
-
 // Glob matching as the dialog does it (case-insensitive, "*.*" matches names without a dot).
 bool matches(const Filter& f, const std::string& file_name);
 

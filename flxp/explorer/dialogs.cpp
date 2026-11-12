@@ -13,6 +13,7 @@
 #include "shell/fileops.h"
 #include "shell/mime.h"
 #include "shell/namespace.h"
+#include "shell/ui.h"
 #include "commands.h"
 extern "C" {
 #include "prsht.h"
@@ -162,8 +163,8 @@ static INT_PTR CALLBACK msg_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM)
     switch (msg) {
     case WM_INITDIALOG:
         if (!g_msg->title.empty()) SetWindowTextW(dlg, WS(g_msg->title));
-        if (g_msg->icon) SendDlgItemMessageW(dlg, GetDlgItem(dlg, IDC_CD_ICON) ? IDC_CD_ICON : IDC_MSG_ICON, STM_SETICON, (WPARAM)g_msg->icon, 0);
-        set_text(dlg, GetDlgItem(dlg, IDC_CD_TEXT) ? IDC_CD_TEXT : IDC_MSG_TEXT, g_msg->text);
+        if (g_msg->icon) SendDlgItemMessageW(dlg, IDC_CD_ICON, STM_SETICON, (WPARAM)g_msg->icon, 0);
+        set_text(dlg, IDC_CD_TEXT, g_msg->text);
         return TRUE;
     case WM_COMMAND:
         if (LOWORD(wp) == IDOK || LOWORD(wp) == IDCANCEL || LOWORD(wp) == IDYES || LOWORD(wp) == IDNO) {
@@ -194,10 +195,7 @@ bool confirm_delete(HWND owner, const std::vector<std::string>& names, HICON ico
 
 void message(HWND owner, const std::string& title, const std::string& text, bool error)
 {
-    MsgState st = { title, text, LoadIconW(nullptr, (LPCWSTR)(error ? IDI_ERROR : IDI_INFORMATION)) };
-    g_msg = &st;
-    DialogBoxParamW(module(), MAKEINTRESOURCEW(IDD_MESSAGE), owner, msg_proc, 0);
-    g_msg = nullptr;
+    shell::message_box(owner, title, text, MB_OK | (error ? MB_ICONHAND : MB_ICONINFORMATION));
 }
 
 // ---- Organize Bookmarks ----------------------------------------------------------------

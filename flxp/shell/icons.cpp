@@ -221,11 +221,11 @@ bool select_icon_theme(const std::string& name)
     if (want != "wine") {
         std::string file = icon_theme_file(want);
         if (file.empty())
-            fprintf(stderr, "flxp: no icon theme \"%s\" (icons/%s.theme in lhde's data directories); using the Wine icons\n",
+            fprintf(stderr, "%s: no icon theme \"%s\" (icons/%s.theme in lhde's data directories); using the Wine icons\n", shell::program_name(),
                     want.c_str(), want.c_str());
         else
-            fprintf(stderr, "flxp: icon theme \"%s\" has no icon files here (%s: its resources/<build> not imported? "
-                    "lhde-import, docs/USAGE.md \"Getting the Windows resources\"); using the Wine icons\n", want.c_str(), file.c_str());
+            fprintf(stderr, "%s: icon theme \"%s\" has no icon files here (%s: its resources/<build> not imported? "
+                    "lhde-import, docs/USAGE.md \"Getting the Windows resources\"); using the Wine icons\n", shell::program_name(), want.c_str(), file.c_str());
     }
     if (load_icon_theme("wine") && theme_usable(g_theme)) { drop_missing_toolbar(g_theme.toolbar); return want == "wine"; }
     g_theme = IconTheme();

@@ -3,7 +3,6 @@
 
 #define IDD_OPENWITH        100
 #define IDD_CONFIRMDELETE   101
-#define IDD_MESSAGE         102
 #define IDD_BOOKMARKS       103
 #define IDD_PROPERTIES      104
 #define IDD_FO_GENERAL      105
@@ -21,8 +20,6 @@
 #define IDC_CD_ICON         1101
 #define IDC_CD_TEXT         1102
 
-#define IDC_MSG_ICON        1201
-#define IDC_MSG_TEXT        1202
 
 #define IDC_BM_LIST         1301
 #define IDC_BM_UP           1302

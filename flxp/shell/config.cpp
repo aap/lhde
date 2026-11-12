@@ -11,6 +11,12 @@
 
 namespace shell {
 
+const char* program_name()
+{
+    const char* n = program_invocation_short_name;   // <errno.h>, glibc and musl: argv[0]'s basename
+    return n && *n ? n : "lhde";
+}
+
 std::string home_dir()
 {
     const char* h = getenv("HOME");
@@ -119,7 +125,7 @@ int flag_value(const std::string& v, const std::string& where)
     for (const std::string& t : told) seen = seen || t == where;
     if (!seen) {
         told.push_back(where);
-        fprintf(stderr, "flxp: %s = %s: a switch is 0 or 1; automatic\n", where.c_str(), v.c_str());
+        fprintf(stderr, "%s: %s = %s: a switch is 0 or 1; automatic\n", shell::program_name(), where.c_str(), v.c_str());
     }
     return -1;
 }

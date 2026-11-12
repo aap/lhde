@@ -153,27 +153,7 @@ std::string base_name(const std::string& p)
 
 void error_box(HWND owner, const std::string& text)
 {
-    filedlg::message_box(owner, "Attributes", text, MB_OK | MB_ICONEXCLAMATION);
-}
-
-// an icon key of the icon theme (shell/icons.h) as an HICON of size px: a .ico file or "pe:FILE#ID"
-HICON load_icon(const std::string& key, int px)
-{
-    for (const std::string& k : { key, std::string("document") }) {
-        std::string src = shell::icon_file(k);
-        HANDLE h = nullptr;
-        if (src.compare(0, 3, "pe:") == 0) {
-            size_t hash = src.rfind('#');
-            if (hash != std::string::npos) {
-                HINSTANCE m = LoadLibraryExW((LPCWSTR)WuxWide(src.substr(3, hash - 3)).c_str(), nullptr, LOAD_LIBRARY_AS_DATAFILE);
-                if (m) h = LoadImageW(m, MAKEINTRESOURCEW(atoi(src.c_str() + hash + 1)), IMAGE_ICON, px, px, 0);
-            }
-        } else if (!src.empty()) {
-            h = LoadImageW(nullptr, (LPCWSTR)WuxWide(src).c_str(), IMAGE_ICON, px, px, LR_LOADFROMFILE);
-        }
-        if (h) return (HICON)h;
-    }
-    return nullptr;
+    shell::message_box(owner, "Attributes", text, MB_OK | MB_ICONEXCLAMATION);
 }
 
 // ---- General -----------------------------------------------------------------------------
@@ -626,7 +606,7 @@ int main(int argc, char** argv)
     g.fields = fields();
     load();
     bool dir0 = g.files.size() == 1 && shell::is_dir(g.files[0]);
-    g.icon = load_icon(g.files.size() == 1 ? shell::icon_key(base_name(g.files[0]), dir0) : "document", 32);
+    g.icon = shell::icon_for_key(g.files.size() == 1 ? shell::icon_key(base_name(g.files[0]), dir0) : "document", 32);
 
     PROPSHEETPAGEW pages[2] = {};
     pages[0].dwSize = pages[1].dwSize = sizeof pages[0];

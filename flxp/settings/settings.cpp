@@ -44,6 +44,7 @@
 #include "shell/runtime.h"
 #include "shell/settings.h"
 #include "shell/wallpapers.h"
+#include "shell/ui.h"
 #include "wuxtheme/ut.h"
 extern "C" {
 #include "lhde/settings.h"
@@ -899,7 +900,7 @@ void apply()
         ok = store::set_current_layer(kv) && ok;
     }
     if (!ok)
-        filedlg::message_box(pages[0], "Display Properties", "Cannot write the settings (" + store::path() + ").", MB_OK | MB_ICONEXCLAMATION);
+        shell::message_box(pages[0], "Display Properties", "Cannot write the settings (" + store::path() + ").", MB_OK | MB_ICONEXCLAMATION);
     if (wall) remember_wallpaper(value("path.wallpaper"));
     if (theme_changed) store::apply_theme(cur.theme);
     else store::notify(layer_changed ? "theme" : (edits.size() == 1 ? edits[0].section : ""));
@@ -1010,19 +1011,19 @@ void save_theme(HWND dlg)
     if (DialogBoxParamW(module(), MAKEINTRESOURCEW(IDD_SAVEAS), GetParent(dlg), saveas_proc, (LPARAM)&title) != IDOK) return;
     std::string file = theme_file_name(title), canon;
     if (file.empty()) {
-        filedlg::message_box(GetParent(dlg), "Save Theme As", "\"" + title + "\" cannot be used as a theme name.", MB_OK | MB_ICONEXCLAMATION);
+        shell::message_box(GetParent(dlg), "Save Theme As", "\"" + title + "\" cannot be used as a theme name.", MB_OK | MB_ICONEXCLAMATION);
         return;
     }
     if (shell::lookup_theme(file, canon) && !shell::is_user_theme(file)) {
-        filedlg::message_box(GetParent(dlg), "Save Theme As", "\"" + file + "\" is a built-in theme.", MB_OK | MB_ICONEXCLAMATION);
+        shell::message_box(GetParent(dlg), "Save Theme As", "\"" + file + "\" is a built-in theme.", MB_OK | MB_ICONEXCLAMATION);
         return;
     }
     if (file != cur.theme && shell::is_user_theme(file) &&
-        filedlg::message_box(GetParent(dlg), "Save Theme As", "The theme \"" + file + "\" exists. Replace it?", MB_YESNO | MB_ICONEXCLAMATION) != IDYES)
+        shell::message_box(GetParent(dlg), "Save Theme As", "The theme \"" + file + "\" exists. Replace it?", MB_YESNO | MB_ICONEXCLAMATION) != IDYES)
         return;
     std::string err;
     if (!store::save_theme_as(file, title, &err)) {
-        filedlg::message_box(GetParent(dlg), "Save Theme As", "Cannot save the theme: " + err + ".", MB_OK | MB_ICONEXCLAMATION);
+        shell::message_box(GetParent(dlg), "Save Theme As", "Cannot save the theme: " + err + ".", MB_OK | MB_ICONEXCLAMATION);
         return;
     }
     State keep = cur;
@@ -1037,7 +1038,7 @@ void save_theme(HWND dlg)
 void delete_theme(HWND dlg)
 {
     if (!shell::is_user_theme(cur.theme)) return;
-    if (filedlg::message_box(GetParent(dlg), "Delete Theme", "Delete the theme \"" + theme_title(cur.theme) + "\"?",
+    if (shell::message_box(GetParent(dlg), "Delete Theme", "Delete the theme \"" + theme_title(cur.theme) + "\"?",
                              MB_YESNO | MB_ICONEXCLAMATION) != IDYES) return;
     bool in_force = cur.theme == committed.theme;
     std::string base = files.value("Theme.base");

@@ -23,9 +23,9 @@ HIMAGELIST large();
 HIMAGELIST at_size(int px);
 int index(const std::string& key);      // loads on first use; "document" for unknown keys; -1 if none
 HICON large_icon(const std::string& key);   // a copy of the large list's icon (DestroyIcon it), or null
-// A theme source as a HICON/HBITMAP (LoadImage flags as the explorer uses them).
+// A theme source as a HICON/HBITMAP (shell::load_image, shell/ui.h)
 HANDLE load_themed(const std::string& src, UINT type, int cx, int cy, UINT extra);
-HICON load_icon(const std::string& key, int size);   // any size from the theme's source (DestroyIcon it)
+HICON load_icon(const std::string& key, int size);   // any size from the theme's source (shell::icon_for_key; DestroyIcon it)
 // The size of the image the theme's icon has for a request of `want` px: want
 // when it has that size, else the smallest larger one, else its largest
 // (Longhorn 4074's shell32: 48 for most, 256 for folder and document; XP: 48)

@@ -321,7 +321,7 @@ bool launch_settings(const std::string& tab)
     std::vector<std::string> argv = { settings_program() };
     if (!tab.empty()) { argv.push_back("--tab"); argv.push_back(tab); }
     std::string err;
-    if (!spawn(argv, home_dir(), &err)) { fprintf(stderr, "flxp: cannot start %s: %s\n", argv[0].c_str(), err.c_str()); return false; }
+    if (!spawn(argv, home_dir(), &err)) { fprintf(stderr, "%s: cannot start %s: %s\n", shell::program_name(), argv[0].c_str(), err.c_str()); return false; }
     return true;
 }
 
