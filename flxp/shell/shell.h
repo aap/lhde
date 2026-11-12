@@ -15,7 +15,7 @@
 //                 the terminal
 //   details.h     the property registry and the annotations: details::property("description" | "tags" | "comment"),
 //                 details::write (as the Explorer writes user.lux.desc / user.xdg.tags / user.xdg.comment),
-//                 read_stored, add_tags, infotip
+//                 read_stored, read_attr, list_attrs (every user.* name on a file), add_tags, infotip
 //   fileops.h     Trash, rename, new folder; fileops_job.h the copy/move/delete engine
 //   dirwatch.h    a directory followed with inotify
 //   thumbs.h      freedesktop thumbnails (made and cached; gdi::Bitmap results)

@@ -54,8 +54,9 @@ stay data-driven in the Longhorn sense without WinFS: a task list keyed by exper
 3. **Tasks as data**: move flxp's task list to a table with experiences and per-selection names; add xattr tasks
    ("Add tags" is itself a task in 4051: `Explorer.Add_keywords`). This is where the research's `TASKS-SUMMARY.txt`
    (74 tasks with their experiences and orders) can be copied almost literally for the Longhorn look.
-4. **Filtering**: "Filter by" over tags/desc in the left pane; later saved filters; later a catalog/index only if
-   walking xattrs gets slow (4051's WinFS was that index; we can start without one, `lsx -t DIR` is the measure).
+4. **Filtering**: the "Filter by" box filters over the name, desc, tags and comment (`tag:`, `desc:`, `comment:` words;
+   docs/USAGE.md "Descriptions and tags"); later saved filters; later a catalog/index only if walking xattrs gets slow
+   (4051's WinFS was that index; we can start without one, `lsx -t DIR` is the measure).
 5. **Agent workflows**: the same xattrs are what agents already read/write in `~/fun/longhorn`; flxp becomes the viewer
    and editor of that metadata, which is the "organize agentic workflows" use in xattribs.txt.
 

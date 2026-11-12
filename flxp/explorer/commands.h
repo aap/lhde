@@ -45,6 +45,7 @@ enum {
     ID_COPY_PATH,                     // Copy as Path: the paths as text on the CLIPBOARD (Vista's Shift+right-click verb)
     ID_EDIT_DESC,                     // Edit Description... (one item: user.lux.desc)
     ID_ADD_TAG,                       // Add Tag... (the selection: user.xdg.tags, the others kept)
+    ID_ATTRIBUTES,                    // Attributes... (the selection in luxattr: every user.* attribute)
     ID_WALL_STRETCH = 520, ID_WALL_CENTER, ID_WALL_TILE, ID_WALL_FILL,   // Set as Desktop Background
     ID_BM_ADD = 600, ID_BM_ORGANIZE, ID_BM_FIRST = 700, ID_BM_LAST = 799,
     ID_OPENWITH_FIRST = 800, ID_OPENWITH_LAST = 899,

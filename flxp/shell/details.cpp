@@ -178,6 +178,36 @@ Read read_attr(const std::string& path, const std::string& xattr, std::string* v
     return Read::Failed;
 }
 
+Read list_attrs(const std::string& path, std::vector<std::string>* names, int* error)
+{
+    names->clear();
+    if (error) *error = 0;
+    for (int tries = 0; tries < 8; tries++) {
+        ssize_t n = listxattr(path.c_str(), nullptr, 0);
+        std::string buf;
+        if (n > 0) {
+            buf.resize((size_t)n);
+            n = listxattr(path.c_str(), &buf[0], buf.size());
+            if (n < 0 && errno == ERANGE) continue;   // grew in between
+        }
+        if (n < 0) {
+            int e = errno;
+            if (e == ENOTSUP || e == ENOENT) return Read::Missing;
+            if (error) *error = e;
+            return Read::Failed;
+        }
+        for (size_t a = 0; a < (size_t)n;) {   // NUL-separated names
+            size_t b = buf.find('\0', a);
+            if (b == std::string::npos || b > (size_t)n) b = (size_t)n;
+            if (buf.compare(a, 5, "user.") == 0) names->push_back(buf.substr(a, b - a));
+            a = b + 1;
+        }
+        return names->empty() ? Read::Missing : Read::Value;
+    }
+    if (error) *error = ERANGE;
+    return Read::Failed;
+}
+
 Stored read_stored(const std::string& path)
 {
     Stored out;
@@ -453,6 +483,79 @@ std::string tag_list(const std::string& v)
     std::string out;
     for (const std::string& t : split_list(v)) out += (out.empty() ? "" : ", ") + t;
     return out;
+}
+
+// ---- the Filter box ----------------------------------------------------------------
+
+static std::string ascii_lower(std::string s)
+{
+    for (char& c : s) if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+    return s;
+}
+
+bool Filter::stored() const
+{
+    for (const Word& w : words) if (w.field != Name) return true;
+    return false;
+}
+
+Filter parse_filter(const std::string& text)
+{
+    static const struct { const char* prefix; Filter::Field field; } FIELDS[] = {
+        { "tag:", Filter::Tags }, { "tags:", Filter::Tags }, { "desc:", Filter::Desc }, { "description:", Filter::Desc },
+        { "comment:", Filter::Comment }, { "name:", Filter::Name },
+    };
+    Filter f;
+    size_t i = 0, n = text.size();
+    while (i < n) {
+        while (i < n && (text[i] == ' ' || text[i] == '\t')) i++;
+        if (i >= n) break;
+        // a word: up to the next space outside double quotes
+        std::string raw;
+        bool quoted = false;
+        for (; i < n && (quoted || (text[i] != ' ' && text[i] != '\t')); i++) {
+            if (text[i] == '"') { quoted = !quoted; continue; }
+            raw += text[i];
+        }
+        Filter::Word w;
+        std::string low = ascii_lower(raw);
+        bool fielded = false;
+        for (const auto& fd : FIELDS) {
+            size_t len = strlen(fd.prefix);
+            if (low.compare(0, len, fd.prefix) == 0) { w.field = fd.field; w.text = low.substr(len); fielded = true; break; }
+        }
+        if (!fielded) w.text = low;
+        if (w.field == Filter::Any && w.text.empty()) continue;   // "" alone: nothing to look for
+        f.words.push_back(w);
+    }
+    return f;
+}
+
+static bool has(const std::string& value, const std::string& word) { return ascii_lower(value).find(word) != std::string::npos; }
+
+static bool word_matches(const Filter::Word& w, const Item& it)
+{
+    static const Property* desc = property("description");
+    static const Property* tags = property("tags");
+    static const Property* comment = property("comment");
+    auto field = [&](Filter::Field f) -> bool {
+        if (f == Filter::Name) return w.text.empty() ? true : has(it.name, w.text);
+        const Property* p = f == Filter::Desc ? desc : f == Filter::Tags ? tags : comment;
+        if (!p) return false;
+        const std::string& v = it.stored(p->xattr);
+        if (w.text.empty()) return !v.empty();
+        if (f != Filter::Tags) return has(v, w.text);
+        for (const std::string& t : split_list(v)) if (has(t, w.text)) return true;   // within one tag, not across the commas
+        return false;
+    };
+    if (w.field != Filter::Any) return field(w.field);
+    return field(Filter::Name) || field(Filter::Desc) || field(Filter::Tags) || field(Filter::Comment);
+}
+
+bool filter_matches(const Filter& f, const Item& it)
+{
+    for (const Filter::Word& w : f.words) if (!word_matches(w, it)) return false;
+    return true;
 }
 
 // ---- the two presentations ----------------------------------------------------------

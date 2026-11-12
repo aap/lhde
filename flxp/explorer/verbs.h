@@ -6,7 +6,8 @@
 // same shape with the unix additions: Open Terminal Here and Add to Bookmarks,
 // and the stored properties of shell/details.h: Edit Description... (one item),
 // Add Tag... (every selected item keeps its tags and gets the new ones) and
-// Remove Tag (the selection's tags; from every item that has it).
+// Remove Tag (the selection's tags; from every item that has it); Attributes... runs luxattr
+// (apps/luxattr) on the selection and takes its changes when it exits.
 // What differs between the views (how a folder opens, how they refresh, how a
 // rename starts) goes through a Host.
 #pragma once
