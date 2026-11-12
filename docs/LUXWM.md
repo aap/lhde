@@ -70,7 +70,8 @@ hit-test probes and the shape. THEMEDIR may be a theme spec (`DIR|STYLE.msstyles
 `|classic|...`). `FRAMETEST_EXT="l r t b [flags]"` extends the frame (`-1 -1 -1 -1` = sheet of glass), `FRAMETEST_FADE=t` renders the
 maximise crossfade at weight t, `FRAMETEST_FONTS="DIR[;DIR]"` registers font directories as a theme's `path.fonts` does,
 `FRAMETEST_SOURCE=dir|lib` picks the PNG cache or the library. `build/luxwm/tests/menutest THEMESPEC out.png [SEL [MAXIMIZED
-[KEYBOARD]]]` renders the window menu (`MENUTEST_FONTS` likewise). `luxwm/tests/regress.sh` (`make check-luxwm`, part of `make check`)
+[KEYBOARD]]]` renders the window menu (`MENUTEST_FONTS` likewise), `build/luxwm/tests/switchertest THEMESPEC out.png N [SEL]` the
+Alt+Tab switcher with N entries ("Task switcher"; it prints the window size). `luxwm/tests/regress.sh` (`make check-luxwm`, part of `make check`)
 renders, for every frame set in `share/frames`, the strip, `normal`, `unfocused`, `max`, `ext60` (`0 0 60 0`) and the Explorer cases
 `ext46`/`ext46u`/`ext46max` (`0 0 46 0` with `NO_TITLE`) at 640x480 with frametest's text output; `vision49`/`vision49max` for
 `header_mode = crop` sets; `NAME.classic/` for the glass sets whose style has a non-composited look of its own (aero5048, aero5112);
@@ -226,16 +227,55 @@ minimise keeps its animation.
 
 ### Alt+Tab
 
-As Windows' (`cycle`, `cycle_run()`): the press grabs the keyboard until the binding's modifier (Alt, Super) is released. Candidates:
-the current desktop's windows in stacking order (top first), then its minimised ones. The first Tab selects the window under the
-active one (Shift+Tab the last candidate; with nothing active the top window); each further Tab / Shift+Tab steps forward / back,
-wrapping. The selected window is previewed: client and frame raised over the others without focus (frames keep their look), and the
-previous preview goes back to its place (the stacking from before the first Tab is restacked with the candidate on top). A minimised
-candidate is not shown. Releasing the modifier restores the original stacking, then activates the candidate (restored if minimised,
-raised), so every other window keeps its place: `C B A` (C active), Alt+Tab+Tab gives `A C B`, not `A B C`. Esc while the modifier is
-held puts the original stacking back and leaves the focus where it was. A modifier already released when the grab starts (xdotool
-`key alt+Tab`) makes it one step. Other events (Expose, maps, property changes) are handled meanwhile; a candidate that goes away is
-skipped. A Super release that ends a cycle sends no start menu.
+As Windows' (`cycle`, `cycle_run()`): the press grabs the keyboard until the binding's modifier (Alt, Super) is released, and XP's
+task switcher window ("Task switcher") shows the candidates. Candidates: the current desktop's switchable windows in stacking
+order (top first, which is the order of last activation), then its minimised ones. Switchable is XP's `IsAltTabWindow` in EWMH
+terms: a normal or dialog window (no `_NET_WM_WINDOW_TYPE` counts as normal), not `_NET_WM_STATE_SKIP_TASKBAR` or `_SKIP_PAGER`;
+an owner whose transient (`WM_TRANSIENT_FOR`) is listed and not minimised is left out, the transient stands for it (XP lists the
+root owner's last active popup). The first Tab selects the window under the active one (Shift+Tab the last candidate; with
+nothing active the top window); each further Tab / Shift+Tab steps forward / back, wrapping; the arrow keys move in the grid
+(Left/Right as Shift+Tab/Tab, Up/Down along the column, wrapping over the rows); the pointer over an item selects it. Nothing is
+restacked meanwhile (XP previews nothing). Releasing the modifier, Enter or a click on an item activates the selected window
+(restored if minimised, raised, focused), so every other window keeps its place: `C B A` (C active), Alt+Tab+Tab gives `A C B`.
+Esc while the modifier is held closes the switcher and leaves the focus where it was. With a single candidate there is no
+switcher: it is activated at once (appswitch.c). A modifier already released when the grab starts (xdotool `key alt+Tab`) makes
+it one step without the window. Other events (Expose, maps, property changes) are handled meanwhile; a candidate that goes away
+is not chosen. A Super release that ends a cycle sends no start menu.
+
+### Task switcher
+
+XP's CoolSwitch window (`switcher.c`, `switcher.h`), shown on the first Tab, before any further key is read, and closed on the
+release. **Geometry** from ReactOS's reimplementation of XP's user32 switcher (`win32ss/user/user32/controls/appswitch.c` in
+ReactOS 0.4.16: `PrepareWindow`, `OnPaint`, its constants and the CoolSwitch defaults), not measured on XP: no reference screenshot
+of XP's or 4074's switcher exists in the workspace (`~/fun/longhorn/screenshots`, `lhwm_screenshots`), so the numbers wait for a
+VM shot. Entries in rows of 7 (`CoolSwitchColumns`), at most 3 rows (`CoolSwitchRows`); each a 40 x 40 item (the 32 px icon, 4 px
+around it) in a 48 px cell (4 px around the item), the grid 8 px from the client edge; the client area always 7 cells wide (352 px),
+fewer than 7 entries centred in it; below the grid the title box, as tall as the dialog font plus 4 px above and below, 8 px in
+from the client's sides and bottom; around it all a 3 px dialog frame (`WS_EX_DLGMODALFRAME`: `EDGE_RAISED` and one row of
+`COLOR_3DFACE`). So 358 x 91 for up to 7 windows with Tahoma 8 (13 px), 358 x 139 for 8-14, 358 x 187 for 15 and more. More than
+21 entries scroll: the grid shows the 21 up to the selection when it lies past them (appswitch.c's `nShift`). Centred on the
+current desktop's monitor.
+
+**Drawing**, user32's through wuxtheme into an image, then into a pixmap that is the window's background (one `XClearWindow`
+per change, so fast Tabs never flicker; the first paint happens before the map): the client area filled with `COLOR_3DFACE`, the
+frame with `ut_draw_edge`; the selected item framed by two 1 px rectangles in `COLOR_HIGHLIGHT` (`Rectangle` twice, the item's
+outline and one inside it); the icons drawn at 32 x 32; the title box `ut_draw_frame_control(DFC_BUTTON, DFCS_BUTTONPUSH |
+DFCS_PUSHED)`, the selected window's title in it with `ut_draw_text_font` in `COLOR_BTNTEXT`, centred, one line, end ellipsis
+(`DT_NOPREFIX` added: a title's `&` is text), in the dialog font `MS Shell Dlg` 8 (`DEFAULT_GUI_FONT`; wux's FontSubstitutes make
+it Tahoma, as XP's and 4074's), smoothed as luxwm's menus (`wm_menu_text_smoothing`). The colours are the theme's system colours
+(`wm_theme_syscolors`): Windows Classic the scheme's, a visual style its `[SysMetrics]` colours over Windows Standard; XP's
+switcher is not a themed window, so under Luna it is the same dialog in Luna's beige `3DFACE` and blue `HIGHLIGHT`, and under 4074's
+Jade, Slate or Aero the same again (4074 has no DWM flip on Alt+Tab: its DWM's "DWM Task Switch", COMPOSITION.md 14.2, is a 3D
+cascade on a hotkey of its own, not Alt+Tab). **Icons** (`client_icon32`, made once per window and kept until its icon changes):
+`_NET_WM_ICON` at 32 px (the smallest image at least 32, else the largest, scaled), else `WM_HINTS` `icon_pixmap`, else the
+generic application icon (shell32 #3, 32 px), else the frame set's default icon, as XP's `ICON_BIG`, class icon, `IDI_APPLICATION`.
+
+The window is override-redirect (WM_CLASS `lhwm-switcher`), takes pointer motion and clicks but no keyboard (the keys come through
+luxwm's grab), and carries `_LHWM_SWITCHER` (CLIENT-PROTOCOL.md "The task switcher window": selection, count, first shown,
+window), which `picom-glass.conf` matches to give it no shadow, blur or fade. Tests: `build/luxwm/tests/switchertest` renders it
+offline ("Running and testing"); `tests/headless/alttab.sh` (in `make check`) runs luxwm on Xvfb with three `testwin` windows and
+checks the size, the centring, the selection frame's pixels, Tab, Shift+Tab, the release, Alt+Tab+Tab, Alt+Shift+Tab, Esc, a
+quick alt+Tab, a click, a minimised, a skip-taskbar and a transient window.
 
 ### Restack requests
 

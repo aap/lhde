@@ -41,6 +41,12 @@ static int sys_smoothing(void) {
     return !strcasecmp(v, "cleartype") ? 2 : !strcasecmp(v, "off") || !strcasecmp(v, "none") || !strcmp(v, "0") ? 0 : 1;
 }
 
+int wm_menu_text_smoothing(const struct theme *t) {
+    if (sys_smoothing() >= 0) return sys_smoothing();   /* the same text as flxp's menus, not the caption's own tuning */
+    if (t->classic) return t->cl_smooth;
+    return t->mode != THEME_MSSTYLES || t->ms_font_aa == CAIRO_ANTIALIAS_SUBPIXEL ? 2 : t->ms_font_aa == CAIRO_ANTIALIAS_NONE ? 0 : 1;
+}
+
 static void look_build(const struct theme *t, const struct wm_menu_item *items, int n, struct look *L) {
     memset(L, 0, sizeof *L);
     ut_menu_spec *s = &L->spec;
@@ -48,12 +54,11 @@ static void look_build(const struct theme *t, const struct wm_menu_item *items, 
         s->colors = t->cl; s->flat = 0;
         snprintf(L->font.face, sizeof L->font.face, "%s", t->cl_mface);
         L->font.height = -t->cl_mpx; L->font.weight = t->cl_mbold ? 700 : 400; L->font.italic = t->cl_mitalic;
-        s->font = &L->font; s->smoothing = t->cl_smooth;
+        s->font = &L->font;
     } else {
         s->theme = (ut_theme *)t->ut; s->flat = -1;
-        s->smoothing = t->mode != THEME_MSSTYLES || t->ms_font_aa == CAIRO_ANTIALIAS_SUBPIXEL ? 2 : t->ms_font_aa == CAIRO_ANTIALIAS_NONE ? 0 : 1;
     }
-    if (sys_smoothing() >= 0) s->smoothing = sys_smoothing();   /* the same text as flxp's menus, not the caption's own tuning */
+    s->smoothing = wm_menu_text_smoothing(t);
     L->n = n < 64 ? n : 64;
     for (int i = 0; i < L->n; i++) {   /* WMMENU_* flags and glyphs are ut_menu's */
         L->it[i].text = items[i].text; L->it[i].accel = items[i].accel;

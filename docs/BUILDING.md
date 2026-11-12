@@ -113,8 +113,8 @@ incl. GTK, the file dialog in both looks, the modifier keys across a focus chang
 the default, Enter and Escape: tests/w32/msgbox), luxshot, luxattr: the Properties sheet's Summary
 and Advanced views driven with xdotool and checked with getfattr, and a run with nothing imported and an empty HOME, flxp's
 Properties from the item menu (General first, Summary's description, two files in one sheet, a read-only file's message box)
-and Add Tag, the Explorer's
-Filter box under jade4074 over names and attributes, skipped without that style or user xattrs) on displays :71-:73
+and Add Tag, the Explorer's Filter box under jade4074 over names and attributes, skipped without that style or user xattrs,
+luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).

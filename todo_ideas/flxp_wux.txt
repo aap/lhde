@@ -51,3 +51,17 @@
 * a message box and a property sheet get minimize and maximize buttons from luxwm (seen in the lab under luna and jade4074);
 	XP's have Close only (a sheet also ?): wux's fixed-size _MOTIF_WM_HINTS keeps MWM_FUNC_MINIMIZE whatever the style's
 	WS_MINIMIZEBOX, and an owned dialog other than the message box gets no WM_TRANSIENT_FOR (the sheet)
+
+## strings: UTF-8 as wux's only public API (survey 2026-11-12)
+* today: 127 W functions, 72 A functions (thin converters; GetACP() = CP_UTF8, so "ANSI" already means UTF-8), 425 neutral;
+	flxp/apps call no A function and use std::u16string + a per-file W() helper over w32::utf16_of (an internal header), 323 L""
+	literals with (LPCWSTR) casts; the vendored Wine controls are UTF-16 throughout and handle both the A and W item messages
+* plan: unsuffixed UTF-8 functions in wux.h (CreateWindowEx, SetWindowText, DrawText, MessageBox, ...) as converters onto the W
+	internals, the W names kept for the vendored code only, the A functions deleted; helpers or UTF-8 struct types for the ~40
+	string-carrying messages (LVM_/TVM_/TB_/TTM_/SB_/CB_/EM_, WM_SETTEXT/GETTEXT) and the GETDISPINFO notifications (a buffer
+	rule); one conversion pair (crt.cpp's) instead of the copies in image.cpp, gdi_priv.h, res.cpp, window.cpp; both APIs
+	coexist while flxp moves file by file (string-free files first: filedlg/main, portal, wallpaper, xwm, preview)
+* bugs found on the way: window.cpp posts one WM_CHAR per code point (wParam up to 0x10FFFF) but the vendored edit treats it as a
+	WCHAR: characters above U+FFFF are truncated; image.cpp's u16_of_a reads bytes as Latin-1 unlike the rest; glibc's wcs*/towupper
+	are reachable from C++ with 16-bit wchar_t (flxp_crt.h redirects them in C only): poison them in C++ too; w32.h defines
+	WINE_UNICODE_NATIVE 0 while the Makefile defines it: settle which
