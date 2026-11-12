@@ -1,7 +1,8 @@
 // The 16-bit wide CRT that the vendored Wine code calls by its MSVCRT names
-// (see include/flxp_crt.h), the wsprintf family, and the UTF-8/UTF-16
-// helpers of w32.h. printf/scanf follow MSVCRT: in the wide functions %s and
-// %c are wide and %S/%hs/%hc narrow (UTF-8); %ld is 32 bits.
+// (see include/flxp_crt.h), the wsprintf family, and the string helpers of
+// w32.h (the UTF-8/UTF-16 pair itself is utf.cpp). printf/scanf follow
+// MSVCRT: in the wide functions %s and %c are wide and %S/%hs/%hc narrow
+// (UTF-8); %ld is 32 bits.
 #include <errno.h>
 #include <stdio.h>
 #include <type_traits>
@@ -13,54 +14,9 @@
 
 typedef unsigned short wch;
 
-// ---- UTF-8 / UTF-16 ----
+// ---- strings ----
 
 namespace {
-
-// Decodes one code point from UTF-8; invalid sequences yield U+FFFD and
-// consume one byte.
-uint32_t utf8_next(const unsigned char*& p, const unsigned char* end)
-{
-    uint32_t c = *p++;
-    if (c < 0x80) return c;
-    int n; uint32_t min;
-    if ((c & 0xe0) == 0xc0) { n = 1; c &= 0x1f; min = 0x80; }
-    else if ((c & 0xf0) == 0xe0) { n = 2; c &= 0x0f; min = 0x800; }
-    else if ((c & 0xf8) == 0xf0) { n = 3; c &= 0x07; min = 0x10000; }
-    else return 0xfffd;
-    if (end - p < n) return 0xfffd;
-    for (int i = 0; i < n; i++)
-        if ((p[i] & 0xc0) != 0x80) return 0xfffd;
-    for (int i = 0; i < n; i++) c = (c << 6) | (*p++ & 0x3f);
-    if (c < min || c > 0x10ffff || (c >= 0xd800 && c < 0xe000)) return 0xfffd;
-    return c;
-}
-
-// Decodes one code point from UTF-16; lone surrogates yield U+FFFD.
-uint32_t utf16_next(const wch*& p, const wch* end)
-{
-    uint32_t c = *p++;
-    if (c >= 0xd800 && c < 0xdc00) {
-        if (p < end && *p >= 0xdc00 && *p < 0xe000) return 0x10000 + ((c - 0xd800) << 10) + (*p++ - 0xdc00);
-        return 0xfffd;
-    }
-    if (c >= 0xdc00 && c < 0xe000) return 0xfffd;
-    return c;
-}
-
-void put_utf8(std::string& s, uint32_t c)
-{
-    if (c < 0x80) s += (char)c;
-    else if (c < 0x800) { s += (char)(0xc0 | c >> 6); s += (char)(0x80 | (c & 0x3f)); }
-    else if (c < 0x10000) { s += (char)(0xe0 | c >> 12); s += (char)(0x80 | ((c >> 6) & 0x3f)); s += (char)(0x80 | (c & 0x3f)); }
-    else { s += (char)(0xf0 | c >> 18); s += (char)(0x80 | ((c >> 12) & 0x3f)); s += (char)(0x80 | ((c >> 6) & 0x3f)); s += (char)(0x80 | (c & 0x3f)); }
-}
-
-void put_utf16(std::u16string& s, uint32_t c)
-{
-    if (c < 0x10000) s += (char16_t)c;
-    else { c -= 0x10000; s += (char16_t)(0xd800 + (c >> 10)); s += (char16_t)(0xdc00 + (c & 0x3ff)); }
-}
 
 size_t wlen(const wch* s) { size_t n = 0; while (s[n]) n++; return n; }
 
@@ -69,26 +25,6 @@ size_t wlen(const wch* s) { size_t n = 0; while (s[n]) n++; return n; }
 namespace w32 {
 
 int utf16_len(const WCHAR* s) { return s ? (int)wlen((const wch*)s) : 0; }
-
-std::string utf8_of(const WCHAR* s, int len)
-{
-    std::string out;
-    if (!s) return out;
-    const wch* p = (const wch*)s;
-    const wch* end = p + (len < 0 ? wlen(p) : (size_t)len);
-    while (p < end) put_utf8(out, utf16_next(p, end));
-    return out;
-}
-
-std::u16string utf16_of(const char* s, int len)
-{
-    std::u16string out;
-    if (!s) return out;
-    const unsigned char* p = (const unsigned char*)s;
-    const unsigned char* end = p + (len < 0 ? strlen(s) : (size_t)len);
-    while (p < end) put_utf16(out, utf8_next(p, end));
-    return out;
-}
 
 // ASCII, Latin-1 and Latin Extended-A.
 WCHAR wupper(WCHAR wc)
@@ -335,12 +271,7 @@ struct WideOut {
     void wide(const wch* s, size_t len) { for (size_t i = 0; i < len; i++) unit(s[i]); }
     void narrow(const char* s, size_t len)
     {
-        const unsigned char* p = (const unsigned char*)s, *e = p + len;
-        while (p < e) {
-            uint32_t c = utf8_next(p, e);
-            if (c >= 0x10000) { c -= 0x10000; unit(0xd800 + (c >> 10)); unit(0xdc00 + (c & 0x3ff)); }
-            else unit(c);
-        }
+        for (char16_t u : w32::utf16_of(s, (int)len)) unit(u);
     }
 };
 
@@ -350,9 +281,7 @@ struct NarrowOut {
     void narrow(const char* s, size_t len) { for (size_t i = 0; i < len; i++) unit((unsigned char)s[i]); }
     void wide(const wch* s, size_t len)
     {
-        std::string t;
-        const wch* p = s, *e = s + len;
-        while (p < e) put_utf8(t, utf16_next(p, e));
+        std::string t = w32::utf8_of((const char16_t*)s, (int)len);
         narrow(t.data(), t.size());
     }
 };
@@ -734,9 +663,7 @@ int vscan(const wch* in, const wch* fmt, va_list ap)
                     memcpy(d, s, (p - s) * sizeof(wch));
                     if (conv != 'c' && conv != 'C') d[p - s] = 0;
                 } else {
-                    std::string t;
-                    const wch* q = s;
-                    while (q < p) put_utf8(t, utf16_next(q, p));
+                    std::string t = w32::utf8_of((const char16_t*)s, (int)(p - s));
                     memcpy(dst, t.data(), t.size());
                     if (conv != 'c' && conv != 'C') ((char*)dst)[t.size()] = 0;
                 }

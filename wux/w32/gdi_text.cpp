@@ -47,7 +47,7 @@ static std::string utf8_cp(uint32_t c)
     int n = 1;
     if (c >= 0x10000) { c -= 0x10000; w[0] = (WCHAR)(0xd800 + (c >> 10)); w[1] = (WCHAR)(0xdc00 + (c & 0x3ff)); n = 2; }
     else w[0] = (WCHAR)c;
-    return to_utf8(w, n);
+    return utf8_of(w, n);
 }
 
 static gdi::Color color_px(uint32_t v) { return gdi::unpack(v); }
@@ -204,7 +204,7 @@ BOOL WINAPI ExtTextOutW(HDC hdc, INT x, INT y, UINT flags, const RECT* lprect, L
     }
     gdi::Color fg = color_px(dev_pixel(d, d->text_color));
     if (!lpDx) {
-        std::string s = to_utf8(str, (int)count);
+        std::string s = utf8_of(str, (int)count);
         gdi::text_out(g, gdi::Point{x, y - tm.ascent}, f, s.data(), (int32_t)s.size(), fg);
     } else {
         int px = x;
@@ -227,7 +227,7 @@ BOOL WINAPI TextOutW(HDC hdc, INT x, INT y, LPCWSTR str, INT count)
 BOOL WINAPI ExtTextOutA(HDC hdc, INT x, INT y, UINT flags, const RECT* lprect, LPCSTR str, UINT count, const INT* lpDx)
 {
     if (!str || !count) return ExtTextOutW(hdc, x, y, flags, lprect, nullptr, 0, nullptr);
-    std::u16string w = to_utf16(str, (int)count);
+    std::u16string w = utf16_of(str, (int)count);
     std::vector<INT> dx;
     if (lpDx) {
         // one lpDx entry per byte; give each UTF-16 unit the sum for its bytes
@@ -290,7 +290,7 @@ BOOL WINAPI GetTextExtentPointW(HDC hdc, LPCWSTR str, INT count, LPSIZE size)
 BOOL WINAPI GetTextExtentExPointA(HDC hdc, LPCSTR str, INT count, INT max_ext, LPINT fit, LPINT dxs, LPSIZE size)
 {
     if (count < 0) return FALSE;
-    std::u16string w = to_utf16(str, count);
+    std::u16string w = utf16_of(str, count);
     std::vector<INT> wdx(w.size());
     INT wfit = 0;
     if (!GetTextExtentExPointW(hdc, (const WCHAR*)w.data(), (INT)w.size(), max_ext, fit ? &wfit : nullptr,
@@ -317,7 +317,7 @@ BOOL WINAPI GetTextExtentExPointA(HDC hdc, LPCSTR str, INT count, INT max_ext, L
 BOOL WINAPI GetTextExtentPoint32A(HDC hdc, LPCSTR str, INT count, LPSIZE size)
 {
     if (count < 0) return FALSE;
-    std::u16string w = to_utf16(str, count);
+    std::u16string w = utf16_of(str, count);
     return GetTextExtentPoint32W(hdc, (const WCHAR*)w.data(), (INT)w.size(), size);
 }
 
@@ -453,7 +453,7 @@ INT WINAPI GetTextFaceA(HDC hdc, INT count, LPSTR name)
 {
     DC* d = dc_of(hdc);
     if (!d || !d->font) return 0;
-    std::string face = to_utf8(d->font->lf.lfFaceName, -1);
+    std::string face = utf8_of(d->font->lf.lfFaceName, -1);
     if (!name) return (INT)face.size() + 1;
     if (count <= 0) return 0;
     int n = min((int)face.size(), count - 1);

@@ -43,8 +43,7 @@
 	under Xvfb with xdotool mousemove + click 3; tests/headless/filedlg.sh clicks again); a real mouse may never do this, check
 * naming pass leftovers: 105 flxp functions and globals with external linkage that no other object references (nm: header::size,
 	browser::zoom_at, shell::thumbs::md5_hex, ...): API used only in its own file, or dead; make them file-local or remove them
-	component by component. wux converts UTF-16 <-> UTF-8 in three places (gdi_priv.h to_utf8 / to_utf16, res.cpp utf16_to_utf8,
-	w32::utf8_of): one header inside wux
+	component by component
 
 * 4074's About box is Segoe UI 8 under Jade (4074-dwm.png) while MS Shell Dlg is Tahoma: our About box should name Segoe UI in
 	its template under the Longhorn styles (the one dialog that does)
@@ -61,9 +60,9 @@
 * plan: unsuffixed UTF-8 functions in wux.h (CreateWindowEx, SetWindowText, DrawText, MessageBox, ...) as converters onto the W
 	internals, the W names kept for the vendored code only, the A functions deleted; helpers or UTF-8 struct types for the ~40
 	string-carrying messages (LVM_/TVM_/TB_/TTM_/SB_/CB_/EM_, WM_SETTEXT/GETTEXT) and the GETDISPINFO notifications (a buffer
-	rule); one conversion pair (crt.cpp's) instead of the copies in image.cpp, gdi_priv.h, res.cpp, window.cpp; both APIs
-	coexist while flxp moves file by file (string-free files first: filedlg/main, portal, wallpaper, xwm, preview)
+	rule), all converting through the one pair (wux/w32/utf.h); both APIs coexist while flxp moves file by file (string-free
+	files first: filedlg/main, portal, wallpaper, xwm, preview)
 * bugs found on the way: window.cpp posts one WM_CHAR per code point (wParam up to 0x10FFFF) but the vendored edit treats it as a
-	WCHAR: characters above U+FFFF are truncated; image.cpp's u16_of_a reads bytes as Latin-1 unlike the rest; glibc's wcs*/towupper
+	WCHAR: characters above U+FFFF are truncated; glibc's wcs*/towupper
 	are reachable from C++ with 16-bit wchar_t (flxp_crt.h redirects them in C only): poison them in C++ too; w32.h defines
 	WINE_UNICODE_NATIVE 0 while the Makefile defines it: settle which

@@ -8,7 +8,7 @@
 
 TOOLKIT_TESTS = $(patsubst tests/toolkit/%.cpp,build/tests/%,$(wildcard tests/toolkit/*.cpp))
 W32_TESTS     = $(patsubst tests/w32/%.cpp,build/tests/w32/%,$(wildcard tests/w32/*.cpp))
-NATIVE_OBJS   = $(patsubst %.cpp,$(O)/%.o,$(WUX_NATIVE)) $(SHELLOBJS)
+NATIVE_OBJS   = $(patsubst %.cpp,$(O)/%.o,$(WUX_NATIVE) wux/w32/utf.cpp) $(SHELLOBJS)
 
 $(O)/tests/toolkit/lhdatatest.o: CXXFLAGS += -Iliblhde
 $(O)/tests/toolkit/%.o: tests/toolkit/%.cpp

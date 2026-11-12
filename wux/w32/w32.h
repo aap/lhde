@@ -16,6 +16,7 @@
 
 // The win32 headers, as seen by the shim. Keep this include set small and
 // identical across shim modules so the ABI (WCHAR = 16-bit) is consistent.
+#include "w32/utf.h"
 extern "C" {
 #define WINE_UNICODE_NATIVE 0
 #include "windef.h"
@@ -103,9 +104,9 @@ template <class T> inline T* as(HANDLE h, uint32_t type) {
 }
 inline DC* dc_of(HDC h) { if (!is_obj_ptr(h) || !obj_live(h)) return nullptr; Obj* o = (Obj*)h; return (o->type == T_DC || o->type == T_MEMDC) ? (DC*)o : nullptr; }
 
-// Strings: WCHAR here is 16-bit (the shim is compiled with -fshort-wchar).
-std::string utf8_of(const WCHAR* s, int len = -1);
-std::u16string utf16_of(const char* s, int len = -1);
+// Strings: WCHAR here is 16-bit (the shim is compiled with -fshort-wchar); the
+// UTF-8/UTF-16 pair is utf.h's, this is its WCHAR spelling.
+inline std::string utf8_of(const WCHAR* s, int len = -1) { return utf8_of((const char16_t*)s, len); }
 int utf16_len(const WCHAR* s);
 
 // GDI shim entry points used by the user shim (implemented in gdi.cpp)

@@ -358,6 +358,13 @@ static void test_resources(const std::string& dir)
     check(FindResourceW(m, L"palbmp", (LPCWSTR)RT_BITMAP) != nullptr, "FindResourceW name case-insensitive");
     check(FindResourceW(m, L"#2", (LPCWSTR)RT_BITMAP) != nullptr && FindResourceA(m, MAKEINTRESOURCEA(100), (LPCSTR)RT_DIALOG) != nullptr, "FindResource #id / ordinal / A");
     check(FindResourceW(m, L"NOPE", (LPCWSTR)RT_BITMAP) == nullptr, "FindResourceW missing");
+    // a name outside ASCII, by its UTF-16 and by its "ANSI" (UTF-8) spelling: é is in Latin-1's range, 𝄞 a surrogate pair
+    check(FindResourceW(m, (LPCWSTR)u"PAL\u00e9\U0001D11E", (LPCWSTR)RT_BITMAP) != nullptr, "FindResourceW non-ASCII name");
+    check(FindResourceA(m, "PAL\xc3\xa9\xf0\x9d\x84\x9e", (LPCSTR)RT_BITMAP) != nullptr, "FindResourceA UTF-8 name");
+    HANDLE hb = LoadImageA(m, "pal\xc3\xa9\xf0\x9d\x84\x9e", IMAGE_BITMAP, 0, 0, 0);
+    check(hb != nullptr, "LoadImageA UTF-8 name (not Latin-1)");
+    if (hb) DeleteObject(hb);
+    check(LoadImageA(m, "PAL\xe9", IMAGE_BITMAP, 0, 0, 0) == nullptr, "LoadImageA Latin-1 bytes are not a name");
     check(GetModuleHandleW(L"test.res") == m, "GetModuleHandleW by loaded name");
     HMODULE m2 = LoadLibraryW((LPCWSTR)wpath.c_str());
     check(m2 == m, "LoadLibraryW refcount same handle");

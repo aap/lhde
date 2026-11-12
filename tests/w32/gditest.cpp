@@ -100,6 +100,19 @@ int main(int argc, char** argv)
     CHECK(fit == 4 && dx[4] == sz.cx);
     printf("extent(Hello) = %dx%d\n", (int)sz.cx, (int)sz.cy);
 
+    // The A functions read "ANSI" as UTF-8 through the one conversion pair: é (Latin-1's range, two bytes) and 𝄞 (four
+    // bytes, a surrogate pair) measure as their UTF-16; the per-byte widths of GetTextExtentExPointA land on the last byte
+    // of each character. Read as Latin-1, the six bytes would be six characters.
+    static const char mixA[] = "\xc3\xa9x\xf0\x9d\x84\x9e";   // é x 𝄞
+    static const WCHAR mixW[] = {0xe9, 'x', 0xd834, 0xdd1e};
+    SIZE sa, sw;
+    CHECK(GetTextExtentPoint32A(dc, mixA, 7, &sa) && GetTextExtentPoint32W(dc, mixW, 4, &sw));
+    CHECK(sa.cx == sw.cx && sa.cy == sw.cy && sw.cx > 0);
+    INT dxa[7], dxw[4], fa = 0, fw = 0;
+    CHECK(GetTextExtentExPointA(dc, mixA, 7, 10000, &fa, dxa, NULL) && GetTextExtentExPointW(dc, mixW, 4, 10000, &fw, dxw, NULL));
+    CHECK(fw == 4 && dxa[1] == dxw[0] && dxa[2] == dxw[1] && dxa[6] == dxw[3]);
+    printf("extent(é x 𝄞): A %dx%d, W %dx%d\n", (int)sa.cx, (int)sa.cy, (int)sw.cx, (int)sw.cy);
+
     // Rectangle: black pen, light gray brush
     SelectObject(dc, GetStockObject(BLACK_PEN));
     SelectObject(dc, GetStockObject(LTGRAY_BRUSH));
