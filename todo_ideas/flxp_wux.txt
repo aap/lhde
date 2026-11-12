@@ -48,3 +48,6 @@
 
 * 4074's About box is Segoe UI 8 under Jade (4074-dwm.png) while MS Shell Dlg is Tahoma: our About box should name Segoe UI in
 	its template under the Longhorn styles (the one dialog that does)
+* a message box and a property sheet get minimize and maximize buttons from luxwm (seen in the lab under luna and jade4074);
+	XP's have Close only (a sheet also ?): wux's fixed-size _MOTIF_WM_HINTS keeps MWM_FUNC_MINIMIZE whatever the style's
+	WS_MINIMIZEBOX, and an owned dialog other than the message box gets no WM_TRANSIENT_FOR (the sheet)
