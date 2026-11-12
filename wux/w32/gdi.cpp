@@ -235,6 +235,10 @@ static Font* new_font(const LOGFONTW& lf, bool is_stock)
     f->lf = lf;
     std::string face = utf8_of(lf.lfFaceName, -1);
     if (face.empty()) face = "MS Shell Dlg";
+    // a face that is not installed, asked for with fixed pitch or as FF_MODERN (notepad's Lucida Console without the
+    // Windows fonts): a monospaced one, as Windows' font mapper weighs the pitch above the name
+    if (((lf.lfPitchAndFamily & 3) == FIXED_PITCH || (lf.lfPitchAndFamily & 0xf0) == FF_MODERN) && !gdi::have_family(face.c_str()))
+        face = "monospace";
     gdi::FontDesc d;
     d.family = face.c_str();
     d.height = lf.lfHeight;

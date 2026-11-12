@@ -60,8 +60,19 @@ int main(int argc, char** argv)
 `wux/wux.h` is `<windows.h>`, `<commctrl.h>`, `<commdlg.h>`, `<uxtheme.h>` with `<vsstyle.h>`, `<shellapi.h>` and wux's own
 additions (`wux/w32/flxp_shell.h`: desktop and dock windows, root properties, file drag and drop, the X selections, typed
 clipboard data, `FlxpWritePng` / `FlxpEncodePng`), plus `WuxWide` / `WuxUtf8` / `WuxWindowText` for the UTF-8 the shell layer
-speaks. Strings to the API are UTF-16 (`L"..."` is 16-bit here). `MessageBoxW` is a stub: `filedlg::message_box` is the XP
-message box.
+speaks. Strings to the API are UTF-16 (`L"..."` is 16-bit here; a character above U+FFFF is a surrogate pair, and typed it
+arrives as two `WM_CHAR`s, as on Windows); the A functions and the A text messages (`SendMessageA`'s `WM_SETTEXT`,
+`WM_GETTEXT`) read "ANSI" as UTF-8. `MessageBoxW` is a stub: `filedlg::message_box` is the XP message box (OK, OK/Cancel,
+Yes/No, Yes/No/Cancel).
+
+Besides the windows and controls, wux has what a document program reaches for: accelerator tables (`LoadAcceleratorsW`,
+`TranslateAcceleratorW`), a class's menu (`lpszMenuName`, also by number), `GetWindowPlacement` / `SetWindowPlacement` (the
+normal rectangle while maximised; minimising is the window manager's), `DragAcceptFiles` with `WM_DROPFILES` and
+`DragQueryFileW` (wux's X drop: a file dragged from flxp or any XDND source), `IsTextUnicode`, `FormatMessageW` (from a string,
+an argument array), the common dialogs `GetOpenFileNameW` / `GetSaveFileNameW` (flxp's dialog; a custom template without stc32
+and its hook: the controls go under the dialog's own, the hook gets `WM_INITDIALOG` and `CDN_FILEOK`), `ChooseFontW`,
+`FindTextW`, `ReplaceTextW` (Wine's comdlg32, over `EnumFontFamiliesExW` and fontconfig) and `GetFileTitleW`. An owned window
+with a caption (a modeless Find dialog) is its owner's transient, as XP keeps owned windows above their owner.
 
 The look needs nothing from the application: WuxInit loads the session theme's visual style, colours, metrics and fonts, and
 the program follows a theme switch by itself (`WM_THEMECHANGED`, the system colours), as every flxp program does. Controls are

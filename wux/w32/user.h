@@ -6,6 +6,7 @@
 extern "C" {
 #include "controls.h"
 #include "user_private.h"
+#include "shellapi.h"
 }
 
 namespace w32 {
@@ -21,6 +22,7 @@ struct Class {
     HCURSOR cursor;
     HBRUSH background;      // brush, or COLOR_xxx+1 pseudo handle, or null
     std::u16string menu_name;
+    UINT_PTR menu_res = 0;   // the class menu given as MAKEINTRESOURCE (menu_name empty then)
     std::vector<uint8_t> cls_bytes;
 };
 
@@ -45,6 +47,9 @@ inline Window* wdata(HWND h) { win::Window* w = window_of(h); return w ? (Window
 Class* find_class(LPCWSTR name);
 win::Window* desktop();
 void init();                 // whole shim: gdi, syscolor, user, builtin classes
+void note_normal_rect(HWND h);      // a toplevel's rectangle while not maximised, for GetWindowPlacement (user.cpp)
+void forget_normal_rect(HWND h);
+HDROP make_hdrop(HWND h, int x, int y, const char* const* paths, unsigned count);   // WM_DROPFILES's HDROP (shellapi.cpp)
 
 // defwnd.cpp
 LRESULT nc_calc_size(HWND hwnd, WPARAM wparam, RECT* rect);

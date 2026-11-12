@@ -8,12 +8,14 @@ What the repository holds, under which licence, and where the notice is. This is
 | `wux/vendor/wine/`: Wine's comctl32, user32, uxtheme files and headers, with lhde's `<file>.patch` beside the files it changed | GNU LGPL 2.1 or later (Wine's terms) | `wux/vendor/wine/LICENSE` (Wine's notice), `wux/vendor/wine/COPYING.LIB` (the LGPL 2.1 text, Wine's own file); `wux/vendor/wine/MANIFEST` names each upstream file with the Wine tag and commit it was taken from |
 | `wux/rc/comctl32.res`, `wux/rc/comdlg32.res`, `wux/w32/stdres.res`: Wine's resources compiled with windres | as Wine's sources, LGPL 2.1 or later | `wux/vendor/wine/MANIFEST` (last section): the Wine sources, the tag and commit (wine-11.18, 7b3fff76fa5; each file rebuilds byte for byte from it) and the command (`wux/rc/build.sh`, `wux/w32/mkstdres.py`) |
 | `flxp/res/icons/*.ico`, `*.bmp`: Wine's shell32 icons, copied unchanged | as Wine's sources, LGPL 2.1 or later | `wux/vendor/wine/MANIFEST`; `flxp/res/icons/wine.theme` says so too |
+| `wux/vendor/wine/comdlg32/`: Wine's `fontdlg.c`, `finddlg.c` (unchanged) and `cdlg.h` (with `cdlg.h.patch`), the Font, Find and Replace dialogs | GNU LGPL 2.1 or later (Wine's terms) | as the rest of `wux/vendor/wine/` (MANIFEST: wine-11.18, 7b3fff76fa5) |
 | luxwm's berry parts: `wm.c`, `client.c`, `config.h`, `globals.h`, `ipc.h`, `types.h`, `utils.c`, `utils.h`, the man pages (luxwm is a fork of berry by Joshua L Ervin) | MIT | `luxwm/LICENSE` (berry's MIT notice); `luxwm/README.md` lists the files from berry and those written for lhde |
 
 The vendored Wine objects are linked into `libwux.a` and `libwuxtheme` (`.a` and `.so`), so the flxp programs, luxwm, luxnav,
 luxshell and the examples contain LGPL code from Wine. Some of lhde's own files say in their header comments that they follow
 named Wine functions (`wux/gdi/font.cpp` "lifted from Wine's dlls/win32u/freetype.c", `wux/w32/gdi_draw.cpp` "follows Wine's
-dlls/win32u/dibdrv"); they are not in the MANIFEST.
+dlls/win32u/dibdrv"); they are not in the MANIFEST. `IsTextUnicode` (`wux/w32/kernel.cpp`) follows ReactOS's
+`RtlIsTextUnicode` (`sdk/lib/rtl/unicode.c`, GPL 2 or later), as it says there.
 
 ## Files the user imports
 

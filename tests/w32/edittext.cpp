@@ -4,7 +4,8 @@
 //   edittext --self        sends the WM_CHARs itself and checks WM_GETTEXT (prints ok/FAIL lines, exit 1 on a failure)
 //   edittext TITLE         a window with a multiline edit that prints its text as UTF-8 hex on every change, one line
 //                          ("text 61c3a9f09f9880"), flushed; tests/headless/typing.sh types into it with xdotool
-// Both need $DISPLAY.
+// --self also checks the A text messages (SendMessageA's WM_SETTEXT / WM_GETTEXT in UTF-8, SetDlgItemInt). Both need
+// $DISPLAY.
 #include <stdio.h>
 #include <string.h>
 #include <string>
@@ -66,6 +67,17 @@ static int self_test(HWND parent)
     // Backspace takes the whole pair (the caret never stops between its halves)
     SendMessageW(e, WM_CHAR, VK_BACK, 1);
     check(edit_utf8(e) == "a\xc3\xa9\xf0\x9f\x98\x80", "Backspace removes the pair");
+    // the A text messages convert UTF-8 (Wine's SetDlgItemTextA, GetDlgItemTextA, SetDlgItemInt, comdlg32's Find dialog)
+    SendMessageA(e, WM_SETTEXT, 0, (LPARAM)"\xc3\xa9\xf0\x9f\x98\x80");
+    check(GetWindowTextLengthW(e) == 3 && edit_utf8(e) == "\xc3\xa9\xf0\x9f\x98\x80", "WM_SETTEXT through SendMessageA: UTF-8 in");
+    char a[8];
+    check(SendMessageA(e, WM_GETTEXTLENGTH, 0, 0) == 6 && SendMessageA(e, WM_GETTEXT, sizeof a, (LPARAM)a) == 6
+          && !strcmp(a, "\xc3\xa9\xf0\x9f\x98\x80"), "WM_GETTEXT through SendMessageA: UTF-8 out, bytes counted");
+    check(SendMessageA(e, WM_GETTEXT, 5, (LPARAM)a) == 2 && !strcmp(a, "\xc3\xa9"), "a short buffer is cut at a character");
+    SetWindowLongPtrW(e, GWLP_ID, 7);
+    SetDlgItemInt(parent, 7, 4096, FALSE);
+    BOOL ok = FALSE;
+    check(edit_utf8(e) == "4096" && GetDlgItemInt(parent, 7, &ok, FALSE) == 4096 && ok, "SetDlgItemInt / GetDlgItemInt");
     DestroyWindow(e);
     printf("%d failure(s)\n", fails);
     return fails != 0;

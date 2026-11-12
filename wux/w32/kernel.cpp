@@ -358,6 +358,12 @@ LPWSTR WINAPI CharUpperW(LPWSTR s)
     return s;
 }
 
+// the CRT's classes (ASCII, Latin-1 and the scripts wupper/wlower know)
+BOOL WINAPI IsCharAlphaW(WCHAR c) { return flxp_iswalpha((flxp_wch)c) != 0; }
+BOOL WINAPI IsCharAlphaNumericW(WCHAR c) { return flxp_iswalnum((flxp_wch)c) != 0; }
+BOOL WINAPI IsCharUpperW(WCHAR c) { return flxp_iswalpha((flxp_wch)c) && w32::wlower(c) != c; }
+BOOL WINAPI IsCharLowerW(WCHAR c) { return flxp_iswalpha((flxp_wch)c) && w32::wupper(c) != c; }
+
 LPWSTR WINAPI CharLowerW(LPWSTR s)
 {
     if (IS_INTRESOURCE(s)) return (LPWSTR)(UINT_PTR)(unsigned short)w32::wlower((WCHAR)(UINT_PTR)s);
@@ -1471,3 +1477,138 @@ namespace w32 {
 void init_kernel() {}
 
 } // namespace w32
+
+// ---- advapi32's IsTextUnicode, kernel32's FormatMessage ----
+
+extern "C" {
+
+// The statistics of ReactOS's RtlIsTextUnicode (sdk/lib/rtl/unicode.c, which follows Wine's): the first 256 units read
+// as UTF-16 LE, the byte-order marks, the units no text has (NUL, U+FFFF, a reversed BOM, CR LF packed into one unit),
+// how much the low and the high bytes vary (ASCII in UTF-16 has quiet high bytes, the same text byte-swapped quiet low
+// bytes), bytes of zero, and the control characters in either byte order. No DBCS lead-byte test: the "ANSI" code page
+// is UTF-8, which has none.
+BOOL WINAPI IsTextUnicode(LPCVOID buf, INT len, LPINT pf)
+{
+    const BYTE* b = (const BYTE*)buf;
+    if (!b || len < 2) { if (pf) *pf = 0; return FALSE; }
+    unsigned flags = pf ? (unsigned)*pf : ~0u, out = 0;
+    if (len & 1) out |= IS_TEXT_UNICODE_ODD_LENGTH;
+    if (b[len - 1] == 0) len--;   // as Windows does, so a trailing NUL is not IS_TEXT_UNICODE_NULL_BYTES
+    int n = len / 2;
+    if (n > 256) n = 256;
+    auto unit = [b](int i) { return (WORD)(b[2 * i] | b[2 * i + 1] << 8); };
+    if (n > 0 && unit(0) == 0xFEFF) out |= IS_TEXT_UNICODE_SIGNATURE;
+    if (n > 0 && unit(0) == 0xFFFE) out |= IS_TEXT_UNICODE_REVERSE_SIGNATURE;
+    unsigned lo_diff = 0, hi_diff = 0, last_lo = 0, last_hi = 0;
+    for (int i = 0; i < n; i++) {
+        WORD u = unit(i);
+        unsigned lo = u & 0xff, hi = u >> 8;
+        lo_diff += lo > last_lo ? lo - last_lo : last_lo - lo;
+        hi_diff += hi > last_hi ? hi - last_hi : last_hi - hi;
+        last_lo = lo; last_hi = hi;
+        if (u == 0xFFFE || u == 0 || u == 0x0A0D || u == 0xFFFF) out |= IS_TEXT_UNICODE_ILLEGAL_CHARS;
+    }
+    const unsigned weight = 3;
+    if (lo_diff < 127 && !hi_diff) out |= IS_TEXT_UNICODE_ASCII16;
+    if (hi_diff && !lo_diff) out |= IS_TEXT_UNICODE_REVERSE_ASCII16;
+    if (weight * lo_diff < hi_diff) out |= IS_TEXT_UNICODE_REVERSE_STATISTICS;
+    if ((flags & IS_TEXT_UNICODE_STATISTICS) && weight * hi_diff < lo_diff) out |= IS_TEXT_UNICODE_STATISTICS;
+    if (flags & IS_TEXT_UNICODE_NULL_BYTES)
+        for (int i = 0; i < n; i++)
+            if (!(unit(i) & 0xff) || !(unit(i) >> 8)) { out |= IS_TEXT_UNICODE_NULL_BYTES; break; }
+    if (flags & IS_TEXT_UNICODE_CONTROLS)
+        for (int i = 0; i < n; i++) {
+            WORD u = unit(i);
+            if (u == '\r' || u == '\n' || u == '\t' || u == ' ' || u == 0x3000) { out |= IS_TEXT_UNICODE_CONTROLS; break; }
+        }
+    if (flags & IS_TEXT_UNICODE_REVERSE_CONTROLS)
+        for (int i = 0; i < n; i++) {
+            WORD u = unit(i);
+            if (u == 0x0d00 || u == 0x0a00 || u == 0x0900 || u == 0x2000) { out |= IS_TEXT_UNICODE_REVERSE_CONTROLS; break; }
+        }
+    if (pf) { out &= (unsigned)*pf; *pf = (INT)out; }
+    if (out & (IS_TEXT_UNICODE_REVERSE_MASK | IS_TEXT_UNICODE_NOT_UNICODE_MASK)) return FALSE;
+    if (out & IS_TEXT_UNICODE_NOT_ASCII_MASK) return TRUE;
+    if (out & IS_TEXT_UNICODE_UNICODE_MASK) return TRUE;
+    return FALSE;
+}
+
+// FORMAT_MESSAGE_FROM_STRING with FORMAT_MESSAGE_ARGUMENT_ARRAY (an array of DWORD_PTR) or IGNORE_INSERTS: %1..%99, each
+// with an optional !printf-format! (default !s!, a string), %n %r %t %0, any other character after % as itself, and
+// ALLOCATE_BUFFER. FROM_SYSTEM gives "Error N." (no message table). A va_list of arguments (no ARGUMENT_ARRAY) is not
+// read: the inserts stay as written.
+DWORD WINAPI FormatMessageW(DWORD flags, LPCVOID src, DWORD id, DWORD, LPWSTR buf, DWORD size, __ms_va_list* args)
+{
+    std::u16string fmt, out;
+    if (flags & FORMAT_MESSAGE_FROM_STRING) fmt = src ? std::u16string((const char16_t*)src) : u"";
+    else if (flags & FORMAT_MESSAGE_FROM_SYSTEM) fmt = utf16_of(("Error " + std::to_string(id) + ".").c_str());
+    else { SetLastError(ERROR_INVALID_PARAMETER); return 0; }
+    const DWORD_PTR* argv = (flags & FORMAT_MESSAGE_ARGUMENT_ARRAY) ? (const DWORD_PTR*)args : nullptr;
+    bool inserts = !(flags & FORMAT_MESSAGE_IGNORE_INSERTS) && argv;
+    for (size_t i = 0; i < fmt.size(); i++) {
+        char16_t c = fmt[i];
+        if (c != '%' || i + 1 >= fmt.size()) { out += c; continue; }
+        char16_t d = fmt[++i];
+        if (d >= '1' && d <= '9') {
+            int k = d - '0';
+            if (i + 1 < fmt.size() && fmt[i + 1] >= '0' && fmt[i + 1] <= '9') k = k * 10 + (fmt[++i] - '0');
+            std::string spec = "s";
+            size_t spec_at = i + 1;
+            if (spec_at < fmt.size() && fmt[spec_at] == '!') {
+                size_t e = fmt.find(u'!', spec_at + 1);
+                if (e != std::u16string::npos) { spec = w32::utf8_of(fmt.data() + spec_at + 1, (int)(e - spec_at - 1)); i = e; }
+            }
+            if (!inserts) { out += u'%'; out += utf16_of(std::to_string(k)); if (spec != "s") out += utf16_of("!" + spec + "!"); continue; }
+            DWORD_PTR a = argv[k - 1];
+            bool is_long = spec.find('l') != std::string::npos || spec.find("I64") != std::string::npos;
+            if (spec == "s" || spec == "ls" || spec == "ws") { if (a) out += (const char16_t*)a; }
+            else if (spec == "S" || spec == "hs") { if (a) out += utf16_of((const char*)a); }
+            else {
+                char t[64];
+                std::string f = "%" + spec;
+                if (is_long) snprintf(t, sizeof t, "%lu", (unsigned long)a);
+                else if (spec.find_first_of("di") != std::string::npos) snprintf(t, sizeof t, f.c_str(), (int)a);
+                else snprintf(t, sizeof t, f.c_str(), (unsigned)a);
+                out += utf16_of(t);
+            }
+        }
+        else if (d == 'n') out += u"\r\n";
+        else if (d == 'r') out += u'\r';
+        else if (d == 't') out += u'\t';
+        else if (d == '0') break;
+        else out += d;
+    }
+    DWORD n = (DWORD)out.size();
+    if (flags & FORMAT_MESSAGE_ALLOCATE_BUFFER) {
+        WCHAR* p = (WCHAR*)LocalAlloc(LMEM_FIXED, (n + 1 > size ? n + 1 : size) * sizeof(WCHAR));
+        if (!p) { SetLastError(ERROR_NOT_ENOUGH_MEMORY); return 0; }
+        memcpy(p, out.c_str(), (n + 1) * sizeof(WCHAR));
+        *(WCHAR**)buf = p;
+        return n;
+    }
+    if (!buf || n + 1 > size) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return 0; }
+    memcpy(buf, out.c_str(), (n + 1) * sizeof(WCHAR));
+    return n;
+}
+
+DWORD WINAPI FormatMessageA(DWORD flags, LPCVOID src, DWORD id, DWORD lang, LPSTR buf, DWORD size, __ms_va_list* args)
+{
+    std::u16string w = (flags & FORMAT_MESSAGE_FROM_STRING) && src ? utf16_of((const char*)src) : std::u16string();
+    WCHAR* res = nullptr;
+    DWORD n = FormatMessageW(flags | FORMAT_MESSAGE_ALLOCATE_BUFFER, (flags & FORMAT_MESSAGE_FROM_STRING) ? (LPCVOID)w.c_str() : src,
+                             id, lang, (LPWSTR)&res, 0, args);
+    if (!res) return 0;
+    std::string s = utf8_of(res, (int)n);
+    LocalFree(res);
+    if (flags & FORMAT_MESSAGE_ALLOCATE_BUFFER) {
+        char* p = (char*)LocalAlloc(LMEM_FIXED, s.size() + 1 > size ? s.size() + 1 : size);
+        memcpy(p, s.c_str(), s.size() + 1);
+        *(char**)buf = p;
+        return (DWORD)s.size();
+    }
+    if (!buf || s.size() + 1 > size) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return 0; }
+    memcpy(buf, s.c_str(), s.size() + 1);
+    return (DWORD)s.size();
+}
+
+} // extern "C"

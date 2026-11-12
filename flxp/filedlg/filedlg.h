@@ -52,6 +52,15 @@ struct Options {
     std::string app_location;         // the calling application's folder ("" = none): the Longhorn look's "App Location" place
     enum class Style { Auto, XP, Longhorn };
     Style style = Style::Auto;        // Auto: filedlg= (flxp.ini / FLXP_FILEDLG), else the explorer's frame style
+    // The caller's own controls under the dialog's (comdlg32's OFN_ENABLETEMPLATE with a template that has no stc32, as
+    // notepad's Encoding box): extra_create(dlg, extra_user) makes them as one child window of the dialog (a DS_CONTROL
+    // dialog) and returns it; the dialog grows by its height and puts it under its own rows (XP: at its left edge, as
+    // comdlg32 puts such a template; Longhorn: in the details band, its first combo box under the File type box) and
+    // paints the background behind it. extra_ok(child, extra_user) runs when a name is accepted, before the dialog
+    // closes (comdlg32's CDN_FILEOK); false keeps the dialog open.
+    void* (*extra_create)(void* dlg, void* user) = nullptr;
+    bool (*extra_ok)(void* child, void* user) = nullptr;
+    void* extra_user = nullptr;
 };
 
 // The look run() would use for o (Auto resolved as described above).
@@ -69,7 +78,8 @@ struct Result {
 Result run(void* owner, const Options& o);
 
 // A message box in the XP layout (the shim's MessageBoxW is a stub).
-// type: MB_OK / MB_YESNO | MB_ICONEXCLAMATION / MB_ICONINFORMATION / ...; returns IDOK/IDYES/IDNO.
+// type: MB_OK / MB_OKCANCEL / MB_YESNO / MB_YESNOCANCEL | MB_ICONEXCLAMATION / MB_ICONINFORMATION / ...; returns
+// IDOK/IDCANCEL/IDYES/IDNO.
 int message_box(void* owner, const std::string& title, const std::string& text, unsigned type);
 
 // Glob matching as the dialog does it (case-insensitive, "*.*" matches names without a dot).

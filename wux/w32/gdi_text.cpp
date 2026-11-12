@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
+#include <algorithm>
+#include <strings.h>
 #include "gdi_priv.h"
 extern "C" {
 #include "flxp_dwmapi.h"
@@ -512,6 +514,83 @@ INT WINAPI FlxpDrawGlowTextW(HDC hdc, LPCWSTR text, INT len, RECT* rc, UINT form
         }
     }
     return DrawTextW(hdc, text, len, rc, format);
+}
+
+} // extern "C"
+
+// ---- font enumeration ----
+// EnumFontFamiliesEx over gdi::list_faces (fontconfig: the theme's fonts, the imported ones, the system's): every face is
+// a TrueType one (scalable) of ANSI_CHARSET, script "Western". An empty lfFaceName gives one callback per family (its
+// regular face, or the first), a name every style of that family. The metrics are nominal (the dialogs that enumerate
+// ask CreateFont for the real ones).
+
+extern "C" {
+
+static int enum_faces(const LOGFONTW* want, FONTENUMPROCW proc, LPARAM lp)
+{
+    std::vector<gdi::FaceInfo> faces = gdi::list_faces();
+    std::string name = want ? utf8_of(want->lfFaceName, -1) : std::string();
+    int ret = 1;
+    for (size_t i = 0; i < faces.size() && ret; i++) {
+        const gdi::FaceInfo* fp = &faces[i];
+        if (!name.empty() && strcasecmp(name.c_str(), fp->family.c_str())) continue;
+        if (name.empty()) {
+            // one per family: the regular face if it has one, else its first
+            if (i > 0 && !strcasecmp(faces[i - 1].family.c_str(), fp->family.c_str())) continue;
+            for (size_t j = i; j < faces.size() && !strcasecmp(faces[j].family.c_str(), faces[i].family.c_str()); j++)
+                if (faces[j].weight == 400 && !faces[j].italic) { fp = &faces[j]; break; }
+        }
+        const gdi::FaceInfo& f = *fp;
+        ENUMLOGFONTEXW elf;
+        NEWTEXTMETRICEXW ntm;
+        memset(&elf, 0, sizeof elf);
+        memset(&ntm, 0, sizeof ntm);
+        std::u16string fam = utf16_of(f.family.c_str()), style = utf16_of(f.style.c_str());
+        std::u16string full = style == u"Regular" ? fam : fam + u" " + style;
+        LOGFONTW& l = elf.elfLogFont;
+        l.lfHeight = 16;
+        l.lfWeight = f.weight;
+        l.lfItalic = f.italic;
+        l.lfCharSet = ANSI_CHARSET;
+        l.lfOutPrecision = OUT_STROKE_PRECIS;
+        l.lfClipPrecision = CLIP_STROKE_PRECIS;
+        l.lfQuality = DRAFT_QUALITY;
+        l.lfPitchAndFamily = (BYTE)((f.fixed_pitch ? FIXED_PITCH | FF_MODERN : VARIABLE_PITCH | FF_DONTCARE));
+        memcpy(l.lfFaceName, fam.c_str(), (std::min)(fam.size(), (size_t)LF_FACESIZE - 1) * 2);
+        memcpy(elf.elfFullName, full.c_str(), (std::min)(full.size(), (size_t)LF_FULLFACESIZE - 1) * 2);
+        memcpy(elf.elfStyle, style.c_str(), (std::min)(style.size(), (size_t)LF_FACESIZE - 1) * 2);
+        memcpy(elf.elfScript, u"Western", 8 * 2);
+        TEXTMETRICW* tm = (TEXTMETRICW*)&ntm.ntmTm;
+        tm->tmHeight = 16; tm->tmAscent = 13; tm->tmDescent = 3;
+        tm->tmAveCharWidth = 7; tm->tmMaxCharWidth = 14;
+        tm->tmWeight = f.weight;
+        tm->tmItalic = f.italic;
+        tm->tmFirstChar = 0x20; tm->tmLastChar = 0xfffc; tm->tmDefaultChar = 0x1f; tm->tmBreakChar = 0x20;
+        // TMPF_FIXED_PITCH set means a variable pitch (sic)
+        tm->tmPitchAndFamily = (BYTE)((f.fixed_pitch ? FF_MODERN : TMPF_FIXED_PITCH) | TMPF_VECTOR | TMPF_TRUETYPE);
+        tm->tmCharSet = ANSI_CHARSET;
+        ntm.ntmTm.ntmFlags = (f.weight >= 600 ? NTM_BOLD : 0) | (f.italic ? NTM_ITALIC : 0) | (f.weight < 600 && !f.italic ? NTM_REGULAR : 0);
+        ntm.ntmTm.ntmSizeEM = 2048;
+        ntm.ntmTm.ntmCellHeight = 2048;
+        ntm.ntmTm.ntmAvgWidth = 1000;
+        ret = proc((const LOGFONTW*)&elf, (const TEXTMETRICW*)&ntm, TRUETYPE_FONTTYPE, lp);
+    }
+    return ret;
+}
+
+INT WINAPI EnumFontFamiliesExW(HDC, LPLOGFONTW lf, FONTENUMPROCW proc, LPARAM lp, DWORD)
+{
+    if (!proc) return 0;
+    return enum_faces(lf, proc, lp);
+}
+
+INT WINAPI EnumFontFamiliesW(HDC hdc, LPCWSTR face, FONTENUMPROCW proc, LPARAM lp)
+{
+    LOGFONTW lf;
+    memset(&lf, 0, sizeof lf);
+    lf.lfCharSet = DEFAULT_CHARSET;
+    if (face) for (int i = 0; i < LF_FACESIZE - 1 && face[i]; i++) lf.lfFaceName[i] = face[i];
+    return EnumFontFamiliesExW(hdc, &lf, proc, lp, 0);
 }
 
 } // extern "C"

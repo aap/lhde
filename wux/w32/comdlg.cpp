@@ -12,12 +12,22 @@
 // "dir\0name\0name\0\0"), OFN_FILEMUSTEXIST, OFN_PATHMUSTEXIST,
 // OFN_OVERWRITEPROMPT, OFN_CREATEPROMPT, OFN_HIDEREADONLY, OFN_READONLY,
 // OFN_NOCHANGEDIR (without it the process cwd becomes the chosen folder, as
-// on Windows), OFN_FORCESHOWHIDDEN. Not supported: hooks (lpfnHook is
-// never called), custom templates, OFN_NODEREFERENCELINKS, OFN_SHAREAWARE.
+// on Windows), OFN_FORCESHOWHIDDEN, and a custom template (OFN_ENABLETEMPLATE from
+// hInstance/lpTemplateName, OFN_ENABLETEMPLATEHANDLE) of the kind that has no
+// stc32: its controls go under the dialog's own (filedlg's extra_create), and
+// with OFN_ENABLEHOOK lpfnHook is its dialog procedure, which gets
+// WM_INITDIALOG with the OPENFILENAMEW and WM_NOTIFY CDN_FILEOK before the
+// dialog closes (a nonzero DWLP_MSGRESULT keeps it open), as notepad's
+// Encoding box needs. Not supported: a template with stc32 (the standard
+// controls inside the caller's layout), the hook's other notifications
+// (CDN_SELCHANGE, CDN_FOLDERCHANGE, ...) and CDM_* messages, a hook without a
+// template, templates in the A functions, OFN_NODEREFERENCELINKS,
+// OFN_SHAREAWARE.
 #define NOMINMAX
 #include <string.h>
 #include <algorithm>
 #include <unistd.h>
+#include "res/res.h"   // before w32.h: winuser.h's RT_* macros clash with res::
 #include "w32.h"
 #include "filedlg/filedlg.h"
 extern "C" {
@@ -29,9 +39,46 @@ namespace filedlg { Result run(void* owner, const Options& o) __attribute__((wea
 
 using namespace w32;
 
+// comdlg32's own resources (the Font, Find and Replace dialog templates, their strings, the TrueType bitmap), compiled
+// from Wine's comdlg32.rc (wux/rc/build.sh) and embedded here, for Wine's fontdlg.c and finddlg.c
+// (wux/vendor/wine/comdlg32), which find them through COMDLG32_hInstance.
+asm(".section .rodata\n"
+    ".global flxp_comdlg32_res_start\n.global flxp_comdlg32_res_end\n"
+    "flxp_comdlg32_res_start:\n.incbin \"wux/rc/comdlg32.res\"\nflxp_comdlg32_res_end:\n"
+    ".previous\n");
+extern "C" const unsigned char flxp_comdlg32_res_start[], flxp_comdlg32_res_end[];
+extern "C" HINSTANCE COMDLG32_hInstance;
+HINSTANCE COMDLG32_hInstance = (HINSTANCE)res::load_memory(flxp_comdlg32_res_start,
+                                                           (size_t)(flxp_comdlg32_res_end - flxp_comdlg32_res_start));
+
 static thread_local DWORD g_cderr;
 
 extern "C" DWORD WINAPI CommDlgExtendedError(void) { return g_cderr; }
+extern "C" void COMDLG32_SetCommDlgExtendedError(DWORD err) { g_cderr = err; }
+
+// GetFileTitle: the name after the last slash (comdlg32 keeps the extension unless Explorer hides them; ours shows them)
+extern "C" short WINAPI GetFileTitleW(LPCWSTR file, LPWSTR title, WORD cch)
+{
+    if (!file || !*file) return -1;
+    std::u16string f((const char16_t*)file);
+    size_t slash = f.find_last_of(u"/\\");
+    std::u16string name = slash == std::u16string::npos ? f : f.substr(slash + 1);
+    if (name.empty()) return -1;
+    if (!title || cch < name.size() + 1) return (short)(name.size() + 1);
+    memcpy(title, name.c_str(), (name.size() + 1) * sizeof(WCHAR));
+    return 0;
+}
+extern "C" short WINAPI GetFileTitleA(LPCSTR file, LPSTR title, WORD cch)
+{
+    if (!file || !*file) return -1;
+    std::string f = file;
+    size_t slash = f.find_last_of("/\\");
+    std::string name = slash == std::string::npos ? f : f.substr(slash + 1);
+    if (name.empty()) return -1;
+    if (!title || cch < name.size() + 1) return (short)(name.size() + 1);
+    memcpy(title, name.c_str(), name.size() + 1);
+    return 0;
+}
 
 static std::string u8(const WCHAR* s) { return s ? utf8_of(s) : std::string(); }
 
@@ -74,6 +121,51 @@ static bool put(WCHAR* buf, DWORD cch, const std::u16string& s)
     memcpy(buf, s.data(), s.size() * sizeof(WCHAR));
     buf[s.size()] = 0;
     return true;
+}
+
+// ---- the caller's template (filedlg::Options::extra_create) ----
+
+static INT_PTR CALLBACK template_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
+{
+    OPENFILENAMEW* ofn = (OPENFILENAMEW*)GetPropW(h, L"flxp_ofn");
+    if (msg == WM_INITDIALOG) {
+        ofn = (OPENFILENAMEW*)lp;
+        SetPropW(h, L"flxp_ofn", (HANDLE)ofn);
+    }
+    if (ofn && (ofn->Flags & OFN_ENABLEHOOK) && ofn->lpfnHook) return (INT_PTR)ofn->lpfnHook(h, msg, wp, lp);
+    return msg == WM_INITDIALOG;
+}
+
+static void* template_create(void* dlg, void* user)
+{
+    OPENFILENAMEW* ofn = (OPENFILENAMEW*)user;
+    const DLGTEMPLATE* t = nullptr;
+    if (ofn->Flags & OFN_ENABLETEMPLATEHANDLE) t = (const DLGTEMPLATE*)ofn->hInstance;
+    else if (HRSRC r = FindResourceW(ofn->hInstance, ofn->lpTemplateName, (LPCWSTR)RT_DIALOG))
+        t = (const DLGTEMPLATE*)LockResource(LoadResource(ofn->hInstance, r));
+    if (!t) return nullptr;
+    HWND child = CreateDialogIndirectParamW(ofn->hInstance, t, (HWND)dlg, template_proc, (LPARAM)ofn);
+    if (!child) return nullptr;
+    // a child, whatever the template says (notepad's has WS_CAPTION | WS_SYSMENU beside WS_CHILD)
+    SetWindowLongW(child, GWL_STYLE, (GetWindowLongW(child, GWL_STYLE) & ~(WS_CAPTION | WS_SYSMENU | WS_POPUP)) | WS_CHILD);
+    RECT r;
+    GetClientRect(child, &r);
+    SetWindowPos(child, nullptr, 0, 0, r.right, r.bottom, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    return child;
+}
+
+static bool template_ok(void* child, void* user)
+{
+    OPENFILENAMEW* ofn = (OPENFILENAMEW*)user;
+    if (!(ofn->Flags & OFN_ENABLEHOOK) || !ofn->lpfnHook) return true;
+    OFNOTIFYW n;
+    memset(&n, 0, sizeof n);
+    n.hdr.hwndFrom = GetParent((HWND)child);
+    n.hdr.code = CDN_FILEOK;
+    n.lpOFN = ofn;
+    SetWindowLongPtrW((HWND)child, DWLP_MSGRESULT, 0);
+    INT_PTR handled = ofn->lpfnHook((HWND)child, WM_NOTIFY, 0, (LPARAM)&n);
+    return !(handled && GetWindowLongPtrW((HWND)child, DWLP_MSGRESULT));
 }
 
 static BOOL file_dialog(OPENFILENAMEW* ofn, bool save)
@@ -119,6 +211,11 @@ static BOOL file_dialog(OPENFILENAMEW* ofn, bool save)
     if (ofn->nFilterIndex == 0) o.filter_index = 0;
     else o.filter_index = (int)ofn->nFilterIndex - 1 + (custom ? 1 : 0);
 
+    if (fl & (OFN_ENABLETEMPLATE | OFN_ENABLETEMPLATEHANDLE)) {
+        o.extra_create = template_create;
+        o.extra_ok = template_ok;
+        o.extra_user = ofn;
+    }
     filedlg::Result r = filedlg::run(ofn->hwndOwner, o);
     if (!r.ok || r.paths.empty()) return FALSE;
 

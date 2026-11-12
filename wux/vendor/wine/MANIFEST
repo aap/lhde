@@ -55,6 +55,9 @@ comctl32/smoothscroll.c                  wine-10.0  2e9cb99369e
 comctl32/taskdialog.c                    wine-10.0  2e9cb99369e
 user32/menu.c                            wine-7.0   2cb237a53c7
 include/commdlg.h                        master     840a939ee52
+comdlg32/fontdlg.c                       wine-11.18 7b3fff76fa5
+comdlg32/finddlg.c                       wine-11.18 7b3fff76fa5
+comdlg32/cdlg.h                          wine-11.18 7b3fff76fa5
 include/dwmapi.h                         master     840a939ee52
 
 # Compiled resources and icons from Wine's sources, kept outside this directory (not patched). Each reproduces byte for byte

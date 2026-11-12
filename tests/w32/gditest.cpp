@@ -48,6 +48,20 @@ static void focus_rect(HDC dc, HBRUSH pat, RECT r)
     SelectObject(dc, old);
 }
 
+struct Enum { int families, named; WCHAR first[LF_FACESIZE]; };
+static INT CALLBACK enum_family(const LOGFONTW* lf, const TEXTMETRICW*, DWORD type, LPARAM lp)
+{
+    Enum* e = (Enum*)lp;
+    if (!e->families++) memcpy(e->first, lf->lfFaceName, sizeof e->first);
+    return type == TRUETYPE_FONTTYPE;
+}
+static INT CALLBACK enum_style(const LOGFONTW* lf, const TEXTMETRICW*, DWORD, LPARAM lp)
+{
+    Enum* e = (Enum*)lp;
+    if (!memcmp(lf->lfFaceName, e->first, sizeof e->first)) e->named++;
+    return 1;
+}
+
 int main(int argc, char** argv)
 {
     const char* out = argc > 1 ? argv[1] : "gditest.ppm";
@@ -112,6 +126,27 @@ int main(int argc, char** argv)
     CHECK(GetTextExtentExPointA(dc, mixA, 7, 10000, &fa, dxa, NULL) && GetTextExtentExPointW(dc, mixW, 4, 10000, &fw, dxw, NULL));
     CHECK(fw == 4 && dxa[1] == dxw[0] && dxa[2] == dxw[1] && dxa[6] == dxw[3]);
     printf("extent(é x 𝄞): A %dx%d, W %dx%d\n", (int)sa.cx, (int)sa.cy, (int)sw.cx, (int)sw.cy);
+
+    // EnumFontFamiliesEx (fontconfig's families): one call per family, then a named family's styles
+    Enum en = {};
+    LOGFONTW all = {};
+    all.lfCharSet = DEFAULT_CHARSET;
+    EnumFontFamiliesExW(dc, &all, enum_family, (LPARAM)&en, 0);
+    LOGFONTW one = {};
+    one.lfCharSet = DEFAULT_CHARSET;
+    memcpy(one.lfFaceName, en.first, sizeof en.first);
+    EnumFontFamiliesExW(dc, &one, enum_style, (LPARAM)&en, 0);
+    CHECK(en.families > 0 && en.named > 0);
+    printf("EnumFontFamiliesExW: %d families, %d styles of the first\n", en.families, en.named);
+
+    // a face that is not installed, asked for with fixed pitch (notepad's Lucida Console without the Windows fonts): a
+    // monospaced one, as the font mapper weighs the pitch
+    HFONT fixed = CreateFontW(-13, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, FIXED_PITCH | FF_MODERN, L"No Such Face Here");
+    HGDIOBJ of = SelectObject(dc, fixed);
+    SIZE si, sW;
+    CHECK(GetTextExtentPoint32W(dc, L"iiii", 4, &si) && GetTextExtentPoint32W(dc, L"WWWW", 4, &sW) && si.cx == sW.cx);
+    SelectObject(dc, of);
+    DeleteObject(fixed);
 
     // Rectangle: black pen, light gray brush
     SelectObject(dc, GetStockObject(BLACK_PEN));

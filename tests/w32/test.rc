@@ -3,7 +3,7 @@
  * pal.bmp changes) and copied to build/tests/w32/: string tables in two languages (the
  * en-US one preferred), two named bitmaps (one named outside ASCII: windres upper-cases
  * only the ASCII letters, so it is "PALé𝄞" in UTF-16 with a surrogate pair) and a
- * numbered one, a dialog. */
+ * numbered one, an accelerator table, a dialog. */
 #pragma code_page(65001)
 #include <windows.h>
 
@@ -26,6 +26,14 @@ END
 "Palé𝄞" BITMAP "pal.bmp"
 PALBMP BITMAP "pal.bmp"
 2 BITMAP "pal.bmp"
+
+// notepad's kinds of accelerator: a control character, a virtual key, one with Ctrl+Shift
+1 ACCELERATORS
+BEGIN
+    "^A", 100
+    VK_F5, 101, VIRTKEY
+    "N", 102, VIRTKEY, CONTROL, SHIFT
+END
 
 100 DIALOG 0, 0, 100, 50
 STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION

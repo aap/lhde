@@ -16,6 +16,10 @@ extern "C" {
 #include "wine/exception.h"
 }
 #include "w32/kernel.h"
+#include "w32/user.h"
+extern "C" {
+#include "commdlg.h"
+}
 
 static int failures, passes;
 
@@ -365,6 +369,14 @@ static void test_resources(const std::string& dir)
     check(hb != nullptr, "LoadImageA UTF-8 name (not Latin-1)");
     if (hb) DeleteObject(hb);
     check(LoadImageA(m, "PAL\xe9", IMAGE_BITMAP, 0, 0, 0) == nullptr, "LoadImageA Latin-1 bytes are not a name");
+    HACCEL acc = LoadAcceleratorsW(m, MAKEINTRESOURCEW(1));
+    ACCEL keys[4] = {};
+    check(acc && CopyAcceleratorTableW(acc, nullptr, 0) == 3 && CopyAcceleratorTableW(acc, keys, 4) == 3, "LoadAcceleratorsW: three keys");
+    // "^A": Microsoft's rc keeps the control character (1), GNU windres makes it Ctrl+A as a virtual key
+    check(((keys[0].key == 1 && !(keys[0].fVirt & FVIRTKEY)) || (keys[0].key == 'A' && keys[0].fVirt == (FVIRTKEY | FCONTROL))) && keys[0].cmd == 100
+          && keys[1].key == VK_F5 && keys[1].cmd == 101 && (keys[1].fVirt & FVIRTKEY)
+          && keys[2].key == 'N' && keys[2].cmd == 102 && keys[2].fVirt == (FVIRTKEY | FCONTROL | FSHIFT), "accelerator entries (the end flag gone)");
+    check(DestroyAcceleratorTable(acc) && !DestroyAcceleratorTable(acc) && CopyAcceleratorTableW(acc, nullptr, 0) == 0, "DestroyAcceleratorTable");
     check(GetModuleHandleW(L"test.res") == m, "GetModuleHandleW by loaded name");
     HMODULE m2 = LoadLibraryW((LPCWSTR)wpath.c_str());
     check(m2 == m, "LoadLibraryW refcount same handle");
@@ -597,6 +609,49 @@ static void test_usp10()
     check(ScriptStringAnalyse(dc, L"", 0, 16, -1, SSA_GLYPHS, -1, nullptr, nullptr, nullptr, nullptr, nullptr, &ssa) == E_INVALIDARG && !ssa, "ScriptStringAnalyse empty fails");
 }
 
+// advapi32's IsTextUnicode (ReactOS's statistics), FormatMessageW, comdlg32's GetFileTitleW, shell32's HDROP
+static void test_text_api()
+{
+    const char ascii[] = "hello world, this is text";
+    std::u16string w = u"hello world, this is text";
+    INT f = IS_TEXT_UNICODE_STATISTICS | IS_TEXT_UNICODE_REVERSE_STATISTICS;
+    check(IsTextUnicode(w.data(), (INT)(w.size() * 2), &f) && (f & IS_TEXT_UNICODE_STATISTICS), "IsTextUnicode: UTF-16 LE text");
+    f = IS_TEXT_UNICODE_STATISTICS | IS_TEXT_UNICODE_REVERSE_STATISTICS;
+    check(!IsTextUnicode(ascii, (INT)strlen(ascii), &f), "IsTextUnicode: ASCII is not");
+    std::string be;
+    for (char16_t c : w) { be += (char)(c >> 8); be += (char)(c & 0xff); }
+    f = IS_TEXT_UNICODE_STATISTICS | IS_TEXT_UNICODE_REVERSE_STATISTICS;
+    check(!IsTextUnicode(be.data(), (INT)be.size(), &f) && (f & IS_TEXT_UNICODE_REVERSE_STATISTICS), "IsTextUnicode: big endian is reversed");
+    f = IS_TEXT_UNICODE_SIGNATURE;
+    unsigned char bom[] = { 0xff, 0xfe, 'a', 0 };
+    check(IsTextUnicode(bom, 4, &f) && f == IS_TEXT_UNICODE_SIGNATURE, "IsTextUnicode: the BOM");
+    f = IS_TEXT_UNICODE_STATISTICS;
+    check(IsTextUnicode("Bush hid the facts", 18, &f), "IsTextUnicode: Bush hid the facts (the heuristic Windows has)");
+
+    WCHAR buf[128];
+    DWORD_PTR args[2] = { 8, 72 };
+    check(FormatMessageW(FORMAT_MESSAGE_FROM_STRING | FORMAT_MESSAGE_ARGUMENT_ARRAY, L"between %1!d! and %2!d! points%n",
+                         0, 0, buf, 128, (__ms_va_list*)args) == 25 && weq(buf, L"between 8 and 72 points\r\n"), "FormatMessageW %1!d!, %n");
+    DWORD_PTR sargs[1] = { (DWORD_PTR)L"w\u00f6rld" };
+    WCHAR* p = nullptr;
+    check(FormatMessageW(FORMAT_MESSAGE_FROM_STRING | FORMAT_MESSAGE_ARGUMENT_ARRAY | FORMAT_MESSAGE_ALLOCATE_BUFFER, L"hello %1 100%%",
+                         0, 0, (LPWSTR)&p, 0, (__ms_va_list*)sargs) == 16 && p && weq(p, L"hello w\u00f6rld 100%"), "FormatMessageW %1, %%, ALLOCATE_BUFFER");
+    LocalFree(p);
+    check(FormatMessageW(FORMAT_MESSAGE_FROM_STRING | FORMAT_MESSAGE_IGNORE_INSERTS, L"a %1 b", 0, 0, buf, 128, nullptr) == 6 && weq(buf, L"a %1 b"), "FormatMessageW IGNORE_INSERTS");
+
+    check(GetFileTitleW(L"/home/u/notes.txt", buf, 128) == 0 && weq(buf, L"notes.txt"), "GetFileTitleW");
+    check(GetFileTitleW(L"/home/u/notes.txt", buf, 3) == 10, "GetFileTitleW: the size needed");
+
+    const char* files[2] = { "/tmp/a b.txt", "/tmp/\xc3\xa9\xf0\x9f\x98\x80.txt" };
+    HDROP d = w32::make_hdrop(nullptr, 5, 6, files, 2);
+    POINT pt = {};
+    check(d && DragQueryFileW(d, 0xFFFFFFFF, nullptr, 0) == 2 && DragQueryFileW(d, 1, nullptr, 0) == 12, "DragQueryFileW: count and length");
+    check(DragQueryFileW(d, 1, buf, 128) == 12 && u8(buf) == files[1] && DragQueryPoint(d, &pt) && pt.x == 5 && pt.y == 6, "DragQueryFileW: the UTF-16 path, DragQueryPoint");
+    char abuf[64];
+    check(DragQueryFileA(d, 0, abuf, sizeof abuf) == 12 && !strcmp(abuf, files[0]), "DragQueryFileA");
+    DragFinish(d);
+}
+
 static void test_imm()
 {
     HIMC c = ImmGetContext(nullptr);
@@ -633,6 +688,7 @@ int main(int argc, char** argv)
     test_try();
     test_usp10();
     test_imm();
+    test_text_api();
     printf("%d passed, %d failed\n", passes, failures);
     return failures ? 1 : 0;
 }

@@ -65,4 +65,5 @@ BEGIN
     DEFPUSHBUTTON   "&Yes", IDYES, 66, 41, 50, 14
     PUSHBUTTON      "&No", IDNO, 120, 41, 50, 14
     PUSHBUTTON      "OK", IDOK, 95, 41, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 174, 41, 50, 14
 END
