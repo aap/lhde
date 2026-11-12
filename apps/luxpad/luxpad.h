@@ -117,7 +117,6 @@ VOID DIALOG_StatusBarUpdateCaretPos(VOID);
 VOID DIALOG_HelpAboutNotepad(VOID);
 
 int DIALOG_StringMsgBox(HWND hParent, int formatId, const WCHAR *szString, DWORD dwFlags);
-int NOTEPAD_MessageBox(HWND hParent, const WCHAR *text, const WCHAR *caption, UINT type);
 
 /* utility functions */
 VOID ShowLastError(VOID);

@@ -12,7 +12,7 @@
  * an ordinary main() with WuxInit; files through POSIX (text.cpp: read and mmap for CreateFileMapping/MapViewOfFile,
  * write in place); the registry became luxpad.ini and luxpad-state.ini through liblhde (settings.cpp); printing,
  * Page Setup, Help Topics (WinHelp) and the recent-documents list are gone; About is a message box; New Window runs this
- * binary again; the message boxes are the file dialog's XP box (filedlg::message_box: wux's MessageBoxW is a stub).
+ * binary again. The message boxes are MessageBoxW, as ReactOS's.
  * The dialogs it uses are wux's: GetOpenFileNameW / GetSaveFileNameW (flxp's dialog, the Encoding boxes through
  * OFN_ENABLETEMPLATE), ChooseFontW, FindTextW, ReplaceTextW (Wine's, vendored), and a file dropped on the window opens
  * (DragAcceptFiles, WM_DROPFILES over wux's X drop).
@@ -235,7 +235,7 @@ BOOL NOTEPAD_FindNext(FINDREPLACEW *pFindReplace, BOOL bReplace, BOOL bShowAlert
             LoadStringW(Globals.hInstance, STRING_CANNOTFIND, szResource, ARRAYSIZE(szResource));
             wsprintfW(szText, szResource, pFindReplace->lpstrFindWhat);
             LoadStringW(Globals.hInstance, STRING_NOTEPAD, szResource, ARRAYSIZE(szResource));
-            NOTEPAD_MessageBox(Globals.hFindReplaceDlg ? Globals.hFindReplaceDlg : Globals.hMainWnd, szText, szResource,
+            MessageBoxW(Globals.hFindReplaceDlg ? Globals.hFindReplaceDlg : Globals.hMainWnd, szText, szResource,
                                MB_OK | MB_ICONINFORMATION);
         }
         bSuccess = FALSE;

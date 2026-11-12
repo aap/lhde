@@ -1,5 +1,5 @@
 # luxpad: lhde's notepad (docs/USAGE.md "luxpad"), ReactOS's Notepad ported to wux: the Open/Save dialog (its Encoding boxes
-# under Save As) and the file dialog's message box, so the file dialog's objects. Installed, with luxpad.desktop (text/plain:
+# under Save As), so the file dialog's objects. Installed, with luxpad.desktop (text/plain:
 # flxp's Open With and a double click reach it) and its icon.
 LUXPAD_OBJS = $(call app_objs,luxpad)
 build/bin/luxpad: $(LUXPAD_OBJS) $(WUX_APP_DEPS) $(WUX_APP_FILEDIALOG)

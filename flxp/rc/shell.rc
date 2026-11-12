@@ -1,11 +1,11 @@
-/* luxattr's property sheet pages, in dialog units for "MS Shell Dlg" 8 (Tahoma 8 under every style). The pages are
- * 227 x 215, XP's file Properties pages (shell32's General page, docprop's Summary page). General is flxp's Properties
- * page (flxp/rc/explorer.rc IDD_PROPERTIES, without its Change... button: an application does not reach the Explorer's
- * Open With dialog). Summary follows XP's Summary page in its two views (the simple one's labelled edits, Advanced >>'s
- * property list); XP's own coordinates were not measured (no reference screenshot of it), so the metrics are the
- * resource conventions: a 7-unit margin, 14-unit edits 4 units apart, labels 8 units high centred on them, 50 x 14
- * buttons in the bottom-right corner.
- * Build: make apps/luxattr/luxattr.res (mingw windres; the .res is checked in); embedded by luxattr.cpp. */
+/* The shell layer's Properties sheet (shell::properties, flxp/shell/ui/properties.cpp: flxp's Properties, luxattr), in dialog
+ * units for "MS Shell Dlg" 8 (Tahoma 8 under every style). The pages are 227 x 215, XP's file Properties pages (shell32's
+ * General page, docprop's Summary page). General: the icon, the name, the type, Opens with and its Change... button (shown
+ * when the caller can change the program: the Explorer), location, size, contains, the dates, permissions, a link's target.
+ * Summary follows XP's Summary page in its two views (the simple one's labelled edits, Advanced >>'s property list); XP's
+ * own coordinates were not measured (no reference screenshot of it), so the metrics are the resource conventions: a 7-unit
+ * margin, 14-unit edits 4 units apart, labels 8 units high centred on them, 50 x 14 buttons in the bottom-right corner.
+ * Build: make flxp/rc/shell.res (mingw windres; the .res is checked in); embedded by properties.cpp. */
 #include <windows.h>
 #include <commctrl.h>
 #include "resource.h"
@@ -23,7 +23,8 @@ BEGIN
     LTEXT           "Type of file:", IDC_TYPEL, 7, 40, 58, 8
     LTEXT           "", IDC_TYPE, 70, 40, 150, 8, SS_NOPREFIX | SS_ENDELLIPSIS
     LTEXT           "Opens with:", IDC_OPENSL, 7, 55, 58, 8
-    LTEXT           "", IDC_OPENS, 70, 55, 150, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    LTEXT           "", IDC_OPENS, 70, 55, 95, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    PUSHBUTTON      "&Change...", IDC_CHANGE, 170, 52, 50, 14
     CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 72, 213, 1
     LTEXT           "Location:", -1, 7, 80, 58, 8
     LTEXT           "", IDC_LOCATION, 70, 80, 150, 8, SS_NOPREFIX | SS_PATHELLIPSIS

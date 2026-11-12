@@ -25,10 +25,6 @@ void message(HWND owner, const std::string& title, const std::string& text, bool
 // Organize Bookmarks: rename, remove, reorder; saves the GTK bookmarks file on OK.
 bool organize_bookmarks(HWND owner, HIMAGELIST small, int folder_image);
 
-// File/folder properties (a General page in a property sheet).
-void properties(HWND owner, const std::string& path, const std::string& display_name, const std::string& type_name,
-                HICON icon, HIMAGELIST small, int app_image);
-
 // Folder Options (Tools menu): XP's General and View pages reduced to flxp's settings.
 // View codes as browser::view_code (LVS_*, VIEW_THUMBNAILS; the Longhorn frame's
 // LVS_REPORT, VIEW_TILES, LVS_ICON with the size above ZOOM_SHIFT). The buttons act at
@@ -55,7 +51,7 @@ void folder_options(HWND owner, FolderOptions& o);
 struct DetailColumn { int id; std::string label; bool shown; int width; };
 bool choose_details(HWND owner, std::vector<DetailColumn>& cols);
 
-// A line of text for items (Edit Description..., Add Tag...): the prompt over the box,
+// A line of text for items (Add Tag...): the prompt over the box,
 // a note under it; suggestions make the box a drop-down offering them (Add Tag: the
 // folder's tags). True on OK with *text what was typed (it may be empty).
 struct TextAsk {

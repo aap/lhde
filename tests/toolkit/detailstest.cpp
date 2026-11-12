@@ -96,6 +96,14 @@ int main(int, char** argv)
     check("long date", "Friday, August 24, 2001, 12:00 AM", friendly_date(at(2001, 8, 24, 0, 0), now));
     check("day with zero", "Thursday, October 02, 2003, 5:36 PM", friendly_date(at(2003, 10, 2, 17, 36), now));
     check("short date", "8/24/2001", short_date(at(2001, 8, 24, 10, 0)));
+    // the Properties sheet's General page: StrFormatByteSize and the exact count, the long date with seconds
+    check("thousands", "1,331", thousands(1331));
+    check("thousands small", "999", thousands(999));
+    check("thousands big", "10,737,418,240", thousands(10737418240ULL));
+    check("size and bytes", "1.29 KB (1,331 bytes)", size_and_bytes(1331));
+    check("size and bytes small", "198 bytes (198 bytes)", size_and_bytes(198));
+    check("properties date", "Thursday, October 02, 2003, 5:36:09 PM", long_date(at(2003, 10, 2, 17, 36) + 9));
+    check("properties midnight", "Friday, August 24, 2001, 12:00:00 AM", long_date(at(2001, 8, 24, 0, 0)));
 
     // attributes: read-only only for files, hidden for both, never archive
     check("attr none", "", attributes(file("a", 1, 0, "")));

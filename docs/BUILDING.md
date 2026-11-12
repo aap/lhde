@@ -7,7 +7,7 @@ sessions are started. The repository, one build for the parts that were separate
 |-------------|----------------------------------------------------------------------|-----|
 | `wux/`      | the win32 UI layer that lhde's own programs are built against from source (it runs no Windows executables): `gdi/` `sys/` `win/` `res/` (native toolkit), `w32/` (the win32 shim), `vendor/wine/` (Wine's comctl32/user32/uxtheme, LGPL, with MANIFEST and patches), `rc/` (Wine's comctl32/comdlg32 resources) | flxp `src/{gdi,sys,win,res,w32}`, `vendor/wine` |
 | `wuxtheme/` | libwuxtheme, the uxtheme library: `.msstyles` read and drawn without Windows (`<wuxtheme/ut.h>`, C API `ut_*`), and `ut-dump` | flxp `src/uxtheme` (libuxtheme) |
-| `flxp/`     | the explorer and shell: `shell/` `explorer/` `desktop/` `taskbar/` `filedlg/` `settings/`, `rc/` (its dialogs), `res/` (icon themes, .desktop, portal files, tools) | flxp |
+| `flxp/`     | the explorer and shell: `shell/` (with `shell/ui/`, its win32 part) `explorer/` `desktop/` `taskbar/` `filedlg/` `settings/`, `rc/` (its dialogs), `res/` (icon themes, .desktop, portal files, tools) | flxp |
 | `tests/`    | `toolkit/` and `w32/` test programs, `headless/` Xvfb scripts, `check.sh`, `demo.sh` | flxp `src/test`, `src/w32test` |
 | `luxwm/`    | the window manager: Longhorn frames (DWM glass frame sets, classic frames from the style through wuxtheme), EWMH, animations; `luxwmc`; `tests/` (frametest, regress) | x11 `lhwm/` |
 | `luxnav/`   | libluxnav, the Longhorn navigation bar (the vision header; C API `lhnav_*`, `lhnav.h`), linked into flxp and navdemo | x11 `lhnav/` |
@@ -114,10 +114,12 @@ incl. GTK, the file dialog in both looks, the modifier keys across a focus chang
 UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair: `tests/headless/typing.sh`), luxpad (`tests/headless/luxpad.sh`:
 an emoji typed into a UTF-8 file with CR LF and saved byte for byte, Ln/Col, Find, Go To, Save As Unicode through the Encoding
 box and back, a Latin-1 file as ANSI saved back unchanged, the unsaved-changes question, the remembered placement, a file
-dropped from flxp, a run with nothing imported), luxshot, luxattr: its Summary
-and Advanced views driven with xdotool and checked with getfattr, and a run with nothing imported and an empty HOME, the Explorer's
-Filter box under jade4074 over names and attributes, skipped without that style or user xattrs, luxwm's Alt+Tab switcher with
-test windows: `tests/headless/alttab.sh`) on displays :71-:73
+dropped from flxp, a run with nothing imported), wux's MessageBoxW (its buttons per type,
+the default, Enter and Escape: tests/w32/msgbox), luxshot, luxattr: the Properties sheet's Summary
+and Advanced views driven with xdotool and checked with getfattr, and a run with nothing imported and an empty HOME, flxp's
+Properties from the item menu (General first, Summary's description, two files in one sheet, a read-only file's message box)
+and Add Tag, the Explorer's Filter box under jade4074 over names and attributes, skipped without that style or user xattrs,
+luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).

@@ -8,7 +8,7 @@
  *             Copyright 2023 Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>
  *
  * For lhde: files through POSIX (open, write in place, so the file keeps its inode, mode and extended attributes),
- * errors from errno, the message boxes through NOTEPAD_MessageBox, New Window runs /proc/self/exe, no printing, About a
+ * errors from errno, New Window runs /proc/self/exe, no printing, About a
  * message box, XP's status bar (hidden while Word Wrap is on, as XP's), XP's Time/Date.
  */
 #include <errno.h>
@@ -52,12 +52,6 @@ static UINT EncToStrId[] = {
     STRING_UTF8_BOM
 };
 
-/* The message box: the file dialog's XP box (wux's MessageBoxW is a stub) */
-int NOTEPAD_MessageBox(HWND hParent, const WCHAR *text, const WCHAR *caption, UINT type)
-{
-    return filedlg::message_box(hParent, WuxUtf8(caption), WuxUtf8(text), type);
-}
-
 static int g_last_errno;
 
 /* LUXPAD_TRACE=1: every status bar text on stdout as "status PART TEXT", flushed (tests/headless/luxpad.sh reads it) */
@@ -79,7 +73,7 @@ VOID ShowLastError(VOID)
         WCHAR szTitle[MAX_STRING_LEN];
         LoadStringW(Globals.hInstance, STRING_ERROR, szTitle, ARRAYSIZE(szTitle));
         std::u16string msg = WuxWide(strerror(error));
-        NOTEPAD_MessageBox(Globals.hMainWnd, (const WCHAR *)msg.c_str(), szTitle, MB_OK | MB_ICONERROR);
+        MessageBoxW(Globals.hMainWnd, (const WCHAR *)msg.c_str(), szTitle, MB_OK | MB_ICONERROR);
     }
     g_last_errno = 0;
 }
@@ -225,7 +219,7 @@ int DIALOG_StringMsgBox(HWND hParent, int formatId, const WCHAR *szString, DWORD
     LoadStringW(Globals.hInstance, STRING_NOTEPAD, szResource, ARRAYSIZE(szResource));
 
     /* Display Modal Dialog */
-    return NOTEPAD_MessageBox(hParent, szMessage, szResource, dwFlags);
+    return MessageBoxW(hParent, szMessage, szResource, dwFlags);
 }
 
 static void AlertFileNotFound(const WCHAR *szFileName)
@@ -910,7 +904,7 @@ DIALOG_GoTo_DialogProc(HWND hwndDialog, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     WCHAR title[128], text[256];
                     LoadStringW(Globals.hInstance, STRING_NOTEPAD, title, ARRAYSIZE(title));
                     LoadStringW(Globals.hInstance, STRING_LINE_NUMBER_OUT_OF_RANGE, text, ARRAYSIZE(text));
-                    NOTEPAD_MessageBox(hwndDialog, text, title, MB_OK);
+                    MessageBoxW(hwndDialog, text, title, MB_OK);
 
                     SendDlgItemMessageW(hwndDialog, ID_LINENUMBER, EM_SETSEL, 0, -1);
                     SetFocus(GetDlgItem(hwndDialog, ID_LINENUMBER));
@@ -1020,5 +1014,5 @@ VOID DIALOG_HelpAboutNotepad(VOID)
     wsprintfW(szText, szFormat, szNotepadAuthors);
 
     std::u16string caption = u"About " + std::u16string((const char16_t *)szNotepad);
-    NOTEPAD_MessageBox(Globals.hMainWnd, szText, (const WCHAR *)caption.c_str(), MB_OK | MB_ICONINFORMATION);
+    MessageBoxW(Globals.hMainWnd, szText, (const WCHAR *)caption.c_str(), MB_OK | MB_ICONINFORMATION);
 }

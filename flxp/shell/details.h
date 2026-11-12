@@ -183,6 +183,10 @@ std::vector<LhLine> lh_lines(const Info& in);       // the values in 4051's orde
 std::string byte_size(uint64_t bytes);                  // StrFormatByteSize: "198 bytes", "1.30 KB", "2.39 MB"
 std::string friendly_date(int64_t t, int64_t now);      // "Today, October 31, 2026, 12:45 PM"
 std::string short_date(int64_t t);                      // "8/24/2001"
+// the Properties sheet's General page (shell::properties), XP's shell32 General page
+std::string thousands(uint64_t n);                      // "1,331"
+std::string size_and_bytes(uint64_t bytes);             // "1.29 KB (1,331 bytes)", "198 bytes (198 bytes)"
+std::string long_date(int64_t t);                       // "Thursday, October 02, 2003, 5:36:12 PM"
 std::string attributes(const Item& it);                 // "Read-only, Hidden"; "" for none
 std::string tag_list(const std::string& value);         // a list value as shown: "a,b; c" -> "a, b, c"
 std::string items_selected_xp(size_t n);                // "3 items selected."

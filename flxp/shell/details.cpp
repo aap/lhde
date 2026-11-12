@@ -64,6 +64,28 @@ std::string friendly_date(int64_t t, int64_t now)
     return buf + time_of_day(tm);
 }
 
+std::string thousands(uint64_t n)
+{
+    std::string s = std::to_string(n);
+    for (int i = (int)s.size() - 3; i > 0; i -= 3) s.insert((size_t)i, ",");
+    return s;
+}
+
+std::string size_and_bytes(uint64_t bytes)
+{
+    return byte_size(bytes) + " (" + thousands(bytes) + " bytes)";
+}
+
+std::string long_date(int64_t t)
+{
+    struct tm tm = local(t);
+    char buf[96];
+    int h = tm.tm_hour % 12;
+    snprintf(buf, sizeof buf, "%s, %s %02d, %d, %d:%02d:%02d %s", DAYS[tm.tm_wday], MONTHS[tm.tm_mon], tm.tm_mday, tm.tm_year + 1900,
+             h ? h : 12, tm.tm_min, tm.tm_sec, tm.tm_hour < 12 ? "AM" : "PM");
+    return buf;
+}
+
 std::string short_date(int64_t t)
 {
     struct tm tm = local(t);

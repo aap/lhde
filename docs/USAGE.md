@@ -706,8 +706,8 @@ itself (`user.lux.desc`, `user.xdg.tags`, `user.xdg.comment`; the names luxfs's 
 there is no database: they need a file system that keeps user attributes (ext4, btrfs, xfs, zfs, tmpfs; not FAT or many network
 mounts, where editing says so). Tags are stored comma-separated (`reference,4051`); typed, they may be separated by commas or
 semicolons, spaces around them are dropped, a tag given twice is kept once. Emptying a value removes the attribute. A value
-of any length is read whole; when an item's current value cannot be read (not readable by you, an I/O error), Edit
-Description, Add Tag, Remove Tag and the task band's editor change nothing and say so, rather than replace what they did not see.
+of any length is read whole; when an item's current value cannot be read (not readable by you, an I/O error), Add Tag, the
+Properties sheet and the task band's editor change nothing and say so, rather than replace what they did not see.
 
 Where they show:
 - **Details view columns.** Right-click the column header for a check per column (Name, Size, Type, Date Modified, Description,
@@ -729,23 +729,25 @@ Where they show:
   with "Add a description", "Add tags", "Add comments" when empty.
 
 How to edit:
-- **The context menu** (Explorer and desktop): Edit Description... (one item), Add Tag... (one or several items: each keeps its
-  tags and gets the new ones; the drop-down offers the tags used in the folder), and Remove Tag (a submenu of the selection's
-  tags, removed from every selected item that has it), and Attributes... (one or several items: luxattr, below).
-- **luxattr**, the attributes editor: `luxattr FILE...` from a terminal, or Attributes... in the context menu. One Properties
-  sheet for the files given (a folder is a file too), XP's file Properties with its Summary tab. General shows the icon, name,
-  type, location, size and dates (several files: "N Files, M Folders", "All of type ..." or "Multiple Types", "All in ..." or
-  "Various Folders", the total size). Summary, where it opens (`--general` opens on General), has an edit for Description,
-  Tags ("a, b"), Comment and luxfs's Author, Source, Build, Notes and To do (docs/ANNOTATIONS.md); Advanced >> shows every
-  `user.*` attribute on the files with its stored value, any program's: F2 or a double click edits a value in place (Enter
+- **The context menu** (Explorer and desktop): Add Tag... (one or several items: each keeps its tags and gets the new ones; the
+  drop-down offers the tags used in the folder) and Properties (one or several items: the sheet below; the rest of the editing
+  is there).
+- **Properties**, the item's Properties sheet (XP's file Properties, titled "a.txt Properties", or "a.txt, b.txt, ...
+  Properties" for several): General, where it opens as XP's does, shows the icon, name, type, Opens with and its Change...
+  button (XP's Open With), location, size ("1.29 KB (1,331 bytes)"), what a folder contains and the dates (several items:
+  "N Files, M Folders", "All of type ..." or "Multiple Types", "All in ..." or "Various Folders", the total size). Summary, one
+  tab away, has an edit for Description, Tags ("a, b"), Comment and luxfs's Author, Source, Build, Notes and To do
+  (docs/ANNOTATIONS.md); Advanced >> shows every `user.*` attribute on the files with its stored value, any program's: F2 or a double click edits a value in place (Enter
   keeps it, Escape drops it), New Attribute... adds one (a name without `user.` gets it), Remove or Delete removes the
   selected ones, << Simple goes back. With several files a value they share is shown, else the edit is empty with "(several
   values)" in grey, and what is typed is written to every file. OK writes and closes, Apply writes and stays, Cancel or Escape
   drops; an emptied value removes the attribute. It writes as the Explorer does (the same code), so tags typed "a; b" are
   stored `a,b`; a file it cannot change (read-only, not yours, no user attributes there) is named in a message box and the
-  sheet stays. It needs no session and nothing imported: on a bare X display it draws in wux's classic defaults; in a
-  session it follows the theme like every lhde program. When it was started from the Explorer, the Explorer refreshes the
-  rows and the panes as it exits. Exit status: 0 something was written, 1 nothing, 2 a usage error or a missing file.
+  sheet stays. After OK the Explorer refreshes the rows and the panes.
+- **luxattr**, the same sheet from a terminal: `luxattr FILE...` opens it on Summary (`--general` on General), for the files
+  given (a folder is a file too), without Change... It needs no session and nothing imported: on a bare X display it draws in
+  wux's classic defaults; in a session it follows the theme like every lhde program. Exit status: 0 something was written,
+  1 nothing, 2 a usage error or a missing file.
 - **The task band:** click a value or its invitation, type, Enter (or click elsewhere) keeps it, Escape drops it.
 - From a terminal: `x desc FILE "text"`, `x +tag FILE a b`, `lsx -t DIR` (luxfs), or `setfattr` / `getfattr`. The Explorer
   follows a change made elsewhere (inotify reports attribute changes).

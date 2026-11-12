@@ -1,0 +1,77 @@
+/*
+ * USER resources: the message box's template and strings, cut from Wine's dlls/user32/user32.rc (wine-11.18, 7b3fff76fa5;
+ * wux/vendor/wine/MANIFEST) for MessageBoxW (wux/vendor/wine/user32/msgbox.c). Wine's text but for one line, FONT 8,
+ * "MS Shell Dlg": the template says DS_SETFONT, and windres writes no font data without a FONT line, so the dialog manager would
+ * read the controls as the font; msgbox.c sets the message font on the controls itself. The ids are dlls/user32/resources.h's.
+ *
+ * Copyright 2001 Alexandre Julliard
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ *
+ * Build: make wux/rc/user32.res (mingw windres; the .res is checked in)
+ */
+#include <windows.h>
+#include <dlgs.h>
+
+#define MSGBOX_IDICON           stc1
+#define MSGBOX_IDTEXT           0xffff
+#define IDS_ERROR               2
+#define IDS_STRING_OK           800
+#define IDS_STRING_CANCEL       801
+#define IDS_STRING_ABORT        802
+#define IDS_STRING_RETRY        803
+#define IDS_STRING_IGNORE       804
+#define IDS_STRING_YES          805
+#define IDS_STRING_NO           806
+#define IDS_STRING_CLOSE        807
+#define IDS_STRING_HELP         808
+#define IDS_STRING_TRYAGAIN     809
+#define IDS_STRING_CONTINUE     810
+
+LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
+
+STRINGTABLE
+{
+    IDS_ERROR "Error"
+    IDS_STRING_OK, "OK"
+    IDS_STRING_CANCEL, "Cancel"
+    IDS_STRING_ABORT, "&Abort"
+    IDS_STRING_RETRY, "&Retry"
+    IDS_STRING_IGNORE, "&Ignore"
+    IDS_STRING_YES, "&Yes"
+    IDS_STRING_NO, "&No"
+    IDS_STRING_CLOSE, "&Close"
+    IDS_STRING_HELP, "Help"
+    IDS_STRING_TRYAGAIN, "&Try Again"
+    IDS_STRING_CONTINUE, "&Continue"
+}
+
+MSGBOX DIALOG 100, 80, 216, 168
+STYLE DS_MODALFRAME | DS_NOIDLEMSG | DS_SETFONT | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON "", MSGBOX_IDICON, 8, 20, 16, 16, WS_CHILD | WS_VISIBLE
+    PUSHBUTTON "&Yes", IDYES, 16, 56, 50, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
+    PUSHBUTTON "&No", IDNO, 74, 56, 50, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
+    PUSHBUTTON "&Abort", IDABORT, 132, 56, 50, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
+    PUSHBUTTON "&Retry", IDRETRY, 190, 56, 50, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
+    PUSHBUTTON "OK", IDOK, 248, 56, 50, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
+    PUSHBUTTON "Cancel", IDCANCEL, 306, 56, 50, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
+    PUSHBUTTON "&Ignore", IDIGNORE, 364, 56, 50, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
+    PUSHBUTTON "&Try Again", IDTRYAGAIN, 422, 56, 50, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
+    PUSHBUTTON "&Continue", IDCONTINUE, 480, 56, 50, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
+    PUSHBUTTON "Help", IDHELP, 538, 56, 50, 14, WS_CHILD | WS_VISIBLE | WS_TABSTOP
+    LTEXT "", MSGBOX_IDTEXT, 32, 4, 176, 48, WS_CHILD | WS_VISIBLE | WS_GROUP | SS_NOPREFIX
+END

@@ -4,7 +4,7 @@
 # failures. Tests that need assets skip when these are absent:
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
-#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh and luxattr.sh getfattr and setfattr, luxpad.sh python3, filter.sh setfattr
+#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh setfattr
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
@@ -83,6 +83,7 @@ else
     tests/headless/lvtiles.sh "$2" > "$T/lvtiles.log" 2>&1; result "headless/lvtiles.sh ($(tail -n 1 "$T/lvtiles.log"))" $? "$T/lvtiles.log"
     tests/headless/modkeys.sh "$1" > "$T/modkeys.log" 2>&1; result headless/modkeys.sh $? "$T/modkeys.log"
     tests/headless/typing.sh "$3" > "$T/typing.log" 2>&1; result headless/typing.sh $? "$T/typing.log"
+    tests/headless/msgbox.sh "$3" > "$T/msgbox.log" 2>&1; result headless/msgbox.sh $? "$T/msgbox.log"
     tests/headless/filedlg.sh "$3" > "$T/filedlg.log" 2>&1; result headless/filedlg.sh $? "$T/filedlg.log"
     tests/headless/filter.sh "$2" > "$T/filter.log" 2>&1; rc=$?
     result "headless/filter.sh$(grep -m1 '^skip' "$T/filter.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/filter.log"
@@ -94,6 +95,8 @@ else
     result "headless/luxattr.sh$(grep -m1 '^skip' "$T/luxattr.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxattr.log"
     tests/headless/luxpad.sh "$3" > "$T/luxpad.log" 2>&1; rc=$?
     result "headless/luxpad.sh$(grep -m1 '^skip' "$T/luxpad.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxpad.log"
+    tests/headless/properties.sh "$3" > "$T/properties.log" 2>&1; rc=$?
+    result "headless/properties.sh$(grep -m1 '^skip' "$T/properties.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/properties.log"
 fi
 
 [ $fails = 0 ] && echo "check: all passed" || echo "check: $fails failed"
