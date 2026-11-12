@@ -45,9 +45,17 @@ TEST_DATA = build/tests/w32/test.res build/tests/w32/comdlg32.res
 
 tests: $(TOOLKIT_TESTS) $(W32_TESTS) $(TEST_DATA)
 w32test: $(W32_TESTS) $(TEST_DATA)
-check: all
+check: all check-poison
 	tests/check.sh
+# win32 C++ cannot call glibc's wide functions (wchar_t is 16 bits there; flxp_crt.h poisons the names): a probe calling
+# wcslen must fail to compile where the same probe calling flxp_wcslen compiles
+POISON_PROBE = printf '\043include <string>\nunsigned long f(const wchar_t* p) { return %s((const unsigned short*)p); }\n'
+check-poison:
+	@$(POISON_PROBE) flxp_wcslen | $(CXX) -std=c++17 $(W32FLAGS) -x c++ -fsyntax-only - || { echo "FAIL  check-poison: the probe does not compile with flxp_wcslen"; exit 1; }
+	@if $(POISON_PROBE) wcslen | $(CXX) -std=c++17 $(W32FLAGS) -x c++ -fsyntax-only - 2>/dev/null; then \
+	    echo "FAIL  check-poison: glibc's wcslen compiles in win32 C++"; exit 1; \
+	else echo "ok    check-poison: glibc's wide functions do not compile in win32 C++"; fi
 
 -include $(patsubst build/tests/%,$(O)/tests/toolkit/%.d,$(TOOLKIT_TESTS)) $(patsubst build/tests/w32/%,$(O)/tests/w32/%.d,$(W32_TESTS))
-.PHONY: tests w32test check
+.PHONY: tests w32test check check-poison
 .PRECIOUS: $(O)/tests/toolkit/%.o $(O)/tests/w32/%.o

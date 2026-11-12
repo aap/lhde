@@ -1,7 +1,11 @@
-/* Force-included into every vendored Wine C file. Wine's code calls the
- * CRT's 16-bit wide string functions by their MSVCRT names; on this side
- * wchar_t is 16 bits only inside the vendored code (-fshort-wchar), so the
- * names are redirected to our own implementations in src/w32/crt.cpp. */
+/* Force-included into every file compiled with the shim's flags (W32FLAGS:
+ * the vendored Wine C, the shim, flxp's and the applications' win32 code).
+ * There wchar_t is 16 bits (-fshort-wchar) while glibc's wide functions take
+ * 32-bit units, so none of glibc's may be called: Wine's C calls the CRT's
+ * 16-bit wide string functions by their MSVCRT names, which are redirected
+ * to our own implementations in wux/w32/crt.cpp; in C++ the names are
+ * poisoned instead, so a stray wcslen or swprintf fails the build (C++ code
+ * calls the flxp_ names, or better w32::utf8_of / utf16_of and std::u16string). */
 #ifndef FLXP_CRT_H
 #define FLXP_CRT_H
 #include <stddef.h>
@@ -42,9 +46,6 @@ int        flxp_swscanf(const flxp_wch*, const flxp_wch*, ...);
 }
 #endif
 
-/* The renames apply to the vendored C only: C++ shim code (also compiled
- * with this header force-included) uses the flxp_ names directly, and
- * renaming would clash with glibc's wchar.h declarations. */
 #ifndef __cplusplus
 #define wcslen     flxp_wcslen
 #define wcscpy     flxp_wcscpy
@@ -75,5 +76,21 @@ int        flxp_swscanf(const flxp_wch*, const flxp_wch*, ...);
 #define _snwprintf flxp_swprintf
 #define vswprintf  flxp_vswprintf
 #define swscanf    flxp_swscanf
-#endif /* !__cplusplus */
+#else
+/* C++: glibc's declarations and libstdc++'s uses of them (cwchar, cwctype, char_traits, basic_string's
+ * to_wstring and stoi) come first, then the names are poisoned for everything after this header, so the
+ * standard headers a file includes later are already in and only the file's own code can hit a poisoned
+ * name. A renaming macro, as in C, would clash with those declarations. std::wstring is no better (its
+ * char_traits call glibc's 32-bit wcslen) but cannot be poisoned without the standard headers. */
+#include <wchar.h>
+#include <wctype.h>
+#include <cwchar>
+#include <cwctype>
+#include <string>
+#pragma GCC poison wcslen wcscpy wcsncpy wcscat wcsncat wcscmp wcsncmp wcsicmp _wcsicmp wcsnicmp _wcsnicmp \
+    wcschr wcsrchr wcsstr wcsdup _wcsdup wcstol wcstoul wcstoll wcstoull wcstod _wtoi \
+    towupper towlower iswspace iswdigit iswalpha iswalnum iswupper iswlower iswpunct iswprint \
+    swprintf _snwprintf vswprintf swscanf wprintf fwprintf \
+    wmemcpy wmemmove wmemset wmemcmp wmemchr
+#endif
 #endif

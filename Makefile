@@ -46,7 +46,10 @@ CXXFLAGS += -pthread -std=c++17 -fno-exceptions -fno-rtti -Wall -Wextra -MMD -MP
 CXXFLAGS += $(if $(WEBP),-DFLXP_WEBP)
 LDLIBS    = $(shell pkg-config --libs $(PKGS)) -pthread
 
-# the win32 headers (Wine's, vendored) and the shim's CRT redirections
+# the win32 headers (Wine's, vendored) and the shim's CRT redirections. WINE_UNICODE_NATIVE makes Wine's headers type WCHAR
+# as wchar_t (16 bits with -fshort-wchar; L"..." literals are WCHAR strings) rather than char16_t; it is defined here, once,
+# because WCHAR must be the same type in every unit that shares the win32 ABI (the vendored C, which includes no header of
+# ours, the shim, flxp, the applications, the tests), and the headers test only whether it is defined.
 WINE_DIR  = wux/vendor/wine
 W32FLAGS  = -fshort-wchar -D__WINESRC__ -DWINE_UNICODE_NATIVE -DDECLSPEC_IMPORT= -DDECLSPEC_HIDDEN= -include wux/w32/include/flxp_crt.h \
             -Iwux/w32/include -I$(WINE_DIR)/include -I$(WINE_DIR)/comctl32 -I$(WINE_DIR)/user32 -I$(WINE_DIR)/uxtheme

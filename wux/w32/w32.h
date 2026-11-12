@@ -18,7 +18,6 @@
 // identical across shim modules so the ABI (WCHAR = 16-bit) is consistent.
 #include "w32/utf.h"
 extern "C" {
-#define WINE_UNICODE_NATIVE 0
 #include "windef.h"
 #include "winbase.h"
 #include "wingdi.h"

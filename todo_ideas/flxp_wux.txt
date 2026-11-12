@@ -62,6 +62,3 @@
 	string-carrying messages (LVM_/TVM_/TB_/TTM_/SB_/CB_/EM_, WM_SETTEXT/GETTEXT) and the GETDISPINFO notifications (a buffer
 	rule), all converting through the one pair (wux/w32/utf.h); both APIs coexist while flxp moves file by file (string-free
 	files first: filedlg/main, portal, wallpaper, xwm, preview)
-* bugs found on the way: glibc's wcs*/towupper
-	are reachable from C++ with 16-bit wchar_t (flxp_crt.h redirects them in C only): poison them in C++ too; w32.h defines
-	WINE_UNICODE_NATIVE 0 while the Makefile defines it: settle which
