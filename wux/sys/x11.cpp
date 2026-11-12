@@ -261,8 +261,11 @@ bool set_argb(NativeWindow* w, bool on)
 
 static void drop_shadow_show(NativeWindow* w, const gdi::Rect& r, bool show);
 
+static void drop_mode_grab(NativeWindow* w);
+
 void destroy_window(NativeWindow* w)
 {
+    drop_mode_grab(w);
     for (size_t i = 0; i < windows.size(); i++)
         if (windows[i] == w) { windows.erase(windows.begin() + i); break; }
     drop_shadow_show(w, w->rect, false);
@@ -447,15 +450,103 @@ void begin_move_resize(NativeWindow* w, gdi::Point root_pos, int direction, int 
 
 static bool own_grab;   // grab_pointer holds one: its LeaveNotify/NotifyGrab is not another client's
 
+// The grabs of the modes (menus, the start panel): a stack, the innermost one holds the X grab and a mode that ends
+// gives it back to the one around it (the start panel's All Programs menu). Synchronous (GrabModeSync): every
+// pointer event freezes the pointer until we let it go, a press until release_press has decided whether it is the
+// mode's or is replayed to the window under the pointer (docs/CLIENT-PROTOCOL.md "Menus and clicks"). The X grab is
+// on the root window (owner events: ours get theirs); what comes to the root is the mode's window's.
+struct ModeGrab { NativeWindow* w; bool shell; };
+static std::vector<ModeGrab> mode_grabs;
+static bool sync_grab;          // the X grab is ours and synchronous
+static bool grab_shell;         // set_shell_grab: the grabs pushed now are the start menu's
+static bool press_frozen;       // a press froze the pointer and waits for release_press
+static bool press_is_foreign, press_on_dock;
+static unsigned foreign_count, replayed_count;  // foreign_presses(), replayed_presses()
+
+static void thaw_pointer() { if (sync_grab) XAllowEvents(dpy, SyncPointer, CurrentTime); }
+
+static bool take_grab()
+{
+    int r = GrabNotViewable;
+    for (int i = 0; i < 40; i++) {   // the window manager's passive grab of the press that opened the menu may be ending
+        // on the root: a replayed press is then checked against the passive grabs under it (the window manager's
+        // click to focus); with a grab window off the pointer's path X would hand it to the window directly
+        r = XGrabPointer(dpy, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+                         GrabModeSync, GrabModeAsync, None, None, CurrentTime);
+        if (r != AlreadyGrabbed && r != GrabFrozen) break;
+        usleep(5000);
+    }
+    own_grab = sync_grab = r == GrabSuccess;
+    press_frozen = false;
+    if (sync_grab) XAllowEvents(dpy, SyncPointer, CurrentTime);   // a synchronous grab starts frozen
+    XFlush(dpy);
+    return sync_grab;
+}
+
 bool grab_pointer(NativeWindow* w, bool on)
 {
-    own_grab = on;
-    if (!on) { XUngrabPointer(dpy, CurrentTime); XFlush(dpy); return true; }
-    int r = XGrabPointer(dpy, w->xw, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-                         GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
+    bool top = !mode_grabs.empty() && mode_grabs.back().w == w;
+    for (size_t i = 0; i < mode_grabs.size(); i++)
+        if (mode_grabs[i].w == w) { mode_grabs.erase(mode_grabs.begin() + (long)i); break; }
+    if (on) {
+        mode_grabs.push_back(ModeGrab{ w, grab_shell });
+        return take_grab();
+    }
+    if (!top) return true;   // an outer mode's entry: the grab stays with the inner one
+    if (!mode_grabs.empty()) return take_grab();
+    if (own_grab) XUngrabPointer(dpy, CurrentTime);
+    own_grab = sync_grab = press_frozen = false;
     XFlush(dpy);
-    own_grab = r == GrabSuccess;
-    return own_grab;
+    return true;
+}
+
+// the server ends a grab whose window goes; the mode around it gets it back
+static void drop_mode_grab(NativeWindow* w)
+{
+    for (const ModeGrab& g : mode_grabs) if (g.w == w) { grab_pointer(w, false); return; }
+}
+
+void set_shell_grab(bool on) { grab_shell = on; }
+bool press_pending() { return press_frozen; }
+bool press_foreign() { return press_frozen && press_is_foreign; }
+unsigned foreign_presses() { return foreign_count; }
+unsigned replayed_presses() { return replayed_count; }
+
+bool release_press(bool replay)
+{
+    if (!press_frozen) return false;
+    press_frozen = false;
+    if (replay && press_on_dock && !mode_grabs.empty() && mode_grabs.back().shell) replay = false;   // the start menu keeps a click on the taskbar
+    if (!replay) { thaw_pointer(); XFlush(dpy); return false; }
+    // the server releases the grab and delivers the press again as if there had been none (passive grabs on the
+    // windows under the pointer included: the window manager's click to focus)
+    XAllowEvents(dpy, ReplayPointer, CurrentTime);
+    if (press_is_foreign) replayed_count++;
+    own_grab = sync_grab = false;
+    XFlush(dpy);
+    return true;
+}
+
+// a press while the synchronous grab is up: what lies under it (the top-level at the point: ours, another
+// client's, a dock)
+static void press_arrived(const XButtonEvent& b)
+{
+    press_frozen = true;
+    ::Window child = 0; int x, y;
+    XTranslateCoordinates(dpy, root, root, b.x_root, b.y_root, &x, &y, &child);
+    NativeWindow* ours = child ? lookup(child) : nullptr;
+    press_is_foreign = !ours;
+    press_on_dock = false;
+    if (ours) press_on_dock = ours->type == WindowType::Dock;
+    else if (child) {
+        Atom type; int format; unsigned long n = 0, after; unsigned char* data = nullptr;
+        Atom wt = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False), dock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
+        if (XGetWindowProperty(dpy, child, wt, 0, 8, False, XA_ATOM, &type, &format, &n, &after, &data) == Success && data) {
+            for (unsigned long i = 0; i < n; i++) if ((Atom)((long*)data)[i] == dock) press_on_dock = true;
+            XFree(data);
+        }
+    }
+    if (press_is_foreign) foreign_count++;
 }
 
 bool is_maximized(NativeWindow* w)
@@ -1116,6 +1207,7 @@ bool drag_begin(NativeWindow* w, const std::vector<std::string>& paths, uint32_t
                      None, ds.cursors[0], CurrentTime) != GrabSuccess)
         return false;
     own_grab = true;
+    sync_grab = press_frozen = false;   // the drag's own grab (asynchronous) replaces a mode's
     XGrabKeyboard(dpy, w->xw, False, GrabModeAsync, GrabModeAsync, CurrentTime);
     XSetSelectionOwner(dpy, a_xsel, w->xw, last_time);
     Atom types[] = { a_uri_list, a_gnome, a_utf8, a_text_plain, XA_STRING };
@@ -1450,6 +1542,10 @@ static bool translate(XEvent& x, Event& ev)
     case KeyPress: case KeyRelease: last_time = x.xkey.time; break;
     case PropertyNotify: last_time = x.xproperty.time; break;
     }
+    if (sync_grab) {   // the mode's grab: a press waits for release_press, the rest go on at once
+        if (x.type == ButtonPress && x.xbutton.button <= 3) press_arrived(x.xbutton);
+        else if (x.type == ButtonPress || x.type == ButtonRelease || x.type == MotionNotify) thaw_pointer();
+    }
     if (source_event(x)) return false;
     if (x.type == PropertyNotify && x.xproperty.window == root) {
         Atom a = x.xproperty.atom;
@@ -1484,6 +1580,12 @@ static bool translate(XEvent& x, Event& ev)
         return false;
     }
     NativeWindow* w = lookup(x.xany.window);
+    if (!w && own_grab && !mode_grabs.empty() && x.xany.window == root &&
+        (x.type == ButtonPress || x.type == ButtonRelease || x.type == MotionNotify)) {
+        w = mode_grabs.back().w;   // outside our windows during a mode's grab: the mode's window, in its coordinates
+        if (x.type == MotionNotify) { x.xmotion.x = x.xmotion.x_root - w->rect.left; x.xmotion.y = x.xmotion.y_root - w->rect.top; }
+        else { x.xbutton.x = x.xbutton.x_root - w->rect.left; x.xbutton.y = x.xbutton.y_root - w->rect.top; }
+    }
     if (!w) return false;
     ev.window = w;
     if (x.type == PropertyNotify) {
@@ -1627,6 +1729,7 @@ void wake()
 bool wait_event(Event& ev, int timeout_ms)
 {
     uint32_t start = ticks();
+    release_press(false);   // a press nobody decided about (no window of ours took it): the pointer must not stay frozen
     for (;;) {
         source_timeouts();
         if (drag_changed) {   // the drag ended: the caller's loop looks at drag_active()
@@ -1639,6 +1742,7 @@ bool wait_event(Event& ev, int timeout_ms)
             XEvent x;
             XNextEvent(dpy, &x);
             if (translate(x, ev)) return true;
+            release_press(false);
         }
         if (timeout_ms == 0) return false;
         int remaining = -1;

@@ -435,6 +435,16 @@ Explorer's menu band while Alt is held and while it is in keyboard mode or has a
 in the window for good (XP's UI state: WM_CHANGEUISTATE / WM_UPDATEUISTATE / WM_QUERYUISTATE; the rebar's "Address" label
 follows it).
 
+**Menus and clicks.** As in Windows, a click outside an open menu closes it and then does what it would have done without the
+menu: the window under the pointer is activated and gets the click. A right click on another file, another program's window or
+the desktop with a context menu open closes that menu and opens the new place's own; a left click on the list selects there; a
+click on another caption, the taskbar or a tile acts on it. This holds for every menu: flxp's and the desktop's context menus and
+menu bars, luxwm's window menu, luxshell's menus and flyouts, whichever program the click goes to. Only the start menu keeps a
+click on the taskbar (XP's start menu belongs to the taskbar): a click on the Start button while it is open closes it without
+opening it again, a click on a task button closes it without switching; a click on the desktop or a window closes it and acts
+there. The sources (Wine's and ReactOS's menu loop, Microsoft's documentation) and how it is done over X: docs/CLIENT-PROTOCOL.md
+"Menus and clicks". Any mouse button activates a window (left, middle or right), as in Windows.
+
 **Window icons.** Captions and task buttons show the window's `_NET_WM_ICON` (the size nearest at or above 16 px), else its
 `WM_HINTS` icon pixmap (xterm, xclock, Xt/Motif/FOX programs), else the theme's default icon: on the glass themes the Windows flag
 (`DEFAULTICON` of the msstyles), on the classic and Luna themes and on the taskbar the XP application icon. A window that changes its
@@ -790,7 +800,8 @@ light blue) and open where you click, flipped to the left / upwards where they w
 - **Keys** while a menu is open: Up/Down (Home/End) move, Right or Return opens a submenu, Left or Esc closes a submenu, Esc
   closes the menu, Return/space activates. The underlined letter (mnemonic) activates its item directly (opens its submenu);
   when several items share it, the key cycles through them; a letter that is nobody's mnemonic jumps to the next item starting
-  with it. A click outside any of luxshell's surfaces (or on another of its surfaces) closes the menu. The 4074 menus drew no
+  with it. A click outside any of luxshell's surfaces (or on another of its surfaces) closes the menu and acts where it was made
+  ("Menus and clicks" below). The 4074 menus drew no
   underlines; ours always do.
 
 **Autohide** (Avalon behaviour): the bar slides out (100 ms) as soon as the pointer is off it and no start menu, menu or

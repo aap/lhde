@@ -20,6 +20,7 @@
 #include "shell/apps.h"
 #include "shell/config.h"
 #include "shell/lhtheme.h"
+#include "sys/sys.h"
 #include "taskbar.h"
 #include "wuxtheme/menu.h"
 
@@ -457,11 +458,15 @@ void show(const RECT& b, bool anchored)
     xwm::focus_own();       // the menu's keyboard (a dock is never focused by the window manager)
     menu_open = true;
     xwm::set_start_menu_open(true);     // _LH_STARTMENU_OPEN for lux's Start button
+    sys::set_shell_grab(true);   // XP's start menu: a click on the taskbar closes it and is kept (the Start button does not reopen it)
+    unsigned replayed = sys::replayed_presses();
     UINT cmd = (UINT)TrackPopupMenu(m, flags, x, y, 0, g.wnd, nullptr);   // modal: every way of closing ends it
+    sys::set_shell_grab(false);
     menu_open = false;
     xwm::set_start_menu_open(false);    // before the command (Run... is a dialog)
     DestroyMenu(m);
-    if (!cmd && prev) xwm::activate(prev);   // dismissed: the keyboard goes back where it was
+    if (!cmd && prev && sys::replayed_presses() == replayed) xwm::activate(prev);   // dismissed: the keyboard goes back where it was
+                                                                                   // (not when a click went on to another window)
     command(cmd);
 }
 

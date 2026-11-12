@@ -831,7 +831,7 @@ All menus are `menu.lua` over wuxtheme's painter (section 16).
 "Options" fading in over 120 ms), FlyoutBorder 8,4,8,8 (Slate 4,0,4,4); Plex: the three-piece FLYOUTTOP / CONTENT / BOTTOM. One
 flyout at a time, `_NET_WM_WINDOW_TYPE_POPUP_MENU`, placed left of the bar at the tile's top (placement 2), clamped to the
 screen; closed by a second click on the tile, a click on another luxshell surface or any click outside (pointer grab with owner
-events, `on_outside`). Other owners (the settings flyout, the run box) may add `place`, `on_key` (keyboard grab; Escape closes)
+events, `on_outside`; the click outside then goes on to the window under it, CLIENT-PROTOCOL.md "Menus and clicks"). Other owners (the settings flyout, the run box) may add `place`, `on_key` (keyboard grab; Escape closes)
 and `stay_open`. An open flyout or menu keeps an autohide taskbar shown.
 
 ## 8. Tiles

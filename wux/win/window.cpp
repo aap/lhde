@@ -1063,11 +1063,26 @@ void set_maximized(Window* w, int action)
 
 // ---- input state ----------------------------------------------------------
 
+// A menu's capture (menu mode) also grabs the pointer, so that a click anywhere ends it (sys::grab_pointer, docs/
+// CLIENT-PROTOCOL.md "Menus and clicks"); the grab goes with the capture.
+static Window* g_menu_grab;     // the toplevel whose native window holds it
+
+static void menu_grab(Window* w)
+{
+    Window* t = is_window(w) ? toplevel_of(w) : nullptr;
+    if (t == g_menu_grab) return;
+    Window* old = g_menu_grab;
+    g_menu_grab = t && t->top ? t : nullptr;
+    if (g_menu_grab) sys::grab_pointer(g_menu_grab->top->native, true);
+    if (is_window(old) && old->top) sys::grab_pointer(old->top->native, false);
+}
+
 void set_capture(Window* w, bool screen_coords)
 {
     Window* old = g_capture;
     g_capture = w;
     g_capture_screen = screen_coords;
+    menu_grab(screen_coords ? w : nullptr);
     if (old && old != w) send(old, WM_CAPTURECHANGED, 0, (LParam)w);
 }
 
@@ -1076,6 +1091,7 @@ void release_capture()
     Window* old = g_capture;
     g_capture = nullptr;
     g_capture_screen = false;
+    menu_grab(nullptr);
     if (old) send(old, WM_CAPTURECHANGED, 0, 0);
 }
 
@@ -1267,13 +1283,72 @@ static void update_hover(Window* client_target, Window* nc_target, uint32_t time
     }
 }
 
+// A press while a mode's grab is up (a menu, the start panel; sys::grab_pointer) waits for a decision: one on the
+// mode's own windows is the mode's; any other ends the mode and acts where it is, as Windows lets the click that
+// dismisses a menu pass through (docs/CLIENT-PROTOCOL.md "Menus and clicks"). On another client's window the X server
+// replays it there (the window manager activates that window on the way). On one of ours it goes on here: the mode
+// gets a copy as a click outside (the menu loop ends on it), then the press goes to the window it hit, after it in the
+// queue, as in Windows (a toolbar's drop-down button removes it to toggle its menu), and that window's toplevel is
+// activated. The press and its release go where they hit even while the capture is still there (the menu ends when
+// its loop looks at the queue again).
+static int (*g_menu_hits)(int x, int y);    // set_menu_hit_test
+void set_menu_hit_test(int (*hits)(int x, int y)) { g_menu_hits = hits; }
+static struct { bool on; uint32_t time; int button; bool down_seen; } g_replayed;
+
+static bool in_mode(Window* t, Point screen)
+{
+    if (g_capture_screen) return g_menu_hits && g_menu_hits(screen.x, screen.y) != 0;
+    Window* c = toplevel_of(g_capture);
+    return is_window(c) && c == t && c->top && sys::window_rect(c->top->native).contains(screen);
+}
+
+// true: the press is on one of our windows outside the mode and goes on here (pass_through)
+static bool decide_press(Window* t, const sys::Event& ev)
+{
+    if (!sys::press_pending()) return false;
+    if (!is_window(g_capture) || in_mode(t, ev.root)) { sys::release_press(false); return false; }
+    if (sys::press_foreign()) {
+        if (sys::release_press(true)) { g_replayed.on = true; g_replayed.time = ev.time; g_replayed.button = ev.button; g_replayed.down_seen = false; }
+        return false;
+    }
+    sys::release_press(false);
+    g_replayed.on = true; g_replayed.time = ev.time; g_replayed.button = ev.button; g_replayed.down_seen = true;
+    return true;
+}
+
+// the mode's copy of a press outside it: what it would have had through the capture
+static void post_outside_click(const sys::Event& ev)
+{
+    static const uint32_t down[] = {0, WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_RBUTTONDOWN};
+    static const uint32_t mkb[]  = {0, MK_LBUTTON, MK_MBUTTON, MK_RBUTTON};
+    Window* c = g_capture;
+    LParam lp = g_capture_screen ? lparam_of(ev.root) : lparam_of(screen_to_client(c, ev.root));
+    post_full(c, down[ev.button], (WParam)(mk_from_mods(ev.mods) | mkb[ev.button]), lp, ev.time, ev.root, nullptr);
+}
+
+// the replayed press (same time) and the release that follows it: by hit test, not to the capture
+static bool replayed_event(const sys::Event& ev)
+{
+    if (!g_replayed.on || ev.button != g_replayed.button) return false;
+    if (ev.kind == sys::EventKind::ButtonDown) {
+        if (ev.time != g_replayed.time) { g_replayed.on = false; return false; }
+        g_replayed.down_seen = true;
+        return true;
+    }
+    if (ev.kind == sys::EventKind::ButtonUp && g_replayed.down_seen) { g_replayed.on = false; return true; }
+    return false;
+}
+
 static void dispatch_mouse(Window* t, const sys::Event& ev)
 {
     Point dev = ev.pos;
     Point screen = ev.root;
     Window* target;
     intptr_t ht = HTCLIENT;
-    if (is_window(g_capture)) {
+    bool replayed = (ev.kind == sys::EventKind::ButtonDown || ev.kind == sys::EventKind::ButtonUp) && replayed_event(ev);
+    bool pass_through = ev.kind == sys::EventKind::ButtonDown && !replayed && decide_press(t, ev);
+    if (pass_through) { post_outside_click(ev); replayed = true; }
+    if (is_window(g_capture) && !replayed) {
         target = g_capture;
     } else {
         target = hit_test(t, dev, &ht);
@@ -1283,7 +1358,7 @@ static void dispatch_mouse(Window* t, const sys::Event& ev)
     if (!is_window(g_capture)) update_hover(client ? target : nullptr, client ? nullptr : target, ev.time, screen);
     Point local = screen_to_client(target, screen);
     uint32_t mk = mk_from_mods(ev.mods);
-    LParam lp = (client && !(is_window(g_capture) && g_capture_screen)) ? lparam_of(local) : lparam_of(screen);
+    LParam lp = (client && !(is_window(g_capture) && g_capture_screen && !replayed)) ? lparam_of(local) : lparam_of(screen);
     WParam wp = client ? (WParam)mk : (WParam)ht;
 
     switch (ev.kind) {
@@ -1309,8 +1384,12 @@ static void dispatch_mouse(Window* t, const sys::Event& ev)
         if (is_dbl && ((target->class_style & CS_DBLCLKS) || (!client && ht == HTCAPTION))) { g_lastclick.w = nullptr; msg = dbl[ev.button]; }
         else { g_lastclick.w = target; g_lastclick.button = ev.button; g_lastclick.time = ev.time; g_lastclick.pos = ev.root; }
         if (!client) msg += WM_NCLBUTTONDOWN - WM_LBUTTONDOWN;
-        if (!is_window(g_capture)) {
+        if (!is_window(g_capture) || replayed) {
             Result ma = send(target, WM_MOUSEACTIVATE, (WParam)toplevel_of(target), make_lparam((int32_t)ht, (int32_t)msg));
+            // a click passed through a mode: the window manager did not see it (the grab), the activation is ours
+            Window* tt = toplevel_of(target);
+            if (pass_through && ma != MA_NOACTIVATE && ma != MA_NOACTIVATEANDEAT && is_window(tt) && tt != g_active && tt->top && tt->wm_decorated)
+                sys::activate_window(tt->top->native);
             if (ma == MA_ACTIVATEANDEAT || ma == MA_NOACTIVATEANDEAT) break;
         }
         post_full(target, msg, wp, lp, ev.time, screen, nullptr);

@@ -204,8 +204,11 @@ itself for its menus. luxwm selects `FocusChangeMask` on the clients and the roo
 focused client (or a window inside it) the frame is active; on a window luxwm does not manage, the root, `PointerRoot` or None,
 `focus_set_active(false)`: the frame is repainted inactive, `_NET_ACTIVE_WINDOW` becomes None and `_NET_WM_STATE_FOCUSED` goes, while
 `f_client` stays the last focused window (`f_active` false; `client_active(c)` is what painting and `FOCUSED` use). Focus inside an
-override-redirect top-level (menus, tooltips) or on another managed client changes nothing. A click on a client or its frame
-(`FOCUS_ON_CLICK`) focuses it whenever it does not really hold the focus. A click on the bare root (no desktop window) gives the focus
+override-redirect top-level (menus, tooltips) or on another managed client changes nothing; luxwm then selects `FocusChangeMask` on
+that override-redirect window too, so that the focus leaving it is followed (the start menu's focus window, the desktop clicked
+through the start menu). A click on a client or its frame (`FOCUS_ON_CLICK`; the left, middle or right button, as Windows activates
+on each, and `focus_button` besides) focuses it whenever it does not really hold the focus; a press another client replays when its
+menu ends (CLIENT-PROTOCOL.md "Menus and clicks") comes through the same passive grab. A click on the bare root (no desktop window) gives the focus
 to luxwm's `nofocus` window and makes the window inactive the same way. While inactive, Alt+Tab first reactivates the last focused
 window, the window key actions (close, kill, maximise, minimise) do nothing (Alt+F4 on the desktop closes nothing), and closing or
 minimising that window from elsewhere moves "last focused" on without taking the focus from the desktop.
@@ -265,7 +268,10 @@ mnemonics are underlined (XP's keyboard cues; a key press shows them in a mouse-
 keyboard_cues = 1`). Keys: Up/Down/Tab (wrapping, separators skipped), Home/End, Enter (nothing on a greyed item), a mnemonic (the
 only item with it is chosen at once, a greyed one only selected; several: the next one), Esc, Alt or F10 close. Mouse: hover selects
 (greyed items too, as XP), a release over an enabled item chooses it (also the release of the button that opened it, dragged onto an
-item), a click outside closes it and is not passed on. Modal like the drags: pointer and keyboard grabbed, Expose/MapRequest/
+item), a click outside closes it and goes on to the window under the pointer (replayed: CLIENT-PROTOCOL.md "Menus and clicks";
+a right click on another caption opens that window's menu), except on the caption icon that opened it, which only closes it (or,
+the second click of a double click, the window). Modal like the drags: pointer and keyboard grabbed (the pointer synchronously, on
+the root), Expose/MapRequest/
 ConfigureRequest of other windows handled meanwhile. **Submenus** cascade as XP's: a 4 x 7 arrow in the right margin; hovering the item
 for MenuShowDelay (400 ms), a click on it, Right, Enter or its mnemonic opens it beside the item (3 px overlap, left of the parent when
 it does not fit); Left or Esc closes only the submenu, the pointer back over another parent item (or a press there) closes it and the

@@ -32,9 +32,12 @@ void* free_user_handle(HANDLE handle, enum user_obj_type type)
     return p;
 }
 
+int MENU_HitsTracking(int x, int y);
+
 BOOL set_capture_window(HWND hwnd, UINT flags, HWND* prev)
 {
     HWND old = GetCapture();
+    win::set_menu_hit_test(MENU_HitsTracking);
     if (hwnd) win::set_capture(w32::window_of(hwnd), (flags & GUI_INMENUMODE) != 0); else ReleaseCapture();
     if (prev) *prev = old;
     return TRUE;

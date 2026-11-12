@@ -290,6 +290,7 @@ static void load_color(XftColor *dest_color, unsigned long raw_color);
 static void load_config(char *conf_path);
 static void manage_new_window(Window w, XWindowAttributes *wa);
 static int manage_xsend_icccm(struct client *c, Atom atom);
+static bool is_focus_button(unsigned b);
 static void window_grab_buttons(Window window);
 static void window_ungrab_buttons(Window window);
 static void grab_buttons(void);
@@ -1152,7 +1153,8 @@ handle_button_press(XEvent *e)
     }
     // If it's not window movement or resize then process focus on click
     state = mod_clean(bev->state);
-    if (conf.focus_on_click && bev->button == (unsigned)conf.focus_button && state != (unsigned)conf.move_mask && !(conf.resize_button && state == (unsigned)conf.resize_mask) && bev->window != c->dec)
+    if (conf.focus_on_click && is_focus_button(bev->button) && !(bev->button == (unsigned)conf.move_button && state == (unsigned)conf.move_mask)
+        && !(conf.resize_button && bev->button == (unsigned)conf.resize_button && state == (unsigned)conf.resize_mask) && bev->window != c->dec)
     {
         LOGN("Handling focus on click");
         // Ungrab buttons, propagate event to the window, and regrab
@@ -1328,6 +1330,11 @@ focus_sync(void)
     }
     if (!ovr)
         focus_set_active(false);
+    else {   /* an override-redirect window took the focus (the start menu's): hear when it gives it up again (handle_focus) */
+        XWindowAttributes wa;
+        if (fw != None && fw != PointerRoot && XGetWindowAttributes(display, fw, &wa) && !(wa.your_event_mask & FocusChangeMask))
+            XSelectInput(display, fw, wa.your_event_mask | FocusChangeMask);
+    }
 }
 
 static void
@@ -2278,6 +2285,15 @@ manage_xsend_icccm(struct client *c, Atom atom)
     return exists;
 }
 
+/* click to focus: any of the three buttons, as Windows activates a window on a left, right or middle press
+   (WM_MOUSEACTIVATE for each), and focus_button besides when it is another; not the wheel. A press another client
+   replays after its menu ended (docs/CLIENT-PROTOCOL.md "Menus and clicks") comes through the same passive grab. */
+static bool
+is_focus_button(unsigned b)
+{
+    return (b >= 1 && b <= 3) || b == (unsigned)conf.focus_button;
+}
+
 static void
 window_grab_buttons(Window window)
 {
@@ -2285,7 +2301,9 @@ window_grab_buttons(Window window)
     if (conf.resize_button)   /* the modifier resize drag is off by default (config.h RESIZE_BUTTON) */
         XGrabButton(display, conf.resize_button, conf.resize_mask, window, True, ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
     if (conf.focus_on_click)
-        XGrabButton(display, conf.focus_button, AnyModifier, window, True, ButtonPressMask, GrabModeSync, GrabModeSync, None, None);
+        for (unsigned b = 1; b <= 5; b++)
+            if (is_focus_button(b))
+                XGrabButton(display, b, AnyModifier, window, True, ButtonPressMask, GrabModeSync, GrabModeSync, None, None);
 }
 
 static void
@@ -2295,7 +2313,9 @@ window_ungrab_buttons(Window window)
     if (conf.resize_button)
         XUngrabButton(display, conf.resize_button, conf.resize_mask, window);
     if (conf.focus_on_click)
-        XUngrabButton(display, conf.focus_button, AnyModifier, window);
+        for (unsigned b = 1; b <= 5; b++)
+            if (is_focus_button(b))
+                XUngrabButton(display, b, AnyModifier, window);
 }
 
 static void

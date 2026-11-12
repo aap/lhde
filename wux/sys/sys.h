@@ -108,10 +108,21 @@ void set_shape(NativeWindow* w, const std::vector<gdi::Rect>* rects);
 // direction 0..7 resize (top-left, top, top-right, right, bottom-right,
 // bottom, bottom-left, left), 8 move, 9 size and 10 move with the keyboard.
 void begin_move_resize(NativeWindow* w, gdi::Point root_pos, int direction, int button, uint32_t time);
-// An active pointer grab for a popup that must see clicks anywhere (the taskbar's start panel):
-// owner_events, so our own windows get their events as usual and clicks into other clients come
-// to w (outside its rectangle) instead of to them. False if another client holds a grab.
+// The pointer grab of a mode that must see clicks anywhere (a menu, the start panel; docs/CLIENT-PROTOCOL.md
+// "Menus and clicks"): owner_events, so our own windows get their events as usual and clicks into other clients
+// come to w (outside its rectangle). Grabs nest: off gives the grab back to the mode around w. Synchronous: a
+// press waits (press_pending) until release_press says whether it is the mode's (false: it stays with us) or not
+// (true: the X server delivers it again to the window under the pointer, as if there had been no grab, and the grab
+// ends; the mode ends on it as on any click outside). False if another client holds a grab.
 bool grab_pointer(NativeWindow* w, bool on);
+bool press_pending();
+bool press_foreign();                       // the waiting press is on another client's window
+bool release_press(bool replay);            // true: replayed
+unsigned foreign_presses();                 // presses on other clients' windows during grabs so far
+unsigned replayed_presses();                // those of them replayed to the other client (it has the click, and the focus)
+// The grabs taken while this is on are the start menu's: a press on a dock (the taskbar: XP's tray thread, the
+// start menu's own) closes the mode and is not replayed (release_press keeps it).
+void set_shell_grab(bool on);
 bool is_maximized(NativeWindow* w);         // _NET_WM_STATE has both MAXIMIZED atoms
 void set_maximized(NativeWindow* w, int action);   // 0 restore, 1 maximise, 2 toggle
 

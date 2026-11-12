@@ -914,10 +914,12 @@ void flyout(int i)
         P->open_item = i;
         P->reopen = -1;
         HHOOK hook = SetWindowsHookExW(WH_MSGFILTER, flyout_filter, nullptr, 0);
+        unsigned outside = sys::foreign_presses();
         UINT cmd = (UINT)TrackPopupMenu(m, flags, edge.x, y, 0, P->wnd, nullptr);
         UnhookWindowsHookEx(hook);
         DestroyMenu(m);
         if (!P) return;
+        if (!cmd && sys::foreign_presses() != outside) { P->done = true; return; }   // a click into another client ended it: the panel goes too
         P->open_item = -1;
         KillTimer(P->wnd, TIMER_SWITCH);
         if (cmd) { P->menu_cmd = cmd; P->done = true; return; }
@@ -1266,9 +1268,13 @@ void show(const RECT& b, bool anchored)
     UpdateWindow(P->wnd);
     SetCapture(P->wnd);
     // clicks into other clients: luxwm does not refocus the window that is already active, so the
-    // dock's FocusOut (WM_CANCELMODE) cannot be relied on; a pointer grab reports them to us
+    // dock's FocusOut (WM_CANCELMODE) cannot be relied on; a pointer grab reports them to us. As XP's
+    // start menu (the tray thread's menu band): a click on the taskbar (a dock) closes it and is kept,
+    // a click on anything else closes it and goes on to that window (docs/CLIENT-PROTOCOL.md "Menus and clicks")
     sys::NativeWindow* nw = sys::window_for_user((void*)P->wnd);
-    bool grabbed = nw && sys::grab_pointer(nw, true);
+    sys::set_shell_grab(true);
+    if (nw) sys::grab_pointer(nw, true);
+    unsigned replayed = sys::replayed_presses();
 
     bool quit = false;
     int quit_code = 0;
@@ -1286,7 +1292,8 @@ void show(const RECT& b, bool anchored)
         TranslateMessage(&m);
         DispatchMessageW(&m);
     }
-    if (grabbed) sys::grab_pointer(nw, false);
+    if (nw) sys::grab_pointer(nw, false);
+    sys::set_shell_grab(false);
     xwm::set_start_menu_open(false);    // every way out (a choice, Escape, Super, a click outside, focus loss, a toggle)
     if (!P) return;
     if (GetCapture() == P->wnd) ReleaseCapture();
@@ -1299,7 +1306,8 @@ void show(const RECT& b, bool anchored)
     if (quit) { PostQuitMessage(quit_code); return; }
     if (have) run(chosen);
     else if (cmd) startmenu::command(cmd);
-    else if (prev) xwm::activate(prev);     // dismissed: the keyboard goes back where it was
+    else if (prev && sys::replayed_presses() == replayed) xwm::activate(prev);   // dismissed: the keyboard goes back where it was
+                                                                                // (not when a click went on to another window)
 }
 
 } // namespace startpanel

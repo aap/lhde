@@ -9,3 +9,5 @@
 * msstyles window shape: only leading/trailing alpha-0 runs of a caption row are cut, so a caption with holes or a step wider than
   40 px keeps black pixels inside the shape (community styles chaninja, dzbio, mxmqj, octane); XP's region is every opaque pixel of the
   CAPTION bitmap (GetThemeBackgroundRegion), so these want several rectangles per row
+* click to focus grabs buttons 1-3 on every client always (GrabModeSync, ReplayPointer): each click makes a round trip through
+	luxwm, also on the focused window; if that ever shows, grab only on unfocused windows (dwm's way)

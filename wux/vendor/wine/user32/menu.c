@@ -3241,6 +3241,30 @@ static void CALLBACK release_capture( BOOL __normal )
     set_capture_window( 0, GUI_INMENUMODE, NULL );
 }
 
+/* flxp: the tracker of the menu loop running now, for MENU_HitsTracking */
+static MTRACKER *tracking_mt;
+
+/* flxp: whether a press at this screen point belongs to the menus being tracked, as MENU_ButtonDown decides it (an
+ * item, anywhere on a popup, the system menu's button): wux's capture asks before the press is queued, while the pointer
+ * grab holds it; a press elsewhere ends the menu and goes on to the window under the pointer, as the loop below leaves it in
+ * the queue (XP's mnloop.c xxxHandleMenuMessages likewise; docs/CLIENT-PROTOCOL.md "Menus and clicks") */
+int MENU_HitsTracking( int x, int y )
+{
+    POINT pt;
+    HMENU hmenu;
+    POPUPMENU *menu;
+    UINT pos;
+    enum hittest ht;
+
+    if (!tracking_mt) return 0;
+    pt.x = x; pt.y = y;
+    hmenu = MENU_PtMenu( tracking_mt->hTopMenu, pt );
+    if (!hmenu || !(menu = MENU_GetMenu( hmenu ))) return 0;
+    if (IS_SYSTEM_MENU(menu)) return 1;
+    ht = MENU_FindItemByCoords( menu, pt, &pos );
+    return ht == ht_item || ((menu->wFlags & MF_POPUP) && ht != ht_nowhere);
+}
+
 /***********************************************************************
  *           MENU_TrackMenu
  *
@@ -3256,6 +3280,7 @@ static BOOL MENU_TrackMenu( HMENU hmenu, UINT wFlags, INT x, INT y,
     MTRACKER mt;
     BOOL enterIdleSent = FALSE;
     HWND capture_win;
+    MTRACKER *prev_mt;      /* flxp */
 
     mt.trackFlags = 0;
     mt.hCurrentMenu = hmenu;
@@ -3290,6 +3315,8 @@ static BOOL MENU_TrackMenu( HMENU hmenu, UINT wFlags, INT x, INT y,
     if ((wFlags & TPM_POPUPMENU) && menu->nItems == 0)
         return FALSE;
 
+    prev_mt = tracking_mt;  /* flxp */
+    tracking_mt = &mt;
     __TRY while (!fEndMenu)
     {
 	menu = MENU_GetMenu( mt.hCurrentMenu );
@@ -3370,8 +3397,9 @@ static BOOL MENU_TrackMenu( HMENU hmenu, UINT wFlags, INT x, INT y,
 		    /* Else, end menu tracking */
 		    fRemove = MENU_ButtonDown( &mt, msg.message, hmenu, wFlags );
 		    fEndMenu = !fRemove;
-		    /* flxp: Windows swallows the click that dismisses a menu; the window
-		     * under the pointer must not act on it (Wine passes it on) */
+		    /* flxp: a press that ends the menu was replayed to the window under the pointer by the X server
+		     * (wux's pointer grab, MENU_HitsTracking), which acts on it as Windows lets it pass through; this
+		     * copy is addressed to the menu, which is going: drop it */
 		    if (fEndMenu) fRemove = TRUE;
 		    break;
 
@@ -3521,6 +3549,7 @@ static BOOL MENU_TrackMenu( HMENU hmenu, UINT wFlags, INT x, INT y,
 	else mt.trackFlags &= ~TF_SKIPREMOVE;
     }
     __FINALLY( release_capture )
+    tracking_mt = prev_mt;  /* flxp */
 
     /* If dropdown is still painted and the close box is clicked on
        then the menu will be destroyed as part of the DispatchMessage above.

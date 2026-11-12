@@ -176,10 +176,20 @@ static double ms_now(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, 
 #define SUB_BACK   (-3)       /* a submenu returns: the pointer went back to its parent (the event is put back for the parent) */
 #define SUB_ALL    (-4)       /* a submenu returns: the whole menu is dismissed */
 
+/* The pointer grab is synchronous: every pointer event freezes the pointer until XAllowEvents, so that a press outside
+   the menu can be replayed (ReplayPointer) to the window under it once the menu has ended, as Windows lets the click
+   that dismisses a menu pass through (docs/CLIENT-PROTOCOL.md "Menus and clicks"). Motion and releases go on at once,
+   a press when the loop has decided about it. */
+static void thaw(Display *dpy) { XAllowEvents(dpy, SyncPointer, CurrentTime); }
+static bool replayed;   /* a press went on to the window under the pointer: the grab has ended */
+
 /* the next menu event, waiting at most timeout ms (-1: no limit); false on timeout */
 static bool menu_next(Display *dpy, XEvent *ev, int timeout) {
     for (;;) {
-        if (XCheckIfEvent(dpy, ev, menu_pred, NULL)) return true;
+        if (XCheckIfEvent(dpy, ev, menu_pred, NULL)) {
+            if (ev->type == MotionNotify || ev->type == ButtonRelease) thaw(dpy);
+            return true;
+        }
         XFlush(dpy);
         struct pollfd pfd = { .fd = ConnectionNumber(dpy), .events = POLLIN };
         if (poll(&pfd, 1, timeout) == 0) return false;
@@ -189,7 +199,9 @@ static bool menu_next(Display *dpy, XEvent *ev, int timeout) {
 static bool menu_grab(Display *dpy, Window w, Window root, bool keyboard) {
     int gp = GrabNotViewable, gk = keyboard ? GrabNotViewable : GrabSuccess;
     for (int i = 0; i < 50; i++) {   /* a client's own grab (or luxwm's passive key grab) may be ending */
-        if (gp != GrabSuccess) gp = XGrabPointer(dpy, w, False, ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
+        /* on the root: a press replayed from it is checked against the passive grabs under it (click to focus) */
+        if (gp != GrabSuccess && (gp = XGrabPointer(dpy, root, False, ButtonPressMask | ButtonReleaseMask | PointerMotionMask, GrabModeSync, GrabModeAsync, None, None, CurrentTime)) == GrabSuccess)
+            thaw(dpy);   /* a synchronous grab starts frozen */
         if (gk != GrabSuccess) gk = XGrabKeyboard(dpy, root, False, GrabModeAsync, GrabModeAsync, CurrentTime);
         if (gp == GrabSuccess && gk == GrabSuccess) return true;
         struct timespec ts = { 0, 5000000 }; nanosleep(&ts, NULL);
@@ -293,15 +305,20 @@ static int popup(const struct wm_menu_env *e, int x, int y, const struct wm_menu
         case ButtonPress: {
             int rx = ev.xbutton.x_root, ry = ev.xbutton.y_root;
             if (!inside(&r, rx, ry)) {
-                if (parent) {   /* in the parent: it handles the press; elsewhere the whole menu goes */
-                    if (inside(parent, rx, ry)) { XPutBackEvent(dpy, &ev); result = SUB_BACK; } else result = SUB_ALL;
-                    done = true; break;
-                }
-                if (e->dbl_w > 0 && rx >= e->dbl_x && rx < e->dbl_x + e->dbl_w && ry >= e->dbl_y && ry < e->dbl_y + e->dbl_h && ms_now() - t0 < e->dbl_ms)
-                    result = WMMENU_DBLCLICK;
-                done = true;   /* a click outside dismisses the menu (and is not passed on, as in XP) */
+                /* in the parent: it handles the press (its grab, taken again, lets it go) */
+                if (parent && inside(parent, rx, ry)) { XPutBackEvent(dpy, &ev); result = SUB_BACK; done = true; break; }
+                if (parent) result = SUB_ALL;   /* elsewhere the whole menu goes */
+                bool on_icon = e->dbl_w > 0 && rx >= e->dbl_x && rx < e->dbl_x + e->dbl_w && ry >= e->dbl_y && ry < e->dbl_y + e->dbl_h;
+                if (on_icon && !parent && ms_now() - t0 < e->dbl_ms) result = WMMENU_DBLCLICK;
+                /* a click outside ends the menu and goes on to the window under the pointer (XP's menu loop: "terminate
+                   menus, and let button pass through"), luxwm's own frames included; the caption icon that opened the menu
+                   is the menu's own button (XP's system menu button): it only closes it (or, double-clicked, the window) */
+                XAllowEvents(dpy, on_icon ? SyncPointer : ReplayPointer, CurrentTime);
+                if (!on_icon) replayed = true;
+                done = true;
                 break;
             }
+            thaw(dpy);
             down = true; int i = item_at(&r, rx, ry);
             if (i != r.sel) { r.sel = i; run_paint(&r); }
             if (i >= 0 && items[i].sub) { down = false; sub_at = 0; SUB_RESULT(open_sub(&r, i, false)); }
@@ -357,7 +374,9 @@ static int popup(const struct wm_menu_env *e, int x, int y, const struct wm_menu
     }
     #undef SUB_RESULT
 out:
-    if (!parent) { XUngrabPointer(dpy, CurrentTime); XUngrabKeyboard(dpy, CurrentTime); }   /* a submenu leaves the grabs to its parent */
+    /* a submenu leaves the grabs to its parent; after a replay the grab is gone, and the pointer may be held by our own passive
+       grab the press activated (click to focus): that one is the main loop's */
+    if (!parent) { if (!replayed) XUngrabPointer(dpy, CurrentTime); XUngrabKeyboard(dpy, CurrentTime); replayed = false; }
     XDestroyWindow(dpy, r.win); XFlush(dpy);
     if (r.under) cairo_surface_destroy(r.under);
     if (result >= 0 && !sub_chosen && items[result].cb) items[result].cb(items[result].arg, items[result].id);   /* a submenu's choice: its cb ran */
