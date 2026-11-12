@@ -14,6 +14,16 @@ namespace shell {
 const char* program_name()
 {
     const char* n = program_invocation_short_name;   // <errno.h>, glibc and musl: argv[0]'s basename
+    if (n && strcmp(n, "exe") == 0) {
+        // started as /proc/self/exe (flxp opening another window): the binary's own name
+        static std::string self;
+        if (self.empty()) {
+            char buf[4096];
+            ssize_t k = readlink("/proc/self/exe", buf, sizeof buf - 1);
+            if (k > 0) { buf[k] = 0; self = base_of(buf); }
+        }
+        if (!self.empty()) return self.c_str();
+    }
     return n && *n ? n : "lhde";
 }
 
