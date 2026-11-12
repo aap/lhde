@@ -9,3 +9,6 @@
 * msstyles window shape: only leading/trailing alpha-0 runs of a caption row are cut, so a caption with holes or a step wider than
   40 px keeps black pixels inside the shape (community styles chaninja, dzbio, mxmqj, octane); XP's region is every opaque pixel of the
   CAPTION bitmap (GetThemeBackgroundRegion), so these want several rectangles per row
+
+* Alt+Tab switcher: its geometry is ReactOS appswitch.c's (48 px cells, 8 px margins, the title box font height + 8), not measured;
+  take a VM screenshot of XP's and of 4074's switcher (classic and Luna/Jade, 3 and 9 windows) and compare (docs/LUXWM.md "Task switcher")
