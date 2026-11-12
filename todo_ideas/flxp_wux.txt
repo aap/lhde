@@ -53,3 +53,17 @@
 	and luxattr
 * MessageBoxW is a stub (stderr): the XP message box is filedlg::message_box, inside the file dialog's objects, so an
 	application that wants an error box links the Explorer (luxattr; docs/APPLICATIONS.md "Not public yet")
+
+## strings: UTF-8 as wux's only public API (survey 2026-11-12)
+* today: 127 W functions, 72 A functions (thin converters; GetACP() = CP_UTF8, so "ANSI" already means UTF-8), 425 neutral;
+	flxp/apps call no A function and use std::u16string + a per-file W() helper over w32::utf16_of (an internal header), 323 L""
+	literals with (LPCWSTR) casts; the vendored Wine controls are UTF-16 throughout and handle both the A and W item messages
+* plan: unsuffixed UTF-8 functions in wux.h (CreateWindowEx, SetWindowText, DrawText, MessageBox, ...) as converters onto the W
+	internals, the W names kept for the vendored code only, the A functions deleted; helpers or UTF-8 struct types for the ~40
+	string-carrying messages (LVM_/TVM_/TB_/TTM_/SB_/CB_/EM_, WM_SETTEXT/GETTEXT) and the GETDISPINFO notifications (a buffer
+	rule); one conversion pair (crt.cpp's) instead of the copies in image.cpp, gdi_priv.h, res.cpp, window.cpp; both APIs
+	coexist while flxp moves file by file (string-free files first: filedlg/main, portal, wallpaper, xwm, preview)
+* bugs found on the way: window.cpp posts one WM_CHAR per code point (wParam up to 0x10FFFF) but the vendored edit treats it as a
+	WCHAR: characters above U+FFFF are truncated; image.cpp's u16_of_a reads bytes as Latin-1 unlike the rest; glibc's wcs*/towupper
+	are reachable from C++ with 16-bit wchar_t (flxp_crt.h redirects them in C only): poison them in C++ too; w32.h defines
+	WINE_UNICODE_NATIVE 0 while the Makefile defines it: settle which
