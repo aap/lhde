@@ -1,0 +1,136 @@
+--- a/dlls/user32/msgbox.c (wine-11.18)
++++ b/vendor/wine/user32/msgbox.c
+@@ -25,12 +25,31 @@
+ #include "windef.h"
+ #include "winbase.h"
+ #include "wingdi.h"
+-#include "winternl.h"
++#include "winuser.h"
++#include "winnls.h"
+ #include "dlgs.h"
+ #include "user_private.h"
+-#include "resources.h"
+ #include "wine/debug.h"
+ 
++/* lhde: wux has no win32u, so the NtUser calls are the user32 ones; the template and the strings are dlls/user32/user32.rc's
++ * MSGBOX and STRINGTABLE, compiled into wux/rc/user32.res (wux/vendor/wine/MANIFEST), which wux/w32/msgbox_glue.cpp loads */
++#define NtUserDestroyWindow DestroyWindow
++#define NtUserSetWindowPos SetWindowPos
++#define NtUserGetDC GetDC
++#define NtUserReleaseDC ReleaseDC
++#define NtUserSetFocus SetFocus
++#define NtUserEnableWindow EnableWindow
++#define NtUserSetWindowContextHelpId SetWindowContextHelpId
++#define NtUserGetWindowContextHelpId GetWindowContextHelpId
++#define NtUserModifyUserStartupInfoFlags(a, b) ((void)0)
++#define MSGBOX_IDICON stc1
++#define MSGBOX_IDTEXT 0xffff
++#define IDS_ERROR 2
++extern HMODULE WUX_User32Resources(void);
++extern void WUX_MsgBoxOwner(HWND hwnd, HWND owner);
++#undef user32_module
++#define user32_module WUX_User32Resources()
++
+ WINE_DEFAULT_DEBUG_CHANNEL(dialog);
+ WINE_DECLARE_DEBUG_CHANNEL(msgbox);
+ 
+@@ -82,6 +101,18 @@
+     nclm.cbSize = sizeof(nclm);
+     SystemParametersInfoW (SPI_GETNONCLIENTMETRICS, 0, &nclm, 0);
+ 
++    /* lhde: the text and the buttons in the message font (NONCLIENTMETRICS' lfMessageFont, the style's MsgBoxFont: Tahoma 8
++     * under XP), as XP's user32 and Wine before 1.3 set it; the box keeps it until it is destroyed (MSGBOX_DlgProc) */
++    {
++        HFONT hFont = CreateFontIndirectW(&nclm.lfMessageFont);
++        if (hFont)
++        {
++            for (i = IDOK; i <= IDCONTINUE; i++) SendDlgItemMessageW(hwnd, i, WM_SETFONT, (WPARAM)hFont, 0);
++            SendDlgItemMessageW(hwnd, MSGBOX_IDTEXT, WM_SETFONT, (WPARAM)hFont, 0);
++            SetPropA(hwnd, "WUX_MSGBOX_FONT", hFont);
++        }
++    }
++
+     if (!IS_INTRESOURCE(lpmb->lpszCaption)) {
+        SetWindowTextW(hwnd, lpmb->lpszCaption);
+     } else {
+@@ -234,7 +265,7 @@
+     iwidth = rect.right - ileft;
+ 
+     hdc = NtUserGetDC(hwnd);
+-    hPrevFont = SelectObject( hdc, (HFONT)SendMessageW( hwnd, WM_GETFONT, 0, 0 ));
++    hPrevFont = SelectObject( hdc, (HFONT)SendDlgItemMessageW( hwnd, MSGBOX_IDTEXT, WM_GETFONT, 0, 0 ));   /* lhde: the message font */
+ 
+     /* Get the number of visible buttons and their size */
+     bh = bw = 1; /* Minimum button sizes */
+@@ -288,6 +319,9 @@
+     wleft = (mon_info.rcWork.left + mon_info.rcWork.right - wwidth) / 2;
+     wtop = (mon_info.rcWork.top + mon_info.rcWork.bottom - wheight) / 2;
+ 
++    /* lhde: the box is the owner's transient (WM_TRANSIENT_FOR, a modal dialog to the window manager) */
++    if (lpmb->hwndOwner) WUX_MsgBoxOwner(hwnd, lpmb->hwndOwner);
++
+     /* Resize and center the window */
+     NtUserSetWindowPos( hwnd, 0, wleft, wtop, wwidth, wheight,
+                         SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW );
+@@ -334,6 +368,7 @@
+    {
+        LPMSGBOXPARAMSW mbp = (LPMSGBOXPARAMSW)lParam;
+        NtUserSetWindowContextHelpId(hwnd, mbp->dwContextHelpId);
++       SetPropA(hwnd, "WUX_MSGBOX_STYLE", (HANDLE)(ULONG_PTR)mbp->dwStyle);
+        MSGBOX_OnInit(hwnd, mbp);
+        SetPropA(hwnd, "WINE_MSGBOX_HELPCALLBACK", mbp->lpfnMsgBoxCallback);
+        break;
+@@ -342,8 +377,17 @@
+    case WM_COMMAND:
+     switch (LOWORD(wParam))
+     {
+-     case IDOK:
+      case IDCANCEL:
++      /* lhde: Escape (or the close box) without a Cancel button: OK where there is one, else nothing (MessageBox's
++       * documented behaviour; Wine ended a Yes/No box with IDCANCEL) */
++      if (!GetDlgItem(hwnd, IDCANCEL))
++      {
++          if (GetDlgItem(hwnd, IDOK)) EndDialog(hwnd, IDOK);
++          break;
++      }
++      EndDialog(hwnd, wParam);
++      break;
++     case IDOK:
+      case IDABORT:
+      case IDRETRY:
+      case IDIGNORE:
+@@ -374,6 +418,15 @@
+ 	break;
+    }
+ 
++   case WM_DESTROY:
++   {
++       HFONT hFont = GetPropA(hwnd, "WUX_MSGBOX_FONT");   /* lhde: the message font made in MSGBOX_OnInit */
++       if (hFont) { RemovePropA(hwnd, "WUX_MSGBOX_FONT"); DeleteObject(hFont); }
++       RemovePropA(hwnd, "WUX_MSGBOX_STYLE");
++       RemovePropA(hwnd, "WINE_MSGBOX_HELPCALLBACK");
++       break;
++   }
++
+    default:
+      /* Ok. Ignore all the other messages */
+      TRACE("Message number 0x%04x is being ignored.\n", message);
+@@ -468,6 +521,18 @@
+ /**************************************************************************
+  *		MessageBoxIndirectA (USER32.@)
+  */
++/* lhde: wux has no ntdll strings; an ANSI string to a heap copy in UTF-16 (CP_ACP is UTF-8 here) */
++typedef struct { LPWSTR Buffer; } UNICODE_STRING;
++static void RtlCreateUnicodeStringFromAsciiz( UNICODE_STRING *s, LPCSTR a )
++{
++    int n = MultiByteToWideChar( CP_ACP, 0, a, -1, NULL, 0 );
++    s->Buffer = HeapAlloc( GetProcessHeap(), 0, (n > 0 ? n : 1) * sizeof(WCHAR) );
++    if (!s->Buffer) return;
++    s->Buffer[0] = 0;
++    if (n > 0) MultiByteToWideChar( CP_ACP, 0, a, -1, s->Buffer, n );
++}
++static void RtlFreeUnicodeString( UNICODE_STRING *s ) { HeapFree( GetProcessHeap(), 0, s->Buffer ); }
++
+ INT WINAPI MessageBoxIndirectA( LPMSGBOXPARAMSA msgbox )
+ {
+     MSGBOXPARAMSW msgboxW;

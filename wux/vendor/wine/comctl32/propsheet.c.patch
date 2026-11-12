@@ -1,0 +1,13 @@
+--- a/dlls/comctl32/propsheet.c (wine-10.0)
++++ b/vendor/wine/comctl32/propsheet.c
+@@ -3607,6 +3607,10 @@
+       psInfo->strPropertiesFor = strCaption;
+ 
+       GetWindowTextW(hwnd, psInfo->strPropertiesFor, MAX_CAPTION_LENGTH);
++      /* lhde: PSH_PROPTITLE's caption is XP's "%s Properties" ("a.txt Properties", "Local Disk (C:) Properties"), not the
++       * template's "Properties for %s" (Wine's comctl32.rc, kept byte for byte in wux/rc/comctl32.res) */
++      if (!lstrcmpW(psInfo->strPropertiesFor, L"Properties for %s"))
++          lstrcpyW(psInfo->strPropertiesFor, L"%s Properties");
+ 
+       PROPSHEET_CreateTabControl(hwnd, psInfo);
+ 

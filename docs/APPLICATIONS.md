@@ -60,8 +60,9 @@ int main(int argc, char** argv)
 `wux/wux.h` is `<windows.h>`, `<commctrl.h>`, `<commdlg.h>`, `<uxtheme.h>` with `<vsstyle.h>`, `<shellapi.h>` and wux's own
 additions (`wux/w32/flxp_shell.h`: desktop and dock windows, root properties, file drag and drop, the X selections, typed
 clipboard data, `FlxpWritePng` / `FlxpEncodePng`), plus `WuxWide` / `WuxUtf8` / `WuxWindowText` for the UTF-8 the shell layer
-speaks. Strings to the API are UTF-16 (`L"..."` is 16-bit here). `MessageBoxW` is a stub: `filedlg::message_box` is the XP
-message box.
+speaks. Strings to the API are UTF-16 (`L"..."` is 16-bit here). `MessageBoxW` (and `MessageBoxA`, `MessageBoxIndirectW`) is
+Wine's message box (`wux/vendor/wine/user32/msgbox.c`): the icon, the text and the buttons the flags ask for, laid out by the
+text's size, in the message font (the style's MsgBoxFont, Tahoma 8 under XP), Escape giving Cancel, or OK in an OK box.
 
 The look needs nothing from the application: WuxInit loads the session theme's visual style, colours, metrics and fonts, and
 the program follows a theme switch by itself (`WM_THEMECHANGED`, the system colours), as every flxp program does. Controls are
@@ -103,9 +104,9 @@ What the first applications needed and the public surface lacks, the list of wha
 - **The Open/Save dialog is built on the Explorer's browsing widget** (`flxp/filedlg/filedlg.cpp` uses `flxp/explorer/browser`,
   the headers, the task band), so `WUX_APP_FILEDIALOG` links all of `flxp/explorer` but its main, and luxnav. The dialog and the
   widget it needs belong with the shell facilities.
-- **A message box needs the file dialog**: wux's `MessageBoxW` is a stub that prints to stderr, and the XP message box is
-  `filedlg::message_box`, which lives in the Open/Save dialog's objects; luxattr links `WUX_APP_FILEDIALOG` (the Explorer's
-  objects, about 40 MB unstripped) for its error box alone. The message box belongs in wux (`MessageBoxW` itself).
+- **A message box needs the file dialog**: the shell layer's own `filedlg::message_box` lives in the Open/Save dialog's
+  objects; luxattr links `WUX_APP_FILEDIALOG` (the Explorer's objects, about 40 MB unstripped) for its error box alone, where
+  `MessageBoxW` would do.
 - **The Properties page and its formats**: flxp's General page (`flxp/explorer/dialogs.cpp`: XP's "1.30 KB (1,331 bytes)"
   sizes, the long dates with seconds) is the Explorer's; luxattr carries a copy of its template and of those three
   formatters. The formats belong beside `details::byte_size` in the shell layer, the page with them.

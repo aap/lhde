@@ -48,8 +48,3 @@
 
 * 4074's About box is Segoe UI 8 under Jade (4074-dwm.png) while MS Shell Dlg is Tahoma: our About box should name Segoe UI in
 	its template under the Longhorn styles (the one dialog that does)
-* a property sheet's PSH_PROPTITLE caption is Wine's "Properties for a.txt" (its template's caption); XP's file Properties say
-	"a.txt Properties" (check against a reference screenshot, then the propsheet template in wux's stdres): flxp's Properties
-	and luxattr
-* MessageBoxW is a stub (stderr): the XP message box is filedlg::message_box, inside the file dialog's objects, so an
-	application that wants an error box links the Explorer (luxattr; docs/APPLICATIONS.md "Not public yet")
