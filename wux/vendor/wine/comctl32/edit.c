@@ -1809,6 +1809,9 @@ static void EDIT_MoveBackward(EDITSTATE *es, BOOL extend)
 
 	if (e) {
 		e--;
+		/* flxp: a surrogate pair is one character (the caret never stops between its halves, Backspace takes both) */
+		if (e && IS_LOW_SURROGATE(es->text[e]) && IS_HIGH_SURROGATE(es->text[e - 1]))
+			e--;
 		if ((es->style & ES_MULTILINE) && e &&
 				(es->text[e - 1] == '\r') && (es->text[e] == '\n')) {
 			e--;
@@ -1879,6 +1882,9 @@ static void EDIT_MoveForward(EDITSTATE *es, BOOL extend)
 
 	if (es->text[e]) {
 		e++;
+		/* flxp: a surrogate pair is one character */
+		if (IS_HIGH_SURROGATE(es->text[e - 1]) && IS_LOW_SURROGATE(es->text[e]))
+			e++;
 		if ((es->style & ES_MULTILINE) && (es->text[e - 1] == '\r')) {
 			if (es->text[e] == '\n')
 				e++;

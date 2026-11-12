@@ -6,6 +6,7 @@
 #include <set>
 #include "window.h"
 #include "sys/sys.h"
+#include "w32/utf.h"
 
 namespace win {
 
@@ -1680,18 +1681,11 @@ bool translate_message(const Message& m)
 {
     if (m.msg != WM_KEYDOWN && m.msg != WM_SYSKEYDOWN) return false;
     if (!m.text[0]) return false;
-    // decode utf-8 → code points, post WM_CHAR per code point
-    const unsigned char* s = (const unsigned char*)m.text;
+    // the key's text in UTF-16 code units, one WM_CHAR each: a character above U+FFFF arrives as two, the high
+    // surrogate first (as on Windows, where WM_CHAR's wParam is a WCHAR; the edit control stores the pair)
     bool any = false;
-    while (*s) {
-        uint32_t cp; int n;
-        if (*s < 0x80) { cp = *s; n = 1; }
-        else if ((*s & 0xE0) == 0xC0) { cp = *s & 0x1F; n = 2; }
-        else if ((*s & 0xF0) == 0xE0) { cp = *s & 0x0F; n = 3; }
-        else { cp = *s & 0x07; n = 4; }
-        for (int i = 1; i < n && s[i]; i++) cp = (cp << 6) | (s[i] & 0x3F);
-        s += n;
-        post_full(m.w, m.msg == WM_SYSKEYDOWN ? WM_SYSCHAR : WM_CHAR, cp, m.lp, m.time, m.pt, nullptr);
+    for (char16_t u : w32::utf16_of(m.text)) {
+        post_full(m.w, m.msg == WM_SYSKEYDOWN ? WM_SYSCHAR : WM_CHAR, u, m.lp, m.time, m.pt, nullptr);
         any = true;
     }
     return any;

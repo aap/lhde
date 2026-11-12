@@ -1,6 +1,26 @@
 --- a/dlls/comctl32/edit.c (wine-10.0)
 +++ b/vendor/wine/comctl32/edit.c
-@@ -2763,8 +2763,17 @@
+@@ -1809,6 +1809,9 @@
+ 
+ 	if (e) {
+ 		e--;
++		/* flxp: a surrogate pair is one character (the caret never stops between its halves, Backspace takes both) */
++		if (e && IS_LOW_SURROGATE(es->text[e]) && IS_HIGH_SURROGATE(es->text[e - 1]))
++			e--;
+ 		if ((es->style & ES_MULTILINE) && e &&
+ 				(es->text[e - 1] == '\r') && (es->text[e] == '\n')) {
+ 			e--;
+@@ -1879,6 +1882,9 @@
+ 
+ 	if (es->text[e]) {
+ 		e++;
++		/* flxp: a surrogate pair is one character */
++		if (IS_HIGH_SURROGATE(es->text[e - 1]) && IS_LOW_SURROGATE(es->text[e]))
++			e++;
+ 		if ((es->style & ES_MULTILINE) && (es->text[e - 1] == '\r')) {
+ 			if (es->text[e] == '\n')
+ 				e++;
+@@ -2763,8 +2769,17 @@
                  }
                  else
                  {
@@ -20,7 +40,7 @@
                  }
  
                  GetClientRect(es->hwndSelf, &rc);
-@@ -3492,10 +3501,24 @@
+@@ -3492,10 +3507,24 @@
   *	WM_LBUTTONUP
   *
   */
@@ -45,7 +65,7 @@
  	}
  	es->bCaptureState = FALSE;
  	return 0;
-@@ -3507,9 +3530,33 @@
+@@ -3507,9 +3536,33 @@
   *	WM_MBUTTONDOWN
   *
   */
@@ -81,7 +101,7 @@
      return 0;
  }
  
-@@ -3585,8 +3632,10 @@
+@@ -3585,8 +3638,10 @@
  		old_brush = SelectObject(dc, GetSysColorBrush(COLOR_WINDOWFRAME));
  		PatBlt(dc, rc.left, rc.top, rc.right - rc.left, bh, PATCOPY);
  		PatBlt(dc, rc.left, rc.top, bw, rc.bottom - rc.top, PATCOPY);
@@ -94,7 +114,7 @@
  		SelectObject(dc, old_brush);
  
  		/* Keep the border clean */
-@@ -4832,6 +4881,9 @@
+@@ -4832,6 +4887,9 @@
  
      case WM_KEYDOWN:
          result = EDIT_WM_KeyDown(es, (INT)wParam);
@@ -104,7 +124,7 @@
          break;
  
      case WM_KILLFOCUS:
-@@ -4851,7 +4903,7 @@
+@@ -4851,7 +4909,7 @@
          break;
  
      case WM_MBUTTONDOWN:

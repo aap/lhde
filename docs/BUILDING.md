@@ -32,7 +32,7 @@ the user's own files (settings below).
 ## Building
 
 Needs a C and C++17 compiler, GNU make, Python 3 (the standard library: every `make` runs
-`tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, xext, freetype2, fontconfig,
+`tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, xext, xkbcommon, freetype2, fontconfig,
 libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, luxshell);
 for the lux side also xfixes, xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4).
 Every `.res` is checked in (`wux/rc/`, `wux/w32/stdres.res`, `flxp/rc/`, `tests/w32/test.res`):
@@ -49,7 +49,7 @@ luac5.4 (each test is skipped when its tool is missing).
 
 On Void Linux, everything above in one command:
 
-    xbps-install -S gcc make pkg-config python3 libX11-devel libXext-devel libXfixes-devel \
+    xbps-install -S gcc make pkg-config python3 libX11-devel libXext-devel libxkbcommon-devel libXfixes-devel \
         libXinerama-devel libXft-devel freetype-devel fontconfig-devel libpng-devel libjpeg-turbo-devel \
         libwebp-devel dbus-devel cairo-devel pango-devel lua54-devel \
         python3-Pillow 7zip cabextract xz tar \
@@ -109,7 +109,8 @@ appearance --pick STYLE`: classic, a bare style with and without a frame set, ba
 `jade4074.msstyles` copied under other names, skipped without it), `tests/aero-patches.py` (lhde-import's table of Aero
 patches and which styles get a frame set, on stand-in files), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
-incl. GTK, the file dialog in both looks, the modifier keys across a focus change, luxshot, luxattr: its Summary
+incl. GTK, the file dialog in both looks, the modifier keys across a focus change, typed text into the Edit control as
+UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair: `tests/headless/typing.sh`), luxshot, luxattr: its Summary
 and Advanced views driven with xdotool and checked with getfattr, and a run with nothing imported and an empty HOME, the Explorer's
 Filter box under jade4074 over names and attributes, skipped without that style or user xattrs, luxwm's Alt+Tab switcher with
 test windows: `tests/headless/alttab.sh`) on displays :71-:73
