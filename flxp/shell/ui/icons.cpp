@@ -3,11 +3,11 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <map>
-#include "w32/w32.h"
-#include "shell/ui.h"
 #include "shell/icons.h"
 #include "shell/namespace.h"
 #include "shell/config.h"
+#include "w32/w32.h"
+#include "shell/ui.h"
 
 namespace shell {
 

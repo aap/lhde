@@ -15,7 +15,8 @@
 //                 the terminal
 //   details.h     the property registry and the annotations: details::property("description" | "tags" | "comment"),
 //                 details::write (as the Explorer writes user.lux.desc / user.xdg.tags / user.xdg.comment),
-//                 read_stored, read_attr, list_attrs (every user.* name on a file), add_tags, infotip
+//                 read_stored, read_attr, list_attrs (every user.* name on a file), add_tags, infotip; the
+//                 Properties formats (size_and_bytes, long_date, thousands)
 //   fileops.h     Trash, rename, new folder; fileops_job.h the copy/move/delete engine
 //   dirwatch.h    a directory followed with inotify
 //   thumbs.h      freedesktop thumbnails (made and cached; gdi::Bitmap results)
@@ -23,7 +24,8 @@
 //   bookmarks.h   the GTK bookmarks
 //   xclip.h       files and text on the X CLIPBOARD (the clipboard API in wux.h goes through it)
 //   ui.h          the win32 part: message_box (MessageBoxW with UTF-8 strings), load_image / icon_for_key / icon_for
-//                 (an icon theme's source or a file's icon as an HICON)
+//                 (an icon theme's source or a file's icon as an HICON), properties (the Properties sheet: General,
+//                 Summary)
 //   filedlg.h     the Open/Save dialog itself (filedlg::run). GetOpenFileNameW / GetSaveFileNameW reach the same dialog;
 //                 either needs $(WUX_APP_FILEDIALOG) on the link line (apps/app.mk)
 #pragma once

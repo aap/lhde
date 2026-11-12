@@ -110,8 +110,10 @@ appearance --pick STYLE`: classic, a bare style with and without a frame set, ba
 patches and which styles get a frame set, on stand-in files), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
 incl. GTK, the file dialog in both looks, the modifier keys across a focus change, wux's MessageBoxW (its buttons per type,
-the default, Enter and Escape: tests/w32/msgbox), luxshot, luxattr: its Summary
-and Advanced views driven with xdotool and checked with getfattr, and a run with nothing imported and an empty HOME, the Explorer's
+the default, Enter and Escape: tests/w32/msgbox), luxshot, luxattr: the Properties sheet's Summary
+and Advanced views driven with xdotool and checked with getfattr, and a run with nothing imported and an empty HOME, flxp's
+Properties from the item menu (General first, Summary's description, two files in one sheet, a read-only file's message box)
+and Add Tag, the Explorer's
 Filter box under jade4074 over names and attributes, skipped without that style or user xattrs) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump

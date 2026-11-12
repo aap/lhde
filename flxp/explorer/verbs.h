@@ -4,10 +4,9 @@
 // Create Shortcut, Delete, Rename, Properties) and the background menu from its
 // own (View, Arrange Icons By, Refresh, Paste, New, Properties). Ours is the
 // same shape with the unix additions: Open Terminal Here and Add to Bookmarks,
-// and the stored properties of shell/details.h: Edit Description... (one item),
-// Add Tag... (every selected item keeps its tags and gets the new ones) and
-// Remove Tag (the selection's tags; from every item that has it); Attributes... runs luxattr
-// (apps/luxattr) on the selection and takes its changes when it exits.
+// and the stored properties of shell/details.h: Add Tag... (every selected item
+// keeps its tags and gets the new ones); the rest is Properties (shell::properties,
+// shell/ui.h: General and Summary, for one or several items).
 // What differs between the views (how a folder opens, how they refresh, how a
 // rename starts) goes through a Host.
 #pragma once
@@ -45,7 +44,7 @@ struct Host {
     virtual void trashed(const Item&) {}                    // before the refill (the explorer leaves a deleted folder)
     virtual void updated() {}                               // a dialog may have changed what the status shows
     virtual void background_properties() { show_properties_default(); }
-    // a description or tags of these files changed (Edit Description, Add Tag, Remove Tag):
+    // a description or tags of these files changed (Add Tag, the Properties sheet):
     // by default changed() for their folders
     virtual void stored_changed(const std::vector<std::string>& paths);
     void show_properties_default();
@@ -82,7 +81,7 @@ DWORD drag_items(HWND from, const std::vector<Item>& items, HIMAGELIST il, const
 std::vector<std::string> drop_paths(const FLXPDROP* d);
 
 void open_items(const std::vector<Item>& items);
-void show_properties(const Item& it);
+void show_properties(const std::vector<Item>& items);   // the Properties sheet of their file-system items
 void add_bookmark(const std::string& dir);
 
 // The wallpaper (flxp-desktop paints it). is_wallpaper_image: a local BMP, PNG or

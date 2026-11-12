@@ -11,8 +11,8 @@ Future: synchronize local metadata catalog with local and remote filesystems
 
 For existing xattr tooling see ~/src/luxfs [note: perhaps move into lhde? or separate repo...]
 
-Phase 1 is in (columns, the 4051 band's editable rows with invitations, the infotip, Edit Description / Add Tag / Remove
-Tag; docs/USAGE.md "Descriptions and tags"). Next phases (todo_ideas/XATTR-DESIGN_CLAUDE.md sections 3-4):
+Phase 1 is in (columns, the 4051 band's editable rows with invitations, the infotip, Add Tag, the Properties sheet's Summary
+page; docs/USAGE.md "Descriptions and tags"). Next phases (todo_ideas/XATTR-DESIGN_CLAUDE.md sections 3-4):
 * the invitation colour in the 4051 band and the Choose Details dialog's layout are unmeasured choices
 * saved filters (the Filter box's text kept by name, 4051's "All Photos" queries); an index only if walking xattrs gets slow
 * while a filter is on, 4051's band still says "N items in this folder" for the items shown (the status bar says "N of M items")
@@ -23,8 +23,8 @@ Tag; docs/USAGE.md "Descriptions and tags"). Next phases (todo_ideas/XATTR-DESIG
 	source's Pexels photos: a source ini key (author = reactos, ...) would say whose they are
 * the Explorer's panes do not follow an attribute changed by another program: inotify's IN_ATTRIB refreshes the rows
 	(browser::update), but changed_on_disk() does not refresh the Details rollout / 4051 band of the selection (setfattr in a
-	terminal: the pane shows the old value until the selection changes); Attributes... avoids it by waiting for luxattr to exit
-* luxattr's Summary list of luxfs's names (author, source, build, notes, todo) is its own: the registry has description, tags
+	terminal: the pane shows the old value until the selection changes); the Properties sheet refreshes them after OK
+* the Properties sheet's Summary list of luxfs's names (author, source, build, notes, todo) is its own: the registry has description, tags
 	and comment only; they belong in the registry's data file when it comes (flxp would then show them too, if wanted)
-* luxattr: a value with a newline (notes) in the Summary page's one-line edits; a binary value shows escaped (\xNN) in the
+* the Properties sheet: a value with a newline (notes) in the Summary page's one-line edits; a binary value shows escaped (\xNN) in the
 	Advanced list but an edit of it is written back as text

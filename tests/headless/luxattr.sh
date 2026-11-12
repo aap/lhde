@@ -1,7 +1,7 @@
 #!/bin/sh
-# luxattr under Xvfb (no window manager). Two files with the same tags: the Summary page's Description typed, a tag added
-# to Tags, OK writes both files as the Explorer writes them (getfattr; build/tests/infotip reads them back); Advanced >>:
-# New Attribute... adds user.zz, then a row removed (Delete) and one edited in place (F2); and a run with nothing at all
+# luxattr (the shell layer's Properties sheet from a terminal, on its Summary page) under Xvfb (no window manager). Two
+# files with the same tags: the Summary page's Description typed, a tag added to Tags, OK writes both files as the Explorer
+# writes them (getfattr; build/tests/infotip reads them back); Advanced >>: New Attribute... adds user.zz, then a row removed (Delete) and one edited in place (F2); and a run with nothing at all
 # (LHDE_WINDOWS=/nonexistent, an empty HOME, no XDG variables) shows the sheet and exits 1 on Escape. A HOME and XDG
 # directories of its own. Needs Xvfb, xdotool, getfattr and setfattr (attr); prints "skip: ..." and passes without them
 # or without user xattrs on $TMPDIR. Usage: tests/headless/luxattr.sh [:DISPLAY]

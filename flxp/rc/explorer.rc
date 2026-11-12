@@ -101,40 +101,6 @@ BEGIN
     PUSHBUTTON      "Cancel", IDCANCEL, 205, 57, 50, 14
 END
 
-IDD_PROPERTIES DIALOGEX 0, 0, 227, 215
-STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
-CAPTION "General"
-FONT 8, "MS Shell Dlg"
-BEGIN
-    ICON            "", IDC_PR_ICON, 7, 7, 21, 20
-    EDITTEXT        IDC_PR_NAME, 53, 11, 167, 12, ES_AUTOHSCROLL | ES_READONLY
-    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 32, 213, 1
-    LTEXT           "Type of file:", -1, 7, 40, 58, 8
-    LTEXT           "", IDC_PR_TYPE, 70, 40, 150, 8, SS_NOPREFIX
-    LTEXT           "Opens with:", IDC_PR_OPENSL, 7, 55, 58, 8
-    LTEXT           "", IDC_PR_OPENS, 70, 55, 95, 8, SS_NOPREFIX
-    PUSHBUTTON      "&Change...", IDC_PR_CHANGE, 170, 52, 50, 14
-    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 72, 213, 1
-    LTEXT           "Location:", -1, 7, 80, 58, 8
-    LTEXT           "", IDC_PR_LOCATION, 70, 80, 150, 8, SS_NOPREFIX | SS_PATHELLIPSIS
-    LTEXT           "Size:", -1, 7, 94, 58, 8
-    LTEXT           "", IDC_PR_SIZE, 70, 94, 150, 8, SS_NOPREFIX
-    LTEXT           "Contains:", IDC_PR_CONTAINSL, 7, 108, 58, 8
-    LTEXT           "", IDC_PR_CONTAINS, 70, 108, 150, 8, SS_NOPREFIX
-    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 124, 213, 1
-    LTEXT           "Modified:", -1, 7, 132, 58, 8
-    LTEXT           "", IDC_PR_MODIFIED, 70, 132, 150, 8, SS_NOPREFIX
-    LTEXT           "Accessed:", -1, 7, 146, 58, 8
-    LTEXT           "", IDC_PR_ACCESSED, 70, 146, 150, 8, SS_NOPREFIX
-    LTEXT           "Changed:", -1, 7, 160, 58, 8
-    LTEXT           "", IDC_PR_CHANGED, 70, 160, 150, 8, SS_NOPREFIX
-    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 176, 213, 1
-    LTEXT           "Permissions:", -1, 7, 184, 58, 8
-    LTEXT           "", IDC_PR_PERMS, 70, 184, 150, 8, SS_NOPREFIX
-    LTEXT           "", IDC_PR_EXTRAL, 7, 198, 58, 8
-    LTEXT           "", IDC_PR_EXTRA, 70, 198, 150, 8, SS_NOPREFIX
-END
-
 /* Folder Options (Tools menu): XP's General and View pages reduced to what
  * flxp has: the default view of folders never opened (with the Longhorn
  * frame's icon size and thumbnails), Apply to All / Reset All Folders and

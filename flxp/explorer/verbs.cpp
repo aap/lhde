@@ -1,10 +1,5 @@
-#include <errno.h>
-#include <fcntl.h>
-#include <signal.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/wait.h>
-#include <unistd.h>
 #include <algorithm>
 #include "verbs.h"
 #include "uiicons.h"
@@ -19,11 +14,11 @@
 #include "shell/mime.h"
 #include "shell/xclip.h"
 #include "w32/user.h"
-#include "sys/sys.h"
 extern "C" {
 #include "commctrl.h"
 #include "w32/flxp_shell.h"
 }
+#include "shell/ui.h"
 
 namespace verbs {
 
@@ -32,7 +27,6 @@ static Host* g_host;
 static std::vector<const shell::App*> g_openwith;    // as last shown in an Open With submenu
 static std::vector<std::string> g_clip;              // Cut/Copy, also offered on the X CLIPBOARD (shell/xclip)
 static bool g_clip_cut;
-static std::vector<std::string> g_tags;               // the Remove Tag submenu's tags, as last shown
 
 static std::u16string W(const std::string& s) { return w32::utf16_of(s.c_str()); }
 #define WS(s) ((LPCWSTR)W(s).c_str())
@@ -223,16 +217,38 @@ static void delete_items(const std::vector<Item>& items_in)
     if (!err.empty()) error_box(err);
 }
 
-void show_properties(const Item& it)
+// Properties: the shell layer's sheet (shell::properties: General, Summary) on the selection's file-system items, General
+// first as XP's; General's Change... is the Explorer's Open With. What the sheet wrote refreshes the rows and the panes.
+void show_properties(const std::vector<Item>& in)
 {
-    if (!is_fs(it)) { MessageBeep(0); return; }
-    HICON icon = uiicons::large_icon(it.icon);
-    dialogs::properties(g_host->window(), it.path, it.name, it.type, icon, uiicons::small(), uiicons::index("exe"));
-    if (icon) DestroyIcon(icon);
+    std::vector<Item> items;
+    for (const Item& it : in) if (is_fs(it)) items.push_back(it);
+    if (items.empty()) { MessageBeep(0); return; }
+    std::vector<std::string> paths;
+    for (const Item& it : items) paths.push_back(it.path);
+    shell::PropertiesOptions o;
+    if (items.size() == 1) {
+        o.name = items[0].name;
+        o.type = items[0].type;
+        o.icon_key = items[0].icon;
+    }
+    std::string icon_key = items[0].icon;
+    o.change_program = [icon_key](HWND page, const std::string& path, const std::string& mime) {
+        HICON icon = uiicons::large_icon(icon_key);
+        dialogs::OpenWith ow;
+        bool chose = dialogs::choose_program(GetParent(page), shell::base_of(path), mime, icon, uiicons::small(),
+                                             uiicons::index("exe"), true, &ow);
+        if (icon) DestroyIcon(icon);
+        if (!chose) return false;
+        std::string err;
+        if (!shell::set_default_app(mime, ow.app_id, &err)) { shell::message_box(GetParent(page), "Properties", err, MB_OK | MB_ICONEXCLAMATION); return false; }
+        return true;
+    };
+    if (shell::properties(g_host->window(), paths, o)) g_host->stored_changed(paths);
     g_host->updated();
 }
 
-void Host::show_properties_default() { show_properties(folder_item()); }
+void Host::show_properties_default() { show_properties({ folder_item() }); }
 
 void Host::stored_changed(const std::vector<std::string>& paths)
 {
@@ -251,7 +267,7 @@ static HICON item_icon(const std::vector<Item>& items)
     return uiicons::large_icon(items.size() == 1 ? items[0].icon : "document");
 }
 
-// the tags the selection has (in their order, the first item's first), for Remove Tag
+// the tags the selection has (in their order, the first item's first): Add Tag's note and drop-down
 static std::vector<std::string> selection_tags(const std::vector<Item>& items)
 {
     std::vector<std::string> out;
@@ -264,24 +280,6 @@ static std::vector<std::string> selection_tags(const std::vector<Item>& items)
                     if (std::find(out.begin(), out.end(), t) == out.end()) out.push_back(t);
     }
     return out;
-}
-
-static void edit_description(const Item& it)
-{
-    if (!is_fs(it)) { MessageBeep(0); return; }
-    const shell::details::Property* p = shell::details::property("description");
-    dialogs::TextAsk a;
-    a.title = "Edit Description";
-    a.prompt = "Description of '" + it.name + "':";
-    std::string text, err;
-    if (!shell::details::read_current(it.path, *p, &a.initial, &err)) { error_box(err); return; }   // not shown: not replaced
-    a.note = "One line, kept with the file. An empty description removes it.";
-    a.icon = item_icon({ it });
-    bool ok = dialogs::ask_text(g_host->window(), a, &text);
-    if (a.icon) DestroyIcon(a.icon);
-    if (!ok || text == a.initial) return;
-    if (!shell::details::write(it.path, *p, text, &err)) error_box(err);
-    g_host->stored_changed({ it.path });
 }
 
 static void add_tag(const std::vector<Item>& in)
@@ -323,75 +321,6 @@ static void add_tag(const std::vector<Item>& in)
     if (!err.empty()) error_box(err);
 }
 
-static void remove_tag(const std::vector<Item>& items, const std::string& tag)
-{
-    std::string err;
-    std::vector<std::string> paths;
-    for (const Item& it : items) {
-        if (!is_fs(it)) continue;
-        std::string e;
-        if (!shell::details::remove_tag(it.path, tag, &e)) { if (err.find(e) == std::string::npos) err += (err.empty() ? "" : "\n") + e; continue; }
-        paths.push_back(it.path);
-    }
-    if (!paths.empty()) g_host->stored_changed(paths);
-    if (!err.empty()) error_box(err);
-}
-
-// Attributes...: luxattr (apps/luxattr) on the selection, found beside our own binary, else on PATH. It runs as a
-// program of its own; a pipe whose write end only it holds says when it exits (EOF), and then the host takes the
-// change as Edit Description's (stored_changed: the rows and the panes' details; inotify's IN_ATTRIB brings the
-// rows alone). An exec failure comes back on the pipe as its errno.
-struct AttrRun { Host* host; pid_t pid; std::vector<std::string> paths; };
-
-static void attributes_done(int fd, void* user)
-{
-    AttrRun* r = (AttrRun*)user;
-    int e = 0;
-    ssize_t n;
-    while ((n = read(fd, &e, sizeof e)) < 0 && errno == EINTR) {}
-    if (n < 0 && errno == EAGAIN) return;
-    sys::unwatch_fd(fd);
-    close(fd);
-    while (waitpid(r->pid, nullptr, 0) < 0 && errno == EINTR) {}
-    if (n == (ssize_t)sizeof e) error_box("luxattr: " + std::string(strerror(e)));
-    else r->host->stored_changed(r->paths);
-    delete r;
-}
-
-static void edit_attributes(const std::vector<Item>& items)
-{
-    std::vector<std::string> paths;
-    for (const Item& it : items) if (is_fs(it)) paths.push_back(it.path);
-    if (paths.empty()) { MessageBeep(0); return; }
-    std::string prog = shell::exe_dir() + "/luxattr";
-    if (access(prog.c_str(), X_OK) != 0) prog = "luxattr";
-    std::vector<char*> args = { (char*)prog.c_str(), (char*)"--" };
-    for (const std::string& p : paths) args.push_back((char*)p.c_str());
-    args.push_back(nullptr);
-    int fds[2];
-    if (pipe2(fds, O_CLOEXEC | O_NONBLOCK) != 0) { error_box(std::string("luxattr: ") + strerror(errno)); return; }
-    pid_t pid = fork();
-    if (pid < 0) { close(fds[0]); close(fds[1]); error_box(std::string("luxattr: ") + strerror(errno)); return; }
-    if (pid == 0) {
-        setsid();
-        long maxfd = sysconf(_SC_OPEN_MAX);
-        if (maxfd < 0 || maxfd > 4096) maxfd = 4096;
-        for (int fd = 3; fd < maxfd; fd++) if (fd != fds[1]) close(fd);   // not our X connection
-        fcntl(fds[1], F_SETFL, 0);
-        fcntl(fds[1], F_SETFD, 0);       // held open by luxattr until it exits
-        sigset_t none; sigemptyset(&none); sigprocmask(SIG_SETMASK, &none, nullptr);
-        signal(SIGPIPE, SIG_DFL); signal(SIGCHLD, SIG_DFL);
-        int dev = open("/dev/null", O_RDONLY);
-        if (dev >= 0) { dup2(dev, 0); if (dev != 0) close(dev); }
-        execvp(args[0], args.data());
-        int e = errno;
-        (void)!write(fds[1], &e, sizeof e);
-        _exit(127);
-    }
-    close(fds[1]);
-    sys::watch_fd(fds[0], attributes_done, new AttrRun{ g_host, pid, paths });
-}
-
 void add_bookmark(const std::string& dir)
 {
     if (dir.empty()) { MessageBeep(0); return; }
@@ -405,11 +334,6 @@ bool run(int id)
     if (id >= ID_OPENWITH_FIRST && id <= ID_OPENWITH_LAST) {
         size_t k = (size_t)(id - ID_OPENWITH_FIRST);
         if (k < g_openwith.size()) open_with(g_openwith[k], items);
-        return true;
-    }
-    if (id >= ID_TAG_REMOVE_FIRST && id <= ID_TAG_REMOVE_LAST) {
-        size_t k = (size_t)(id - ID_TAG_REMOVE_FIRST);
-        if (k < g_tags.size()) remove_tag(items, g_tags[k]);
         return true;
     }
     switch (id) {
@@ -464,12 +388,10 @@ bool run(int id)
     }
     case ID_DELETE: delete_items(items); return true;
     case ID_RENAME: g_host->begin_rename(); return true;
-    case ID_EDIT_DESC: if (items.size() == 1) edit_description(items[0]); return true;
     case ID_ADD_TAG: add_tag(items); return true;
-    case ID_ATTRIBUTES: edit_attributes(items); return true;
     case ID_PROPERTIES:
         if (items.empty()) g_host->background_properties();
-        else show_properties(items[0]);
+        else show_properties(items);
         return true;
     case ID_NEW_FOLDER: case ID_NEW_TEXT: {
         std::string dir = g_host->current_dir(), path;
@@ -612,19 +534,10 @@ void build_item_menu(HMENU m)
     AppendMenuW(m, MF_STRING, ID_DELETE, L"&Delete");
     AppendMenuW(m, MF_STRING | single, ID_RENAME, L"Rena&me");
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
-    // the stored properties (shell/details.h): a description for one item, tags for all
-    AppendMenuW(m, MF_STRING | single, ID_EDIT_DESC, L"Edit D&escription...");
+    // the stored properties (shell/details.h): tags for one or several items here, the rest in Properties' Summary page
     AppendMenuW(m, MF_STRING, ID_ADD_TAG, L"Add Ta&g...");
-    g_tags = selection_tags(items);
-    HMENU rm = CreatePopupMenu();
-    for (size_t k = 0; k < g_tags.size() && (int)k <= ID_TAG_REMOVE_LAST - ID_TAG_REMOVE_FIRST; k++) {
-        std::u16string t = W(g_tags[k]);
-        AppendMenuW(rm, MF_STRING, (UINT_PTR)(ID_TAG_REMOVE_FIRST + (int)k), (LPCWSTR)t.c_str());
-    }
-    AppendMenuW(m, MF_POPUP | (g_tags.empty() ? MF_GRAYED : 0), (UINT_PTR)rm, L"Remo&ve Tag");
-    AppendMenuW(m, MF_STRING, ID_ATTRIBUTES, L"Attr&ibutes...");
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(m, MF_STRING | single, ID_PROPERTIES, L"P&roperties");
+    AppendMenuW(m, MF_STRING, ID_PROPERTIES, L"P&roperties");
 }
 
 void build_background_menu(HMENU m, unsigned flags, int view, int sort)
