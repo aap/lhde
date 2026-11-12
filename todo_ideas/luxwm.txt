@@ -12,3 +12,6 @@
 
 * Alt+Tab switcher: its geometry is ReactOS appswitch.c's (48 px cells, 8 px margins, the title box font height + 8), not measured;
   take a VM screenshot of XP's and of 4074's switcher (classic and Luna/Jade, 3 and 9 windows) and compare (docs/LUXWM.md "Task switcher")
+* a dialog's frame has the minimize and maximize buttons although the window has neither (no WS_MINIMIZEBOX/WS_MAXIMIZEBOX;
+	wux puts _MOTIF_WM_HINTS without resize and maximize on a fixed-size one, and an owned one is a transient dialog): XP's
+	dialogs (luxpad's Find, Replace, Font) have Close alone

@@ -786,6 +786,35 @@ From a script: `luxshot [--screen | --window [--no-frame] | --region] [--delay S
 FILE.png (with the description and tags) and exits without a window; without FILE the window comes up. Exit status 0 saved or
 copied, 1 cancelled or failed, 2 a usage error. `session/lab.sh shot` keeps using ImageMagick's `import` (it needs nothing built).
 
+## luxpad, the notepad
+
+`luxpad [FILE]` is XP's Notepad (ReactOS's, ported to wux): the title "Untitled - luxpad" or the file's name, File (New,
+Open..., Save, Save As..., Exit), Edit (Undo, Cut, Copy, Paste, Delete, Find..., Find Next F3, Replace..., Go To..., Select
+All, Time/Date F5: XP's "11:41 PM 11/12/2026"), Format (Word Wrap, Font...), View (Status Bar), XP's keys (Ctrl+N, O, S, F, H,
+G, A; Shift+F3 finds upward; Ctrl+Shift+N a new window). A file that starts with `.LOG` gets the time and date appended when it
+opens. Closing with unsaved changes asks; a file dropped on the window (from the Explorer, any XDND source) opens.
+`luxpad.desktop` (installed) claims `text/plain`, so the Explorer's Open With lists it and a double click on a `.txt` opens it
+when no other default is set (`mimeapps.list`).
+
+Encodings, as Notepad's, with one difference: **ANSI means UTF-8 here** (the code page wux reads "ANSI" in), so "ANSI (UTF-8)"
+and "UTF-8" write the same bytes. A file opens as: Unicode (UTF-16 LE) or Unicode big endian or UTF-8 with BOM when it starts
+with that byte-order mark; else UTF-8 when it is plain ASCII or valid UTF-8 without NUL bytes; else UTF-16 when Notepad's
+statistics say so (`IsTextUnicode`); else ANSI: a file that is not valid UTF-8 (Latin-1, a broken download), whose bytes that
+are not UTF-8 are kept as they were and written back unchanged (they show as boxes). Save As has Notepad's **Encoding** box
+under "Save as type" (ANSI, Unicode, Unicode big endian, UTF-8, UTF-8 with BOM) and ReactOS's **Line endings** box (Windows
+CR + LF, Unix LF, Mac CR). The line ends are kept as read: a file's own kind is written back for every line (a file mixing
+them gets its most common). The status bar says, from the left, Ln and Col (XP's: lines of the text, a column counted in
+UTF-16 units from 1), the line ends and the encoding; XP hides it while Word Wrap is on, and so does luxpad (Go To is greyed
+then too). A character above U+FFFF (an emoji, 𝄞) is typed, saved and reloaded intact; the caret and Backspace take it as one.
+NUL characters in a file become spaces (the Edit control's text ends at a NUL), as Notepad does.
+
+The font is Lucida Console 10 as XP's (a monospaced face when the Windows fonts are not imported: `fc-match monospace`);
+Font... is comdlg32's Font dialog over every installed family. What luxpad keeps: `~/.config/lhde/luxpad.ini` (`[luxpad]`
+`font`, `font_size`, `font_weight`, `font_italic`, `wrap`, `statusbar`; what you chose) and `~/.local/state/lhde/luxpad.ini`
+(`[window]` `x`, `y`, `width`, `height`, `maximized`; `[search]` `find`, `replace`, `match_case`, `whole_word`, `down`; what it
+remembers), both written when it exits (docs/SETTINGS.md). No printing, no Help Topics; About is a message box.
+`LUXPAD_TRACE=1` prints every status bar text on stdout (`status pos Ln 2, Col 3`), for scripts.
+
 ## Start menu, taskbar autohide, sidebar modes (luxshell, docs/SHELL-DESIGN.md 6.4, 7.3, 13)
 
 **Start menu.** The Start button and the Super key (luxwm sends the root client message `_LHSHELL_START` when Super is pressed

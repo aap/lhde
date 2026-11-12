@@ -50,6 +50,10 @@
 * a property sheet's PSH_PROPTITLE caption is Wine's "Properties for a.txt" (its template's caption); XP's file Properties say
 	"a.txt Properties" (check against a reference screenshot, then the propsheet template in wux's stdres): flxp's Properties
 	and luxattr
+* Alt+letter on a menu bar highlights the menu but does not drop its popup (luxpad: Alt+O shows Format highlighted, nothing
+	opens; XP opens it); a click and F10 then Down work
+* no font fallback in GDI: a character the font lacks is its missing glyph (an emoji in luxpad's Lucida Console is a box,
+	stored and saved right); Vista's Uniscribe and fontconfig would take a face that has it
 * MessageBoxW is a stub (stderr): the XP message box is filedlg::message_box, inside the file dialog's objects, so an
 	application that wants an error box links the Explorer (luxattr; docs/APPLICATIONS.md "Not public yet")
 

@@ -95,7 +95,7 @@ way a double click opens); `shell::details::write(path, *shell::details::propert
 ends everything the lab started. A headless test goes in `tests/headless/` (its own HOME and XDG directories, xdotool to drive
 the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
 
-## Two worked examples
+## Three worked examples
 
 - **luxshot** (`apps/luxshot`): a dialog program with an Xlib part (`capture_native.cpp`), the Open/Save dialog for Browse...,
   the annotations written with `shell::details::write`, PNG encoding and the clipboard (`FlxpWritePng`, `FlxpEncodePng`).
@@ -106,6 +106,13 @@ the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
   and an empty HOME, WuxInit and the shell layer fall back by themselves (fontconfig's fonts, the classic look, the Wine icon
   recipe with a warning on stderr), and `tests/headless/luxattr.sh` runs it that way. flxp runs it as a program
   (`verbs.cpp`'s Attributes...: found beside flxp's binary as luxshot finds flxp, a pipe telling flxp when it exits).
+- **luxpad** (`apps/luxpad`): a port, ReactOS's Notepad nearly as it is (its C as C++ on the W functions, its resources and
+  ReactOS's header comments kept): a main window with a class menu, accelerators, a subclassed Edit control and a status bar,
+  the modeless Find and Replace dialogs (`FindTextW`, the `FINDMSGSTRING` message, `IsDialogMessageW` in the loop), `ChooseFontW`,
+  a modal Go To dialog, the Save As dialog with notepad's own Encoding boxes under it (`OFN_ENABLETEMPLATE | OFN_ENABLEHOOK`),
+  `WM_DROPFILES`, the window placement; what Windows had and lhde does not became POSIX (files through `open`/`mmap`/`write`
+  for `CreateFile`/`CreateFileMapping`, the registry as two ini files through liblhde's `lhde_ini`, `errno` for
+  `GetLastError`/`FormatMessage`). `tests/headless/luxpad.sh` drives it, the status bar read from `LUXPAD_TRACE=1`.
 
 ## Not public yet: what an application cannot reach
 
@@ -116,7 +123,12 @@ What the first applications needed and the public surface lacks, the list of wha
   widget it needs belong with the shell facilities.
 - **A message box needs the file dialog**: wux's `MessageBoxW` is a stub that prints to stderr, and the XP message box is
   `filedlg::message_box`, which lives in the Open/Save dialog's objects; luxattr links `WUX_APP_FILEDIALOG` (the Explorer's
-  objects, about 40 MB unstripped) for its error box alone. The message box belongs in wux (`MessageBoxW` itself).
+  objects, about 40 MB unstripped) for its error box alone, luxpad calls it for notepad's boxes (one function,
+  `NOTEPAD_MessageBox`, to become `MessageBoxW`). The message box belongs in wux (`MessageBoxW` itself).
+- **No font fallback**: wux's GDI draws a character its font lacks as the font's missing glyph (Windows XP's GDI did too), so
+  an emoji in luxpad's Lucida Console is a box although it is stored, saved and reloaded right; Uniscribe's and fontconfig's
+  fallback to a face that has it is not there.
+- **No printing**: no `PrintDlgW`, `PageSetupDlgW` or printer DC; luxpad's printing was left out.
 - **The Properties page and its formats**: flxp's General page (`flxp/explorer/dialogs.cpp`: XP's "1.30 KB (1,331 bytes)"
   sizes, the long dates with seconds) is the Explorer's; luxattr carries a copy of its template and of those three
   formatters. The formats belong beside `details::byte_size` in the shell layer, the page with them.
