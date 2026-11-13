@@ -132,7 +132,7 @@ static void publish_icons(HWND h)
     sys::set_icon(sys::window_for_user((void*)h), data);
 }
 
-// XP's SizeBoxHwnd: the scroll bars' corner of a window is a size grip when its top level is sizable and not maximised and
+// XP: the scroll bars' corner of a window is a size grip when its top level is sizable and not maximised and
 // the corner sits in the top level's client bottom right (Notepad's Edit without the status bar); it draws the grip and hit
 // tests as HTBOTTOMRIGHT, and a press there sizes the top level
 static bool size_box(HWND h)
@@ -278,7 +278,7 @@ void nc_paint(HWND h, HRGN clip)
         RECT r = rect;
         if (ex & WS_EX_LEFTSCROLLBAR) r.right = r.left + GetSystemMetrics(SM_CXVSCROLL);
         else r.left = r.right - GetSystemMetrics(SM_CXVSCROLL);
-        r.top = r.bottom - GetSystemMetrics(SM_CYHSCROLL);   // the corner is CXVSCROLL x CYHSCROLL (Wine left a row and a column of it unpainted)
+        r.top = r.bottom - GetSystemMetrics(SM_CYHSCROLL);   // the corner is CXVSCROLL x CYHSCROLL (Wine's leaves a row and a column of it unpainted)
         if (size_box(h)) WUX_DrawSizeGrip(h, hdc, &r);
         else FillRect(hdc, &r, GetSysColorBrush(COLOR_SCROLLBAR));
     }
