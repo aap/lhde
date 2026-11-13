@@ -1,4 +1,4 @@
-; Jade as Longhorn 4074 shipped it, without composition (aap's themes.txt): its own classic decorations, the Jade/Aero bars
+; Jade as Longhorn 4074 shipped it, without composition: its own classic decorations, the Jade/Aero bars
 [Theme]
 name     = Jade (4074)
 build    = 4074

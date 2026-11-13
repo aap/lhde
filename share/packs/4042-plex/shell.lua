@@ -1,9 +1,8 @@
--- 4042-plex pack: the Avalon taskbar and sidebar of Longhorn 4042 main (theme plex4042). Every value below is read from 4042 main
--- itself: Microsoft.Windows.Client 6.0.3708 (Application1.Taskbar, Application1.Tile, Application1.Sidebarstylesheet_themed,
+-- 4042-plex pack: the Avalon taskbar and sidebar of Longhorn 4042 main (theme plex4042). Every value below is 4042 main's:
+-- Microsoft.Windows.Client 6.0.3708 (Application1.Taskbar, Application1.Tile, Application1.Sidebarstylesheet_themed,
 -- System.Windows.Desktop.SidebarElement / FlyoutElement / SideBarClock), System.Windows.Explorer 6.0.3708 (Taskbar, TaskList,
--- TaskPresenter, StartButton, Tile, ImageResource), the Administrator hive and plex.msstyles' `Sidebar` class. Extracted for
--- reading in ~/fun/longhorn/wim/4042main/2 (the ISO's install.wim image 2).
--- What drew the bars: 4042 main runs the managed "new taskbar" (default since build 4015, BetaWiki 4015 main) beside the managed
+-- TaskPresenter, StartButton, Tile, ImageResource), the Administrator hive and plex.msstyles' `Sidebar` class.
+-- What drew the bars: 4042 main runs the managed "new taskbar" (default since build 4015) beside the managed
 -- sidebar, both System.Windows.Desktop.StartBar; the Win32 tray (Shell_TrayWnd, uxtheme TaskBar/TaskBand/Start::Button) is not
 -- used by default (no StartBar\Taskbar key; StuckRects2's 30 px rect is the unused classic tray's). Both bars are skinned only by
 -- ThemeImage('Sidebar', part, state) of the msstyles (4042 main's Sidebar BLOBs are bare PNGs; the margins are the stylesheet's
@@ -16,7 +15,7 @@ local S = function(part) return "plex-sidebar-" .. part end
 local P = {
   build = 4042, imageres = "4042/imageres",
   font = "Franklin Gothic Medium,Tahoma 12px",       -- the stylesheet's tile, task, notify and PIDL text: Franklin Gothic Medium 12, white
-  filter = "bilinear",                        -- Avalon 6.0.3708 draws images through MIL scaling (not nearest); not measured
+  filter = "bilinear",                        -- Avalon 6.0.3708 draws images through MIL scaling (not nearest)
   default_icon = "4042/shell32/16/3.png",     -- IDI_APPLICATION of 4042 main's shell32 (packs/4042/shell32)
   -- the Aero imageres ids runtime.lua asks for -> the Plex Sidebar parts
   ids = {
@@ -76,7 +75,7 @@ local P = {
   taskbar_tiles = nil,
   clock_pinned = false, clock_face = "plex", clock_layers = "full",
   -- popup menus: plex.msstyles [sysmetrics] FLATMENUS colours (MENU 58,106,170, MENUTEXT white, MENUHILIGHT 131,182,234, GRAYTEXT
-  -- 147,185,220); the border is not in the style (darker MENU, a guess). The managed context menus' own look is not decoded.
+  -- 147,185,220); the border is not in the style (darker MENU, a guess). The managed context menus' own look is not reproduced.
   menu = { bg = "#3a6aaa", text = "#ffffff", hot = "#83b6ea", hot_text = "#ffffff", border = "#2b5286", gray = "#93b9dc" },
 }
 return P

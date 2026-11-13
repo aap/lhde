@@ -1,4 +1,4 @@
-; Slate as Longhorn 4051 shipped it (aap's themes.txt): no composition, the Slate bars as 4051 drew them, the 4051 header
+; Slate as Longhorn 4051 shipped it: no composition, the Slate bars as 4051 drew them, the 4051 header
 [Theme]
 name     = Slate (4051)
 build    = 4051

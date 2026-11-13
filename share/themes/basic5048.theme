@@ -1,4 +1,4 @@
-; Longhorn 5048 without composition (aap's themes.txt: "basic5048"): 5048's own Window class (the opaque frame of its
+; Longhorn 5048 without composition: 5048's own Window class (the opaque frame of its
 ; aero.msstyles), the classic taskbar, the vision header (luxnav) instead of the faithful one
 [Theme]
 name     = Basic (5048)
