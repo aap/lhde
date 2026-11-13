@@ -12,6 +12,7 @@
 // UI thread after the notify callback (called on a worker thread) woke it.
 #pragma once
 #include <stdint.h>
+#include <set>
 #include <string>
 #include <vector>
 #include "gdi/bitmap.h"
@@ -39,6 +40,9 @@ bool picture_size(const std::string& path, int* w, int* h);
 // The thumbnail at cache size: a current cached one, else a new one that is
 // also saved. Null when the file cannot be decoded. Thread-safe.
 gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size);
+// Thumbnails made from their pictures so far (decodes; not those read from the cache). FLXP_TRACE_THUMBS=1 prints a line
+// for each on stderr: the picture's size and the size it was decoded at.
+int decodes();
 
 class Loader {
 public:
@@ -65,6 +69,32 @@ private:
 };
 
 void free_result(Loader::Result& r);  // destroys its bitmaps
+
+// The images a view keeps, bounded by bytes: each key (a file and its mtime) has a slot (the view's image list index
+// space for thumbnails, slots reused), the least recently used are evicted when an insert would pass the budget, never
+// the pinned ones (the items on screen), so a view holds at most budget bytes plus what it shows.
+class Slots {
+public:
+    static const size_t DEFAULT_BUDGET = 64u << 20;
+    explicit Slots(size_t budget = DEFAULT_BUDGET);
+    ~Slots();
+    void reset(size_t item_bytes);            // drops everything; every image is item_bytes from now on
+    int find(const std::string& key);         // its slot (now the most recently used), -1: none
+    // a slot for key: its own, a free one, the least recently used unpinned one's (its key into evicted) or a new one
+    int insert(const std::string& key, std::vector<std::string>* evicted);
+    void erase(const std::string& key);
+    void pin(const std::set<std::string>& keys);   // the keys not to evict (replaces the earlier set)
+    size_t bytes() const;
+    size_t count() const;
+    size_t budget() const;
+    size_t item_bytes() const;
+    int slots() const;                        // slots ever handed out (the image list's thumbnail images)
+    struct Impl;                              // (std::list and std::unordered_map kept out of here: win32's min/max)
+private:
+    Impl* impl_;
+    Slots(const Slots&);
+    Slots& operator=(const Slots&);
+};
 
 } // namespace thumbs
 } // namespace shell

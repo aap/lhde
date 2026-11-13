@@ -11,6 +11,9 @@
 #include <atomic>
 #include <condition_variable>
 #include <deque>
+#include <list>
+#include <set>
+#include <unordered_map>
 #include <mutex>
 #include <thread>
 #include "thumbs.h"
@@ -237,6 +240,16 @@ static void save(const gdi::Bitmap* b, const std::string& path, const gdi::PngTe
     if (rename(t.c_str(), path.c_str()) != 0) unlink(t.c_str());
 }
 
+static std::atomic<int> g_decodes{0};
+int decodes() { return g_decodes; }
+
+static bool trace()
+{
+    static int on = -1;
+    if (on < 0) { const char* t = getenv("FLXP_TRACE_THUMBS"); on = t && atoi(t) > 0; }
+    return on > 0;
+}
+
 gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size)
 {
     struct stat st;
@@ -264,7 +277,10 @@ gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size)
     snprintf(mt, sizeof mt, "%lld", (long long)mtime);
     snprintf(sz, sizeof sz, "%lld", (long long)st.st_size);
     int ow = 0, oh = 0;
+    g_decodes++;
     gdi::Bitmap* img = gdi::load_image(path, cache_size, &ow, &oh);
+    if (trace())
+        fprintf(stderr, "thumbs: decode %s %dx%d at %dx%d\n", path.c_str(), ow, oh, img ? img->width : 0, img ? img->height : 0);
     if (!img) {
         if (!in_cache) {
             gdi::Bitmap* dot = gdi::create_bitmap(1, 1);
@@ -446,6 +462,76 @@ void Loader::Impl::run()
         }
         if (wake && notify) notify(ctx);   // one wake-up per batch: the UI takes everything there is
     }
+}
+
+// ---- the view's images ----------------------------------------------------------------
+
+struct Slots::Impl {
+    struct Entry { int slot; std::list<std::string>::iterator at; };
+    std::list<std::string> lru;               // the most recently used first
+    std::unordered_map<std::string, Entry> map;
+    std::set<std::string> pinned;
+    std::vector<int> free;
+    size_t budget, item = 1;
+    int next = 0;
+};
+
+Slots::Slots(size_t budget) : impl_(new Impl) { impl_->budget = budget; }
+Slots::~Slots() { delete impl_; }
+size_t Slots::bytes() const { return impl_->map.size() * impl_->item; }
+size_t Slots::count() const { return impl_->map.size(); }
+size_t Slots::budget() const { return impl_->budget; }
+size_t Slots::item_bytes() const { return impl_->item; }
+int Slots::slots() const { return impl_->next; }
+void Slots::pin(const std::set<std::string>& keys) { impl_->pinned = keys; }
+
+void Slots::reset(size_t item_bytes)
+{
+    impl_->lru.clear();
+    impl_->map.clear();
+    impl_->pinned.clear();
+    impl_->free.clear();
+    impl_->next = 0;
+    impl_->item = item_bytes ? item_bytes : 1;
+}
+
+int Slots::find(const std::string& key)
+{
+    auto it = impl_->map.find(key);
+    if (it == impl_->map.end()) return -1;
+    impl_->lru.splice(impl_->lru.begin(), impl_->lru, it->second.at);
+    return it->second.slot;
+}
+
+void Slots::erase(const std::string& key)
+{
+    auto it = impl_->map.find(key);
+    if (it == impl_->map.end()) return;
+    impl_->free.push_back(it->second.slot);
+    impl_->lru.erase(it->second.at);
+    impl_->map.erase(it);
+}
+
+int Slots::insert(const std::string& key, std::vector<std::string>* evicted)
+{
+    int have = find(key);
+    if (have >= 0) return have;
+    Impl* p = impl_;
+    auto victim = p->lru.end();
+    while (bytes() + p->item > p->budget && victim != p->lru.begin()) {
+        --victim;
+        if (p->pinned.count(*victim)) continue;
+        std::string k = *victim;
+        ++victim;   // stays valid: the erased element is the one before it
+        if (evicted) evicted->push_back(k);
+        erase(k);
+    }
+    int slot;
+    if (!p->free.empty()) { slot = p->free.back(); p->free.pop_back(); }
+    else slot = p->next++;
+    p->lru.push_front(key);
+    p->map[key] = Impl::Entry{ slot, p->lru.begin() };
+    return slot;
 }
 
 } // namespace thumbs

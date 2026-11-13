@@ -1,13 +1,18 @@
 // The thumbnails' memory bounds (shell/thumbs.h, gdi/image.h) on pictures the test writes itself into a scratch
 // directory (also its $XDG_CACHE_HOME): a 6000 x 4000 JPEG and a 4000 x 4000 PNG made into a 128 px thumbnail without
 // their full image in memory (the peak RSS, /proc/self/status VmHWM after resetting it through /proc/self/clear_refs,
-// grows by less than 16 MB), the PNG's reduction against the full decode, an interlaced PNG, the size ceilings.
+// grows by less than 16 MB), the PNG's reduction against the full decode, an interlaced PNG, the size ceilings; the
+// view's images bounded by bytes (thumbs::Slots: 300 inserts, the pinned ones kept, least recently used first); a
+// cancelled generation decodes nothing more (thumbs::Loader).
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <set>
 #include <string>
+#include <thread>
+#include <chrono>
 #include <vector>
 #include <jpeglib.h>
 #include <png.h>
@@ -211,6 +216,79 @@ int main()
     img = gdi::load_image(prog, 128, &ow, &oh);
     check("progressive JPEG", img && img->width == 375 && img->height == 250);
     if (img) gdi::destroy_bitmap(img);
+
+    // the view's images: 300 thumbnails of 256 px (256 KB each) into the 64 MB budget
+    {
+        shell::thumbs::Slots slots;
+        slots.reset(256 * 256 * 4);
+        std::set<std::string> pinned = { "item 0", "item 1" };
+        slots.pin(pinned);
+        std::vector<std::string> evicted;
+        size_t most = 0;
+        int max_slot = -1;
+        for (int i = 0; i < 300; i++) {
+            int slot = slots.insert("item " + std::to_string(i), &evicted);
+            if (slot > max_slot) max_slot = slot;
+            if (slots.bytes() > most) most = slots.bytes();
+            if (i == 200) slots.find("item 10");   // used again: kept over the older ones
+        }
+        check("bytes within the budget after 300 inserts", most <= shell::thumbs::Slots::DEFAULT_BUDGET,
+              std::to_string(most / 1024) + " KB");
+        check("256 kept", slots.count() == 256, std::to_string(slots.count()));
+        check("44 evicted", evicted.size() == 44, std::to_string(evicted.size()));
+        check("slots reused", max_slot == 255, std::to_string(max_slot));
+        check("pinned kept", slots.find("item 0") >= 0 && slots.find("item 1") >= 0);
+        check("the least recently used went first", evicted.size() > 1 && evicted[0] == "item 2" && evicted[1] == "item 3",
+              evicted.empty() ? "" : evicted[0]);
+        check("used again: kept", slots.find("item 10") >= 0);
+        check("the newest kept", slots.find("item 299") >= 0);
+        // everything pinned: the view still gets its images (budget plus what it shows)
+        std::set<std::string> all;
+        for (int i = 0; i < 300; i++) all.insert("p" + std::to_string(i));
+        slots.reset(256 * 256 * 4);
+        slots.pin(all);
+        evicted.clear();
+        for (int i = 0; i < 300; i++) slots.insert("p" + std::to_string(i), &evicted);
+        check("pinned beyond the budget", slots.count() == 300 && evicted.empty());
+        slots.erase("p5");
+        check("an erased slot is handed out again", slots.insert("q", nullptr) >= 0 && slots.slots() == 300);
+    }
+
+    // the loader: a cancelled generation decodes nothing more (one thread; 40 pictures asked for, cancelled at once)
+    {
+        std::string one = dir + "/one.jpg";
+        check("write the small JPEG", write_jpeg(one, 2000, 1500, false));
+        std::vector<std::string> files;
+        for (int i = 0; i < 40; i++) {
+            std::string f = dir + "/q" + std::to_string(i) + ".jpg";
+            if (link(one.c_str(), f.c_str()) == 0) files.push_back(f);
+        }
+        auto idle = [](shell::thumbs::Loader& l) {
+            for (int i = 0; i < 1000 && l.busy(); i++) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        };
+        shell::thumbs::Loader loader(nullptr, nullptr, 1);
+        int before = shell::thumbs::decodes();
+        uint32_t gen = loader.generation();
+        for (size_t i = 0; i < 20; i++) loader.request(gen, (int)i, files[i], 0, 128);
+        uint32_t next = loader.cancel();
+        idle(loader);
+        int made = shell::thumbs::decodes() - before;
+        check("cancelled: at most the one being made", made <= 1, std::to_string(made) + " decodes");
+        shell::thumbs::Loader::Result r;
+        check("cancelled: nothing to take", !loader.take(r));
+        check("a new generation", next != gen);
+        before = shell::thumbs::decodes();
+        for (size_t i = 20; i < 23; i++) loader.request(next, (int)i, files[i], 0, 128);
+        idle(loader);
+        int got = 0;
+        while (loader.take(r)) { got += r.bmp != nullptr; shell::thumbs::free_result(r); }
+        check("the new generation's three", got == 3 && shell::thumbs::decodes() - before == 3, std::to_string(got));
+        // asked for in an old generation: dropped unmade
+        before = shell::thumbs::decodes();
+        for (size_t i = 23; i < 26; i++) loader.request(gen, (int)i, files[i], 0, 128);
+        idle(loader);
+        check("an old generation's requests: not made", shell::thumbs::decodes() == before && !loader.take(r));
+    }
 
     std::string cmd = "rm -rf '" + dir + "'";
     if (system(cmd.c_str()) != 0) printf("note: %s failed\n", cmd.c_str());

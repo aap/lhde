@@ -5,7 +5,7 @@
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh setfattr
-#                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick); displays :71-:73,
+#                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, thumbsmem.sh ImageMagick); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
 fails=0
@@ -96,6 +96,9 @@ else
     tests/headless/menus.sh "$3" > "$T/menus.log" 2>&1; result headless/menus.sh $? "$T/menus.log"
     # the task band's picture of a folder with two JPEGs is the Icons view's square (folderpictest)
     tests/headless/folderpic.sh "$2" > "$T/folderpic.log" 2>&1; result headless/folderpic.sh $? "$T/folderpic.log"
+    # flxp's peak RSS on 600 6000 x 4000 JPEGs at 256 px, the view's images within their budget (needs ImageMagick)
+    tests/headless/thumbsmem.sh "$1" > "$T/thumbsmem.log" 2>&1; rc=$?
+    result "headless/thumbsmem.sh ($(tail -n 1 "$T/thumbsmem.log"))" $rc "$T/thumbsmem.log"
     tests/headless/luxshot.sh "$1" > "$T/luxshot.log" 2>&1; rc=$?
     result "headless/luxshot.sh$(grep -m1 '^skip' "$T/luxshot.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxshot.log"
     tests/headless/luxattr.sh "$2" > "$T/luxattr.log" 2>&1; rc=$?

@@ -642,7 +642,18 @@ behind them; selection and hover are the theme's `Explorer::ListView` LISTITEM u
 the icon and its label, not the whole cell), the classic highlight in styles without it. View > Show Thumbnails (and Folder
 Options) turn them off for every folder (`thumbnails = 0` in `flxp.ini`); on network mounts (NFS, SMB, sshfs and other FUSE
 network filesystems) they are off unless `thumbnails_network = 1`, since every picture would be read over the network. The
-thumbnails are cached in `~/.cache/thumbnails` (the freedesktop spec, shared with other programs).
+thumbnails are cached in `~/.cache/thumbnails` (the freedesktop spec, shared with other programs: 128 px in `normal/`, 256 px in
+`large/`), so a picture is decoded once and its thumbnail read back after that.
+
+Memory is bounded whatever the folder holds. A picture is never decoded at full size for its thumbnail where the format allows
+it: a JPEG decodes at 1/2, 1/4 or 1/8 of its size (DCT scaling) straight from the file, a PNG is reduced row by row as it is read,
+a WebP rescaled by libwebp; what can only decode whole (an interlaced PNG, BMP, ICO) gets no thumbnail above 25 megapixels, nor a
+file of those formats above 64 MB, nor a JPEG whose decoder would need more than 160 MB (a huge progressive one). Two threads
+make the view's thumbnails. A view asks only for the items on screen and a screen's worth around them, drops what it asked for
+when you scroll away before it was made, and keeps at most 64 MB of thumbnails (256 at 256 px, about 1800 at 96 px) plus those on
+screen; the least recently seen go back to their icon and are read from the disk cache again when they come back. With
+`FLXP_TRACE_THUMBS=1` flxp prints each decode (the picture's size and the size it was decoded at) and, after each batch, the
+images the view holds, their bytes against the budget, how many were evicted and how many are pending.
 
 In the XP frame the Explorer keeps XP's views: Thumbnails (squares of `thumbnail_size`), Tiles, Icons, Small Icons, List,
 Details; Ctrl+1 Details, 2 Icons, 3 Thumbnails, 4 List, 5 Small Icons. Tiles is XP's: the 48 px icon at the left of a tile and the
