@@ -104,7 +104,7 @@ header (the step-2 `LUXNAV_DIR` hook and build/compat are gone).
 
 `make check` first compiles a probe that calls glibc's wcslen in win32 C++ and fails if it compiles (`check-poison`:
 wchar_t is 16 bits there, `wux/w32/include/flxp_crt.h` poisons glibc's wide functions). `tests/check.sh` runs what needs no Microsoft files: kerneltest (the shim's
-kernel/CRT/registry/resource/usp10 parts), gditest, fileops_test, `tests/settings-lists.sh` (Display Properties' Desktop
+kernel/CRT/registry/resource/usp10 parts), gditest, fileops_test, thumbstest (the thumbnails' memory bounds on pictures it writes: a 6000 x 4000 JPEG and a 4000 x 4000 PNG into 128 px thumbnails with the peak RSS growing by less than 16 MB, the PNG reduced row by row), `tests/settings-lists.sh` (Display Properties' Desktop
 lists without a window: the backgrounds' order and selection, the icon sets; Appearance's "Windows and buttons", `--list
 appearance --pick STYLE`: classic, a bare style with and without a frame set, back to the theme's own, with the user's
 `jade4074.msstyles` copied under other names, skipped without it), `tests/aero-patches.py` (lhde-import's table of Aero

@@ -41,6 +41,9 @@ result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"
 # the Details columns' layout (shell/columns.h) and the per-folder records of flxp-views, on a scratch state directory
 build/tests/columnstest > "$T/columns.log" 2>&1
 result "columnstest ($(tail -n 1 "$T/columns.log"))" $? "$T/columns.log"
+# the thumbnails' memory bounds (shell/thumbs.h, gdi/image.h): big pictures into small thumbnails without their full image
+build/tests/thumbstest > "$T/thumbs.log" 2>&1
+result "thumbstest ($(tail -n 1 "$T/thumbs.log"))" $? "$T/thumbs.log"
 # lhde-import's overwrite policy (kept without --force, written with it) on a scratch tree and a stand-in file
 tests/import-policy.sh > "$T/import.log" 2>&1
 result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"

@@ -25,6 +25,102 @@ Bitmap* decode_png(const uint8_t* data, size_t size)
     return b;
 }
 
+
+// ---- reduced while reading -------------------------------------------------------
+
+struct PngSource { FILE* f; const uint8_t* d; size_t n, at; };
+
+static void png_source_read(png_structp png, png_bytep out, png_size_t len)
+{
+    PngSource* s = (PngSource*)png_get_io_ptr(png);
+    if (s->f) {
+        if (fread(out, 1, len, s->f) != len) png_error(png, "short read");
+        return;
+    }
+    if (len > s->n - s->at) png_error(png, "short read");
+    memcpy(out, s->d + s->at, len);
+    s->at += len;
+}
+
+// the libpng part, apart so that nothing with a destructor lives across its setjmp; row and sums are the caller's, sized
+// by the first call (rows null: only the header is read, into *w, *h, *interlaced)
+static bool reduced_rows(PngSource* src, int max_size, int* w, int* h, bool* interlaced, std::vector<png_byte>* row,
+                         std::vector<uint32_t>* sums, std::vector<uint32_t>* counts, Bitmap** out)
+{
+    png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+    png_infop info = png ? png_create_info_struct(png) : nullptr;
+    Bitmap* volatile b = nullptr;
+    if (!png || !info || setjmp(png_jmpbuf(png))) {
+        png_destroy_read_struct(&png, &info, nullptr);
+        if (b) destroy_bitmap(b);
+        return false;
+    }
+    png_set_read_fn(png, src, png_source_read);
+    png_set_user_limits(png, 0x7fffffff, 0x7fffffff);
+    png_read_info(png, info);
+    png_uint_32 iw = 0, ih = 0;
+    int depth = 0, type = 0, il = 0;
+    png_get_IHDR(png, info, &iw, &ih, &depth, &type, &il, nullptr, nullptr);
+    *w = (int)iw; *h = (int)ih;
+    *interlaced = il != PNG_INTERLACE_NONE;
+    if (*interlaced || !out || iw == 0 || ih == 0 || iw > 0x7fffff || ih > 0x7fffff) {
+        png_destroy_read_struct(&png, &info, nullptr);
+        return !*interlaced && iw && ih;
+    }
+    // 8-bit BGRA rows whatever the file has (palette, grey, tRNS, 16-bit)
+    png_set_expand(png);
+    png_set_strip_16(png);
+    png_set_gray_to_rgb(png);
+    png_set_bgr(png);
+    png_set_filler(png, 0xff, PNG_FILLER_AFTER);
+    png_read_update_info(png, info);
+    // the largest factor that keeps both sides at least max_size (as the JPEG's DCT scaling)
+    int f = 1;
+    int shorter = (int)(iw < ih ? iw : ih);
+    while (f < 64 && shorter / (f * 2) >= max_size) f *= 2;   // 64: the sums stay within 32 bits
+    int ow = (int)((iw + f - 1) / f), oh = (int)((ih + f - 1) / f);
+    b = create_bitmap(ow, oh);
+    if (!b) { png_destroy_read_struct(&png, &info, nullptr); return false; }
+    row->assign((size_t)iw * 4, 0);
+    sums->assign((size_t)ow * 4, 0);
+    counts->assign((size_t)ow, 0);
+    for (png_uint_32 y = 0; y < ih; y++) {
+        png_read_row(png, row->data(), nullptr);
+        const png_byte* r = row->data();
+        uint32_t* s = sums->data();
+        for (png_uint_32 x = 0; x < iw; x++, r += 4) {   // premultiplied sums: transparent pixels do not darken
+            uint32_t a = r[3], *t = s + (x / f) * 4;
+            t[0] += r[0] * a; t[1] += r[1] * a; t[2] += r[2] * a; t[3] += a;
+            (*counts)[x / f]++;
+        }
+        if ((y + 1) % (png_uint_32)f && y + 1 != ih) continue;
+        uint32_t* d = ((Bitmap*)b)->row((int)(y / f));
+        for (int x = 0; x < ow; x++) {
+            uint32_t* t = s + x * 4, n = (*counts)[(size_t)x], a = t[3];
+            d[x] = !a ? 0 : (a + n / 2) / n << 24 | (t[2] + a / 2) / a << 16 | (t[1] + a / 2) / a << 8 | (t[0] + a / 2) / a;
+            t[0] = t[1] = t[2] = t[3] = 0;
+            (*counts)[(size_t)x] = 0;
+        }
+    }
+    png_destroy_read_struct(&png, &info, nullptr);
+    *out = b;
+    return true;
+}
+
+Bitmap* decode_png_reduced(FILE* f, const uint8_t* data, size_t size, int max_size, int* w, int* h, bool* interlaced)
+{
+    PngSource src = { f, data, size, 0 };
+    std::vector<png_byte> row;
+    std::vector<uint32_t> sums, counts;
+    Bitmap* out = nullptr;
+    int iw = 0, ih = 0;
+    bool il = false;
+    bool ok = reduced_rows(&src, max_size < 1 ? 1 : max_size, &iw, &ih, &il, &row, &sums, &counts, &out);
+    if (w) *w = iw;
+    if (h) *h = ih;
+    if (interlaced) *interlaced = il;
+    return ok ? out : nullptr;
+}
 } // namespace gdi
 
 namespace gdi {
