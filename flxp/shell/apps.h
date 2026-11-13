@@ -24,6 +24,9 @@ struct App {
 void reload_apps();                                     // forget the cached desktop files and mimeapps.list
 const std::vector<App>& all_apps();                     // every installed application, by name (NoDisplay ones included)
 const App* find_app(const std::string& id);
+// one .desktop file outside the data directories (the Quick Launch folder), id = its file name; false if it is no
+// application (Hidden, Type, Exec, Name, TryExec)
+bool read_desktop_file(const std::string& path, App& out);
 const App* default_app(const std::string& mime);        // the type's default, else its nearest ancestor's; null if none
 std::vector<const App*> apps_for(const std::string& mime);   // default first, then the other associations (incl. ancestors')
 bool set_default_app(const std::string& mime, const std::string& app_id, std::string* err = nullptr);   // edits $XDG_CONFIG_HOME/mimeapps.list

@@ -21,7 +21,12 @@ HBITMAP xp_explorer_bitmap(int id, UINT flags);
 
 enum : UINT {
     WM_TB_XCHANGED = WM_APP + 1,    // xwm has news (posted from its thread)
+    WM_TB_TRAYCTL = WM_APP + 2,     // the tray's own controls read new values (notify.cpp's thread)
 };
+
+void relayout_bar();                // the bar's parts placed again (the tray, Quick Launch changed size)
+void taskbar_menu(POINT screen);    // XP's taskbar context menu at a point
+void toggle_desktop();              // _NET_SHOWING_DESKTOP flipped (Show the Desktop / Show Open Windows)
 
 enum Edge { EdgeLeft = 0, EdgeTop = 1, EdgeRight = 2, EdgeBottom = 3 };
 
@@ -79,6 +84,42 @@ void launch(const shell::App& a);           // start it and count it for the pan
 bool run_line(const std::string& cmd);      // /bin/sh -c in $HOME
 void log_off();                             // asks first
 void shut_down();
+}
+
+// the notification area's chevron, our own items and the docked icons' tooltips (notify.cpp)
+namespace notify {
+void start(bool tray_running);              // the controls' thread, the tooltips
+void stop();
+void theme_changed();
+int slot();                                 // one icon's cell: 16 px and XP's 2 px
+int own_count();                            // our items shown (Volume, Brightness, Touchpad)
+SIZE chevron_size();
+bool chevron_shown();                       // two or more inactive icons ([taskbar] hide_inactive)
+bool demote();                              // decide which docked icons hide; true when that changed
+void place(const RECT& chevron, const RECT& own_icons);   // in the tray window
+void paint(HDC hdc);
+bool mouse(UINT msg, POINT p);              // a mouse message in the tray window; true when it was ours
+bool wheel(POINT screen, int delta);
+void controls_changed();                    // WM_TB_TRAYCTL
+void x_changed(const xwm::Snapshot& s);     // the docked icon under the pointer
+bool timer(UINT_PTR id);
+std::string hover_text();                   // the docked icon's tooltip on screen ("" none)
+bool popup_open();
+}
+
+// XP's Quick Launch toolbar (quicklaunch.cpp)
+namespace quicklaunch {
+HWND create(HWND parent);
+void theme_changed();
+void read_setting();                        // [taskbar] quicklaunch
+bool shown();
+int length();                               // along the bar
+int count();                                // buttons, Show Desktop included
+void place(const RECT& r);                  // in the bar's client coordinates; an empty rect hides it
+bool refresh();                             // the folder changed: read again (true if it did)
+LRESULT notify(NMHDR* h);
+bool command(UINT id);
+HWND window();
 }
 
 namespace startpanel {

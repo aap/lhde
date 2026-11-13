@@ -17,7 +17,7 @@ Two directories, one rule each. liblhde gives every path (`lhde_config_file`, `l
 | `themes/NAME.theme` | the user's theme files (docs/THEME-FORMAT.md), written by Save As (Display Properties, luxshell's flyout, `lhde-theme save-as`) |
 | `flxp.ini` | flxp's own preferences (`[flxp]` key = value: views, header, thumbnails, the terminal, dialog sizes, ...); written with every key empty (= automatic) and its comment on first run; any key also as `FLXP_<KEY>` in the environment for one run. Nothing the desktop shares: flxp reads the keys below from settings.ini, the theme's from the session theme (`_LH_THEME`, without a session `[theme] name`; `--theme` / `FLXP_THEME` gives one run a fixed visual style) |
 | `keys` | luxwm's key bindings, one per line (`Mod4+Return exec urxvt`; LUXWM.md "Running and testing") |
-| `quicklaunch/` | the Quick Launch tile's `.desktop` files (`[quicklaunch] dir` names another folder) |
+| `quicklaunch/` | the Quick Launch `.desktop` files: luxshell's tile, flxp-taskbar's toolbar (`[quicklaunch] dir` names another folder) |
 | `luxpad.ini` | luxpad's choices: `[luxpad]` font, font_size, font_weight, font_italic, wrap, statusbar (docs/USAGE.md "luxpad") |
 | anything else | a shipped file overridden under its own relative name (`navbar/4074.ini`, `frames/jade4074/theme.ini`, `packs/4074-aero/shell.lua`): this directory is the first tree of every data lookup (docs/LAYOUT.md "The three trees") |
 
@@ -61,6 +61,9 @@ comments, the order and the keys it does not know: it reads the whole file, chan
               max_fade_ms = 0            ; the bars' black layers in maximised mode: 0 at once, else a fade in ms (luxshell)
 [taskbar]     autohide = 0 ; rows = 1    ; 0 | 1; 1..3 (the top-edge drag)
               start_menu = panel         ; the classic bar's Start button: panel (XP's start panel) | classic (the popup menu) (flxp-taskbar)
+              quicklaunch = 1            ; the classic bar's Quick Launch toolbar (its menu's Toolbars > Quick Launch) (flxp-taskbar)
+              locked = 1                 ; the classic bar's Lock the Taskbar; 0: the bands' grippers show (flxp-taskbar)
+              hide_inactive = 1          ; the classic bar's chevron hides the icons unchanged for an hour (XP's Hide inactive icons)
 [sidebar]     mode = full                ; full | minimized | pinned (absent: the theme's Shell.sidebar; Super+H: minimized ⇄ back)
               width = 150                ; 100..600 (the sizer drag)
               stacking = top             ; top: above the windows, with its strut | bottom: under them, part of the desktop (Win+S)
@@ -69,7 +72,7 @@ comments, the order and the keys it does not know: it reads the whole file, chan
               locked = 0                 ; 1: Lock the Sidebar (no width drag)
               animate = 0                ; 0: hiding (minimized) and showing it is instant, as 4074's | 1: the sidebar slides, the taskbar follows
 [clock]       pinned = 1 ; pack = 4074-aero ; layout = default   ; the clock tile; pinned holds for the pack it was chosen in
-[quicklaunch] dir = ~/some/dir           ; the Quick Launch tile's folder (default ~/.config/lhde/quicklaunch/)
+[quicklaunch] dir = ~/some/dir           ; the Quick Launch folder: luxshell's tile and flxp-taskbar's toolbar (default ~/.config/lhde/quicklaunch/)
 [start]       pinned = a.desktop;b.desktop ; flxp's start panel: the pinned programs (desktop ids, terminal, explorer, commands)
 [commands]    logoff = ... ; standby ; shutdown ; restart ; lock ; picom ; taskbar ; filemanager ; search   ; luxshell, flxp's start panel (logoff, shutdown)
               run = dmenu_run            ; Super+R runs this instead of the start menu's Run dialog (the default: unset)
@@ -102,7 +105,7 @@ selecting another theme removes it (`lhde_theme_select`), Save As turns it into 
 | flxp-desktop, the Explorer | Set as Desktop Background: the current layer's `Desktop.wallpaper` / `Desktop.mode` (and a `[desktop] wallpaper = none` cleared) |
 | lhde-session | `_LH_THEME` only (`theme NAME`; luxshell then writes the file); without a luxshell, `taskbar KIND` through `lhde-theme set-key`, `set` and `setting` |
 | luxwm | nothing; it reads `[fonts] smoothing` and `[effects]` for its window menu, the theme through `_LH_THEME` |
-| flxp-taskbar, the start panel | nothing; they read `[taskbar] start_menu`, `[start] pinned`, `[commands] logoff shutdown` |
+| flxp-taskbar, the start panel | `[taskbar] quicklaunch locked` (the taskbar menu); they read `[taskbar] start_menu hide_inactive`, `[quicklaunch] dir`, `[start] pinned`, `[commands] logoff shutdown` |
 
 ## Change notification
 

@@ -14,6 +14,11 @@
 	tests/headless/themeswitch.sh allows it within its 0.5 %); a fresh classic Explorer draws a black 1 px line left of the
 	Go button's strip that a switched one does not
 
+* flxp-taskbar: the grippers of an unlocked bar do not drag (Quick Launch and the task band cannot be moved or resized);
+	a click on a docked tray icon goes to its program, so the chevron counts only an icon's changes as use (XP also counted
+	clicks: an icon used only by clicking hides after an hour); the tray offers the default 24-bit visual, so an ARGB icon
+	that paints its surround transparent on 32 bits (luxshell/tests/trayicon) shows it black there (luxshell's tray is 32-bit)
+
 * the classic theme's icon set (2k) has no Go glyph, so a classic Explorer has no Go button, while XP's classic Explorer has
 	it (WinXP-193211.png)
 

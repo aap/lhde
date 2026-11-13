@@ -1,8 +1,9 @@
 // flxp-taskbar: the classic Windows XP taskbar (explorer's tray), drawn
 // through uxtheme from the session's visual style: the TaskBar background,
-// the Start button (Start::Button), the task band (a comctl32
+// the Start button (Start::Button), Quick Launch (quicklaunch.cpp), the task band (a comctl32
 // toolbar themed TaskBand::Toolbar), the notification area (TrayNotify, an
-// XEmbed system tray) and the clock (TrayNotify::Clock). Without a visual
+// XEmbed system tray with the chevron and our own items: notify.cpp) and the clock (TrayNotify::Clock), and XP's taskbar
+// menu (taskbar_menu). Without a visual
 // style it is the classic 3D bar. One EWMH DOCK window on a screen edge with
 // struts; the window list and the tray are xwm.cpp's (its own X thread).
 //
@@ -54,8 +55,7 @@ std::string setting(const char* key, const char* fallback) { return shell::theme
 
 namespace {
 
-enum { TIMER_CLOCK = 1, TIMER_QUIT = 2 };
-const int TRAY_SLOT = 22;               // one notification icon: 16 px in a 22 px cell (XP: 16 px buttons, TB_SETPADDING 2)
+enum { TIMER_CLOCK = 1, TIMER_QUIT = 2, TIMER_FOLDER = 3 };
 const int CLASSIC_EDGE = 2;             // the raised edge of the classic bar (SM_CXEDGE)
 
 HTHEME th_start, th_tray, th_clock;
@@ -72,6 +72,11 @@ bool tray_on = true;
 int tray_icons;                         // icons shown in the tray
 UINT w_clock_visible;
 UINT w_settings;                        // _LH_SETTINGS_CHANGED (the per-theme start menu)
+bool locked = true;                     // [taskbar] locked: XP's Lock the Taskbar (no grippers)
+const int GRIP = 5;                     // a band's gripper: 2 px before a 3 px line
+RECT grips[2];                          // Quick Launch's and the task band's grippers, while unlocked
+bool showing_desktop;                   // _NET_SHOWING_DESKTOP as last seen
+void paint_grips(HDC hdc);
 
 // ---- metrics ------------------------------------------------------------------
 
@@ -314,11 +319,13 @@ void arm_clock_timer()
     SetTimer(g.wnd, TIMER_CLOCK, ms, nullptr);
 }
 
-// ---- layout ---------------------------------------------------------------------
+struct TrayGeometry { RECT tray, icons, own, chevron, clock; };
 
-struct TrayGeometry { RECT tray, icons, clock; };
-
-// The notification area's width (horizontal) or height (vertical) and its parts in its own coordinates
+// The notification area's width (horizontal) or height (vertical) and its parts in its own coordinates, as XP's: inside the
+// background's content margins (classic: 1 px of border, 3 on the far sides), the chevron at the start when icons are
+// hidden (its own height across a classic bar from the border's top; centred at the Button part's true size under a
+// style), the icons after it in 18 px cells (16 px and 2 px) trimmed to a whole number of cells across, the docked ones
+// first and ours after them, the clock last
 TrayGeometry tray_geometry(int across)
 {
     TrayGeometry t = {};
@@ -326,30 +333,46 @@ TrayGeometry tray_geometry(int across)
     MARGINS m = {};
     if (th_tray) GetThemeMargins(th_tray, nullptr, TNP_BACKGROUND, 0, TMT_CONTENTMARGINS, nullptr, &m);
     else { m.cxLeftWidth = 1; m.cyTopHeight = 1; m.cxRightWidth = 1 + 2; m.cyBottomHeight = 1 + 2; }   // XP: border + 2
-    int n = tray_on ? tray_icons : 0;
+    const int SLOT = notify::slot();
+    int n = tray_on ? tray_icons : 0, k = notify::own_count();
+    bool chev = tray_on && notify::chevron_shown();
+    SIZE cs = notify::chevron_size();
     if (h) {
         int inner_h = across - m.cyTopHeight - m.cyBottomHeight;
-        int icons_w = n * TRAY_SLOT;
-        int len = m.cxLeftWidth + icons_w + clock_width + m.cxRightWidth;
-        if (th_tray && n == 0 && clock_width == 0) len = 0;
-        if (!th_tray && n == 0 && clock_width == 0) len = 0;
+        if (chev) {
+            t.chevron = RECT{ 0, (LONG)m.cyTopHeight, cs.cx, (LONG)(across - m.cyBottomHeight) };
+            if (th_tray) { t.chevron.top = m.cyTopHeight + (inner_h - cs.cy) / 2; t.chevron.bottom = t.chevron.top + cs.cy; }
+        }
+        int x0 = chev && t.chevron.right > m.cxLeftWidth ? t.chevron.right : m.cxLeftWidth;
+        int len = x0 + (n + k) * SLOT + clock_width + m.cxRightWidth;
+        if (n + k == 0 && clock_width == 0 && !chev) len = 0;
         t.tray = RECT{ 0, 0, len, across };
-        int slot_h = inner_h - inner_h % TRAY_SLOT;
+        int slot_h = inner_h - inner_h % SLOT;
         if (slot_h <= 0) slot_h = inner_h;
-        t.icons = RECT{ (LONG)m.cxLeftWidth, (LONG)(m.cyTopHeight + (inner_h - slot_h) / 2), (LONG)(m.cxLeftWidth + icons_w),
-                        (LONG)(m.cyTopHeight + (inner_h - slot_h) / 2 + slot_h) };
-        t.clock = RECT{ t.icons.right, (LONG)m.cyTopHeight, (LONG)(t.icons.right + clock_width), (LONG)(across - m.cyBottomHeight) };
+        int top = m.cyTopHeight + (inner_h - slot_h) / 2;
+        t.icons = RECT{ x0, top, x0 + n * SLOT, top + slot_h };
+        t.own = RECT{ t.icons.right, top, t.icons.right + k * SLOT, top + slot_h };
+        t.clock = RECT{ t.own.right, (LONG)m.cyTopHeight, (LONG)(t.own.right + clock_width), (LONG)(across - m.cyBottomHeight) };
     } else {
         int inner_w = across - m.cxLeftWidth - m.cxRightWidth;
-        int per_row = inner_w / TRAY_SLOT; if (per_row < 1) per_row = 1;
-        int rows = (n + per_row - 1) / per_row;
+        int per_row = inner_w / SLOT; if (per_row < 1) per_row = 1;
+        int y0 = m.cyTopHeight;
+        if (chev) {
+            t.chevron = RECT{ (LONG)m.cxLeftWidth, 0, (LONG)(across - m.cxRightWidth), cs.cy };
+            if (th_tray) { t.chevron.left = (across - cs.cx) / 2; t.chevron.right = t.chevron.left + cs.cx; }
+            if (t.chevron.bottom > y0) y0 = t.chevron.bottom;
+        }
+        int rows = (n + per_row - 1) / per_row, own_rows = (k + per_row - 1) / per_row;
         int clock_h = clock_width ? 2 * GetSystemMetrics(SM_CYSIZE) / 2 + 4 : 0;
-        int len = m.cyTopHeight + rows * TRAY_SLOT + clock_h + m.cyBottomHeight;
+        int len = y0 + (rows + own_rows) * SLOT + clock_h + m.cyBottomHeight;
         t.tray = RECT{ 0, 0, across, len };
-        int iw = (n < per_row ? n : per_row) * TRAY_SLOT;
-        t.icons = RECT{ (LONG)(m.cxLeftWidth + (inner_w - iw) / 2), (LONG)m.cyTopHeight, 0, (LONG)(m.cyTopHeight + rows * TRAY_SLOT) };
+        int iw = (n < per_row ? n : per_row) * SLOT;
+        t.icons = RECT{ (LONG)(m.cxLeftWidth + (inner_w - iw) / 2), y0, 0, y0 + rows * SLOT };
         t.icons.right = t.icons.left + iw;
-        t.clock = RECT{ (LONG)m.cxLeftWidth, t.icons.bottom, (LONG)(across - m.cxRightWidth), (LONG)(t.icons.bottom + clock_h) };
+        int ow = (k < per_row ? k : per_row) * SLOT;
+        t.own = RECT{ (LONG)(m.cxLeftWidth + (inner_w - ow) / 2), t.icons.bottom, 0, t.icons.bottom + own_rows * SLOT };
+        t.own.right = t.own.left + ow;
+        t.clock = RECT{ (LONG)m.cxLeftWidth, t.own.bottom, (LONG)(across - m.cxRightWidth), (LONG)(t.own.bottom + clock_h) };
     }
     return t;
 }
@@ -442,15 +465,43 @@ void layout()
         start = g.theme ? RECT{ 0, 0, start_size.cx, scy } : RECT{ sx, in.top, sx + start_size.cx, in.bottom };
         int tw = tray.right;
         OffsetRect(&tray, g.theme ? bw - tw : in.right - tw, g.theme ? 0 : in.top);
-        // XP: the task view starts at the start button's width + SM_CXFRAME + 1
-        RECT band = { start.right + GetSystemMetrics(SM_CXFRAME) + 1, g.button_top, tray.left - 3, g.button_top + g.button_height };
+        // XP: a band starts at the start button's width + SM_CXFRAME + 1; unlocked, each band begins with its gripper
+        int x = start.right + GetSystemMetrics(SM_CXFRAME) + 1;
+        grips[0] = grips[1] = RECT{};
+        int gt = g.theme ? 0 : in.top, gb = g.theme ? bh : in.bottom;
+        if (quicklaunch::shown()) {
+            if (!locked) { grips[0] = RECT{ x, gt + 2, x + GRIP, gb - 2 }; x += GRIP + 2; }
+            // the first icon 9 px after the start button (2k3-205316.png: button 23 px, icon 3 px in)
+            int qh = g.theme ? gb - gt : 22, qy = gt + (gb - gt - qh) / 2;   // themed: the bar's height, as the task buttons
+            RECT q = { x + 1, qy, x + 1 + quicklaunch::length(), qy + qh };
+            quicklaunch::place(q);
+            x = q.right + GetSystemMetrics(SM_CXFRAME) + 1;
+        } else {
+            quicklaunch::place(RECT{});
+        }
+        if (!locked) { grips[1] = RECT{ x, gt + 2, x + GRIP, gb - 2 }; x += GRIP + 2; }
+        RECT band = { x, g.button_top, tray.left - 3, g.button_top + g.button_height };
         band::place(band);
     } else {
         int sh2 = g.theme ? (start_size.cy > 30 ? start_size.cy : 30) : 22;
         start = g.theme ? RECT{ 0, 0, bw, sh2 } : RECT{ in.left, in.top, in.right, in.top + sh2 };
         int th2 = tray.bottom;
         OffsetRect(&tray, g.theme ? 0 : in.left, g.theme ? bh - th2 : in.bottom - th2);
-        RECT band = { g.theme ? 0 : in.left, start.bottom + 4, g.theme ? bw : in.right, tray.top - 3 };
+        int y = start.bottom + 4;
+        int gl = g.theme ? 0 : in.left, gr = g.theme ? bw : in.right;
+        grips[0] = grips[1] = RECT{};
+        if (quicklaunch::shown()) {
+            if (!locked) { grips[0] = RECT{ gl + 2, y, gr - 2, y + GRIP }; y += GRIP + 2; }
+            int per = (gr - gl) / 23 > 0 ? (gr - gl) / 23 : 1;
+            int rows = (quicklaunch::count() + per - 1) / per;
+            RECT q = { gl, y, gr, y + rows * 22 };
+            quicklaunch::place(q);
+            y = q.bottom + 4;
+        } else {
+            quicklaunch::place(RECT{});
+        }
+        if (!locked) { grips[1] = RECT{ gl + 2, y, gr - 2, y + GRIP }; y += GRIP + 2; }
+        RECT band = { gl, y, gr, tray.top - 3 };
         band::place(band);
     }
     SetWindowPos(g.start, nullptr, start.left, start.top, start.right - start.left, start.bottom - start.top, SWP_NOZORDER | SWP_NOACTIVATE);
@@ -462,10 +513,41 @@ void layout()
     if (tray_on) {
         RECT ic = tg.icons;
         OffsetRect(&ic, tray.left, tray.top);
-        xwm::tray_layout(ic.left, ic.top, ic.right - ic.left, ic.bottom - ic.top, TRAY_SLOT, 16, !h);
+        xwm::tray_layout(ic.left, ic.top, ic.right - ic.left, ic.bottom - ic.top, notify::slot(), 16, !h);
         render_tray_background(tray, tg.icons);
     }
+    notify::place(tg.chevron, tg.own);
+    if (getenv("FLXP_TASKBAR_LOG")) {   // the parts in the bar's coordinates, for the tests
+        RECT q = {};
+        if (quicklaunch::shown()) { GetWindowRect(quicklaunch::window(), &q); MapWindowPoints(nullptr, g.wnd, (POINT*)&q, 2); }
+        RECT c = tg.chevron, o = tg.own, ic = tg.icons;
+        OffsetRect(&c, tray.left, tray.top); OffsetRect(&o, tray.left, tray.top); OffsetRect(&ic, tray.left, tray.top);
+        fprintf(stderr, "flxp-taskbar: layout bar %ld %ld %ld %ld start %ld %ld quicklaunch %ld %ld %ld %ld buttons %d tray %ld %ld "
+                "icons %ld %ld %d chevron %ld %ld %ld %ld own %ld %ld %d\n", (long)g.screen.left, (long)g.screen.top,
+                (long)g.screen.right, (long)g.screen.bottom, (long)start.left, (long)start.right, (long)q.left, (long)q.top,
+                (long)q.right, (long)q.bottom, quicklaunch::shown() ? quicklaunch::count() : 0, (long)tray.left, (long)tray.right,
+                (long)ic.left, (long)ic.right, tray_icons, (long)c.left, (long)c.top, (long)c.right, (long)c.bottom, (long)o.left,
+                (long)o.right, notify::own_count());
+    }
     InvalidateRect(g.wnd, nullptr, TRUE);
+}
+
+// a band's gripper, shown while the taskbar is not locked: TaskBar::Rebar's GRIPPER under a style, else the classic
+// rebar's raised 3 px line
+void paint_grips(HDC hdc)
+{
+    for (const RECT& r : grips) {
+        if (r.right <= r.left) continue;
+        HTHEME th = g.theme ? OpenThemeData(nullptr, L"TaskBar::Rebar") : nullptr;
+        if (th) {
+            DrawThemeBackground(th, hdc, g.horizontal() ? RP_GRIPPER : RP_GRIPPERVERT, 0, &r, nullptr);
+            CloseThemeData(th);
+        } else {
+            RECT e = r;
+            if (g.horizontal()) e.right = e.left + 3; else e.bottom = e.top + 3;
+            DrawEdge(hdc, &e, BDR_RAISEDINNER, BF_RECT | BF_MIDDLE);
+        }
+    }
 }
 
 void open_themes()
@@ -604,9 +686,21 @@ LRESULT CALLBACK tray_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_PAINT: {
         PAINTSTRUCT ps;
-        BeginPaint(h, &ps);
+        HDC hdc = BeginPaint(h, &ps);
+        notify::paint(hdc);
         EndPaint(h, &ps);
         return 0;
+    }
+    case WM_MOUSEMOVE: case WM_MOUSELEAVE: case WM_LBUTTONDOWN: case WM_LBUTTONUP: case WM_LBUTTONDBLCLK: case WM_MBUTTONUP:
+    case WM_RBUTTONUP: {
+        POINT p = { (short)LOWORD(lp), (short)HIWORD(lp) };
+        if (notify::mouse(msg, p)) return 0;
+        if (msg == WM_RBUTTONUP) {      // the area outside its icons: the taskbar's menu
+            ClientToScreen(h, &p);
+            taskbar_menu(p);
+            return 0;
+        }
+        break;
     }
     }
     return DefWindowProcW(h, msg, wp, lp);
@@ -634,6 +728,12 @@ LRESULT CALLBACK clock_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         }
         SelectObject(hdc, old);
         EndPaint(h, &ps);
+        return 0;
+    }
+    case WM_RBUTTONUP: {                // XP's clock opens the taskbar's menu
+        POINT p = { (short)LOWORD(lp), (short)HIWORD(lp) };
+        ClientToScreen(h, &p);
+        taskbar_menu(p);
         return 0;
     }
     }
@@ -702,14 +802,26 @@ void on_x_changed()
 {
     xwm::Snapshot s;
     xwm::snapshot(s);
+    showing_desktop = s.showing_desktop;
     if (!g.menu_only) band::update(s);      // menu only: no buttons, no _NET_WM_ICON_GEOMETRY next to luxshell's bar
-    if ((s.changes & xwm::ChangeTray) && xwm::tray_count() != tray_icons) layout();
+    if (s.changes & xwm::ChangeTray) {
+        bool demoted = tray_on && notify::demote();
+        if (demoted || xwm::tray_count() != tray_icons) layout();
+    }
+    if (s.changes & xwm::ChangeTrayHover) notify::x_changed(s);
     if (s.changes & xwm::ChangeStartKey) start_request(s.start);
 }
 
 void notify_from_x()
 {
     PostMessageW(g.wnd, WM_TB_XCHANGED, 0, 0);
+}
+
+// the settings flxp-taskbar follows live: [taskbar] quicklaunch, locked, hide_inactive
+void read_bar_settings()
+{
+    quicklaunch::read_setting();
+    locked = shell::store::flag("taskbar", "locked", true);
 }
 
 LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
@@ -721,6 +833,7 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         RECT rc;
         GetClientRect(h, &rc);
         paint_bar_background((HDC)wp, rc);
+        paint_grips((HDC)wp);
         return 1;
     }
     case WM_PRINTCLIENT:
@@ -731,16 +844,32 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         EndPaint(h, &ps);
         return 0;
     }
+    case WM_RBUTTONUP: {                // the bar's empty parts (the task band's and the tray's own send theirs here too)
+        POINT p = { (short)LOWORD(lp), (short)HIWORD(lp) };
+        ClientToScreen(h, &p);
+        taskbar_menu(p);
+        return 0;
+    }
+    case WM_MOUSEWHEEL: {
+        POINT p = { (short)LOWORD(lp), (short)HIWORD(lp) };
+        notify::wheel(p, (short)HIWORD(wp));
+        return 0;
+    }
     case WM_TB_XCHANGED:
         on_x_changed();
+        return 0;
+    case WM_TB_TRAYCTL:
+        notify::controls_changed();
         return 0;
     case WM_NOTIFY: {
         NMHDR* n = (NMHDR*)lp;
         if (n->hwndFrom == g.band) return band::notify(n);
+        if (n->hwndFrom == quicklaunch::window()) return quicklaunch::notify(n);
         return 0;
     }
     case WM_COMMAND:
         if (band::command(LOWORD(wp))) return 0;
+        if (quicklaunch::command(LOWORD(wp))) return 0;
         break;
     case WM_TIMER:
         if (wp == TIMER_CLOCK) {
@@ -750,19 +879,29 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             arm_clock_timer();
         } else if (wp == TIMER_QUIT) {
             PostQuitMessage(0);
-        } else {
+        } else if (wp == TIMER_FOLDER) {
+            if (quicklaunch::refresh()) layout();
+        } else if (!notify::timer(wp)) {
             band::timer(wp);
         }
         return 0;
     case WM_THEMECHANGED:
         open_themes();
         band::theme_changed();
+        quicklaunch::theme_changed();
+        notify::theme_changed();
         layout();
         update_menu_provider();     // claims _LH_STARTMENU_S if we do not hold it yet
         InvalidateRect(h, nullptr, TRUE);
         return 0;
     case WM_FLXP_ROOTPROPERTY:
-        if ((UINT)wp == w_settings) update_menu_provider();   // claims _LH_STARTMENU_S if we do not hold it yet
+        if ((UINT)wp == w_settings) {
+            update_menu_provider();   // claims _LH_STARTMENU_S if we do not hold it yet
+            bool ql = quicklaunch::shown(), lk = locked;
+            read_bar_settings();
+            bool dm = tray_on && notify::demote();
+            if (ql != quicklaunch::shown() || lk != locked || dm || quicklaunch::refresh()) layout();
+        }
         if ((UINT)wp == w_clock_visible) {
             bool was = clock_hidden;
             read_clock_visible();
@@ -814,6 +953,91 @@ void paint_bar_background(HDC hdc, const RECT& rc)
     case EdgeRight: r.right += 2; r.top -= 2; r.bottom += 2; break;
     }
     DrawEdge(hdc, &r, EDGE_RAISED, BF_RECT);
+}
+
+void relayout_bar() { layout(); }
+
+void toggle_desktop() { xwm::set_showing_desktop(!showing_desktop); }
+
+namespace {
+
+// a process list for Task Manager: the first installed of these (luxshell's list), else top in an xterm; "" none
+std::string task_manager()
+{
+    auto have = [](const std::string& prog) {
+        const char* path = getenv("PATH");
+        std::string p = path ? path : "/usr/bin:/bin";
+        size_t i = 0;
+        while (i <= p.size()) {
+            size_t j = p.find(':', i);
+            if (j == std::string::npos) j = p.size();
+            if (access((p.substr(i, j - i) + "/" + prog).c_str(), X_OK) == 0) return true;
+            i = j + 1;
+        }
+        return false;
+    };
+    for (const char* c : { "xfce4-taskmanager", "lxtask", "gnome-system-monitor", "mate-system-monitor", "qps" }) if (have(c)) return c;
+    return have("xterm") ? "xterm -title 'Task Manager' -e top" : "";
+}
+
+enum : UINT {
+    TBM_TOOLBARS_ADDRESS = 0x2001, TBM_TOOLBARS_LINKS, TBM_TOOLBARS_DESKTOP, TBM_TOOLBARS_QUICKLAUNCH, TBM_TOOLBARS_NEW,
+    TBM_CASCADE, TBM_TILE_H, TBM_TILE_V, TBM_DESKTOP, TBM_TASKMGR, TBM_LOCK, TBM_PROPERTIES,
+};
+
+} // namespace
+
+// XP's taskbar menu: Toolbars (Quick Launch ours; Address, Links, Desktop and New Toolbar... greyed), Cascade Windows, Tile
+// Windows Horizontally / Vertically, Show the Desktop (Show Open Windows while the desktop shows), Task Manager, Lock the
+// Taskbar, Properties (Display Properties' Shell tab: the taskbar's settings live there, not in a Taskbar and Start Menu
+// Properties dialog of their own)
+void taskbar_menu(POINT pt)
+{
+    HMENU bars = CreatePopupMenu();
+    AppendMenuW(bars, MF_STRING | MF_GRAYED, TBM_TOOLBARS_ADDRESS, L"&Address");
+    AppendMenuW(bars, MF_STRING | MF_GRAYED, TBM_TOOLBARS_LINKS, L"&Links");
+    AppendMenuW(bars, MF_STRING | MF_GRAYED, TBM_TOOLBARS_DESKTOP, L"&Desktop");
+    AppendMenuW(bars, MF_STRING | (quicklaunch::shown() ? MF_CHECKED : 0), TBM_TOOLBARS_QUICKLAUNCH, L"&Quick Launch");
+    AppendMenuW(bars, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(bars, MF_STRING | MF_GRAYED, TBM_TOOLBARS_NEW, L"&New Toolbar...");
+    HMENU m = CreatePopupMenu();
+    AppendMenuW(m, MF_POPUP, (UINT_PTR)bars, L"T&oolbars");
+    AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(m, MF_STRING, TBM_CASCADE, L"Ca&scade Windows");
+    AppendMenuW(m, MF_STRING, TBM_TILE_H, L"Tile Windows &Horizontally");
+    AppendMenuW(m, MF_STRING, TBM_TILE_V, L"Tile Windows V&ertically");
+    AppendMenuW(m, MF_STRING, TBM_DESKTOP, showing_desktop ? L"Show Open &Windows" : L"Show the Des&ktop");
+    AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+    std::string tm = task_manager();
+    AppendMenuW(m, MF_STRING | (tm.empty() ? MF_GRAYED : 0), TBM_TASKMGR, L"Tas&k Manager");
+    AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(m, MF_STRING | (locked ? MF_CHECKED : 0), TBM_LOCK, L"&Lock the Taskbar");
+    AppendMenuW(m, MF_STRING, TBM_PROPERTIES, L"P&roperties");
+    xwm::focus_own();
+    UINT cmd = (UINT)TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON | (g.edge == EdgeBottom ? TPM_BOTTOMALIGN : TPM_TOPALIGN),
+                                    pt.x, pt.y, 0, g.wnd, nullptr);
+    DestroyMenu(m);
+    switch (cmd) {
+    case TBM_TOOLBARS_QUICKLAUNCH:
+        shell::store::set("taskbar", "quicklaunch", quicklaunch::shown() ? "0" : "1");
+        shell::store::notify("taskbar");
+        read_bar_settings();
+        layout();
+        break;
+    case TBM_LOCK:
+        shell::store::set("taskbar", "locked", locked ? "0" : "1");
+        shell::store::notify("taskbar");
+        read_bar_settings();
+        layout();
+        break;
+    case TBM_CASCADE: xwm::arrange(0); break;
+    case TBM_TILE_H: xwm::arrange(1); break;
+    case TBM_TILE_V: xwm::arrange(2); break;
+    case TBM_DESKTOP: toggle_desktop(); break;
+    case TBM_TASKMGR: startmenu::run_line(tm); break;
+    case TBM_PROPERTIES: shell::store::launch_settings("shell"); break;
+    default: break;
+    }
 }
 
 } // namespace tb
@@ -887,8 +1111,12 @@ int main(int argc, char** argv)
     g.clock = CreateWindowExW(0, L"TrayClockWClass", nullptr, WS_CHILD | WS_VISIBLE, 0, 0, 1, 1, g.tray, nullptr, nullptr, nullptr);
     SetWindowTheme(g.clock, L"TrayNotify", nullptr);
     g.band = band::create(g.wnd);
+    quicklaunch::create(g.wnd);
     open_themes();
     band::theme_changed();
+    read_bar_settings();
+    quicklaunch::theme_changed();
+    notify::theme_changed();
     w_clock_visible = FlxpWatchRootProperty("_LHSHELL_CLOCK_VISIBLE");
     w_settings = FlxpWatchRootProperty("_LH_SETTINGS_CHANGED");
     read_clock_visible();
@@ -896,10 +1124,12 @@ int main(int argc, char** argv)
 
     if (!xwm::start(g.own, notify_from_x)) { fprintf(stderr, "flxp-taskbar: no X connection\n"); return 1; }
     if (tray_on) xwm::tray_start(shell::setting_flag("tray_takeover", false), !g.horizontal());
+    notify::start(tray_on);
     update_menu_provider();
     layout();
     set_clock_tip();
     arm_clock_timer();
+    SetTimer(g.wnd, TIMER_FOLDER, 2000, nullptr);   // the Quick Launch folder looked at again
     ShowWindow(g.wnd, SW_SHOWNA);
     if (quit_ms) SetTimer(g.wnd, TIMER_QUIT, (UINT)quit_ms, nullptr);
 
@@ -909,6 +1139,7 @@ int main(int argc, char** argv)
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
+    notify::stop();
     xwm::stop();
     return 0;
 }

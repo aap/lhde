@@ -261,6 +261,15 @@ void read_active()
     if (a != active) { active = a; changes |= ChangeActive; }
 }
 
+bool showing;                   // _NET_SHOWING_DESKTOP
+
+void read_showing()
+{
+    std::vector<unsigned long> v;
+    bool s = get_prop(root, XInternAtom(xd, "_NET_SHOWING_DESKTOP", False), XA_CARDINAL, 1, v) && !v.empty() && v[0];
+    if (s != showing) { showing = s; changes |= ChangeShowing; }
+}
+
 void read_current_desktop()
 {
     std::vector<unsigned long> v;
@@ -310,6 +319,9 @@ struct Icon {
     bool mapped;                // XEMBED_MAPPED (or no _XEMBED_INFO)
     bool same_depth;            // can show the container through ParentRelative
     long docked_ms;             // when we embedded it (a racing hand-back from the previous tray, see tray_reparented)
+    long used_ms;               // when it docked or last changed (a property, its size): what "inactive" counts from
+    bool hidden = false;        // demoted under the chevron (tray_hide)
+    std::string name;           // _NET_WM_NAME / WM_NAME: the tooltip
 };
 std::vector<Icon> icons;
 ::Window tray_owner, container;
@@ -323,6 +335,7 @@ Atom luxshell_selection;         // _LHSHELL_S<screen>: luxshell runs (it forwar
 Atom menu_selection;
 bool menu_wanted;
 bool menu_open;                 // our panel or classic menu is up: _LH_STARTMENU_OPEN = 1
+uint64_t tray_hover;            // the icon under the pointer (EnterNotify), 0 none
 
 long now_ms()
 {
@@ -375,7 +388,7 @@ void tray_relayout()
     if (!container) return;
     int n = 0;
     for (Icon& i : icons) {
-        if (!i.mapped) { XUnmapWindow(xd, i.w); continue; }
+        if (!i.mapped || i.hidden) { XUnmapWindow(xd, i.w); continue; }
         int off = (tray_slot - tray_icon) / 2;
         int x = tray_vertical ? (tray_w - tray_icon) / 2 : n * tray_slot + off;
         int y = tray_vertical ? n * tray_slot + off : (tray_h - tray_icon) / 2;
@@ -404,10 +417,11 @@ void tray_dock(::Window w)
     XWindowAttributes a;
     XSync(xd, False);
     if (!XGetWindowAttributes(xd, w, &a)) return;
-    XSelectInput(xd, w, StructureNotifyMask | PropertyChangeMask);
+    XSelectInput(xd, w, StructureNotifyMask | PropertyChangeMask | EnterWindowMask | LeaveWindowMask);
     XAddToSaveSet(xd, w);       // back to the root if we go away
     Icon ic;
     ic.w = w;
+    ic.name = get_title(w);
     ic.mapped = xembed_mapped(w);
     ic.same_depth = a.depth == DefaultDepth(xd, scr);
     XUnmapWindow(xd, w);        // XEmbed: the embedder maps it
@@ -425,7 +439,7 @@ void tray_dock(::Window w)
     e.xclient.data.l[3] = (long)container;
     e.xclient.data.l[4] = version < 0 ? 0 : version;
     XSendEvent(xd, w, False, NoEventMask, &e);
-    ic.docked_ms = now_ms();
+    ic.docked_ms = ic.used_ms = now_ms();
     icons.push_back(ic);
     if (ic.same_depth) XSetWindowBackgroundPixmap(xd, w, ParentRelative);
     tray_relayout();
@@ -616,6 +630,7 @@ void handle(XEvent& e)
         ::Window w = e.xproperty.window;
         if (w == root) {
             if (a == atoms[A_CLIENT_LIST]) read_client_list();
+            else if (a == XInternAtom(xd, "_NET_SHOWING_DESKTOP", False)) read_showing();
             else if (a == atoms[A_ACTIVE]) read_active();
             else if (a == atoms[A_CURRENT_DESKTOP]) read_current_desktop();
             return;
@@ -637,11 +652,15 @@ void handle(XEvent& e)
             }
             return;
         }
-        for (Icon& i : icons)
-            if (i.w == w && a == atoms[A_XEMBED_INFO]) {
+        for (Icon& i : icons) {
+            if (i.w != w) continue;
+            i.used_ms = now_ms();       // the icon changed: it is in use
+            if (a == atoms[A_NAME] || a == XA_WM_NAME) i.name = get_title(w);
+            if (a == atoms[A_XEMBED_INFO]) {
                 bool m = xembed_mapped(w);
                 if (m != i.mapped) { i.mapped = m; tray_relayout(); changes |= ChangeTray; }
             }
+        }
         return;
     }
     case ClientMessage:
@@ -658,7 +677,16 @@ void handle(XEvent& e)
         }
         return;
     case DestroyNotify:
+        if (tray_hover == e.xdestroywindow.window) { tray_hover = 0; changes |= ChangeTrayHover; }
         tray_forget(e.xdestroywindow.window);
+        return;
+    case EnterNotify:
+    case LeaveNotify:
+        for (Icon& i : icons)
+            if (i.w == e.xcrossing.window && e.xcrossing.detail != NotifyInferior) {
+                uint64_t h = e.type == EnterNotify ? (uint64_t)i.w : 0;
+                if (h != tray_hover || h) { tray_hover = h; changes |= ChangeTrayHover; }
+            }
         return;
     case ReparentNotify:
         tray_reparented(e.xreparent.window, e.xreparent.parent);
@@ -749,6 +777,7 @@ bool start(uint64_t own_window, Notify notify)
     read_current_desktop();
     read_client_list();
     read_active();
+    read_showing();
     changes = ChangeList | ChangeActive;
     running = true;
     worker = std::thread(run);
@@ -786,6 +815,18 @@ void snapshot(Snapshot& out)
     out.have_wm = have_wm;
     out.start = start_req;
     out.menu_provider = menu_owner != None;
+    out.showing_desktop = showing;
+    out.tray_hover = tray_hover;
+    out.tray_hover_name.clear();
+    out.tray_hover_rect[0] = out.tray_hover_rect[1] = out.tray_hover_rect[2] = out.tray_hover_rect[3] = 0;
+    for (const Icon& i : icons)
+        if ((uint64_t)i.w == tray_hover) {
+            out.tray_hover_name = i.name;
+            int x = 0, y = 0; ::Window child;
+            if (XTranslateCoordinates(xd, i.w, root, 0, 0, &x, &y, &child)) {
+                out.tray_hover_rect[0] = x; out.tray_hover_rect[1] = y; out.tray_hover_rect[2] = tray_icon; out.tray_hover_rect[3] = tray_icon;
+            }
+        }
     changes = 0;
     notified = false;
 }
@@ -934,7 +975,7 @@ int tray_count()
 {
     std::lock_guard<std::mutex> l(model_lock);
     int n = 0;
-    for (const Icon& i : icons) if (i.mapped) n++;
+    for (const Icon& i : icons) if (i.mapped && !i.hidden) n++;
     return n;
 }
 
@@ -956,4 +997,113 @@ void tray_background(const uint32_t* pixels, int w, int h, int stride)
     });
 }
 
+
+std::vector<TrayIcon> tray_icons()
+{
+    std::lock_guard<std::mutex> l(model_lock);
+    std::vector<TrayIcon> out;
+    long now = now_ms();
+    for (const Icon& i : icons) {
+        if (!i.mapped) continue;
+        TrayIcon t;
+        t.id = (uint64_t)i.w;
+        t.name = i.name;
+        t.idle_ms = now - i.used_ms;
+        t.hidden = i.hidden;
+        out.push_back(t);
+    }
+    return out;
+}
+
+void tray_hide(const std::vector<uint64_t>& hidden)
+{
+    {
+        std::lock_guard<std::mutex> l(model_lock);
+        for (Icon& i : icons) {
+            bool h = false;
+            for (uint64_t id : hidden) if ((uint64_t)i.w == id) h = true;
+            i.hidden = h;
+        }
+    }
+    queue([] { tray_relayout(); });
+}
+
+bool wm_supports(const char* atom)
+{
+    Display* d = XOpenDisplay(nullptr);
+    if (!d) return false;
+    bool yes = false;
+    Atom want = XInternAtom(d, atom, False);
+    Atom t; int f; unsigned long n, after; unsigned char* data = nullptr;
+    if (XGetWindowProperty(d, DefaultRootWindow(d), XInternAtom(d, "_NET_SUPPORTED", False), 0, 4096, False, XA_ATOM, &t, &f, &n,
+                           &after, &data) == Success && data) {
+        for (unsigned long k = 0; k < n; k++) if (((Atom*)data)[k] == want) yes = true;
+        XFree(data);
+    }
+    XCloseDisplay(d);
+    return yes;
+}
+
+void show_window_menu(uint64_t id, int x, int y)
+{
+    queue([=] {
+        XUngrabPointer(xd, CurrentTime);
+        client_message((::Window)id, XInternAtom(xd, "_GTK_SHOW_WINDOW_MENU", False), 0, x, y, 0, 0);
+    });
+}
+
+void set_showing_desktop(bool on)
+{
+    queue([on] { client_message(root, XInternAtom(xd, "_NET_SHOWING_DESKTOP", False), on ? 1 : 0, 0, 0, 0, 0); });
+}
+
+void arrange(int how)
+{
+    queue([how] {
+        // the work area of the current desktop (luxwm's _NET_WORKAREA), else the screen
+        long x0 = 0, y0 = 0, W = DisplayWidth(xd, scr), H = DisplayHeight(xd, scr);
+        std::vector<unsigned long> wa;
+        if (get_prop(root, XInternAtom(xd, "_NET_WORKAREA", False), XA_CARDINAL, 64, wa) && wa.size() >= 4) {
+            size_t k = current_desktop > 0 && wa.size() >= (size_t)(current_desktop + 1) * 4 ? (size_t)current_desktop * 4 : 0;
+            x0 = (long)wa[k]; y0 = (long)wa[k + 1]; W = (long)wa[k + 2]; H = (long)wa[k + 3];
+        }
+        std::vector<::Window> ws;
+        for (const Client& c : clients) if (c.eligible && c.t.shown && !c.t.minimized) ws.push_back((::Window)c.t.id);
+        int n = (int)ws.size();
+        if (!n) return;
+        Atom mr = XInternAtom(xd, "_NET_MOVERESIZE_WINDOW", False);
+        long flags = 1 | (0xF << 8) | (2 << 12);   // NorthWestGravity, x y w h, from a pager
+        if (how == 0) {     // cascade: 26 px steps, each window 60 % of the work area
+            long w = W * 6 / 10, h = H * 6 / 10, step = 26, per = (H - h) / step + 1;
+            if (per < 1) per = 1;
+            for (int i = 0; i < n; i++) {
+                long k = i % per;
+                client_message(ws[i], mr, flags, x0 + k * step, y0 + k * step, w, h);
+                client_message(ws[i], atoms[A_ACTIVE], 2, CurrentTime, (long)own, 0, 0);
+            }
+            return;
+        }
+        int cols, rows;     // more than three windows: a grid, as TileWindows
+        if (n <= 3) { if (how == 2) cols = n, rows = 1; else cols = 1, rows = n; }
+        else {
+            cols = 1;
+            while (cols * cols < n) cols++;
+            rows = (n + cols - 1) / cols;
+            if (how == 1) std::swap(cols, rows);
+        }
+        for (int i = 0; i < n; i++) {
+            int c = i % cols, r = i / cols;
+            long x = x0 + c * W / cols, y = y0 + r * H / rows;
+            client_message(ws[i], mr, flags, x, y, x0 + (c + 1) * W / cols - x, y0 + (r + 1) * H / rows - y);
+        }
+    });
+}
+
+bool pointer_state(int* x, int* y, unsigned* buttons)
+{
+    if (!xd) return false;
+    ::Window r, c;
+    int wx, wy;
+    return XQueryPointer(xd, root, &r, &c, x, y, &wx, &wy, buttons);   // Xlib locks the display itself (XInitThreads)
+}
 } // namespace xwm

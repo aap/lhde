@@ -573,7 +573,13 @@ bool command(UINT cmd)
 
 void window_menu(uint64_t id, const xwm::Task& t, POINT pt)
 {
-    // the system menu explorer shows for a task button (Move/Size need the window manager's keyboard modes: left out)
+    // XP's task button menu is the window's system menu: the window manager's own when it offers one at a point (luxwm:
+    // Restore, Move, Size, Minimize, Maximize, Close, the keyboard modes included; docs/CLIENT-PROTOCOL.md)
+    if (xwm::wm_supports("_GTK_SHOW_WINDOW_MENU")) {
+        xwm::show_window_menu(id, pt.x, pt.y);
+        return;
+    }
+    // else ours, without Move and Size (they need the window manager's keyboard modes)
     HMENU m = CreatePopupMenu();
     append(m, SC_RESTORE, "&Restore", t.minimized || t.maximized ? 0 : MF_GRAYED);
     append(m, SC_MINIMIZE, "Mi&nimize", t.minimized ? MF_GRAYED : 0);

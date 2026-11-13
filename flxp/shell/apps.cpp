@@ -130,6 +130,39 @@ struct Db {
 
 Db db;
 
+// one .desktop file as an App: false when it is no application to show (Hidden, another Type, no Exec or Name, TryExec
+// not found)
+bool read_entry(const std::string& full, const std::string& id, App& a)
+{
+    KeyFile kf;
+    if (!parse_keyfile(full, kf)) return false;
+    const auto* g = kf.group("Desktop Entry");
+    if (!g) return false;
+    a = App();
+    a.id = id; a.file = full;
+    std::string type, tryexec;
+    bool hidden = false;
+    for (auto& kv : *g) {
+        const std::string& k = kv.first;
+        if (k == "Type") type = kv.second;
+        else if (k == "Name") a.name = unescape(kv.second, false);
+        else if (k == "GenericName") a.generic_name = unescape(kv.second, false);
+        else if (k == "Comment") a.comment = unescape(kv.second, false);
+        else if (k == "Icon") a.icon = unescape(kv.second, false);
+        else if (k == "Exec") a.exec = unescape(kv.second, true);
+        else if (k == "Path") a.path = unescape(kv.second, false);
+        else if (k == "TryExec") tryexec = unescape(kv.second, false);
+        else if (k == "Terminal") a.terminal = truthy(kv.second);
+        else if (k == "NoDisplay") a.no_display = truthy(kv.second);
+        else if (k == "Hidden") hidden = truthy(kv.second);
+        else if (k == "MimeType") a.mime_types = split_list(kv.second);
+        else if (k == "Categories") a.categories = split_list(kv.second);
+    }
+    if (hidden || type != "Application" || a.exec.empty() || a.name.empty()) return false;
+    if (!tryexec.empty() && !in_path(tryexec)) return false;
+    return true;
+}
+
 void scan_dir(const std::string& root, const std::string& sub, std::set<std::string>& seen, std::vector<App>& out)
 {
     DIR* d = opendir((root + sub).c_str());
@@ -147,32 +180,8 @@ void scan_dir(const std::string& root, const std::string& sub, std::set<std::str
         std::string id = rel.substr(1);
         for (char& c : id) if (c == '/') c = '-';
         if (!seen.insert(id).second) continue;   // a higher-precedence dir has it (or hid it)
-        KeyFile kf;
-        if (!parse_keyfile(full, kf)) continue;
-        const auto* g = kf.group("Desktop Entry");
-        if (!g) continue;
         App a;
-        a.id = id; a.file = full;
-        std::string type, tryexec;
-        bool hidden = false;
-        for (auto& kv : *g) {
-            const std::string& k = kv.first;
-            if (k == "Type") type = kv.second;
-            else if (k == "Name") a.name = unescape(kv.second, false);
-            else if (k == "GenericName") a.generic_name = unescape(kv.second, false);
-            else if (k == "Comment") a.comment = unescape(kv.second, false);
-            else if (k == "Icon") a.icon = unescape(kv.second, false);
-            else if (k == "Exec") a.exec = unescape(kv.second, true);
-            else if (k == "Path") a.path = unescape(kv.second, false);
-            else if (k == "TryExec") tryexec = unescape(kv.second, false);
-            else if (k == "Terminal") a.terminal = truthy(kv.second);
-            else if (k == "NoDisplay") a.no_display = truthy(kv.second);
-            else if (k == "Hidden") hidden = truthy(kv.second);
-            else if (k == "MimeType") a.mime_types = split_list(kv.second);
-            else if (k == "Categories") a.categories = split_list(kv.second);
-        }
-        if (hidden || type != "Application" || a.exec.empty() || a.name.empty()) continue;
-        if (!tryexec.empty() && !in_path(tryexec)) continue;
+        if (!read_entry(full, id, a)) continue;
         out.push_back(a);
     }
 }
@@ -592,6 +601,13 @@ bool open_files(const std::vector<std::string>& paths, std::string* err)
     }
     for (auto& g : groups) if (!launch(*g.first, g.second, err)) ok = false;
     return ok;
+}
+
+// a .desktop file anywhere (the Quick Launch folder): its id the file name
+bool read_desktop_file(const std::string& path, App& out)
+{
+    size_t slash = path.rfind('/');
+    return read_entry(path, slash == std::string::npos ? path : path.substr(slash + 1), out);
 }
 
 } // namespace shell

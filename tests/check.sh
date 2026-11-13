@@ -122,6 +122,9 @@ else
     # flxp switched luna -> jade4074 -> classic and back looks as a fresh start under the last theme (icons, colours, bands)
     tests/headless/themeswitch.sh "$2" > "$T/themeswitch.log" 2>&1; rc=$?
     result "headless/themeswitch.sh$(grep -m1 '^skip' "$T/themeswitch.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/themeswitch.log"
+    # flxp-taskbar under luxwm: XEmbed icons in 18 px cells, their tooltip, the chevron, Quick Launch, the taskbar menu's Show the Desktop
+    tests/headless/taskbar.sh "$3" > "$T/taskbar.log" 2>&1; rc=$?
+    result "headless/taskbar.sh$(grep -m1 '^skip' "$T/taskbar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/taskbar.log"
     # the task band's picture of a folder with two JPEGs is the Icons view's square (folderpictest)
     tests/headless/folderpic.sh "$2" > "$T/folderpic.log" 2>&1; result headless/folderpic.sh $? "$T/folderpic.log"
     # flxp's peak RSS on 600 6000 x 4000 JPEGs at 256 px, the view's images within their budget (needs ImageMagick)

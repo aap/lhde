@@ -1027,6 +1027,17 @@ settings flyout can also be opened from a terminal (the classic bar has no way t
   for a minimised window Restore is the default item); dragging a button past 4 px moves it to the place of the button under the
   pointer (4074's taskbar). The order holds for the X session (root property `_LHSHELL_TASK_ORDER`, the window ids in order);
   new windows go to the end.
+- flxp-taskbar is XP's bar: Quick Launch after the Start button (Show Desktop, then the `.desktop` files of the Quick Launch
+  folder, `[quicklaunch] dir`, the same folder as luxshell's Quick Launch tile; drop a file on it to add an entry, right click an
+  entry to delete it or open the folder; the taskbar menu's *Toolbars > Quick Launch* hides it, `[taskbar] quicklaunch`), the
+  task buttons (a right click: luxwm's window menu with Move and Size), the notification area (the XEmbed icons; XP's chevron
+  hides the icons unchanged for an hour while `[taskbar] hide_inactive = 1`, the default; the pointer over an icon shows its
+  window name; our Volume, Brightness and Touchpad items: a click opens XP's volume slider with Mute, the brightness slider, or
+  turns the touchpad on or off, the wheel steps, a right click has *Open Volume Control* and *Mute*) and the clock. A right click
+  on the bar's empty part, the tray or the clock opens XP's taskbar menu: Toolbars, Cascade Windows, Tile Windows Horizontally
+  and Vertically, Show the Desktop / Show Open Windows, Task Manager (a process viewer when one is installed), Lock the Taskbar
+  (`[taskbar] locked`; unlocked, Quick Launch and the task buttons show XP's grippers) and Properties (Display Properties'
+  Shell tab).
 - Clock: luxshell publishes the root property `_LHSHELL_CLOCK_VISIBLE` = 1 while a clock tile of its own is on screen, 0
   otherwise (sidebar minimized, clock tile closed); flxp-taskbar hides its clock while it is 1.
 - Start menu: see "Start menu: flxp's start panel everywhere" below; in `classic` the classic Start button and Super open
@@ -1120,6 +1131,9 @@ luxshell keeps the button pressed from the click (or Super) until the panel's wi
 | `[desktop]` | `black` * | `0` (default): a maximised window darkens only its own frame (luxwm) and the bars' black layers; `1`: the whole desktop also turns black |
 | `[desktop]` | `max_fade_ms` * | `0` (default): the bars' black layers switch at once when a window is maximised or restored; a number: a fade in ms (4074: 400) |
 | `[taskbar]` | `start_menu` | the menu the classic bar's Start button opens: `panel` (XP's start panel, default) or `classic` (the classic popup menu); flxp-taskbar reads it at every open. Next to the Avalon bar the start menu is the panel. |
+| `[taskbar]` | `quicklaunch` | the classic bar's Quick Launch toolbar: `1` (default) or `0`; its menu's Toolbars > Quick Launch writes it |
+| `[taskbar]` | `locked` | the classic bar's Lock the Taskbar: `1` (default) or `0` (the grippers show) |
+| `[taskbar]` | `hide_inactive` | the classic bar's notification area: `1` (default, XP's "Hide inactive icons": two or more icons unchanged for an hour go behind the chevron) or `0` |
 | `[taskbar]` | `autohide` * | `0` (default) or `1` |
 | `[taskbar]` | `rows` * | 1 (default), 2 or 3: the top-edge drag writes it |
 | `[sidebar]` | `mode` * | `full` (default), `minimized`, `pinned`; Super+h minimizes and restores |

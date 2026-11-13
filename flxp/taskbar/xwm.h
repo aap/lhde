@@ -26,6 +26,8 @@ struct Task {
 enum Change : uint32_t {
     ChangeList = 1, ChangeActive = 2, ChangeTitle = 4, ChangeIcon = 8, ChangeState = 16,
     ChangeDesktop = 32, ChangeTray = 64,
+    ChangeTrayHover = 256,          // the pointer entered or left a tray icon
+    ChangeShowing = 512,            // _NET_SHOWING_DESKTOP
     ChangeStartKey = 128,           // _LHSHELL_START: luxwm's root broadcast (Super) or luxshell's to our owner window
 };
 
@@ -46,6 +48,10 @@ struct Snapshot {
     bool have_wm = false;           // a window manager publishes _NET_CLIENT_LIST
     StartRequest start;             // the last one (ChangeStartKey says a new one came)
     bool menu_provider = false;     // we own _LH_STARTMENU_S<screen>
+    bool showing_desktop = false;   // _NET_SHOWING_DESKTOP
+    uint64_t tray_hover = 0;        // the tray icon under the pointer
+    std::string tray_hover_name;    // its _NET_WM_NAME / WM_NAME
+    int tray_hover_rect[4] = {};    // its root x, y, w, h
 };
 
 typedef void (*Notify)();
@@ -95,5 +101,23 @@ void tray_layout(int x, int y, int w, int h, int slot, int icon_size, bool verti
 // The pixels behind the icons (premultiplied BGRA rows of the area's size):
 // the container's background, which the icons show through ParentRelative.
 void tray_background(const uint32_t* pixels, int w, int h, int stride);
+// The docked icons in docking order: how long each has been unchanged (since it docked or last changed a property or
+// its size), whether it is demoted; tray_hide demotes these (left out of the layout, unmapped), the others are shown.
+struct TrayIcon { uint64_t id = 0; std::string name; long idle_ms = 0; bool hidden = false; };
+std::vector<TrayIcon> tray_icons();
+void tray_hide(const std::vector<uint64_t>& hidden);
+
+// The window manager lists ATOM in _NET_SUPPORTED (calling thread, a connection of its own)
+bool wm_supports(const char* atom);
+// _GTK_SHOW_WINDOW_MENU for a client at root x, y (luxwm's window menu; docs/CLIENT-PROTOCOL.md)
+void show_window_menu(uint64_t id, int x, int y);
+void set_showing_desktop(bool on);          // _NET_SHOWING_DESKTOP to the root
+// The windows of the current desktop that are not minimised, over the work area (_NET_MOVERESIZE_WINDOW):
+// 0 cascade (26 px steps, 60 % of the area), 1 tile horizontally (one above the other), 2 tile vertically (side by side);
+// more than three windows in a grid
+void arrange(int how);
+
+// the pointer on the root and its buttons (Button1Mask ...), read on the calling thread
+bool pointer_state(int* x, int* y, unsigned* buttons);
 
 } // namespace xwm

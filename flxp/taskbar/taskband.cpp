@@ -357,7 +357,10 @@ LRESULT notify(NMHDR* h)
             startmenu::window_menu(it->t.id, it->t, p);
             return TRUE;
         }
-        return 0;
+        POINT p;                // the band's empty part: the taskbar's menu
+        GetCursorPos(&p);
+        taskbar_menu(p);
+        return TRUE;
     }
     }
     return 0;
