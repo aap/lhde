@@ -26,6 +26,9 @@
 #include <math.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/prctl.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <fontconfig/fontconfig.h>
 
 Display *dpy; int screen; Window root; Visual *argb; static Colormap cmap; static int depth = 32;
@@ -500,6 +503,63 @@ static int l_window_menu(lua_State *L) {
     return 0;
 }
 static int l_spawn(lua_State *L) { const char *cmd = luaL_checkstring(L, 1); if (fork() == 0) { setsid(); execl("/bin/sh", "sh", "-c", cmd, NULL); _exit(1); } return 0; }
+/* lh.pipe(cmd, on_line [, on_done]): `sh -c cmd` in its own process group with its stdout on a pipe that the main loop reads
+   without blocking; on_line(line) for each line (without the newline), on_done() at end of file (the command exited or closed
+   its stdout). Returns an id, nil when the pipe or fork failed. lh.pipe_close(id) ends it early: the group gets SIGTERM, on_done
+   is not called. The children get SIGTERM when luxshell exits (PR_SET_PDEATHSIG, and pipes_stop on the way out). stdin is
+   /dev/null, stderr is luxshell's. The tray tiles' system commands (tiles/volume.lua: `pactl subscribe`, `wpctl get-volume`). */
+#define MAXPIPES 32
+struct lpipe { int fd, id; pid_t pid; int line_ref, done_ref; size_t len; char buf[4096]; };
+static struct lpipe lpipes[MAXPIPES]; static int nlpipes, next_pipe_id = 1;
+static int l_pipe(lua_State *L) {
+    const char *cmd = luaL_checkstring(L, 1); luaL_checktype(L, 2, LUA_TFUNCTION);
+    if (nlpipes >= MAXPIPES) { lua_pushnil(L); return 1; }
+    int fds[2]; if (pipe(fds) < 0) { lua_pushnil(L); return 1; }
+    pid_t parent = getpid(), pid = fork();
+    if (pid < 0) { close(fds[0]); close(fds[1]); lua_pushnil(L); return 1; }
+    if (pid == 0) {
+        setpgid(0, 0); prctl(PR_SET_PDEATHSIG, SIGTERM); if (getppid() != parent) _exit(1);
+        signal(SIGCHLD, SIG_DFL); signal(SIGPIPE, SIG_DFL);
+        int nul = open("/dev/null", O_RDONLY); if (nul >= 0) { dup2(nul, 0); close(nul); }
+        dup2(fds[1], 1); close(fds[0]); close(fds[1]); close(ConnectionNumber(dpy));
+        execl("/bin/sh", "sh", "-c", cmd, NULL); _exit(127);
+    }
+    setpgid(pid, pid); close(fds[1]); fcntl(fds[0], F_SETFL, O_NONBLOCK); fcntl(fds[0], F_SETFD, FD_CLOEXEC);
+    struct lpipe *p = &lpipes[nlpipes++]; p->fd = fds[0]; p->pid = pid; p->id = next_pipe_id++; p->len = 0;
+    p->line_ref = ref_of(L, 2); p->done_ref = lua_isfunction(L, 3) ? ref_of(L, 3) : LUA_NOREF;
+    lua_pushinteger(L, p->id); return 1;
+}
+static void pipe_free(int i, bool killit) {
+    struct lpipe *p = &lpipes[i];
+    if (killit) kill(-p->pid, SIGTERM);
+    close(p->fd); luaL_unref(L, LUA_REGISTRYINDEX, p->line_ref); luaL_unref(L, LUA_REGISTRYINDEX, p->done_ref);
+    lpipes[i] = lpipes[--nlpipes];
+}
+static int pipe_index(int id) { for (int i = 0; i < nlpipes; i++) if (lpipes[i].id == id) return i; return -1; }
+static int l_pipe_close(lua_State *L) { int i = pipe_index((int)luaL_checkinteger(L, 1)); if (i >= 0) pipe_free(i, true); lua_pushboolean(L, i >= 0); return 1; }
+static void pipe_call(int ref, const char *line, size_t n) {
+    push_ref(L, ref); int nargs = 0; if (line) { lua_pushlstring(L, line, n); nargs = 1; }
+    if (lua_pcall(L, nargs, 0, 0)) { fprintf(stderr, "luxshell: pipe: %s\n", lua_tostring(L, -1)); lua_pop(L, 1); }
+}
+/* read what is there for pipe id; the callbacks may open and close pipes, so it is found again by id after each */
+static void pipe_read(int id) {
+    for (;;) {
+        int i = pipe_index(id); if (i < 0) return;
+        struct lpipe *p = &lpipes[i];
+        char *nl = memchr(p->buf, '\n', p->len);
+        if (nl) { size_t n = (size_t)(nl - p->buf); char line[sizeof p->buf]; memcpy(line, p->buf, n); memmove(p->buf, nl + 1, p->len - n - 1); p->len -= n + 1;
+                  int ref = p->line_ref; pipe_call(ref, line, n); continue; }
+        if (p->len == sizeof p->buf) { char line[sizeof p->buf]; size_t n = p->len; memcpy(line, p->buf, n); p->len = 0; pipe_call(p->line_ref, line, n); continue; }
+        ssize_t k = read(p->fd, p->buf + p->len, sizeof p->buf - p->len);
+        if (k > 0) { p->len += (size_t)k; continue; }
+        if (k < 0 && (errno == EAGAIN || errno == EINTR)) return;
+        if (p->len) { char line[sizeof p->buf]; size_t n = p->len; memcpy(line, p->buf, n); p->len = 0; pipe_call(p->line_ref, line, n); i = pipe_index(id); if (i < 0) return; p = &lpipes[i]; }
+        int done = p->done_ref; p->done_ref = LUA_NOREF; pipe_free(i, false);
+        if (done != LUA_NOREF) { pipe_call(done, NULL, 0); luaL_unref(L, LUA_REGISTRYINDEX, done); }
+        return;
+    }
+}
+static void pipes_stop(void) { while (nlpipes) pipe_free(nlpipes - 1, true); }
 /* lh.set_desktop(n): ask the WM to switch to desktop n (EWMH _NET_CURRENT_DESKTOP client message to the root) */
 static int l_set_desktop(lua_State *L) { long n = (long)luaL_checkinteger(L, 1); send_root_message(root, atom[A_NET_CURRENT_DESKTOP], n, CurrentTime, 0); return 0; }
 static int l_desktop(lua_State *L) { unsigned long n; int fmt; unsigned char *d = get_prop(root, atom[A_NET_CURRENT_DESKTOP], XA_CARDINAL, &n, &fmt); lua_pushinteger(L, d ? ((long *)d)[0] : 0); if (d) XFree(d); return 1; }
@@ -934,7 +994,7 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"tray_start", l_tray_start}, {"tray_count", l_tray_count}, {"tray_manager", l_tray_manager}, {"tray_stop", l_tray_stop},
     {"selection_owner", l_selection_owner}, {"watch_selection", l_watch_selection}, {"own_selection", l_own_selection}, {"send_message", l_send_message}, {"send_root_message", l_send_root_message}, {"atom", l_atom},
     {"set_root_cardinal", l_set_root_cardinal}, {"struts", l_struts}, {"spawn_pid", l_spawn_pid}, {"notification_closed", l_notification_closed}, {"notification_action", l_notification_action},
-    {"spawn", l_spawn}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"mtime", l_mtime}, {"exists", l_exists}, {"trim", l_trim},
+    {"spawn", l_spawn}, {"pipe", l_pipe}, {"pipe_close", l_pipe_close}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"mtime", l_mtime}, {"exists", l_exists}, {"trim", l_trim},
     {"data_find", l_data_find}, {"data_resolve", l_data_resolve}, {"data_resolve_dir", l_data_resolve_dir},
     {"component_dir", l_component_dir},
     {"theme_resolve", l_theme_resolve}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},
@@ -989,8 +1049,11 @@ int main(int argc, char **argv) {
            Xlib's queue; poll() on the socket would then sleep on events already read, up to the next timer (the clock's
            1 s), which would start the maximise black layers late */
         if (XEventsQueued(dpy, QueuedAlready) > 0 || notify_pending()) timeout = 0;
-        struct pollfd p[2] = { { xfd, POLLIN, 0 }, { dfd, POLLIN, 0 } }; poll(p, dfd >= 0 ? 2 : 1, timeout);
+        struct pollfd p[2 + MAXPIPES] = { { xfd, POLLIN, 0 }, { dfd, POLLIN, 0 } }; int ids[MAXPIPES], np = nlpipes;   /* dfd < 0: poll skips it */
+        for (int i = 0; i < np; i++) { p[2 + i] = (struct pollfd){ lpipes[i].fd, POLLIN, 0 }; ids[i] = lpipes[i].id; }
+        if (poll(p, 2 + np, timeout) > 0) for (int i = 0; i < np; i++) if (p[2 + i].revents) pipe_read(ids[i]);
     }
+    pipes_stop();
     emit("exit", 0);                                                  /* runtime.lua: stops the classic taskbar it started */
     tray_stop();
     XDeleteProperty(dpy, root, atom[A_LHSHELL_CLOCK_VISIBLE]); XSync(dpy, False);   /* nobody shows a sidebar clock any more */

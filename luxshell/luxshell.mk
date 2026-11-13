@@ -23,11 +23,14 @@ build/luxshell/tests/trayicon: luxshell/tests/trayicon.c
 
 luxshell: build/bin/luxshell build/luxshell/tests/trayicon
 
-# make check-luxshell: it builds, and every Lua file at least compiles (luac -p when there is one)
+# make check-luxshell: it builds, every Lua file at least compiles (luac -p when there is one), and the tray tiles pass
+# luxshell/tests/tiles.sh (stub system commands, no display)
 check-luxshell: build/bin/luxshell
 	@if command -v luac5.4 >/dev/null 2>&1; then L=luac5.4; elif command -v luac >/dev/null 2>&1; then L=luac; else L=; fi; \
 	if [ -n "$$L" ]; then $$L -p $(LUXSHELL_LUA) share/packs/*/shell.lua && echo "ok    luxshell (built, Lua parses: $$L -p)"; \
 	else echo "ok    luxshell (built; no luac to check the Lua)"; fi
+	@luxshell/tests/tiles.sh > build/luxshell-tiles.log 2>&1 && echo "ok    luxshell tray tiles ($$(tail -n 1 build/luxshell-tiles.log))" || \
+	{ echo "FAIL  luxshell tray tiles (log below)"; grep -v '^ok' build/luxshell-tiles.log | tail -n 20; exit 1; }
 
 install-luxshell: build/bin/luxshell
 	install -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(PKGLIBDIR)/luxshell/tiles

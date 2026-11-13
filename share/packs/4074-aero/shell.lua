@@ -22,10 +22,11 @@ return {
   sidebar = { width = 150, bg_grid = {0, 0, 0, 36}, sizer = { w = 2, image = nil } },
   tile_bg = nil,                                          -- Aero tiles are transparent over the glass
   -- 4074 Administrator SidebarTiles: Search, Notification History, Quick Launch, Classic Tray (+ the transient Power, the pinned
-  -- Clock), top to bottom (luxshell has no Search tile)
-  tiles = { "notifyhistory", "quicklaunch", "notifications", "power", "clock" },
+  -- Clock), top to bottom (luxshell has no Search tile); after Power luxshell's volume, brightness and touchpad (no 4074 module:
+  -- XP's tray icons as tiles; brightness and touchpad hide themselves without the device)
+  tiles = { "notifyhistory", "quicklaunch", "notifications", "power", "volume", "brightness", "touchpad", "clock" },
   pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 7.3)
-  taskbar_tiles = { "notifyhistory", "quicklaunch", "notifications", "clock" },   -- minimized: 4074 TaskbarTiles (all five)
+  taskbar_tiles = { "notifyhistory", "quicklaunch", "notifications", "volume", "brightness", "touchpad", "clock" },   -- minimized: 4074 TaskbarTiles (all five) + luxshell's three beside the tray
   -- popup menus: the 4074 Jade [sysmetrics] FLATMENUS colours (MENU, MENUTEXT, MENUHILIGHT, MENUBAR, GRAYTEXT)
   menu = { bg = "#f4f4f4", text = "#00025c", hot = "#c5e7f6", hot_text = "#000000", border = "#929497", gray = "#b0b1b3" },
 }
