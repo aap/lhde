@@ -4,7 +4,7 @@
    client: layout, painting, hit-testing and visual state live here so the header looks the same in every program; what a click
    *does* (history, the path model, the address and search text) is the client's.
 
-   Conventions follow libuxtheme (~/.local/include/uxtheme/ut.h), so flxp can wrap it unchanged:
+   Conventions follow libuxtheme (wuxtheme/ut.h), so flxp can wrap it unchanged:
    - plain C, no window system, no cairo, no pango: liblhnav depends on libuxtheme (and libpng); pixels are 32-bit premultiplied
      ARGB in native byte order (cairo's CAIRO_FORMAT_ARGB32, a 32-bit DIB section's), rows `stride` bytes apart; lhnav_paint
      composites OVER what is in the buffer (glass: transparent; opaque: the header pixmap);
@@ -15,7 +15,7 @@
      (lhnav_add_font_dir for the theme's font directories); with no style there is no text;
    - a header-only cairo helper (define LHNAV_WITH_CAIRO before including) for cairo clients.
 
-   Coordinates are the client window's. The geometry (NAVBAR.md, aap's measurements) is measured from the frame's top edge:
+   Coordinates are the client window's. The geometry (NAVBAR.md) is measured from the frame's top edge:
      rows [0, deco_h)                    the frame's decoration (caption buttons); the title is drawn here, baseline on deco_h
      rows [deco_h, deco_h + orb_h)       the back/forward orb (no drop-down arrows), the breadcrumb box and the search box,
                                          both boxes box_h high and centred in the row (the big variant: the whole travel art
@@ -142,7 +142,7 @@ typedef struct lhnav_metrics {
        0 = auto (the orb part's height - 2); tool_icon = the icon buttons' icon size (16 or 24, 32); tool_gap between items;
        tools_dx / tools_dy move every item except the search field (which keeps search_*); the items are centred on the search
        box's row (after search_dy) */
-    char tools[512];    /* default "search_field" (the look before the toolbar) */
+    char tools[512];    /* default "search_field" (the search box alone) */
     int tool_size, tool_icon, tool_gap, tools_dx, tools_dy;
     int sep_last;       /* the chevron after the last segment: 0 never, 1 always, 2 while the breadcrumb is hovered (default) */
     char icon_dir[512]; /* a build's system32 with shell32.dll: the toolbar's icons where the style has none ("" = drawn) */

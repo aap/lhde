@@ -285,8 +285,8 @@ static void mc_clear(lhnav *n)
 {
     for (int i = 0; i < MCACHE; i++) { free(n->mc[i].s); n->mc[i].s = NULL; }
 }
-/* the orb-only hot/pressed image (aap's todo: "we have no hovered/clicked icons without the menu arrow ... synthesized from the
-   regular buttons with just the inside orb copied over"): the NORMAL image, and inside the orb the HOT/PRESSED one. The orb is
+/* the orb-only hot/pressed image (the styles have none without the menu arrow): the NORMAL image, and inside the orb the
+   HOT/PRESSED one. The orb is
    where NORMAL is (nearly) opaque: the well and halo around it are translucent and the drop-down box below is absent from NORMAL
    (alpha 0), so it stays out. Between alpha 160 and 240 the two are mixed (the orb's antialiased rim). Premultiplied lerp. */
 static __attribute__((unused)) uint32_t *synth_orb(const uint32_t *nrm, const uint32_t *act, int w, int h)
@@ -362,8 +362,8 @@ static uint32_t *sub_cols(const uint32_t *px, int w, int x, int cw, int h)
    forward in the right one (5048 36x24, 5112 54x27), one image per state. Composed as browseui does: the plate in the chevron's
    state, then each button's half of the strip in its own state. Where the halves go: with CONTENTMARGINS on the plate (5112:
    0 13 2 0) each button is centred in its half of the content width (back at x 1, forward at 29: the two wells' centres);
-   without (5048) the strip sits whole at x 4, centred vertically (measured on a 5048 Explorer screenshot: plate at 8,25, back
-   glyph at 12,27). The chevron (the recent-pages list, LHNAV_BACK_MENU) is hit right of the glyphs, from where the HOT plate's
+   without (5048) the strip sits whole at x 4, centred vertically (5048's Explorer: plate at 8,25, back glyph at
+   12,27). The chevron (the recent-pages list, LHNAV_BACK_MENU) is hit right of the glyphs, from where the HOT plate's
    box starts. */
 /* a TRUESIZE image part at its own size, premultiplied; NULL when the part has no image. Free with free().
    5112's TravelBand TRAVELBUTTONS(DISABLED) bitmap (#254, 2 bytes longer than its siblings) comes out of libuxtheme with straight
@@ -1096,8 +1096,7 @@ static int text_width(lhnav *n, int fid, const char *s)
 }
 
 /* s in font fid, its cell's top-left at (x, y) (the baseline y + asc), ellipsized to maxw (> 0), in rgb at opacity alpha. glow
-   (text on glass, aap's todo: "liberally blur the text to white so it becomes a background, draw the text in black over it"):
-   first the glyphs' coverage blurred (two box passes of half the glow size ~ a gaussian of that size), times glow_strength and
+   (text on glass: the text blurred to white as a background, the text drawn in black over it): first the glyphs' coverage blurred (two box passes of half the glow size ~ a gaussian of that size), times glow_strength and
    clamped, in the glow colour */
 static void draw_text(lhnav *n, px_cv *c, int fid, const char *s, int x, int y, int maxw, uint32_t rgb, double alpha, int glow)
 {
@@ -1204,7 +1203,7 @@ void lhnav_layout(lhnav *n, int width)
     int by = top + (orb_part - m->box_h) / 2;
     int ax = orb_r + m->box_gap, sr = width - m->pad_r;
     /* the toolbar (nav.ini `tools`), right-aligned before pad_r; the search field (a search_field item, or an open `search`)
-       takes search_w, which narrow windows shrink first, as before the toolbar */
+       takes search_w, which narrow windows shrink first */
     int field_at = -1;   /* the field goes before item field_at (ntools: at the right end) */
     for (int i = 0; i < n->ntools && field_at < 0; i++) if (n->tools[i].kind == LHNAV_TOOL_SEARCH_FIELD) field_at = i;
     if (field_at < 0 && n->search_open) {
@@ -1656,7 +1655,7 @@ static void caret(px_cv *c, int x, const struct rect *r)
     lhnav__px_fill_rect(c, x, r->y + 4, 1, r->h - 8, &b);
 }
 
-/* the top of a text cell centred in r (with the old pango layout's rounding: floor) */
+/* the top of a text cell centred in r (rounded down) */
 static int text_top(lhnav *n, int fid, const struct rect *r, int dy)
 {
     return (int)floor(r->y + (r->h - font_get(n, fid)->height) / 2.0) + dy;

@@ -1,6 +1,6 @@
 # luxnav, the Longhorn navigation bar library (docs/NAVBAR.md). Included by the top-level Makefile.
-# Plain C over libwuxtheme (art and all text) and libpng; no cairo, no pango. The C API keeps its lhnav_ prefix and its header
-# lhnav.h (like wuxtheme's ut_), so flxp's header.cpp and navdemo use it unchanged.
+# Plain C over libwuxtheme (art and all text) and libpng; no cairo, no pango. The C API's prefix is lhnav_ and its header
+# lhnav.h (like wuxtheme's ut_).
 #   build/lib/libluxnav.a                 linked into flxp (the explorer header's vision mode) and navdemo
 #   build/lib/libluxnav.so.1 (+ .so)      for other programs
 #   build/lib/pkgconfig/luxnav.pc         pkg-config for the build tree; make install writes the installed one
