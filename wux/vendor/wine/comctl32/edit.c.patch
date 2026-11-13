@@ -40,7 +40,37 @@
                  }
  
                  GetClientRect(es->hwndSelf, &rc);
-@@ -3492,10 +3507,24 @@
+@@ -3336,6 +3351,17 @@
+ 		else
+ 			EDIT_CheckCombo(es, WM_KEYDOWN, key);
+ 		break;
++	case VK_BACK:
++		/* flxp: Ctrl+Backspace deletes the word before the caret, to where Ctrl+Left goes (XP's Edit inserted a DEL
++		 * character); a selection goes as with Backspace */
++		if (control && !shift && !(es->style & ES_READONLY)) {
++			if (es->selection_start == es->selection_end) {
++				EDIT_EM_SetSel(es, ~0u, 0, FALSE);
++				EDIT_MoveWordBackward(es, TRUE);
++			}
++			EDIT_WM_Clear(es);
++		}
++		break;
+ 	case VK_DELETE:
+ 		if (!(es->style & ES_READONLY) && !(shift && control)) {
+ 			if (es->selection_start != es->selection_end) {
+@@ -3349,8 +3375,9 @@
+ 					/* delete character left of caret */
+ 					EDIT_MoveBackward(es, TRUE);
+ 				else if (control)
+-					/* delete to end of line */
+-					EDIT_MoveEnd(es, TRUE, FALSE);
++					/* flxp: Ctrl+Delete deletes the word after the caret, to where Ctrl+Right goes
++					 * (the Edit this comes from deleted to the end of the line) */
++					EDIT_MoveWordForward(es, TRUE);
+ 				else
+ 					/* delete character right of caret */
+ 					EDIT_MoveForward(es, TRUE);
+@@ -3492,10 +3519,24 @@
   *	WM_LBUTTONUP
   *
   */
@@ -65,7 +95,7 @@
  	}
  	es->bCaptureState = FALSE;
  	return 0;
-@@ -3507,9 +3536,33 @@
+@@ -3507,9 +3548,33 @@
   *	WM_MBUTTONDOWN
   *
   */
@@ -101,7 +131,7 @@
      return 0;
  }
  
-@@ -3585,8 +3638,10 @@
+@@ -3585,8 +3650,10 @@
  		old_brush = SelectObject(dc, GetSysColorBrush(COLOR_WINDOWFRAME));
  		PatBlt(dc, rc.left, rc.top, rc.right - rc.left, bh, PATCOPY);
  		PatBlt(dc, rc.left, rc.top, bw, rc.bottom - rc.top, PATCOPY);
@@ -114,7 +144,7 @@
  		SelectObject(dc, old_brush);
  
  		/* Keep the border clean */
-@@ -4832,6 +4887,9 @@
+@@ -4832,6 +4899,9 @@
  
      case WM_KEYDOWN:
          result = EDIT_WM_KeyDown(es, (INT)wParam);
@@ -124,7 +154,7 @@
          break;
  
      case WM_KILLFOCUS:
-@@ -4851,7 +4909,7 @@
+@@ -4851,7 +4921,7 @@
          break;
  
      case WM_MBUTTONDOWN:

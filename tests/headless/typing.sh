@@ -3,7 +3,8 @@
 # keysym, wux makes it UTF-8 text (XLookupString alone answers in Latin-1 or not at all), and TranslateMessage posts one
 # WM_CHAR per UTF-16 code unit (a character above U+FFFF as two, high surrogate first) which the edit stores as the pair.
 # First build/tests/w32/edittext --self (the WM_CHARs sent directly), then xdotool types ASCII, é (Latin-1's range), ж
-# (a keysym outside Latin-1) and 😀 (U+1F600, a Unicode keysym) into edittext's window, which prints its text as hex.
+# (a keysym outside Latin-1) and 😀 (U+1F600, a Unicode keysym) into edittext's window, which prints its text as hex; then
+# Ctrl+Backspace and Ctrl+Delete delete a word (lhde's Edit; XP's inserted a DEL character for Ctrl+Backspace).
 # Needs Xvfb and xdotool. Usage: tests/headless/typing.sh [:DISPLAY]
 D=${1:-:75}
 T=$(mktemp -d)
@@ -37,6 +38,17 @@ else
     check "U+1F600 typed: f09f9880 (two WM_CHARs, one pair)" 61c3a9d0b6f09f9880 "$(last)"
     xdotool key BackSpace; wait_for 10 is 61c3a9d0b6
     check "Backspace takes the whole pair" 61c3a9d0b6 "$(last)"
+    # Ctrl+Backspace deletes the word before the caret, Ctrl+Delete the one after, to where Ctrl+Left / Ctrl+Right go
+    xdotool key ctrl+a; xdotool type --delay 30 'alpha beta gamma'; wait_for 10 is 616c70686120626574612067616d6d61
+    xdotool key ctrl+BackSpace; wait_for 10 is 616c706861206265746120
+    check "Ctrl+Backspace: 'gamma' gone" 616c706861206265746120 "$(last)"
+    xdotool key ctrl+BackSpace; wait_for 10 is 616c70686120
+    check "Ctrl+Backspace again: 'beta ' gone (the word and the space after it)" 616c70686120 "$(last)"
+    xdotool type --delay 30 'beta'; wait_for 10 is 616c7068612062657461
+    xdotool key Home ctrl+Delete; wait_for 10 is 62657461
+    check "Ctrl+Delete at the start: 'alpha ' gone" 62657461 "$(last)"
+    xdotool key End ctrl+Delete ctrl+BackSpace ctrl+BackSpace; sleep .5
+    check "Ctrl+Delete at the end does nothing, Ctrl+Backspace empties it, no DEL inserted" "" "$(last)"
 fi
 kill $P 2>/dev/null; wait $P 2>/dev/null; stop_xvfb
 rm -rf $T
