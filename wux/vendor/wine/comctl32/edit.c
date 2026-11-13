@@ -3352,7 +3352,7 @@ static LRESULT EDIT_WM_KeyDown(EDITSTATE *es, INT key)
 			EDIT_CheckCombo(es, WM_KEYDOWN, key);
 		break;
 	case VK_BACK:
-		/* flxp: Ctrl+Backspace deletes the word before the caret, to where Ctrl+Left goes (XP's Edit inserted a DEL
+		/* flxp: Ctrl+Backspace deletes the word before the caret, to where Ctrl+Left goes (XP's Edit inserts a DEL
 		 * character); a selection goes as with Backspace */
 		if (control && !shift && !(es->style & ES_READONLY)) {
 			if (es->selection_start == es->selection_end) {
@@ -3376,7 +3376,7 @@ static LRESULT EDIT_WM_KeyDown(EDITSTATE *es, INT key)
 					EDIT_MoveBackward(es, TRUE);
 				else if (control)
 					/* flxp: Ctrl+Delete deletes the word after the caret, to where Ctrl+Right goes
-					 * (the Edit this comes from deleted to the end of the line) */
+					 * (Wine's Edit deletes to the end of the line) */
 					EDIT_MoveWordForward(es, TRUE);
 				else
 					/* delete character right of caret */

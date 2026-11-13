@@ -39,7 +39,7 @@
      SystemParametersInfoW (SPI_GETNONCLIENTMETRICS, 0, &nclm, 0);
  
 +    /* lhde: the text and the buttons in the message font (NONCLIENTMETRICS' lfMessageFont, the style's MsgBoxFont: Tahoma 8
-+     * under XP), as XP's user32 and Wine before 1.3 set it; the box keeps it until it is destroyed (MSGBOX_DlgProc) */
++     * under XP), as XP sets it; the box keeps it until it is destroyed (MSGBOX_DlgProc) */
 +    {
 +        HFONT hFont = CreateFontIndirectW(&nclm.lfMessageFont);
 +        if (hFont)
@@ -87,7 +87,7 @@
 -     case IDOK:
       case IDCANCEL:
 +      /* lhde: Escape (or the close box) without a Cancel button: OK where there is one, else nothing (MessageBox's
-+       * documented behaviour; Wine ended a Yes/No box with IDCANCEL) */
++       * documented behaviour; Wine's own ends a Yes/No box with IDCANCEL) */
 +      if (!GetDlgItem(hwnd, IDCANCEL))
 +      {
 +          if (GetDlgItem(hwnd, IDOK)) EndDialog(hwnd, IDOK);

@@ -228,7 +228,7 @@
      DeleteDC( hdcMem );
  }
 +/* flxp: a menu bar shows its mnemonics while Alt is held, while a menu opened from the keyboard is tracked, and always with
-+ * SPI_GETKEYBOARDCUES (XP's xxxDrawMenuBarUnderlines); otherwise they are hidden */
++ * SPI_GETKEYBOARDCUES, as in XP; otherwise they are hidden */
 +static BOOL bar_cues(void)
 +{
 +    BOOL cues = FALSE;
@@ -534,7 +534,7 @@
 +/* flxp: whether a press at this screen point belongs to the menus being tracked, as MENU_ButtonDown decides it (an
 + * item, anywhere on a popup, the system menu's button): wux's capture asks before the press is queued, while the pointer
 + * grab holds it; a press elsewhere ends the menu and goes on to the window under the pointer, as the loop below leaves it in
-+ * the queue (XP's mnloop.c xxxHandleMenuMessages likewise; docs/CLIENT-PROTOCOL.md "Menus and clicks") */
++ * the queue (as XP's menu loop does; docs/CLIENT-PROTOCOL.md "Menus and clicks") */
 +int MENU_HitsTracking( int x, int y )
 +{
 +    POINT pt;
