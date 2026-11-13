@@ -600,6 +600,7 @@ void start_message(const XClientMessageEvent& m, bool from_root)
     r.x = (int)m.data.l[1]; r.y = (int)m.data.l[2]; r.w = (int)m.data.l[3]; r.h = (int)m.data.l[4];
     if (r.w <= 0 || r.h <= 0) r.x = r.y = r.w = r.h = 0;
     r.from_root = from_root;
+    r.run = !from_root && (m.data.l[0] & 2) != 0;
     r.serial = start_req.serial + 1;
     start_req = r;
     changes |= ChangeStartKey;

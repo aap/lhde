@@ -3,9 +3,7 @@
 
 #define IDD_OPENWITH        100
 #define IDD_CONFIRMDELETE   101
-#define IDD_MESSAGE         102
 #define IDD_BOOKMARKS       103
-#define IDD_PROPERTIES      104
 #define IDD_FO_GENERAL      105
 #define IDD_FO_VIEW         106
 #define IDD_CHOOSEDETAILS   107
@@ -21,8 +19,6 @@
 #define IDC_CD_ICON         1101
 #define IDC_CD_TEXT         1102
 
-#define IDC_MSG_ICON        1201
-#define IDC_MSG_TEXT        1202
 
 #define IDC_BM_LIST         1301
 #define IDC_BM_UP           1302
@@ -30,23 +26,6 @@
 #define IDC_BM_REMOVE       1304
 #define IDC_BM_NAME         1305
 #define IDC_BM_RENAME       1306
-
-#define IDC_PR_ICON         1401
-#define IDC_PR_NAME         1402
-#define IDC_PR_TYPE         1403
-#define IDC_PR_OPENSL       1404
-#define IDC_PR_OPENS        1405
-#define IDC_PR_CHANGE       1406
-#define IDC_PR_LOCATION     1407
-#define IDC_PR_SIZE         1408
-#define IDC_PR_CONTAINSL    1409
-#define IDC_PR_CONTAINS     1410
-#define IDC_PR_MODIFIED     1411
-#define IDC_PR_ACCESSED     1412
-#define IDC_PR_CHANGED      1413
-#define IDC_PR_PERMS        1414
-#define IDC_PR_EXTRAL       1415
-#define IDC_PR_EXTRA        1416
 
 #define IDC_FO_VIEW         1501
 #define IDC_FO_ZOOML        1502

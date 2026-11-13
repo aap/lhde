@@ -30,12 +30,12 @@ $PREFIX/share/lhde/                  shipped data, our text only (DATADIR)
   sources/ID.ini                       what lhde-pack takes from each Windows build, the recipes lhde-import runs
   frames/SET/theme.ini (+ nav.ini)     frame-set tuning; the pixels are generated, below
   packs/PACK/shell.lua                 luxshell's packs
-  res/icons/                           flxp's own (Wine's) icons
+  res/icons/                           flxp's own (Wine's) icons, luxpad.ico (ReactOS's notepad icon)
 $PREFIX/lib/lhde/                    code that is not a binary (PKGLIBDIR)
   luxshell/                            luxshell's Lua (runtime.lua, tiles/, ...)
   session/                             lhde-session's helpers: lhde-paths.sh, lhwall.sh, lab.sh, theme-*.sh, picom configs
   tools/                               lhde-import's Python: lhdeimport.py, lhdetree.py, lhdeschemes.py, recipe builders
-$PREFIX/bin/                         luxwm luxshell luxshot flxp* lhde-theme lhde-session lhde-import lhde-pack lhde-schemes ut-dump
+$PREFIX/bin/                         luxwm luxshell luxshot luxattr luxpad flxp* lhde-theme lhde-session lhde-import lhde-pack lhde-schemes ut-dump
 
 WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows
 ~/.local/share/lhde-windows/

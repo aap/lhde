@@ -7,17 +7,17 @@ drawn live from the visual style through libwuxtheme (Window.CAPTION & co.) with
     make check-luxwm              luxwm/tests/regress.sh: the frame painter against this machine's baseline
 
 - Sources: wm.c (window management, EWMH, the session theme, animations, keys), frame.c (frame sets and painting),
-  frame_ut.c (frames from a .msstyles through libwuxtheme), menu.c (the window menu), client.c (luxwmc), config.h (build
+  frame_ut.c (frames from a .msstyles through libwuxtheme), menu.c (the window menu), switcher.c (the Alt+Tab switcher window), client.c (luxwmc), config.h (build
   configuration). `luxwm.mk` is its part of the top-level build.
 - Themes: the theme files share/themes/NAME.theme, resolved by liblhde (`[Glass] frames = NAME`), frame sets in
   share/frames/NAME (theme.ini, nav.ini) with their pixels in the Windows tree (`~/.local/share/lhde-windows/generated/frames`,
   tools/lhde-import), found through liblhde/data.c.
 - From berry (MIT, Joshua L Ervin; its notice is luxwm/LICENSE, docs/LICENSING.md): wm.c and client.c (they carry berry's
   copyright line), config.h, globals.h, ipc.h, types.h, utils.c, utils.h, the man pages luxwm.1 and luxwmc.1 (berry's
-  berry.1 and berryc.1). Written for lhde: frame.c, frame.h, frame_ut.c, frame_ut.h, menu.c, menu.h, luxwm.mk
+  berry.1 and berryc.1). Written for lhde: frame.c, frame.h, frame_ut.c, frame_ut.h, menu.c, menu.h, switcher.c, switcher.h, luxwm.mk
   and tests/.
 - Names kept from lhwm: the X atoms (`_LHWM_*`), the window manager's `_NET_WM_NAME` "lhwm" (luxshell and flxp's log-off know
   it by that), `LHWM_*` environment variables, `~/.config/lhde/keys`. `make install` adds `lhwm` and `lhwmc` symlinks.
-- tests/: frametest (renders frames offline), menutest, regress.sh, and small X clients for the lab (desktopwin, dockorder,
-  strutdock). berry's examples/ (an autostart of berryc colour and gap settings, an sxhkdrc) are not carried: luxwm reads
+- tests/: frametest (renders frames offline), menutest, switchertest, regress.sh, and small X clients for the lab and the
+  headless tests (desktopwin, dockorder, strutdock, testwin). berry's examples/ (an autostart of berryc colour and gap settings, an sxhkdrc) are not carried: luxwm reads
   its keys and its frames itself (docs/LUXWM.md).

@@ -40,13 +40,16 @@
 CXX      ?= g++
 # WebP (wux/gdi/image.cpp) when libwebp is installed: FLXP_WEBP, libwebpdemux for animations' first frame
 WEBP     := $(shell pkg-config --exists libwebp libwebpdemux && echo libwebp libwebpdemux)
-PKGS      = x11 xext freetype2 fontconfig libpng libjpeg $(WEBP)
+PKGS      = x11 xext xcursor xfixes xkbcommon freetype2 fontconfig libpng libjpeg $(WEBP)
 CXXFLAGS ?= -g -O1
 CXXFLAGS += -pthread -std=c++17 -fno-exceptions -fno-rtti -Wall -Wextra -MMD -MP -Iwux -Iflxp -I. $(shell pkg-config --cflags $(PKGS))
 CXXFLAGS += $(if $(WEBP),-DFLXP_WEBP)
 LDLIBS    = $(shell pkg-config --libs $(PKGS)) -pthread
 
-# the win32 headers (Wine's, vendored) and the shim's CRT redirections
+# the win32 headers (Wine's, vendored) and the shim's CRT redirections. WINE_UNICODE_NATIVE makes Wine's headers type WCHAR
+# as wchar_t (16 bits with -fshort-wchar; L"..." literals are WCHAR strings) rather than char16_t; it is defined here, once,
+# because WCHAR must be the same type in every unit that shares the win32 ABI (the vendored C, which includes no header of
+# ours, the shim, flxp, the applications, the tests), and the headers test only whether it is defined.
 WINE_DIR  = wux/vendor/wine
 W32FLAGS  = -fshort-wchar -D__WINESRC__ -DWINE_UNICODE_NATIVE -DDECLSPEC_IMPORT= -DDECLSPEC_HIDDEN= -include wux/w32/include/flxp_crt.h \
             -Iwux/w32/include -I$(WINE_DIR)/include -I$(WINE_DIR)/comctl32 -I$(WINE_DIR)/user32 -I$(WINE_DIR)/uxtheme
@@ -93,6 +96,8 @@ include examples/examples.mk
 include apps/app.mk            # after wux.mk and flxp.mk: the recipe an application includes (docs/APPLICATIONS.md)
 include apps/skeleton/skeleton.mk
 include apps/luxshot/luxshot.mk
+include apps/luxattr/luxattr.mk
+include apps/luxpad/luxpad.mk
 
 all: libs programs tests liblhde luxwm luxshell examples
 libs: $(WUXA) $(UTA) $(UTSO) $(UTPC) $(LHDEA) $(LHDESO) $(LHDEPC) $(LUXNAVA) $(LUXNAVSO) $(LUXNAVPC)

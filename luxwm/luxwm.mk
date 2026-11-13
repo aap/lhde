@@ -2,7 +2,8 @@
 # Included by the top-level Makefile. Frames come from the visual style through libwuxtheme (build/lib/libwuxtheme.so.1,
 # rpath $ORIGIN/../lib) and from the frame sets in lhde's data directories, the theme from liblhde's resolver (liblhde/liblhde.mk).
 #   build/bin/luxwm build/bin/luxwmc
-#   build/luxwm/tests/frametest menutest shapetest desktopwin dockorder strutdock   (shapetest, tests/regress.sh: make check-luxwm)
+#   build/luxwm/tests/frametest menutest switchertest shapetest desktopwin dockorder strutdock testwin
+#   (shapetest, tests/regress.sh: make check-luxwm; testwin: tests/headless/alttab.sh)
 
 LUXWM_PKGS   = x11 xext xfixes xinerama fontconfig xft cairo cairo-xlib pangocairo
 # berry's warnings; LUX_COPT (the top-level Makefile: -Os)
@@ -11,8 +12,8 @@ LUXWM_CFLAGS = -std=c99 $(LUX_COPT) -Wall -Wextra -Wredundant-decls -Wshadow -Wn
 LUXWM_LIBS   = -Lbuild/lib -lwuxtheme '-Wl,-rpath,$$ORIGIN/../lib' $(shell pkg-config --libs $(LUXWM_PKGS)) -lm
 LUXWM_TLIBS  = $(subst ../lib,../../lib,$(LUXWM_LIBS))   # build/luxwm/tests: the library two levels up
 LUXWM_CORE   = $(addprefix $(O)/luxwm/,frame.o frame_ut.o) $(LHDEA)
-LUXWM_OBJS   = $(addprefix $(O)/luxwm/,wm.o utils.o menu.o) $(LUXWM_CORE)
-LUXWM_TESTS  = $(addprefix build/luxwm/tests/,frametest menutest shapetest desktopwin dockorder strutdock)
+LUXWM_OBJS   = $(addprefix $(O)/luxwm/,wm.o utils.o menu.o switcher.o) $(LUXWM_CORE)
+LUXWM_TESTS  = $(addprefix build/luxwm/tests/,frametest menutest switchertest shapetest desktopwin dockorder strutdock testwin)
 
 $(O)/luxwm/%.o: luxwm/%.c
 	@mkdir -p $(dir $@)
@@ -39,6 +40,9 @@ build/luxwm/tests/shapetest: $(O)/luxwm/tests/shapetest.o $(LUXWM_CORE) $(UTSO)
 build/luxwm/tests/menutest: $(O)/luxwm/tests/menutest.o $(O)/luxwm/menu.o $(LUXWM_CORE) $(UTSO)
 	@mkdir -p $(dir $@)
 	$(CC) -o $@ $< $(O)/luxwm/menu.o $(LUXWM_CORE) $(LUXWM_TLIBS)
+build/luxwm/tests/switchertest: $(O)/luxwm/tests/switchertest.o $(O)/luxwm/switcher.o $(O)/luxwm/menu.o $(LUXWM_CORE) $(UTSO)
+	@mkdir -p $(dir $@)
+	$(CC) -o $@ $< $(O)/luxwm/switcher.o $(O)/luxwm/menu.o $(LUXWM_CORE) $(LUXWM_TLIBS)
 build/luxwm/tests/%: $(O)/luxwm/tests/%.o
 	@mkdir -p $(dir $@)
 	$(CC) -o $@ $< $(shell pkg-config --libs x11)

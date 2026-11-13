@@ -168,6 +168,7 @@ ATOM WINAPI RegisterClassExW(const WNDCLASSEXW* wc)
     c->cursor = wc->hCursor;
     c->background = wc->hbrBackground;
     if (wc->lpszMenuName && ((ULONG_PTR)wc->lpszMenuName >> 16)) c->menu_name = (const char16_t*)wc->lpszMenuName;
+    else c->menu_res = (UINT_PTR)wc->lpszMenuName;
     c->cls_bytes.assign((size_t)(c->cls_extra > 0 ? c->cls_extra : 0) + 8, 0);
     g_classes.push_back(c);
     return c->atom;
@@ -227,7 +228,7 @@ static void fill_classinfo(Class* c, WNDCLASSEXW* wc)
     wc->style = c->style; wc->lpfnWndProc = c->proc; wc->cbClsExtra = c->cls_extra;
     wc->cbWndExtra = c->wnd_extra; wc->hInstance = c->inst; wc->hIcon = c->icon; wc->hIconSm = c->icon_sm;
     wc->hCursor = c->cursor; wc->hbrBackground = c->background;
-    wc->lpszMenuName = c->menu_name.empty() ? nullptr : (LPCWSTR)c->menu_name.c_str();
+    wc->lpszMenuName = c->menu_name.empty() ? (LPCWSTR)c->menu_res : (LPCWSTR)c->menu_name.c_str();
     wc->lpszClassName = (LPCWSTR)c->name.c_str();
 }
 
@@ -336,6 +337,9 @@ HWND WINAPI CreateWindowExW(DWORD ex, LPCWSTR clsname, LPCWSTR name, DWORD style
     if (cy < 0) cy = 0;
     if (parent == hwnd_of(g_desktop)) parent = nullptr;
     if ((style & WS_CHILD) && !parent) { SetLastError(ERROR_TLW_WITH_WSCHILD); return nullptr; }
+    // a toplevel without a menu of its own gets its class's (lpszMenuName, from the class's module)
+    if (!(style & WS_CHILD) && !menu && (c->menu_res || !c->menu_name.empty()))
+        menu = LoadMenuW(c->inst, c->menu_name.empty() ? (LPCWSTR)c->menu_res : (LPCWSTR)c->menu_name.c_str());
 
     Window* d = new Window();
     d->cls = c;
@@ -374,6 +378,10 @@ HWND WINAPI CreateWindowExW(DWORD ex, LPCWSTR clsname, LPCWSTR name, DWORD style
         win::set_drop_shadow(w, UT_MENU_SHADOW, on ? ut_menu_shadow_alpha : nullptr);
     }
     HWND h = hwnd_of(w);
+    // an owned window with a caption (a modeless dialog: Find, Replace) stays above its owner and has no taskbar button,
+    // as XP's owned windows: the owner's transient (a dialog to the window manager); WS_EX_APPWINDOW keeps it apart
+    if (owner && owner->top && w->top && w->wm_decorated && !(ex & WS_EX_APPWINDOW))
+        sys::set_transient_for(sys::window_for_user((void*)h), sys::native_id(sys::window_for_user((void*)hwnd_of(owner))), false);
     if (!(style & WS_CHILD) && menu) MENU_SetMenu(h, menu);   // attaches the bar to the window and recomputes the frame
     SendMessageW(h, WM_SIZE, SIZE_RESTORED, MAKELONG(w->client.width(), w->client.height()));
     SendMessageW(h, WM_MOVE, 0, MAKELONG(w->rect.left + w->client.left, w->rect.top + w->client.top));
@@ -396,6 +404,7 @@ BOOL WINAPI DestroyWindow(HWND h)
 {
     win::Window* w = window_of(h);
     if (!win::is_window(w)) return FALSE;
+    forget_normal_rect(h);
     win::destroy(w);
     return TRUE;
 }
@@ -1028,7 +1037,36 @@ LRESULT WINAPI SendMessageW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     if (!win::is_window(w)) return 0;
     return win::send(w, msg, wp, lp);
 }
-LRESULT WINAPI SendMessageA(HWND h, UINT msg, WPARAM wp, LPARAM lp) { return SendMessageW(h, msg, wp, lp); }
+// The A messages that carry a window's text are converted, as Windows converts them for a Unicode window ("ANSI" is
+// UTF-8): WM_SETTEXT's string, WM_GETTEXT's buffer (cut at a character, the byte count returned) and WM_GETTEXTLENGTH
+// (in bytes). SetDlgItemTextA, GetDlgItemTextA and SetDlgItemInt go through here (Wine's dialog.c; comdlg32's Find and
+// Replace dialogs use them). Every other message passes as it is.
+LRESULT WINAPI SendMessageA(HWND h, UINT msg, WPARAM wp, LPARAM lp)
+{
+    switch (msg) {
+    case WM_SETTEXT: {
+        if (!lp) return SendMessageW(h, msg, wp, lp);
+        std::u16string w = utf16_of((const char*)lp);
+        return SendMessageW(h, msg, wp, (LPARAM)w.c_str());
+    }
+    case WM_GETTEXT:
+    case WM_GETTEXTLENGTH: {
+        int n = (int)SendMessageW(h, WM_GETTEXTLENGTH, 0, 0);
+        std::u16string w((size_t)(n > 0 ? n : 0) + 1, 0);
+        int got = n > 0 ? (int)SendMessageW(h, WM_GETTEXT, (WPARAM)(n + 1), (LPARAM)&w[0]) : 0;
+        std::string s = utf8_of((const WCHAR*)w.c_str(), got > 0 ? got : 0);
+        if (msg == WM_GETTEXTLENGTH) return (LRESULT)s.size();
+        char* out = (char*)lp;
+        if (!out || !wp) return 0;
+        size_t k = s.size() < (size_t)wp - 1 ? s.size() : (size_t)wp - 1;
+        while (k > 0 && k < s.size() && ((unsigned char)s[k] & 0xc0) == 0x80) k--;   // not inside a character
+        memcpy(out, s.data(), k);
+        out[k] = 0;
+        return (LRESULT)k;
+    }
+    }
+    return SendMessageW(h, msg, wp, lp);
+}
 BOOL WINAPI SendNotifyMessageW(HWND h, UINT msg, WPARAM wp, LPARAM lp) { SendMessageW(h, msg, wp, lp); return TRUE; }
 LRESULT WINAPI SendMessageTimeoutW(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT, UINT, PDWORD_PTR res)
 {
@@ -1204,6 +1242,13 @@ HWND WINAPI GetActiveWindow(void)
     if (!a && win::focus()) a = win::toplevel_of(win::focus());
     return hwnd_of(a);
 }
+// the window is the active top level now (not GetActiveWindow's fallback to the focus's top level, which a window that has
+// lost the activation still has): its non-client area in the active look (menu.c.patch's themed menu bar)
+BOOL WUX_IsActiveWindow(HWND h)
+{
+    win::Window* a = win::active_window();
+    return a && a == window_of(h);
+}
 HWND WINAPI SetActiveWindow(HWND h) { HWND old = GetActiveWindow(); win::Window* w = window_of(h); if (win::is_window(w)) win::set_focus(w); return old; }
 HWND WINAPI GetForegroundWindow(void) { return GetActiveWindow(); }
 BOOL WINAPI SetForegroundWindow(HWND h) { SetActiveWindow(h); return TRUE; }
@@ -1285,7 +1330,8 @@ HCURSOR WINAPI SetCursor(HCURSOR c)
         { (LPCWSTR)IDC_SIZEWE, win::Cursor::SizeWE }, { (LPCWSTR)IDC_SIZENS, win::Cursor::SizeNS },
         { (LPCWSTR)IDC_SIZENWSE, win::Cursor::SizeNWSE }, { (LPCWSTR)IDC_SIZENESW, win::Cursor::SizeNESW },
         { (LPCWSTR)IDC_SIZEALL, win::Cursor::SizeAll }, { (LPCWSTR)IDC_HAND, win::Cursor::Hand },
-        { (LPCWSTR)IDC_NO, win::Cursor::No },
+        { (LPCWSTR)IDC_NO, win::Cursor::No }, { (LPCWSTR)IDC_APPSTARTING, win::Cursor::AppStarting },
+        { (LPCWSTR)IDC_HELP, win::Cursor::Help }, { (LPCWSTR)IDC_UPARROW, win::Cursor::UpArrow },
     };
     if (!c) { win::set_cursor(win::Cursor::None); return old; }
     for (auto& m : map) if (LoadCursorW(nullptr, m.id) == c) { win::set_cursor(m.shape); return old; }
@@ -1495,5 +1541,89 @@ void WINPOS_ActivateOtherWindow(HWND h)
 }
 
 const char* SPY_GetMsgName(UINT, HWND) { return ""; }
+
+} // extern "C"
+
+// ---- window placement ----
+// The window manager owns minimised and maximised states (_NET_WM_STATE); the
+// normal rectangle is the window rectangle last seen while not maximised (DefWindowProc's WM_WINDOWPOSCHANGED notes
+// it), so a window closed maximised still gives back where it was before.
+
+namespace w32 {
+static std::map<HWND, RECT> g_normal_rect;
+void note_normal_rect(HWND h)
+{
+    win::Window* w = window_of(h);
+    if (!win::is_window(w) || w->parent || win::is_maximized(w)) return;
+    g_normal_rect[h] = RECT_of(win::window_rect(w));
+}
+void forget_normal_rect(HWND h) { g_normal_rect.erase(h); }
+}
+
+extern "C" {
+
+BOOL WINAPI GetWindowPlacement(HWND h, WINDOWPLACEMENT* wp)
+{
+    win::Window* w = window_of(h);
+    if (!win::is_window(w) || !wp) return FALSE;
+    bool max = !w->parent && win::is_maximized(w);
+    if (!max) note_normal_rect(h);
+    auto it = g_normal_rect.find(h);
+    wp->length = sizeof *wp;
+    wp->flags = max ? WPF_RESTORETOMAXIMIZED : 0;
+    wp->showCmd = !(w->style & WS_VISIBLE) ? SW_HIDE : max ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL;
+    wp->ptMinPosition.x = wp->ptMinPosition.y = -1;
+    wp->ptMaxPosition.x = wp->ptMaxPosition.y = -1;
+    wp->rcNormalPosition = it != g_normal_rect.end() ? it->second : RECT_of(win::window_rect(w));
+    return TRUE;
+}
+
+BOOL WINAPI SetWindowPlacement(HWND h, const WINDOWPLACEMENT* wp)
+{
+    win::Window* w = window_of(h);
+    if (!win::is_window(w) || !wp) return FALSE;
+    const RECT& r = wp->rcNormalPosition;
+    if (r.right > r.left && r.bottom > r.top) {
+        if (win::is_maximized(w)) win::set_maximized(w, 0);
+        SetWindowPos(h, nullptr, r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_NOZORDER | SWP_NOACTIVATE);
+        g_normal_rect[h] = r;
+    }
+    switch (wp->showCmd) {
+    case SW_HIDE: ShowWindow(h, SW_HIDE); break;
+    case SW_SHOWMAXIMIZED:
+        ShowWindow(h, SW_SHOW);
+        win::set_maximized(w, 1);
+        break;
+    case SW_SHOWMINIMIZED: case SW_MINIMIZE: case SW_SHOWMINNOACTIVE: case SW_FORCEMINIMIZE:
+        ShowWindow(h, SW_SHOW);   // minimising is the window manager's (no iconic state here)
+        break;
+    default:
+        ShowWindow(h, SW_SHOW);
+        if (win::is_maximized(w)) win::set_maximized(w, 0);
+        break;
+    }
+    return TRUE;
+}
+
+BOOL WINAPI GetWindowInfo(HWND h, WINDOWINFO* wi)
+{
+    win::Window* w = window_of(h);
+    if (!win::is_window(w) || !wi) return FALSE;
+    wi->cbSize = sizeof *wi;
+    wi->rcWindow = RECT_of(win::window_rect(w));
+    POINT o = { 0, 0 };
+    ClientToScreen(h, &o);
+    gdi::Rect c = win::client_rect(w);
+    wi->rcClient = { o.x, o.y, o.x + c.width(), o.y + c.height() };
+    wi->dwStyle = w->style;
+    wi->dwExStyle = w->ex_style;
+    wi->dwWindowStatus = GetActiveWindow() == h ? WS_ACTIVECAPTION : 0;
+    wi->cxWindowBorders = (UINT)(wi->rcClient.left - wi->rcWindow.left);
+    wi->cyWindowBorders = (UINT)(wi->rcWindow.bottom - wi->rcClient.bottom);
+    Class* cls = wdata(h) ? wdata(h)->cls : nullptr;
+    wi->atomWindowType = cls ? cls->atom : 0;
+    wi->wCreatorVersion = 0x0501;
+    return TRUE;
+}
 
 } // extern "C"

@@ -1,0 +1,28 @@
+--- a/dlls/comdlg32/cdlg.h (wine-11.18)
++++ b/vendor/wine/comdlg32/cdlg.h
+@@ -165,23 +165,10 @@
+ #include "winuser.h"
+ #include "winnls.h"
+ #include "commctrl.h"
+-#include "shlobj.h"
++/* flxp: only the font and find/replace dialogs are vendored (fontdlg.c, finddlg.c; the file dialog is flxp's own,
++ * wux/w32/comdlg.cpp): the file dialog's shell types and helpers are left out */
+ #include "shellapi.h"
+ 
+-/* Constructors */
+-HRESULT FileOpenDialog_Constructor(IUnknown *pUnkOuter, REFIID riid, void **ppv);
+-HRESULT FileSaveDialog_Constructor(IUnknown *pUnkOuter, REFIID riid, void **ppv);
+-
+-/* Shared helper functions */
+-void COMDLG32_GetCanonicalPath(PCIDLIST_ABSOLUTE pidlAbsCurrent, LPWSTR lpstrFile, LPWSTR lpstrPathAndFile);
+-int FILEDLG95_ValidatePathAction(LPWSTR lpstrPathAndFile, IShellFolder **ppsf,
+-                                 HWND hwnd, DWORD flags, BOOL isSaveDlg, int defAction);
+-int COMDLG32_SplitFileNames(LPWSTR lpstrEdit, UINT nStrLen, LPWSTR *lpstrFileList, UINT *sizeUsed);
+-void FILEDLG95_OnOpenMessage(HWND hwnd, int idCaption, int idText);
+-
+-extern BOOL GetFileName31A( OPENFILENAMEA *lpofn, UINT dlgType );
+-extern BOOL GetFileName31W( OPENFILENAMEW *lpofn, UINT dlgType );
+-
+ #define ONOPEN_BROWSE 1
+ #define ONOPEN_OPEN   2
+ #define ONOPEN_SEARCH 3

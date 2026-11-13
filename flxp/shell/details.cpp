@@ -1,14 +1,17 @@
 // The details model (details.h). The rules are XP's (shell32's details and
 // properties, shlwapi's StrFormatByteSizeW and SHFormatDateTimeW) and 4051's
 // managed preview pane.
+#include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/xattr.h>
 #include <time.h>
 #include <algorithm>
+#include "config.h"
 #include "details.h"
 #include "thumbs.h"
 
@@ -61,6 +64,28 @@ std::string friendly_date(int64_t t, int64_t now)
     char buf[96];
     snprintf(buf, sizeof buf, "%s, %s %02d, %d, ", day, MONTHS[tm.tm_mon], tm.tm_mday, tm.tm_year + 1900);
     return buf + time_of_day(tm);
+}
+
+std::string thousands(uint64_t n)
+{
+    std::string s = std::to_string(n);
+    for (int i = (int)s.size() - 3; i > 0; i -= 3) s.insert((size_t)i, ",");
+    return s;
+}
+
+std::string size_and_bytes(uint64_t bytes)
+{
+    return byte_size(bytes) + " (" + thousands(bytes) + " bytes)";
+}
+
+std::string long_date(int64_t t)
+{
+    struct tm tm = local(t);
+    char buf[96];
+    int h = tm.tm_hour % 12;
+    snprintf(buf, sizeof buf, "%s, %s %02d, %d, %d:%02d:%02d %s", DAYS[tm.tm_wday], MONTHS[tm.tm_mon], tm.tm_mday, tm.tm_year + 1900,
+             h ? h : 12, tm.tm_min, tm.tm_sec, tm.tm_hour < 12 ? "AM" : "PM");
+    return buf;
 }
 
 std::string short_date(int64_t t)
@@ -177,6 +202,36 @@ Read read_attr(const std::string& path, const std::string& xattr, std::string* v
     return Read::Failed;
 }
 
+Read list_attrs(const std::string& path, std::vector<std::string>* names, int* error)
+{
+    names->clear();
+    if (error) *error = 0;
+    for (int tries = 0; tries < 8; tries++) {
+        ssize_t n = listxattr(path.c_str(), nullptr, 0);
+        std::string buf;
+        if (n > 0) {
+            buf.resize((size_t)n);
+            n = listxattr(path.c_str(), &buf[0], buf.size());
+            if (n < 0 && errno == ERANGE) continue;   // grew in between
+        }
+        if (n < 0) {
+            int e = errno;
+            if (e == ENOTSUP || e == ENOENT) return Read::Missing;
+            if (error) *error = e;
+            return Read::Failed;
+        }
+        for (size_t a = 0; a < (size_t)n;) {   // NUL-separated names
+            size_t b = buf.find('\0', a);
+            if (b == std::string::npos || b > (size_t)n) b = (size_t)n;
+            if (buf.compare(a, 5, "user.") == 0) names->push_back(buf.substr(a, b - a));
+            a = b + 1;
+        }
+        return names->empty() ? Read::Missing : Read::Value;
+    }
+    if (error) *error = ERANGE;
+    return Read::Failed;
+}
+
 Stored read_stored(const std::string& path)
 {
     Stored out;
@@ -251,41 +306,183 @@ static bool put(const std::string& path, const std::string& xattr, const std::st
 bool write(const std::string& path, const Property& p, const std::string& text, std::string* err)
 {
     if (p.xattr.empty() || !p.editable) { if (err) *err = "'" + p.label + "' cannot be changed."; return false; }
-    std::string v = text;
+    std::string v;
     if (p.type == ValueType::List) v = join_list(split_list(text));
-    else {
+    else if (p.multiline) {
+        for (size_t i = 0; i < text.size(); i++)   // CR LF (an edit control's) and a lone CR as LF
+            if (text[i] == '\r') { v += '\n'; if (i + 1 < text.size() && text[i + 1] == '\n') i++; }
+            else v += text[i];
+    } else {
+        for (char c : text) {   // one line: each run of line breaks a space
+            bool br = c == '\r' || c == '\n';
+            if (!br) v += c;
+            else if (!v.empty() && v.back() != ' ') v += ' ';
+        }
+    }
+    if (p.type != ValueType::List) {
         size_t a = v.find_first_not_of(" \t\r\n"), b = v.find_last_not_of(" \t\r\n");
         v = a == std::string::npos ? "" : v.substr(a, b - a + 1);
     }
+    if (p.type == ValueType::Color)
+        if (const Color* c = color(v)) v = c->name;
     std::string old;
     if (!read_current(path, p, &old, err)) return false;   // the value it replaces was not seen
     return put(path, p.xattr, v, err);
 }
 
-bool add_tags(const std::string& path, const std::vector<std::string>& tags, std::string* err)
+bool change_tags(const std::string& path, const std::vector<std::string>& add, const std::vector<std::string>& remove,
+                 std::string* err)
 {
     const Property* p = property("tags");
     std::string old;
     if (!read_current(path, *p, &old, err)) return false;
     std::vector<std::string> have = split_list(old);
-    for (const std::string& t : tags)
+    for (const std::string& t : add)
         for (const std::string& u : split_list(t))
             if (std::find(have.begin(), have.end(), u) == have.end()) have.push_back(u);
+    for (const std::string& t : remove)
+        have.erase(std::remove(have.begin(), have.end(), t), have.end());
     std::string v = join_list(have);
-    if (v == old) return true;
+    if (v == join_list(split_list(old))) return true;
     return put(path, p->xattr, v, err);
+}
+
+bool add_tags(const std::string& path, const std::vector<std::string>& tags, std::string* err)
+{
+    return change_tags(path, tags, {}, err);
 }
 
 bool remove_tag(const std::string& path, const std::string& tag, std::string* err)
 {
-    const Property* p = property("tags");
-    std::string old;
-    if (!read_current(path, *p, &old, err)) return false;
-    std::vector<std::string> have = split_list(old);
-    auto i = std::find(have.begin(), have.end(), tag);
-    if (i == have.end()) return true;
-    have.erase(i);
-    return put(path, p->xattr, join_list(have), err);
+    return change_tags(path, {}, { tag }, err);
+}
+
+static std::string recent_tags_file() { return state_file("flxp-tags"); }
+
+static std::vector<std::string> recent_tags()
+{
+    std::vector<std::string> out;
+    FILE* f = fopen(recent_tags_file().c_str(), "r");
+    if (!f) return out;
+    char line[1024];
+    while (fgets(line, sizeof line, f)) {
+        std::string t = line;
+        while (!t.empty() && (t.back() == '\n' || t.back() == '\r')) t.pop_back();
+        if (!t.empty() && std::find(out.begin(), out.end(), t) == out.end()) out.push_back(t);
+    }
+    fclose(f);
+    return out;
+}
+
+void remember_tags(const std::vector<std::string>& tags)
+{
+    std::vector<std::string> list;
+    for (const std::string& t : tags)
+        for (const std::string& u : split_list(t))
+            if (std::find(list.begin(), list.end(), u) == list.end()) list.push_back(u);
+    if (list.empty()) return;
+    for (const std::string& t : recent_tags())
+        if (std::find(list.begin(), list.end(), t) == list.end()) list.push_back(t);
+    if (list.size() > 100) list.resize(100);
+    std::string text;
+    for (const std::string& t : list) text += t + "\n";
+    write_file_atomic(recent_tags_file(), text);   // best effort: a convenience
+}
+
+std::vector<std::string> known_tags(const std::vector<std::string>& paths)
+{
+    std::vector<std::string> out;
+    auto add = [&](const std::string& value) {
+        for (const std::string& t : split_list(value))
+            if (std::find(out.begin(), out.end(), t) == out.end()) out.push_back(t);
+    };
+    std::string v;
+    for (size_t i = 0; i < paths.size() && i < 500; i++)
+        if (read_attr(paths[i], "user.xdg.tags", &v) == Read::Value) add(v);
+    for (const std::string& t : recent_tags()) add(t);
+    std::vector<std::string> dirs;
+    for (const std::string& p : paths) {
+        std::string d = p.substr(0, p.find_last_of('/'));
+        if (d.empty()) d = "/";
+        if (std::find(dirs.begin(), dirs.end(), d) == dirs.end() && dirs.size() < 8) dirs.push_back(d);
+    }
+    for (const std::string& d : dirs) {
+        DIR* dir = opendir(d.c_str());
+        if (!dir) continue;
+        int n = 0;
+        while (struct dirent* e = readdir(dir)) {
+            if (++n > 2000) break;
+            if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+            std::string f = (d == "/" ? "" : d) + "/" + e->d_name;
+            if (read_attr(f, "user.xdg.tags", &v) == Read::Value) add(v);
+        }
+        closedir(dir);
+    }
+    return out;
+}
+
+std::string first_line(const std::string& text)
+{
+    size_t nl = text.find('\n');
+    if (nl == std::string::npos) return text;
+    std::string line = text.substr(0, nl);
+    while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+    if (text.find_first_not_of(" \t\r\n", nl) == std::string::npos) return line;   // only blank lines follow
+    return line + "\xe2\x80\xa6";
+}
+
+std::string shown(const Property& p, const std::string& v)
+{
+    if (p.type == ValueType::List) return tag_list(v);
+    if (p.type == ValueType::Color) { const Color* c = color(v); return c ? c->label : v; }
+    if (p.multiline) return first_line(v);
+    return v;
+}
+
+const std::vector<Color>& palette()
+{
+    static const std::vector<Color> p = {
+        { "red", "Red", 0xFF0000 }, { "orange", "Orange", 0xFF8C00 }, { "yellow", "Yellow", 0xFFFF00 },
+        { "green", "Green", 0x008000 }, { "teal", "Teal", 0x008080 }, { "blue", "Blue", 0x0000FF },
+        { "purple", "Purple", 0x800080 }, { "pink", "Pink", 0xFF69B4 }, { "brown", "Brown", 0x8B4513 },
+        { "gray", "Gray", 0x808080 },
+    };
+    return p;
+}
+
+const Color* color(const std::string& value)
+{
+    for (const Color& c : palette()) if (!strcasecmp(c.name, value.c_str())) return &c;
+    return nullptr;
+}
+
+std::string run_command(const std::string& command, const std::string& path)
+{
+    std::string out, q = shell_quote(path);
+    bool file = false;
+    for (size_t i = 0; i < command.size(); i++) {
+        if (command[i] == '%' && i + 1 < command.size() && command[i + 1] == 'f') { out += q; file = true; i++; continue; }
+        if (command[i] == '%' && i + 1 < command.size() && command[i + 1] == '%') { out += '%'; i++; continue; }
+        out += command[i];
+    }
+    if (!file) out += " " + q;
+    return out;
+}
+
+std::string run_program(const std::string& command)
+{
+    size_t a = command.find_first_not_of(" \t");
+    if (a == std::string::npos) return "";
+    std::string prog;
+    if (command[a] == '\'' || command[a] == '"') {   // a quoted program: up to its closing quote
+        size_t b = command.find(command[a], a + 1);
+        prog = command.substr(a + 1, b == std::string::npos ? std::string::npos : b - a - 1);
+    } else {
+        size_t b = command.find_first_of(" \t", a);
+        prog = command.substr(a, b == std::string::npos ? std::string::npos : b - a);
+    }
+    size_t slash = prog.find_last_of('/');
+    return slash == std::string::npos || slash + 1 == prog.size() ? prog : prog.substr(slash + 1);
 }
 
 std::string infotip(const Item& it)
@@ -306,8 +503,11 @@ std::string infotip(const Item& it)
     if (s.empty() && fs) s = read_stored(it.path);
     for (const Property& p : registry()) {
         if (p.xattr.empty()) continue;
-        for (const auto& kv : s)
-            if (kv.first == p.xattr) line(p.label, p.type == ValueType::List ? tag_list(kv.second) : kv.second);
+        for (const auto& kv : s) {
+            if (kv.first != p.xattr) continue;
+            if (p.type == ValueType::Command) line("Runs with", run_program(kv.second));
+            else line(p.label, shown(p, kv.second));
+        }
     }
     return out;
 }
@@ -329,7 +529,9 @@ const std::vector<Property>& registry()
         // stored (docs/ANNOTATIONS.md)
         { "description", "Description", ValueType::Text, "user.lux.desc", true, "Add a description" },
         { "tags", "Tags", ValueType::List, "user.xdg.tags", true, "Add tags" },
-        { "comment", "Comment", ValueType::Text, "user.xdg.comment", true, "Add comments" },
+        { "comment", "Comment", ValueType::Text, "user.xdg.comment", true, "Add comments", true },
+        { "color", "Color", ValueType::Color, "user.lux.color", true, "" },
+        { "run", "Run as", ValueType::Command, "user.lux.run", true, "" },
     };
     return r;
 }
@@ -341,19 +543,20 @@ const Property* property(const std::string& id)
 }
 
 // the list's columns beyond the derived four, in SortBy's order
-static const char* const COLUMN_IDS[] = { "description", "tags", "comment" };
+static const char* const COLUMN_IDS[] = { "description", "tags", "comment", "color" };
+static const int N_COLUMN_IDS = 4;
 
 const Property* column_property(SortBy col)
 {
     int k = (int)col - (int)SortBy::Description;
-    return k >= 0 && k < 3 ? property(COLUMN_IDS[k]) : nullptr;
+    return k >= 0 && k < N_COLUMN_IDS ? property(COLUMN_IDS[k]) : nullptr;
 }
 
 int column_of(const std::string& id)
 {
     static const char* const DERIVED[] = { "name", "size", "type", "modified" };
     for (int k = 0; k < 4; k++) if (id == DERIVED[k]) return k;
-    for (int k = 0; k < 3; k++) if (id == COLUMN_IDS[k]) return (int)SortBy::Description + k;
+    for (int k = 0; k < N_COLUMN_IDS; k++) if (id == COLUMN_IDS[k]) return (int)SortBy::Description + k;
     return -1;
 }
 
@@ -361,13 +564,13 @@ int column_of(const std::string& id)
 struct KindList { std::vector<const char*> xp, lh; };
 static const KindList& kind_list(const Item& it, const Facts& f)
 {
-    static const KindList FILE_ = { { "type", "attributes", "modified", "size", "description", "tags", "comment" },
+    static const KindList FILE_ = { { "type", "attributes", "modified", "size", "description", "tags", "comment", "color" },
                                     { "size", "modified", "type", "description", "tags", "comment" } };
-    static const KindList PICTURE = { { "type", "dimensions", "size", "modified", "description", "tags", "comment" },
+    static const KindList PICTURE = { { "type", "dimensions", "size", "modified", "description", "tags", "comment", "color" },
                                       { "size", "modified", "dimensions", "description", "tags", "comment" } };
-    static const KindList SONG = { { "size", "type", "description", "tags", "comment" },
+    static const KindList SONG = { { "size", "type", "description", "tags", "comment", "color" },
                                    { "size", "modified", "type", "description", "tags", "comment" } };
-    static const KindList FOLDER = { { "type", "attributes", "modified", "description", "tags", "comment" },
+    static const KindList FOLDER = { { "type", "attributes", "modified", "description", "tags", "comment", "color" },
                                      { "modified", "type", "description", "tags", "comment" } };
     static const KindList DRIVE = { { "type", "filesystem", "freespace", "capacity" }, { "type", "freespace" } };
     static const KindList SYSTEM = { { "type" }, { "type" } };
@@ -394,7 +597,7 @@ static std::string value(const Property& p, const Item& it, const Facts& f, bool
 {
     if (!p.xattr.empty()) {
         std::string v = stored(f, p.xattr);
-        return p.type == ValueType::List ? tag_list(v) : v;
+        return shown(p, v);
     }
     const std::string& id = p.id;
     if (id == "type") {
@@ -436,7 +639,7 @@ static std::vector<Row> rows_for(const Item& it, const Facts& f, int64_t now)
         r.label = r.id == "type" ? "" : p->label;
         r.xp = value(*p, it, f, true, now);
         r.lh = value(*p, it, f, false, now);
-        if (!p->xattr.empty()) r.raw = r.lh;
+        if (!p->xattr.empty()) { std::string v = stored(f, p->xattr); r.raw = p->type == ValueType::List ? tag_list(v) : v; }
         r.editable = p->editable && !p->xattr.empty() && f.kind != Facts::System && f.kind != Facts::Drive;
         r.invitation = p->invitation;
         rows.push_back(r);
@@ -452,6 +655,79 @@ std::string tag_list(const std::string& v)
     std::string out;
     for (const std::string& t : split_list(v)) out += (out.empty() ? "" : ", ") + t;
     return out;
+}
+
+// ---- the Filter box ----------------------------------------------------------------
+
+static std::string ascii_lower(std::string s)
+{
+    for (char& c : s) if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+    return s;
+}
+
+bool Filter::stored() const
+{
+    for (const Word& w : words) if (w.field != Name) return true;
+    return false;
+}
+
+Filter parse_filter(const std::string& text)
+{
+    static const struct { const char* prefix; Filter::Field field; } FIELDS[] = {
+        { "tag:", Filter::Tags }, { "tags:", Filter::Tags }, { "desc:", Filter::Desc }, { "description:", Filter::Desc },
+        { "comment:", Filter::Comment }, { "name:", Filter::Name },
+    };
+    Filter f;
+    size_t i = 0, n = text.size();
+    while (i < n) {
+        while (i < n && (text[i] == ' ' || text[i] == '\t')) i++;
+        if (i >= n) break;
+        // a word: up to the next space outside double quotes
+        std::string raw;
+        bool quoted = false;
+        for (; i < n && (quoted || (text[i] != ' ' && text[i] != '\t')); i++) {
+            if (text[i] == '"') { quoted = !quoted; continue; }
+            raw += text[i];
+        }
+        Filter::Word w;
+        std::string low = ascii_lower(raw);
+        bool fielded = false;
+        for (const auto& fd : FIELDS) {
+            size_t len = strlen(fd.prefix);
+            if (low.compare(0, len, fd.prefix) == 0) { w.field = fd.field; w.text = low.substr(len); fielded = true; break; }
+        }
+        if (!fielded) w.text = low;
+        if (w.field == Filter::Any && w.text.empty()) continue;   // "" alone: nothing to look for
+        f.words.push_back(w);
+    }
+    return f;
+}
+
+static bool has(const std::string& value, const std::string& word) { return ascii_lower(value).find(word) != std::string::npos; }
+
+static bool word_matches(const Filter::Word& w, const Item& it)
+{
+    static const Property* desc = property("description");
+    static const Property* tags = property("tags");
+    static const Property* comment = property("comment");
+    auto field = [&](Filter::Field f) -> bool {
+        if (f == Filter::Name) return w.text.empty() ? true : has(it.name, w.text);
+        const Property* p = f == Filter::Desc ? desc : f == Filter::Tags ? tags : comment;
+        if (!p) return false;
+        const std::string& v = it.stored(p->xattr);
+        if (w.text.empty()) return !v.empty();
+        if (f != Filter::Tags) return has(v, w.text);
+        for (const std::string& t : split_list(v)) if (has(t, w.text)) return true;   // within one tag, not across the commas
+        return false;
+    };
+    if (w.field != Filter::Any) return field(w.field);
+    return field(Filter::Name) || field(Filter::Desc) || field(Filter::Tags) || field(Filter::Comment);
+}
+
+bool filter_matches(const Filter& f, const Item& it)
+{
+    for (const Filter::Word& w : f.words) if (!word_matches(w, it)) return false;
+    return true;
 }
 
 // ---- the two presentations ----------------------------------------------------------
@@ -529,6 +805,7 @@ Info describe(const std::vector<Item>& sel, const std::vector<Facts>& facts, con
         in.path = it.path;
         in.rows = rows_for(it, f, now);
         in.xp_preview = !it.is_folder() && f.thumbnail && !f.network;
+        in.folder = it.is_folder();
         if (!it.is_folder() && f.thumbnail) in.previews.push_back(it.path);
         return in;
     }

@@ -664,13 +664,19 @@ void set_clock_tip()
 }
 
 // _LHSHELL_START for us: luxwm's root broadcast (only while luxshell does not run; start_key = 0 ignores it) or
-// luxshell's message to our _LH_STARTMENU_S owner window (its Avalon Start button, the Super key it received)
+// luxshell's message to our _LH_STARTMENU_S owner window (its Avalon Start button, the Super key it received; with l[0] bit 1,
+// Super+R: the Run dialog)
 void start_request(const xwm::StartRequest& q)
 {
     static uint32_t done;
     if (q.serial == done) return;
     done = q.serial;
     if (q.from_root && !shell::setting_flag("start_key", true)) return;
+    if (q.run) {                            // Super+R: Start > Run's dialog (the menu closes first, as XP's Win+R)
+        if (start_down) { startpanel::close(); startmenu::close(); }
+        startmenu::run_dialog();
+        return;
+    }
     if (start_down) {                       // open: a toggle closes it, a plain "open" leaves it
         if (q.toggle) { startpanel::close(); startmenu::close(); }
         return;

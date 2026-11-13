@@ -1,5 +1,6 @@
 # flxp, the XP-style explorer and shell (included by the top-level Makefile).
-#   shell/      the shell model: namespace, icons, associations, settings, file ops (native)
+#   shell/      the shell model: namespace, icons, associations, settings, file ops (native); shell/ui/ its win32 part
+#               (the message box, shell icons as HICON, the Properties sheet), compiled on the shim
 #   explorer/   the explorer (flxp) and the browsing widget the others share
 #   desktop/    flxp-desktop       taskbar/   flxp-taskbar (start menu, start panel, tray; as flxp-startmenu the panel alone)
 #   filedlg/    flxp-filedialog, flxp-portal (xdg-desktop-portal FileChooser backend)
@@ -19,19 +20,24 @@ SHELLOBJS = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/shell/*.cpp)) $(LHDE_OBJS)
 # liblhde (<lhde/data.h>, <lhde/theme.h>, <lhde/settings.h>): the data directories, the theme resolver and the settings
 # store; its objects are linked into every flxp program and test with the shell model
 $(O)/flxp/shell/lhdata.o $(O)/flxp/shell/lhtheme.o $(O)/flxp/shell/settings.o $(O)/flxp/settings/settings.o: CXXFLAGS += -Iliblhde
+# the shell layer's win32 part (shell/ui.h): linked with wux, so not into the native toolkit tests
+SHELLUIOBJS = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/shell/ui/*.cpp))
 EXPLOBJS  = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/explorer/*.cpp))
 EXPLSHARED = $(filter-out $(O)/flxp/explorer/explorer.o,$(EXPLOBJS))   # everything but its main
 DESKOBJS  = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/desktop/*.cpp))
 FILEDLGLIB = $(O)/flxp/filedlg/filedlg.o
 TBOBJS    = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/taskbar/*.cpp))
 SETOBJS   = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/settings/*.cpp))
-FLXP_OBJS = $(SHELLOBJS) $(EXPLOBJS) $(DESKOBJS) $(TBOBJS) $(SETOBJS) $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/filedlg/*.cpp))
+FLXP_OBJS = $(SHELLOBJS) $(SHELLUIOBJS) $(EXPLOBJS) $(DESKOBJS) $(TBOBJS) $(SETOBJS) $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/filedlg/*.cpp))
 
 # the shell model is native code; the rest is win32 code on the shim
 $(O)/flxp/shell/%.o: flxp/shell/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 $(O)/flxp/%.o: flxp/%.cpp
+	@mkdir -p $(dir $@)
+	$(W32CXX) -c $< -o $@
+$(O)/flxp/shell/ui/%.o: flxp/shell/ui/%.cpp
 	@mkdir -p $(dir $@)
 	$(W32CXX) -c $< -o $@
 # plain Xlib / libpng+libjpeg / libdbus parts, compiled without the Wine headers
@@ -54,6 +60,9 @@ $(O)/flxp/shell/config.o: CXXFLAGS += -DFLXP_DATADIR='"$(DATADIR)"'
 flxp/rc/%.res: flxp/rc/%.rc flxp/%/resource.h
 	$(WINDRES) -O res -I flxp/$* -o $@ $<
 $(O)/flxp/explorer/dialogs.o: flxp/rc/explorer.res
+$(O)/flxp/shell/ui/properties.o: flxp/rc/shell.res
+flxp/rc/shell.res: flxp/rc/shell.rc flxp/shell/ui/resource.h
+	$(WINDRES) -O res -I flxp/shell/ui -o $@ $<
 $(O)/flxp/filedlg/filedlg.o: flxp/rc/filedlg.res
 $(O)/flxp/settings/settings.o: flxp/rc/settings.res
 
@@ -61,11 +70,12 @@ $(O)/flxp/settings/settings.o: flxp/rc/settings.res
 # liblhde probes a style through weak ut_* references (liblhde/style.c): a program that does not
 # call them itself (flxp-taskbar) would link without the probe and see every style as "classic"
 UT_PROBE = -Wl,-u,ut_open,-u,ut_close,-u,ut_format,-u,ut_list_classes,-u,ut_color,-u,ut_size,-u,ut_get_resource,-u,ut_prop,-u,ut_get_string,-u,ut_get_bitmap,-u,ut_free
-W32LINK = $(UT_PROBE) $(SHELLOBJS) $(WUX_LINK)
-W32DEPS = $(SHELLOBJS) $(WUXA) $(LUXNAVA) $(UTA)
-build/bin/flxp: $(EXPLOBJS) $(W32DEPS)
+W32LINK = $(UT_PROBE) $(SHELLOBJS) $(SHELLUIOBJS) $(WUX_LINK)
+W32DEPS = $(SHELLOBJS) $(SHELLUIOBJS) $(WUXA) $(LUXNAVA) $(UTA)
+# flxp links the file dialog for the Properties sheet's Run as Browse... (GetOpenFileNameW)
+build/bin/flxp: $(EXPLOBJS) $(FILEDLGLIB) $(W32DEPS)
 	@mkdir -p $(dir $@)
-	$(CXX) -o $@ $(EXPLOBJS) $(W32LINK) $(LDLIBS) -no-pie
+	$(CXX) -o $@ $(EXPLOBJS) $(FILEDLGLIB) $(W32LINK) $(LDLIBS) -no-pie
 build/bin/flxp-desktop: $(DESKOBJS) $(EXPLSHARED) $(FILEDLGLIB) $(W32DEPS)
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $(DESKOBJS) $(EXPLSHARED) $(FILEDLGLIB) $(W32LINK) $(LDLIBS) $(shell pkg-config --libs libpng libjpeg) -no-pie

@@ -67,6 +67,10 @@ extern void MENU_EndMenu( HWND hwnd );
 extern void MENU_TrackMouseMenuBar( HWND hWnd, INT ht, POINT pt );
 extern void MENU_TrackKbdMenuBar( HWND hwnd, UINT wParam, WCHAR wChar );
 extern UINT MENU_GetMenuBarHeight( HWND hwnd, UINT menubarWidth, INT orgX, INT orgY );
+extern void MENU_SetBarHot( HWND hwnd, POINT pt, BOOL inside );   /* flxp: menu.c.patch */
+extern void MENU_FontsChanged(void);   /* flxp: menu.c.patch */
+extern BOOL WUX_IsActiveWindow( HWND hwnd );   /* flxp: user.cpp */
+extern void WUX_DrawSizeGrip( HWND hwnd, HDC hdc, const RECT *rc );   /* flxp: theme.cpp */
 extern BOOL MENU_SetMenu( HWND hWnd, HMENU hMenu );
 extern LRESULT WINAPI PopupMenuWndProc( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam );
 extern void NC_GetSysPopupPos( HWND hwnd, RECT* rect );

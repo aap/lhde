@@ -2,7 +2,7 @@
 #   gdi/ sys/ win/ res/   the native toolkit: surfaces and text, the X11 backend,
 #                         the window tree, the PE/.res reader
 #   w32/                  the win32 shim the vendored Wine code and flxp run on
-#   vendor/wine/          Wine's comctl32, user32 and uxtheme sources (LGPL; MANIFEST, *.patch)
+#   vendor/wine/          Wine's comctl32, comdlg32 (the font and find dialogs), user32 and uxtheme sources (LGPL; MANIFEST, *.patch)
 #   rc/                   Wine's comctl32/comdlg32 resources compiled with rc/build.sh
 # build/lib/libwux.a holds all of it except what libwuxtheme.a already has
 # (wuxtheme/wuxtheme.mk: gdi, res and the window-system-free part of the shim);
@@ -29,7 +29,12 @@ $(O)/$(WINE_DIR)/%.o: $(WINE_DIR)/%.c
 
 # resources embedded with .incbin (the path is the assembler's, relative to the top)
 $(O)/wux/w32/comctl.o: wux/rc/comctl32.res
+$(O)/wux/w32/comdlg.o: wux/rc/comdlg32.res
 $(O)/wux/w32/image.o: wux/w32/stdres.res
+$(O)/wux/w32/msgbox_glue.o: wux/rc/user32.res
+# the message box's template and strings, cut from Wine's user32.rc (the .res is checked in; windres when the .rc changes)
+wux/rc/user32.res: wux/rc/user32.rc
+	$(WINDRES) -O res -o $@ $<
 
 $(WUXA): $(filter-out $(UTOBJS),$(WUX_OBJS))
 	@mkdir -p $(dir $@)

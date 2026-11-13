@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=luxpad
+GenericName=Text Editor
+Comment=Edit text files the Windows XP Notepad way
+Exec=@BINDIR@/luxpad %f
+TryExec=@BINDIR@/luxpad
+Icon=@DATADIR@/res/icons/luxpad.ico
+Terminal=false
+MimeType=text/plain;
+Categories=Utility;TextEditor;

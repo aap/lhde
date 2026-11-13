@@ -7,14 +7,14 @@ sessions are started. The repository, one build for the parts that were separate
 |-------------|----------------------------------------------------------------------|-----|
 | `wux/`      | the win32 UI layer that lhde's own programs are built against from source (it runs no Windows executables): `gdi/` `sys/` `win/` `res/` (native toolkit), `w32/` (the win32 shim), `vendor/wine/` (Wine's comctl32/user32/uxtheme, LGPL, with MANIFEST and patches), `rc/` (Wine's comctl32/comdlg32 resources) | flxp `src/{gdi,sys,win,res,w32}`, `vendor/wine` |
 | `wuxtheme/` | libwuxtheme, the uxtheme library: `.msstyles` read and drawn without Windows (`<wuxtheme/ut.h>`, C API `ut_*`), and `ut-dump` | flxp `src/uxtheme` (libuxtheme) |
-| `flxp/`     | the explorer and shell: `shell/` `explorer/` `desktop/` `taskbar/` `filedlg/` `settings/`, `rc/` (its dialogs), `res/` (icon themes, .desktop, portal files, tools) | flxp |
+| `flxp/`     | the explorer and shell: `shell/` (with `shell/ui/`, its win32 part) `explorer/` `desktop/` `taskbar/` `filedlg/` `settings/`, `rc/` (its dialogs), `res/` (icon themes, .desktop, portal files, tools) | flxp |
 | `tests/`    | `toolkit/` and `w32/` test programs, `headless/` Xvfb scripts, `check.sh`, `demo.sh` | flxp `src/test`, `src/w32test` |
 | `luxwm/`    | the window manager: Longhorn frames (DWM glass frame sets, classic frames from the style through wuxtheme), EWMH, animations; `luxwmc`; `tests/` (frametest, regress) | x11 `lhwm/` |
 | `luxnav/`   | libluxnav, the Longhorn navigation bar (the vision header; C API `lhnav_*`, `lhnav.h`), linked into flxp and navdemo | x11 `lhnav/` |
 | `luxshell/` | the Avalon bars, sidebar, tiles, toasts, start menu: C core + Lua (`*.lua`, `tiles/`) | x11 `lhshell/` (without `assets/`) |
 | `liblhde/`  | liblhde (`<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`): the three trees and every lookup in them, the theme resolver, the settings store; `lhde-theme` (with `explain` and `dirs`); `tests/resolve.c` | new (was `lhtheme/`) |
 | `session/`  | `lhde-session` (start, theme, taskbar, shell, picom, desktop, stop), `lab.sh` (the headless bench), `lhwall.sh`, theme-reload/-watch, picom configs | x11 `xinitrc.lab`, `second-display.sh`, `lab.sh`, ... |
-| `apps/`     | lhde's applications on the public entry point (`wux/wux.h`, `shell/shell.h`, the recipe `apps/app.mk`; docs/APPLICATIONS.md): `luxshot` (screenshots), `skeleton` (the one to copy) | new |
+| `apps/`     | lhde's applications on the public entry point (`wux/wux.h`, `shell/shell.h`, the recipe `apps/app.mk`; docs/APPLICATIONS.md): `luxshot` (screenshots), `luxattr` (the attributes editor), `luxpad` (the notepad), `skeleton` (the one to copy) | new |
 | `examples/` | extendframe, navdemo, aurorademo (its tables made at build time from the Windows tree) | x11 `examples/` |
 | `tools/`    | `lhde-pack` (a resource pack of raw Windows files from ISOs), `lhde-import` (a pack, ISO, WIM or Windows directory into the Windows tree, the recipes), `lhdeimport.py`, `lhdetree.py` (the Windows tree, its index, the migration), `wim0108.py`, `lhdebaml.py` + `lhdeaurora.py` (the aurora: BAML decoders, layer lists, aurorademo's tables), recipe builders (`msstyles2theme.py`, `build_aerovision.py`, `build_aero5112.py`) | x11 `lhwm/tools/` |
 | `share/`    | text only: `themes/*.theme` (the shipped themes), `navbar/*.ini`, `icons/*.theme`, `sources/*.ini` (what lhde-pack takes from each Windows build), `frames/*/theme.ini`, `packs/*/shell.lua` | x11 `themes.ini`, `wallpapers.ini`, `lhwm/themes/*/*.ini`, `lhshell/themes/` |
@@ -32,9 +32,9 @@ the user's own files (settings below).
 ## Building
 
 Needs a C and C++17 compiler, GNU make, Python 3 (the standard library: every `make` runs
-`tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, xext, freetype2, fontconfig,
-libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, luxshell);
-for the lux side also xfixes, xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4).
+`tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, xext, xcursor, xfixes, xkbcommon, freetype2,
+fontconfig, libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, luxshell);
+for the lux side also xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4).
 Every `.res` is checked in (`wux/rc/`, `wux/w32/stdres.res`, `flxp/rc/`, `tests/w32/test.res`):
 the mingw-w64 cross toolchain (`x86_64-w64-mingw32-windres`, which preprocesses with its gcc) is needed
 only when a `.rc` or a header it includes changes, and Wine's sources only to rebuild Wine's resources
@@ -49,7 +49,7 @@ luac5.4 (each test is skipped when its tool is missing).
 
 On Void Linux, everything above in one command:
 
-    xbps-install -S gcc make pkg-config python3 libX11-devel libXext-devel libXfixes-devel \
+    xbps-install -S gcc make pkg-config python3 libX11-devel libXext-devel libXcursor-devel libxkbcommon-devel libXfixes-devel \
         libXinerama-devel libXft-devel freetype-devel fontconfig-devel libpng-devel libjpeg-turbo-devel \
         libwebp-devel dbus-devel cairo-devel pango-devel lua54-devel \
         python3-Pillow 7zip cabextract xz tar \
@@ -73,7 +73,7 @@ What `make` builds:
     build/lib/libluxnav.a, libluxnav.so.1 (+ .so), pkgconfig/luxnav.pc   luxnav (flxp links the .a)
     build/bin/flxp flxp-desktop flxp-taskbar flxp-settings flxp-filedialog flxp-portal ut-dump
     build/bin/luxwm luxwmc luxshell
-    build/bin/luxshot skeleton           the applications (apps/; skeleton is not installed)
+    build/bin/luxshot luxattr luxpad skeleton   the applications (apps/; skeleton is not installed)
     build/lib/libflxpshell.a             the shell facilities an application links (apps/app.mk)
     build/examples/extendframe navdemo aurorademo
     build/tests/..., build/tests/w32/... test programs and demos (tests/demo.sh runs some)
@@ -84,11 +84,11 @@ tree). Per component: `make wux`, `make wuxtheme`, `make flxp`, `make tests`, `m
 `make luxshell`, `make examples`, `make apps`.
 
 `make install` installs program files only (docs/LAYOUT.md "The three trees"): `bin/` (the six flxp programs, ut-dump,
-luxwm, luxwmc, luxshell, luxshot, lhde-theme, lhde-session, lhde-import, lhde-pack, lhde-schemes), `lib/` (`libwuxtheme`, `libluxnav`, `liblhde` `.so.1` + `.so`, `liblhde.a`, `pkgconfig/`),
+luxwm, luxwmc, luxshell, luxshot, luxattr, luxpad, lhde-theme, lhde-session, lhde-import, lhde-pack, lhde-schemes), `lib/` (`libwuxtheme`, `libluxnav`, `liblhde` `.so.1` + `.so`, `liblhde.a`, `pkgconfig/`),
 `lib/lhde/` (`PKGLIBDIR`: the code that is not a binary: `luxshell/` the Lua, `session/` lhde-session's helpers and lab.sh,
 `tools/` lhde-import's Python), `share/lhde/` (`DATADIR`: our shipped text, `themes/ navbar/ icons/ sources/ frames/*/theme.ini
 packs/*/shell.lua`, flxp's `res/icons`), `include/`,
-the man pages luxwm.1 and luxwmc.1 (`MANDIR`), `share/applications/flxp.desktop`, the portal backend's `flxp.portal` (in
+the man pages luxwm.1 and luxwmc.1 (`MANDIR`), `share/applications/flxp.desktop` and `luxpad.desktop`, the portal backend's `flxp.portal` (in
 `PORTALDIR`, default `$PREFIX/share/xdg-desktop-portal/portals`; xdg-desktop-portal reads its own datadir, so set
 `PORTALDIR=/usr/share/xdg-desktop-portal/portals` for a system install) and its D-Bus service file (`DBUSSERVICEDIR`, default
 `$PREFIX/share/dbus-1/services`). Also settable: `BINDIR LIBDIR INCLUDEDIR DATADIR PKGLIBDIR APPDIR PKGCONFIGDIR`.
@@ -102,14 +102,36 @@ header (the step-2 `LUXNAV_DIR` hook and build/compat are gone).
 
 ### make check
 
-`tests/check.sh` runs what needs no Microsoft files: kerneltest (the shim's
-kernel/CRT/registry/resource/usp10 parts), gditest, fileops_test, `tests/settings-lists.sh` (Display Properties' Desktop
+`make check` first compiles a probe that calls glibc's wcslen in win32 C++ and fails if it compiles (`check-poison`:
+wchar_t is 16 bits there, `wux/w32/include/flxp_crt.h` poisons glibc's wide functions). `tests/check.sh` runs what needs no Microsoft files: kerneltest (the shim's
+kernel/CRT/registry/resource/usp10 parts), gditest, swatchtest (the Details Color column's square through an image list),
+fileops_test, thumbstest (the thumbnails' memory bounds on pictures it writes: a 6000 x 4000 JPEG and a 4000 x 4000 PNG into 128 px thumbnails with the peak RSS growing by less than 16 MB, the PNG reduced row by row; the view's image budget over 300 inserts, the pinned ones kept; a cancelled loader generation
+decoding nothing more, three loaders decoding at most two pictures at once), `tests/settings-lists.sh` (Display Properties' Desktop
 lists without a window: the backgrounds' order and selection, the icon sets; Appearance's "Windows and buttons", `--list
 appearance --pick STYLE`: classic, a bare style with and without a frame set, back to the theme's own, with the user's
 `jade4074.msstyles` copied under other names, skipped without it), `tests/aero-patches.py` (lhde-import's table of Aero
-patches and which styles get a frame set, on stand-in files), and the
+patches and which styles get a frame set, on stand-in files), `tests/keys-doc.py` (docs/KEYS.md lists every default of luxwm's
+key table, and the Super keys it calls free are unbound), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
-incl. GTK, the file dialog in both looks, the modifier keys across a focus change) on displays :71-:73
+incl. GTK, the file dialog in both looks, the modifier keys across a focus change, typed text into the Edit control as
+UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair: `tests/headless/typing.sh`), luxpad (`tests/headless/luxpad.sh`:
+an emoji typed into a UTF-8 file with CR LF and saved byte for byte, Ln/Col, Find, Go To, Save As Unicode through the Encoding
+box and back, a Latin-1 file as ANSI saved back unchanged, the unsaved-changes question, the remembered placement, a file
+dropped from flxp, a run with nothing imported), wux's MessageBoxW (its buttons per type,
+the default, Enter and Escape: tests/w32/msgbox), luxshot, luxattr: the Properties sheet's Metadata
+and Advanced views driven with xdotool and checked with getfattr, and a run with nothing imported and an empty HOME, flxp's
+Properties from the item menu (General first, Metadata's description, its tag list, colour, multi-line comment and Run as, two
+files in one sheet with a tag added to both, a read-only file's message box)
+and Add Tag, the Explorer's Filter box under jade4074 over names and attributes, skipped without that style or user xattrs,
+luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`, clicks outside open menus under luxwm:
+`tests/headless/menus.sh`, a Win32 menu bar's pixels (plain, hot, open, inactive) under jade4074, luna and classic with
+ImageMagick: `tests/headless/menubar.sh`, every IDC_ cursor shown under the X cursor theme's name (XFixes): `tests/headless/cursors.sh`, Super+R
+opening the start menu's Run dialog (luxwm, luxshell, flxp-startmenu) and settings.ini `[commands] run` instead:
+`tests/headless/runkey.sh`, luxpad's size grips (the status
+bar's and the scroll bars' corner: the cursor over them, a drag sizes the window, 4074's dots under jade4074): `tests/headless/grip.sh`, the task band's folder picture against the Icons view's: `tests/headless/folderpic.sh`, flxp's memory on 600 6000 x 4000
+JPEGs in the Thumbnails view at 256 px, paged through and into a subfolder: the peak RSS under 400 MB, the view's images within
+their 64 MB budget plus what is on screen, some evicted, skipped without ImageMagick: `tests/headless/thumbsmem.sh`, a double
+click and Enter on a file with Run as running its command: `tests/headless/runas.sh`) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).

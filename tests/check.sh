@@ -4,7 +4,8 @@
 # failures. Tests that need assets skip when these are absent:
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
-#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh getfattr and setfattr); displays :71-:73,
+#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh and runas.sh setfattr
+#                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, thumbsmem.sh ImageMagick); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
 fails=0
@@ -34,9 +35,18 @@ result "lhdatatest ($(tail -n 1 "$T/lhdata.log"))" $? "$T/lhdata.log"
 # the Explorer's view model (shell/viewmodel.h): views, sizes, 4074's slider stops, memory
 build/tests/viewmodeltest > "$T/viewmodel.log" 2>&1
 result "viewmodeltest ($(tail -n 1 "$T/viewmodel.log"))" $? "$T/viewmodel.log"
+# a colour swatch as an icon (the Details view's Color column) through an image list
+build/tests/w32/swatchtest > "$T/swatch.log" 2>&1
+result "swatchtest ($(tail -n 1 "$T/swatch.log"))" $? "$T/swatch.log"
 # the details model (shell/details.h): XP's Details lines, 4051's band values
 build/tests/detailstest > "$T/details.log" 2>&1
 result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"
+# the Details columns' layout (shell/columns.h) and the per-folder records of flxp-views, on a scratch state directory
+build/tests/columnstest > "$T/columns.log" 2>&1
+result "columnstest ($(tail -n 1 "$T/columns.log"))" $? "$T/columns.log"
+# the thumbnails' memory bounds (shell/thumbs.h, gdi/image.h): big pictures into small thumbnails without their full image
+build/tests/thumbstest > "$T/thumbs.log" 2>&1
+result "thumbstest ($(tail -n 1 "$T/thumbs.log"))" $? "$T/thumbs.log"
 # lhde-import's overwrite policy (kept without --force, written with it) on a scratch tree and a stand-in file
 tests/import-policy.sh > "$T/import.log" 2>&1
 result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"
@@ -46,6 +56,9 @@ result "settings-lists ($(tail -n 1 "$T/settings-lists.log"))" $? "$T/settings-l
 # lhde-import's Aero patches (by sha256, the unknown one by its bytes) and which dropped-in styles get a frame set, stand-in files
 python3 -I tests/aero-patches.py > "$T/aero-patches.log" 2>&1
 result "aero-patches ($(tail -n 1 "$T/aero-patches.log"))" $? "$T/aero-patches.log"
+# docs/KEYS.md against luxwm's default key table: every default listed, the Super keys it calls free unbound
+python3 -I tests/keys-doc.py > "$T/keys-doc.log" 2>&1
+result "keys-doc ($(tail -n 1 "$T/keys-doc.log"))" $? "$T/keys-doc.log"
 # libwuxtheme through its own API: every style the user imported
 styles=${LHDE_STYLES:-$(build/bin/lhde-theme find styles 2>/dev/null)}   # liblhde's lookup: the Windows tree's index/styles (docs/LAYOUT.md)
 n=0
@@ -78,9 +91,42 @@ else
     tests/headless/dnd.sh "$2" > "$T/dnd.log" 2>&1; result headless/dnd.sh $? "$T/dnd.log"
     tests/headless/lvtiles.sh "$2" > "$T/lvtiles.log" 2>&1; result "headless/lvtiles.sh ($(tail -n 1 "$T/lvtiles.log"))" $? "$T/lvtiles.log"
     tests/headless/modkeys.sh "$1" > "$T/modkeys.log" 2>&1; result headless/modkeys.sh $? "$T/modkeys.log"
+    tests/headless/typing.sh "$3" > "$T/typing.log" 2>&1; result headless/typing.sh $? "$T/typing.log"
+    tests/headless/msgbox.sh "$3" > "$T/msgbox.log" 2>&1; result headless/msgbox.sh $? "$T/msgbox.log"
     tests/headless/filedlg.sh "$3" > "$T/filedlg.log" 2>&1; result headless/filedlg.sh $? "$T/filedlg.log"
+    tests/headless/filter.sh "$2" > "$T/filter.log" 2>&1; rc=$?
+    result "headless/filter.sh$(grep -m1 '^skip' "$T/filter.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/filter.log"
+    tests/headless/alttab.sh "$2" > "$T/alttab.log" 2>&1; rc=$?
+    result "headless/alttab.sh$(grep -m1 '^skip' "$T/alttab.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/alttab.log"
+    # a click outside an open menu ends it and acts where it was made (docs/CLIENT-PROTOCOL.md "Menus and clicks"), under luxwm
+    tests/headless/menus.sh "$3" > "$T/menus.log" 2>&1; result headless/menus.sh $? "$T/menus.log"
+    # every IDC_ cursor as the X cursor theme's double arrows and kin (XFixes reads back the one shown)
+    tests/headless/cursors.sh "$2" > "$T/cursors.log" 2>&1; result headless/cursors.sh $? "$T/cursors.log"
+    # the size grip in luxpad's status bar and its scroll bars' corner: 4074's dots under jade4074, the double arrow, a drag sizes
+    tests/headless/grip.sh "$3" > "$T/grip.log" 2>&1; rc=$?
+    result "headless/grip.sh$(grep -m1 '^skip' "$T/grip.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/grip.log"
+    # Super+R: the start menu's Run dialog through luxwm, luxshell and flxp-startmenu; [commands] run instead when set
+    tests/headless/runkey.sh "$1" > "$T/runkey.log" 2>&1; rc=$?
+    result "headless/runkey.sh$(grep -m1 '^skip' "$T/runkey.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/runkey.log"
+    # a Win32 program's menu bar under jade4074 (4074's themed bar), luna (XP's flat bar) and classic, read back at measured points
+    tests/headless/menubar.sh "$1" > "$T/menubar.log" 2>&1; rc=$?
+    result "headless/menubar.sh$(grep -m1 '^skip' "$T/menubar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/menubar.log"
+    # the task band's picture of a folder with two JPEGs is the Icons view's square (folderpictest)
+    tests/headless/folderpic.sh "$2" > "$T/folderpic.log" 2>&1; result headless/folderpic.sh $? "$T/folderpic.log"
+    # flxp's peak RSS on 600 6000 x 4000 JPEGs at 256 px, the view's images within their budget (needs ImageMagick)
+    tests/headless/thumbsmem.sh "$1" > "$T/thumbsmem.log" 2>&1; rc=$?
+    result "headless/thumbsmem.sh ($(tail -n 1 "$T/thumbsmem.log"))" $rc "$T/thumbsmem.log"
     tests/headless/luxshot.sh "$1" > "$T/luxshot.log" 2>&1; rc=$?
     result "headless/luxshot.sh$(grep -m1 '^skip' "$T/luxshot.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxshot.log"
+    tests/headless/luxattr.sh "$2" > "$T/luxattr.log" 2>&1; rc=$?
+    result "headless/luxattr.sh$(grep -m1 '^skip' "$T/luxattr.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxattr.log"
+    tests/headless/luxpad.sh "$3" > "$T/luxpad.log" 2>&1; rc=$?
+    result "headless/luxpad.sh$(grep -m1 '^skip' "$T/luxpad.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxpad.log"
+    tests/headless/properties.sh "$3" > "$T/properties.log" 2>&1; rc=$?
+    result "headless/properties.sh$(grep -m1 '^skip' "$T/properties.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/properties.log"
+    # a double click on a file with user.lux.run runs that command
+    tests/headless/runas.sh "$1" > "$T/runas.log" 2>&1; rc=$?
+    result "headless/runas.sh$(grep -m1 '^skip' "$T/runas.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/runas.log"
 fi
 
 [ $fails = 0 ] && echo "check: all passed" || echo "check: $fails failed"

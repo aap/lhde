@@ -1809,6 +1809,9 @@ static void EDIT_MoveBackward(EDITSTATE *es, BOOL extend)
 
 	if (e) {
 		e--;
+		/* flxp: a surrogate pair is one character (the caret never stops between its halves, Backspace takes both) */
+		if (e && IS_LOW_SURROGATE(es->text[e]) && IS_HIGH_SURROGATE(es->text[e - 1]))
+			e--;
 		if ((es->style & ES_MULTILINE) && e &&
 				(es->text[e - 1] == '\r') && (es->text[e] == '\n')) {
 			e--;
@@ -1879,6 +1882,9 @@ static void EDIT_MoveForward(EDITSTATE *es, BOOL extend)
 
 	if (es->text[e]) {
 		e++;
+		/* flxp: a surrogate pair is one character */
+		if (IS_HIGH_SURROGATE(es->text[e - 1]) && IS_LOW_SURROGATE(es->text[e]))
+			e++;
 		if ((es->style & ES_MULTILINE) && (es->text[e - 1] == '\r')) {
 			if (es->text[e] == '\n')
 				e++;
@@ -3345,6 +3351,17 @@ static LRESULT EDIT_WM_KeyDown(EDITSTATE *es, INT key)
 		else
 			EDIT_CheckCombo(es, WM_KEYDOWN, key);
 		break;
+	case VK_BACK:
+		/* flxp: Ctrl+Backspace deletes the word before the caret, to where Ctrl+Left goes (XP's Edit inserted a DEL
+		 * character); a selection goes as with Backspace */
+		if (control && !shift && !(es->style & ES_READONLY)) {
+			if (es->selection_start == es->selection_end) {
+				EDIT_EM_SetSel(es, ~0u, 0, FALSE);
+				EDIT_MoveWordBackward(es, TRUE);
+			}
+			EDIT_WM_Clear(es);
+		}
+		break;
 	case VK_DELETE:
 		if (!(es->style & ES_READONLY) && !(shift && control)) {
 			if (es->selection_start != es->selection_end) {
@@ -3358,8 +3375,9 @@ static LRESULT EDIT_WM_KeyDown(EDITSTATE *es, INT key)
 					/* delete character left of caret */
 					EDIT_MoveBackward(es, TRUE);
 				else if (control)
-					/* delete to end of line */
-					EDIT_MoveEnd(es, TRUE, FALSE);
+					/* flxp: Ctrl+Delete deletes the word after the caret, to where Ctrl+Right goes
+					 * (the Edit this comes from deleted to the end of the line) */
+					EDIT_MoveWordForward(es, TRUE);
 				else
 					/* delete character right of caret */
 					EDIT_MoveForward(es, TRUE);

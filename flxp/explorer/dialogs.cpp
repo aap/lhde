@@ -13,6 +13,7 @@
 #include "shell/fileops.h"
 #include "shell/mime.h"
 #include "shell/namespace.h"
+#include "shell/ui.h"
 #include "commands.h"
 extern "C" {
 #include "prsht.h"
@@ -162,8 +163,8 @@ static INT_PTR CALLBACK msg_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM)
     switch (msg) {
     case WM_INITDIALOG:
         if (!g_msg->title.empty()) SetWindowTextW(dlg, WS(g_msg->title));
-        if (g_msg->icon) SendDlgItemMessageW(dlg, GetDlgItem(dlg, IDC_CD_ICON) ? IDC_CD_ICON : IDC_MSG_ICON, STM_SETICON, (WPARAM)g_msg->icon, 0);
-        set_text(dlg, GetDlgItem(dlg, IDC_CD_TEXT) ? IDC_CD_TEXT : IDC_MSG_TEXT, g_msg->text);
+        if (g_msg->icon) SendDlgItemMessageW(dlg, IDC_CD_ICON, STM_SETICON, (WPARAM)g_msg->icon, 0);
+        set_text(dlg, IDC_CD_TEXT, g_msg->text);
         return TRUE;
     case WM_COMMAND:
         if (LOWORD(wp) == IDOK || LOWORD(wp) == IDCANCEL || LOWORD(wp) == IDYES || LOWORD(wp) == IDNO) {
@@ -194,10 +195,7 @@ bool confirm_delete(HWND owner, const std::vector<std::string>& names, HICON ico
 
 void message(HWND owner, const std::string& title, const std::string& text, bool error)
 {
-    MsgState st = { title, text, LoadIconW(nullptr, (LPCWSTR)(error ? IDI_ERROR : IDI_INFORMATION)) };
-    g_msg = &st;
-    DialogBoxParamW(module(), MAKEINTRESOURCEW(IDD_MESSAGE), owner, msg_proc, 0);
-    g_msg = nullptr;
+    shell::message_box(owner, title, text, MB_OK | (error ? MB_ICONHAND : MB_ICONINFORMATION));
 }
 
 // ---- Organize Bookmarks ----------------------------------------------------------------
@@ -325,127 +323,6 @@ bool organize_bookmarks(HWND owner, HIMAGELIST small, int folder_image)
     if (r != IDOK) return false;
     if (!shell::save_bookmarks(organize::list)) { message(owner, "Organize Bookmarks", "Cannot write " + shell::bookmarks_path() + "."); return false; }
     return true;
-}
-
-// ---- Properties ------------------------------------------------------------------------
-
-namespace props {
-
-struct State {
-    std::string path, name, type;
-    HICON icon;
-    HIMAGELIST small;
-    int app_image;
-};
-State* s;
-
-static std::string long_date(int64_t t)
-{
-    // XP: "Friday, October 23, 2026, 1:45:12 PM"
-    time_t tt = (time_t)t;
-    struct tm tm; localtime_r(&tt, &tm);
-    char buf[96];
-    int h = tm.tm_hour % 12; if (!h) h = 12;
-    char day[48]; strftime(day, sizeof day, "%A, %B %e, %Y", &tm);
-    std::string d = day;
-    for (size_t k; (k = d.find("  ")) != std::string::npos;) d.erase(k, 1);
-    snprintf(buf, sizeof buf, "%s, %d:%02d:%02d %s", d.c_str(), h, tm.tm_min, tm.tm_sec, tm.tm_hour < 12 ? "AM" : "PM");
-    return buf;
-}
-
-static std::string commas(uint64_t n)
-{
-    std::string s = std::to_string(n);
-    for (int i = (int)s.size() - 3; i > 0; i -= 3) s.insert((size_t)i, ",");
-    return s;
-}
-
-static std::string size_text(uint64_t b)
-{
-    char buf[64];
-    if (b < 1024) snprintf(buf, sizeof buf, "%llu bytes", (unsigned long long)b);
-    else if (b < 1024 * 1024) snprintf(buf, sizeof buf, "%.1f KB (%s bytes)", b / 1024.0, commas(b).c_str());
-    else if (b < 1024ULL * 1024 * 1024) snprintf(buf, sizeof buf, "%.1f MB (%s bytes)", b / 1048576.0, commas(b).c_str());
-    else snprintf(buf, sizeof buf, "%.2f GB (%s bytes)", b / 1073741824.0, commas(b).c_str());
-    return buf;
-}
-
-static void show_opens_with(HWND dlg, const std::string& mime)
-{
-    const shell::App* a = shell::default_app(mime);
-    set_text(dlg, IDC_PR_OPENS, a ? a->name : "(none)");
-}
-
-static INT_PTR CALLBACK proc(HWND dlg, UINT msg, WPARAM wp, LPARAM)
-{
-    switch (msg) {
-    case WM_INITDIALOG: {
-        if (s->icon) SendDlgItemMessageW(dlg, IDC_PR_ICON, STM_SETICON, (WPARAM)s->icon, 0);
-        set_text(dlg, IDC_PR_NAME, s->name);
-        shell::FileInfo fi = shell::file_info(s->path, true);
-        std::string mime = shell::mime_type(s->path);
-        std::string desc = s->type.empty() ? shell::mime_comment(mime) : s->type;
-        set_text(dlg, IDC_PR_TYPE, desc + " (" + mime + ")");
-        if (fi.is_dir) {
-            ShowWindow(GetDlgItem(dlg, IDC_PR_OPENSL), SW_HIDE);
-            ShowWindow(GetDlgItem(dlg, IDC_PR_OPENS), SW_HIDE);
-            ShowWindow(GetDlgItem(dlg, IDC_PR_CHANGE), SW_HIDE);
-            set_text(dlg, IDC_PR_CONTAINS, commas(fi.files) + " Files, " + commas(fi.folders) + " Folders");
-        } else {
-            show_opens_with(dlg, mime);
-            ShowWindow(GetDlgItem(dlg, IDC_PR_CONTAINSL), SW_HIDE);
-        }
-        set_text(dlg, IDC_PR_LOCATION, shell::dir_of(s->path));
-        set_text(dlg, IDC_PR_SIZE, fi.ok ? size_text(fi.size) : "");
-        if (fi.ok) {
-            set_text(dlg, IDC_PR_MODIFIED, long_date(fi.mtime));
-            set_text(dlg, IDC_PR_ACCESSED, long_date(fi.atime));
-            set_text(dlg, IDC_PR_CHANGED, long_date(fi.ctime));
-            set_text(dlg, IDC_PR_PERMS, fi.perms + "   " + fi.owner + ":" + fi.group);
-        }
-        if (fi.is_link) { set_text(dlg, IDC_PR_EXTRAL, "Link target:"); set_text(dlg, IDC_PR_EXTRA, fi.link_target); }
-        return TRUE;
-    }
-    case WM_COMMAND:
-        if (LOWORD(wp) == IDC_PR_CHANGE) {
-            std::string mime = shell::mime_type(s->path);
-            OpenWith ow;
-            if (choose_program(GetParent(dlg), s->name, mime, s->icon, s->small, s->app_image, true, &ow)) {
-                std::string err;
-                if (!shell::set_default_app(mime, ow.app_id, &err)) message(GetParent(dlg), "Properties", err);
-                show_opens_with(dlg, mime);
-            }
-            return TRUE;
-        }
-        return FALSE;
-    }
-    return FALSE;
-}
-
-} // namespace props
-
-void properties(HWND owner, const std::string& path, const std::string& display_name, const std::string& type_name,
-                HICON icon, HIMAGELIST small, int app_image)
-{
-    props::State st = { path, display_name, type_name, icon, small, app_image };
-    props::s = &st;
-    PROPSHEETPAGEW page = {};
-    page.dwSize = sizeof page;
-    page.dwFlags = PSP_DEFAULT;
-    page.hInstance = module();
-    page.pszTemplate = MAKEINTRESOURCEW(IDD_PROPERTIES);
-    page.pfnDlgProc = props::proc;
-    PROPSHEETHEADERW psh = {};
-    psh.dwSize = sizeof psh;
-    psh.dwFlags = PSH_PROPSHEETPAGE | PSH_NOAPPLYNOW | PSH_PROPTITLE;
-    psh.hwndParent = owner;
-    psh.hInstance = module();
-    std::u16string cap = W(display_name);
-    psh.pszCaption = (LPCWSTR)cap.c_str();
-    psh.nPages = 1;
-    psh.ppsp = &page;
-    PropertySheetW(&psh);
-    props::s = nullptr;
 }
 
 // ---- Folder Options ---------------------------------------------------------------
@@ -653,15 +530,19 @@ static void fill(HWND dlg, int select)
     g_filling = false;
 }
 
+static bool is_name(int i) { return i >= 0 && (size_t)i < cols->size() && (*cols)[(size_t)i].id == 0; }
+
 static void sync(HWND dlg)
 {
     int i = current(dlg);
     bool sel = i >= 0;
-    // Name stays first and shown (XP's is greyed)
-    EnableWindow(GetDlgItem(dlg, IDC_CDT_UP), i > 1);
-    EnableWindow(GetDlgItem(dlg, IDC_CDT_DOWN), i > 0 && i + 1 < (int)cols->size());
-    EnableWindow(GetDlgItem(dlg, IDC_CDT_SHOW), i > 0 && !(*cols)[(size_t)i].shown);
-    EnableWindow(GetDlgItem(dlg, IDC_CDT_HIDE), i > 0 && (*cols)[(size_t)i].shown);
+    // Name stays shown (XP's check is greyed) and where it is (a header drag moves it);
+    // the others move past it and past the hidden ones, which keep their places
+    bool name = sel && is_name(i);
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_UP), sel && !name && i > 0);
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_DOWN), sel && !name && i + 1 < (int)cols->size());
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_SHOW), sel && !name && !(*cols)[(size_t)i].shown);
+    EnableWindow(GetDlgItem(dlg, IDC_CDT_HIDE), sel && !name && (*cols)[(size_t)i].shown);
     EnableWindow(GetDlgItem(dlg, IDC_CDT_WIDTH), sel);
     g_filling = true;
     set_text(dlg, IDC_CDT_WIDTH, sel ? std::to_string((*cols)[(size_t)i].width) : "");
@@ -670,7 +551,7 @@ static void sync(HWND dlg)
 
 static void show(HWND dlg, int i, bool on)
 {
-    if (i <= 0 || i >= (int)cols->size()) return;
+    if (i < 0 || i >= (int)cols->size() || is_name(i)) return;
     (*cols)[(size_t)i].shown = on;
     g_filling = true;
     set_check(GetDlgItem(dlg, IDC_CDT_LIST), i, on);
@@ -698,7 +579,7 @@ static INT_PTR CALLBACK proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         NMLISTVIEW* lv = (NMLISTVIEW*)nm;
         if ((lv->uChanged & LVIF_STATE) && ((lv->uNewState ^ lv->uOldState) & LVIS_STATEIMAGEMASK) && lv->iItem >= 0) {
             bool on = get_check(nm->hwndFrom, lv->iItem);
-            if (lv->iItem == 0 && !on) { g_filling = true; set_check(nm->hwndFrom, 0, TRUE); g_filling = false; }
+            if (is_name(lv->iItem) && !on) { g_filling = true; set_check(nm->hwndFrom, lv->iItem, TRUE); g_filling = false; }
             else if ((size_t)lv->iItem < cols->size()) (*cols)[(size_t)lv->iItem].shown = on;
         }
         sync(dlg);
@@ -708,10 +589,10 @@ static INT_PTR CALLBACK proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         int i = current(dlg);
         switch (LOWORD(wp)) {
         case IDC_CDT_UP:
-            if (i > 1) { std::swap((*cols)[(size_t)i], (*cols)[(size_t)i - 1]); fill(dlg, i - 1); sync(dlg); }
+            if (i > 0 && !is_name(i)) { std::swap((*cols)[(size_t)i], (*cols)[(size_t)i - 1]); fill(dlg, i - 1); sync(dlg); }
             return TRUE;
         case IDC_CDT_DOWN:
-            if (i > 0 && i + 1 < (int)cols->size()) { std::swap((*cols)[(size_t)i], (*cols)[(size_t)i + 1]); fill(dlg, i + 1); sync(dlg); }
+            if (i >= 0 && !is_name(i) && i + 1 < (int)cols->size()) { std::swap((*cols)[(size_t)i], (*cols)[(size_t)i + 1]); fill(dlg, i + 1); sync(dlg); }
             return TRUE;
         case IDC_CDT_SHOW: show(dlg, i, true); return TRUE;
         case IDC_CDT_HIDE: show(dlg, i, false); return TRUE;

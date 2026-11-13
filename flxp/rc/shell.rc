@@ -1,0 +1,101 @@
+/* The shell layer's Properties sheet (shell::properties, flxp/shell/ui/properties.cpp: flxp's Properties, luxattr), in dialog
+ * units for "MS Shell Dlg" 8 (Tahoma 8 under every style). The pages are 227 x 215, XP's file Properties pages (shell32's
+ * General page, docprop's Summary page). General: the icon, the name, the type, Opens with and its Change... button (shown
+ * when the caller can change the program: the Explorer), location, size, contains, the dates, permissions, a link's target.
+ * Metadata has the two views of XP's Summary page: the simple one's labelled fields (Description, Tags as a list with a
+ * drop-down to add from, Color as a row of swatches, Comment of several lines, Run as with Browse...) and Advanced >>'s
+ * attribute list. The metrics are the resource conventions, not XP's own: a 7-unit margin, 14-unit edits 4 units apart,
+ * labels 8 units high level with an edit's text, buttons 14 high on the right edge.
+ * Build: make flxp/rc/shell.res (mingw windres; the .res is checked in); embedded by properties.cpp. */
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
+
+IDD_GENERAL DIALOGEX 0, 0, 227, 215
+STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "General"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            "", IDC_GICON, 7, 7, 21, 20
+    EDITTEXT        IDC_NAME, 53, 11, 167, 12, ES_AUTOHSCROLL | ES_READONLY
+    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 32, 213, 1
+    LTEXT           "Type of file:", IDC_TYPEL, 7, 40, 58, 8
+    LTEXT           "", IDC_TYPE, 70, 40, 150, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    LTEXT           "Opens with:", IDC_OPENSL, 7, 55, 58, 8
+    LTEXT           "", IDC_OPENS, 70, 55, 95, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    PUSHBUTTON      "&Change...", IDC_CHANGE, 170, 52, 50, 14
+    CONTROL         "", -1, "Static", SS_ETCHEDHORZ, 7, 72, 213, 1
+    LTEXT           "Location:", -1, 7, 80, 58, 8
+    LTEXT           "", IDC_LOCATION, 70, 80, 150, 8, SS_NOPREFIX | SS_PATHELLIPSIS
+    LTEXT           "Size:", -1, 7, 94, 58, 8
+    LTEXT           "", IDC_GSIZE, 70, 94, 150, 8, SS_NOPREFIX
+    LTEXT           "Contains:", IDC_CONTAINSL, 7, 108, 58, 8
+    LTEXT           "", IDC_CONTAINS, 70, 108, 150, 8, SS_NOPREFIX
+    CONTROL         "", IDC_SEP3, "Static", SS_ETCHEDHORZ, 7, 124, 213, 1
+    LTEXT           "Modified:", IDC_MODIFIEDL, 7, 132, 58, 8
+    LTEXT           "", IDC_MODIFIED, 70, 132, 150, 8, SS_NOPREFIX
+    LTEXT           "Accessed:", IDC_ACCESSEDL, 7, 146, 58, 8
+    LTEXT           "", IDC_ACCESSED, 70, 146, 150, 8, SS_NOPREFIX
+    LTEXT           "Changed:", IDC_CHANGEDL, 7, 160, 58, 8
+    LTEXT           "", IDC_CHANGED, 70, 160, 150, 8, SS_NOPREFIX
+    CONTROL         "", IDC_SEP4, "Static", SS_ETCHEDHORZ, 7, 176, 213, 1
+    LTEXT           "Permissions:", IDC_PERMSL, 7, 184, 58, 8
+    LTEXT           "", IDC_PERMS, 70, 184, 150, 8, SS_NOPREFIX
+    LTEXT           "", IDC_EXTRAL, 7, 198, 58, 8
+    LTEXT           "", IDC_EXTRA, 70, 198, 150, 8, SS_NOPREFIX | SS_PATHELLIPSIS
+END
+
+IDD_METADATA DIALOGEX 0, 0, 227, 215
+STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "Metadata"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "&Description:", IDC_DESCL, 7, 10, 52, 8
+    EDITTEXT        IDC_DESC, 62, 7, 158, 14, ES_AUTOHSCROLL
+    LTEXT           "&Tags:", IDC_TAGSL, 7, 28, 52, 8
+    COMBOBOX        IDC_TAGEDIT, 62, 25, 108, 100, CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "&Add", IDC_TAGADD, 174, 25, 46, 14
+    LISTBOX         IDC_TAGLIST, 62, 43, 108, 38, LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | LBS_EXTENDEDSEL | LBS_NOINTEGRALHEIGHT |
+                    LBS_WANTKEYBOARDINPUT | WS_VSCROLL | WS_BORDER | WS_TABSTOP
+    PUSHBUTTON      "R&emove", IDC_TAGREMOVE, 174, 43, 46, 14
+    LTEXT           "Co&lor:", IDC_COLORL, 7, 87, 52, 8
+    CONTROL         "None", IDC_SWATCH0 + 0, "Button", BS_OWNERDRAW | WS_GROUP | WS_TABSTOP, 62, 85, 13, 12
+    CONTROL         "", IDC_SWATCH0 + 1, "Button", BS_OWNERDRAW, 76, 85, 13, 12
+    CONTROL         "", IDC_SWATCH0 + 2, "Button", BS_OWNERDRAW, 90, 85, 13, 12
+    CONTROL         "", IDC_SWATCH0 + 3, "Button", BS_OWNERDRAW, 104, 85, 13, 12
+    CONTROL         "", IDC_SWATCH0 + 4, "Button", BS_OWNERDRAW, 118, 85, 13, 12
+    CONTROL         "", IDC_SWATCH0 + 5, "Button", BS_OWNERDRAW, 132, 85, 13, 12
+    CONTROL         "", IDC_SWATCH0 + 6, "Button", BS_OWNERDRAW, 146, 85, 13, 12
+    CONTROL         "", IDC_SWATCH0 + 7, "Button", BS_OWNERDRAW, 160, 85, 13, 12
+    CONTROL         "", IDC_SWATCH0 + 8, "Button", BS_OWNERDRAW, 174, 85, 13, 12
+    CONTROL         "", IDC_SWATCH0 + 9, "Button", BS_OWNERDRAW, 188, 85, 13, 12
+    CONTROL         "", IDC_SWATCH0 + 10, "Button", BS_OWNERDRAW, 202, 85, 13, 12
+    LTEXT           "C&omment:", IDC_COMMENTL, 7, 104, 52, 8
+    EDITTEXT        IDC_COMMENT, 62, 101, 158, 40, ES_MULTILINE | ES_WANTRETURN | ES_AUTOVSCROLL | WS_VSCROLL
+    LTEXT           "&Run as:", IDC_RUNL, 7, 148, 52, 8
+    EDITTEXT        IDC_RUN, 62, 145, 108, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "Bro&wse...", IDC_RUNBROWSE, 174, 145, 46, 14
+    LTEXT           "%f is the file: python3 %f, wine %f. Empty: the program of its type.", IDC_RUNHINT,
+                    62, 162, 158, 16, SS_NOPREFIX
+    PUSHBUTTON      "Ad&vanced >>", IDC_ADVANCED, 170, 194, 50, 14
+    CONTROL         "", IDC_LIST, "SysListView32", LVS_REPORT | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP | NOT WS_VISIBLE,
+                    7, 7, 213, 180
+    PUSHBUTTON      "&New Attribute...", IDC_NEW, 7, 194, 66, 14, NOT WS_VISIBLE
+    PUSHBUTTON      "&Remove", IDC_REMOVE, 77, 194, 50, 14, NOT WS_VISIBLE
+    PUSHBUTTON      "<< &Simple", IDC_SIMPLE, 170, 194, 50, 14, NOT WS_VISIBLE
+END
+
+IDD_NEWATTR DIALOGEX 0, 0, 220, 70
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "New Attribute"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "&Name:", -1, 7, 10, 40, 8
+    EDITTEXT        IDC_ATTRNAME, 50, 7, 163, 14, ES_AUTOHSCROLL
+    LTEXT           "&Value:", -1, 7, 28, 40, 8
+    EDITTEXT        IDC_ATTRVALUE, 50, 25, 163, 14, ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK", IDOK, 109, 49, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 163, 49, 50, 14
+END

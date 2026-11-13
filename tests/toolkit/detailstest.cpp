@@ -77,6 +77,40 @@ int main(int, char** argv)
     check("unknown", 1, property("rating") == nullptr);
     check("tag list", "a, b, c", tag_list("a,b, c"));
     check("tag list blanks", "x", tag_list(" x ,,"));
+    // the metadata's other properties: colour and run as; the description one line, the comment several
+    check("color xattr", "user.lux.color", property("color")->xattr);
+    check("color type", 1, property("color")->type == ValueType::Color);
+    check("run xattr", "user.lux.run", property("run")->xattr);
+    check("run type", 1, property("run")->type == ValueType::Command);
+    check("run label", "Run as", property("run")->label);
+    check("desc one line", 0, property("description")->multiline);
+    check("comment multi-line", 1, property("comment")->multiline);
+    check("column color", "user.lux.color", column_property(SortBy::Color)->xattr);
+    check("column of color", (int)SortBy::Color, column_of("color"));
+    check("column of run: none", -1, column_of("run"));
+    // the palette: lower-case names, found whatever the case; an unknown value shows as written
+    check("palette size", 10, (int)palette().size());
+    check("palette first", "red", palette()[0].name);
+    check("color by name", "Red", color("RED") ? color("RED")->label : "<none>");
+    check("color rgb", (int)0x008080, color("teal") ? (int)color("teal")->rgb : -1);
+    check("color unknown", 1, color("chartreuse") == nullptr);
+    check("shown color", "Purple", shown(*property("color"), "purple"));
+    check("shown unknown color", "chartreuse", shown(*property("color"), "chartreuse"));
+    // a multi-line value's row: its first line and an ellipsis when more follows
+    check("first line", "first\xe2\x80\xa6", first_line("first\nsecond"));
+    check("first line alone", "only", first_line("only"));
+    check("first line, blank after", "only", first_line("only\n\n"));
+    check("first line CR LF", "a\xe2\x80\xa6", first_line("a\r\nb"));
+    check("shown comment", "one\xe2\x80\xa6", shown(*property("comment"), "one\ntwo"));
+    check("shown desc", "as is", shown(*property("description"), "as is"));
+    // run as: %f the quoted file, %% a percent, appended without %f; the program's name
+    check("run %f", "python3 '/a/b c.py'", run_command("python3 %f", "/a/b c.py"));
+    check("run appended", "wine '/x/s.exe'", run_command("wine", "/x/s.exe"));
+    check("run twice and %%", "cp '/f' '/f'.bak 100%", run_command("cp %f %f.bak 100%%", "/f"));
+    check("run quote in name", "sh 'it'\\''s'", run_command("sh %f", "it's"));
+    check("run program", "python3", run_program("/usr/bin/python3 -u %f"));
+    check("run program quoted", "my tool", run_program("\"/opt/my tool\""));
+    check("run program plain", "xdg-open", run_program("  xdg-open %f"));
 
     // StrFormatByteSize: three digits, the fraction cut
     check("bytes", "198 bytes", byte_size(198));
@@ -96,6 +130,14 @@ int main(int, char** argv)
     check("long date", "Friday, August 24, 2001, 12:00 AM", friendly_date(at(2001, 8, 24, 0, 0), now));
     check("day with zero", "Thursday, October 02, 2003, 5:36 PM", friendly_date(at(2003, 10, 2, 17, 36), now));
     check("short date", "8/24/2001", short_date(at(2001, 8, 24, 10, 0)));
+    // the Properties sheet's General page: StrFormatByteSize and the exact count, the long date with seconds
+    check("thousands", "1,331", thousands(1331));
+    check("thousands small", "999", thousands(999));
+    check("thousands big", "10,737,418,240", thousands(10737418240ULL));
+    check("size and bytes", "1.29 KB (1,331 bytes)", size_and_bytes(1331));
+    check("size and bytes small", "198 bytes (198 bytes)", size_and_bytes(198));
+    check("properties date", "Thursday, October 02, 2003, 5:36:09 PM", long_date(at(2003, 10, 2, 17, 36) + 9));
+    check("properties midnight", "Friday, August 24, 2001, 12:00:00 AM", long_date(at(2001, 8, 24, 0, 0)));
 
     // attributes: read-only only for files, hidden for both, never archive
     check("attr none", "", attributes(file("a", 1, 0, "")));
@@ -151,6 +193,17 @@ int main(int, char** argv)
     in = describe({ bak }, { bf }, loc, Facts(), 107, now);
     check("one tags xp", "BAK File|Date Modified: Friday, October 23, 2026, 2:24 PM|Size: 198 bytes|Tags: boot, backup", xp(in));
     check("one tags lh", "1 KB|10/23/2026 2:24 PM|BAK File|<Add a description>|boot, backup|<Add comments>", lh(in));
+    // a comment of two lines shows its first; a colour is XP's line (the band draws it by the name); run as in neither pane;
+    // the editor gets the whole stored value
+    Facts cf; cf.xattrs = { { "user.xdg.comment", "line one\nline two" }, { "user.lux.color", "red" }, { "user.lux.run", "python3 %f" } };
+    in = describe({ bak }, { cf }, loc, Facts(), 107, now);
+    check("comment and color xp", "BAK File|Date Modified: Friday, October 23, 2026, 2:24 PM|Size: 198 bytes|Comment: line one\xe2\x80\xa6|Color: Red", xp(in));
+    check("comment and color lh", "1 KB|10/23/2026 2:24 PM|BAK File|<Add a description>|<Add tags>|line one\xe2\x80\xa6", lh(in));
+    {
+        std::string raws;
+        for (const Row& r : in.rows) if (r.id == "comment" || r.id == "color") raws += (raws.empty() ? "" : "|") + r.raw;
+        check("editor raw values", "line one\nline two|red", raws);
+    }
 
     // an empty file has no Size line; a read-only one says so
     in = describe({ file("empty", 0, old, "File", IsReadOnly) }, {}, loc, Facts(), 1, now);
@@ -249,6 +302,42 @@ int main(int, char** argv)
     check("infotip", "Type: BAK File\nDate Modified: 10/23/2026 2:24 PM\nSize: 198 bytes\nDescription: The old boot file\nTags: boot, backup", infotip(tip));
     Item ftip = sub; ftip.xattrs = { { "user.xdg.comment", "fonts" } };
     check("infotip folder", "Date Modified: 10/23/2026 2:24 PM\nComment: fonts", infotip(ftip));
+    Item rtip = bak;
+    rtip.xattrs = { { "user.lux.run", "/usr/bin/python3 %f" }, { "user.lux.color", "teal" }, { "user.xdg.comment", "a\nb" } };
+    check("infotip run and color", "Type: BAK File\nDate Modified: 10/23/2026 2:24 PM\nSize: 198 bytes\nComment: a\xe2\x80\xa6\nColor: Teal\nRuns with: python3", infotip(rtip));
+
+    // the Filter box: words, fields, quotes; every word matches somewhere, case ignored
+    {
+        auto words = [](const std::string& text) {
+            std::string s;
+            for (const Filter::Word& w : parse_filter(text).words) s += (s.empty() ? "" : "|") + std::to_string((int)w.field) + w.text;
+            return s;
+        };
+        check("filter words", "0red|0sun", words("  Red   sun "));
+        check("filter fields", "3red|1x|2to do|4", words("TAG:red name:x desc:\"to do\" comment:"));
+        check("filter other prefix", "0http://a", words("http://a"));
+        check("filter quotes", "0a red", words("\"a red\" \"\""));
+        check("filter empty", 1, parse_filter("   ").empty());
+        check("filter name only reads nothing", 0, parse_filter("name:a").stored());
+        check("filter word reads the attributes", 1, parse_filter("a").stored());
+        Item a = file("alpha.txt", 1, 0, "Text"), g = file("gamma.png", 1, 0, "PNG");
+        a.xattrs = { { "user.xdg.tags", "red,work" } };
+        g.xattrs = { { "user.lux.desc", "A Red sunset" }, { "user.xdg.comment", "tagged later" } };
+        auto hits = [&](const std::string& text) {
+            Filter f = parse_filter(text);
+            return std::string(filter_matches(f, a) ? "a" : "") + (filter_matches(f, g) ? "g" : "");
+        };
+        check("filter any field", "ag", hits("red"));
+        check("filter every word", "a", hits("red work"));
+        check("filter tag: tags only", "a", hits("tag:red"));
+        check("filter tag: within one tag", "", hits("tag:red,work"));
+        check("filter tag: set", "a", hits("tag:"));
+        check("filter desc:", "g", hits("desc:SUN"));
+        check("filter comment: not the tags", "g", hits("comment:tag"));
+        check("filter name:", "a", hits("name:alp"));
+        check("filter none", "ag", hits(""));
+        check("filter no match", "", hits("blue"));
+    }
 
     // the write path on a scratch file (skipped where the file system keeps no user attributes)
     {
@@ -294,6 +383,49 @@ int main(int, char** argv)
             check("desc removed", "<none>", value("user.lux.desc"));
             check("remove twice", 1, write(f, *desc, " ", &err));
             check("derived refused", 0, write(f, *property("size"), "1", &err));
+            // the description is one line: a pasted line break becomes a space; the comment keeps its lines (CR LF as LF)
+            check("write desc of lines", 1, write(f, *desc, "first\r\nsecond\n\nthird\n", &err));
+            check("desc one line", "first second third", value("user.lux.desc"));
+            write(f, *desc, "", &err);
+            check("write comment", 1, write(f, *property("comment"), "  one\r\ntwo\r\n\r\nthree\r\n", &err));
+            check("comment lines", "one\ntwo\n\nthree", value("user.xdg.comment"));
+            // a colour of the palette is stored by its lower-case name, another as typed
+            check("write color", 1, write(f, *property("color"), " Red ", &err));
+            check("color stored", "red", value("user.lux.color"));
+            check("write odd color", 1, write(f, *property("color"), "Chartreuse", &err));
+            check("odd color stored", "Chartreuse", value("user.lux.color"));
+            write(f, *property("color"), "", &err);
+            // tags added and removed in one go: the others kept in their order, an added one not twice
+            write(f, *tags, "a,b,c", &err);
+            check("change tags", 1, change_tags(f, { "d", "b", "e; f" }, { "a", "zzz" }, &err));
+            check("tags changed", "b,c,d,e,f", value("user.xdg.tags"));
+            check("change nothing", 1, change_tags(f, {}, {}, &err));
+            check("remove all", 1, change_tags(f, {}, { "b", "c", "d", "e", "f" }, &err));
+            check("all removed", "<none>", value("user.xdg.tags"));
+            // run as: the attribute is what a double click runs (shell::open_files reads it with run_as)
+            check("write run", 1, write(f, *property("run"), "python3 %f\n", &err));
+            check("run stored", "python3 %f", value("user.lux.run"));
+            write(f, *property("run"), "", &err);
+            // the known tags: the files' own, the recently used, the folder's other files'
+            {
+                std::string other = dir + "/other.txt", state = dir + "/state";
+                FILE* op = fopen(other.c_str(), "w"); if (op) fclose(op);
+                setxattr(other.c_str(), "user.xdg.tags", "folder1,shared", 14, 0);
+                write(f, *tags, "own,shared", &err);
+                const char* old_state = getenv("XDG_STATE_HOME");
+                std::string keep = old_state ? old_state : "";
+                setenv("XDG_STATE_HOME", state.c_str(), 1);
+                check("known: own and folder", "own|shared|folder1", join(known_tags({ f })));
+                remember_tags({ "recent1, recent2" });
+                remember_tags({ "recent3", "recent1" });
+                check("known: recent after own", "own|shared|recent3|recent1|recent2|folder1", join(known_tags({ f })));
+                if (old_state) setenv("XDG_STATE_HOME", keep.c_str(), 1); else unsetenv("XDG_STATE_HOME");
+                unlink((state + "/lhde/flxp-tags").c_str());
+                rmdir((state + "/lhde").c_str());
+                rmdir(state.c_str());
+                unlink(other.c_str());
+                write(f, *tags, "", &err);
+            }
             // a NUL and a newline someone else wrote are not part of the value
             setxattr(f.c_str(), "user.xdg.comment", "echoed\n", 7, 0);
             check("newline dropped", "echoed", value("user.xdg.comment"));

@@ -9,6 +9,7 @@ user32/uitools.c                         wine-7.0   2cb237a53c7
 user32/text.c                            wine-7.0   2cb237a53c7
 user32/dialog.c                          wine-6.0   1f352a9d3a6
 user32/defdlg.c                          wine-6.0   1f352a9d3a6
+user32/msgbox.c                          wine-11.18 7b3fff76fa5
 uxtheme/buffer.c                         master     840a939ee52
 uxtheme/dialog.c                         master     840a939ee52
 uxtheme/draw.c                           master     840a939ee52
@@ -55,6 +56,9 @@ comctl32/smoothscroll.c                  wine-10.0  2e9cb99369e
 comctl32/taskdialog.c                    wine-10.0  2e9cb99369e
 user32/menu.c                            wine-7.0   2cb237a53c7
 include/commdlg.h                        master     840a939ee52
+comdlg32/fontdlg.c                       wine-11.18 7b3fff76fa5
+comdlg32/finddlg.c                       wine-11.18 7b3fff76fa5
+comdlg32/cdlg.h                          wine-11.18 7b3fff76fa5
 include/dwmapi.h                         master     840a939ee52
 
 # Compiled resources and icons from Wine's sources, kept outside this directory (not patched). Each reproduces byte for byte
@@ -63,4 +67,5 @@ include/dwmapi.h                         master     840a939ee52
 wux/rc/comctl32.res                      wine-11.18 7b3fff76fa5  dlls/comctl32/comctl32.rc + the .bmp/.cur/.ico it names    wux/rc/build.sh WINE/dlls/comctl32 comctl32
 wux/rc/comdlg32.res                      wine-11.18 7b3fff76fa5  dlls/comdlg32/comdlg32.rc + cdlg.h colordlg.h filedlgbrowser.h + the .ico/.bmp it names    wux/rc/build.sh WINE/dlls/comdlg32 comdlg32 -DNEWFILEOPENV3ORD=1553 (mingw's dlgs.h lacks it)
 wux/w32/stdres.res                       wine-11.18 7b3fff76fa5  dlls/user32/resources/obm_*.bmp ocr_*.cur oic_*.ico (icons cut to 16+32 px, cursors to 32 px, 32 bpp)    python3 -I wux/w32/mkstdres.py WINE
+wux/rc/user32.res                        wine-11.18 7b3fff76fa5  dlls/user32/user32.rc's STRINGTABLE (IDS_ERROR, the button names) and MSGBOX dialog with dlls/user32/resources.h's ids, cut to wux/rc/user32.rc with one line added (FONT 8, "MS Shell Dlg": the template says DS_SETFONT)    make wux/rc/user32.res (windres -O res)
 flxp/res/icons/*.ico, *.bmp (47 files)   wine-11.18 7b3fff76fa5  dlls/shell32/resources/<same name>, copied unchanged

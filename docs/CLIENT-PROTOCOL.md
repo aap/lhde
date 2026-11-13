@@ -32,6 +32,7 @@ the client needs to know only *where* the glass is, not how it is drawn.
 | `_LHWM_CAPTION_RECT` | client toplevel | luxwm | CARDINAL[4] | "Client content over the caption rows" |
 | `_LHWM_DESKTOP_LAYER` | desktop window | client | CARDINAL | "Desktop windows" |
 | `_LH_DROP_SHADOW` | override-redirect window | client | CARDINAL | "Drop shadows" |
+| `_LHWM_SWITCHER` | luxwm's Alt+Tab switcher window | luxwm | CARDINAL[4] | "The task switcher window" |
 | `_NET_FRAME_EXTENTS` | client toplevel | luxwm | CARDINAL[4] | the real frame margins outside the client; an extension (inside the client) does not change them |
 | `_LHWM_COMPOSITED` | root | luxwm | CARDINAL 0/1 | "Root properties" |
 | `_LHWM_THEME` | root | luxwm | STRING | "Root properties" |
@@ -319,6 +320,14 @@ shadow's alpha; without one it is a copy of the screen under it, taken before th
 | --- | --- | --- |
 | `_LH_DROP_SHADOW` | CARDINAL | on an override-redirect window: 1 = a popup whose drop shadow is its client's own (or none, when the setting is off), 2 = such a shadow window. The compositor adds no shadow of its own and does not blur behind either (`picom-glass.conf`, `picom-glass-fvwm.conf`). |
 
+## The task switcher window: `_LHWM_SWITCHER`
+
+While Alt+Tab is held luxwm shows XP's switcher (docs/LUXWM.md "Task switcher"): an override-redirect window of WM_CLASS
+`lhwm-switcher`/`lhwm`, named "lhwm task switcher", which carries `_LHWM_SWITCHER` (CARDINAL[4]): the selected entry (0-based),
+the number of entries, the first entry shown (more than 7 x 3 entries scroll), the selected client window. It is written before
+the map and on every change of the selection, for tests (`tests/headless/alttab.sh`) and the compositor: `picom-glass.conf` gives
+the window no shadow, no blur and no fade, as XP shows and hides it at once.
+
 ## Start menu state: `_LH_STARTMENU_OPEN`
 
 CARDINAL, set by the start-menu provider (flxp-taskbar, `xwm::set_start_menu_open`) on the root and on its `_LH_STARTMENU_S<n>`
@@ -341,6 +350,84 @@ dragged from keeps the focus.
 wux's XDND source (`wux/sys/x11.cpp` `hover_raise`) raises the toplevel the pointer rested over (within 8 px) for 1 s, skipping
 override-redirect windows and the topmost one, with `_NET_ACTIVE_WINDOW` (source 2) on its client window instead, which also
 moves the focus; without a window manager it calls `XRaiseWindow`.
+
+## Menus and clicks
+
+What a click outside an open menu does, as Windows does it, and how lhde's three menu owners (wux: flxp's and the desktop's
+popup menus, menu bars and the start panel; luxwm: the window menu; luxshell: its context menus and flyouts) do the same over X.
+
+**The rule.** A click outside an open menu ends the menu, and then acts where it was made, as if no menu had been open: the window
+under the pointer is activated and gets the click. A right click on another file, another window or the desktop therefore closes
+the menu and opens that place's own. Only a click on the menu's own parts (an item, anywhere on a popup, the menu bar item or
+system-menu button it hangs from) is the menu's. Escape closes the innermost menu, Alt or F10 the whole menu.
+
+- Wine's user32, as vendored (`wux/vendor/wine/user32/menu.c`, `MENU_TrackMenu`): the loop peeks a message without removing it
+  ("we have to keep the message in the queue until it's clear that menu loop is not over yet"); on `WM_LBUTTONDOWN` (and
+  `WM_RBUTTONDOWN` with `TPM_RIGHTBUTTON`) "If the message belongs to the menu, removes it from the queue / Else, end menu
+  tracking": `fRemove = MENU_ButtonDown(...); fEndMenu = !fRemove;`, and at the bottom `if (fRemove && !(mt.trackFlags &
+  TF_SKIPREMOVE)) PeekMessageW(..., PM_REMOVE)`: a press that ends the menu stays in the queue and, after `TrackPopupMenu`
+  returns, goes to the window it was for. `MENU_ButtonDown` keeps tracking only for "a click on an item or anywhere on a popup"
+  (`ht == ht_item || (MF_POPUP && ht != ht_nowhere)`). `TF_ENDMENU` (a menu opened already ended) and `TF_SKIPREMOVE` (a message
+  the key handling removed itself) do not change this. Keys are always removed; `VK_MENU`/`VK_F10` end the menu,
+  `MENU_KeyEscape` closes one level.
+- ReactOS's win32k (`win32ss/user/ntuser/menu.c`, `MENU_TrackMenu`) has the same: "If the message belongs to the menu, removes
+  it from the queue / Else, end menu tracking", the press left in the queue.
+- XP's win32k (`windows/core/ntuser/kernel/mnloop.c`, `xxxHandleMenuMessages`, read as the reference) also leaves a press off
+  the menu in the queue when it dismisses the menu, a right press as well as a left one.
+- From the documentation (TrackPopupMenu, Remarks): "To display a context menu for a notification icon, the current window must
+  be the foreground window before the application calls TrackPopupMenu or TrackPopupMenuEx. Otherwise, the menu will not
+  disappear when the user clicks outside of the menu or the window that created the menu (if it is visible)." SetCapture: it
+  captures "for the current thread"; "If the mouse cursor is over a window created by another thread, the system will direct
+  mouse input to the specified window only if a mouse button is down", and "even if the foreground window has captured the
+  mouse, the user can still click another window, bringing it to the foreground". So a menu's capture does not keep a click
+  from another thread's window: that window is activated and gets it, and the menu's thread ends its menu (the system cancels
+  the menu loop of the thread that lost the click: WM_CANCELMODE, the activation change).
+
+On X every lhde program is a process of its own (luxshell, flxp-desktop, each flxp window, flxp-startmenu), so a click from one
+into another is Windows' cross-thread case and a click on another window of the same program the same-thread case. Both end in
+the same place: the menu ends, the window under the pointer is activated and acts on the click.
+
+**The start menu** is no `TrackPopupMenu` menu but XP's menu band (a message filter on the tray's thread; ReactOS's
+`CMenuFocusManager` and `CMenuDeskBar` in `dll/win32/shell32/shellmenu` have the same design): a press outside it cancels the
+whole menu, and on the tray's own thread (the taskbar, the Start button) the press goes no further; on another thread's window
+(the desktop, a program) the click goes on as above, and the start menu closes as its thread loses the activation. So a click on the Start button while the start menu is open
+closes it and does not open it again, a click on a task button closes it without switching, and a click on the desktop or a
+window closes it and acts there. Here the taskbars (luxshell's Avalon bar and sidebar, flxp-taskbar) are the tray, whichever
+process draws them: flxp's start panel and its classic start menu (both `sys::set_shell_grab`) keep a press on a
+`_NET_WM_WINDOW_TYPE_DOCK` window and replay every other one; the start panel then does not give the focus back to the window it
+took it from.
+
+**Over X.** An open menu holds an active pointer grab with owner events (`XGrabPointer(root, True, ButtonPress | ButtonRelease |
+PointerMotion, GrabModeSync, GrabModeAsync)`): its own windows get their events as usual, everything else comes to the grab. The
+grab is on the root window, so that a replayed press is checked against the passive grabs on the windows under the pointer (a
+grab window off the pointer's path makes the X server hand the press straight to the window, past the window manager's click to
+focus). It is synchronous: each pointer event freezes the pointer until `XAllowEvents`; motion and releases are let go at once
+(`SyncPointer`), a press when the owner has decided:
+
+- on the menu's own windows: the menu's (`SyncPointer`);
+- on another client's window: the menu ends and the press is replayed (`XAllowEvents(ReplayPointer)`): the server ends the grab
+  and delivers the press again as if there had been none, through luxwm's passive button grab (click to focus: luxwm activates
+  the window and replays it on) to the window, which acts on it;
+- on another window of the same program (wux): the menu gets the press as a click outside and ends; the press goes on to the
+  window it hit right after it in the queue (as in Windows: a toolbar's drop-down button, `TBN_DROPDOWN`, removes the pending
+  `WM_LBUTTONDOWN` after its menu returns, which makes a second click on it close the menu instead of reopening it), and wux asks
+  the window manager to activate that window's top-level.
+
+luxwm focuses a window on a press of any of the three buttons (Windows sends `WM_MOUSEACTIVATE` and activates on each), not only
+the left one (`focus_button` besides, when it is another button; not the wheel). luxwm's own window menu grabs the same way and
+replays a press outside to the window under it, its own frames included (a right click on another caption opens that window's
+menu); a press on the caption icon that opened the menu is the menu's own (XP's system-menu button): it closes the menu, or the
+window when it is the second click of a double click. luxshell's grabbing surfaces (context menus, flyouts) replay a press outside
+every luxshell surface after calling `on_outside`; a press on another luxshell surface is that surface's and closes the menu.
+
+Keys go to the menu: wux's menus get them through the focus (the program is active), luxwm's and luxshell's menus grab the
+keyboard. A combo box's drop-down list uses a plain capture (no menu mode) and no X grab; a drag holds its own asynchronous grab.
+
+`tests/headless/menus.sh` checks the rule under luxwm with two `tests/w32/menuclick` programs: a right click into the other
+program's window with a menu up ends it, activates that window and opens its menu, both ways; a click on the same window outside
+its menu ends it and reaches the window; a right click into another window of the same program; Escape; an item chosen; luxwm's
+window menu and a click into a window. xdotool's `click` sends press and release in one burst, which Xorg delivers past the
+freeze before the replay; the test holds each button 0.1 s, as a hand does.
 
 ## Not implemented
 

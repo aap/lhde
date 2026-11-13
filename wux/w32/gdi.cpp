@@ -233,8 +233,12 @@ static Font* new_font(const LOGFONTW& lf, bool is_stock)
     Font* f = new Font;
     f->type = T_FONT; f->stock = is_stock;
     f->lf = lf;
-    std::string face = to_utf8(lf.lfFaceName, -1);
+    std::string face = utf8_of(lf.lfFaceName, -1);
     if (face.empty()) face = "MS Shell Dlg";
+    // a face that is not installed, asked for with fixed pitch or as FF_MODERN (notepad's Lucida Console without the
+    // Windows fonts): a monospaced one, as Windows' font mapper weighs the pitch above the name
+    if (((lf.lfPitchAndFamily & 3) == FIXED_PITCH || (lf.lfPitchAndFamily & 0xf0) == FF_MODERN) && !gdi::have_family(face.c_str()))
+        face = "monospace";
     gdi::FontDesc d;
     d.family = face.c_str();
     d.height = lf.lfHeight;
@@ -290,7 +294,7 @@ HFONT WINAPI CreateFontIndirectA(const LOGFONTA* lfa)
     LOGFONTW lf;
     memcpy(&lf, lfa, offsetof(LOGFONTA, lfFaceName));
     memset(lf.lfFaceName, 0, sizeof lf.lfFaceName);
-    std::u16string face = to_utf16(lfa->lfFaceName, strnlen(lfa->lfFaceName, LF_FACESIZE));
+    std::u16string face = utf16_of(lfa->lfFaceName, (int)strnlen(lfa->lfFaceName, LF_FACESIZE));
     for (size_t i = 0; i < face.size() && i < LF_FACESIZE - 1; i++) lf.lfFaceName[i] = face[i];
     return (HFONT)new_font(lf, false);
 }
@@ -1038,7 +1042,7 @@ INT WINAPI GetObjectA(HGDIOBJ h, INT size, void* buf)
     LOGFONTA lfa;
     const LOGFONTW& lf = ((Font*)o)->lf;
     memcpy(&lfa, &lf, offsetof(LOGFONTA, lfFaceName));
-    std::string face = to_utf8(lf.lfFaceName, -1);
+    std::string face = utf8_of(lf.lfFaceName, -1);
     memset(lfa.lfFaceName, 0, sizeof lfa.lfFaceName);
     memcpy(lfa.lfFaceName, face.c_str(), min(face.size(), (size_t)LF_FACESIZE - 1));
     INT n = min(size, (INT)sizeof(LOGFONTA));

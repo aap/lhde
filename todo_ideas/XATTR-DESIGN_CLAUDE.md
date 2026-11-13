@@ -49,13 +49,18 @@ stay data-driven in the Longhorn sense without WinFS: a task list keyed by exper
    lists properties below the preview); context menu "Edit Description", "Add Tag" (selected items), a full editor
    later. Read/write via libattr; mirror luxfs's names so `x`/`lsx` and flxp agree (docs/ANNOTATIONS.md is the shared
    convention; "author/source/build" are research-specific, "desc/tags/comment" general).
+   1b. **More metadata** (done): the description one line, the comment the free text of several lines (luxfs's notes and
+   todo stay plain names in the Advanced list); a colour label (`user.lux.color`, a ten-name palette; where it shows is still
+   open) and Run as (`user.lux.run`, a command a double click runs instead of the type's program); the Properties sheet's
+   Metadata page with a tag list and a drop-down of known tags.
 2. **Pane states as in 4051**: none / one / many, with the thumbnail left, properties middle, tasks right; compact vs
    expanded (72 / 150 px) as measured; the folder band colour per folder kind (already in lux themes).
 3. **Tasks as data**: move flxp's task list to a table with experiences and per-selection names; add xattr tasks
    ("Add tags" is itself a task in 4051: `Explorer.Add_keywords`). This is where the research's `TASKS-SUMMARY.txt`
    (74 tasks with their experiences and orders) can be copied almost literally for the Longhorn look.
-4. **Filtering**: "Filter by" over tags/desc in the left pane; later saved filters; later a catalog/index only if
-   walking xattrs gets slow (4051's WinFS was that index; we can start without one, `lsx -t DIR` is the measure).
+4. **Filtering**: the "Filter by" box filters over the name, desc, tags and comment (`tag:`, `desc:`, `comment:` words;
+   docs/USAGE.md "Metadata"); later saved filters; later a catalog/index only if walking xattrs gets slow
+   (4051's WinFS was that index; we can start without one, `lsx -t DIR` is the measure).
 5. **Agent workflows**: the same xattrs are what agents already read/write in `~/fun/longhorn`; flxp becomes the viewer
    and editor of that metadata, which is the "organize agentic workflows" use in xattribs.txt.
 

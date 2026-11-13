@@ -18,9 +18,11 @@
 //   drive     Type; File System; Free Space; Total Size                     type, free space
 //   virtual   Type ("System Folder")                                        type
 //   files and folders also: Description (user.lux.desc), Tags (user.xdg.tags),
-//   Comment (user.xdg.comment); XP shows them when set (read-only there, as
-//   XP's Details were), 4051 always, an empty one as its invitation ("Add a
-//   description", ...), and a click on one edits it (write()).
+//   Comment (user.xdg.comment, its first line); XP shows them when set
+//   (read-only there, as XP's Details were), 4051 always, an empty one as its
+//   invitation ("Add a description", ...), and a click on one edits it
+//   (write()). Color (user.lux.color): XP's line when set; the band shows it as
+//   a square after the name (Info::rows has its row), not as a line.
 //
 // XP: the name in bold above the lines; Type is the value alone, the others
 // "Label: value"; an empty value drops its line, as does
@@ -54,7 +56,9 @@ namespace details {
 // dimensions, a drive's space) has no attribute and is computed from the item
 // and its facts. The item kinds' lists name properties by id only, so
 // mappings can be added or renamed here without touching the lists.
-enum class ValueType { Text, List, Date, Size, Number };
+// Text is one line (a line break typed or pasted becomes a space) unless `multiline`; Color a name of palette();
+// Command a /bin/sh command line run on the file (run_command).
+enum class ValueType { Text, List, Date, Size, Number, Color, Command };
 struct Property {
     std::string id;                     // "tags"
     std::string label;                  // "Tags" (XP's "Label: value")
@@ -62,11 +66,12 @@ struct Property {
     std::string xattr;                  // "user.xdg.tags"; "" = derived
     bool editable = false;              // the user sets it (4051: a click on its row edits it)
     std::string invitation;             // shown while it is empty ("Add tags"), 4051 only
+    bool multiline = false;             // a Text of several lines (the comment): one row shows its first line and "..."
 };
 const std::vector<Property>& registry();                // the defaults
 const Property* property(const std::string& id);        // null: unknown
-// The list's column of a stored property (SortBy::Description, Tags, Comment;
-// null for the derived columns), and the column of a property id (-1: none)
+// The list's column of a stored property (SortBy::Description, Tags, Comment,
+// Color; null for the derived columns), and the column of a property id (-1: none)
 const Property* column_property(SortBy col);
 int column_of(const std::string& id);
 
@@ -88,20 +93,73 @@ Read read_attr(const std::string& path, const std::string& xattr, std::string* v
 // a sentence for the message box ("The tags of 'a' could not be read ...")
 bool read_current(const std::string& path, const Property& p, std::string* value, std::string* err);
 Stored read_stored(const std::string& path);                         // the registry's attributes that are set (Value only)
+// The names of every user.* attribute on path (any program's, not only the registry's), in the file system's order.
+// Missing: none, no user attributes on that file system (ENOTSUP) or no such file; Failed: *error the errno.
+Read list_attrs(const std::string& path, std::vector<std::string>* names, int* error = nullptr);
 void read_stored(Item& it);                                          // into it.xattrs (a file-system item)
 std::vector<std::string> split_list(const std::string& text);        // "a, b;c\n" -> a, b, c (commas, semicolons, newlines)
 std::string join_list(const std::vector<std::string>& items);        // -> "a,b,c", as stored
-// The value the user typed for p on path: a list is split and joined again.
-// False with *err a sentence for a message box (the file system keeps no user
+// The value the user typed for p on path: a list is split and joined again; a
+// one-line text has its line breaks as spaces, a multi-line one its CR LF as LF;
+// a colour of the palette its lower-case name; every value trimmed. False with *err a sentence for a message box (the file system keeps no user
 // attributes, the file is not the user's or read-only, its current value could
 // not be read, ...). add_tags and remove_tag refuse the same way.
 bool write(const std::string& path, const Property& p, const std::string& text, std::string* err);
 bool add_tags(const std::string& path, const std::vector<std::string>& tags, std::string* err);   // keeping the others
 bool remove_tag(const std::string& path, const std::string& tag, std::string* err);
+// One read and one write: `add` appended (each split as typed: "a, b" is two), then `remove` taken out; the file's
+// other tags kept in their order. Nothing is written when nothing changes.
+bool change_tags(const std::string& path, const std::vector<std::string>& add, const std::vector<std::string>& remove,
+                 std::string* err);
+// The tags to offer where a tag is typed (Add Tag..., the Properties sheet): those of `paths`, then the recently used
+// ones (remember_tags), then those of the other files in the paths' folders (at most 2000 entries a folder); each once.
+std::vector<std::string> known_tags(const std::vector<std::string>& paths);
+// Tags the user just added, kept at the front of $XDG_STATE_HOME/lhde/flxp-tags (one a line, the last 100)
+void remember_tags(const std::vector<std::string>& tags);
+
+// A value on one row (the Details column, the panes, the infotip): a list as "a, b", a colour by its label ("Red"; an
+// unknown name as written), a multi-line text its first line and "..." (U+2026) when more follows.
+std::string shown(const Property& p, const std::string& value);
+std::string first_line(const std::string& text);
+
+// ---- colours (user.lux.color) ------------------------------------------------------------
+// A small named palette, stored as the lower-case name. VGA's sixteen where they have the colour (red, yellow, green, teal,
+// blue, purple, gray) and orange, pink and brown, which VGA lacks; chosen to read on white and on the task band's blue.
+struct Color { const char* name; const char* label; unsigned rgb; };   // rgb 0xRRGGBB
+const std::vector<Color>& palette();
+const Color* color(const std::string& value);           // by name, ASCII case ignored; null: none or unknown
+
+// ---- run as (user.lux.run) -----------------------------------------------------------------
+// What a file with `run` set opens with: a /bin/sh command line in which %f is the file, quoted ("python3 %f" ->
+// python3 '/a/b c.py'), %% a percent sign; without %f the quoted file is appended.
+std::string run_command(const std::string& command, const std::string& path);
+std::string run_program(const std::string& command);    // its program's name ("/usr/bin/python3 -u %f" -> "python3")
+
 // XP's infotip of a list item (defview's InfoTip lines, "Label: value" per
 // line): a file's Type, Date Modified and Size, a folder's Date Modified, then
-// Description, Tags and Comment when set (from it.xattrs, read when empty)
+// Description, Tags, Comment (its first line), Color and "Runs with: PROGRAM"
+// when set (from it.xattrs, read when empty)
 std::string infotip(const Item& it);
+
+// ---- the Filter box ------------------------------------------------------------------
+// What the Longhorn hosts' "Filter by" box (and the header's search box) keep of
+// the folder: the items every word of the text matches, each word anywhere in the
+// name, the description, a tag or the comment, as a part of the value, ASCII case
+// ignored ("red" finds "Red sunset.png" and the tag "reddish"). A word written
+// field:text looks at that field only: tag: (also tags:), desc: (description:),
+// comment:, name:; a field with nothing after it matches the items where that
+// field is set ("tag:" keeps the tagged ones). Double quotes make one word of
+// several ("a red", tag:"to do"). A word with another prefix ("http:") is a
+// plain word. Words are separated by spaces; an empty text is no filter.
+struct Filter {
+    enum Field { Any, Name, Desc, Tags, Comment };
+    struct Word { Field field = Any; std::string text; };   // text in lower case
+    std::vector<Word> words;
+    bool empty() const { return words.empty(); }
+    bool stored() const;                // a word looks at the stored properties (they must be read)
+};
+Filter parse_filter(const std::string& text);
+bool filter_matches(const Filter& f, const Item& it);   // the stored properties from it.xattrs (read_stored)
 
 // What the file system says about an item beyond shell::Item (probe() reads it)
 struct Facts {
@@ -136,6 +194,7 @@ struct Info {
     std::vector<Row> rows;
     uint64_t total = 0;                 // Many: the files' bytes (0 for more than 100 items, as XP)
     bool xp_preview = false;            // XP's mini preview (a single non-folder that has a thumbnail)
+    bool folder = false;                // One: the item is a folder (4051's band shows its picture as the Icons view composes it)
     std::vector<std::string> previews;  // 4051's pictures (One: the item; Many: up to 7)
 };
 
@@ -159,6 +218,10 @@ std::vector<LhLine> lh_lines(const Info& in);       // the values in 4051's orde
 std::string byte_size(uint64_t bytes);                  // StrFormatByteSize: "198 bytes", "1.30 KB", "2.39 MB"
 std::string friendly_date(int64_t t, int64_t now);      // "Today, October 31, 2026, 12:45 PM"
 std::string short_date(int64_t t);                      // "8/24/2001"
+// the Properties sheet's General page (shell::properties), XP's shell32 General page
+std::string thousands(uint64_t n);                      // "1,331"
+std::string size_and_bytes(uint64_t bytes);             // "1.29 KB (1,331 bytes)", "198 bytes (198 bytes)"
+std::string long_date(int64_t t);                       // "Thursday, October 02, 2003, 5:36:12 PM"
 std::string attributes(const Item& it);                 // "Read-only, Hidden"; "" for none
 std::string tag_list(const std::string& value);         // a list value as shown: "a,b; c" -> "a, b, c"
 std::string items_selected_xp(size_t n);                // "3 items selected."

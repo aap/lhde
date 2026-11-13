@@ -397,6 +397,14 @@ static void cl_marlett(void) {
     if (*free_) wm_fut_add_font_dir(free_);
 }
 
+/* the system colours a window luxwm draws itself in the user32 way (the Alt+Tab switcher, LUXWM.md "Task switcher") gets: Windows
+   Classic the scheme's, a visual style its [SysMetrics] colours over Windows Standard (what XP's user32 has under the style) */
+void wm_theme_syscolors(const struct theme *t, uint32_t out[31]) {
+    for (int i = 0; i < CL_N; i++) out[i] = t->classic ? t->cl[i] : cl_standard[i];
+    if (t->classic || !t->ut) return;
+    for (int i = 0; i < CL_N; i++) { uint32_t c; if (ut_get_color((ut_theme *)t->ut, "sysmetrics", 0, 0, 1601 + i, &c)) out[i] = c; }   /* TMT_SCROLLBAR.. */
+}
+
 static int classic_load(struct theme *t, const char *spec) {
     t->mode = THEME_MSSTYLES; t->classic = 1; t->cl_gradient = 1;
     memcpy(t->cl, cl_standard, sizeof t->cl);

@@ -9,6 +9,7 @@
 #include <X11/Xatom.h>
 #include "shell/xclip.h"
 #include "shell/config.h"
+#include "shell/util.h"
 
 namespace shell {
 namespace xclip {
@@ -93,7 +94,7 @@ void answer(Display* d, const Atoms& a, const XSelectionRequestEvent& rq)
             for (const auto& e : data) if (XInternAtom(d, e.first.c_str(), True) == rq.target) bytes = &e.second;
             long max = XExtendedMaxRequestSize(d) ? XExtendedMaxRequestSize(d) : XMaxRequestSize(d);
             if (bytes && (long)bytes->size() > max * 4 - 1024) {
-                fprintf(stderr, "flxp: the clipboard's %zu bytes exceed the server's request size\n", bytes->size());
+                fprintf(stderr, "%s: the clipboard's %zu bytes exceed the server's request size\n", shell::program_name(), bytes->size());
                 bytes = nullptr;
             }
             if (bytes) XChangeProperty(d, rq.requestor, ev.property, rq.target, 8, PropModeReplace, (const unsigned char*)bytes->data(), (int)bytes->size());

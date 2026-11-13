@@ -10,10 +10,14 @@
 
 namespace gdi {
 
-// max_size > 0 is a hint that the caller will shrink the result to fit
-// max_size x max_size: JPEG then decodes with DCT scaling (1/2, 1/4, 1/8),
-// never below that size. orig_w/orig_h get the full image size (after the
-// EXIF rotation). Null on anything unreadable.
+// max_size > 0: the caller will shrink the result to fit max_size x max_size
+// (a thumbnail), so the result may be smaller than the image, never below that
+// size: JPEG decodes with DCT scaling (1/2, 1/4, 1/8), PNG is reduced row by row
+// (by up to 64), WebP rescaled by libwebp; what can only decode at full size is
+// refused above 25 megapixels, a file read whole above 64 MB, a JPEG whose
+// decoder needs more than 160 MB. orig_w/orig_h get the full image size (after
+// the EXIF rotation). Null on anything unreadable. load_image reads JPEG and PNG
+// from the file as they decode.
 Bitmap* decode_image(const uint8_t* data, size_t size, int max_size = 0, int* orig_w = nullptr, int* orig_h = nullptr);
 Bitmap* load_image(const std::string& path, int max_size = 0, int* orig_w = nullptr, int* orig_h = nullptr);
 bool webp_supported();                                      // built with libwebp

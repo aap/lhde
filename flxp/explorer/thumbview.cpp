@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -22,14 +23,35 @@ static HIMAGELIST g_restore_small;               // what the small slot had befo
 static HIMAGELIST g_il;
 static shell::thumbs::Loader* g_loader;
 static std::map<std::string, int> g_defaults;    // icon key -> image (icon centred on the window colour)
-static std::map<std::string, int> g_done;        // key(path, mtime) -> image, for the folder shown
+static shell::thumbs::Slots g_done;              // key(path, mtime) -> slot: the thumbnails made, bounded by bytes
+static std::vector<int> g_slot_image;            // slot -> its image in g_il
 static std::map<std::string, int64_t> g_asked;   // path -> the mtime requested (F5 asks again for changed files)
+static std::set<std::string> g_pending;          // paths requested and not back yet
 static std::map<std::string, std::pair<int, int64_t>> g_where;   // path -> list index and mtime, as last filled
+struct Wanted { std::string path, icon; int64_t mtime; bool folder; };
+static std::vector<Wanted> g_items;              // list index -> what its thumbnail would be made of (path empty: none)
+static RECT g_seen;                              // item 0's place and the client size when the near items were last asked
+static bool g_check_posted;                      // a scroll was seen: on_ready looks at what is on screen
+static bool g_trace;                             // FLXP_TRACE_THUMBS
+static int g_evicted;                            // images evicted from g_done so far (the trace)
 
 static std::string key(const std::string& path, int64_t mtime) { return path + '\n' + std::to_string((long long)mtime); }
 static std::map<std::string, std::string> g_keys; // folder path -> its icon key
 
 static void notify(void*) { PostMessageW(g_notify, WM_THUMBS, 0, 0); }   // a worker thread
+
+// the list scrolled or changed size: what is on screen is looked at again on WM_THUMBS
+static LRESULT CALLBACK list_watch(HWND w, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR)
+{
+    LRESULT r = DefSubclassProc(w, msg, wp, lp);
+    switch (msg) {
+    case WM_VSCROLL: case WM_HSCROLL: case WM_MOUSEWHEEL: case WM_MOUSEHWHEEL: case WM_KEYDOWN: case WM_SIZE:
+    case LVM_ENSUREVISIBLE: case LVM_SCROLL:
+        if (g_on && !g_check_posted) { g_check_posted = true; PostMessageW(g_notify, WM_THUMBS, 0, 0); }
+        break;
+    }
+    return r;
+}
 
 int size() { return g_size; }
 int default_size() { return g_default; }
@@ -39,6 +61,8 @@ void init(HWND list, HWND notify_window)
 {
     g_list = list;
     g_notify = notify_window;
+    g_trace = getenv("FLXP_TRACE_THUMBS") && atoi(getenv("FLXP_TRACE_THUMBS")) > 0;
+    SetWindowSubclass(list, list_watch, 0x7468, 0);
     int s = atoi(shell::setting("thumbnail_size", "96").c_str());
     g_size = g_default = s >= 32 && s <= 256 ? s : 96;
 }
@@ -49,6 +73,8 @@ struct Square {
     HDC dc = nullptr;
     HBITMAP bmp = nullptr, old = nullptr;
     uint32_t* bits = nullptr;   // top-down 0xAARRGGBB, straight alpha
+    int size = 0;               // size x size
+    bool lh = false;            // the Longhorn style: transparent, icons composed with their alpha
 };
 
 static COLORREF background()
@@ -57,12 +83,14 @@ static COLORREF background()
     return c == CLR_NONE ? GetSysColor(COLOR_WINDOW) : c;
 }
 
-static bool begin(Square& sq)
+static bool begin_at(Square& sq, int size, bool lh, COLORREF bk)
 {
+    sq.size = size;
+    sq.lh = lh;
     BITMAPINFO bi = {};
     bi.bmiHeader.biSize = sizeof bi.bmiHeader;
-    bi.bmiHeader.biWidth = g_size;
-    bi.bmiHeader.biHeight = -g_size;
+    bi.bmiHeader.biWidth = size;
+    bi.bmiHeader.biHeight = -size;
     bi.bmiHeader.biPlanes = 1;
     bi.bmiHeader.biBitCount = 32;
     void* bits = nullptr;
@@ -72,11 +100,13 @@ static bool begin(Square& sq)
     sq.dc = CreateCompatibleDC(nullptr);
     sq.old = (HBITMAP)SelectObject(sq.dc, sq.bmp);
     // XP: the window colour; Longhorn: nothing behind the image
-    COLORREF bk = background();
-    uint32_t px = g_lh ? 0 : 0xff000000u | (uint32_t)GetRValue(bk) << 16 | (uint32_t)GetGValue(bk) << 8 | GetBValue(bk);
-    for (int i = 0; i < g_size * g_size; i++) sq.bits[i] = px;
+    uint32_t px = lh ? 0 : 0xff000000u | (uint32_t)GetRValue(bk) << 16 | (uint32_t)GetGValue(bk) << 8 | GetBValue(bk);
+    for (int i = 0; i < size * size; i++) sq.bits[i] = px;
     return true;
 }
+
+// a square of the view's size and style
+static bool begin(Square& sq) { return begin_at(sq, g_size, g_lh, background()); }
 
 // p (straight alpha) over q (straight alpha)
 static inline uint32_t over(uint32_t p, uint32_t q)
@@ -107,25 +137,42 @@ static void put_into(uint32_t* dst, int w, int h, const gdi::Bitmap* b, int x, i
     }
 }
 
-static void put(Square& sq, const gdi::Bitmap* b, int x, int y) { put_into(sq.bits, g_size, g_size, b, x, y); }
+static void put(Square& sq, const gdi::Bitmap* b, int x, int y) { put_into(sq.bits, sq.size, sq.size, b, x, y); }
 
 static void fill_rect(Square& sq, int x, int y, int w, int h, uint32_t argb)
 {
+    int n = sq.size;
     for (int j = y; j < y + h; j++) {
-        if (j < 0 || j >= g_size) continue;
+        if (j < 0 || j >= n) continue;
         for (int i = x; i < x + w; i++)
-            if (i >= 0 && i < g_size) sq.bits[(size_t)j * g_size + i] = over(argb, sq.bits[(size_t)j * g_size + i]);
+            if (i >= 0 && i < n) sq.bits[(size_t)j * n + i] = over(argb, sq.bits[(size_t)j * n + i]);
     }
 }
 
-static int finish(Square& sq)
+static void end(Square& sq)
 {
-    if (!g_lh) for (int i = 0; i < g_size * g_size; i++) sq.bits[i] |= 0xff000000u;   // opaque: no mask needed
+    if (!sq.lh) for (int i = 0; i < sq.size * sq.size; i++) sq.bits[i] |= 0xff000000u;   // opaque: no mask needed
     SelectObject(sq.dc, sq.old);
     DeleteDC(sq.dc);
-    int idx = ImageList_Add(g_il, sq.bmp, nullptr);
+}
+
+// into the view's image list: a new image, or in place of image `into`
+static int finish(Square& sq, int into = -1)
+{
+    end(sq);
+    int idx = into >= 0 ? (ImageList_Replace(g_il, into, sq.bmp, nullptr) ? into : -1) : ImageList_Add(g_il, sq.bmp, nullptr);
     DeleteObject(sq.bmp);
     return idx;
+}
+
+// as a bitmap (straight alpha)
+static gdi::Bitmap* finish_bitmap(Square& sq)
+{
+    end(sq);
+    gdi::Bitmap* b = gdi::create_bitmap(sq.size, sq.size);
+    if (b) for (int y = 0; y < sq.size; y++) memcpy(b->row(y), sq.bits + (size_t)y * sq.size, (size_t)sq.size * 4);
+    DeleteObject(sq.bmp);
+    return b;
 }
 
 // an icon's pixels at px, straight alpha (the mask where it has no alpha); null if none
@@ -162,7 +209,7 @@ static void draw_icon(Square& sq, const std::string& key, int px, int x, int y)
 {
     HICON ic = uiicons::load_icon(key, px);
     if (!ic) return;
-    if (g_lh) {   // composed with its alpha (DrawIconEx would flatten it onto the transparency)
+    if (sq.lh) {   // composed with its alpha (DrawIconEx would flatten it onto the transparency)
         if (gdi::Bitmap* b = icon_pixels(ic, px)) { put(sq, b, x, y); gdi::destroy_bitmap(b); }
     } else DrawIconEx(sq.dc, x, y, ic, px, px, 0, nullptr, DI_NORMAL);
     DestroyIcon(ic);
@@ -238,9 +285,9 @@ static bool have_folder_art()
 
 static void put_art(Square& sq, int id)
 {
-    HICON ic = (HICON)uiicons::load_themed(folder_art(id), IMAGE_ICON, g_size, g_size, 0);
+    HICON ic = (HICON)uiicons::load_themed(folder_art(id), IMAGE_ICON, sq.size, sq.size, 0);
     if (!ic) return;
-    if (gdi::Bitmap* b = icon_pixels(ic, g_size)) { put(sq, b, 0, 0); gdi::destroy_bitmap(b); }
+    if (gdi::Bitmap* b = icon_pixels(ic, sq.size)) { put(sq, b, 0, 0); gdi::destroy_bitmap(b); }
     DestroyIcon(ic);
 }
 
@@ -288,27 +335,24 @@ static gdi::Bitmap* photo_layer(const gdi::Bitmap* img)
     return out;
 }
 
-static int folder_photo_image(const gdi::Bitmap* photo)
+static void folder_photo(Square& sq, const gdi::Bitmap* photo)
 {
-    Square sq;
-    if (!begin(sq)) return -1;
     put_art(sq, 389);
     if (photo) {
         if (gdi::Bitmap* layer = photo_layer(photo)) {
-            if (gdi::Bitmap* small = gdi::resample(layer, g_size, g_size)) { put(sq, small, 0, 0); gdi::destroy_bitmap(small); }
+            if (gdi::Bitmap* small = gdi::resample(layer, sq.size, sq.size)) { put(sq, small, 0, 0); gdi::destroy_bitmap(small); }
             gdi::destroy_bitmap(layer);
         }
     }
     put_art(sq, 390);
-    return finish(sq);
 }
 
 // the 4074 folder for folders at this size (else the folder icon with the minis)
-static bool folder_photos() { return g_lh && g_size >= 32 && have_folder_art(); }
+static bool folder_photos_at(int size, bool lh) { return lh && size >= 32 && have_folder_art(); }
 
 // ---- default images ---------------------------------------------------------------------
 
-static int folder_image(const std::string& key, const std::vector<gdi::Bitmap*>& minis);
+static int folder_image(const std::string& key, const std::vector<gdi::Bitmap*>& minis, int into = -1);
 
 // XP CreateDefaultThumbnail: the SHIL_EXTRALARGE (48 px) icon centred; Longhorn: the icon at full size
 static int default_image(const std::string& key, bool folder)
@@ -343,32 +387,52 @@ static int default_image(const std::string& key, bool folder)
 
 // XP: the folder icon at thumbnail size, the pictures in a
 // 2x2 layout (96: 40 px cells at x 7/49, y 11/52; scaled for other sizes)
-static int mini_size() { return (40 * g_size + 48) / 96; }
+static int mini_size_at(int size) { return (40 * size + 48) / 96; }
 
-static int folder_image(const std::string& key, const std::vector<gdi::Bitmap*>& minis)
+// a folder's square: 4074's photo in the open folder, or the folder icon with the pictures on it
+static void compose_folder(Square& sq, const std::string& key, const std::vector<gdi::Bitmap*>& minis)
 {
     // a folder of the theme's own (a custom icon) keeps it; the plain folder is 4074's
-    if (folder_photos() && (key.empty() || key == "folder")) return folder_photo_image(minis.empty() ? nullptr : minis[0]);
-    Square sq;
-    if (!begin(sq)) return -1;
-    draw_icon(sq, key.empty() ? "folder" : key, g_size, 0, 0);
+    if (folder_photos_at(sq.size, sq.lh) && (key.empty() || key == "folder")) { folder_photo(sq, minis.empty() ? nullptr : minis[0]); return; }
+    draw_icon(sq, key.empty() ? "folder" : key, sq.size, 0, 0);
     static const int xs[2] = { 7, 49 }, ys[2] = { 11, 52 };
-    int cell = mini_size();
+    int cell = mini_size_at(sq.size);
     for (size_t i = 0; i < minis.size() && i < 4; i++) {
         const gdi::Bitmap* b = minis[i];
-        int cx = xs[i & 1] * g_size / 96, cy = ys[i >> 1] * g_size / 96;
+        int cx = xs[i & 1] * sq.size / 96, cy = ys[i >> 1] * sq.size / 96;
         put(sq, b, cx + (cell - b->width) / 2, cy + (cell - b->height) / 2);
     }
-    return finish(sq);
 }
 
-static int picture_image(const gdi::Bitmap* b)
+static int folder_image(const std::string& key, const std::vector<gdi::Bitmap*>& minis, int into)
+{
+    Square sq;
+    if (!begin(sq)) return -1;
+    compose_folder(sq, key, minis);
+    return finish(sq, into);
+}
+
+int folder_mini_size(int size, bool lh)
+{
+    // 4074's photo: one picture, big enough for the folder's front at this size
+    return folder_photos_at(size, lh) ? (size < 64 ? 64 : size > 256 ? 256 : size) : mini_size_at(size);
+}
+
+gdi::Bitmap* folder_picture(const std::string& key, const std::vector<gdi::Bitmap*>& minis, int size, bool lh)
+{
+    Square sq;
+    if (size < 16 || !begin_at(sq, size, lh, GetSysColor(COLOR_WINDOW))) return nullptr;
+    compose_folder(sq, key, minis);
+    return finish_bitmap(sq);
+}
+
+static int picture_image(const gdi::Bitmap* b, int into)
 {
     Square sq;
     if (!begin(sq)) return -1;
     if (g_lh) framed(sq, b);
     else put(sq, b, (g_size - b->width) / 2, (g_size - b->height) / 2);   // XP: centred
-    return finish(sq);
+    return finish(sq, into);
 }
 
 // ---- the view -------------------------------------------------------------------------
@@ -377,7 +441,9 @@ static void reset_images()
 {
     if (g_il) ImageList_Remove(g_il, -1);
     g_defaults.clear();
-    g_done.clear();
+    g_done.reset((size_t)g_size * g_size * 4);
+    g_slot_image.clear();
+    g_pending.clear();
 }
 
 bool longhorn() { return g_lh; }
@@ -411,6 +477,7 @@ bool enter_at(int px, bool small_slot, HIMAGELIST large, HIMAGELIST small)
         g_il = nullptr;
     }
     g_size = px;
+    if (g_done.item_bytes() != (size_t)g_size * g_size * 4) g_done.reset((size_t)g_size * g_size * 4);
     if (!g_il) g_il = ImageList_Create(g_size, g_size, ILC_COLOR32, 64, 64);
     if (!g_loader) g_loader = new shell::thumbs::Loader(notify, nullptr);
     if (small_slot) {   // List and Details: the squares in place of the 16 px icons
@@ -435,6 +502,7 @@ void leave(HIMAGELIST large, HIMAGELIST small)
     g_on = false;
     if (g_loader) g_loader->cancel();
     g_asked.clear();
+    g_pending.clear();
     if (g_small_slot) {
         SendMessageW(g_list, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)(small ? small : g_restore_small));
         g_small_slot = false;
@@ -452,13 +520,17 @@ bool busy() { return g_on && g_loader && g_loader->busy(); }
 void stop()
 {
     if (g_loader) g_loader->cancel();   // what was asked stays asked: the default images stay until F5
+    g_pending.clear();
 }
+
+int icon_image(const std::string& key) { return g_on ? default_image(key, false) : -1; }
 
 void folder_changed()
 {
     if (g_loader) g_loader->cancel();
     g_asked.clear();
     g_where.clear();
+    g_items.clear();
     g_keys.clear();
     reset_images();
 }
@@ -472,47 +544,127 @@ static void set_image(int index, int image)
     SendMessageW(g_list, LVM_SETITEMW, 0, (LPARAM)&lvi);
 }
 
+// Only the items on screen and a screen's worth around them are asked for (a folder of thousands asks for a few dozen);
+// what was asked for and is no longer near is dropped from the loader's queue, and what scrolled away may be evicted
+// from g_done (back to its default image, asked for again when it comes back: the disk cache has it then).
+static bool near_items(std::vector<int>& near, std::set<std::string>& on_screen)
+{
+    RECT c;
+    if (!GetClientRect(g_list, &c)) return false;
+    int w = c.right - c.left, h = c.bottom - c.top;
+    RECT zone = { c.left - w, c.top - h, c.right + w, c.bottom + h };
+    for (size_t i = 0; i < g_items.size(); i++) {
+        RECT r;
+        r.left = LVIR_BOUNDS;
+        if (!SendMessageW(g_list, LVM_GETITEMRECT, (WPARAM)i, (LPARAM)&r)) continue;
+        if (r.right <= zone.left || r.left >= zone.right || r.bottom <= zone.top || r.top >= zone.bottom) continue;
+        near.push_back((int)i);
+        on_screen.insert(key(g_items[i].path.empty() ? std::string() : g_items[i].path, g_items[i].mtime));
+    }
+    return true;
+}
+
+// item 0's place and the client size: changes with every scroll, in every view
+static RECT seen_now()
+{
+    RECT r = {}, c = {};
+    r.left = LVIR_BOUNDS;
+    if (g_items.empty() || !SendMessageW(g_list, LVM_GETITEMRECT, 0, (LPARAM)&r)) r = RECT();
+    GetClientRect(g_list, &c);
+    return RECT{ r.left, r.top, c.right, c.bottom };
+}
+
+static void ask_near()
+{
+    if (!g_on || !g_loader) return;
+    g_seen = seen_now();
+    std::vector<int> near;
+    std::set<std::string> keep;
+    near_items(near, keep);
+    g_done.pin(keep);
+    std::set<std::string> wanted;
+    for (int i : near) if (!g_items[(size_t)i].path.empty()) wanted.insert(g_items[(size_t)i].path);
+    bool stale = false;
+    for (const std::string& p : g_pending) stale |= !wanted.count(p);
+    if (stale) {   // asked for and scrolled away: out of the queue (its result, if being made, is dropped)
+        g_loader->cancel();
+        for (const std::string& p : g_pending) g_asked.erase(p);
+        g_pending.clear();
+    }
+    uint32_t gen = g_loader->generation();
+    for (int i : near) {
+        const Wanted& it = g_items[(size_t)i];
+        if (it.path.empty() || g_done.find(key(it.path, it.mtime)) >= 0) continue;
+        auto a = g_asked.find(it.path);
+        if (a != g_asked.end() && a->second == it.mtime) continue;
+        g_asked[it.path] = it.mtime;
+        g_pending.insert(it.path);
+        if (it.folder) {
+            g_keys[it.path] = it.icon;
+            g_loader->request(gen, i, it.path, it.mtime, g_size, true, folder_mini_size(g_size, g_lh));
+        } else g_loader->request(gen, i, it.path, it.mtime, g_lh ? picture_box() : g_size);
+    }
+}
+
 void fill(const std::vector<shell::Item>& items)
 {
     if (!g_on) return;
     g_where.clear();
-    uint32_t gen = g_loader->generation();
+    g_items.assign(items.size(), Wanted());
     for (size_t i = 0; i < items.size(); i++) {
         const shell::Item& it = items[i];
         g_where[it.path] = std::make_pair((int)i, it.mtime);
-        auto d = g_done.find(key(it.path, it.mtime));
-        set_image((int)i, d != g_done.end() ? d->second : default_image(it.icon, it.is_folder()));
-        auto a = g_asked.find(it.path);
-        if (d != g_done.end() || (a != g_asked.end() && a->second == it.mtime) || (it.flags & shell::IsVirtual) || it.path.empty() || it.path[0] != '/') continue;
-        if (it.is_folder()) {
-            if (g_size < (g_lh ? 32 : 48)) continue;   // the folder's icon: no pictures in it at this size
-            g_asked[it.path] = it.mtime;
-            g_keys[it.path] = it.icon;
-            // 4074's photo: one picture, big enough for the folder's front at this size
-            int mini = folder_photos() ? (g_size < 64 ? 64 : g_size > 256 ? 256 : g_size) : mini_size();
-            g_loader->request(gen, (int)i, it.path, it.mtime, g_size, true, mini);
-        } else if (shell::thumbs::can_thumbnail(it.path)) {
-            g_asked[it.path] = it.mtime;
-            g_loader->request(gen, (int)i, it.path, it.mtime, g_lh ? picture_box() : g_size);
-        }
+        int slot = g_done.find(key(it.path, it.mtime));
+        set_image((int)i, slot >= 0 ? g_slot_image[(size_t)slot] : default_image(it.icon, it.is_folder()));
+        if ((it.flags & shell::IsVirtual) || it.path.empty() || it.path[0] != '/') continue;
+        if (it.is_folder() ? g_size >= (g_lh ? 32 : 48) : shell::thumbs::can_thumbnail(it.path))   // a folder below that: its icon
+            g_items[i] = Wanted{ it.path, it.icon, it.mtime, it.is_folder() };
     }
+    ask_near();
 }
 
 void on_ready()
 {
     if (!g_loader) return;
     shell::thumbs::Loader::Result r;
+    int made = 0;
     while (g_loader->take(r)) {
+        g_pending.erase(r.path);
+        int64_t mtime = g_asked.count(r.path) ? g_asked[r.path] : 0;
+        std::string k = key(r.path, mtime);
         int image = -1;
-        if (r.bmp) image = picture_image(r.bmp);
-        else if (!r.minis.empty()) image = folder_image(g_keys[r.path], r.minis);
+        if (r.bmp || !r.minis.empty()) {
+            std::vector<std::string> evicted;
+            int slot = g_done.insert(k, &evicted);
+            g_evicted += (int)evicted.size();
+            for (const std::string& e : evicted) {   // back to the default image; asked for again when near
+                std::string path = e.substr(0, e.rfind('\n'));
+                g_asked.erase(path);
+                auto w = g_where.find(path);
+                if (g_on && w != g_where.end() && (size_t)w->second.first < g_items.size()) {
+                    const Wanted& it = g_items[(size_t)w->second.first];
+                    set_image(w->second.first, default_image(it.icon, it.folder));
+                }
+            }
+            if ((size_t)slot >= g_slot_image.size()) g_slot_image.resize((size_t)slot + 1, -1);
+            int into = g_slot_image[(size_t)slot];   // a slot's image is reused, -1: a new one
+            image = r.bmp ? picture_image(r.bmp, into) : folder_image(g_keys[r.path], r.minis, into);
+            if (image < 0) g_done.erase(k);
+            else g_slot_image[(size_t)slot] = image;
+            made++;
+        }
         shell::thumbs::free_result(r);
         if (image < 0) continue;   // no picture: the default image stays
-        int64_t mtime = g_asked.count(r.path) ? g_asked[r.path] : 0;
-        g_done[key(r.path, mtime)] = image;
         auto w = g_where.find(r.path);
         if (g_on && w != g_where.end() && w->second.second == mtime) set_image(w->second.first, image);
     }
+    RECT now = seen_now();
+    if (g_check_posted || memcmp(&now, &g_seen, sizeof now)) ask_near();
+    g_check_posted = false;
+    if (g_trace && made)
+        fprintf(stderr, "thumbs: view %zu images at %d px, %zu of %zu KB, %d slots, %d evicted, %zu pending, %zu items\n",
+                g_done.count(), g_size, g_done.bytes() / 1024, g_done.budget() / 1024, g_done.slots(), g_evicted,
+                g_pending.size(), g_items.size());
 }
 
 } // namespace thumbview

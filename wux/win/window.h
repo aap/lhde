@@ -81,7 +81,7 @@ struct WindowPos {          // lparam of WM_WINDOWPOSCHANGED
     uint32_t flags;
 };
 
-enum class Cursor { Arrow, IBeam, Wait, Cross, SizeWE, SizeNS, SizeNWSE, SizeNESW, SizeAll, Hand, No, None };
+enum class Cursor { Arrow, IBeam, Wait, Cross, SizeWE, SizeNS, SizeNWSE, SizeNESW, SizeAll, Hand, No, AppStarting, Help, UpArrow, None };   // sys::PointerShape's order
 
 bool init();
 void shutdown();
@@ -153,6 +153,9 @@ void toplevels(std::vector<Window*>& out);      // in z-order (creation order fo
 
 void set_capture(Window* w, bool screen_coords = false);   // screen_coords: mouse lparams in screen space, as in win32 menu mode
 void release_capture();
+// Menu mode's test for a press (user32's MENU_HitsTracking: on the menus being tracked); while a menu-mode capture
+// holds the pointer grab, a press elsewhere ends the menu and is replayed (docs/CLIENT-PROTOCOL.md "Menus and clicks")
+void set_menu_hit_test(int (*hits)(int x, int y));
 Window* capture();
 void set_focus(Window* w);
 Window* focus();

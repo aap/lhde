@@ -50,6 +50,7 @@ extern "C" {
 #undef small      // rpcndr.h (through dwmapi.h)
 }
 #include "explorer/browser.h"
+#include "shell/ui.h"
 
 asm(".section .rodata\n"
     ".global flxp_filedlg_res_start\n.global flxp_filedlg_res_end\n"
@@ -394,6 +395,8 @@ struct Dlg : browser::Browser {
     struct Anchor { HWND h; RECT r; int how; };
     std::vector<Anchor> anchors;
     int place_line = 13;
+    HWND extra = nullptr;                    // the caller's controls (Options::extra_create)
+    int extra_h = 0;
 };
 
 enum { MOVE_X = 1, MOVE_Y = 2, SIZE_X = 4, SIZE_Y = 8 };
@@ -813,7 +816,7 @@ static void new_folder(Dlg& d)
 {
     std::string dir = cur_dir(d), path, err;
     if (dir.empty()) return;
-    if (!shell::new_folder(dir, &path, &err)) { message_box(d.dlg, "Error Creating Folder", "Cannot create the folder.\n" + err, MB_OK | MB_ICONEXCLAMATION); return; }
+    if (!shell::new_folder(dir, &path, &err)) { shell::message_box(d.dlg, "Error Creating Folder", "Cannot create the folder.\n" + err, MB_OK | MB_ICONEXCLAMATION); return; }
     fill_list(d, path);
     for (size_t i = 0; i < d.items.size(); i++)
         if (d.items[i].path == path) { SetFocus(d.list); SendMessageW(d.list, LVM_EDITLABELW, (WPARAM)i, 0); break; }
@@ -828,10 +831,10 @@ static void delete_selection(Dlg& d)
     if (paths.empty()) return;
     std::string q = paths.size() == 1 ? "Are you sure you want to send '" + shell::base_of(paths[0]) + "' to the Trash?"
                                       : "Are you sure you want to send these " + std::to_string(paths.size()) + " items to the Trash?";
-    if (message_box(d.dlg, paths.size() == 1 ? "Confirm File Delete" : "Confirm Multiple File Delete", q, MB_YESNO | MB_ICONQUESTION) != IDYES) return;
+    if (shell::message_box(d.dlg, paths.size() == 1 ? "Confirm File Delete" : "Confirm Multiple File Delete", q, MB_YESNO | MB_ICONQUESTION) != IDYES) return;
     for (const std::string& p : paths) {
         std::string err;
-        if (!shell::trash(p, &err)) { message_box(d.dlg, "Error Deleting File", "Cannot delete " + shell::base_of(p) + ": " + err, MB_OK | MB_ICONEXCLAMATION); break; }
+        if (!shell::trash(p, &err)) { shell::message_box(d.dlg, "Error Deleting File", "Cannot delete " + shell::base_of(p) + ": " + err, MB_OK | MB_ICONEXCLAMATION); break; }
     }
     fill_list(d);
 }
@@ -974,6 +977,7 @@ static std::string ext_of(const std::string& name)
 
 static bool finish(Dlg& d, const std::vector<std::string>& paths)
 {
+    if (d.extra && d.o->extra_ok && !d.o->extra_ok(d.extra, d.o->extra_user)) return false;
     d.r->ok = true;
     d.r->paths = paths;
     d.r->filter_index = d.custom.empty() ? d.type_filter : -1;
@@ -985,7 +989,7 @@ static bool finish(Dlg& d, const std::vector<std::string>& paths)
 
 static void error(Dlg& d, const std::string& text)
 {
-    message_box(d.dlg, d.o->title.empty() ? (d.o->mode == Mode::Save ? "Save As" : "Open") : d.o->title, text, MB_OK | MB_ICONEXCLAMATION);
+    shell::message_box(d.dlg, d.o->title.empty() ? (d.o->mode == Mode::Save ? "Save As" : "Open") : d.o->title, text, MB_OK | MB_ICONEXCLAMATION);
     SetFocus(d.name_edit);
     SendMessageW(d.name_edit, EM_SETSEL, 0, -1);
 }
@@ -1059,7 +1063,7 @@ static void on_ok(Dlg& d)
             if (!is_dir(p)) { error(d, n + "\nThe above name is not a folder."); return; }
         } else if (d.o->mode == Mode::Open) {
             if (!there && d.o->create_prompt) {
-                if (message_box(d.dlg, "Open", n + "\nThis file does not exist.\n\nCreate the file?", MB_YESNO | MB_ICONEXCLAMATION) != IDYES) return;
+                if (shell::message_box(d.dlg, "Open", n + "\nThis file does not exist.\n\nCreate the file?", MB_YESNO | MB_ICONEXCLAMATION) != IDYES) return;
             } else if (!there && d.o->file_must_exist) {
                 error(d, n + "\nFile not found.\nPlease verify the correct file name was given.");
                 return;
@@ -1068,7 +1072,7 @@ static void on_ok(Dlg& d)
             if (there && is_dir(p)) { navigate(d, p, true); set_name(d, ""); return; }
             if (there && access(p.c_str(), W_OK) != 0) { error(d, n + "\nThis file exists with Read Only attributes.\nPlease use a different file name."); return; }
             if (there && d.o->overwrite_prompt) {
-                if (message_box(d.dlg, d.o->title.empty() ? "Save As" : d.o->title,
+                if (shell::message_box(d.dlg, d.o->title.empty() ? "Save As" : d.o->title,
                                 shell::base_of(p) + " already exists.\nDo you want to replace it?", MB_YESNO | MB_ICONEXCLAMATION) != IDYES) {
                     SetFocus(d.name_edit);
                     return;
@@ -1173,6 +1177,60 @@ static void layout(Dlg& d, int cx, int cy)
     InvalidateRect(d.dlg, nullptr, TRUE);
 }
 
+// ---- the caller's controls (Options::extra_create) ----
+
+// The child dialog shows the dialog's background through it: its erase is the dialog's own, shifted, and its statics
+// draw on that (the Longhorn look's band is a gradient)
+static LRESULT CALLBACK extra_subclass(HWND h, UINT msg, WPARAM wp, LPARAM lp)
+{
+    WNDPROC old = (WNDPROC)GetPropW(h, L"flxp_extra_proc");
+    switch (msg) {
+    case WM_ERASEBKGND: {
+        HWND parent = GetParent(h);
+        POINT o = { 0, 0 };
+        MapWindowPoints(h, parent, &o, 1);
+        POINT prev;
+        SetViewportOrgEx((HDC)wp, -o.x, -o.y, &prev);
+        SendMessageW(parent, WM_ERASEBKGND, wp, 0);
+        SetViewportOrgEx((HDC)wp, prev.x, prev.y, nullptr);
+        return 1;
+    }
+    case WM_CTLCOLORSTATIC:
+        SetBkMode((HDC)wp, TRANSPARENT);
+        SetTextColor((HDC)wp, GetSysColor(COLOR_WINDOWTEXT));
+        return (LRESULT)GetStockObject(NULL_BRUSH);
+    case WM_NCDESTROY:
+        SetWindowLongPtrW(h, GWLP_WNDPROC, (LONG_PTR)old);
+        RemovePropW(h, L"flxp_extra_proc");
+        break;
+    }
+    return CallWindowProcW(old, h, msg, wp, lp);
+}
+
+// Creates the caller's controls; their height in d.extra_h (0: none)
+static void create_extra(Dlg& d)
+{
+    if (!d.o->extra_create) return;
+    d.extra = (HWND)d.o->extra_create(d.dlg, d.o->extra_user);
+    if (!d.extra) return;
+    SetPropW(d.extra, L"flxp_extra_proc", (HANDLE)SetWindowLongPtrW(d.extra, GWLP_WNDPROC, (LONG_PTR)extra_subclass));
+    RECT r;
+    GetWindowRect(d.extra, &r);
+    d.extra_h = r.bottom - r.top;
+    ShowWindow(d.extra, SW_SHOW);
+}
+
+// the x of the child's first combo box, in its own coordinates (to line it up with the dialog's)
+static int extra_combo_x(Dlg& d)
+{
+    for (HWND c = GetWindow(d.extra, GW_CHILD); c; c = GetWindow(c, GW_HWNDNEXT)) {
+        WCHAR cls[16] = {0};
+        GetClassNameW(c, cls, 16);
+        if (!lstrcmpiW(cls, L"ComboBox")) { RECT r = child_rect(d.extra, c); return r.left; }
+    }
+    return 0;
+}
+
 // ---- placement ----
 
 static void place_dialog(Dlg& d, HWND owner)
@@ -1270,6 +1328,22 @@ static void init_dialog(Dlg& d, HWND owner)
     }
     // (XP also deletes Minimize/Maximize/Restore from the system menu; the window manager owns it here)
 
+    // the caller's controls (OFN_ENABLETEMPLATE without stc32): under the Files of type row, the gap between the File
+    // name and Files of type rows above them, the dialog as much taller (comdlg32's template placement), and moved
+    // sideways so that their first combo box is under Files of type's (notepad's Encoding box under Save as type:
+    // the templates count on comdlg32's own layout, which ours follows only roughly)
+    create_extra(d);
+    if (d.extra) {
+        RECT name = child_rect(dlg, GetDlgItem(dlg, cmb13)), type = child_rect(dlg, GetDlgItem(dlg, cmb1));
+        RECT cr; GetClientRect(dlg, &cr);
+        int y = type.bottom + (type.top - name.bottom);
+        int cx = extra_combo_x(d);
+        SetWindowPos(d.extra, nullptr, cx ? type.left - cx : 0, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        int grow = std::max(0, (int)(y + d.extra_h + (cr.bottom - type.bottom) - cr.bottom));
+        RECT wr; GetWindowRect(dlg, &wr);
+        SetWindowPos(dlg, nullptr, 0, 0, wr.right - wr.left, wr.bottom - wr.top + grow, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+
     d.lookin = GetDlgItem(dlg, cmb2);
     d.types = GetDlgItem(dlg, cmb1);
     d.places = GetDlgItem(dlg, ctl1);
@@ -1313,7 +1387,7 @@ static void init_dialog(Dlg& d, HWND owner)
     set_name(d, name);
 
     order_children({ GetDlgItem(dlg, stc4), d.lookin, GetDlgItem(dlg, stc1), d.toolbar, d.places, lst1w, d.list,
-                     GetDlgItem(dlg, stc3), GetDlgItem(dlg, edt1), d.name_cbx, GetDlgItem(dlg, stc2), d.types,
+                     GetDlgItem(dlg, stc3), GetDlgItem(dlg, edt1), d.name_cbx, GetDlgItem(dlg, stc2), d.types, d.extra,
                      GetDlgItem(dlg, chx1), GetDlgItem(dlg, IDOK), GetDlgItem(dlg, IDCANCEL), GetDlgItem(dlg, pshHelp) });
 
     // resizing (XP _bEnableSizing): everything right of / below the view follows the frame
@@ -1332,6 +1406,7 @@ static void init_dialog(Dlg& d, HWND owner)
     add_anchor(d, GetDlgItem(dlg, IDOK), MOVE_X | MOVE_Y);
     add_anchor(d, GetDlgItem(dlg, IDCANCEL), MOVE_X | MOVE_Y);
     add_anchor(d, GetDlgItem(dlg, pshHelp), MOVE_X | MOVE_Y);
+    add_anchor(d, d.extra, MOVE_Y);
 
     place_dialog(d, owner);
     SetFocus(d.name_edit);
@@ -1386,12 +1461,16 @@ static std::string folder_label(Dlg& d)
     return d.folder->is_filesystem() ? d.folder->path() : d.folder->name();
 }
 
+// the details band: its rows, and under them the caller's controls (Options::extra_create) with a row's gap
+static int lh_band_h(Dlg& d) { return LH_BAND_H + (d.extra ? d.extra_h + LH_ROWGAP : 0); }
+
 static int lh_bottom_h(Dlg& d)
 {
-    if (d.o->mode == Mode::Save) return LH_BAND_H + LH_STRIP_H;
+    if (d.o->mode == Mode::Save) return lh_band_h(d) + LH_STRIP_H;
     int rows = d.o->mode == Mode::Folder ? 1 : 2;
     int h = LH_MARGIN + rows * LH_ROW + (rows - 1) * LH_ROWGAP + LH_MARGIN;
     if (d.o->show_read_only && d.o->mode == Mode::Open) h += 20;
+    if (d.extra) h += d.extra_h + LH_ROWGAP;
     return h;
 }
 
@@ -1596,7 +1675,7 @@ static RECT lh_band_rect(Dlg& d)
 {
     RECT rc; GetClientRect(d.dlg, &rc);
     int top = d.show_explorer ? rc.bottom - lh_bottom_h(d) : (d.header ? header::height() : 0);
-    return RECT{ 0, top, rc.right, top + LH_BAND_H };
+    return RECT{ 0, top, rc.right, top + lh_band_h(d) };
 }
 
 static void lh_erase(Dlg& d, HDC dc)
@@ -1744,6 +1823,10 @@ static void lh_layout(Dlg& d)
         place(d.name_cbx, fx, y1, fw, LH_ROW);
         place(ltype, lx0, y3 + 3, LH_LABEL_W, LH_ROW - 4);
         place(d.types, fx, y3, std::min(fw, 320), 200);
+        if (d.extra) {
+            RECT er = child_rect(d.dlg, d.extra);
+            place(d.extra, fx - extra_combo_x(d), y3 + LH_ROW + LH_ROWGAP, er.right - er.left, d.extra_h);
+        }
         int sy = br ? H_ - LH_STRIP_H : band.bottom;
         int by = sy + (LH_STRIP_H - LH_BTN_H) / 2;
         place(cancel, W_ - 12 - LH_BTN_W, by, LH_BTN_W, LH_BTN_H);
@@ -1764,6 +1847,10 @@ static void lh_layout(Dlg& d)
             place(d.types, fx, y2, fw, 200);
             if (d.o->show_read_only) place(ro, fx, y2 + LH_ROW + 6, 200, 16);
         }
+        if (d.extra) {
+            RECT er = child_rect(d.dlg, d.extra);
+            place(d.extra, fx - extra_combo_x(d), H_ - LH_MARGIN - d.extra_h, er.right - er.left, d.extra_h);
+        }
     }
     if (d.view != LVS_REPORT) SendMessageW(d.list, LVM_ARRANGE, LVA_DEFAULT, 0);
 }
@@ -1780,7 +1867,7 @@ static void lh_set_explorer(Dlg& d, bool show, bool resize)
     RECT wr; GetWindowRect(d.dlg, &wr);
     RECT cr; GetClientRect(d.dlg, &cr);
     int frame_h = (wr.bottom - wr.top) - cr.bottom;
-    int collapsed = (d.header ? header::height() : 0) + LH_BAND_H + LH_STRIP_H + frame_h;
+    int collapsed = (d.header ? header::height() : 0) + lh_band_h(d) + LH_STRIP_H + frame_h;
     sys::NativeWindow* nw = sys::window_for_user((void*)d.dlg);
     if (nw) sys::set_min_size(nw, 480, show ? collapsed + 200 : collapsed);   // before the resize: the WM keeps the old minimum
     if (resize) {
@@ -1962,6 +2049,7 @@ static void lh_init(Dlg& d, HWND owner)
     h = std::max(360, std::min(h, (int)sys::screen_size().cy));
     SetWindowPos(dlg, nullptr, 0, 0, w, h, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
     d.full_h = h;
+    create_extra(d);
     lh_layout(d);
 
     // starting folder and name
@@ -1977,7 +2065,7 @@ static void lh_init(Dlg& d, HWND owner)
     set_name(d, name);
 
     // tab order: the list, the bottom controls, the pane (Filter box), the header (search)
-    order_children({ d.list, GetDlgItem(dlg, stc3), GetDlgItem(dlg, edt1), d.name_cbx, GetDlgItem(dlg, stc2), d.types,
+    order_children({ d.list, GetDlgItem(dlg, stc3), GetDlgItem(dlg, edt1), d.name_cbx, GetDlgItem(dlg, stc2), d.types, d.extra,
                      GetDlgItem(dlg, chx1), GetDlgItem(dlg, IDOK), GetDlgItem(dlg, IDCANCEL), d.hide, d.pane, d.bar, d.header });
 
     if (o.mode == Mode::Save && !shell::setting_flag("filedlg_explorer", true)) lh_set_explorer(d, false, true);
@@ -1988,7 +2076,7 @@ static void lh_init(Dlg& d, HWND owner)
         RECT wr; GetWindowRect(dlg, &wr);
         RECT cr; GetClientRect(dlg, &cr);
         int frame_h = (wr.bottom - wr.top) - cr.bottom;
-        int collapsed = (d.header ? header::height() : 0) + LH_BAND_H + LH_STRIP_H + frame_h;
+        int collapsed = (d.header ? header::height() : 0) + lh_band_h(d) + LH_STRIP_H + frame_h;
         sys::set_min_size(nw, 480, d.show_explorer ? std::max(360, collapsed + 200) : collapsed);
     }
     d.w_active = FlxpWatchRootProperty("_NET_ACTIVE_WINDOW");
@@ -2179,7 +2267,7 @@ static LRESULT drop_message(Dlg& d, UINT msg, const FLXPDROP* f)
     if (!e) return 0;
     std::string err;
     bool ok = shell::drop_items(paths, dest, e, &err);
-    if (!ok && !err.empty()) message_box(d.dlg, "Error Copying File or Folder", "Cannot copy or move the files.\n" + err, MB_OK | MB_ICONEXCLAMATION);
+    if (!ok && !err.empty()) shell::message_box(d.dlg, "Error Copying File or Folder", "Cannot copy or move the files.\n" + err, MB_OK | MB_ICONEXCLAMATION);
     fill_list(d);
     return ok ? e : 0;
 }
@@ -2410,7 +2498,7 @@ static INT_PTR CALLBACK dlg_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         std::string p = d->pending_nav;
         d->pending_nav.clear();
         if (!p.empty() && !navigate(*d, p, true)) {
-            message_box(h, "Open", p + "\nThe folder cannot be opened.", MB_OK | MB_ICONEXCLAMATION);
+            shell::message_box(h, "Open", p + "\nThe folder cannot be opened.", MB_OK | MB_ICONEXCLAMATION);
             build_lookin(*d);
         }
         return TRUE;
@@ -2576,89 +2664,6 @@ Result run(void* owner, const Options& o)
     if (d.icons.large) ImageList_Destroy(d.icons.large);
     for (auto& z : d.icons.sized) ImageList_Destroy(z.second);
     return r;
-}
-
-// ---- message box ------------------------------------------------------------------
-
-struct Msg { std::string title, text; unsigned type; };
-
-static INT_PTR CALLBACK msg_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
-{
-    switch (msg) {
-    case WM_INITDIALOG: {
-        Msg* m = (Msg*)lp;
-        SetWindowTextW(h, WS(m->title));
-        SetDlgItemTextW(h, IDC_FD_MSG_TEXT, WS(m->text));
-        LPCWSTR icon = nullptr;
-        switch (m->type & MB_ICONMASK) {
-        case MB_ICONHAND: icon = MAKEINTRESOURCEW(32513); break;          // IDI_HAND
-        case MB_ICONQUESTION: icon = MAKEINTRESOURCEW(32514); break;
-        case MB_ICONEXCLAMATION: icon = MAKEINTRESOURCEW(32515); break;
-        case MB_ICONASTERISK: icon = MAKEINTRESOURCEW(32516); break;
-        }
-        HWND ic = GetDlgItem(h, IDC_FD_MSG_ICON);
-        if (icon) SendMessageW(ic, STM_SETICON, (WPARAM)LoadIconW(nullptr, icon), 0);
-        else ShowWindow(ic, SW_HIDE);
-        order_children({ GetDlgItem(h, IDC_FD_MSG_ICON), GetDlgItem(h, IDC_FD_MSG_TEXT), GetDlgItem(h, IDYES), GetDlgItem(h, IDNO), GetDlgItem(h, IDOK) });
-        bool yesno = (m->type & MB_TYPEMASK) == MB_YESNO;
-        ShowWindow(GetDlgItem(h, yesno ? IDOK : IDYES), SW_HIDE);
-        ShowWindow(GetDlgItem(h, yesno ? IDOK : IDNO), SW_HIDE);
-        if (yesno) SendMessageW(h, DM_SETDEFID, IDYES, 0);
-        // size to the text (user32 MSGBOX_OnInit, roughly): wrap at 2/3 of the screen
-        HWND t = GetDlgItem(h, IDC_FD_MSG_TEXT);
-        RECT tr0 = child_rect(h, t);
-        HDC hdc = GetDC(t);
-        HGDIOBJ of = SelectObject(hdc, (HFONT)SendMessageW(h, WM_GETFONT, 0, 0));
-        RECT calc = { 0, 0, std::max((int)(tr0.right - tr0.left), (int)sys::screen_size().cx / 3), 0 };
-        std::u16string w = W(m->text);
-        DrawTextW(hdc, (LPCWSTR)w.c_str(), -1, &calc, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX | DT_EXPANDTABS);
-        SelectObject(hdc, of);
-        ReleaseDC(t, hdc);
-        int tw = calc.right, th = std::max((int)calc.bottom, 32);
-        RECT ir = child_rect(h, ic);
-        int left = icon ? tr0.left : ir.left;
-        SetWindowPos(t, nullptr, left, std::max((int)tr0.top, (int)(ir.top + (ir.bottom - ir.top - calc.bottom) / 2)), tw, th, SWP_NOZORDER);
-        RECT br = child_rect(h, GetDlgItem(h, IDOK));
-        int bw = br.right - br.left, bh = br.bottom - br.top, gap = 6;
-        int nb = yesno ? 2 : 1;
-        int cw = std::max(left + tw + ir.left, nb * bw + (nb - 1) * gap + 2 * ir.left);
-        int by = std::max((int)ir.bottom, (int)(tr0.top + th)) + 12;
-        int bx = (cw - (nb * bw + (nb - 1) * gap)) / 2;
-        int ids[2] = { yesno ? IDYES : IDOK, IDNO };
-        for (int i = 0; i < nb; i++) SetWindowPos(GetDlgItem(h, ids[i]), nullptr, bx + i * (bw + gap), by, bw, bh, SWP_NOZORDER);
-        RECT wr, cr;
-        GetWindowRect(h, &wr); GetClientRect(h, &cr);
-        int fw = (wr.right - wr.left) - cr.right, fh = (wr.bottom - wr.top) - cr.bottom;
-        int W_ = cw + fw, H_ = by + bh + 12 + fh;
-        HWND owner = GetWindow(h, GW_OWNER);
-        RECT orc;
-        gdi::Size ss = sys::screen_size();
-        if (owner) GetWindowRect(owner, &orc); else orc = { 0, 0, ss.cx, ss.cy };
-        SetWindowPos(h, nullptr, orc.left + (orc.right - orc.left - W_) / 2, orc.top + (orc.bottom - orc.top - H_) / 2, W_, H_, SWP_NOZORDER);
-        if (owner) {
-            sys::NativeWindow* nw = sys::window_for_user((void*)h);
-            sys::set_transient_for(nw, sys::native_id(sys::window_for_user((void*)GetAncestor(owner, GA_ROOT))), true);
-        }
-        MessageBeep(m->type & MB_ICONMASK);
-        SetFocus(GetDlgItem(h, yesno ? IDYES : IDOK));
-        return FALSE;
-    }
-    case WM_COMMAND:
-        if (LOWORD(wp) == IDOK || LOWORD(wp) == IDYES || LOWORD(wp) == IDNO) { EndDialog(h, LOWORD(wp)); return TRUE; }
-        if (LOWORD(wp) == IDCANCEL) {
-            // Escape / close: No for Yes/No boxes (they have no Cancel), OK otherwise
-            EndDialog(h, IsWindowVisible(GetDlgItem(h, IDNO)) ? IDNO : IDOK);
-            return TRUE;
-        }
-        return FALSE;
-    }
-    return FALSE;
-}
-
-int message_box(void* owner, const std::string& title, const std::string& text, unsigned type)
-{
-    Msg m = { title, text, type };
-    return (int)DialogBoxParamW(module(), MAKEINTRESOURCEW(IDD_FD_MESSAGE), (HWND)owner, msg_proc, (LPARAM)&m);
 }
 
 } // namespace filedlg

@@ -47,33 +47,6 @@ static std::u16string u16_of(const WCHAR* s)
     return o;
 }
 
-static std::u16string u16_of_a(const char* s)
-{
-    std::u16string o;
-    if (s) while (*s) o += (char16_t)(uint8_t)*s++;   // ANSI as Latin-1
-    return o;
-}
-
-static std::string utf8_of_u16(const std::u16string& s)
-{
-    std::string o;
-    for (size_t i = 0; i < s.size(); i++) {
-        uint32_t c = s[i];
-        if (c >= 0xd800 && c < 0xdc00 && i + 1 < s.size() && s[i + 1] >= 0xdc00 && s[i + 1] < 0xe000) {
-            c = 0x10000 + ((c - 0xd800) << 10) + (s[i + 1] - 0xdc00);
-            i++;
-        }
-        if (c < 0x80) o += (char)c;
-        else if (c < 0x800) { o += (char)(0xc0 | c >> 6); o += (char)(0x80 | (c & 0x3f)); }
-        else if (c < 0x10000) {
-            o += (char)(0xe0 | c >> 12); o += (char)(0x80 | ((c >> 6) & 0x3f)); o += (char)(0x80 | (c & 0x3f));
-        } else {
-            o += (char)(0xf0 | c >> 18); o += (char)(0x80 | ((c >> 12) & 0x3f));
-            o += (char)(0x80 | ((c >> 6) & 0x3f)); o += (char)(0x80 | (c & 0x3f));
-        }
-    }
-    return o;
-}
 
 // A resource name: MAKEINTRESOURCE, "#123", or a string.
 static res::Id id_of(const std::u16string& s)
@@ -562,7 +535,7 @@ HANDLE WINAPI LoadImageW(HINSTANCE hinst, LPCWSTR name, UINT type, INT cx, INT c
 {
     if (flags & LR_LOADFROMFILE) {
         if (IS_INTRESOURCE(name)) return nullptr;
-        return load_image(hinst, res::Id(), utf8_of_u16(u16_of(name)), type, cx, cy, flags);
+        return load_image(hinst, res::Id(), utf8_of(name), type, cx, cy, flags);
     }
     res::Id id = IS_INTRESOURCE(name) ? res::Id((uint32_t)(uintptr_t)name) : id_of(u16_of(name));
     return load_image(hinst, id, std::string(), type, cx, cy, flags);
@@ -574,7 +547,7 @@ HANDLE WINAPI LoadImageA(HINSTANCE hinst, LPCSTR name, UINT type, INT cx, INT cy
         if (IS_INTRESOURCE(name)) return nullptr;
         return load_image(hinst, res::Id(), std::string(name), type, cx, cy, flags);
     }
-    res::Id id = IS_INTRESOURCE(name) ? res::Id((uint32_t)(uintptr_t)name) : id_of(u16_of_a(name));
+    res::Id id = IS_INTRESOURCE(name) ? res::Id((uint32_t)(uintptr_t)name) : id_of(utf16_of(name));
     return load_image(hinst, id, std::string(), type, cx, cy, flags);
 }
 

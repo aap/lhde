@@ -435,6 +435,16 @@ Explorer's menu band while Alt is held and while it is in keyboard mode or has a
 in the window for good (XP's UI state: WM_CHANGEUISTATE / WM_UPDATEUISTATE / WM_QUERYUISTATE; the rebar's "Address" label
 follows it).
 
+**Menus and clicks.** As in Windows, a click outside an open menu closes it and then does what it would have done without the
+menu: the window under the pointer is activated and gets the click. A right click on another file, another program's window or
+the desktop with a context menu open closes that menu and opens the new place's own; a left click on the list selects there; a
+click on another caption, the taskbar or a tile acts on it. This holds for every menu: flxp's and the desktop's context menus and
+menu bars, luxwm's window menu, luxshell's menus and flyouts, whichever program the click goes to. Only the start menu keeps a
+click on the taskbar (XP's start menu belongs to the taskbar): a click on the Start button while it is open closes it without
+opening it again, a click on a task button closes it without switching; a click on the desktop or a window closes it and acts
+there. The sources (Wine's and ReactOS's menu loop, Microsoft's documentation) and how it is done over X: docs/CLIENT-PROTOCOL.md
+"Menus and clicks". Any mouse button activates a window (left, middle or right), as in Windows.
+
 **Window icons.** Captions and task buttons show the window's `_NET_WM_ICON` (the size nearest at or above 16 px), else its
 `WM_HINTS` icon pixmap (xterm, xclock, Xt/Motif/FOX programs), else the theme's default icon: on the glass themes the Windows flag
 (`DEFAULTICON` of the msstyles), on the classic and Luna themes and on the taskbar the XP application icon. A window that changes its
@@ -501,7 +511,8 @@ poweroff`; `restart` = `loginctl reboot`; `lock` = `xlock` or `slock` if install
 
 ## Keys in the session
 
-Default keys, override in `~/.config/lhde/keys` (one binding per line; docs/LUXWM.md):
+Default keys, override in `~/.config/lhde/keys` (one binding per line; docs/LUXWM.md). docs/KEYS.md lists every shortcut,
+the programs' fixed ones too, and which Super combinations are free.
 
 | Keys | Action |
 | --- | --- |
@@ -509,13 +520,13 @@ Default keys, override in `~/.config/lhde/keys` (one binding per line; docs/LUXW
 | Super+Return | terminal (urxvt), Super+t for xterm |
 | Super+e | flxp Explorer (ROX-Filer when flxp is not installed) |
 | Super+d | show desktop, as Windows' Win+D: minimises the visible windows (they stay minimised); Super+d again brings exactly those back, but only if nothing changed in between (no window restored, activated, opened or closed); otherwise it is a new "show desktop" |
-| Super+r | Run box (luxshell's own, via `_LHSHELL_COMMAND run`; or `Mod4+r exec rofi -show run` in your keys file) |
+| Super+r | Run: the start menu's Run dialog, as Start > Run... (`_LHSHELL_COMMAND run`, which luxshell hands to the start menu); settings.ini `[commands] run` runs something else instead (dmenu, rofi), as does `Mod4+r exec ...` in your keys file |
 | Super+Shift+S, Super+Shift+F, Super+Shift+W | a screenshot of a rectangle dragged with the mouse (Windows 10's snip key), of the full screen, of the active window with its frame (luxshot, "Screenshots" below; `_LHSHELL_COMMAND screenshot_region`, `screenshot`, `screenshot_window`, settings.ini `[commands]` of those names to run something else). Print is not bound, it may be your compose key: `Print shell screenshot` in the keys file binds it (`Mod1+Print shell screenshot_window`, `Shift+Print shell screenshot_region` likewise) |
 | Super+s | sidebar under the windows (part of the desktop) ⇄ on top of them, at once (`_LHSHELL_COMMAND sidebar-stacking toggle`; saved as `[sidebar] stacking`) |
 | Super+q or Alt+F4 | close window |
 | Alt+Space | the window menu (Restore, Move, Size, Minimize, Maximize, Close; arrows, mnemonics, Enter, Esc); also a right click on the caption or a click on the caption icon (double click there: close) |
 | Alt+Space, M / S | keyboard move / size: arrows move (size: the first arrow picks the edge) in half-button steps, Ctrl+arrow 1 px, the mouse takes over, Enter or a click accepts, Esc puts the window back |
-| Alt+Tab, Super+Tab (Shift: backwards) | as Windows': while Alt (Super) is held each Tab previews the next window by raising it (the previous one goes back to its place; minimised windows come last and are not previewed); releasing Alt focuses and raises the chosen one, every other window keeps its stacking order; Esc cancels |
+| Alt+Tab, Super+Tab (Shift: backwards) | XP's task switcher: while Alt (Super) is held each Tab selects the next window in it (the arrow keys move in its grid), nothing is restacked meanwhile; releasing Alt, Enter or a click activates the chosen one, every other window keeps its stacking order; Esc cancels |
 | Super+Up / Super+Down | maximise / minimise |
 | Super+1..4 | workspaces (virtual desktops: the taskbars show the current one's windows; `_LHSHELL_COMMAND desktop N\|next\|prev` or any pager's `_NET_CURRENT_DESKTOP` request switches too; pressed while moving a window, the window goes along; the window menu's Move to Desktop moves one too) |
 | drag caption | move; drag edges and corners: resize |
@@ -610,8 +621,8 @@ Details, Ctrl+2 Tiles, Ctrl+3, 4, 5 Large, Medium, Small Icons (4074's five slid
 Ctrl+plus, Ctrl+minus, Ctrl+wheel and View > Zoom make the view shown a step bigger or smaller within its range (4051's levels 16
 21 27 36 48 64 84 111 147 194 256 and the range's ends). Each of the five stops remembers the size it was last shown at, and
 "Icons" is the icon stop used last, so going back to a view brings its size back; the sizes are kept for every window in
-`~/.local/state/lhde/flxp-view-sizes`. Every folder keeps its own view, size and Hide File Names in `flxp-views` beside it
-(`remember_views`, Tools > Folder Options); a folder never opened gets `default_view_longhorn` (Icons at 48 px unless Folder
+`~/.local/state/lhde/flxp-view-sizes`. Every folder keeps its own view, size and Hide File Names (and its Details columns, "Descriptions
+and tags") in `flxp-views` beside it (`remember_views`, Tools > Folder Options); a folder never opened gets `default_view_longhorn` (Icons at 48 px unless Folder
 Options says otherwise).
 
 The breadcrumb names your home folder "Home" (Home > Documents), as the namespace places it under the Desktop. Folder Options'
@@ -632,7 +643,19 @@ behind them; selection and hover are the theme's `Explorer::ListView` LISTITEM u
 the icon and its label, not the whole cell), the classic highlight in styles without it. View > Show Thumbnails (and Folder
 Options) turn them off for every folder (`thumbnails = 0` in `flxp.ini`); on network mounts (NFS, SMB, sshfs and other FUSE
 network filesystems) they are off unless `thumbnails_network = 1`, since every picture would be read over the network. The
-thumbnails are cached in `~/.cache/thumbnails` (the freedesktop spec, shared with other programs).
+thumbnails are cached in `~/.cache/thumbnails` (the freedesktop spec, shared with other programs: 128 px in `normal/`, 256 px in
+`large/`), so a picture is decoded once and its thumbnail read back after that.
+
+Memory is bounded whatever the folder holds. A picture is never decoded at full size for its thumbnail where the format allows it:
+a JPEG decodes at 1/2, 1/4 or 1/8 of its size (DCT scaling) straight from the file, a PNG is reduced row by row as it is read, a
+WebP rescaled by libwebp; what can only decode whole (an interlaced PNG, BMP, ICO) gets no thumbnail above 25 megapixels, nor a
+file of those formats above 64 MB, nor a JPEG whose decoder would need more than 160 MB (a huge progressive one). At most two
+pictures decode at once in a flxp process, whichever view or pane asks for them. A view asks only for the items on screen and a
+screen's worth around them, drops what it asked for when you scroll away before it was made, and keeps at most 64 MB of thumbnails
+(256 at 256 px, about 1800 at 96 px) plus those on screen; the least recently seen go back to their icon and are read from the
+disk cache again when they come back. With `FLXP_TRACE_THUMBS=1` flxp prints each decode (the picture's size and the size it was
+decoded at) and, after each batch, the images the view holds, their bytes against the budget, how many were evicted and how many
+are pending.
 
 In the XP frame the Explorer keeps XP's views: Thumbnails (squares of `thumbnail_size`), Tiles, Icons, Small Icons, List,
 Details; Ctrl+1 Details, 2 Icons, 3 Thumbnails, 4 List, 5 Small Icons. Tiles is XP's: the 48 px icon at the left of a tile and the
@@ -665,22 +688,25 @@ only what the window's chrome has, in the words of its era:
 What the Explorer says about the folder shown or the selection comes from one model (`flxp/shell/details.h`) shown two ways.
 Per kind of item (file, picture, song, folder, drive, a virtual folder such as My Computer) it lists properties from a small
 registry: the derived Type, Attributes, Date Modified, Size, Dimensions, File System, Free Space, Total Size, and the stored
-Description (`user.lux.desc`), Tags (`user.xdg.tags`) and Comment (`user.xdg.comment`), the extended attributes of
-docs/ANNOTATIONS.md (how to edit them: "Descriptions and tags" below).
+Description (`user.lux.desc`), Tags (`user.xdg.tags`), Comment (`user.xdg.comment`), Color (`user.lux.color`) and Run as
+(`user.lux.run`), the extended attributes of docs/ANNOTATIONS.md (how to edit them: "Metadata" below).
 
 **XP frame: the Details section.** The task pane's last section, under Places and Bookmarks, is XP's Details rollout. With nothing
 selected it describes the folder itself (its name in bold, "File Folder", Date Modified; My Computer "System Folder"; a drive "Local
 Disk", File System, Free Space, Total Size); with one item its name, type and its kind's lines in XP's order and wording ("Date
 Modified: Today, October 31, 2026, 12:45 PM", "Size: 23.1 KB", "Dimensions: 800 x 600", "Attributes: Read-only, Hidden"), the
 extended attributes when they are set; a picture gets its thumbnail above the name (at most 150 x 100), except in the Thumbnails
-view and where thumbnails are off (`thumbnails = 0`, or a network mount without `thumbnails_network = 1`). Several items: "N items
+view and where thumbnails are off (`thumbnails = 0`, or a network mount without `thumbnails_network = 1`); a folder gets none, as
+in XP (its mini previewer is for items that are not folders). Several items: "N items
 selected." and the files' "Total File Size" (for up to 100 items). Like XP the section starts folded except in My Computer; its
 chevron folds and opens it, and from then on it stays as it was left (`places_details = 0|1` in `flxp.ini`).
 
 **Longhorn frame: the task band** (View > Task Band, `taskpane = 1` or `--taskpane`). Build 4051's band under the command bar:
 left to right the preview, the details and the tasks. Nothing selected: the folder's image faded at the left with "N items / in this
 folder" over it, and the folder's tasks (Make a new folder, Search, Open a terminal here, Add to Bookmarks, folder Properties) in
-columns, "more" opening the rest of the folder's menu. One item: its thumbnail in a white frame (a picture) or its 128 px icon,
+columns, "more" opening the rest of the folder's menu. One item: its thumbnail in a white frame (a picture) or its 128 px icon (48
+in the compact band), a folder the picture the Icons view shows for it (the folder with up to four of the pictures inside, or
+4074's photo standing in the open folder), made at that size from the same recipe and thumbnail cache in the background,
 hanging a little below the band over the left pane, then its name, its values in two columns (size, date, type; a picture's size,
 date and dimensions) with "Add a description", "Add tags", "Add comments" where those attributes are empty, and "all properties..."
 (the Properties dialog). The description, tags and comment, or their invitations, are editable: a click opens an edit box in the
@@ -699,34 +725,95 @@ all spelled `taskpane*`: `taskpane` (shown, `0 | 1`), `taskpane_compact` (`0 | 1
 87..246, default 126) and `taskpane_background` (`menubar`, default: the command bar's strip; `aurora`: the Longhorn demo's
 aurora bitmaps from `resources/demo`, a taste choice).
 
-## Descriptions and tags (flxp)
+## Metadata: descriptions, comments, tags, colours, run as (flxp)
 
-A file or folder can carry a one-line **description**, **tags** and a **comment**. They are extended attributes on the file
-itself (`user.lux.desc`, `user.xdg.tags`, `user.xdg.comment`; the names luxfs's `x` and `lsx` use, docs/ANNOTATIONS.md), so
-there is no database: they need a file system that keeps user attributes (ext4, btrfs, xfs, zfs, tmpfs; not FAT or many network
-mounts, where editing says so). Tags are stored comma-separated (`reference,4051`); typed, they may be separated by commas or
-semicolons, spaces around them are dropped, a tag given twice is kept once. Emptying a value removes the attribute. A value
-of any length is read whole; when an item's current value cannot be read (not readable by you, an I/O error), Edit
-Description, Add Tag, Remove Tag and the task band's editor change nothing and say so, rather than replace what they did not see.
+A file or folder can carry a **description** (one line: what it is), a **comment** (free text of as many lines as it needs),
+**tags**, a **colour** and a **Run as** command. They are extended attributes on the file itself (`user.lux.desc`,
+`user.xdg.comment`, `user.xdg.tags`, `user.lux.color`, `user.lux.run`; the names luxfs's `x` and `lsx` use,
+docs/ANNOTATIONS.md), so there is no database: they need a file system that keeps user attributes (ext4, btrfs, xfs, zfs, tmpfs;
+not FAT or many network mounts, where editing says so). A line break typed or pasted into a description becomes a space.
+Tags are stored comma-separated (`reference,4051`); typed, they may be separated by commas or semicolons, spaces around them
+are dropped, a tag given twice is kept once. A colour is one of ten names (Red, Orange, Yellow, Green, Teal, Blue, Purple,
+Pink, Brown, Gray), stored in lower case (`red`). Emptying a value removes the attribute. A value of any length is read whole;
+when an item's current value cannot be read (not readable by you, an I/O error), Add Tag, the Properties sheet and the task
+band's editor change nothing and say so, rather than replace what they did not see.
+
+**Run as** is a command for that one file, in place of its type's program: `python3 %f`, `wine %f`, `xdg-open %f`. A double
+click, Open or Enter on the file runs it with `%f` replaced by the file's path (quoted; without `%f` the path goes at the
+end; `%%` is a percent sign), through `/bin/sh` in the file's folder, without asking, as a Windows shortcut runs its target.
+Open With still offers the programs of the file's type. It is yours: it travels with the file only where the file's
+attributes travel (below), so a file downloaded or copied without them has none.
 
 Where they show:
 - **Details view columns.** Right-click the column header for a check per column (Name, Size, Type, Date Modified, Description,
-  Tags, Comment) and More..., or View > Choose Details... (XP's dialog: check, Move Up / Move Down, Show / Hide, the selected
-  column's width). A click on a column header sorts by it (files without a value first). The columns, their order and widths
-  are remembered in `~/.local/state/lhde/flxp-columns`; the attributes are only read while one of their columns is shown or
-  sorted by.
-- **The infotip.** Resting the pointer on an item shows XP's tip: Type, Date Modified and Size, then Description, Tags and
-  Comment when they are set.
-- **The panes.** XP's Details rollout lists them when set (read-only, as XP's did); 4051's task band shows them for one item,
-  with "Add a description", "Add tags", "Add comments" when empty.
+  Tags, Comment, Color) and More..., or View > Choose Details... (XP's dialog: check, Move Up / Move Down, Show / Hide, the selected
+  column's width); drag a column header to move the column. A click on a column header sorts by it (files without a value first).
+  As in XP every column keeps its place in the order and its width whether it is shown or not: hiding one takes it out, showing
+  it again puts it back where it was, at its width, and nothing else moves. Choose Details lists the columns in that order, the
+  hidden ones at their places, so Move Up / Move Down also place a hidden one. Name is always shown. The attributes are only read
+  while one of their columns is shown or sorted by (or the filter looks at them). Comment shows the first line and "…" when
+  there are more; Color, hidden by default, a small square in the colour and its name.
+- **Columns per folder.** As XP's view state, each folder keeps its own columns: what you change in one folder (the set, the
+  order, the widths) stays with that folder, in its line of `~/.local/state/lhde/flxp-views` beside its view (only when it
+  differs from the default); a folder of its own gets the default, `~/.local/state/lhde/flxp-columns`. Tools > Folder Options'
+  Apply to All Folders makes the current folder's columns the default and forgets every folder's own, Reset All Folders goes
+  back to XP's four (Name, Size, Type, Date Modified) and forgets them too. With "Remember each folder's view settings" off
+  (`remember_views = 0`) the columns are one set for every folder, kept in `flxp-columns`.
+- **The infotip.** Resting the pointer on an item shows XP's tip: Type, Date Modified and Size, then Description, Tags,
+  Comment (its first line), Color ("Color: Red") and "Runs with: python3" (the command's program) when they are set.
+- **The panes.** XP's Details rollout lists them when set (read-only, as XP's did; "Color: Red"); 4051's task band shows the
+  description, tags and the comment's first line for one item, with "Add a description", "Add tags", "Add comments" when
+  empty, and the colour as a square after the item's name. Run as shows in neither.
+
+Where a colour shows (the column's square and name, the band's square, the lines) is a first choice and may change.
 
 How to edit:
-- **The context menu** (Explorer and desktop): Edit Description... (one item), Add Tag... (one or several items: each keeps its
-  tags and gets the new ones; the drop-down offers the tags used in the folder), and Remove Tag (a submenu of the selection's
-  tags, removed from every selected item that has it).
-- **The task band:** click a value or its invitation, type, Enter (or click elsewhere) keeps it, Escape drops it.
+- **The context menu** (Explorer and desktop): Add Tag... (one or several items: each keeps its tags and gets the new ones; the
+  drop-down offers the known tags: the items' own, the ones you added lately, `~/.local/state/lhde/flxp-tags`, and those of
+  the other files in the folder) and Properties (one or several items: the sheet below; the rest of the editing is there).
+- **Properties**, the item's Properties sheet (XP's file Properties, titled "a.txt Properties", or "a.txt, b.txt, ...
+  Properties" for several): General, where it opens as XP's does, shows the icon, name, type, Opens with and its Change...
+  button (XP's Open With), location, size ("1.29 KB (1,331 bytes)"), what a folder contains and the dates (several items:
+  "N Files, M Folders", "All of type ..." or "Multiple Types", "All in ..." or "Various Folders", the total size). **Metadata**,
+  one tab away, has:
+  - *Description*, one line (a pasted text of several lines comes in as one).
+  - *Tags*: the files' tags in a list, one a row, and above it a box whose drop-down offers the known tags (the files' own,
+    the ones you added lately, the folder's). Type a tag (or several, `a, b` or `a; b`) or pick one, then Add or Enter; select
+    rows (Shift and Ctrl for several) and Remove or Delete. With several files a tag only some of them have is grey; one you
+    add goes to all of them, one you remove leaves those that have it, and each keeps its other tags.
+  - *Color*: a row of squares, None first, then the ten colours; the chosen one is framed and named beside the label
+    ("Color: Red", "Color: (several)" when the files differ). Click one, or Alt+L, the arrow keys and Space.
+  - *Comment*, several lines (Enter starts a new line), with a scroll bar.
+  - *Run as*: the command (`python3 %f`), Browse... to pick the program in the file dialog (it writes `PROGRAM %f`); empty,
+    the file opens with its type's program again.
+
+  luxfs's Author, Source, Build, Notes and To do are in the Advanced view only. Advanced >> shows every `user.*` attribute on
+  the files with its stored value, any program's: F2 or a double click edits a value in place (Enter keeps it, Escape drops
+  it), New Attribute... adds one (a name without `user.` gets it), Remove or Delete removes the selected ones, << Simple goes
+  back. With several files a value they share is shown, else the edit is empty with "(several values)" in grey, and what is
+  typed is written to every file. OK writes and closes, Apply writes and stays, Cancel or Escape drops; an emptied value
+  removes the attribute. It writes as the Explorer does (the same code), so tags typed "a; b" are stored `a,b`; a file it
+  cannot change (read-only, not yours, no user attributes there) is named in a message box and the sheet stays. After OK the
+  Explorer refreshes the rows and the panes.
+- **luxattr**, the same sheet from a terminal: `luxattr FILE...` opens it on Metadata (`--general` on General), for the files
+  given (a folder is a file too), without Change... It needs no session and nothing imported: on a bare X display it draws in
+  wux's classic defaults; in a session it follows the theme like every lhde program. Exit status: 0 something was written,
+  1 nothing, 2 a usage error or a missing file.
+- **The task band:** click a value or its invitation, type, Enter (or click elsewhere) keeps it, Escape drops it. A comment of
+  several lines and the colour's square open the Properties sheet on its Metadata page instead.
 - From a terminal: `x desc FILE "text"`, `x +tag FILE a b`, `lsx -t DIR` (luxfs), or `setfattr` / `getfattr`. The Explorer
   follows a change made elsewhere (inotify reports attribute changes).
+
+**Filtering.** The Longhorn frame's "Filter by" box at the top of the left pane (4074's) and the header's
+search box keep the list to the items that match what is typed, narrowing it in place at every key (the view and the sort stay).
+Each word, separated by spaces, must match somewhere: in the name, the description, a tag or the comment, as a part of the value,
+ASCII upper and lower case alike (`red work` finds a file tagged `red,work` and one named `redwork.txt` whose comment says "work"). A
+word can name the field it looks in: `tag:x` (or `tags:`) a tag containing x, `desc:x` (`description:`), `comment:x`, `name:x`;
+the field alone (`tag:`) keeps the items where it is set. Double quotes make one word of several (`desc:"red sunset"`); any
+other `word:` is a plain word. While a filter is on the status bar says "N of M items". Escape in the box empties it and the
+whole folder shows again; Enter goes back to the list keeping the filter; another folder starts unfiltered. The filter belongs to
+the window and is not remembered. The attributes are read once per folder when a word needs them (or a column shows them) and
+follow changes on disk.
 
 They travel with the file where its attributes travel: a move on the same file system, flxp's own copy and move (also across
 file systems), `cp -a` (or `--preserve=xattr`), `rsync -X`, `tar --xattrs`. They do not travel with `cp` without `-a`, most
@@ -743,7 +830,7 @@ file can bind it ("Keys in the session" above). A window comes up at once with t
   folder (`XDG_PICTURES_DIR`, from `~/.config/user-dirs.dirs`, else `~/Pictures`; made when missing); **Browse...** is the Save As
   dialog. A name without `.png` gets it; a name with a `/` is a path of its own.
 - **Description** and **Tags**: written on the file as the Explorer writes them (`user.lux.desc`, `user.xdg.tags`; tags separated
-  by commas or semicolons, "Descriptions and tags" above), so the Explorer shows them at once. An empty box writes nothing.
+  by commas or semicolons, "Metadata" above), so the Explorer shows them at once. An empty box writes nothing.
 - **Save** (Enter) writes the PNG and closes; a file of that name is replaced only after asking. **Copy** puts the picture on the
   clipboard as `image/png` (paste it into GIMP, a browser, a chat); luxshot then stays, without a window, until another program
   takes the clipboard, since an X clipboard lives in the program that offers it. **Open Folder** opens the folder in the Explorer
@@ -752,6 +839,36 @@ file can bind it ("Keys in the session" above). A window comes up at once with t
 From a script: `luxshot [--screen | --window [--no-frame] | --region] [--delay S] [--desc TEXT] [--tags A,B] FILE.png` writes
 FILE.png (with the description and tags) and exits without a window; without FILE the window comes up. Exit status 0 saved or
 copied, 1 cancelled or failed, 2 a usage error. `session/lab.sh shot` keeps using ImageMagick's `import` (it needs nothing built).
+
+## luxpad, the notepad
+
+`luxpad [FILE]` is XP's Notepad (ReactOS's, ported to wux): the title "Untitled - luxpad" or the file's name, File (New,
+Open..., Save, Save As..., Exit), Edit (Undo, Cut, Copy, Paste, Delete, Find..., Find Next F3, Replace..., Go To..., Select
+All, Time/Date F5: XP's "11:41 PM 11/12/2026"), Format (Word Wrap, Font...), View (Status Bar), XP's keys (Ctrl+N, O, S, F, H,
+G, A; Shift+F3 finds upward; Ctrl+Shift+N a new window). A file that starts with `.LOG` gets the time and date appended when it
+opens. Closing with unsaved changes asks; a file dropped on the window (from the Explorer, any XDND source) opens.
+`luxpad.desktop` (installed) claims `text/plain`, so the Explorer's Open With lists it and a double click on a `.txt` opens it
+when no other default is set (`mimeapps.list`).
+
+Encodings, as Notepad's, with one difference: **ANSI means UTF-8 here** (the code page wux reads "ANSI" in), so "ANSI (UTF-8)"
+and "UTF-8" write the same bytes. A file opens as: Unicode (UTF-16 LE) or Unicode big endian or UTF-8 with BOM when it starts
+with that byte-order mark; else UTF-8 when it is plain ASCII or valid UTF-8 without NUL bytes; else UTF-16 when Notepad's
+statistics say so (`IsTextUnicode`); else ANSI: a file that is not valid UTF-8 (Latin-1, a broken download), whose bytes that
+are not UTF-8 are kept as they were and written back unchanged (they show as boxes). Save As has Notepad's **Encoding** box
+under "Save as type" (ANSI, Unicode, Unicode big endian, UTF-8, UTF-8 with BOM) and ReactOS's **Line endings** box (Windows
+CR + LF, Unix LF, Mac CR). The line ends are kept as read: a file's own kind is written back for every line (a file mixing
+them gets its most common). The status bar is off until View > Status Bar turns it on, as in XP's Notepad, and stays as last chosen (luxpad.ini's
+`statusbar`, for every luxpad window after); it says, from the left, Ln and Col (XP's: lines of the text, a column counted in
+UTF-16 units from 1), the line ends and the encoding; XP hides it while Word Wrap is on, and so does luxpad (Go To is greyed
+then too). A character above U+FFFF (an emoji, 𝄞) is typed, saved and reloaded intact; the caret and Backspace take it as one.
+NUL characters in a file become spaces (the Edit control's text ends at a NUL), as Notepad does.
+
+The font is Lucida Console 10 as XP's (a monospaced face when the Windows fonts are not imported: `fc-match monospace`);
+Font... is comdlg32's Font dialog over every installed family. What luxpad keeps: `~/.config/lhde/luxpad.ini` (`[luxpad]`
+`font`, `font_size`, `font_weight`, `font_italic`, `wrap`, `statusbar`; what you chose) and `~/.local/state/lhde/luxpad.ini`
+(`[window]` `x`, `y`, `width`, `height`, `maximized`; `[search]` `find`, `replace`, `match_case`, `whole_word`, `down`; what it
+remembers), both written when it exits (docs/SETTINGS.md). No printing, no Help Topics; About is a message box.
+`LUXPAD_TRACE=1` prints every status bar text on stdout (`status pos Ln 2, Col 3`), for scripts.
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell, docs/SHELL-DESIGN.md 6.4, 7.3, 13)
 
@@ -790,7 +907,8 @@ light blue) and open where you click, flipped to the left / upwards where they w
 - **Keys** while a menu is open: Up/Down (Home/End) move, Right or Return opens a submenu, Left or Esc closes a submenu, Esc
   closes the menu, Return/space activates. The underlined letter (mnemonic) activates its item directly (opens its submenu);
   when several items share it, the key cycles through them; a letter that is nobody's mnemonic jumps to the next item starting
-  with it. A click outside any of luxshell's surfaces (or on another of its surfaces) closes the menu. The 4074 menus drew no
+  with it. A click outside any of luxshell's surfaces (or on another of its surfaces) closes the menu and acts where it was made
+  ("Menus and clicks" below). The 4074 menus drew no
   underlines; ours always do.
 
 **Autohide** (Avalon behaviour): the bar slides out (100 ms) as soon as the pointer is off it and no start menu, menu or
@@ -1003,7 +1121,7 @@ luxshell keeps the button pressed from the click (or Super) until the panel's wi
 | `[commands]` | `logoff`, `standby`, `shutdown`, `restart`, `lock` | session commands ("The session" above) |
 | `[commands]` | `taskbar` | the classic taskbar for `Shell.taskbar = classic` and, with `--start-menu-only`, the start-menu provider (default: `$LHSHELL_TASKBAR_CMD`, else `flxp-taskbar`) |
 | `[commands]` | `picom` | the compositor command for the rule above (default: `$LHSHELL_PICOM_CMD`, else picom with `picom-glass.conf` and glx) |
-| `[commands]` | `filemanager`, `run`, `search` | file manager for the places (default flxp, rox, else xdg-open); Run (default `rofi -show run` if installed, else luxshell's own run box); Search (default: luxshell's box, which starts the best-matching program) |
+| `[commands]` | `filemanager`, `run`, `search` | file manager for the places (default flxp, rox, else xdg-open); Run, Super+R (default: the start menu's Run dialog, as Start > Run...; luxshell's own run box when no start menu runs); Search (default: luxshell's box, which starts the best-matching program) |
 
 `~/.local/state/lhde/luxshell-state.ini` (`LHSHELL_STATE` another file): `[sidebar] tiles` = the tile order,
 `notifications;clock;power` (written by Move Up / Move Down; default: the pack's list). Beside it: `luxshell-mfu.ini` (the start

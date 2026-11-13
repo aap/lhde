@@ -688,6 +688,16 @@ lh.on("start-key", function(l0, x, y, w, h)
   local has = (w or 0) > 0 and (h or 0) > 0
   forward_start(has and ((l0 or 0) & 0xff) or 1, has and { x = x, y = y, w = w, h = h } or our_anchor())
 end)
+-- Super+R (luxwm "shell run", _LHSHELL_COMMAND run): settings.ini [commands] run when set (dmenu, rofi, ...), else the Run
+-- dialog of the start menu, the provider's (_LHSHELL_START with l[0] bit 1 to its owner window), else our own run box
+function lh.run_dialog()
+  local cmd = S.get("commands", "run")
+  if cmd then io.stderr:write("luxshell: run: " .. cmd .. "\n"); lh.spawn(cmd) return end
+  local o = lh.selection_owner(lh.startmenu_selection or "_LH_STARTMENU_S0")
+  if o then io.stderr:write("luxshell: run: the start menu's Run dialog\n"); lh.send_message(o, "_LHSHELL_START", 2, 0, 0, 0, 0) return end
+  io.stderr:write("luxshell: run: no start menu provider, our run box\n")
+  lh.run_box("run")
+end
 lua("settings.lua")(ctx)            -- settings flyout ("Control Panel"), run / search box
 
 ------------------------------------------------------------------ tiles
@@ -1641,7 +1651,7 @@ lh.on("command", function()
   local c = lh.root_prop("_LHSHELL_COMMAND"); lh.set_root_prop("_LHSHELL_COMMAND", nil)
   if not c or c == "" then return end
   local verb, arg = c:match("^%s*(%S+)%s+(%S+)%s*$")
-  if c:match("^%s*run%s*$") then lh.run_box("run") return end          -- Super+r (luxwm "shell run"): luxshell's own Run box
+  if c:match("^%s*run%s*$") then lh.run_dialog() return end            -- Super+r (luxwm "shell run"): Start > Run's dialog
   if c:match("^%s*reload%s*$") then lh.reload_pack("_LHSHELL_COMMAND reload") return end   -- session/theme-reload.sh: re-read the pack
   if verb == "taskbar" then lh.set_taskbar(arg) return end            -- _LHSHELL_COMMAND "taskbar avalon|classic|none"
   if c:match("^%s*settings%s*$") then lh.settings_flyout() return end   -- the settings flyout (e.g. with the classic bar, which has no way to it)

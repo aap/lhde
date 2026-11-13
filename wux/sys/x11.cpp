@@ -14,7 +14,10 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <X11/keysym.h>
+#include <xkbcommon/xkbcommon.h>
 #include <X11/extensions/shape.h>
+#include <X11/extensions/Xfixes.h>
+#include <X11/Xcursor/Xcursor.h>
 #include "sys.h"
 
 namespace sys {
@@ -261,8 +264,11 @@ bool set_argb(NativeWindow* w, bool on)
 
 static void drop_shadow_show(NativeWindow* w, const gdi::Rect& r, bool show);
 
+static void drop_mode_grab(NativeWindow* w);
+
 void destroy_window(NativeWindow* w)
 {
+    drop_mode_grab(w);
     for (size_t i = 0; i < windows.size(); i++)
         if (windows[i] == w) { windows.erase(windows.begin() + i); break; }
     drop_shadow_show(w, w->rect, false);
@@ -447,15 +453,103 @@ void begin_move_resize(NativeWindow* w, gdi::Point root_pos, int direction, int 
 
 static bool own_grab;   // grab_pointer holds one: its LeaveNotify/NotifyGrab is not another client's
 
+// The grabs of the modes (menus, the start panel): a stack, the innermost one holds the X grab and a mode that ends
+// gives it back to the one around it (the start panel's All Programs menu). Synchronous (GrabModeSync): every
+// pointer event freezes the pointer until we let it go, a press until release_press has decided whether it is the
+// mode's or is replayed to the window under the pointer (docs/CLIENT-PROTOCOL.md "Menus and clicks"). The X grab is
+// on the root window (owner events: ours get theirs); what comes to the root is the mode's window's.
+struct ModeGrab { NativeWindow* w; bool shell; };
+static std::vector<ModeGrab> mode_grabs;
+static bool sync_grab;          // the X grab is ours and synchronous
+static bool grab_shell;         // set_shell_grab: the grabs pushed now are the start menu's
+static bool press_frozen;       // a press froze the pointer and waits for release_press
+static bool press_is_foreign, press_on_dock;
+static unsigned foreign_count, replayed_count;  // foreign_presses(), replayed_presses()
+
+static void thaw_pointer() { if (sync_grab) XAllowEvents(dpy, SyncPointer, CurrentTime); }
+
+static bool take_grab()
+{
+    int r = GrabNotViewable;
+    for (int i = 0; i < 40; i++) {   // the window manager's passive grab of the press that opened the menu may be ending
+        // on the root: a replayed press is then checked against the passive grabs under it (the window manager's
+        // click to focus); with a grab window off the pointer's path X would hand it to the window directly
+        r = XGrabPointer(dpy, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+                         GrabModeSync, GrabModeAsync, None, None, CurrentTime);
+        if (r != AlreadyGrabbed && r != GrabFrozen) break;
+        usleep(5000);
+    }
+    own_grab = sync_grab = r == GrabSuccess;
+    press_frozen = false;
+    if (sync_grab) XAllowEvents(dpy, SyncPointer, CurrentTime);   // a synchronous grab starts frozen
+    XFlush(dpy);
+    return sync_grab;
+}
+
 bool grab_pointer(NativeWindow* w, bool on)
 {
-    own_grab = on;
-    if (!on) { XUngrabPointer(dpy, CurrentTime); XFlush(dpy); return true; }
-    int r = XGrabPointer(dpy, w->xw, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-                         GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
+    bool top = !mode_grabs.empty() && mode_grabs.back().w == w;
+    for (size_t i = 0; i < mode_grabs.size(); i++)
+        if (mode_grabs[i].w == w) { mode_grabs.erase(mode_grabs.begin() + (long)i); break; }
+    if (on) {
+        mode_grabs.push_back(ModeGrab{ w, grab_shell });
+        return take_grab();
+    }
+    if (!top) return true;   // an outer mode's entry: the grab stays with the inner one
+    if (!mode_grabs.empty()) return take_grab();
+    if (own_grab) XUngrabPointer(dpy, CurrentTime);
+    own_grab = sync_grab = press_frozen = false;
     XFlush(dpy);
-    own_grab = r == GrabSuccess;
-    return own_grab;
+    return true;
+}
+
+// the server ends a grab whose window goes; the mode around it gets it back
+static void drop_mode_grab(NativeWindow* w)
+{
+    for (const ModeGrab& g : mode_grabs) if (g.w == w) { grab_pointer(w, false); return; }
+}
+
+void set_shell_grab(bool on) { grab_shell = on; }
+bool press_pending() { return press_frozen; }
+bool press_foreign() { return press_frozen && press_is_foreign; }
+unsigned foreign_presses() { return foreign_count; }
+unsigned replayed_presses() { return replayed_count; }
+
+bool release_press(bool replay)
+{
+    if (!press_frozen) return false;
+    press_frozen = false;
+    if (replay && press_on_dock && !mode_grabs.empty() && mode_grabs.back().shell) replay = false;   // the start menu keeps a click on the taskbar
+    if (!replay) { thaw_pointer(); XFlush(dpy); return false; }
+    // the server releases the grab and delivers the press again as if there had been none (passive grabs on the
+    // windows under the pointer included: the window manager's click to focus)
+    XAllowEvents(dpy, ReplayPointer, CurrentTime);
+    if (press_is_foreign) replayed_count++;
+    own_grab = sync_grab = false;
+    XFlush(dpy);
+    return true;
+}
+
+// a press while the synchronous grab is up: what lies under it (the top-level at the point: ours, another
+// client's, a dock)
+static void press_arrived(const XButtonEvent& b)
+{
+    press_frozen = true;
+    ::Window child = 0; int x, y;
+    XTranslateCoordinates(dpy, root, root, b.x_root, b.y_root, &x, &y, &child);
+    NativeWindow* ours = child ? lookup(child) : nullptr;
+    press_is_foreign = !ours;
+    press_on_dock = false;
+    if (ours) press_on_dock = ours->type == WindowType::Dock;
+    else if (child) {
+        Atom type; int format; unsigned long n = 0, after; unsigned char* data = nullptr;
+        Atom wt = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False), dock = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
+        if (XGetWindowProperty(dpy, child, wt, 0, 8, False, XA_ATOM, &type, &format, &n, &after, &data) == Success && data) {
+            for (unsigned long i = 0; i < n; i++) if ((Atom)((long*)data)[i] == dock) press_on_dock = true;
+            XFree(data);
+        }
+    }
+    if (press_is_foreign) foreign_count++;
 }
 
 bool is_maximized(NativeWindow* w)
@@ -480,15 +574,42 @@ void set_maximized(NativeWindow* w, int action)
 
 void* window_user(NativeWindow* w) { return w->user; }
 
+// The Win32 cursors as the X cursor theme has them: the theme's named cursors (Xcursor: the freedesktop names, then the
+// older ones themes carry as well), else the core cursor font's shape. Windows' size cursors are double-headed arrows; the
+// core font has none on the diagonals (its corner cursors point one way, wrong at the opposite corner), so its fallback
+// there is the bottom right / bottom left corner, where a size grip is. The cursor is named after the first theme name
+// (XFixesSetCursorName) so that a test reads back which one is up (XFixesGetCursorImage).
+struct PointerNames { const char* names[4]; unsigned core; };
+static const PointerNames pointer_names[] = {
+    { { "default", "left_ptr" }, 68 /*XC_left_ptr*/ },
+    { { "text", "xterm", "ibeam" }, 152 /*XC_xterm*/ },
+    { { "wait", "watch" }, 150 /*XC_watch*/ },
+    { { "crosshair", "cross" }, 34 /*XC_crosshair*/ },
+    { { "ew-resize", "sb_h_double_arrow", "size_hor", "h_double_arrow" }, 108 /*XC_sb_h_double_arrow*/ },
+    { { "ns-resize", "sb_v_double_arrow", "size_ver", "v_double_arrow" }, 116 /*XC_sb_v_double_arrow*/ },
+    { { "nwse-resize", "size_fdiag", "bd_double_arrow" }, 14 /*XC_bottom_right_corner*/ },
+    { { "nesw-resize", "size_bdiag", "fd_double_arrow" }, 12 /*XC_bottom_left_corner*/ },
+    { { "all-scroll", "fleur", "size_all", "move" }, 52 /*XC_fleur*/ },
+    { { "pointer", "hand2", "hand" }, 60 /*XC_hand2*/ },
+    { { "not-allowed", "crossed_circle", "forbidden" }, 0 /*XC_X_cursor*/ },
+    { { "progress", "left_ptr_watch", "half-busy" }, 150 /*XC_watch*/ },
+    { { "help", "question_arrow", "whats_this" }, 92 /*XC_question_arrow*/ },
+    { { "up-arrow", "sb_up_arrow", "center_ptr" }, 114 /*XC_sb_up_arrow*/ },
+};
+
 void set_cursor(NativeWindow* w, PointerShape shape)
 {
-    static ::Cursor cache[12];
-    static const unsigned shapes[] = { 68 /*XC_left_ptr*/, 152 /*xterm*/, 150 /*watch*/, 34 /*crosshair*/,
-        108 /*sb_h_double_arrow*/, 116 /*sb_v_double_arrow*/, 134 /*top_left_corner*/,
-        136 /*top_right_corner*/, 52 /*fleur*/, 60 /*hand2*/, 0 /*X_cursor*/, 0 };
-    int i = (int)shape;
+    static ::Cursor cache[sizeof pointer_names / sizeof pointer_names[0]];
     if (shape == PointerShape::Hidden) { XUndefineCursor(dpy, w->xw); return; }
-    if (!cache[i]) cache[i] = XCreateFontCursor(dpy, shapes[i]);
+    unsigned i = (unsigned)shape;
+    if (i >= sizeof cache / sizeof cache[0]) i = 0;
+    if (!cache[i]) {
+        const PointerNames& p = pointer_names[i];
+        for (const char* n : p.names) if (n && !cache[i]) cache[i] = XcursorLibraryLoadCursor(dpy, n);
+        if (!cache[i]) cache[i] = XCreateFontCursor(dpy, p.core);
+        int ev, err;
+        if (XFixesQueryExtension(dpy, &ev, &err)) XFixesSetCursorName(dpy, cache[i], p.names[0]);
+    }
     XDefineCursor(dpy, w->xw, cache[i]);
     XFlush(dpy);
 }
@@ -1116,6 +1237,7 @@ bool drag_begin(NativeWindow* w, const std::vector<std::string>& paths, uint32_t
                      None, ds.cursors[0], CurrentTime) != GrabSuccess)
         return false;
     own_grab = true;
+    sync_grab = press_frozen = false;   // the drag's own grab (asynchronous) replaces a mode's
     XGrabKeyboard(dpy, w->xw, False, GrabModeAsync, GrabModeAsync, CurrentTime);
     XSetSelectionOwner(dpy, a_xsel, w->xw, last_time);
     Atom types[] = { a_uri_list, a_gnome, a_utf8, a_text_plain, XA_STRING };
@@ -1450,6 +1572,10 @@ static bool translate(XEvent& x, Event& ev)
     case KeyPress: case KeyRelease: last_time = x.xkey.time; break;
     case PropertyNotify: last_time = x.xproperty.time; break;
     }
+    if (sync_grab) {   // the mode's grab: a press waits for release_press, the rest go on at once
+        if (x.type == ButtonPress && x.xbutton.button <= 3) press_arrived(x.xbutton);
+        else if (x.type == ButtonPress || x.type == ButtonRelease || x.type == MotionNotify) thaw_pointer();
+    }
     if (source_event(x)) return false;
     if (x.type == PropertyNotify && x.xproperty.window == root) {
         Atom a = x.xproperty.atom;
@@ -1484,6 +1610,12 @@ static bool translate(XEvent& x, Event& ev)
         return false;
     }
     NativeWindow* w = lookup(x.xany.window);
+    if (!w && own_grab && !mode_grabs.empty() && x.xany.window == root &&
+        (x.type == ButtonPress || x.type == ButtonRelease || x.type == MotionNotify)) {
+        w = mode_grabs.back().w;   // outside our windows during a mode's grab: the mode's window, in its coordinates
+        if (x.type == MotionNotify) { x.xmotion.x = x.xmotion.x_root - w->rect.left; x.xmotion.y = x.xmotion.y_root - w->rect.top; }
+        else { x.xbutton.x = x.xbutton.x_root - w->rect.left; x.xbutton.y = x.xbutton.y_root - w->rect.top; }
+    }
     if (!w) return false;
     ev.window = w;
     if (x.type == PropertyNotify) {
@@ -1551,7 +1683,14 @@ static bool translate(XEvent& x, Event& ev)
         ev.keysym = (uint32_t)ks;
         ev.mods = mods_from_state(x.xkey.state);
         ev.time = (uint32_t)x.xkey.time;
-        if (n > 0 && x.type == KeyPress) memcpy(ev.text, buf, (size_t)n);
+        if (x.type == KeyPress) {
+            // The text in UTF-8. XLookupString answers in the C locale's Latin-1 and not at all for a keysym outside it
+            // (Cyrillic_a, the Unicode keysyms 0x1000000 + U that xdotool type and the compose tables use), so it
+            // gives only the keysym and the ASCII control characters (Ctrl+A is 0x01); the rest is the keysym's
+            // character (xkbcommon's table, which is X's keysym-to-UCS mapping).
+            if (n == 1 && (unsigned char)buf[0] < 0x80) ev.text[0] = buf[0];
+            else if (ks && xkb_keysym_to_utf8((xkb_keysym_t)ks, ev.text, sizeof ev.text) <= 0) ev.text[0] = 0;
+        }
         return true;
     }
     case FocusIn:  ev.kind = EventKind::FocusGained;  return true;
@@ -1627,6 +1766,7 @@ void wake()
 bool wait_event(Event& ev, int timeout_ms)
 {
     uint32_t start = ticks();
+    release_press(false);   // a press nobody decided about (no window of ours took it): the pointer must not stay frozen
     for (;;) {
         source_timeouts();
         if (drag_changed) {   // the drag ended: the caller's loop looks at drag_active()
@@ -1639,6 +1779,7 @@ bool wait_event(Event& ev, int timeout_ms)
             XEvent x;
             XNextEvent(dpy, &x);
             if (translate(x, ev)) return true;
+            release_press(false);
         }
         if (timeout_ms == 0) return false;
         int remaining = -1;

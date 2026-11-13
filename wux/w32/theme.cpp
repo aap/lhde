@@ -19,6 +19,9 @@
 #include "user.h"
 extern "C" {
 #include "winreg.h"
+#include "uxtheme.h"
+#include "vssym32.h"
+#include "msstyles.h"
 void UXTHEME_InitSystem(HINSTANCE hInst);
 void UXTHEME_UninitSystem(void);
 void UXTHEME_ReloadTheme(void);
@@ -67,6 +70,12 @@ static BOOL CALLBACK post_theme_changed(HWND h, LPARAM top)
 {
     PostMessageW(h, WM_THEMECHANGED, 0, 0);
     if (top) EnumChildWindows(h, post_theme_changed, 0);
+    return TRUE;
+}
+
+static BOOL CALLBACK refit_menu_bar(HWND h, LPARAM)
+{
+    if (GetMenu(h)) DrawMenuBar(h);
     return TRUE;
 }
 
@@ -242,7 +251,10 @@ void session_theme_refresh()
         // change for the windows (chrome, navbar, icons, luxwm's frame)
         EnumWindows(post_theme_changed, 1);
     }
-    // repaint everything: system colours, non-client areas, unthemed parts
+    // the menu font may be another one: menu bars measured again (DrawMenuBar: the frame recalculated), then repaint
+    // everything: system colours, non-client areas, unthemed parts
+    MENU_FontsChanged();
+    EnumWindows(refit_menu_bar, 0);
     EnumWindows(redraw_all, 0);
 }
 
@@ -276,3 +288,47 @@ void init_theme()
 }
 
 } // namespace w32
+
+// The size grip of a sizable window: the status bar's (SBARS_SIZEGRIP) and the scroll bars' corner at the window's bottom
+// right. A Longhorn (v4) style: 4074 draws neither the style's ScrollBar SIZEBOX nor its Status GRIPPER image (under Jade
+// both are one picture, a pyramid of white dots) but six 2 x 2 dots in a triangle on a 4 px pitch in the bottom right of the
+// box, each 172 grey lit by a 255 L below and right of it, the scroll bars' corner 233 under them. FALSE for another style.
+// (opened without the window: OpenThemeData with one makes the class its window theme, and the status bar would draw as a
+// scroll bar)
+static bool longhorn_style(HTHEME th)
+{
+    PTHEME_CLASS tc = (PTHEME_CLASS)th;
+    return tc && tc->tf && tc->tf->v4;
+}
+
+extern "C" BOOL WUX_DrawLonghornSizeGrip(HWND hwnd, HDC hdc, const RECT* rc, BOOL fill)
+{
+    HTHEME th = OpenThemeData(nullptr, L"ScrollBar");
+    bool v4 = longhorn_style(th);
+    if (th) CloseThemeData(th);
+    if (!v4) return FALSE;
+    RECT r = *rc;
+    if (fill) { HBRUSH b = CreateSolidBrush(RGB(233, 233, 233)); FillRect(hdc, &r, b); DeleteObject(b); }
+    static const int dots[6][2] = { { 4, 12 }, { 8, 8 }, { 4, 8 }, { 12, 4 }, { 8, 4 }, { 4, 4 } };
+    for (const auto& d : dots) {
+        int x = r.right - d[0], y = r.bottom - d[1];
+        for (int k = 0; k < 4; k++) SetPixel(hdc, x + (k & 1), y + (k >> 1), RGB(172, 172, 172));
+        SetPixel(hdc, x + 2, y + 1, RGB(255, 255, 255));
+        SetPixel(hdc, x + 1, y + 2, RGB(255, 255, 255));
+        SetPixel(hdc, x + 2, y + 2, RGB(255, 255, 255));
+    }
+    return TRUE;
+}
+
+// the scroll bars' corner as a size grip: the Longhorn dots above; XP's styles the ScrollBar class's SIZEBOX part right
+// aligned over BTNFACE (Luna's dotted triangle); Windows Classic DrawFrameControl's DFCS_SCROLLSIZEGRIP over BTNFACE
+extern "C" void WUX_DrawSizeGrip(HWND hwnd, HDC hdc, const RECT* rc)
+{
+    if (WUX_DrawLonghornSizeGrip(hwnd, hdc, rc, TRUE)) return;
+    RECT r = *rc;
+    FillRect(hdc, &r, GetSysColorBrush(COLOR_BTNFACE));
+    HTHEME th = OpenThemeData(nullptr, L"ScrollBar");
+    if (th) DrawThemeBackground(th, hdc, SBP_SIZEBOX, SZB_RIGHTALIGN, &r, nullptr);
+    else DrawFrameControl(hdc, &r, DFC_SCROLL, DFCS_SCROLLSIZEGRIP);
+    if (th) CloseThemeData(th);
+}

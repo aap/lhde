@@ -310,16 +310,24 @@ static int l_surface_background(lua_State *L) { struct surface *s = check_surfac
     unsigned long px = ((unsigned long)(c[3] * 255) << 24) | ((unsigned long)(c[0] * c[3] * 255) << 16) | ((unsigned long)(c[1] * c[3] * 255) << 8) | (unsigned long)(c[2] * c[3] * 255);
     XSetWindowBackground(dpy, s->win, px); return 0; }
 /* surface:grab([keyboard]) / :ungrab(): pointer grab with owner events; a press outside every luxshell surface calls
-   surface.on_outside. keyboard = true also grabs the keyboard (menus: every key goes to this surface's on_key, wherever
-   the focus is); returns pointer_ok, keyboard_ok. Without a keyboard grab, keys reach a surface only when it has the focus. */
+   surface.on_outside and goes on to the window under the pointer (the grab is synchronous: the press waits until it is
+   replayed with XAllowEvents(ReplayPointer), as Windows lets the click that dismisses a menu pass through; docs/
+   CLIENT-PROTOCOL.md "Menus and clicks"); a press on another of our surfaces is that surface's, as usual. keyboard = true
+   also grabs the keyboard (menus: every key goes to this surface's on_key, wherever the focus is); returns pointer_ok,
+   keyboard_ok. Without a keyboard grab, keys reach a surface only when it has the focus. */
 static struct surface *kb_surface;   /* the surface holding the keyboard grab */
+static bool grab_sync;               /* we hold the (synchronous) pointer grab: every pointer event waits for XAllowEvents */
+static struct surface *grab_surface; /* the surface whose grab it is */
 static int l_surface_grab(lua_State *L) { struct surface *s = check_surface(L, 1); bool kb = lua_toboolean(L, 2);
-    int r = XGrabPointer(dpy, s->win, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask | EnterWindowMask | LeaveWindowMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
+    /* on the root: a replayed press is then checked against the passive grabs under it (luxwm's click to focus); what comes
+       to the root is this surface's (handle_event) */
+    int r = XGrabPointer(dpy, root, True, ButtonPressMask | ButtonReleaseMask | PointerMotionMask | EnterWindowMask | LeaveWindowMask, GrabModeSync, GrabModeAsync, None, None, CurrentTime);
     s->grabbed = r == GrabSuccess; int k = -1;
+    if (s->grabbed) { grab_sync = true; grab_surface = s; XAllowEvents(dpy, SyncPointer, CurrentTime); }   /* a synchronous grab starts frozen */
     if (kb) { k = XGrabKeyboard(dpy, s->win, False, GrabModeAsync, GrabModeAsync, CurrentTime); if (k == GrabSuccess) kb_surface = s; }
     if (debug) fprintf(stderr, "luxshell: grab 0x%lx: pointer %d keyboard %d\n", s->win, r, k);
     lua_pushboolean(L, s->grabbed); lua_pushboolean(L, kb && k == GrabSuccess); return 2; }
-static int l_surface_ungrab(lua_State *L) { struct surface *s = check_surface(L, 1); if (s->grabbed) XUngrabPointer(dpy, CurrentTime); s->grabbed = false;
+static int l_surface_ungrab(lua_State *L) { struct surface *s = check_surface(L, 1); if (s->grabbed) { XUngrabPointer(dpy, CurrentTime); grab_sync = false; } s->grabbed = false; if (grab_surface == s) grab_surface = NULL;
     if (kb_surface == s) { XUngrabKeyboard(dpy, CurrentTime); kb_surface = NULL; } XFlush(dpy); return 0; }
 /* surface:icon_offset(dx, dy): _NET_WM_ICON_GEOMETRY of the nodes on this surface is published shifted by dx,dy (the
    autohidden taskbar reports where its buttons are when shown, not the off-screen slot) */
@@ -827,6 +835,12 @@ static void handle_event(XEvent *e) {
         emit("toplevel", 2); return; }
     struct surface *s = surface_from_window(e->xany.window);
     if ((e->type == KeyPress || e->type == KeyRelease) && kb_surface) s = kb_surface;   /* the grabbing menu gets every key */
+    if (!s && grab_sync && grab_surface && e->xany.window == root) {   /* outside our surfaces: the grabbing one's, in its coordinates */
+        s = grab_surface;
+        if (e->type == MotionNotify) { e->xmotion.x = e->xmotion.x_root - s->x; e->xmotion.y = e->xmotion.y_root - s->y; }
+        else if (e->type == ButtonPress || e->type == ButtonRelease) { e->xbutton.x = e->xbutton.x_root - s->x; e->xbutton.y = e->xbutton.y_root - s->y; }
+        else if (e->type == EnterNotify || e->type == LeaveNotify) return;
+    }
     if (!s) return;
     switch (e->type) {
         case KeyPress: case KeyRelease: {   /* surface.on_key(self, keysym name, text, modifier state, pressed) */
@@ -845,6 +859,7 @@ static void handle_event(XEvent *e) {
         case LeaveNotify: if (!s->pressed) set_hot(s, NULL); lua_pushinteger(L, e->xcrossing.detail); call_surface(s, "on_leave", 1); break;
         case ButtonPress: {
             if (s->grabbed && (e->xbutton.x < 0 || e->xbutton.y < 0 || e->xbutton.x >= s->w || e->xbutton.y >= s->h)) {   /* outside all our surfaces */
+                if (grab_sync) { XAllowEvents(dpy, ReplayPointer, CurrentTime); grab_sync = false; s->grabbed = false; grab_surface = NULL; }   /* the press goes on to the window under it; the grab is over */
                 push_ref(L, s->lua_ref); lua_getfield(L, -1, "on_outside"); lua_remove(L, -2);
                 if (lua_isfunction(L, -1)) { push_ref(L, s->lua_ref); if (lua_pcall(L, 1, 0, 0)) { fprintf(stderr, "luxshell: on_outside: %s\n", lua_tostring(L, -1)); lua_pop(L, 1); } } else lua_pop(L, 1);
                 break; }
@@ -960,7 +975,9 @@ int main(int argc, char **argv) {
     clients_refresh();
     int xfd = ConnectionNumber(dpy), dfd = notify_start();
     while (running && !terminated) {
-        while (XPending(dpy)) { XEvent e; XNextEvent(dpy, &e); handle_event(&e); }
+        while (XPending(dpy)) { XEvent e; XNextEvent(dpy, &e); handle_event(&e);
+            /* the grab's next pointer event (a replayed press has ended it) */
+            if (grab_sync && (e.type == ButtonPress || e.type == ButtonRelease || e.type == MotionNotify)) XAllowEvents(dpy, SyncPointer, CurrentTime); }
         notify_dispatch();
         run_timers();
         for (struct surface *s = surfaces; s; s = s->next) if (s->dirty) surface_paint(s);

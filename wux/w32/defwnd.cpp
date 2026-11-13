@@ -69,8 +69,9 @@ LRESULT nc_calc_size(HWND h, WPARAM wparam, RECT* r)
         adjust_frame_rect(&tmp, style, FALSE, ex & ~WS_EX_CLIENTEDGE);
         r->left -= tmp.left; r->top -= tmp.top; r->right -= tmp.right; r->bottom -= tmp.bottom;
     }
+    // the menu bar and the line under it (nc_paint draws the bar's height and that line: SM_CYMENU + 1, as XP's 20 rows)
     if (((style & (WS_CHILD | WS_POPUP)) != WS_CHILD) && GetMenu(h))
-        r->top += MENU_GetMenuBarHeight(h, r->right - r->left, 0, 0);
+        r->top += MENU_GetMenuBarHeight(h, r->right - r->left, 0, 0) + 1;
     if (ex & WS_EX_CLIENTEDGE)
         if (r->right - r->left > 2 * GetSystemMetrics(SM_CXEDGE) && r->bottom - r->top > 2 * GetSystemMetrics(SM_CYEDGE))
             InflateRect(r, -GetSystemMetrics(SM_CXEDGE), -GetSystemMetrics(SM_CYEDGE));
@@ -131,6 +132,24 @@ static void publish_icons(HWND h)
     sys::set_icon(sys::window_for_user((void*)h), data);
 }
 
+// XP's SizeBoxHwnd: the scroll bars' corner of a window is a size grip when its top level is sizable and not maximised and
+// the corner sits in the top level's client bottom right (Notepad's Edit without the status bar); it draws the grip and hit
+// tests as HTBOTTOMRIGHT, and a press there sizes the top level
+static bool size_box(HWND h)
+{
+    HWND top = GetAncestor(h, GA_ROOT);
+    LONG st = GetWindowLongW(top, GWL_STYLE);
+    if (!(st & WS_THICKFRAME) || (st & WS_MAXIMIZE) || (GetWindowLongW(h, GWL_EXSTYLE) & WS_EX_LEFTSCROLLBAR)) return false;
+    RECT win, client;
+    GetWindowRect(h, &win);
+    if (GetWindowLongW(h, GWL_EXSTYLE) & WS_EX_CLIENTEDGE)
+        InflateRect(&win, -GetSystemMetrics(SM_CXEDGE), -GetSystemMetrics(SM_CYEDGE));
+    GetClientRect(top, &client);
+    MapWindowPoints(top, nullptr, (POINT*)&client, 2);
+    const int slack = 2 * GetSystemMetrics(SM_CXEDGE);
+    return win.right >= client.right - slack && win.bottom >= client.bottom - slack;
+}
+
 LRESULT nc_hit_test(HWND h, POINT pt)
 {
     win::Window* w = window_of(h);
@@ -187,7 +206,7 @@ LRESULT nc_hit_test(HWND h, POINT pt)
             if ((style & WS_VSCROLL) &&
                 ((((ex & WS_EX_LEFTSCROLLBAR) != 0) && (pt.x <= rcClient.left + GetSystemMetrics(SM_CXVSCROLL))) ||
                  (((ex & WS_EX_LEFTSCROLLBAR) == 0) && (pt.x >= rcClient.right - GetSystemMetrics(SM_CXVSCROLL)))))
-                return HTSIZE;
+                return size_box(h) ? HTBOTTOMRIGHT : HTSIZE;
             return HTHSCROLL;
         }
     }
@@ -257,10 +276,11 @@ void nc_paint(HWND h, HRGN clip)
     SCROLL_DrawNCScrollBar(h, hdc, style & WS_HSCROLL, style & WS_VSCROLL);
     if ((style & WS_VSCROLL) && (style & WS_HSCROLL)) {
         RECT r = rect;
-        if (ex & WS_EX_LEFTSCROLLBAR) r.right = r.left + GetSystemMetrics(SM_CXVSCROLL) + 1;
-        else r.left = r.right - GetSystemMetrics(SM_CXVSCROLL) + 1;
-        r.top = r.bottom - GetSystemMetrics(SM_CYHSCROLL) + 1;
-        FillRect(hdc, &r, GetSysColorBrush(COLOR_SCROLLBAR));
+        if (ex & WS_EX_LEFTSCROLLBAR) r.right = r.left + GetSystemMetrics(SM_CXVSCROLL);
+        else r.left = r.right - GetSystemMetrics(SM_CXVSCROLL);
+        r.top = r.bottom - GetSystemMetrics(SM_CYHSCROLL);   // the corner is CXVSCROLL x CYHSCROLL (Wine left a row and a column of it unpainted)
+        if (size_box(h)) WUX_DrawSizeGrip(h, hdc, &r);
+        else FillRect(hdc, &r, GetSysColorBrush(COLOR_SCROLLBAR));
     }
     ReleaseDC(h, hdc);
 }
@@ -367,7 +387,20 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         nc_paint(h, (HRGN)wp);
         return 0;
     case WM_NCACTIVATE:
+        if (HAS_MENU(h, w->style)) DrawMenuBar(h);   // a themed bar has an active and an inactive look
         return TRUE;
+    case WM_NCMOUSEMOVE:
+        // XP hot-tracks the menu bar: the item under the pointer is drawn hot until it leaves (WM_NCMOUSELEAVE)
+        if (HAS_MENU(h, w->style)) {
+            POINT pt = { (SHORT)LOWORD(lp), (SHORT)HIWORD(lp) };
+            MENU_SetBarHot(h, pt, wp == HTMENU);
+            TRACKMOUSEEVENT t = { sizeof t, TME_LEAVE | TME_NONCLIENT, h, 0 };
+            TrackMouseEvent(&t);
+        }
+        return 0;
+    case WM_NCMOUSELEAVE:
+        if (HAS_MENU(h, w->style)) { POINT pt = { -1, -1 }; MENU_SetBarHot(h, pt, FALSE); }
+        return 0;
     case WM_NCLBUTTONDOWN:
         switch (wp) {
         case HTVSCROLL: SendMessageW(h, WM_SYSCOMMAND, SC_VSCROLL + HTVSCROLL, lp); break;
@@ -376,8 +409,11 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         case HTCAPTION: if (w->top && w->wm_decorated) SendMessageW(h, WM_SYSCOMMAND, SC_MOVE + HTCAPTION, lp); break;
         case HTLEFT: case HTRIGHT: case HTTOP: case HTTOPLEFT: case HTTOPRIGHT:
         case HTBOTTOM: case HTBOTTOMLEFT: case HTBOTTOMRIGHT:
-            // as Wine's NC_HandleNCLButtonDown: SC_SIZE + WMSZ_*
+            // as Wine's NC_HandleNCLButtonDown: SC_SIZE + WMSZ_*; a child's size grip (the scroll bars' corner) sizes its
+            // top level
             if (w->top && w->wm_decorated) SendMessageW(h, WM_SYSCOMMAND, SC_SIZE + wp - (HTLEFT - WMSZ_LEFT), lp);
+            else if (wp == HTBOTTOMRIGHT && (w->style & WS_CHILD) && size_box(h))
+                SendMessageW(GetAncestor(h, GA_ROOT), WM_SYSCOMMAND, SC_SIZE + WMSZ_BOTTOMRIGHT, lp);
             break;
         }
         return 0;
@@ -397,8 +433,11 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     case WM_SYSKEYDOWN:
         // XP: the first Alt press shows the window's keyboard cues (WM_CHANGEUISTATE to the top level, which tells
         // every child); they stay for that window
-        if ((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && !(lp & 0x40000000))
-            SendMessageW(GetAncestor(h, GA_ROOT), WM_CHANGEUISTATE, MAKEWPARAM(UIS_CLEAR, UISF_HIDEACCEL), 0);
+        if ((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && !(lp & 0x40000000)) {
+            HWND top = GetAncestor(h, GA_ROOT);
+            SendMessageW(top, WM_CHANGEUISTATE, MAKEWPARAM(UIS_CLEAR, UISF_HIDEACCEL), 0);
+            if (GetMenu(top)) DrawMenuBar(top);   // the menu bar's mnemonics show while Alt is held
+        }
         if (HIWORD(lp) & KEYDATA_ALT) {
             if ((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && !g_menu_sys_key) g_menu_sys_key = 1;
             else g_menu_sys_key = 0;
@@ -418,6 +457,8 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     case WM_SYSKEYUP:
         if (((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && g_menu_sys_key) || (wp == VK_F10 && g_f10_key))
             SendMessageW(GetAncestor(h, GA_ROOT), WM_SYSCOMMAND, SC_KEYMENU, 0);
+        else if ((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && GetMenu(GetAncestor(h, GA_ROOT)))
+            DrawMenuBar(GetAncestor(h, GA_ROOT));   // Alt used with another key: the bar's mnemonics hidden again
         g_menu_sys_key = g_f10_key = 0;
         return 0;
     case WM_SYSCHAR:
@@ -507,6 +548,7 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_WINDOWPOSCHANGED: {
         const WINDOWPOS* p = (const WINDOWPOS*)lp;
+        if (!w->parent) note_normal_rect(h);   // GetWindowPlacement's normal rectangle
         if (!(p->flags & SWP_NOCLIENTSIZE) && !(p->flags & SWP_NOSIZE))
             SendMessageW(h, WM_SIZE, SIZE_RESTORED, MAKELONG(w->client.width(), w->client.height()));
         if (!(p->flags & SWP_NOCLIENTMOVE) && !(p->flags & SWP_NOMOVE))
@@ -582,10 +624,23 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         if (!w->parent) publish_icons(h);
         return (LRESULT)old;
     }
+    case win::WM_FLXP_DRAGOVER:     // drops: a window that accepts files (DragAcceptFiles) copies them, as Windows' shell
+    case win::WM_FLXP_DROP: {       // drop target does; it gets WM_DROPFILES (shellapi.cpp)
+        const win::DropInfo* f = (const win::DropInfo*)lp;
+        if ((w->ex_style & WS_EX_ACCEPTFILES) && f && f->count) {
+            enum { COPY = 1, MOVE = 2, LINK = 4 };   // DROPEFFECT_*
+            DWORD effect = (f->allowed & COPY) ? COPY : (f->allowed & LINK) ? LINK : (f->allowed & MOVE) ? MOVE : 0;
+            if (msg == win::WM_FLXP_DROP && effect) {
+                HDROP d = make_hdrop(h, f->x, f->y, f->paths, f->count);
+                if (d && !PostMessageW(h, WM_DROPFILES, (WPARAM)d, 0)) GlobalFree((HGLOBAL)d);
+            }
+            return effect;
+        }
+        if (w->parent) return SendMessageW(hwnd_of(w->parent), msg, wp, lp);   // the frame answers for its controls
+        return 0;
+    }
     case WM_MOUSEWHEEL:
-    case win::WM_FLXP_DRAGOVER:     // drops: the frame answers for its controls
     case win::WM_FLXP_DRAGLEAVE:
-    case win::WM_FLXP_DROP:
         if (w->parent) return SendMessageW(hwnd_of(w->parent), msg, wp, lp);
         return 0;
     default:

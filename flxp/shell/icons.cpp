@@ -221,11 +221,11 @@ bool select_icon_theme(const std::string& name)
     if (want != "wine") {
         std::string file = icon_theme_file(want);
         if (file.empty())
-            fprintf(stderr, "flxp: no icon theme \"%s\" (icons/%s.theme in lhde's data directories); using the Wine icons\n",
+            fprintf(stderr, "%s: no icon theme \"%s\" (icons/%s.theme in lhde's data directories); using the Wine icons\n", shell::program_name(),
                     want.c_str(), want.c_str());
         else
-            fprintf(stderr, "flxp: icon theme \"%s\" has no icon files here (%s: its resources/<build> not imported? "
-                    "lhde-import, docs/USAGE.md \"Getting the Windows resources\"); using the Wine icons\n", want.c_str(), file.c_str());
+            fprintf(stderr, "%s: icon theme \"%s\" has no icon files here (%s: its resources/<build> not imported? "
+                    "lhde-import, docs/USAGE.md \"Getting the Windows resources\"); using the Wine icons\n", shell::program_name(), want.c_str(), file.c_str());
     }
     if (load_icon_theme("wine") && theme_usable(g_theme)) { drop_missing_toolbar(g_theme.toolbar); return want == "wine"; }
     g_theme = IconTheme();
@@ -250,8 +250,16 @@ bool refresh_icon_theme()
 
 int icon_theme_generation() { icon_theme(); return g_generation; }
 
+std::string swatch_key(unsigned rgb)
+{
+    char buf[16];
+    snprintf(buf, sizeof buf, "swatch:%06x", rgb & 0xffffff);
+    return buf;
+}
+
 std::string icon_file(const std::string& key)
 {
+    if (key.compare(0, 7, "swatch:") == 0) return key;
     const IconTheme& t = icon_theme();
     for (auto& kv : t.icons) if (kv.first == key) return kv.second;
     for (auto& kv : t.icons) if (kv.first == "document") return kv.second;

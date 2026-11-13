@@ -219,7 +219,7 @@ void setup_fonts()
         bool exact;
         std::string f = system_match(wanted[i].family, exact);
         if (!exact && i == 0)
-            fprintf(stderr, "flxp: no Tahoma font; using %s (lhde-import fonts/<build>, or put tahoma.ttf in ~/.fonts)\n",
+            fprintf(stderr, "%s: no Tahoma font; using %s (lhde-import fonts/<build>, or put tahoma.ttf in ~/.fonts)\n", shell::program_name(),
                     f.empty() ? "fontconfig's default" : f.c_str());
     }
 }
@@ -310,7 +310,7 @@ std::string setup_theme()
             if (!sel.empty()) { got = resolve_theme(sel, t, &err); if (!got) err = sel + ": " + err; }
         }
         if (getenv("FLXP_DEBUG"))
-            fprintf(stderr, "flxp: session theme %s (%s): style.kind %s, path.style %s\n", got ? t.name.c_str() : "-",
+            fprintf(stderr, "%s: session theme %s (%s): style.kind %s, path.style %s\n", shell::program_name(), got ? t.name.c_str() : "-",
                     err.c_str(), t.value("style.kind").c_str(), t.value("path.style").c_str());
         if (got) {
             set_session_theme(t);
@@ -321,7 +321,7 @@ std::string setup_theme()
                 return "";
             }
             if (t.msstyles.empty())
-                fprintf(stderr, "flxp: session theme %s: no visual style (%s: %s); using luna\n", t.name.c_str(),
+                fprintf(stderr, "%s: session theme %s: no visual style (%s: %s); using luna\n", shell::program_name(), t.name.c_str(),
                         t.value("VisualStyle.style").c_str(), t.why.count("path.style") ? t.why.at("path.style").c_str() : "not found");
             else {
                 export_env("FLXP_THEME", t.msstyles);
@@ -331,7 +331,7 @@ std::string setup_theme()
                 return t.msstyles;
             }
         } else if (err != "no _LH_THEME" && err != "no display")
-            fprintf(stderr, "flxp: session theme: %s; using luna\n", err.c_str());
+            fprintf(stderr, "%s: session theme: %s; using luna\n", shell::program_name(), err.c_str());
     }
     if (getenv("FLXP_THEME_FOLLOWED")) {
         // inherited from a parent that followed a session theme that is gone now
@@ -345,7 +345,7 @@ std::string setup_theme()
     if (strcasecmp(want.c_str(), "classic") && strcasecmp(want.c_str(), "none") && strcasecmp(want.c_str(), "off")) {
         path = find_msstyles(want);
         if (path.empty() && asked)
-            fprintf(stderr, "flxp: visual style \"%s\" not found (lhde's styles/); using classic\n", want.c_str());
+            fprintf(stderr, "%s: visual style \"%s\" not found (lhde's styles/); using classic\n", shell::program_name(), want.c_str());
     }
     export_env("FLXP_THEME", path);
     if (path.empty()) { unsetenv("FLXP_THEME_COLOR"); unsetenv("FLXP_THEME_SIZE"); }   // else the caller's, if any (the style's default)

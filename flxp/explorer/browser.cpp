@@ -5,12 +5,15 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <unistd.h>
 #include <algorithm>
 #include <math.h>
 #include "shell/namespace.h"
 #include "shell/config.h"
 #include "shell/util.h"
+#include "shell/columns.h"
 #include "shell/details.h"
+#include "shell/icons.h"
 #include "shell/lhtheme.h"
 #include "shell/dirwatch.h"
 #include "shell/thumbs.h"
@@ -163,9 +166,7 @@ static const struct { const char* name; int view; } k_names[] = {
     { "smallicons+thumbnails", LVS_SMALLICON | VIEW_THUMBS_FLAG }, { "list+thumbnails", LVS_LIST | VIEW_THUMBS_FLAG },
     { "details+thumbnails", LVS_REPORT | VIEW_THUMBS_FLAG },
 };
-static std::map<std::string, int> g_views;
 static std::map<std::string, int> g_shown;   // this window: the view each folder was last shown in
-static struct stat g_stamp;                  // the file as last read (other windows write it too)
 
 static bool enabled() { return shell::setting_flag("remember_views", true); }
 
@@ -214,30 +215,7 @@ int default_view(bool zoomable)
     return v >= 0 ? v : builtin_default(zoomable);
 }
 void set_default(bool zoomable, int view) { shell::write_setting(default_key(zoomable), view < 0 ? "" : name_of(view)); }
-static std::string path() { return shell::state_file("flxp-views"); }
-
-// (re)read the file when it changed since the last read
-static void load()
-{
-    struct stat st = {};
-    stat(path().c_str(), &st);
-    if (st.st_mtim.tv_sec == g_stamp.st_mtim.tv_sec && st.st_mtim.tv_nsec == g_stamp.st_mtim.tv_nsec &&
-        st.st_size == g_stamp.st_size && st.st_ino == g_stamp.st_ino) return;
-    g_stamp = st;
-    g_views.clear();
-    std::string data;
-    if (!shell::read_file(path(), data)) return;
-    size_t at = 0;
-    while (at < data.size()) {
-        size_t nl = data.find('\n', at);
-        std::string line = data.substr(at, nl == std::string::npos ? std::string::npos : nl - at);
-        at = nl == std::string::npos ? data.size() : nl + 1;
-        size_t tab = line.rfind('\t');
-        if (tab == std::string::npos || !tab) continue;
-        int v = parse(line.substr(tab + 1));
-        if (v >= 0) g_views[line.substr(0, tab)] = v;
-    }
-}
+// the records are shell::folderviews' (flxp-views, shared with the folder's columns)
 
 // the view to show a folder in: the stored one, else the one it was last shown
 // in by this window, else the default view (XP: a folder without a bag gets the
@@ -246,9 +224,8 @@ static void load()
 int lookup(const std::string& folder, bool zoomable)
 {
     if (!enabled() || folder.empty()) return -1;
-    load();
-    auto it = g_views.find(folder);
-    if (it != g_views.end()) return it->second;
+    int v = parse(shell::folderviews::get(folder).view);
+    if (v >= 0) return v;
     auto s = g_shown.find(folder);
     return s == g_shown.end() ? default_view(zoomable) : s->second;
 }
@@ -256,43 +233,27 @@ int lookup(const std::string& folder, bool zoomable)
 // leaving a folder: remember its view for this window (not stored)
 void leaving(const std::string& folder, int view) { if (!folder.empty()) g_shown[folder] = view; }
 
-static void save()
-{
-    std::string out;
-    for (const auto& v : g_views) {
-        std::string n = name_of(v.second);
-        if (!n.empty()) out += v.first + '\t' + n + '\n';
-    }
-    shell::write_file_atomic(path(), out);
-    stat(path().c_str(), &g_stamp);
-}
-
 void store(const std::string& folder, int view)
 {
     if (!enabled() || folder.empty()) return;
-    load();
-    if (g_views.count(folder) && g_views[folder] == view) return;
-    g_views[folder] = view;
+    std::string n = name_of(view);
+    if (n.empty()) return;
     g_shown[folder] = view;
-    save();
+    shell::folderviews::set_view(folder, n);
 }
 
 // Ctrl+0: the folder goes back to the default view, as a folder never shown
 void forget(const std::string& folder)
 {
     g_shown.erase(folder);
-    load();
-    if (!g_views.erase(folder)) return;
-    save();
+    shell::folderviews::set_view(folder, "");
 }
 
 // Apply to All Folders / Reset All Folders (XP deletes the Bags key): every folder's view forgotten
 void forget_all()
 {
     g_shown.clear();
-    load();
-    g_views.clear();
-    save();
+    shell::folderviews::forget_views();
 }
 
 } // namespace views
@@ -350,7 +311,10 @@ static void tip_track(Browser& b, int x, int y)
     g_tip_list = b.list;
 }
 
+enum { WM_COLUMNS_DRAGGED = WM_APP + 0x3c1 };   // posted to the list after a header drag
+
 // Ctrl+wheel over the list: the zoom (the Longhorn hosts), as Vista's; the infotip; the header's menu
+// and the header's drag order
 static LRESULT CALLBACK list_subclass(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR ref)
 {
     Browser& b = *(Browser*)ref;
@@ -365,6 +329,12 @@ static LRESULT CALLBACK list_subclass(HWND h, UINT msg, WPARAM wp, LPARAM lp, UI
         }
         if (msg == WM_MOUSEMOVE) { TRACKMOUSEEVENT t = { sizeof t, TME_LEAVE, h, 0 }; TrackMouseEvent(&t); }
     }
+    // a column dragged to another place in the header: the header has its new order only
+    // after HDN_ENDDRAG returns, so it is read on a message of our own after that
+    if (msg == WM_NOTIFY && b.choose_columns && ((NMHDR*)lp)->code == HDN_ENDDRAG &&
+        ((NMHDR*)lp)->hwndFrom == (HWND)SendMessageW(h, LVM_GETHEADER, 0, 0))
+        PostMessageW(h, WM_COLUMNS_DRAGGED, 0, 0);
+    if (msg == WM_COLUMNS_DRAGGED) { save_columns(b); return 0; }   // (take_layout reads the order)
     if (msg == WM_CONTEXTMENU && b.choose_columns && (HWND)wp == (HWND)SendMessageW(h, LVM_GETHEADER, 0, 0)) {
         column_menu(b, GetParent(h), (SHORT)LOWORD(lp), (SHORT)HIWORD(lp));
         return 0;
@@ -392,8 +362,11 @@ HWND create_list(Browser& b, HWND parent, int id, DWORD style, DWORD exstyle, co
     SetWindowTheme(b.list, L"Explorer", nullptr);
     SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)b.small);
     SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)b.large);
-    for (int i = 0; i < 4; i++) if (!b.column_widths.count(i)) b.column_widths[i] = widths[i];
-    set_columns(b, b.columns);
+    for (int i = 0; i < 4; i++) {   // the host's widths of the four derived columns
+        shell::columns::set_width(b.column_layout, i, widths[i]);
+        shell::columns::set_width(b.column_default, i, widths[i]);
+    }
+    set_layout(b, b.column_layout, false);
     return b.list;
 }
 
@@ -410,6 +383,7 @@ const std::vector<Column>& all_columns()
         { (int)shell::SortBy::Description, "Description", 180, LVCFMT_LEFT },
         { (int)shell::SortBy::Tags, "Tags", 120, LVCFMT_LEFT },
         { (int)shell::SortBy::Comment, "Comment", 150, LVCFMT_LEFT },
+        { (int)shell::SortBy::Color, "Color", 100, LVCFMT_LEFT },   // a swatch and the name: a provisional look (todo_ideas/xattribs.txt)
     };
     return c;
 }
@@ -430,7 +404,7 @@ int column_id(const Browser& b, int index) { return index >= 0 && (size_t)index 
 
 bool wants_stored(const Browser& b)
 {
-    if (shell::details::column_property(b.sort)) return true;
+    if (shell::details::column_property(b.sort) || b.query.stored()) return true;
     for (int id : b.columns) if (shell::details::column_property((shell::SortBy)id)) return true;
     return false;
 }
@@ -446,30 +420,43 @@ static void read_stored(const Browser& b, std::vector<Item>& items)
     }
 }
 
-// the widths the user gave the columns shown
-static void take_widths(Browser& b)
+// The user's widths and header order into b.column_layout: the list's column i shows
+// b.columns[i]; LVM_GETCOLUMNORDERARRAY gives the columns in the header's order
+void take_layout(Browser& b)
 {
     if (!b.list) return;
     HWND hdr = (HWND)SendMessageW(b.list, LVM_GETHEADER, 0, 0);
     int n = hdr ? (int)SendMessageW(hdr, HDM_GETITEMCOUNT, 0, 0) : 0;
-    for (int i = 0; i < n && (size_t)i < b.columns.size(); i++) {
+    if (n <= 0 || (size_t)n != b.columns.size()) return;
+    for (int i = 0; i < n; i++) {
         int w = (int)SendMessageW(b.list, LVM_GETCOLUMNWIDTH, (WPARAM)i, 0);
-        if (w > 0) b.column_widths[b.columns[(size_t)i]] = w;
+        if (w > 0) shell::columns::set_width(b.column_layout, b.columns[(size_t)i], w);
     }
+    std::vector<int> order((size_t)n);
+    if (!SendMessageW(b.list, LVM_GETCOLUMNORDERARRAY, (WPARAM)n, (LPARAM)order.data())) return;
+    std::vector<int> ids;
+    for (int k : order) if (k >= 0 && k < n) ids.push_back(b.columns[(size_t)k]);
+    if (ids.size() == (size_t)n) shell::columns::reorder_shown(b.column_layout, ids);
 }
 
-void set_columns(Browser& b, const std::vector<int>& want, bool take)
+// The list's columns from b.column_layout: the list's column 0 is Name (the item's text
+// and icon), the other shown ones follow in the layout's order; the header shows them in
+// that order (LVM_SETCOLUMNORDERARRAY: Name where the user dragged it). Nothing is
+// re-sorted or moved here: hiding a column takes it out, showing it puts it back at its
+// place. True when the list had columns before (a refill is due).
+static bool build_columns(Browser& b)
 {
+    std::vector<int> order;
+    for (int id : shell::columns::shown(b.column_layout)) if (column(id)) order.push_back(id);
+    if (std::find(order.begin(), order.end(), 0) == order.end()) order.insert(order.begin(), 0);
     std::vector<int> ids = { 0 };
-    for (int id : want) if (id != 0 && column(id) && std::find(ids.begin(), ids.end(), id) == ids.end()) ids.push_back(id);
-    if (!b.list) { b.columns = ids; return; }
-    HWND hdr = (HWND)SendMessageW(b.list, LVM_GETHEADER, 0, 0);
-    int n = hdr ? (int)SendMessageW(hdr, HDM_GETITEMCOUNT, 0, 0) : 0;
-    if (n > 0 && take) take_widths(b);
-    bool had_stored = wants_stored(b);
+    for (int id : order) if (id != 0) ids.push_back(id);
     // the sorted column goes with its column (back to Name)
     if (std::find(ids.begin(), ids.end(), (int)b.sort) == ids.end()) { b.sort = shell::SortBy::Name; b.ascending = true; }
     b.columns = ids;
+    if (!b.list) return false;
+    HWND hdr = (HWND)SendMessageW(b.list, LVM_GETHEADER, 0, 0);
+    int n = hdr ? (int)SendMessageW(hdr, HDM_GETITEMCOUNT, 0, 0) : 0;
     SendMessageW(b.list, WM_SETREDRAW, FALSE, 0);
     for (int i = n - 1; i >= 0; i--) SendMessageW(b.list, LVM_DELETECOLUMN, (WPARAM)i, 0);
     for (size_t i = 0; i < ids.size(); i++) {
@@ -478,62 +465,100 @@ void set_columns(Browser& b, const std::vector<int>& want, bool take)
         LVCOLUMNW lc = {};
         lc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT | LVCF_SUBITEM;
         lc.pszText = (LPWSTR)t.c_str(); lc.fmt = c->fmt; lc.iSubItem = (int)i;
-        lc.cx = b.column_widths.count(c->id) ? b.column_widths[c->id] : c->width;
+        int w = shell::columns::width(b.column_layout, c->id);
+        lc.cx = w > 0 ? w : c->width;
         SendMessageW(b.list, LVM_INSERTCOLUMNW, (WPARAM)i, (LPARAM)&lc);
     }
+    std::vector<int> arr;
+    for (int id : order) arr.push_back((int)(std::find(ids.begin(), ids.end(), id) - ids.begin()));
+    SendMessageW(b.list, LVM_SETCOLUMNORDERARRAY, (WPARAM)arr.size(), (LPARAM)arr.data());
+    // the Color column's swatch is its subitem's image, asked for when drawn (subitem_image; the others have none)
+    bool swatches = std::find(ids.begin(), ids.end(), (int)shell::SortBy::Color) != ids.end();
+    SendMessageW(b.list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_SUBITEMIMAGES, swatches ? LVS_EX_SUBITEMIMAGES : 0);
     SendMessageW(b.list, WM_SETREDRAW, TRUE, 0);
-    if (n > 0) {
-        if (wants_stored(b) && !had_stored) { read_stored(b, b.all_items); read_stored(b, b.items); }
-        fill_list(b);
-        if (b.choose_columns) save_columns(b);
-    }
+    return n > 0;
+}
+
+// whether this browser keeps a layout per folder (the explorer with remember_views)
+static bool per_folder(const Browser& b) { return b.choose_columns && b.remember_views && views::enabled() && b.folder; }
+
+static void apply_layout(Browser& b, const shell::columns::Layout& l, bool refill)
+{
+    bool had_stored = wants_stored(b);
+    b.column_layout = l;
+    bool had_columns = build_columns(b);
+    if (!had_columns || !refill) return;
+    if (wants_stored(b) && !had_stored) { read_stored(b, b.all_items); read_stored(b, b.items); }
+    fill_list(b);
+}
+
+void set_layout(Browser& b, const shell::columns::Layout& l, bool user)
+{
+    apply_layout(b, l, true);
+    if (user) save_columns(b);
 }
 
 static std::string columns_path() { return shell::state_file("flxp-columns"); }
 
-// "name:180 size:96 type:120 modified:120 tags:120": the columns in order, each with its width
+// the default layout ("name:180 size:96 type:120 modified:120 -description:180 tags:120 -comment:150"):
+// for every folder without its own, and the one the window starts with
 void load_columns(Browser& b)
 {
     std::string text;
     shell::read_file(columns_path(), text);
-    std::vector<int> ids;
-    size_t i = 0;
-    while (i < text.size()) {
-        size_t e = text.find_first_of(" \t\n", i);
-        if (e == std::string::npos) e = text.size();
-        std::string w = text.substr(i, e - i);
-        i = e + 1;
-        size_t colon = w.find(':');
-        int id = shell::details::column_of(w.substr(0, colon));
-        if (id < 0) continue;
-        ids.push_back(id);
-        int px = colon == std::string::npos ? 0 : atoi(w.c_str() + colon + 1);
-        if (px > 0 && px < 4000) b.column_widths[id] = px;
-    }
-    set_columns(b, ids.empty() ? b.columns : ids);
+    b.column_default = shell::columns::parse(text, b.column_default);
+    set_layout(b, b.column_default, false);
 }
 
 void save_columns(Browser& b)
 {
-    take_widths(b);
-    static const char* const NAMES[] = { "name", "size", "type", "modified", "description", "tags", "comment" };
-    std::string text;
-    for (int id : b.columns) {
-        if (id < 0 || id > 6) continue;
-        text += (text.empty() ? "" : " ") + std::string(NAMES[id]);
-        if (b.column_widths.count(id)) text += ":" + std::to_string(b.column_widths[id]);
+    if (!b.choose_columns) return;
+    take_layout(b);
+    if (per_folder(b)) {
+        bool same = b.column_layout == b.column_default;
+        shell::folderviews::set_columns(b.folder->path(), same ? "" : shell::columns::format(b.column_layout));
+        return;
     }
-    shell::write_file_atomic(columns_path(), text + "\n");
+    b.column_default = b.column_layout;
+    shell::write_file_atomic(columns_path(), shell::columns::format(b.column_layout) + "\n");
+}
+
+// the folder's own layout, else the default (navigate: before the list is filled)
+static void folder_columns(Browser& b)
+{
+    if (!per_folder(b)) return;
+    std::string own = shell::folderviews::get(b.folder->path()).columns;
+    shell::columns::Layout l = own.empty() ? b.column_default : shell::columns::parse(own, b.column_default);
+    if (!(l == b.column_layout)) apply_layout(b, l, false);
+}
+
+void columns_apply_all(Browser& b)
+{
+    take_layout(b);
+    b.column_default = b.column_layout;
+    shell::write_file_atomic(columns_path(), shell::columns::format(b.column_layout) + "\n");
+    shell::folderviews::forget_columns();
+}
+
+void columns_reset_all(Browser& b)
+{
+    b.column_default = shell::columns::builtin();
+    unlink(columns_path().c_str());
+    shell::folderviews::forget_columns();
+    if (b.choose_columns) apply_layout(b, b.column_default, true);
 }
 
 enum { COLMENU_FIRST = 1, COLMENU_MORE = 100 };
 
+// XP's header menu: a check per column (Name greyed), More...; in the layout's order
 void column_menu(Browser& b, HWND owner, int x, int y)
 {
     HMENU m = CreatePopupMenu();
-    for (const Column& c : all_columns()) {
-        UINT f = MF_STRING | (column_index(b, c.id) >= 0 ? MF_CHECKED : 0) | (c.id == 0 ? MF_GRAYED : 0);
-        AppendMenuW(m, f, (UINT_PTR)(COLMENU_FIRST + c.id), WS(c.label));
+    for (const shell::columns::Column& lc : b.column_layout) {
+        const Column* c = column(lc.id);
+        if (!c) continue;
+        UINT f = MF_STRING | (column_index(b, c->id) >= 0 ? MF_CHECKED : 0) | (c->id == 0 ? MF_GRAYED : 0);
+        AppendMenuW(m, f, (UINT_PTR)(COLMENU_FIRST + c->id), WS(c->label));
     }
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m, MF_STRING, COLMENU_MORE, L"&More...");
@@ -542,30 +567,25 @@ void column_menu(Browser& b, HWND owner, int x, int y)
     if (cmd == COLMENU_MORE) { choose_details(b, owner); return; }
     int id = cmd - COLMENU_FIRST;
     if (cmd <= 0 || id <= 0 || !column(id)) return;
-    std::vector<int> ids = b.columns;
-    auto at = std::find(ids.begin(), ids.end(), id);
-    if (at != ids.end()) ids.erase(at); else ids.push_back(id);
-    set_columns(b, ids);
+    take_layout(b);
+    shell::columns::Layout l = b.column_layout;
+    shell::columns::set_shown(l, id, column_index(b, id) < 0);
+    set_layout(b, l);
 }
 
+// XP's dialog lists the columns shown first, then the others; ours lists the layout as it
+// is, hidden ones at their places, so that where a hidden column comes back shows and Move
+// Up / Move Down can change it (a choice: XP's long list of columns had no such places)
 void choose_details(Browser& b, HWND owner)
 {
-    take_widths(b);
-    // XP's dialog lists the columns shown first, in their order, then the others
+    take_layout(b);
     std::vector<dialogs::DetailColumn> cols;
-    for (int id : b.columns) {
-        const Column* c = column(id);
-        cols.push_back(dialogs::DetailColumn{ id, c->label, true, b.column_widths.count(id) ? b.column_widths[id] : c->width });
-    }
-    for (const Column& c : all_columns())
-        if (column_index(b, c.id) < 0) cols.push_back(dialogs::DetailColumn{ c.id, c.label, false, b.column_widths.count(c.id) ? b.column_widths[c.id] : c.width });
+    for (const shell::columns::Column& lc : b.column_layout)
+        if (const Column* c = column(lc.id)) cols.push_back(dialogs::DetailColumn{ lc.id, c->label, lc.shown || lc.id == 0, lc.width > 0 ? lc.width : c->width });
     if (!dialogs::choose_details(owner, cols)) return;
-    std::vector<int> ids;
-    for (const dialogs::DetailColumn& c : cols) {
-        if (c.width > 0) b.column_widths[c.id] = c.width;
-        if (c.shown) ids.push_back(c.id);
-    }
-    set_columns(b, ids, false);   // the dialog's widths, not the list's
+    shell::columns::Layout l;
+    for (const dialogs::DetailColumn& c : cols) l.push_back(shell::columns::Column{ c.id, c.shown || c.id == 0, c.width });
+    set_layout(b, shell::columns::parse(shell::columns::format(l), b.column_layout));   // (a column the dialog left out kept)
 }
 
 void sort_by_column(Browser& b, int index)
@@ -627,6 +647,7 @@ static void make_groups(Browser& b, std::vector<int>& group_of)
 }
 
 static void put_tile_lines(Browser& b, size_t i);
+static void trace_count(const Browser& b);
 
 // list item i from b.items[i] (lParam i): inserted, or set again (a change on disk)
 static void put_item(Browser& b, size_t i, int group, bool insert)
@@ -650,13 +671,26 @@ static void put_item(Browser& b, size_t i, int group, bool insert)
         else if (id == (int)shell::SortBy::Type) text = it.type;
         else if (id == (int)shell::SortBy::Date) text = it.mtime ? shell::format_date(it.mtime) : "";
         else if (const shell::details::Property* p = shell::details::column_property((shell::SortBy)id))
-            text = p->type == shell::details::ValueType::List ? shell::details::tag_list(it.stored(p->xattr)) : it.stored(p->xattr);
+            text = shell::details::shown(*p, it.stored(p->xattr));
         std::u16string t = W(text);
         LVITEMW sub = {};
         sub.mask = LVIF_TEXT; sub.iItem = (int)i; sub.iSubItem = (int)k; sub.pszText = (LPWSTR)t.c_str();
         SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
     }
     if (b.tiles) put_tile_lines(b, i);
+}
+
+void subitem_image(Browser& b, NMLVDISPINFOW* di)
+{
+    if (!(di->item.mask & LVIF_IMAGE) || di->item.iSubItem <= 0) return;
+    size_t i = (size_t)di->item.lParam;
+    if (column_id(b, di->item.iSubItem) != (int)shell::SortBy::Color || i >= b.items.size()) return;
+    const shell::details::Color* c = shell::details::color(b.items[i].stored(shell::details::property("color")->xattr));
+    if (!c) return;
+    std::string key = shell::swatch_key(c->rgb);
+    // the list's small images are the icons, or the thumbnail squares (a zoomed Details view)
+    if ((HIMAGELIST)SendMessageW(b.list, LVM_GETIMAGELIST, LVSIL_SMALL, 0) == b.small) di->item.iImage = b.icon(key);
+    else if (thumbview::active()) di->item.iImage = thumbview::icon_image(key);
 }
 
 void fill_list(Browser& b)
@@ -687,6 +721,7 @@ void fill_list(Browser& b)
     InvalidateRect(b.list, nullptr, TRUE);
     b.filled();
     b.filling = false;
+    trace_count(b);
 }
 
 // XP: the sort column gets HDF_SORTUP/DOWN in the
@@ -707,13 +742,37 @@ void sort_feedback(Browser& b)
     SendMessageW(b.list, LVM_SETSELECTEDCOLUMN, (WPARAM)col, 0);
 }
 
-// The list shows the folder's items whose names contain the search box's text
-// (ASCII case-insensitive, as you type; 4074's "Filter by" box).
+// The filter narrows the list in place as the user types, every key at once (the
+// list refilled, the view and its scroll kept as fill_list keeps them). 4074's
+// screenshots show the "Filter by" box only empty (lh4074-180309.png, 4074-dwm.png)
+// and 4051's code shows it only in views at least 300 px wide (_ShouldShowFilters);
+// what it did to the list was a WinFS query not seen in the references, so the
+// narrowing in place, the words and their fields are our choice (shell/details.h).
+bool passes(const Browser& b, const Item& it)
+{
+    return const_cast<Browser&>(b).visible(it) && (b.query.empty() || shell::details::filter_matches(b.query, it));
+}
+
+int unfiltered_count(const Browser& b)
+{
+    int n = 0;
+    for (const Item& it : b.all_items) if (const_cast<Browser&>(b).visible(it)) n++;
+    return n;
+}
+
+// testing (tests/headless/filter.sh): the list's item count after every change, "list: N of M"
+static void trace_count(const Browser& b)
+{
+    static bool on = getenv("FLXP_TRACE_LIST") != nullptr;
+    if (!on || !b.list) return;
+    fprintf(stderr, "list: %d of %d\n", (int)SendMessageW(b.list, LVM_GETITEMCOUNT, 0, 0), unfiltered_count(b));
+    fflush(stderr);
+}
+
 void apply_filter(Browser& b)
 {
     b.items.clear();
-    for (const Item& it : b.all_items)
-        if (b.visible(it) && (b.filter.empty() || lower(it.name).find(b.filter) != std::string::npos)) b.items.push_back(it);
+    for (const Item& it : b.all_items) if (passes(b, it)) b.items.push_back(it);
     fill_list(b);
 }
 
@@ -721,7 +780,10 @@ bool set_filter(Browser& b, const std::string& text)
 {
     std::string f = lower(text);
     if (f == b.filter) return false;
+    bool had = wants_stored(b);
     b.filter = f;
+    b.query = shell::details::parse_filter(text);
+    if (!had && wants_stored(b)) read_stored(b, b.all_items);   // once per folder, while the filter needs them
     apply_filter(b);
     return true;
 }
@@ -826,8 +888,7 @@ void update(Browser& b)
     if (!b.folder->enumerate(all, b.show_hidden) && all.empty()) return;
     read_stored(b, all);
     std::vector<Item> items;
-    for (const Item& it : all)
-        if (b.visible(it) && (b.filter.empty() || lower(it.name).find(b.filter) != std::string::npos)) items.push_back(it);
+    for (const Item& it : all) if (passes(b, it)) items.push_back(it);
     shell::sort_items(items, b.sort, b.ascending);
     std::map<std::string, size_t> at_new, at_old;
     for (size_t i = 0; i < items.size(); i++) at_new[items[i].path] = i;
@@ -906,6 +967,7 @@ void update(Browser& b)
     InvalidateRect(b.list, nullptr, TRUE);
     b.filling = false;
     b.changed_on_disk();
+    trace_count(b);
 }
 
 bool navigate(Browser& b, const std::string& path, bool record)
@@ -914,11 +976,16 @@ bool navigate(Browser& b, const std::string& path, bool record)
     if (!f) return false;
     bool changed = !b.folder || b.folder->path() != f->path();
     if (record && b.folder && (changed || b.record_same)) { b.back.push_back(b.folder->path()); b.forward.clear(); }
-    if (b.folder && changed && !b.filter.empty()) { b.filter.clear(); header::clear_filter(); places::clear_filter(); b.filter_cleared(); }
+    if (b.folder && changed && !b.filter.empty()) {
+        b.filter.clear(); b.query = shell::details::Filter();
+        header::clear_filter(); places::clear_filter(); b.filter_cleared();
+    }
     if (changed) thumbview::folder_changed();
     if (changed && b.folder && b.remember_views) views::leaving(b.folder->path(), view_code(b));
+    if (changed && per_folder(b)) save_columns(b);   // the widths dragged to in the folder left
     std::string from = b.folder ? b.folder->path() : "";
     b.folder = f;
+    if (changed) folder_columns(b);                  // its own columns, else the default (XP's per-folder bag)
     if (changed) {
         int v = b.remember_views ? views::lookup(f->path(), b.zoomable) : -1;
         // the Longhorn views every time: whether thumbnails show depends on the folder (a network mount)

@@ -19,10 +19,14 @@
 // spacing and selection; this only makes the images.
 //
 // Pictures come from shell/thumbs on worker threads; an item shows its default
-// image at once and the thumbnail replaces it when it arrives.
+// image at once and the thumbnail replaces it when it arrives. Only the items on
+// screen and a screen around them are asked for (again when the list scrolls),
+// and the view keeps at most shell::thumbs::Slots' 64 MB of thumbnails plus
+// those on screen, the least recently used going back to their default image.
 #pragma once
 #include <string>
 #include <vector>
+#include "gdi/bitmap.h"
 #include "shell/namespace.h"
 #include "w32/w32.h"
 extern "C" {
@@ -51,6 +55,14 @@ void stop();                          // Stop: drop what is pending
 // sets each item's image and asks for the missing thumbnails.
 void fill(const std::vector<shell::Item>& items);
 void folder_changed();                // navigation: drop pending work and the cached images
+int icon_image(const std::string& key);   // an icon key's square in the view's image list (-1: none), as an icon's item gets
 void on_ready();                      // WM_THUMBS
+
+// A folder's picture as the view composes it, at any size and outside the view (the task band's preview): the
+// folder icon with up to four pictures of it fitted into folder_mini_size(size, lh) cells (Loader::request with
+// folder = true gives them), or under the Longhorn style with the build's art 4074's photo standing in the open folder;
+// lh: on transparency, else on the window colour. Null when it cannot be made.
+int folder_mini_size(int size, bool lh);
+gdi::Bitmap* folder_picture(const std::string& icon_key, const std::vector<gdi::Bitmap*>& minis, int size, bool lh);
 
 }

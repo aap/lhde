@@ -33,6 +33,22 @@ int menu_part(HTHEME th, const char* name)
     return 0;
 }
 
+// a state of a Menu part by name, in the style's own numbering (v4 styles number BARITEM's states differently: Jade NORMAL HOT
+// PUSHED ..., Plex and Slate NORMAL HIGHLIGHTED HOT PUSHED ...); 0 when the style does not name it
+int menu_state(HTHEME th, int part, const char* part_name, const char* name)
+{
+    PTHEME_CLASS tc = (PTHEME_CLASS)th;
+    if (!tc || !part) return 0;
+    if (tc->tf && tc->tf->v4) {
+        int s = v4::state_id(*(v4::Style*)tc->tf->v4, "Menu", part, name);
+        return s > 0 ? s : 0;
+    }
+    int p, s;
+    std::u16string pn = w32::utf16_of(part_name), sn = w32::utf16_of(name);
+    if (MSSTYLES_LookupPartState(L"Menu", (LPCWSTR)pn.c_str(), (LPCWSTR)sn.c_str(), &p, &s) && p == part) return s;
+    return 0;
+}
+
 void fill(HDC dc, COLORREF c, int x, int y, int w, int h)
 {
     if (w <= 0 || h <= 0) return;
@@ -106,7 +122,7 @@ void UXMENU_InitLook(UXMENU_LOOK* L, HTHEME theme, const COLORREF* sys, BOOL fla
     L->menu = C(COLOR_MENU); L->text = C(COLOR_MENUTEXT); L->gray = C(COLOR_GRAYTEXT);
     L->hlframe = C(COLOR_HIGHLIGHT); L->hltext = C(COLOR_HIGHLIGHTTEXT); L->hl = C(COLOR_MENUHILIGHT);
     L->face = C(COLOR_BTNFACE); L->shadow = C(COLOR_BTNSHADOW); L->hilight = C(COLOR_BTNHIGHLIGHT);
-    L->dkshadow = C(COLOR_3DDKSHADOW); L->light = C(COLOR_3DLIGHT);
+    L->dkshadow = C(COLOR_3DDKSHADOW); L->light = C(COLOR_3DLIGHT); L->window = C(COLOR_WINDOW);
     L->flat = flat ? 1 : 0;
 
     LOGFONTW lf = {};
@@ -139,6 +155,23 @@ void UXMENU_InitLook(UXMENU_LOOK* L, HTHEME theme, const COLORREF* sys, BOOL fla
         L->t_hot = SUCCEEDED(GetThemeColor(theme, p_item, 2, TMT_TEXTCOLOR, &c)) ? c : L->t_norm;
         L->t_dis = SUCCEEDED(GetThemeColor(theme, p_item, 3, TMT_TEXTCOLOR, &c)) ? c : L->gray;
         L->t_dishot = SUCCEEDED(GetThemeColor(theme, p_item, 4, TMT_TEXTCOLOR, &c)) ? c : L->t_dis;
+        // the menu bar: 4074 draws an active window's bar in BAR's second image (INACTIVE by the style's own names: under
+        // Jade a flat grey) and an inactive window's in the first (ACTIVE: Jade's gradient to white); BARITEM by state name
+        if ((L->p_baritem = menu_part(theme, "BARITEM"))) {
+            const char* bar = "BAR";
+            if (!(L->p_bar = menu_part(theme, bar))) L->p_bar = menu_part(theme, bar = "BARBACKGROUND");
+            L->s_bar[0] = menu_state(theme, L->p_bar, bar, "ACTIVE");
+            L->s_bar[1] = menu_state(theme, L->p_bar, bar, "INACTIVE");
+            if (!L->s_bar[1]) L->s_bar[1] = L->s_bar[0];
+            if (!L->s_bar[0]) L->s_bar[0] = L->s_bar[1];
+            static const char* st[6] = { "NORMAL", "HOT", "PUSHED", "DISABLED", "DISABLEDHOT", "DISABLEDPUSHED" };
+            for (int i = 0; i < 6; i++) L->s_bi[i] = menu_state(theme, L->p_baritem, "BARITEM", st[i]);
+            if (!L->s_bi[4]) L->s_bi[4] = L->s_bi[3];
+            if (!L->s_bi[5]) L->s_bi[5] = L->s_bi[3];
+            for (int i = 0; i < 6; i++)
+                L->bt[i] = L->s_bi[i] && SUCCEEDED(GetThemeColor(theme, L->p_baritem, L->s_bi[i], TMT_TEXTCOLOR, &c)) ? c
+                         : i >= 3 ? L->gray : L->text;
+        }
         MARGINS m;
         if (SUCCEEDED(GetThemeMargins(theme, dc, p_item, 0, TMT_CONTENTMARGINS, nullptr, &m))) { item_t = m.cyTopHeight; item_b = m.cyBottomHeight; }
         else item_t = item_b = 3;
@@ -243,6 +276,35 @@ COLORREF UXMENU_TextColor(const UXMENU_LOOK* L, unsigned flags) { return text_co
 static bool emboss(const UXMENU_LOOK* L, unsigned flags)
 {
     return (flags & UXMENU_DISABLED) && !(flags & UXMENU_HOT) && !L->theme && !L->flat && L->menu == L->face;
+}
+
+BOOL UXMENU_DrawBar(const UXMENU_LOOK* L, HDC dc, const RECT* bar, BOOL active)
+{
+    if (!L->theme || !L->p_baritem) return FALSE;
+    int x = bar->left, y = bar->top, w = bar->right - bar->left, h = bar->bottom - bar->top;
+    fill(dc, L->menu, x, y, w, 1);
+    if (L->p_bar) part(L, dc, L->p_bar, L->s_bar[active ? 1 : 0], x, y + 1, w, h - 1);
+    else fill(dc, L->menu, x, y + 1, w, h - 1);
+    fill(dc, L->window, x, bar->bottom, w, 1);
+    return TRUE;
+}
+
+BOOL UXMENU_DrawBarItem(const UXMENU_LOOK* L, HDC dc, const RECT* rc, unsigned flags, const WCHAR* text, int len,
+                        const RECT* text_rect)
+{
+    if (!L->theme || !L->p_baritem) return FALSE;
+    int i = (flags & UXMENU_PUSHED) ? 2 : (flags & UXMENU_HOT) ? 1 : 0;
+    if (flags & UXMENU_DISABLED) i += 3;
+    if (i % 3 && L->s_bi[i]) part(L, dc, L->p_baritem, L->s_bi[i], rc->left, rc->top, rc->right - rc->left, rc->bottom - rc->top);
+    if (!text || len <= 0 || !text_rect) return TRUE;
+    HGDIOBJ old = SelectObject(dc, L->font);
+    int mode = SetBkMode(dc, TRANSPARENT);
+    SetTextColor(dc, L->bt[i]);
+    RECT r = *text_rect;
+    DrawTextW(dc, text, len, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE | ((flags & UXMENU_CUES) ? 0 : DT_HIDEPREFIX));
+    SetBkMode(dc, mode);
+    SelectObject(dc, old);
+    return TRUE;
 }
 
 void UXMENU_DrawArrow(const UXMENU_LOOK* L, HDC dc, const RECT* rc, unsigned flags)

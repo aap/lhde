@@ -34,7 +34,7 @@ struct Item {
 // What a list sorts by and what its Details columns are: the first four are
 // derived from the item, the others are stored properties (shell/details.h
 // column_property)
-enum class SortBy { Name, Size, Type, Date, Description, Tags, Comment };
+enum class SortBy { Name, Size, Type, Date, Description, Tags, Comment, Color };
 
 class Folder {
 public:

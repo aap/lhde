@@ -70,7 +70,12 @@ static Bitmap* orient(Bitmap* s, int o)
     return d;
 }
 
-Bitmap* decode_jpeg(const uint8_t* data, size_t size, int max_size, int* orig_w, int* orig_h)
+// Libjpeg's whole-image buffers (a progressive JPEG keeps every coefficient: about 3 bytes a pixel) for a thumbnail; a
+// file that needs more is not decoded.
+static const long thumb_jpeg_memory = 160L << 20;
+
+// from f (read as it goes) when it is not null, else from data
+static Bitmap* jpeg_from(FILE* f, const uint8_t* data, size_t size, int max_size, int* orig_w, int* orig_h)
 {
     jpeg_decompress_struct c;
     JpegErr e;
@@ -85,7 +90,9 @@ Bitmap* decode_jpeg(const uint8_t* data, size_t size, int max_size, int* orig_w,
         return nullptr;
     }
     jpeg_create_decompress(&c);
-    jpeg_mem_src(&c, (const unsigned char*)data, (unsigned long)size);
+    if (max_size > 0) c.mem->max_memory_to_use = thumb_jpeg_memory;
+    if (f) jpeg_stdio_src(&c, f);
+    else jpeg_mem_src(&c, (const unsigned char*)data, (unsigned long)size);
     jpeg_save_markers(&c, JPEG_APP0 + 1, 0xffff);
     if (jpeg_read_header(&c, TRUE) != JPEG_HEADER_OK) { jpeg_destroy_decompress(&c); return nullptr; }
     int o = 1;
@@ -118,6 +125,11 @@ Bitmap* decode_jpeg(const uint8_t* data, size_t size, int max_size, int* orig_w,
     jpeg_finish_decompress(&c);
     jpeg_destroy_decompress(&c);
     return orient(b, o);
+}
+
+Bitmap* decode_jpeg(const uint8_t* data, size_t size, int max_size, int* orig_w, int* orig_h)
+{
+    return jpeg_from(nullptr, data, size, max_size, orig_w, orig_h);
 }
 
 // ---- ICO / CUR ------------------------------------------------------------------
@@ -275,10 +287,12 @@ static void header_size(const uint8_t* d, size_t n, int* w, int* h)
     }
 }
 
-// Images with more pixels than this are not decoded for thumbnails (max_size > 0):
-// PNG and BMP decode at full size, so a handful of huge files on the worker
-// threads could otherwise eat all memory. JPEG scales while decoding and is exempt.
-static const int64_t thumb_max_pixels = 40LL * 1000 * 1000;
+// For a thumbnail (max_size > 0) the full image is never in memory where the format allows: JPEG decodes with DCT
+// scaling (and streams from the file), PNG is reduced row by row, WebP is rescaled by libwebp. What has to decode at full
+// size (an interlaced PNG, BMP, ICO) is refused above this many pixels (100 MB decoded), and a file read whole into memory
+// (all but JPEG and PNG) above thumb_max_file bytes.
+static const int64_t thumb_max_pixels = 25LL * 1000 * 1000;
+static const long thumb_max_file = 64L << 20;
 
 Bitmap* decode_image(const uint8_t* d, size_t n, int max_size, int* orig_w, int* orig_h)
 {
@@ -286,6 +300,14 @@ Bitmap* decode_image(const uint8_t* d, size_t n, int max_size, int* orig_w, int*
     if (n < 8) return nullptr;
     if (d[0] == 0xff && d[1] == 0xd8) return decode_jpeg(d, n, max_size, orig_w, orig_h);
     if (is_webp(d, n)) return decode_webp(d, n, max_size, orig_w, orig_h);   // scales while decoding
+    if (max_size > 0 && !memcmp(d, "\x89PNG", 4)) {
+        int w = 0, h = 0;
+        bool interlaced = false;
+        b = decode_png_reduced(nullptr, d, n, max_size, &w, &h, &interlaced);
+        if (orig_w) *orig_w = w;
+        if (orig_h) *orig_h = h;
+        if (!interlaced) return b;
+    }
     if (max_size > 0) {
         int hw, hh;
         header_size(d, n, &hw, &hh);
@@ -309,10 +331,26 @@ Bitmap* load_image(const std::string& path, int max_size, int* orig_w, int* orig
 {
     FILE* f = fopen(path.c_str(), "rb");
     if (!f) return nullptr;
+    uint8_t head[8];
+    bool got_head = fread(head, 1, sizeof head, f) == sizeof head;
+    if (!got_head || fseek(f, 0, SEEK_SET) != 0) { fclose(f); return nullptr; }
+    if (head[0] == 0xff && head[1] == 0xd8) {   // JPEG: read as it decodes
+        Bitmap* b = jpeg_from(f, nullptr, 0, max_size, orig_w, orig_h);
+        fclose(f);
+        return b;
+    }
+    if (max_size > 0 && !memcmp(head, "\x89PNG", 4)) {   // PNG: reduced as it is read
+        int w = 0, h = 0;
+        bool interlaced = false;
+        Bitmap* b = decode_png_reduced(f, nullptr, 0, max_size, &w, &h, &interlaced);
+        if (orig_w) *orig_w = w;
+        if (orig_h) *orig_h = h;
+        if (!interlaced || fseek(f, 0, SEEK_SET) != 0) { fclose(f); return b; }
+    }
     std::vector<uint8_t> buf;
     if (fseek(f, 0, SEEK_END) == 0) {
         long sz = ftell(f);
-        if (sz > 0 && sz < (1L << 30)) buf.resize((size_t)sz);
+        if (sz > 0 && sz < (1L << 30) && (max_size <= 0 || sz <= thumb_max_file)) buf.resize((size_t)sz);
         fseek(f, 0, SEEK_SET);
     }
     size_t got = buf.empty() ? 0 : fread(buf.data(), 1, buf.size(), f);
