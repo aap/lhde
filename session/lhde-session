@@ -104,11 +104,11 @@ session() {
 	[ -s "$STATE/desktop" ] || echo "${LHDE_DESKTOP:-1}" > "$STATE/desktop"
 	rm -f "$STATE/quit"; echo $$ > "$STATE/loop.pid"
 	trap session_end INT TERM HUP
-	[ "$LHDE_MODE" = real ] && [ -f "$HOME/.xinit_all" ] && . "$HOME/.xinit_all"   # aap's personal X startup, real sessions only
+	[ "$LHDE_MODE" = real ] && [ -f "$HOME/.xinit_all" ] && . "$HOME/.xinit_all"   # the user's own X startup, real sessions only
 	[ -f "$HOME/.Xresources" ] && xrdb "$HOME/.Xresources" 2>/dev/null
 	# a session bus for luxshell's notification server (toasts via notify-send); a tty login has none. Ours, ended with the session
-	# (bus_stop): dbus-launch left one dbus-daemon per start behind, and with it an at-spi bus and an xdg-desktop-portal; a hundred
-	# of them used up the user's inotify instances (fs.inotify.max_user_instances, 128)
+	# (bus_stop): dbus-launch leaves one dbus-daemon per start behind, and with it an at-spi bus and an xdg-desktop-portal; a hundred
+	# of them use up the user's inotify instances (fs.inotify.max_user_instances, 128)
 	if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && [ "$LHDE_MODE" = real ]; then bus_start; fi
 	xset -b 2>/dev/null
 	# the root background once, from the settings luxshell and flxp-desktop read (lhwall.sh): the first frames already show the

@@ -1,4 +1,4 @@
-# Longhorn lab: aap's Win95 config plus lab-specific tweaks
+# Longhorn lab: the user's Win95 fvwm config plus lab-specific tweaks
 Read $HOME/cfg/fvwmrc/fvwm2rc.win95
 ImagePath +:$HOME/cfg/fvwm/win2k
 # our self-framed clients draw their own frame
