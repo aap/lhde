@@ -33,9 +33,15 @@ trash = pe:shell32.dll#32
 help = pe:shell32.dll#24
 pictures = pe:shell32.dll#236
 control_panel = pe:shell32.dll#137
-display = pe:desk.cpl#100
 run = pe:shell32.dll#25
 recent = pe:shell32.dll#21
+; window and program icons (icons/apps.ini maps window classes to them; lhde/icon.h): exe above is the generic one
+cmd = pe:cmd.exe#IDI_APPICON
+display = pe:desk.cpl#100
+notepad = pe:notepad.exe#2
+explorer = pe:explorer.exe#100
+browser = pe:explorer.exe#253
+mail = pe:explorer.exe#254
 
 [toolbar]
 strip = pe:resources/xp/shell32.dll#214

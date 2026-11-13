@@ -70,7 +70,12 @@ HANDLE load_image(const std::string& src, UINT type, int cx, int cy, UINT flags)
         if (hash == std::string::npos) return nullptr;
         HINSTANCE h = module_for(src.substr(3, hash - 3));
         if (!h) return nullptr;
-        return LoadImageW(h, MAKEINTRESOURCEW(atoi(src.c_str() + hash + 1)), type, cx, cy, depth_flag | flags);
+        std::string id = src.substr(hash + 1);
+        if (!id.empty() && id.find_first_not_of("0123456789") != std::string::npos) {   // a named resource (cmd.exe's IDI_APPICON)
+            std::u16string name = w32::utf16_of(id.c_str());
+            return LoadImageW(h, (LPCWSTR)name.c_str(), type, cx, cy, depth_flag | flags);
+        }
+        return LoadImageW(h, MAKEINTRESOURCEW(atoi(id.c_str())), type, cx, cy, depth_flag | flags);
     }
     std::u16string w = w32::utf16_of(src.c_str());
     return LoadImageW(nullptr, (LPCWSTR)w.c_str(), type, cx, cy, LR_LOADFROMFILE | depth_flag | flags);
@@ -81,6 +86,53 @@ HICON icon_for_key(const std::string& key, int px)
     HICON h = key.empty() ? nullptr : (HICON)load_image(icon_file(key), IMAGE_ICON, px, px);
     if (!h && key != "document") h = (HICON)load_image(icon_file("document"), IMAGE_ICON, px, px);
     return h;
+}
+
+HICON icon_from_argb(const std::vector<unsigned long>& im)
+{
+    if (im.size() < 3) return nullptr;
+    int w = (int)im[0], h = (int)im[1];
+    if (w <= 0 || h <= 0 || im.size() < 2 + (size_t)w * h) return nullptr;
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+    bi.bmiHeader.biWidth = w;
+    bi.bmiHeader.biHeight = -h;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    void* bits = nullptr;
+    HBITMAP color = CreateDIBSection(nullptr, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    if (!color || !bits) return nullptr;
+    uint32_t* px = (uint32_t*)bits;
+    for (size_t i = 0; i < (size_t)w * h; i++) px[i] = (uint32_t)im[2 + i];   // straight alpha, as an icon's
+    std::vector<uint8_t> zeros((size_t)((w + 15) / 16 * 2 * h));
+    HBITMAP mask = CreateBitmap(w, h, 1, 1, zeros.data());
+    ICONINFO ii = {};
+    ii.fIcon = TRUE;
+    ii.hbmColor = color;
+    ii.hbmMask = mask;
+    HICON ic = CreateIconIndirect(&ii);
+    DeleteObject(color);
+    DeleteObject(mask);
+    return ic;
+}
+
+// a program's desktop file Icon= is its own icon (a window's _NET_WM_ICON): first; then the class map by the id's name
+// (xterm.desktop, whose xterm-color.xpm is no PNG: cmd), then the generic icon
+HICON app_hicon(const std::string& desktop_id, int px)
+{
+    std::vector<unsigned long> im = app_icon("", "", desktop_id, px, false);
+    std::string stem = desktop_id.size() > 8 && desktop_id.compare(desktop_id.size() - 8, 8, ".desktop") == 0
+                           ? desktop_id.substr(0, desktop_id.size() - 8) : desktop_id;
+    if (im.empty()) im = app_icon("", stem, "", px);
+    return icon_from_argb(im);
+}
+
+bool set_window_icon_key(HWND w, const std::string& key)
+{
+    HICON s = icon_from_argb(key_icon(key, 16)), b = icon_from_argb(key_icon(key, 32));
+    if (s) SendMessageW(w, WM_SETICON, ICON_SMALL, (LPARAM)s);
+    if (b) SendMessageW(w, WM_SETICON, ICON_BIG, (LPARAM)b);
+    return s || b;
 }
 
 HICON icon_for(const std::string& path, int px)

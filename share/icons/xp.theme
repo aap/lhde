@@ -35,10 +35,15 @@ trash = pe:shell32.dll#32
 help = pe:shell32.dll#24
 pictures = pe:shell32.dll#236
 control_panel = pe:shell32.dll#137
-; desk.cpl's IDI_DISPLAY (Display Properties' window icon): XP's desk.cpl is not among this build's files, 4074's has XP's art
-display = pe:resources/4074/desk.cpl#100
 run = pe:shell32.dll#25
 recent = pe:shell32.dll#21
+; window and program icons (icons/apps.ini maps window classes to them; lhde/icon.h): exe above is the generic one
+cmd = pe:cmd.exe#IDI_APPICON
+display = pe:desk.cpl#100
+notepad = pe:notepad.exe#2
+explorer = pe:explorer.exe#100
+browser = pe:explorer.exe#253
+mail = pe:explorer.exe#254
 
 ; the file dialog's small toolbar (comdlg32 loads comctl32's IDB_VIEW_SMALL_COLOR 124 / IDB_HIST_SMALL_COLOR 130)
 ; comes from comctl32 6.0, which is in WinSxS (ASMS01.CAB) and not imported: comctl32's own images stand in.

@@ -37,8 +37,9 @@ bool launch(const App& app, const std::vector<std::string>& files, std::string* 
 // Start a program detached (new session, double fork) in cwd; reports exec failures.
 bool spawn(const std::vector<std::string>& argv, const std::string& cwd, std::string* err = nullptr);
 
-// The terminal: setting "terminal" (FLXP_TERMINAL or terminal= in flxp.ini), default "urxvt".
-// It is a /bin/sh command; %d is replaced by the quoted directory, and it runs with cwd = dir.
+// The terminal: settings.ini [commands] terminal, else the first of cmd, urxvt, xterm, x-terminal-emulator on PATH
+// (liblhde lhde_terminal_command). It is a /bin/sh command; %d is replaced by the quoted directory, and it runs with
+// cwd = dir; a Terminal=true program runs as TERMINAL -e PROGRAM ARGS.
 std::string terminal_command();
 bool open_terminal(const std::string& dir, std::string* err = nullptr);
 

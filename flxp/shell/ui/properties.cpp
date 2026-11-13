@@ -211,10 +211,24 @@ void error_box(HWND owner, const std::string& text) { message_box(owner, g->titl
 
 // ---- General -----------------------------------------------------------------------------
 
+// "Opens with:" the program's 16 px icon, then its name (XP's General page); the icon is a static made beside the name the
+// first time, the name moved right of it
 void show_opens_with(HWND dlg, const std::string& mime)
 {
     const App* a = default_app(mime);
     set_text(dlg, IDC_OPENS, a ? a->name : "(none)");
+    HWND name = GetDlgItem(dlg, IDC_OPENS), ic = GetDlgItem(dlg, IDC_OPENSICON);
+    if (!ic && name) {
+        RECT r; GetWindowRect(name, &r); MapWindowPoints(nullptr, dlg, (POINT*)&r, 2);
+        int y = (r.top + r.bottom) / 2 - 8;
+        ic = CreateWindowExW(0, L"STATIC", nullptr, WS_CHILD | SS_ICON | SS_REALSIZEIMAGE, r.left, y, 16, 16, dlg,
+                             (HMENU)(INT_PTR)IDC_OPENSICON, nullptr, nullptr);
+        MoveWindow(name, r.left + 20, r.top, r.right - r.left - 20, r.bottom - r.top, TRUE);
+    }
+    if (!ic) return;
+    HICON old = (HICON)SendMessageW(ic, STM_SETICON, (WPARAM)(a ? app_hicon(a->id, 16) : nullptr), 0);
+    if (old) DestroyIcon(old);
+    ShowWindow(ic, a ? SW_SHOW : SW_HIDE);
 }
 
 void init_general(HWND dlg)
@@ -281,7 +295,7 @@ void init_general(HWND dlg)
 
 INT_PTR CALLBACK general_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM)
 {
-    if (msg == WM_INITDIALOG) { init_general(dlg); return TRUE; }
+    if (msg == WM_INITDIALOG) { if (!g->opts->window_icon.empty()) set_window_icon_key(GetParent(dlg), g->opts->window_icon); init_general(dlg); return TRUE; }
     if (msg == WM_COMMAND && LOWORD(wp) == IDC_CHANGE && g->opts->change_program && g->files.size() == 1) {
         std::string mime = mime_type(g->files[0]);
         if (g->opts->change_program(dlg, g->files[0], mime)) show_opens_with(dlg, mime);

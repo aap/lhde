@@ -43,8 +43,8 @@ source"), `LHWM_ANIMATIONS=NAME` ("Animations"), `LHWM_DEBUG=1` (icon source per
 theme") and `quit` (clean exit, "EWMH and the shell").
 
 **Keys** come from `~/.config/lhde/keys` (lines `MODS+Key action [arg]`, MODS of `Mod4`/`Super`, `Mod1`/`Alt`, `Control`/`Ctrl`,
-`Shift`; `#` comments). Actions: `exec CMD`, `close`, `kill`, `cycle`, `maximize`, `minimize`, `sysmenu`, `workspace N`, `showdesktop`,
-`shell CMD`, `start`, `none`. Without the file the defaults: `Mod4+Return` urxvt, `Mod4+t` xterm, `Mod4+e` flxp (rox when flxp is not on
+`Shift`; `#` comments). Actions: `exec CMD`, `terminal` (settings.ini `[commands] terminal`, docs/SETTINGS.md), `close`, `kill`, `cycle`, `maximize`, `minimize`, `sysmenu`, `workspace N`, `showdesktop`,
+`shell CMD`, `start`, `none`. Without the file the defaults: `Mod4+Return terminal`, `Mod4+t` xterm, `Mod4+e` flxp (rox when flxp is not on
 PATH), `Mod4+r shell run`, `Mod4+d showdesktop`, `Mod4+s shell sidebar-stacking toggle`, `Mod4+h shell sidebar-mode toggle`, `Mod4+q` and `Mod1+F4` close, `Mod1+space
 sysmenu`, `Mod1+Tab`/`Mod4+Tab` and their `Shift+` forms `cycle`, `Mod4+Up` maximize, `Mod4+Down` minimize, `Mod4+1..4` `workspace
 0..3`, `Mod4+Shift+s shell screenshot_region` (Windows 10's snip key), `Mod4+Shift+f shell screenshot` (the full screen),
@@ -270,8 +270,9 @@ it Tahoma, as XP's and 4074's), smoothed as luxwm's menus (`wm_menu_text_smoothi
 switcher is not a themed window, so under Luna it is the same dialog in Luna's beige `3DFACE` and blue `HIGHLIGHT`, and under 4074's
 Jade, Slate or Aero the same again (4074 has no DWM flip on Alt+Tab: its DWM's "DWM Task Switch", COMPOSITION.md 14.2, is a 3D
 cascade on a hotkey of its own, not Alt+Tab). **Icons** (`client_icon32`, made once per window and kept until its icon changes):
-`_NET_WM_ICON` at 32 px (the smallest image at least 32, else the largest, scaled), else `WM_HINTS` `icon_pixmap`, else the
-generic application icon (shell32 #3, 32 px), else the frame set's default icon, as XP's `ICON_BIG`, class icon, `IDI_APPLICATION`.
+the caption's lookup at 32 px (`client_lookup_icon`: `_NET_WM_ICON`, the class map and the desktop file, `WM_HINTS` `icon_pixmap`,
+the generic application icon; "Window icons" below), else the frame set's default icon, as XP's `ICON_BIG`, class icon,
+`IDI_APPLICATION`.
 
 The window is override-redirect (WM_CLASS `lhwm-switcher`), takes pointer motion and clicks but no keyboard (the keys come through
 luxwm's grab), and carries `_LHWM_SWITCHER` (CLIENT-PROTOCOL.md "The task switcher window": selection, count, first shown,
@@ -724,21 +725,25 @@ Computer 1 0 none ICON` against the screenshot's rows 33-55 (all 800 columns, th
 
 ### Window icons
 
-`client_set_icon`, `client_icon`, frame.c `wm_frame_icon_from_netwm`, `wm_frame_icon_from_pixmap`, `wm_theme_default_icon`. The caption icon is:
+`client_set_icon`, `client_lookup_icon`, `client_icon`, frame.c `wm_frame_icon_from_netwm`, `wm_frame_icon_from_pixmap`,
+`wm_theme_default_icon`. The caption icon is the lookup every lhde consumer shares (liblhde `lhde_app_icon`, docs/THEME-FORMAT.md
+section 9), with the X parts luxwm reads itself:
 1. `_NET_WM_ICON` (read up to 16M items): the smallest image at least the icon size (`icon_size`, msstyles 16), else the largest, scaled
    once to the size with `CAIRO_FILTER_BEST` (aspect kept, centred);
-2. else `WM_HINTS` `icon_pixmap` + `icon_mask` (depth 1: black on white as the classic X icon box; other depths through the default
+2. else the class map (`icons/apps.ini`: urxvt, xterm and the other terminals get cmd.exe's icon) and the window's desktop file
+   (`WM_CLASS` class and instance);
+3. else `WM_HINTS` `icon_pixmap` + `icon_mask` (depth 1: black on white as the classic X icon box; other depths through the default
    visual; depth 32 taken as premultiplied ARGB; errors from a pixmap the client freed meanwhile swallowed), scaled the same way;
-3. else the generic application icon (`app_icon`: shell32 #3, what Windows draws for a window without an icon, from the first imported
-   pack of 4074, 4051, 5112, 4042, `packs/BUILD/shell32/16|32/3.png`); urxvt and xterm get it;
-4. else the set's default icon: `default_icon = FILE [FILE...]` (relative to the set's directory, or with a `/` to the data
+4. else the generic application icon (the icon set's `exe` key, shell32 #3: what Windows draws for a window without an icon);
+5. else the set's default icon: `default_icon = FILE [FILE...]` (relative to the set's directory, or with a `/` to the data
    directories; the nearest size at or above is used), else `default_icon.png`. The DWM sets' `default_icon.png` is the CompositedWindow
    `DEFAULTICON` part (STREAM 506, a 20x17 Windows flag), drawn 1:1 centred on the 16 px cell (icons at most 4 px larger than the cell are
    not scaled); the classic sets say `default_icon = packs/4074/shell32/16/3.png packs/4074/shell32/32/3.png` (the converter writes it).
 
 PropertyNotify: `_NET_WM_ICON` set, changed or deleted re-reads it; `WM_HINTS` re-reads the icon when its pixmap or mask id changed
-(urgency updates do not). Theme switches re-read at the new size. The caption text of a client without an icon starts after the
-default icon (XP's indentation). `LHWM_DEBUG=1` logs `icon 0x...: client | application | theme default | none`.
+(urgency updates do not). Theme switches re-read at the new size, with the new theme's icon set (`lhde_app_icons_set` of its
+`path.icons`). The caption text of a client without an icon starts after the default icon (XP's indentation). `LHWM_DEBUG=1`
+logs `icon 0x...: found | theme default | none`.
 
 ### Maximised caption text
 

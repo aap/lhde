@@ -26,9 +26,9 @@
 #   luxwm/luxwm.mk        luxwm, luxwmc -> build/bin; its tests -> build/luxwm/tests
 #   luxshell/luxshell.mk  luxshell -> build/bin (its Lua stays in luxshell/, installed to PKGLIBDIR/luxshell)
 #   examples/examples.mk  extendframe, navdemo, aurorademo -> build/examples
-#   liblhde/liblhde.mk    liblhde (lhde/data.h, lhde/theme.h, lhde/settings.h): the data directories, the theme resolver,
+#   liblhde/liblhde.mk    liblhde (lhde/data.h, theme.h, settings.h, icon.h): the data directories, the theme resolver,
 #                         the settings store -> build/lib/liblhde.{a,so.1}, lhde.pc, build/bin/lhde-theme
-#   share/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme, sources/*.ini,
+#   share/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme + apps.ini, sources/*.ini,
 #                         sources/free-wallpapers-LICENSE.txt, frames/*/*.ini, packs/*/shell.lua), PKGLIBDIR/session +
 #                         BINDIR/lhde-session, PKGLIBDIR/tools + BINDIR/lhde-import, lhde-pack, lhde-schemes
 #
@@ -132,7 +132,7 @@ install-data:
 	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
 	install -m 644 share/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
 	install -m 644 share/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
-	install -m 644 share/icons/*.theme $(DESTDIR)$(DATADIR)/icons/
+	install -m 644 share/icons/*.theme share/icons/apps.ini $(DESTDIR)$(DATADIR)/icons/
 	install -m 644 share/sources/*.ini share/sources/free-wallpapers-LICENSE.txt $(DESTDIR)$(DATADIR)/sources/
 	for d in share/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
 	for d in share/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done

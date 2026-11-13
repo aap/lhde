@@ -15,7 +15,7 @@ Two directories, one rule each. liblhde gives every path (`lhde_config_file`, `l
 | --- | --- |
 | `settings.ini` | the selected theme, its current layer and the per-user keys (below); `$LHDE_SETTINGS` names another file |
 | `themes/NAME.theme` | the user's theme files (docs/THEME-FORMAT.md), written by Save As (Display Properties, luxshell's flyout, `lhde-theme save-as`) |
-| `flxp.ini` | flxp's own preferences (`[flxp]` key = value: views, header, thumbnails, the terminal, dialog sizes, ...); written with every key empty (= automatic) and its comment on first run; any key also as `FLXP_<KEY>` in the environment for one run. Nothing the desktop shares: flxp reads the keys below from settings.ini, the theme's from the session theme (`_LH_THEME`, without a session `[theme] name`; `--theme` / `FLXP_THEME` gives one run a fixed visual style) |
+| `flxp.ini` | flxp's own preferences (`[flxp]` key = value: views, header, thumbnails, dialog sizes, ...); written with every key empty (= automatic) and its comment on first run; any key also as `FLXP_<KEY>` in the environment for one run. Nothing the desktop shares: flxp reads the keys below from settings.ini, the theme's from the session theme (`_LH_THEME`, without a session `[theme] name`; `--theme` / `FLXP_THEME` gives one run a fixed visual style) |
 | `keys` | luxwm's key bindings, one per line (`Mod4+Return exec urxvt`; LUXWM.md "Running and testing") |
 | `quicklaunch/` | the Quick Launch tile's `.desktop` files (`[quicklaunch] dir` names another folder) |
 | `luxpad.ini` | luxpad's choices: `[luxpad]` font, font_size, font_weight, font_italic, wrap, statusbar (docs/USAGE.md "luxpad") |
@@ -73,11 +73,22 @@ comments, the order and the keys it does not know: it reads the whole file, chan
 [start]       pinned = a.desktop;b.desktop ; flxp's start panel: the pinned programs (desktop ids, terminal, explorer, commands)
 [commands]    logoff = ... ; standby ; shutdown ; restart ; lock ; picom ; taskbar ; filemanager ; search   ; luxshell, flxp's start panel (logoff, shutdown)
               run = dmenu_run            ; Super+R runs this instead of the start menu's Run dialog (the default: unset)
+              terminal = cmd             ; the terminal (below); default: the first of cmd, urxvt, xterm, x-terminal-emulator on PATH
               screenshot = luxshot --screen ; screenshot_window = luxshot --window ; screenshot_region = luxshot --region   ; luxwm's Super+Shift+F/W/S (luxshell; the defaults)
 [fonts]       smoothing = standard       ; off | standard | cleartype (flxp, luxwm's menus; luxshell uses fontconfig's)
 [effects]     menu_shadows = 1           ; XP's drop shadow under menus (wux's popup menus, luxwm's window menu, luxshell's menus)
               keyboard_cues = 0          ; 0: mnemonics underlined only after Alt (XP's default); 1: always
 ```
+
+**The terminal**, `[commands] terminal`, is a `/bin/sh` command line; `%d` in it is the directory, quoted. Every terminal of the
+desktop is this one: luxwm's Super+Return (the `terminal` key action), flxp's Open Terminal Here (run in the folder, `%d` that
+folder), the start panel's pinned `terminal`, a `Terminal=true` program (`TERMINAL -e PROGRAM ARGS...`, from flxp and luxshell),
+luxshell's Quick Launch Command Prompt and Task Manager fallback (`top`), lhde-session's first terminal (liblhde
+`lhde_terminal_command`; `lhde-theme terminal` prints it, `lhde-theme terminal --run [DIR]` runs it). Without the key the first
+of `cmd` (a script of the user's own: one that looks like cmd.exe), `urxvt`, `xterm`, `x-terminal-emulator` on PATH, `cmd`
+first by aap's choice. The window that starts gets cmd.exe's icon through the class map (docs/THEME-FORMAT.md section 9) when its
+class is one of the terminals there; a terminal of another class is added in `~/.config/lhde/icons/apps.ini`. flxp.ini has no
+`terminal` key any more (settings.ini's is the desktop's); one left there is not read.
 
 **Switches** are `1` or `0` in every file lhde reads (settings.ini, flxp.ini, theme files) and in the `FLXP_<KEY>` /
 `LHSHELL_*` environment; `on`, `off`, `yes`, `no`, `true`, `false` are not accepted: such a value is reported once on stderr
@@ -102,7 +113,7 @@ selecting another theme removes it (`lhde_theme_select`), Save As turns it into 
 | flxp-desktop, the Explorer | Set as Desktop Background: the current layer's `Desktop.wallpaper` / `Desktop.mode` (and a `[desktop] wallpaper = none` cleared) |
 | lhde-session | `_LH_THEME` only (`theme NAME`; luxshell then writes the file); without a luxshell, `taskbar KIND` through `lhde-theme set-key`, `set` and `setting` |
 | luxwm | nothing; it reads `[fonts] smoothing` and `[effects]` for its window menu, the theme through `_LH_THEME` |
-| flxp-taskbar, the start panel | nothing; they read `[taskbar] start_menu`, `[start] pinned`, `[commands] logoff shutdown` |
+| flxp-taskbar, the start panel | nothing; they read `[taskbar] start_menu`, `[start] pinned`, `[commands] logoff shutdown terminal` |
 
 ## Change notification
 

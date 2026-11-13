@@ -1,4 +1,5 @@
--- The tray tiles (tiles/volume.lua, brightness.lua, touchpad.lua) against a stand-in `lh`: nodes are tables, timers and
+-- The tray items (trayitems/volume.lua, brightness.lua, touchpad.lua) and the Classic Tray tile hosting them
+-- (tiles/notifications.lua) against a stand-in `lh`: nodes are tables, timers and
 -- lh.pipe run when the test says so (lh.pipe through io.popen, so the stub commands of tiles.sh on PATH answer), and the
 -- commands the tiles run are logged by those stubs. Usage: lua5.4 tiles.lua LUXSHELL_DIR TEST (tiles.sh sets the scene).
 local dir, test = arg[1], arg[2]
@@ -56,18 +57,19 @@ local function read(path) local f = io.open(path); if not f then return nil end 
 local function find_text(node, text) if node.kind == "text" and node.text == text then return node end
   for _, k in ipairs(node.kids or {}) do local r = find_text(k, text); if r then return r end end end
 
--- a tile in the sidebar (its foreground, chrome node and host as runtime.lua gives them) or in the taskbar
+-- an item with one view in the sidebar's Classic Tray tile (t.foreground, t.icon_node, t.node: that view) or in the taskbar
+local SB = { surface = { damage = function() end, x = 1130 }, tile_rect = function() return 1130, 500 end }
 local function sidebar_tile(name)
-  local t = dofile(dir .. "/tiles/" .. name .. ".lua")
-  t.T = {}; t.R = function(id) return id end; t.sb = { surface = { damage = function() end, x = 1130 }, tile_rect = function() return 1130, 500 end }
-  t.foreground = lh.node{ layout = "fill" }; t.node = lh.node{}
-  if t.flyout then t.foreground.on_click = function(_, b) if b == 1 then lh.toggle_flyout(t) end end end
-  t:initialize(); settle(); return t
+  local t = dofile(dir .. "/trayitems/" .. name .. ".lua").new{ T = {}, sb = SB, tile = {} }
+  local view = t:view(lh.node{ layout = "canvas" }, { x = 61, y = 6 }, "sidebar")
+  t.foreground, t.icon_node, t.node = view, view, view
+  t:start_once(); settle(); return t
 end
 local function taskbar_tile(name)
-  local t = dofile(dir .. "/tiles/" .. name .. ".lua")
-  t.T = { taskbar = { height = 30 } }; t.R = function(id) return id end; t.tb = { h = 30, surface = { damage = function() end } }
-  local host = lh.node{}; t:taskbar(host); settle(); return t, host.kids[1]
+  local t = dofile(dir .. "/trayitems/" .. name .. ".lua").new{ T = { taskbar = { height = 30 } }, sb = SB, tb = { h = 30, surface = { damage = function() end } } }
+  local view = t:view(lh.node{}, { x = 2, y = 7 }, "taskbar")
+  t.tb_icon = view
+  t:start_once(); settle(); return t, view
 end
 local function tip(node) return type(node.tooltip) == "function" and node.tooltip() or node.tooltip end
 
@@ -76,7 +78,6 @@ if test == "volume-wpctl" then
   local t = sidebar_tile("volume")
   local fg = t.foreground
   check("volume: wpctl answers, the tooltip is XP's", tip(fg) == "Volume: 40%", tip(fg))
-  check("volume: the label", t.label_node.text == "Volume: 40%", t.label_node.text)
   check("volume: under 50 % one wave", t.icon_node.name == "speaker-1", t.icon_node.name)
   check("volume: pactl subscribe follows other programs", (function() for _, p in pairs(pipes) do if p.cmd:find("pactl subscribe") then return true end end end)())
   clear_log(); fg.on_click(fg, 4); settle()
@@ -131,7 +132,7 @@ elseif test == "brightness" then
   local bl = os.getenv("LHSHELL_BACKLIGHT") .. "/acpi_video0/"
   local t = sidebar_tile("brightness")
   local fg = t.foreground
-  check("brightness: 600 of 1000 is 60 %", tip(fg) == "Brightness: 60%" and t.label_node.text == "Brightness: 60%", tip(fg))
+  check("brightness: 600 of 1000 is 60 %", tip(fg) == "Brightness: 60%", tip(fg))
   check("brightness: shown with a device", not t.hidden)
   check("brightness: the sun", t.icon_node.name == "sun", t.icon_node.name)
   clear_log(); fg.on_click(fg, 4); settle()
@@ -160,7 +161,6 @@ elseif test == "touchpad" then
   local t = sidebar_tile("touchpad")
   local fg = t.foreground
   check("touchpad: found by xinput, on", tip(fg) == "Touchpad: on (click to turn it off)" and t.icon_node.name == "touchpad-on", tip(fg))
-  check("touchpad: the label", t.label_node.text == "Touchpad: on", t.label_node.text)
   clear_log(); fg.on_click(fg, 1); settle()
   check("touchpad: a click turns it off", log():find("xinput set%-prop 12 libinput Device Enabled 0") ~= nil, log())
   check("touchpad: off icon and tooltip", t.icon_node.name == "touchpad-off" and tip(fg) == "Touchpad: off (click to turn it on)", tip(fg))
@@ -171,6 +171,54 @@ elseif test == "touchpad-none" then
   local t = sidebar_tile("touchpad")
   check("touchpad: none, hidden", t.hidden == true and t.node.visible == false)
   t:dispose()
+elseif test == "host" then
+  -- the Classic Tray tile with its items after K docked XEmbed icons (5 slots a row at the stand-in's 133 px), no backlight
+  local K, foreign = tonumber(os.getenv("TR_DOCKED") or "2"), false
+  function lh.tray_count() return K end
+  function lh.tray_start() return not foreign end
+  function lh.tray_foreign() return foreign end
+  local tile = dofile(dir .. "/tiles/notifications.lua")
+  local heights = {}
+  tile.T = {}; tile.R = function(id) return id end
+  tile.sb = { surface = { damage = function() end, x = 1130 }, tile_rect = function() return 1130, 500 end, resize_tile = function(_, h) table.insert(heights, h) end }
+  tile.foreground = lh.node{ layout = "fill" }; tile.node = lh.node{}
+  tile:initialize(); settle()
+  local by = {}; for _, it in ipairs(tile.items) do by[it.name] = it end
+  check("host: the three items", by.Volume and by.Brightness and by.Touchpad and #tile.items == 3)
+  local v, tp = by.Volume.views[1].node, by.Touchpad.views[1].node
+  check("host: brightness hidden without a backlight, no slot", by.Brightness.hidden == true and by.Brightness.views[1].node.visible == false)
+  check("host: volume after the 2 docked icons (slot 2: 61,6)", v.x == 61 and v.y == 6, v.x .. "," .. v.y)
+  check("host: touchpad next (slot 3: 89,6)", tp.x == 89 and tp.y == 6 and tp.visible ~= false, tp.x .. "," .. tp.y)
+  check("host: one row, 33 high", heights[#heights] == 33, heights[#heights])
+  check("host: volume's tooltip in the tray", tip(v) == "Volume: 40%", tip(v))
+  v.on_click(v, 1)
+  check("host: a click on the volume icon opens its popup, anchored at the tile", lh.flyout_tile == by.Volume and by.Volume.anchor.where == "sidebar")
+  local fx = by.Volume:place(80, 160)
+  check("host: the popup left of the sidebar", fx == 1130 - 80, fx)
+  lh.close_flyout()
+  K = 4; lh._emit("tray", 4)
+  check("host: 4 docked icons: volume in slot 4 (117,6), touchpad wraps to the second row (5,30)", v.x == 117 and v.y == 6 and tp.x == 5 and tp.y == 30, v.x .. "," .. v.y .. " " .. tp.x .. "," .. tp.y)
+  check("host: two rows, 57 high", heights[#heights] == 57, heights[#heights])
+  -- another client owns the tray (flxp-taskbar): the tile stays for the items, which take the first slots
+  foreign = true; lh._emit("tray-owner", true)
+  check("host: tray foreign: the tile shown for the items, the tray node hidden", tile.hidden == false and tile.tray.visible == false)
+  check("host: tray foreign: volume in slot 0 (5,6)", v.x == 5 and v.y == 6, v.x .. "," .. v.y)
+  tile:dispose()
+  check("host: dispose ends the items' commands", next(pipes) == nil)
+  -- the minimized sidebar's taskbar view: the tray's icons, then the items, 20 px apart
+  foreign = false; K = 3
+  local tb = dofile(dir .. "/tiles/notifications.lua")
+  tb.T = { taskbar = { height = 30 } }; tb.R = function(id) return id end; tb.sb = tile.sb; tb.tb = { h = 30, surface = { damage = function() end } }
+  local host = lh.node{}; tb:taskbar(host); settle()
+  local tv = host.kids[1]
+  local tvol; for _, it in ipairs(tb.items) do if it.name == "Volume" then tvol = it end end
+  check("host: taskbar view: the tray 4 + 3 x 20 wide, then the items (two shown: 42 px)", tb.tray.w == 64 and tb.layer.w == 42, tb.tray.w .. " " .. tostring(tb.layer.w))
+  check("host: taskbar view: volume at x 2, touchpad at 22 of the items", tvol.views[1].node.x == 2, tvol.views[1].node.x)
+  check("host: taskbar view: one view node in the bar", tv == tb.view and #host.kids == 1)
+  tvol.views[1].node.on_click(tvol.views[1].node, 1)
+  local px, py = tvol:place(80, 160)
+  check("host: the taskbar popup above the bar at the pointer", px == 1200 - 40 and py == 1024 - 30 - 160, px .. "," .. py)
+  lh.close_flyout(); tb:dispose()
 end
 print(string.format("%d checks, %d failed", n, fails))
 os.exit(fails == 0 and 0 or 1)

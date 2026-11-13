@@ -1,8 +1,9 @@
--- Touchpad tile: turns the touchpad off and on (XP has none; the notification-area icon of the laptop vendors' tools).
+-- Touchpad: a tray item (traycontrol.lua C.item) that turns the touchpad off and on (XP has none; the notification-area
+-- icon of the laptop vendors' tools).
 -- `xinput list`: the first slave pointer whose name has TouchPad, Touchpad or Trackpad; its state is `xinput list-props ID`'s
 -- "libinput Device Enabled" (the evdev / synaptics drivers': "Device Enabled"), read every 2 s; a click sets it with `xinput
 -- set-prop ID 'libinput Device Enabled' 0|1`. Hidden while no touchpad is found (looked for again every 10 s: a USB one
--- plugged in). Tooltip "Touchpad: on (click to turn it off)", label "Touchpad: on" / "off"; no flyout.
+-- plugged in). Tooltip "Touchpad: on (click to turn it off)"; no flyout.
 local C = dofile(lh.lua_dir .. "/traycontrol.lua")
 
 local function start(self, update)
@@ -51,12 +52,11 @@ local function stop(self)
   if self.refind then lh.cancel(self.refind) end
 end
 
-return C.tile{
+return C.item{
   name = "Touchpad",
   hidden_until_read = true,
   start = start, stop = stop,
   icon = function(st) return st.enabled == false and "touchpad-off" or "touchpad-on" end,
-  label = function(st) return "Touchpad: " .. (st.enabled == false and "off" or "on") end,
   tooltip = function(st) if st.enabled == false then return "Touchpad: off (click to turn it on)" end return "Touchpad: on (click to turn it off)" end,
   wheel = function() end,
   click = function(self)

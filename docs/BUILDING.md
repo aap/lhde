@@ -135,11 +135,14 @@ strips and the corner, XP's ramp, none with `[effects] menu_shadows = 0`: `tests
 bar's and the scroll bars' corner: the cursor over them, a drag sizes the window, 4074's dots under jade4074): `tests/headless/grip.sh`, the task band's folder picture against the Icons view's: `tests/headless/folderpic.sh`, flxp's memory on 600 6000 x 4000
 JPEGs in the Thumbnails view at 256 px, paged through and into a subfolder: the peak RSS under 400 MB, the view's images within
 their 64 MB budget plus what is on screen, some evicted, skipped without ImageMagick: `tests/headless/thumbsmem.sh`, a double
-click and Enter on a file with Run as running its command: `tests/headless/runas.sh`) on displays :71-:73
+click and Enter on a file with Run as running its command: `tests/headless/runas.sh`, the window and program icons through
+liblhde's lookup, counted by colour in screenshots of a scratch icon set: the Open With list's and Properties' Opens with icon
+from a desktop file, luxshell's task buttons and the Alt+Tab switcher with an xterm (the class map's cmd) and Display Properties
+(its display key), none generic: `tests/headless/appicons.sh`) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).
-Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac -p`), its tray tiles
+Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac -p`), its tray items and the Classic Tray tile hosting them
 work against stub system commands (`luxshell/tests/tiles.sh`), every tile is in the sidebar menu's parts list
 (`luxshell/tests/parts.py`), and luxwm's frame
 regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a
@@ -151,7 +154,8 @@ Last the free baseline (`make check-free`, `tests/check-free.sh`): the free pack
 themes' photos from `FREE_WALLPAPERS`, and without that directory their missing wallpaper is reported, not failed) imported
 once into `build/free/windows`, and with that tree
 alone every shipped theme must resolve (`lhde-theme explain`, `explain --files`), classic and the ReactOS themes with
-nothing missing but what ReactOS stands in for, and luxwm's classic frames render against a baseline of their own
+nothing missing but what ReactOS stands in for, every icon key of the icon recipes and the class map has a picture in the
+free set (`lhde-theme icon --set reactos --key KEY`), and luxwm's classic frames render against a baseline of their own
 (`build/luxwm/regress/baseline-free.sha256`; ReactOS's Tahoma and Marlett, so they differ from the normal run's).
 Nothing imported at all (`make check-bare`, `tests/check-bare.sh`, what a CI job runs): the whole `make check` with an empty
 Windows tree and empty config, data, state and cache homes and HOME (fresh temporary directories; no `LHDE_DATA`, no ReactOS

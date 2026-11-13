@@ -37,6 +37,7 @@
 #include <lhde/data.h>
 #include <lhde/theme.h>
 #include <lhde/settings.h>
+#include <lhde/icon.h>
 #include <cairo/cairo-xlib.h>
 #include <X11/XKBlib.h>
 #include <X11/keysym.h>
@@ -80,7 +81,6 @@ static cairo_surface_t *client_icon(struct client *c);
 /* EWMH states, stacking order, struts and work area */
 static void ewmh_update_state(struct client *c);
 static int client_hit(struct client *c, int x, int y);
-static cairo_surface_t *app_icon(int want);
 static void ewmh_update_stacking(void);
 static void client_minimize(struct client *c);
 static void client_restore(struct client *c);
@@ -2963,76 +2963,67 @@ client_set_input(struct client *c)
     XSetInputFocus(display, c->window, RevertToPointerRoot, CurrentTime);
 }
 
+/* a window's icon at want px, as every lhde consumer finds it (liblhde lhde_app_icon, docs/THEME-FORMAT.md section 9): its
+   _NET_WM_ICON, the class map (urxvt and xterm: cmd.exe's icon), its desktop file's Icon=, its WM_HINTS icon_pixmap (xterm,
+   xclock, Xt/Motif/FOX programs: no _NET_WM_ICON), the generic application icon; NULL when none answers (the theme's
+   default icon then). WM_HINTS is read into c->icon_pm / icon_mask by client_set_icon. */
+static cairo_surface_t *
+client_lookup_icon(struct client *c, int want)
+{
+    cairo_surface_t *ic = NULL;
+    Atom ty; int fmt; unsigned long n = 0, after; unsigned char *d = NULL;
+    /* the whole array: 1L << 24 longs (a 256 px icon set alone is 87k) */
+    if (XGetWindowProperty(display, c->window, net_atom[NetWMIcon], 0, 1L << 24, False, XA_CARDINAL, &ty, &fmt, &n, &after, &d) == Success && d) {
+        if (fmt == 32 && n > 2) ic = wm_frame_icon_from_netwm((unsigned long *)d, n, want);
+        XFree(d);
+    }
+    if (ic) return ic;
+    XClassHint ch = { NULL, NULL };
+    XGetClassHint(display, c->window, &ch);
+    unsigned long *im = lhde_app_icon(ch.res_class, ch.res_name, NULL, want, NULL, 0, LHDE_APPICON_NO_GENERIC, &n, NULL, NULL, 0);
+    if (ch.res_class) XFree(ch.res_class);
+    if (ch.res_name) XFree(ch.res_name);
+    if (!im && c->icon_pm) { ic = wm_frame_icon_from_pixmap(display, c->icon_pm, c->icon_mask, want); if (ic) return ic; }
+    if (!im) im = lhde_app_icon(NULL, NULL, NULL, want, NULL, 0, 0, &n, NULL, NULL, 0);   /* the generic application icon */
+    if (im) { ic = wm_frame_icon_from_netwm(im, n, want); free(im); }
+    return ic;
+}
+
 static void
 client_set_icon(struct client *c)
 {
-    Atom ty; int fmt; unsigned long n, after; unsigned char *d = NULL;
     int want = theme.mode == THEME_MSSTYLES ? 16 : theme.icon_size;   /* msstyles: SM_CXSMICON */
     if (c->icon) { cairo_surface_destroy((cairo_surface_t *)c->icon); c->icon = NULL; }
     if (c->icon32) { cairo_surface_destroy((cairo_surface_t *)c->icon32); c->icon32 = NULL; }
-    /* _NET_WM_ICON first (the whole array: 1L << 24 longs; a 256 px icon set alone is 87k), then WM_HINTS icon_pixmap/icon_mask
-       (xterm, xclock, Xt/Motif/FOX programs: they have no _NET_WM_ICON). Without either the frame shows the theme's default icon */
-    if (XGetWindowProperty(display, c->window, net_atom[NetWMIcon], 0, 1L << 24, False, XA_CARDINAL, &ty, &fmt, &n, &after, &d) == Success && d) {
-        if (fmt == 32 && n > 2) c->icon = wm_frame_icon_from_netwm((unsigned long *)d, n, want);
-        XFree(d);
-    }
     XWMHints *h = XGetWMHints(display, c->window);
     c->icon_pm = c->icon_mask = None;
     if (h) {
         if (h->flags & IconPixmapHint) c->icon_pm = h->icon_pixmap;
         if (h->flags & IconMaskHint) c->icon_mask = h->icon_mask;
-        if (!c->icon && c->icon_pm) c->icon = wm_frame_icon_from_pixmap(display, c->icon_pm, c->icon_mask, want);
         XFree(h);
     }
-    if (getenv("LHWM_DEBUG")) fprintf(stderr, "luxwm: icon 0x%lx: %s\n", c->window, c->icon ? "client" : app_icon(want) ? "application" : wm_theme_default_icon(&theme, want) ? "theme default" : "none");
+    c->icon = client_lookup_icon(c, want);
+    if (getenv("LHWM_DEBUG")) fprintf(stderr, "luxwm: icon 0x%lx: %s\n", c->window, c->icon ? "found" : wm_theme_default_icon(&theme, want) ? "theme default" : "none");
 }
 
-/* the generic application icon (shell32 #3, user32's IDI_APPLICATION art) from an imported build's pack, 16 and 32 px: what a
-   window without an icon of its own shows in Windows' caption (urxvt, xterm and most X programs have none) */
-static cairo_surface_t *
-app_icon(int want)
-{
-    static cairo_surface_t *ic[2]; static bool tried;
-    if (!tried) {
-        tried = true;
-        static const char *builds[] = { "4074", "4051", "5112", "4042" };
-        for (size_t b = 0; b < sizeof builds / sizeof builds[0] && !ic[0] && !ic[1]; b++)
-            for (int k = 0; k < 2; k++) {
-                char rel[64], q[4200]; snprintf(rel, sizeof rel, "packs/%s/shell32/%d/3.png", builds[b], k ? 32 : 16);
-                if (!lhde_data_find(rel, q, sizeof q)) continue;
-                cairo_surface_t *s = cairo_image_surface_create_from_png(q);
-                if (cairo_surface_status(s) == CAIRO_STATUS_SUCCESS) ic[k] = s; else cairo_surface_destroy(s);
-            }
-    }
-    return want > 16 && ic[1] ? ic[1] : ic[0] ? ic[0] : ic[1];
-}
-
-/* what the caption shows: the client's icon, else the generic application icon, else the theme's default icon (DWM
-   DEFAULTICON / the XP application icon of the classic frame set) */
+/* what the caption shows: the window's icon (client_lookup_icon), else the theme's default icon (DWM DEFAULTICON / the XP
+   application icon of the classic frame set) */
 static cairo_surface_t *
 client_icon(struct client *c)
 {
     if (c->icon) return (cairo_surface_t *)c->icon;
     int want = theme.mode == THEME_MSSTYLES ? 16 : theme.icon_size;
-    cairo_surface_t *a = app_icon(want);
-    return a ? a : wm_theme_default_icon(&theme, want);
+    return wm_theme_default_icon(&theme, want);
 }
 
 /* the Alt+Tab switcher's icon (LUXWM.md "Task switcher"): as the caption's, at 32 px (XP's ICON_BIG, else the class icon, else
-   IDI_APPLICATION): _NET_WM_ICON, WM_HINTS icon_pixmap, the generic application icon, the theme's default icon; kept until the
-   caption icon is read again */
+   IDI_APPLICATION), else the theme's default icon; kept until the caption icon is read again */
 static cairo_surface_t *
 client_icon32(struct client *c)
 {
     if (c->icon32) return (cairo_surface_t *)c->icon32;
-    cairo_surface_t *ic = NULL;
-    Atom ty; int fmt; unsigned long n, after; unsigned char *d = NULL;
-    if (XGetWindowProperty(display, c->window, net_atom[NetWMIcon], 0, 1L << 24, False, XA_CARDINAL, &ty, &fmt, &n, &after, &d) == Success && d) {
-        if (fmt == 32 && n > 2) ic = wm_frame_icon_from_netwm((unsigned long *)d, n, 32);
-        XFree(d);
-    }
-    if (!ic && c->icon_pm) ic = wm_frame_icon_from_pixmap(display, c->icon_pm, c->icon_mask, 32);
-    if (!ic) { ic = app_icon(32); if (!ic) ic = wm_theme_default_icon(&theme, 32); if (ic) cairo_surface_reference(ic); }
+    cairo_surface_t *ic = client_lookup_icon(c, 32);
+    if (!ic) { ic = wm_theme_default_icon(&theme, 32); if (ic) cairo_surface_reference(ic); }
     c->icon32 = ic;
     return ic;
 }
@@ -4498,6 +4489,8 @@ lh_theme_apply(const char *arg, char *canon, size_t n)
     }
     wm_menu_set_theme_smoothing(TV("Fonts.smoothing"));   /* the menus' text, with settings.ini [fonts] smoothing over it */
     wm_frame_fonts_set(TV("path.fonts"));   /* registered by the wm_theme_load that follows */
+    /* the window icons' keys from the theme's icon set (Desktop.icons; "" path: Wine's); every client's icon is read again */
+    lhde_app_icons_set(TV("path.icons")[0] ? TV("path.icons") : !strcmp(TV("Desktop.icons"), "wine") ? "wine" : NULL);
     snprintf(theme_anim, sizeof theme_anim, "%s", TV("Glass.animations"));
     if (canon) snprintf(canon, n, "%s", TV("theme"));
     if (!strncmp(theme_req, "|classic|", 9))
@@ -4624,11 +4617,11 @@ compositor_check(void)
     theme_select();
 }
 
-/* ---- keybindings: ~/.config/lhde/keys (lines: MODS+Key action [arg]); actions: exec, close, kill, cycle, maximize, minimize, sysmenu (the window menu), workspace N, showdesktop, shell CMD (_LHSHELL_COMMAND), start (bare Super → _LHSHELL_START), none ---- */
+/* ---- keybindings: ~/.config/lhde/keys (lines: MODS+Key action [arg]); actions: exec, terminal ([commands] terminal: lhde_terminal_command), close, kill, cycle, maximize, minimize, sysmenu (the window menu), workspace N, showdesktop, shell CMD (_LHSHELL_COMMAND), start (bare Super → _LHSHELL_START), none ---- */
 struct keybind { unsigned mods; KeySym sym; char action[16]; char arg[240]; };
 static struct keybind keys[64]; static int nkeys = 0;
 static const char *default_keys[] = {
-    "Mod4+Return exec urxvt", "Mod4+t exec xterm", "Mod4+e exec if command -v flxp >/dev/null; then exec flxp; else exec rox; fi",
+    "Mod4+Return terminal", "Mod4+t exec xterm", "Mod4+e exec if command -v flxp >/dev/null; then exec flxp; else exec rox; fi",
     "Mod4+r shell run", "Mod4+d showdesktop", "Mod4+s shell sidebar-stacking toggle", "Mod4+h shell sidebar-mode toggle",
     "Mod4+Shift+f shell screenshot", "Mod4+Shift+w shell screenshot_window", "Mod4+Shift+s shell screenshot_region",
     "Mod4+q close", "Mod1+F4 close", "Mod1+space sysmenu", "Mod4+Tab cycle", "Mod1+Tab cycle", "Mod4+Shift+Tab cycle", "Mod1+Shift+Tab cycle", "Mod4+Up maximize", "Mod4+Down minimize",
@@ -4908,6 +4901,7 @@ static void handle_key_press(XEvent *e) {
         if (keys[i].sym != sym || keys[i].mods != mods) continue;
         const char *a = keys[i].action;
         if (!strcmp(a, "exec")) spawn(keys[i].arg);
+        else if (!strcmp(a, "terminal")) { char t[1024]; spawn(lhde_terminal_command(t, sizeof t)); }
         /* the window actions need an active window (Alt+F4 on the desktop closes nothing); Alt+Tab from the desktop first
            reactivates the last focused window */
         else if (!strcmp(a, "close") && client_active(f_client)) client_close(f_client);
