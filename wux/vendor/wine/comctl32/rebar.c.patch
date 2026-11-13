@@ -211,12 +211,55 @@
  
      TRACE("created!\n");
      return 0;
-@@ -3515,6 +3575,8 @@
+@@ -3515,6 +3575,27 @@
      HTHEME theme = GetWindowTheme (infoPtr->hwndSelf);
      CloseThemeData (theme);
      OpenThemeData(infoPtr->hwndSelf, themeClass);
 +    REBAR_CacheThemeInfo(infoPtr);   /* flxp */
++    if (infoPtr->hDefaultFont && infoPtr->hFont == infoPtr->hDefaultFont)
++    {
++        /* lhde: the default font is the caption font at normal weight: the new style's */
++        NONCLIENTMETRICSW ncm;
++        HFONT tfont;
++        ncm.cbSize = sizeof(ncm);
++        SystemParametersInfoW (SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
++        if (ncm.lfCaptionFont.lfWeight > FW_NORMAL) ncm.lfCaptionFont.lfWeight = FW_NORMAL;
++        if ((tfont = CreateFontIndirectW (&ncm.lfCaptionFont)))
++        {
++            DeleteObject (infoPtr->hDefaultFont);
++            infoPtr->hFont = infoPtr->hDefaultFont = tfont;
++        }
++    }
++    {
++        /* lhde: the band headers measured again (a band's text in the new style's font, or GDI's without one) */
++        UINT i;
++        for (i = 0; i < infoPtr->uNumBands; i++) REBAR_ValidateBand(infoPtr, REBAR_GetBand(infoPtr, i));
++    }
 +    REBAR_Layout(infoPtr);
      return 0;
  }
  
+@@ -3733,8 +3814,23 @@
+             return theme_changed (infoPtr);
+ 
+         case WM_SYSCOLORCHANGE:
++        {
++            /* lhde: the bands that took the system colours when they were inserted take the new ones (a style change
++             * from Luna to classic turns the button face from 236 233 216 to 212 208 200); a band's own colours stay */
++            COLORREF face = infoPtr->clrBtnFace, text = infoPtr->clrBtnText;
++            UINT i;
+             COMCTL32_RefreshSysColors();
++            infoPtr->clrBtnFace = comctl32_color.clrBtnFace;
++            infoPtr->clrBtnText = comctl32_color.clrBtnText;
++            for (i = 0; i < infoPtr->uNumBands; i++)
++            {
++                REBAR_BAND *band = REBAR_GetBand(infoPtr, i);
++                if (band->clrBack == face) band->clrBack = infoPtr->clrBtnFace;
++                if (band->clrFore == text) band->clrFore = infoPtr->clrBtnText;
++            }
++            InvalidateRect(hwnd, NULL, TRUE);
+             return 0;
++        }
+ 
+ /*      case WM_VKEYTOITEM:     supported according to ControlSpy */
+ /*	case WM_WININICHANGE: */

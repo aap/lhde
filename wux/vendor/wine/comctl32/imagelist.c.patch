@@ -1,6 +1,16 @@
 --- a/dlls/comctl32/imagelist.c (wine-10.0)
 +++ b/vendor/wine/comctl32/imagelist.c
-@@ -1218,14 +1218,19 @@
+@@ -219,6 +219,9 @@
+             for (j = n * width; j < (n + 1) * width; j++)
+                 if ((has_alpha = ((bits[i * stride + j] & 0xff000000) != 0))) break;
+ 
++        /* lhde: an image without alpha that replaces one with it is drawn through its mask again */
++        if (!has_alpha) himl->item_flags[pos + n] = 0;
++
+         if (has_alpha)
+         {
+             himl->item_flags[pos + n] = ILIF_ALPHA;
+@@ -1218,14 +1221,19 @@
      }
      else if (state & ILS_SATURATE)
      {
@@ -24,3 +34,19 @@
      }
      else if (style & ILD_PRESERVEALPHA)
      {
+@@ -2446,6 +2454,7 @@
+     if (add_with_alpha( himl, hdcImage, i, 1, bmp.bmWidth, bmp.bmHeight, hbmImage, hbmMask ))
+         goto done;
+ 
++    himl->item_flags[i] = 0;   /* lhde: no alpha in this image, whatever the one it replaces had */
+     imagelist_point_from_index(himl, i, &pt);
+     StretchBlt (himl->hdcImage, pt.x, pt.y, himl->cx, himl->cy,
+                   hdcImage, 0, 0, bmp.bmWidth, bmp.bmHeight, SRCCOPY);
+@@ -2559,6 +2568,7 @@
+         if (ret) goto done;
+     }
+ 
++    himl->item_flags[nIndex] = 0;   /* lhde: no alpha in this icon, whatever the one it replaces had */
+     imagelist_point_from_index(himl, nIndex, &pt);
+ 
+     if (himl->hbmMask)

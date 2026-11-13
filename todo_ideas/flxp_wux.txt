@@ -10,6 +10,13 @@
 
 * future: put the aurora example into longhorn flxp as an option
 
+* after luna -> jade4074 -> classic the menu band's items sit 1 px apart from a fresh classic start's (File..Help, x 8..241;
+	tests/headless/themeswitch.sh allows it within its 0.5 %); a fresh classic Explorer draws a black 1 px line left of the
+	Go button's strip that a switched one does not
+
+* the classic theme's icon set (2k) has no Go glyph, so a classic Explorer has no Go button, while XP's classic Explorer has
+	it (WinXP-193211.png)
+
 * the Filter box's text sits 2 px higher and 1 px further left than 4074's (Jade, 4074-dwm.png: cap top 8 px below the box's
 	top, 5 px in; ours 6 and 4): 4074's box is not a plain Edit with a client edge (1 px rounded border)
 

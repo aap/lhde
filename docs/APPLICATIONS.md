@@ -79,7 +79,10 @@ and its hook: the controls go under the dialog's own, the hook gets `WM_INITDIAL
 with a caption (a modeless Find dialog) is its owner's transient, as XP keeps owned windows above their owner.
 
 The look needs nothing from the application: WuxInit loads the session theme's visual style, colours, metrics and fonts, and
-the program follows a theme switch by itself (`WM_THEMECHANGED`, the system colours), as every flxp program does. Controls are
+the program follows a theme switch by itself, as every flxp program does: wux reloads the style and posts `WM_THEMECHANGED`,
+`WM_SYSCOLORCHANGE` and `WM_SETTINGCHANGE` to every window, children included (a program need not pass them on to its
+controls; comctl32's rebar takes the new face colour and caption font, an image list's icon without alpha that replaces one
+with it draws through its mask, a list view's header takes its font in every view). Controls are
 themed by the style; a dialog in "MS Shell Dlg" gets the theme's dialog font.
 
 ## What the shell layer offers (shell/shell.h)

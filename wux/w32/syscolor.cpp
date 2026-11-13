@@ -4,6 +4,8 @@
 // COLOR_HOTLIGHT, which XP classic has at 0,0,128).
 #include "w32/image.h"
 
+extern "C" void COMCTL32_RefreshSysColors(void) __attribute__((weak));
+
 namespace w32 {
 
 static const int NUM_SYS_COLORS = COLOR_MENUBAR + 1;
@@ -130,6 +132,7 @@ void reset_syscolors()
     init_syscolor();
     for (int i = 0; i < NUM_SYS_COLORS; i++) colors[i] = default_colors[i];
     refresh_objects();
+    if (COMCTL32_RefreshSysColors) COMCTL32_RefreshSysColors();   // comctl32's copy (its controls re-read it on WM_SYSCOLORCHANGE)
 }
 
 // Static initialiser so the table is ready before main(); everything also

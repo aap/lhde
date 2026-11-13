@@ -12014,6 +12014,9 @@ static LRESULT LISTVIEW_SetFont(LISTVIEW_INFO *infoPtr, HFONT hFont, WORD fRedra
 
     infoPtr->nItemHeight = LISTVIEW_CalculateItemHeight(infoPtr);
 
+    /* lhde: the header takes the font in every view, so a later switch to Details shows it in this one */
+    if (infoPtr->hwndHeader && infoPtr->uView != LV_VIEW_DETAILS)
+        SendMessageW(infoPtr->hwndHeader, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(FALSE, 0));
     if (infoPtr->uView == LV_VIEW_DETAILS)
     {
 	SendMessageW(infoPtr->hwndHeader, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(fRedraw, 0));

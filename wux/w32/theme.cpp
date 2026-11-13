@@ -142,10 +142,14 @@ static bool parse_font(const std::string& v, LOGFONTW& lf)
     return true;
 }
 
-static BOOL CALLBACK post_settings_changed(HWND h, LPARAM)
+// WM_SYSCOLORCHANGE and WM_SETTINGCHANGE (the metrics) to every window: Windows sends them to the top-level windows after
+// the colours or a visual style changed and a program passes them on to its common controls; here every child gets them
+// too, so a control that caches the colours (comctl32's rebar, toolbar, list view, tree view) takes the new ones
+static BOOL CALLBACK post_settings_changed(HWND h, LPARAM top)
 {
     PostMessageW(h, WM_SYSCOLORCHANGE, 0, 0);
     PostMessageW(h, WM_SETTINGCHANGE, SPI_SETNONCLIENTMETRICS, 0);
+    if (top) EnumChildWindows(h, post_settings_changed, 0);
     return TRUE;
 }
 
@@ -241,12 +245,13 @@ void session_theme_refresh()
         init_sysparams();                                // flxp: and the metrics (a classic scheme's Large Fonts)
         set_theme(t.classic ? nullptr : t.msstyles.c_str(), t.color.c_str(), t.size.c_str());
         if (t.classic) apply_classic_look(t);            // flxp: the scheme's colours and metrics (section 2a)
+        EnumWindows(post_settings_changed, 1);           // the style's [SysMetrics] colours and fonts, or classic's
         if (getenv("FLXP_DEBUG")) fprintf(stderr, "flxp: session theme %s: %s (%s/%s), window text %06x\n", t.name.c_str(),
                                           t.classic ? "classic" : t.msstyles.c_str(), t.color.c_str(), t.size.c_str(),
                                           (unsigned)GetSysColor(COLOR_WINDOWTEXT));
     } else {
         // flxp: classic with another scheme, size or Advanced edit: the system colours and metrics again
-        if (classic_look) { apply_classic_look(t); EnumWindows(post_settings_changed, 0); }
+        if (classic_look) { apply_classic_look(t); EnumWindows(post_settings_changed, 1); }
         // the same style (aero4074 and aerovision both load realaero): still a theme
         // change for the windows (chrome, navbar, icons, luxwm's frame)
         EnumWindows(post_theme_changed, 1);

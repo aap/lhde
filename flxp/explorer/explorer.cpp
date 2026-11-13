@@ -183,6 +183,43 @@ static void icons_changed()
     RedrawWindow(g.frame, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
 }
 
+namespace gobutton { static void icons_changed(HWND cbx); }
+namespace brand { static void create(HWND rebar); static void destroy(HWND rebar); }
+
+static BOOL CALLBACK send_theme_changed(HWND h, LPARAM) { SendMessageW(h, WM_THEMECHANGED, 0, 0); return TRUE; }
+
+// A theme change, after the frame's children took the new style:
+// the bands fitted again as create_children fits them: the toolbar band's height from its first button and,
+// under a style, its 4 px header; the Address band as high as the inner combo box, the Go button the icon set's
+static void bands_changed()
+{
+    if (!g.rebar || !g.toolbar) return;
+    brand::destroy(g.rebar);   // the throbber the icon set has, or none
+    brand::create(g.rebar);
+    set_toolbar_size(g.large_toolbar);
+    REBARBANDINFOW rb = {};
+    rb.cbSize = sizeof rb;
+    int ti = (int)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_TOOLBAR, 0);
+    if (ti >= 0) {
+        rb.fMask = RBBIM_HEADERSIZE;
+        rb.cxHeader = GetWindowTheme(g.rebar) ? 4 : 0;   // unthemed: what the rebar gives a band without gripper and text
+        SendMessageW(g.rebar, RB_SETBANDINFOW, (WPARAM)ti, (LPARAM)&rb);
+    }
+    int ai = g.address ? (int)SendMessageW(g.rebar, RB_IDTOINDEX, IDC_ADDRESS, 0) : -1;
+    if (ai >= 0) {
+        gobutton::icons_changed(g.address);
+        HWND combo = (HWND)SendMessageW(g.address, CBEM_GETCOMBOCONTROL, 0, 0);
+        RECT crc = {};
+        GetWindowRect(combo ? combo : g.address, &crc);
+        rb.fMask = RBBIM_CHILDSIZE;
+        SendMessageW(g.rebar, RB_GETBANDINFOW, (WPARAM)ai, (LPARAM)&rb);
+        rb.cyMinChild = (UINT)(crc.bottom - crc.top);
+        SendMessageW(g.rebar, RB_SETBANDINFOW, (WPARAM)ai, (LPARAM)&rb);
+    }
+    layout();
+    RedrawWindow(g.rebar, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN);
+}
+
 // ---- Go button ----------------------------------------------------------------
 // XP: the Go button is a one-button list toolbar inside the
 // ComboBoxEx window, which is subclassed so that its inner combo leaves room on
@@ -193,6 +230,7 @@ namespace gobutton {
 
 HWND g_tb = nullptr;
 WNDPROC g_old = nullptr;
+bool g_hidden = false;   // the icon set has no Go glyph: no button (go_width 0)
 
 static void place(HWND cbx, int cx)
 {
@@ -201,10 +239,12 @@ static void place(HWND cbx, int cx)
     HWND combo = (HWND)SendMessageW(cbx, CBEM_GETCOMBOCONTROL, 0, 0);
     RECT cr = {}; GetWindowRect(combo ? combo : cbx, &cr);
     int y = (cr.bottom - cr.top - cyGo) / 2;
+    if (g_hidden) return;
     SetWindowPos(g_tb, nullptr, cx - cxGo, y, cxGo, cyGo, SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_NOZORDER);
 }
 
-static int go_width() { RECT rc = {}; SendMessageW(g_tb, TB_GETITEMRECT, 0, (LPARAM)&rc); return rc.right - rc.left; }
+static int go_width() { if (g_hidden) return 0; RECT rc = {}; SendMessageW(g_tb, TB_GETITEMRECT, 0, (LPARAM)&rc); return rc.right - rc.left; }
+static int go_room() { return g_hidden ? 0 : go_width() + 2; }   // what the combo leaves on its right
 
 static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 {
@@ -214,17 +254,17 @@ static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         if (pwp->flags & SWP_NOSIZE) break;
         WINDOWPOS wp2 = *pwp;
         int cx = pwp->cx;
-        wp2.cx -= go_width() + 2;
+        wp2.cx -= go_room();
         LRESULT r = CallWindowProcW(g_old, h, msg, wp, (LPARAM)&wp2);
         pwp->cy = wp2.cy;   // Wine's comboex fits its height to the combo
-        RECT inv = { cx - go_width() - 2, 0, cx, pwp->cy };
+        RECT inv = { cx - go_room(), 0, cx, pwp->cy };
         InvalidateRect(h, &inv, TRUE);
         place(h, cx);
         return r;
     }
     case WM_SIZE: {
         int cx = LOWORD(lp), cy = HIWORD(lp);
-        LRESULT r = CallWindowProcW(g_old, h, msg, wp, MAKELPARAM(cx - go_width() - 2, cy));
+        LRESULT r = CallWindowProcW(g_old, h, msg, wp, MAKELPARAM(cx - go_room(), cy));
         place(h, cx);
         return r;
     }
@@ -284,8 +324,10 @@ static HIMAGELIST glyphs(const std::string& src, int size)
     return il;
 }
 
+
 static void create(HWND cbx)
 {
+    g_tb = nullptr; g_old = nullptr; g_hidden = false;   // a new Address box (the frame's children made again)
     const shell::ToolbarTheme& t = shell::icon_theme().toolbar;
     if (t.go.empty()) return;
     HIMAGELIST def = glyphs(t.go, t.go_size), hot = glyphs(t.go_hot.empty() ? t.go : t.go_hot, t.go_size);
@@ -302,6 +344,30 @@ static void create(HWND cbx)
     TBBUTTON b = { 0, 1, TBSTATE_ENABLED, BTNS_BUTTON, {0}, 0, (INT_PTR)L"Go" };
     SendMessageW(g_tb, TB_ADDBUTTONSW, 1, (LPARAM)&b);
     RECT rc; GetClientRect(cbx, &rc);
+    SetWindowPos(cbx, nullptr, 0, 0, rc.right + 1, rc.bottom, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);   // the combo fitted beside it
+    SetWindowPos(cbx, nullptr, 0, 0, rc.right, rc.bottom, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+// another icon set: its Go glyphs, or no button when it has none
+static void icons_changed(HWND cbx)
+{
+    if (!g_tb || !IsWindow(g_tb)) { create(cbx); return; }
+    const shell::ToolbarTheme& t = shell::icon_theme().toolbar;
+    HIMAGELIST def = t.go.empty() ? nullptr : glyphs(t.go, t.go_size);
+    HIMAGELIST hot = def ? glyphs(t.go_hot.empty() ? t.go : t.go_hot, t.go_size) : nullptr;
+    g_hidden = !def;
+    if (def) {
+        HIMAGELIST old = (HIMAGELIST)SendMessageW(g_tb, TB_SETIMAGELIST, 0, (LPARAM)def);
+        HIMAGELIST oldhot = (HIMAGELIST)SendMessageW(g_tb, TB_SETHOTIMAGELIST, 0, (LPARAM)hot);
+        if (old) ImageList_Destroy(old);
+        if (oldhot) ImageList_Destroy(oldhot);
+        SendMessageW(g_tb, TB_SETBITMAPSIZE, 0, MAKELONG(t.go_size, t.go_size));
+        SendMessageW(g_tb, TB_AUTOSIZE, 0, 0);
+    } else {
+        ShowWindow(g_tb, SW_HIDE);
+    }
+    RECT rc; GetClientRect(cbx, &rc);
+    SetWindowPos(cbx, nullptr, 0, 0, rc.right + 1, rc.bottom, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);   // re-fit the combo
     SetWindowPos(cbx, nullptr, 0, 0, rc.right, rc.bottom, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
@@ -2162,13 +2228,17 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         if (g.header) header::pixmap_changed();
         return 0;
     case WM_THEMECHANGED:                   // the session theme: the header's images, the command bar
-        fonts_changed();                    // the style's fonts (tree, list, status bar, menu band)
+        // the children take the new style first (the frame hears of it before them), so that what is measured here
+        // (the list's header, the menu band's and the toolbar's buttons, the bands) is measured in it
+        EnumChildWindows(h, send_theme_changed, 0);
+        fonts_changed();                   // the style's fonts (tree, list, status bar, menu band)
         menuband::fonts_changed();
         lhbar::theme_changed();             // before a 4051 command bar is made for this theme
         taskpane::theme_changed();          // (Explorer.taskpane: the band at the top or the bottom)
         if (g.taskband) { places::set_top_inset(taskpane::bottom() ? 0 : 14); layout(); }
+        icons_changed();                    // the theme's icon set (Desktop.icons), before the frame's bars are made for it
         set_frame_mode(want_longhorn());    // Explorer.chrome (Luna: the XP explorer)
-        icons_changed();                    // the theme's icon set (Desktop.icons)
+        if (!g.longhorn) bands_changed();   // the toolbar and Address bands fitted to the new style
         if (g.header) {
             header::theme_changed();
             header_refit(h);

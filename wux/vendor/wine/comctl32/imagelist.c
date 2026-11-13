@@ -219,6 +219,9 @@ static void add_dib_bits( HIMAGELIST himl, int pos, int count, int width, int he
             for (j = n * width; j < (n + 1) * width; j++)
                 if ((has_alpha = ((bits[i * stride + j] & 0xff000000) != 0))) break;
 
+        /* lhde: an image without alpha that replaces one with it is drawn through its mask again */
+        if (!has_alpha) himl->item_flags[pos + n] = 0;
+
         if (has_alpha)
         {
             himl->item_flags[pos + n] = ILIF_ALPHA;
@@ -2451,6 +2454,7 @@ ImageList_Replace (HIMAGELIST himl, INT i, HBITMAP hbmImage,
     if (add_with_alpha( himl, hdcImage, i, 1, bmp.bmWidth, bmp.bmHeight, hbmImage, hbmMask ))
         goto done;
 
+    himl->item_flags[i] = 0;   /* lhde: no alpha in this image, whatever the one it replaces had */
     imagelist_point_from_index(himl, i, &pt);
     StretchBlt (himl->hdcImage, pt.x, pt.y, himl->cx, himl->cy,
                   hdcImage, 0, 0, bmp.bmWidth, bmp.bmHeight, SRCCOPY);
@@ -2564,6 +2568,7 @@ ImageList_ReplaceIcon (HIMAGELIST himl, INT nIndex, HICON hIcon)
         if (ret) goto done;
     }
 
+    himl->item_flags[nIndex] = 0;   /* lhde: no alpha in this icon, whatever the one it replaces had */
     imagelist_point_from_index(himl, nIndex, &pt);
 
     if (himl->hbmMask)

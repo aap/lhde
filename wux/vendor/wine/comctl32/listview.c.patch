@@ -1485,7 +1485,7 @@
  
      if (infoPtr->hwndHeader)  UpdateWindow(infoPtr->hwndHeader);
  
-@@ -11043,6 +12010,7 @@
+@@ -11043,9 +12010,13 @@
      if (infoPtr->hFont == oldFont) return 0;
      
      LISTVIEW_SaveTextMetrics(infoPtr);
@@ -1493,7 +1493,13 @@
  
      infoPtr->nItemHeight = LISTVIEW_CalculateItemHeight(infoPtr);
  
-@@ -11448,7 +12416,17 @@
++    /* lhde: the header takes the font in every view, so a later switch to Details shows it in this one */
++    if (infoPtr->hwndHeader && infoPtr->uView != LV_VIEW_DETAILS)
++        SendMessageW(infoPtr->hwndHeader, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(FALSE, 0));
+     if (infoPtr->uView == LV_VIEW_DETAILS)
+     {
+ 	SendMessageW(infoPtr->hwndHeader, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(fRedraw, 0));
+@@ -11448,7 +12419,17 @@
    case LVM_EDITLABELW:
      return (LRESULT)LISTVIEW_EditLabelT(infoPtr, (INT)wParam,
                                          uMsg == LVM_EDITLABELW);
@@ -1512,7 +1518,7 @@
  
    case LVM_ENSUREVISIBLE:
      return LISTVIEW_EnsureVisible(infoPtr, (INT)wParam, (BOOL)lParam);
-@@ -11558,7 +12536,8 @@
+@@ -11558,7 +12539,8 @@
      LISTVIEW_GetOrigin(infoPtr, (LPPOINT)lParam);
      return TRUE;
  
@@ -1522,7 +1528,7 @@
  
    case LVM_GETSELECTEDCOLUMN:
      return infoPtr->selected_column;
-@@ -11583,9 +12562,29 @@
+@@ -11583,9 +12565,29 @@
    case LVM_GETTEXTCOLOR:
      return infoPtr->clrText;
  
@@ -1554,7 +1560,7 @@
  
    case LVM_GETTOOLTIPS:
      if( !infoPtr->hwndToolTip )
-@@ -11599,7 +12598,7 @@
+@@ -11599,7 +12601,7 @@
      return (infoPtr->notifyFormat == NFR_UNICODE);
  
    case LVM_GETVIEW:
@@ -1563,7 +1569,7 @@
  
    case LVM_GETVIEWRECT:
      return LISTVIEW_GetViewRect(infoPtr, (LPRECT)lParam);
-@@ -11618,7 +12617,8 @@
+@@ -11618,7 +12620,8 @@
      return LISTVIEW_InsertColumnT(infoPtr, (INT)wParam, (LPLVCOLUMNW)lParam,
                                    uMsg == LVM_INSERTCOLUMNW);
  
@@ -1573,7 +1579,7 @@
  
    /* case LVM_INSERTGROUPSORTED: */
  
-@@ -11628,7 +12628,33 @@
+@@ -11628,7 +12631,33 @@
  
    /* case LVM_INSERTMARKHITTEST: */
  
@@ -1608,7 +1614,7 @@
  
    case LVM_ISITEMVISIBLE:
      return LISTVIEW_IsItemVisible(infoPtr, (INT)wParam);
-@@ -11734,7 +12760,12 @@
+@@ -11734,7 +12763,12 @@
      return LISTVIEW_SetItemTextT(infoPtr, (INT)wParam, (LPLVITEMW)lParam,
                                   uMsg == LVM_SETITEMTEXTW);
  
@@ -1622,7 +1628,7 @@
  
    case LVM_SETSELECTEDCOLUMN:
      infoPtr->selected_column = (INT)wParam;
-@@ -11749,9 +12780,36 @@
+@@ -11749,9 +12783,36 @@
    case LVM_SETTEXTCOLOR:
      return LISTVIEW_SetTextColor(infoPtr, (COLORREF)lParam);
  
@@ -1661,7 +1667,7 @@
  
    /* case LVM_SETTILEWIDTH: */
  
-@@ -11817,6 +12875,17 @@
+@@ -11817,6 +12878,17 @@
    case WM_KEYDOWN:
      return LISTVIEW_KeyDown(infoPtr, (INT)wParam, (LONG)lParam);
  
@@ -1679,7 +1685,7 @@
    case WM_KILLFOCUS:
      return LISTVIEW_KillFocus(infoPtr);
  
-@@ -11835,6 +12904,15 @@
+@@ -11835,6 +12907,15 @@
    case WM_MOUSEHOVER:
      return LISTVIEW_MouseHover(infoPtr, (SHORT)LOWORD(lParam), (SHORT)HIWORD(lParam));
  
@@ -1695,7 +1701,7 @@
    case WM_NCDESTROY:
      return LISTVIEW_NCDestroy(infoPtr);
  
-@@ -11983,45 +13061,9 @@
+@@ -11983,45 +13064,9 @@
      switch (HIWORD(wParam))
      {
  	case EN_UPDATE:
