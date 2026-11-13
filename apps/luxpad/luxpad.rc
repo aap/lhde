@@ -8,7 +8,7 @@
  * The English resources only. The menu is XP's notepad's (no New Window item: its Ctrl+Shift+N stays; Page Setup, Print and
  * Help Topics are gone with printing and help; About names luxpad); the Go To dialog has XP's caption and label; the
  * status bar's text is XP's "Ln, Col"; F5 inserts XP's short time and date (main.cpp). The Encoding and line-end boxes
- * under the Save As dialog are ReactOS's template (XP had the Encoding box alone). The icon is ReactOS's notepad.ico.
+ * under the Save As dialog are ReactOS's template (XP has the Encoding box alone). The icon is ReactOS's notepad.ico.
  * Build: make apps/luxpad/luxpad.res (mingw windres; the .res is checked in); embedded by main.cpp.
  */
 #include <windows.h>
