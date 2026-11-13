@@ -69,8 +69,9 @@ LRESULT nc_calc_size(HWND h, WPARAM wparam, RECT* r)
         adjust_frame_rect(&tmp, style, FALSE, ex & ~WS_EX_CLIENTEDGE);
         r->left -= tmp.left; r->top -= tmp.top; r->right -= tmp.right; r->bottom -= tmp.bottom;
     }
+    // the menu bar and the line under it (nc_paint draws the bar's height and that line: SM_CYMENU + 1, as XP's 20 rows)
     if (((style & (WS_CHILD | WS_POPUP)) != WS_CHILD) && GetMenu(h))
-        r->top += MENU_GetMenuBarHeight(h, r->right - r->left, 0, 0);
+        r->top += MENU_GetMenuBarHeight(h, r->right - r->left, 0, 0) + 1;
     if (ex & WS_EX_CLIENTEDGE)
         if (r->right - r->left > 2 * GetSystemMetrics(SM_CXEDGE) && r->bottom - r->top > 2 * GetSystemMetrics(SM_CYEDGE))
             InflateRect(r, -GetSystemMetrics(SM_CXEDGE), -GetSystemMetrics(SM_CYEDGE));
@@ -367,7 +368,20 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         nc_paint(h, (HRGN)wp);
         return 0;
     case WM_NCACTIVATE:
+        if (HAS_MENU(h, w->style)) DrawMenuBar(h);   // a themed bar has an active and an inactive look
         return TRUE;
+    case WM_NCMOUSEMOVE:
+        // XP hot-tracks the menu bar: the item under the pointer is drawn hot until it leaves (WM_NCMOUSELEAVE)
+        if (HAS_MENU(h, w->style)) {
+            POINT pt = { (SHORT)LOWORD(lp), (SHORT)HIWORD(lp) };
+            MENU_SetBarHot(h, pt, wp == HTMENU);
+            TRACKMOUSEEVENT t = { sizeof t, TME_LEAVE | TME_NONCLIENT, h, 0 };
+            TrackMouseEvent(&t);
+        }
+        return 0;
+    case WM_NCMOUSELEAVE:
+        if (HAS_MENU(h, w->style)) { POINT pt = { -1, -1 }; MENU_SetBarHot(h, pt, FALSE); }
+        return 0;
     case WM_NCLBUTTONDOWN:
         switch (wp) {
         case HTVSCROLL: SendMessageW(h, WM_SYSCOMMAND, SC_VSCROLL + HTVSCROLL, lp); break;
@@ -397,8 +411,11 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     case WM_SYSKEYDOWN:
         // XP: the first Alt press shows the window's keyboard cues (WM_CHANGEUISTATE to the top level, which tells
         // every child); they stay for that window
-        if ((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && !(lp & 0x40000000))
-            SendMessageW(GetAncestor(h, GA_ROOT), WM_CHANGEUISTATE, MAKEWPARAM(UIS_CLEAR, UISF_HIDEACCEL), 0);
+        if ((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && !(lp & 0x40000000)) {
+            HWND top = GetAncestor(h, GA_ROOT);
+            SendMessageW(top, WM_CHANGEUISTATE, MAKEWPARAM(UIS_CLEAR, UISF_HIDEACCEL), 0);
+            if (GetMenu(top)) DrawMenuBar(top);   // the menu bar's mnemonics show while Alt is held
+        }
         if (HIWORD(lp) & KEYDATA_ALT) {
             if ((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && !g_menu_sys_key) g_menu_sys_key = 1;
             else g_menu_sys_key = 0;
@@ -418,6 +435,8 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     case WM_SYSKEYUP:
         if (((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && g_menu_sys_key) || (wp == VK_F10 && g_f10_key))
             SendMessageW(GetAncestor(h, GA_ROOT), WM_SYSCOMMAND, SC_KEYMENU, 0);
+        else if ((wp == VK_MENU || wp == VK_LMENU || wp == VK_RMENU) && GetMenu(GetAncestor(h, GA_ROOT)))
+            DrawMenuBar(GetAncestor(h, GA_ROOT));   // Alt used with another key: the bar's mnemonics hidden again
         g_menu_sys_key = g_f10_key = 0;
         return 0;
     case WM_SYSCHAR:

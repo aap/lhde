@@ -94,6 +94,9 @@ else
     result "headless/alttab.sh$(grep -m1 '^skip' "$T/alttab.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/alttab.log"
     # a click outside an open menu ends it and acts where it was made (docs/CLIENT-PROTOCOL.md "Menus and clicks"), under luxwm
     tests/headless/menus.sh "$3" > "$T/menus.log" 2>&1; result headless/menus.sh $? "$T/menus.log"
+    # a Win32 program's menu bar under jade4074 (4074's themed bar), luna (XP's flat bar) and classic, read back at measured points
+    tests/headless/menubar.sh "$1" > "$T/menubar.log" 2>&1; rc=$?
+    result "headless/menubar.sh$(grep -m1 '^skip' "$T/menubar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/menubar.log"
     # the task band's picture of a folder with two JPEGs is the Icons view's square (folderpictest)
     tests/headless/folderpic.sh "$2" > "$T/folderpic.log" 2>&1; result headless/folderpic.sh $? "$T/folderpic.log"
     # flxp's peak RSS on 600 6000 x 4000 JPEGs at 256 px, the view's images within their budget (needs ImageMagick)

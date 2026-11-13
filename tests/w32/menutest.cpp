@@ -5,6 +5,8 @@
 #include "w32/w32.h"
 #include "w32/user.h"
 
+extern "C" void WINAPI WuxInit(void);
+
 static void CALLBACK quit_timer(HWND h, UINT, UINT_PTR, DWORD) { DestroyWindow(h); }
 
 static HMENU build_menu()
@@ -75,7 +77,7 @@ static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 
 int main(int argc, char** argv)
 {
-    w32::init();
+    WuxInit();   // the fonts and the session's visual style, as a program has them
     WNDCLASSW wc = {};
     wc.lpfnWndProc = proc;
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
@@ -85,6 +87,18 @@ int main(int argc, char** argv)
     HWND w = CreateWindowExW(0, L"flxpmenu", L"flxp menus", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 100, 100, 400, 300, nullptr, build_menu(), nullptr, nullptr);
     CreateWindowExW(0, L"Static", L"Click the menu bar, right-click here for a context menu, or press Alt.", WS_CHILD | WS_VISIBLE, 20, 20, 340, 40, w, nullptr, nullptr, nullptr);
     if (argc > 1) SetTimer(w, 1, atoi(argv[1]), quit_timer);
+    // MENUTEST_RECTS=1: the menu bar's items as "item N L T R B" in window coordinates (tests/headless/menubar.sh)
+    if (getenv("MENUTEST_RECTS")) {
+        RECT wr; GetWindowRect(w, &wr);
+        for (int i = 0; i < GetMenuItemCount(GetMenu(w)); i++) {
+            RECT r;
+            if (GetMenuItemRect(w, GetMenu(w), (UINT)i, &r))
+                printf("item %d %ld %ld %ld %ld\n", i, r.left - wr.left, r.top - wr.top, r.right - wr.left, r.bottom - wr.top);
+        }
+        RECT cr; GetClientRect(w, &cr); POINT o = { 0, 0 }; ClientToScreen(w, &o);
+        printf("client %ld %ld %ld %ld\n", o.x - wr.left, o.y - wr.top, o.x - wr.left + cr.right, o.y - wr.top + cr.bottom);
+        fflush(stdout);
+    }
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) { TranslateMessage(&msg); DispatchMessageW(&msg); }
     return 0;

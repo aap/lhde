@@ -11,6 +11,7 @@
 #include <vector>
 #include "w32.h"
 #include "kernel.h"
+#include "user.h"
 #include "image.h"
 #include "shell/lhtheme.h"
 #include "shell/config.h"
@@ -67,6 +68,12 @@ static BOOL CALLBACK post_theme_changed(HWND h, LPARAM top)
 {
     PostMessageW(h, WM_THEMECHANGED, 0, 0);
     if (top) EnumChildWindows(h, post_theme_changed, 0);
+    return TRUE;
+}
+
+static BOOL CALLBACK refit_menu_bar(HWND h, LPARAM)
+{
+    if (GetMenu(h)) DrawMenuBar(h);
     return TRUE;
 }
 
@@ -242,7 +249,10 @@ void session_theme_refresh()
         // change for the windows (chrome, navbar, icons, luxwm's frame)
         EnumWindows(post_theme_changed, 1);
     }
-    // repaint everything: system colours, non-client areas, unthemed parts
+    // the menu font may be another one: menu bars measured again (DrawMenuBar: the frame recalculated), then repaint
+    // everything: system colours, non-client areas, unthemed parts
+    MENU_FontsChanged();
+    EnumWindows(refit_menu_bar, 0);
     EnumWindows(redraw_all, 0);
 }
 

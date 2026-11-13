@@ -31,6 +31,11 @@ typedef struct UXMENU_LOOK {
     HTHEME band_theme;                  /* its plate: the style's StartMenu::Toolbar (part 0) */
     COLORREF band_arrow;                /* its submenu arrow: StartMenu::MenuBand's TEXTCOLOR */
     int band_gutter, band_icon_x, band_text_x;   /* the band's icon column (the plate's left sizing margin), icon, text */
+    int p_bar, p_baritem;               /* the menu bar's parts (BAR, BARITEM; 0 = none: XP's flat or classic bar) */
+    int s_bar[2], s_bi[6];              /* BAR's state for an inactive and an active window's bar; BARITEM's for normal, hot,
+                                           pushed, disabled, disabled hot, disabled pushed (the style's own numbers) */
+    COLORREF bt[6];                     /* the bar items' text colours in those states */
+    COLORREF window;                    /* COLOR_WINDOW: the line under a themed bar */
 } UXMENU_LOOK;
 
 /* a private MENUINFO style bit (MIM_STYLE): the popup is a shell menu band (the start menu's Programs cascades), not a user32
@@ -39,7 +44,8 @@ typedef struct UXMENU_LOOK {
 
 /* the item flags and the system menu glyphs (XP's HBMMENU_POPUP_*) */
 enum { UXMENU_DISABLED = 1, UXMENU_SEPARATOR = 2, UXMENU_DEFAULT = 4, UXMENU_CHECKED = 8, UXMENU_RADIO = 16, UXMENU_SUBMENU = 32,
-       UXMENU_HOT = 64, UXMENU_CUES = 128 /* underline the mnemonic */, UXMENU_TEXTONLY = 256 /* the text over a drawn item */ };
+       UXMENU_HOT = 64, UXMENU_CUES = 128 /* underline the mnemonic */, UXMENU_TEXTONLY = 256 /* the text over a drawn item */,
+       UXMENU_PUSHED = 512 /* a menu bar item whose menu is open */ };
 enum { UXMENU_GLYPH_NONE, UXMENU_GLYPH_RESTORE, UXMENU_GLYPH_MINIMIZE, UXMENU_GLYPH_MAXIMIZE, UXMENU_GLYPH_CLOSE };
 
 /* sys: the system colours in COLOR_ order (UT_SYSCOLORS of them; NULL: GetSysColor); flat: FLATMENUS; theme: the style's
@@ -69,6 +75,17 @@ void UXMENU_DrawFrame(const UXMENU_LOOK *L, HDC hdc, const RECT *menu);
  * instead) and the submenu arrow. text NULL: everything but the text (an owner's bitmap item). */
 void UXMENU_DrawItem(const UXMENU_LOOK *L, HDC hdc, const RECT *rect, unsigned flags, int glyph, const WCHAR *text, int text_len,
                      const WCHAR *accel, int accel_x);
+/* the menu bar of a style with the Longhorn Menu class's BAR and BARITEM parts, as 4074's user32 draws a program's menu bar
+ * (Notepad under Jade): active: the window's, bar = the whole bar (its first row is the 1 px top border, MENU_MenuBarCalcSize's) in COLOR_MENU with
+ * BAR over the rows under it, and the line under the bar (the row after bar) in COLOR_WINDOW. FALSE (nothing drawn) for a look
+ * without those parts: user32 draws XP's flat bar (FLATMENUS: COLOR_MENUBAR, the selected item MENUHILIGHT framed in HIGHLIGHT)
+ * or the classic one (COLOR_MENU, a raised or sunken edge) itself */
+BOOL UXMENU_DrawBar(const UXMENU_LOOK *L, HDC hdc, const RECT *bar, BOOL active);
+/* one item of that bar: rect from the bar's top to the item's bottom, BARITEM in the state the flags say (UXMENU_HOT,
+ * UXMENU_PUSHED, UXMENU_DISABLED) over the bar, then text_len chars of text centred in text_rect in BARITEM's text colour,
+ * the mnemonic underlined with UXMENU_CUES. FALSE for a look without BARITEM */
+BOOL UXMENU_DrawBarItem(const UXMENU_LOOK *L, HDC hdc, const RECT *rect, unsigned flags, const WCHAR *text, int text_len,
+                        const RECT *text_rect);
 /* only the submenu arrow of an item (an owner-drawn one: Windows draws the arrow after the owner) */
 void UXMENU_DrawArrow(const UXMENU_LOOK *L, HDC hdc, const RECT *rect, unsigned flags);
 

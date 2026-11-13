@@ -78,7 +78,8 @@ counts, flxp's remembered views and icon positions). Nothing else is read (docs/
   and the sample in `flxp/settings`, kept equal by hand; and luxwm's glass and msstyles frames are its own compositions of the
   style's parts (drawn through wuxtheme, laid out by `frame.c` after uxtheme's nctheme rules), not uxtheme's non-client code.
 - **Popup menus**: the themed popup menu has one painter, wuxtheme's (`wuxtheme/menu.cpp`: XP's popup in the style's colours and
-  menu font, the Longhorn/Vista Menu parts where the style has them), which Wine's user32 menus in wux call for every popup (flxp's
+  menu font, the Longhorn/Vista Menu parts where the style has them; also a Win32 program's menu bar under a style with the Menu
+  class's BAR and BARITEM parts, as 4074 draws Notepad's, while XP's flat and classic bars stay user32's own drawing), which Wine's user32 menus in wux call for every popup (flxp's
   context menus, menu band, the start menu's Programs cascades: owner-drawn items marked `UXMENU_MNS_BAND`, which the painter gives
   4074's menu band look under a Longhorn style, `UXMENU_SetBand`, and the owner only its icons and text), and luxwm's window menu
   and luxshell's context menus (the sidebar, tiles, Avalon taskbar and Start button: `luxshell/menupaint.c`, `lh.menu_render`)

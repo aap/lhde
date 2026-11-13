@@ -1242,6 +1242,13 @@ HWND WINAPI GetActiveWindow(void)
     if (!a && win::focus()) a = win::toplevel_of(win::focus());
     return hwnd_of(a);
 }
+// the window is the active top level now (not GetActiveWindow's fallback to the focus's top level, which a window that has
+// lost the activation still has): its non-client area in the active look (menu.c.patch's themed menu bar)
+BOOL WUX_IsActiveWindow(HWND h)
+{
+    win::Window* a = win::active_window();
+    return a && a == window_of(h);
+}
 HWND WINAPI SetActiveWindow(HWND h) { HWND old = GetActiveWindow(); win::Window* w = window_of(h); if (win::is_window(w)) win::set_focus(w); return old; }
 HWND WINAPI GetForegroundWindow(void) { return GetActiveWindow(); }
 BOOL WINAPI SetForegroundWindow(HWND h) { SetActiveWindow(h); return TRUE; }

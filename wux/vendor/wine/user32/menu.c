@@ -176,6 +176,9 @@ static HMENU top_popup_hmenu;
  * (the last input was a key press, LINP_KEYBOARD), and every submenu of it; SPI_GETKEYBOARDCUES underlines them always */
 static BOOL menu_cues;
 extern BOOL MENU_LastInputKeyboard(void);
+/* flxp: the menu bar item under the pointer while no menu is open (XP hot-tracks a menu bar: MENU_SetBarHot) */
+static HWND bar_hot_hwnd;
+static UINT bar_hot_item = NO_SELECTED_ITEM;
 
   /* Flag set by EndMenu() to force an exit from menu tracking */
 static BOOL fEndMenu = FALSE;
@@ -353,9 +356,9 @@ static HMENU get_win_sys_menu( HWND hwnd )
 /***********************************************************************
  *           get_menu_font
  */
+static HFONT hMenuFont, hMenuFontBold;   /* flxp: file scope, MENU_FontsChanged drops them */
 static HFONT get_menu_font( BOOL bold )
 {
-    static HFONT hMenuFont, hMenuFontBold;
 
     HFONT ret = bold ? hMenuFontBold : hMenuFont;
 
@@ -1526,6 +1529,63 @@ static void draw_popup_arrow( HDC hdc, RECT rect, UINT arrow_bitmap_width,
     SelectObject( hdcMem, hOrigBitmap );
     DeleteDC( hdcMem );
 }
+/* flxp: a menu bar shows its mnemonics while Alt is held, while a menu opened from the keyboard is tracked, and always with
+ * SPI_GETKEYBOARDCUES (XP's xxxDrawMenuBarUnderlines); otherwise they are hidden */
+static BOOL bar_cues(void)
+{
+    BOOL cues = FALSE;
+    SystemParametersInfoW( SPI_GETKEYBOARDCUES, 0, &cues, 0 );
+    return cues || (top_popup && menu_cues) || GetKeyState( VK_MENU ) < 0;
+}
+/* flxp: the bar's window is the active one (a themed bar has an active and an inactive look) */
+static BOOL bar_active( HWND hwnd )
+{
+    return hwnd && WUX_IsActiveWindow( GetAncestor( hwnd, GA_ROOT ) );
+}
+/* flxp: a menu bar item is hot while the pointer is over it and no menu is open, or while it is selected from the keyboard;
+ * pushed while its menu is open (MF_MOUSESELECT: MENU_ShowSubPopup draws it again) */
+static BOOL bar_hot( const POPUPMENU *menu, const MENUITEM *item )
+{
+    return !top_popup && menu->hWnd && menu->hWnd == bar_hot_hwnd && (UINT)(item - menu->items) == bar_hot_item;
+}
+static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC hdc,
+                               MENUITEM *lpitem, BOOL menuBar, UINT odaction );
+static void redraw_bar_item( POPUPMENU *menu, UINT index )
+{
+    HDC hdc;
+    if (!menu->hWnd || index >= menu->nItems) return;
+    hdc = GetDCEx( menu->hWnd, 0, DCX_CACHE | DCX_WINDOW );
+    SelectObject( hdc, get_menu_font(FALSE) );
+    MENU_DrawMenuItem( menu->hWnd, menu, menu->hWnd, hdc, &menu->items[index], TRUE, ODA_DRAWENTIRE );
+    ReleaseDC( menu->hWnd, hdc );
+}
+/* flxp: the pointer moved over a window's non-client area (inside: over its menu bar, pt in screen coordinates) or left it;
+ * the item under it becomes the bar's hot item, the one before is drawn again without it. defwnd.cpp calls this */
+void MENU_SetBarHot( HWND hwnd, POINT pt, BOOL inside )
+{
+    POPUPMENU *menu = MENU_GetMenu( GetMenu( hwnd ) );
+    POPUPMENU *old = (bar_hot_hwnd && bar_hot_item != NO_SELECTED_ITEM) ? MENU_GetMenu( GetMenu( bar_hot_hwnd ) ) : NULL;
+    UINT item = NO_SELECTED_ITEM, old_item = bar_hot_item;
+    HWND old_hwnd = bar_hot_hwnd;
+    if (menu && !menu->hWnd) menu->hWnd = hwnd;
+    if (inside && menu && !top_popup) MENU_FindItemByCoords( menu, pt, &item );
+    if (item != NO_SELECTED_ITEM && (menu->items[item].fType & (MF_SEPARATOR | MF_SYSMENU))) item = NO_SELECTED_ITEM;
+    if (old_hwnd == hwnd && old_item == item) return;
+    bar_hot_hwnd = item != NO_SELECTED_ITEM ? hwnd : NULL;
+    bar_hot_item = item;
+    if (old && old->hWnd == old_hwnd) redraw_bar_item( old, old_item );
+    if (item != NO_SELECTED_ITEM) redraw_bar_item( menu, item );
+}
+
+/* flxp: the menu font changed (another visual style or scheme): the next menu measures and draws in the new one */
+void MENU_FontsChanged(void)
+{
+    if (hMenuFont) DeleteObject( hMenuFont );
+    if (hMenuFontBold) DeleteObject( hMenuFontBold );
+    hMenuFont = hMenuFontBold = NULL;
+    menucharsize.cx = menucharsize.cy = 0;
+}
+
 /***********************************************************************
  *           MENU_DrawMenuItem
  *
@@ -1539,6 +1599,7 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
     int bkgnd;
     UINT arrow_bitmap_width = 0, arrow_bitmap_height = 0;
     HRGN old_clip = NULL, clip;
+    BOOL hot_only = FALSE;   /* flxp: a hot-tracked bar item, drawn as selected */
 
     debug_print_menuitem("MENU_DrawMenuItem: ", lpitem, "");
 
@@ -1564,6 +1625,11 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
 
     SystemParametersInfoW (SPI_GETFLATMENU, 0, &flat_menu, 0);
     bkgnd = (menuBar && flat_menu) ? COLOR_MENUBAR : COLOR_MENU;
+    if (menuBar && !(lpitem->fState & MF_HILITE) && bar_hot( menu, lpitem ))
+    {
+        hot_only = TRUE;
+        lpitem->fState |= MF_HILITE;
+    }
   
       /* Setup colors */
 
@@ -1662,6 +1728,38 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
         goto done;
     }
 
+    /* flxp: a menu bar's text item under a style with the Longhorn Menu class's bar parts: the bar under it, BARITEM hot (the
+     * pointer over it, or selected from the keyboard) or pushed (its menu open) from the bar's top to the item's bottom, the
+     * text centred in that, between the menu font's average character width on either side */
+    if (menuBar && lpitem->text && !lpitem->hbmpItem && !(lpitem->fType & MF_SEPARATOR))
+    {
+        UXMENU_LOOK look;
+        BOOL themed;
+        menu_look( hwnd, menu, &look );
+        themed = look.theme && look.p_baritem;
+        if (themed)
+        {
+            RECT bg = rect, tr = rect;
+            unsigned f = 0;
+            int n, saved;
+            if (lpitem->fState & MF_HILITE) f |= (lpitem->fState & MF_MOUSESELECT) ? UXMENU_PUSHED : UXMENU_HOT;
+            if (lpitem->fState & MF_GRAYED) f |= UXMENU_DISABLED;
+            if (bar_cues()) f |= UXMENU_CUES;
+            bg.top = menu->items_rect.top;
+            saved = SaveDC( hdc );
+            IntersectClipRect( hdc, bg.left, bg.top, bg.right, bg.bottom );
+            UXMENU_DrawBar( &look, hdc, &menu->items_rect, bar_active( hwnd ) );
+            RestoreDC( hdc, saved );
+            for (n = 0; lpitem->text[n] && lpitem->text[n] != '\t' && lpitem->text[n] != '\b'; n++) ;
+            tr.top = bg.top;   /* centred in the whole bar: 4074's text sits a row higher than Wine's */
+            tr.left += menucharsize.cx;
+            tr.right -= menucharsize.cx;
+            UXMENU_DrawBarItem( &look, hdc, &bg, f, lpitem->text, n, &tr );
+        }
+        menu_look_done( &look );
+        if (themed) goto done;
+    }
+
     /* flxp: a popup's item through the painter: background or highlight, separator, check mark, the owner's check bitmap or
      * item bitmap as Wine draws them, text and accelerator (after a tab: in the accelerator column), submenu arrow */
     if (!menuBar)
@@ -1740,8 +1838,8 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
         }
         else
         {
-            if(menuBar)
-                DrawEdge(hdc, &rect, BDR_SUNKENOUTER, BF_RECT);
+            if(menuBar)   /* flxp: XP's classic bar: the open item sunken, the hot one raised */
+                DrawEdge(hdc, &rect, (lpitem->fState & MF_MOUSESELECT) ? BDR_SUNKENOUTER : BDR_RAISEDINNER, BF_RECT);
             else
                 FillRect(hdc, &rect, GetSysColorBrush(COLOR_HIGHLIGHT));
         }
@@ -1902,6 +2000,7 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
 	UINT uFormat = (menuBar) ?
 			DT_CENTER | DT_VCENTER | DT_SINGLELINE :
 			DT_LEFT | DT_VCENTER | DT_SINGLELINE;
+	if (menuBar && !bar_cues()) uFormat |= DT_HIDEPREFIX;   /* flxp */
 
         if( !(menu->dwStyle & MNS_CHECKORBMP))
             rect.left += menu->textOffset;
@@ -1970,6 +2069,7 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
     }
 
 done:
+    if (hot_only) lpitem->fState &= ~MF_HILITE;
     ExtSelectClipRgn( hdc, old_clip, RGN_COPY );
     if (old_clip) DeleteObject( old_clip );
 }
@@ -2534,6 +2634,8 @@ static void MENU_HideSubPopups( HWND hwndOwner, HMENU hmenu,
 	    if (!(item->fType & MF_POPUP) ||
 		!(item->fState & MF_MOUSESELECT)) return;
 	    item->fState &= ~MF_MOUSESELECT;
+	    if (!(menu->wFlags & MF_POPUP) && (item->fState & MF_HILITE))   /* flxp: the bar's item hot again */
+	        redraw_bar_item( menu, menu->FocusedItem );
 	    hsubmenu = item->hSubMenu;
 	} else return;
 
@@ -2601,6 +2703,7 @@ static HMENU MENU_ShowSubPopup( HWND hwndOwner, HMENU hmenu,
         item->rect = rect;
 
     item->fState |= MF_MOUSESELECT;
+    if (!(menu->wFlags & MF_POPUP)) redraw_bar_item( menu, menu->FocusedItem );   /* flxp: a bar's item pushed */
 
     if (IS_SYSTEM_MENU(menu))
     {
@@ -3608,6 +3711,7 @@ static BOOL MENU_InitTracking(HWND hWnd, HMENU hMenu, BOOL bPopup, UINT wFlags)
         top_popup = menu->hWnd;
         top_popup_hmenu = hMenu;
     }
+    if (!bPopup && menu_cues) DrawMenuBar( hWnd );   /* flxp: the bar's mnemonics for keyboard tracking */
 
     fEndMenu = FALSE;
 
@@ -3639,6 +3743,8 @@ static BOOL MENU_ExitTracking(HWND hWnd, BOOL bPopup)
     ShowCaret(0);
     top_popup = 0;
     top_popup_hmenu = NULL;
+    if (!bPopup && menu_cues && GetMenu( hWnd )) DrawMenuBar( hWnd );   /* flxp: the bar's mnemonics hidden again */
+    menu_cues = FALSE;
     return TRUE;
 }
 
@@ -4831,11 +4937,20 @@ DWORD WINAPI DrawMenuBarTemp(HWND hwnd, HDC hDC, LPRECT lprect, HMENU hMenu, HFO
 
     lprect->bottom = lprect->top + lppop->Height;
 
-    FillRect(hDC, lprect, GetSysColorBrush(flat_menu ? COLOR_MENUBAR : COLOR_MENU) );
-
-    SelectObject( hDC, SYSCOLOR_GetPen(COLOR_3DFACE));
-    MoveToEx( hDC, lprect->left, lprect->bottom, NULL );
-    LineTo( hDC, lprect->right, lprect->bottom );
+    {   /* flxp: a style's bar parts (the painter), else XP's flat or classic bar and the 3D face line under it */
+        UXMENU_LOOK look;
+        BOOL themed;
+        menu_look( hwnd, lppop, &look );
+        themed = UXMENU_DrawBar( &look, hDC, lprect, bar_active( hwnd ) );
+        menu_look_done( &look );
+        if (!themed)
+        {
+            FillRect(hDC, lprect, GetSysColorBrush(flat_menu ? COLOR_MENUBAR : COLOR_MENU) );
+            SelectObject( hDC, SYSCOLOR_GetPen(COLOR_3DFACE));
+            MoveToEx( hDC, lprect->left, lprect->bottom, NULL );
+            LineTo( hDC, lprect->right, lprect->bottom );
+        }
+    }
 
     if (lppop->nItems == 0)
     {

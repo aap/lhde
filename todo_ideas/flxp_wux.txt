@@ -56,6 +56,8 @@
 
 * 4074's About box is Segoe UI 8 under Jade (4074-dwm.png) while MS Shell Dlg is Tahoma: our About box should name Segoe UI in
 	its template under the Longhorn styles (the one dialog that does)
+* a dropped menu under Jade has a 1 px white line inside its outline where 4074's Notepad menu is the 245 grey of its body
+	(lh4074-083401.png: the Edit menu's outline at x=78, 245 from x=79); the window menu matched lh4074-195235.png
 * Alt+letter on a menu bar highlights the menu but does not drop its popup (luxpad: Alt+O shows Format highlighted, nothing
 	opens; XP opens it); a click and F10 then Down work
 * no font fallback in GDI: a character the font lacks is its missing glyph (an emoji in luxpad's Lucida Console is a box,

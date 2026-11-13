@@ -1625,6 +1625,7 @@ static void handle_event(const sys::Event& ev)
         g_active = t;
         if (!is_window(g_focus) || toplevel_of(g_focus) != t) set_focus(t);
         else send(g_focus, WM_SETFOCUS, 0, 0);
+        send(t, WM_NCACTIVATE, 1, 0);   // the non-client area in its active look (a themed menu bar)
         send(t, WM_ACTIVATE, 1, 0);
         break;
     case sys::EventKind::FocusLost:
@@ -1632,6 +1633,7 @@ static void handle_event(const sys::Event& ev)
         if (is_window(g_focus) && toplevel_of(g_focus) == t) send(g_focus, WM_KILLFOCUS, 0, 0);
         send(t, WM_ACTIVATE, 0, 0);
         if (g_active == t) g_active = nullptr;
+        send(t, WM_NCACTIVATE, 0, 0);   // after: GetActiveWindow no longer names it while the non-client area is drawn
         break;
     default:
         break;
