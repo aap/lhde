@@ -898,6 +898,14 @@ light blue) and open where you click, flipped to the left / upwards where they w
   (checked and greyed: our tiles always size to their content), *Move Up* / *Move Down* (greyed at the ends of the list and for
   pinned tiles), *&lt;Name&gt; Tile Properties* (clock: a flyout with the layouts and the pinned switch; power: the power flyout;
   tray: greyed, it has none), *Remove &lt;Name&gt; Tile* (not on pinned tiles, as in 4074; the sidebar menu brings it back).
+
+**Volume** (docs/SHELL-DESIGN.md 8.6). The 4074 packs put a tile of luxshell's after Power, and its icon beside the tray in
+the minimized sidebar's taskbar view: the default output's level through PipeWire (`wpctl`), PulseAudio (`pactl`) or ALSA
+(`amixer`), whichever is installed and answers (`LHSHELL_VOLUME=pactl` picks one); a click opens XP's small volume popup (the
+trackbar and *Mute*), the mouse wheel over the tile or icon changes it in 2 % steps, a middle click mutes; the tooltip says
+"Volume: 40%", or which tool is missing or failing. Its menu removes it (*Remove Volume Tile*); the sidebar menu's parts list
+does not list it, so to get it back delete `[sidebar] tiles` from `~/.local/state/lhde/luxshell-state.ini` (the pack's list
+returns), or leave it out of a pack's `tiles` / `taskbar_tiles` for good.
 - **Taskbar menu** (Avalon taskbar): right-click an empty part. 4074's items: *Minimize bar* / *Restore bar* (the sidebar),
   *Properties* (the settings flyout: theme list, Save as..., composition, taskbar kind and autohide, start menu, sidebar
   mode and stacking, wallpaper), *Task Manager* (the first of xfce4-taskmanager, lxtask, gnome-system-monitor,

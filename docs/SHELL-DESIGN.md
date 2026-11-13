@@ -610,7 +610,8 @@ C: `luxshell.c` (surfaces, the EWMH client model, input, timers, the Lua API `lh
 overrides): `runtime.lua` (event bus, animation, packs, taskbar, sidebar and its modes, maximised mode, theme switching, classic
 bar and start-menu coordination, compositor, root commands), `session.lua` (the theme through liblhde, settings.ini, the state
 file, session commands), `settings.lua` (settings flyout, run box), `menu.lua`, `flyout.lua`, `toast.lua`, `notifylog.lua`,
-`tooltip.lua`, `apps.lua` (desktop entries, icon-theme lookup, launch counts), `tiles/*.lua`.
+`tooltip.lua`, `apps.lua` (desktop entries, icon-theme lookup, launch counts), `traycontrol.lua` (the tray tiles' shared view,
+drawn icons, slider flyout and command queue, 8.6), `tiles/*.lua`.
 
 Events (`lh.on(name, fn)`, `lh._emit`): from C `windows`, `window(id)`, `desktop`, `maxmode`, `workarea`, `toplevel(win, map |
 unmap | destroy)`, `lh-theme`, `command`, `settings-changed(serial, hint)`, `start-key(l0..l4)`, `startmenu-open`,
@@ -815,7 +816,11 @@ Tile API (mirrors BaseTile, 2.5): a tile file returns a table `{ name, height, p
 set `foreground`, `sb`, `T`, `R`), `dispose`, `flyout()` → node, w, h (a click on the foreground or the side strip toggles it),
 `flyout_closed`, `properties()`, `menu()` (items in front of the host's), `taskbar(host)` (the compact view). Host calls:
 `sb.resize_tile(tile, h)` (400 ms ease-in-out, min 30, 2.4.4), `sb.tile_rect`, `lh.open_flyout` / `lh.toggle_flyout` /
-`lh.close_flyout`, `lh.tooltip(node, text)`.
+`lh.close_flyout`, `lh.tooltip(node, text)`. System commands: `lh.spawn(cmd)` (detached, no output), `lh.pipe(cmd, on_line
+[, on_done])` (`sh -c cmd` in its own process group, stdout read by the main loop without blocking: `on_line(line)` per line,
+`on_done()` at end of file; returns an id, nil on failure; stdin /dev/null, stderr luxshell's; at most 32 at once),
+`lh.pipe_close(id)` (SIGTERM to the group, no `on_done`). The pipes' children get SIGTERM when luxshell exits
+(`PR_SET_PDEATHSIG` and on the way out). `io.popen` blocks the shell: only for one-off checks such as `command -v`.
 
 ### 7.6 Sidebar and tile menus
 
@@ -835,7 +840,9 @@ property page, *Remove <Friendly Name> Tile* unless pinned; no separators).
 - Tile menu: right click on a tile, or a click on its arrow when it has no flyout. The tile's `menu()`, a separator (ours),
   *Auto Size* (checked and greyed: tiles size to their content), *Move Up* / *Move Down* (greyed at the ends and for pinned
   tiles), *<Name> Tile Properties* (`properties()`, else the flyout; greyed without either), *Remove <Name> Tile* (not on pinned
-  tiles). Friendly names: Classic Tray, Power, Clock, Quick Launch, Notification History.
+  tiles). Friendly names: Classic Tray, Power, Clock, Quick Launch, Notification History; the tray tile (8.6) Volume
+  (its `name`; the parts list does not have them: a removed one comes back with the pack's list when
+  `[sidebar] tiles` is deleted from luxshell-state.ini).
 
 All menus are `menu.lua` over wuxtheme's painter (section 16).
 
@@ -910,6 +917,40 @@ closing it marks all viewed. Menu: *Go to rules and alerts* (greyed: no rules en
 works; 4074's did nothing). Store: `~/.local/state/lhde/luxshell-notifications`, newest last, at most 100, one tab-separated line
 each (time, viewed, app, icon, summary, body; `\\ \t \n` escaped); `transient` notifications stay out; `CloseNotification`
 revokes, `replaces_id` updates in place; viewed once dismissed, clicked, re-shown or seen in the flyout.
+
+### 8.6 Tray tiles: Volume (`tiles/volume.lua`, `traycontrol.lua`)
+
+XP's notification-area controls as tiles (4074 had no such module): in the 4074 packs' `tiles` after Power and their
+`taskbar_tiles` after the tray, so the full sidebar shows it as a tile and the minimized sidebar's taskbar view as an icon
+beside the tray icons (the pinned block has none). Sidebar view: the tray tile's geometry, the 16 px icon at 5,6 of the
+foreground, 33 high, the value beside it at x 26 in the power tile's line style (Segoe UI 13 bold `#dddddd`): "Volume: 40%",
+"Muted: 40%". Taskbar view: the icon in a 20 px slot centred in the bar; its flyout opens
+above the bar at the pointer. Left click: the slider flyout, wheel: a step, middle click: the volume's
+mute. Tooltips are read when they show.
+
+Icons: none of the packs' images fits (4074's imageres and shell32 have no speaker; XP's tray speaker is in
+sndvol32 / stobject, which lhde-import does not take), so they are drawn: shapes sampled 4x4 per pixel into 1 px rect runs. A
+grey speaker with no, one (< 50 %) or two blue waves, muted: a red ring-and-slash on a white disc at its lower right (XP's
+muted overlay).
+
+Slider flyout, after XP's tray volume popup (`sndvol32 /t`: the caption "Volume", a vertical trackbar loud at the top with
+ticks on both sides, a "Mute" check box under it, closed when it loses the focus); its pixel layout is ours, no reference of the
+popup is measured: 72 wide on white (the power flyout's background) inside the flyout chrome, the caption Tahoma 8 centred 6 px
+from the top, a 100 px travel with 11 ticks (every 10 %, 3 px each side), a 21x11 thumb (radius 2, `#1C5180` frame, white to
+`#D6D2C2`) on a 4 px sunken channel, the check box row (13 px box, Marlett check) 4 px under the trackbar, 6 px bottom margin.
+A press on the trackbar jumps the thumb there and drags it (the value is sent at most every 60 ms while dragging and once on
+release), the wheel steps; an outside change moves the thumb unless the pointer holds it. Commands run one at a time in order
+(`traycontrol.lua` `C.queue`: a waiting command of the same kind is replaced by the newer, so wheel bursts collapse), then the
+tile reads the value back.
+
+| Tile | Reads | Sets | Follows outside changes |
+| --- | --- | --- | --- |
+| Volume | the first that answers of `wpctl get-volume @DEFAULT_AUDIO_SINK@` ("Volume: 0.40 [MUTED]"), `pactl get-sink-volume` + `get-sink-mute @DEFAULT_SINK@`, `amixer get Master` ("[40%] ... [on]"); `LHSHELL_VOLUME` forces one | `wpctl set-volume / set-mute`, `pactl set-sink-volume N% / set-sink-mute`, `amixer -q set Master N% / mute / unmute`; wheel 2 %, up to 100 % (a level above stays) | `pactl subscribe` (sink and server events, 50 ms debounce) when pactl is installed, else a read every 1 s |
+
+Tooltips: "Volume: 40%" (XP's), "Volume: 40% (muted)", on failure "Volume: no wpctl, pactl or amixer found" or "Volume:
+pactl: <its first line>". Tested
+by `luxshell/tests/tiles.sh` (stub commands on a PATH of their own; `tiles.lua` drives the tiles
+through a stand-in `lh`), part of `make check`.
 
 ## 9. Toasts: `org.freedesktop.Notifications` (`notify.c`, `toast.lua`)
 
