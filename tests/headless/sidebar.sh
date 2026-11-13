@@ -15,7 +15,7 @@ T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 mkdir -p $T/home/.config/lhde
 export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config XDG_DATA_HOME=$T/home/.local/share XDG_STATE_HOME=$T/home/.local/state \
-       XDG_CACHE_HOME=$T/home/.cache DISPLAY=$D PATH="$R/build/bin:$PATH" LHSHELL_COMPOSITION=0 LHSHELL_WALLPAPER=0
+       XDG_CACHE_HOME=$T/home/.cache DISPLAY=$D PATH="$R/build/bin:$PATH" LHSHELL_COMPOSITION=0 LHSHELL_WALLPAPER=0 LHSHELL_TASKBAR=avalon
 unset DBUS_SESSION_BUS_ADDRESS
 . "$(dirname "$0")/wait.sh"
 SW=1024
@@ -53,6 +53,22 @@ shown() { mapped "$SB"; }
 shell || { kill $PW; stop_xvfb; exit 1; }
 shown && ok "the sidebar is up ($(width $TB) px taskbar)" || bad "no sidebar mapped at startup"
 TBW0=$(width $TB)
+
+# a tile's hover look: OuterContentHostBack (1107) over the first tile's top 10 rows (y 19..28, the bright inner part x 1..60
+# of the bar) fades in (120 ms) while the pointer is over the tile and out (80 ms) when it leaves; needs the pack's images
+if [ -e "${LHDE_WINDOWS:-/nonexistent}/generated/packs/4074/imageres/1107.png" ]; then
+    band() { magick xwd:"$1" -crop 60x10+$((SW - 149))+19 +repage -format '%[fx:mean*255]' info:; }
+    xdotool mousemove 300 300; sleep .3; shot $T/t0.xwd
+    xdotool mousemove $((SW - 70)) 24; sleep .3; shot $T/t1.xwd
+    xdotool mousemove 300 300; sleep .3; shot $T/t2.xwd
+    b0=$(band $T/t0.xwd); b1=$(band $T/t1.xwd); b2=$(band $T/t2.xwd)
+    if awk "BEGIN { exit !($b1 > $b0 + 2) }"; then ok "tile hover: the top band lightens ($b0 -> $b1)"; else bad "tile hover: the band $b0 -> $b1"; fi
+    [ "$b2" = "$b0" ] && ok "tile hover: back to $b0 when the pointer leaves" || bad "tile hover: $b2 after leaving, not $b0"
+    below=$(magick xwd:$T/t0.xwd -crop 60x10+$((SW - 149))+29 +repage ppm:- | md5sum); below1=$(magick xwd:$T/t1.xwd -crop 60x10+$((SW - 149))+29 +repage ppm:- | md5sum)
+    [ "$below" = "$below1" ] && ok "tile hover: only the top 10 rows" || bad "tile hover: rows 29..38 changed as well"
+else
+    echo "skip tile hover: no imported pack images (LHDE_WINDOWS)"
+fi
 
 ms() { echo $(($(date +%s%N) / 1000000)); }
 quick() { n=0; while [ $n -lt 300 ] && ! "$@"; do sleep .01; n=$((n + 1)); done; "$@"; }   # polls every 10 ms, 3 s at most

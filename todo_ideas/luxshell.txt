@@ -9,7 +9,6 @@
 		scene-node drawing is menu.lua before the commit that moved it onto the painter
 
 * sidebar
-	* mouse hover over tiles
 	* unclear how quicklaunch icons are chosen
 		* perhaps tie into the grander lhde icon system?
 

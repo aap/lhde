@@ -568,7 +568,7 @@ under it does not matter.
 | Behaviour | Reference | luxshell |
 | --- | --- | --- |
 | Add / remove | `CSidebarWnd::_OnAddTile/_OnRemoveTile`, `CShellSidebar::AddTile/RemoveTile`; modules registered under `Explorer\StartBar\Modules` (4051) / `Explorer\Sidebar\Modules` (4074) with `Friendly Name`, `ShowInMenu`, `MultiInstance`, `Transient`, `IconOnly`, `MaxHeight`; instances persisted under `Sidebar\Tiles\{TileGUID}` and the order lists `SidebarTiles`/`SidebarPinnedTiles`/`TaskbarTiles`; new tile added by a third party → consent toast "New Sidebar Tile Added" Show/Hide (2.4.4) | `luxshell/tiles/*.lua`; the sidebar menu's parts list adds and removes them, the tile menu has Move Up/Down, Remove, Properties (7.5, 7.6) |
-| Lifecycle animations | fade in `TileUI` 800 ms; remove 400 ms; resize to a new height 400 ms ease-in-out; hide: 100 ms delay then 400 ms to 0; hover chrome 120 ms in / 80 ms out; flash 0.5↔1.0 with period 1000 → 100 ms (2.4.4) | fade-in 800 ms and resize 400 ms ease-in-out done; hide, hover chrome and flash not |
+| Lifecycle animations | fade in `TileUI` 800 ms; remove 400 ms; resize to a new height 400 ms ease-in-out; hide: 100 ms delay then 400 ms to 0; hover chrome 120 ms in / 80 ms out; flash 0.5↔1.0 with period 1000 → 100 ms (2.4.4) | fade-in 800 ms, resize 400 ms ease-in-out and the hover band (7.5) done; hide and flash not |
 | Sizes | tile height min 30, default 30, max = remaining `sidebarMain` height or module `MaxHeight`; "very large" dialog forces 400 and asks; shrink deferred 30 s after a grow; width = bar width (150 default, 100..600) | a tile's `height` is its own request, the host clamps to min 30 (7.5); the very-large consent not done |
 | Order and drag | `DragButton#TileContent`, `OuterTileBack`/`OuterContentHostBack` insertion markers (`PreviewPercent`, 800 ms snap, 10 s reset), `SBContentHostOverflow.DropTarget` highlights the overflow strip with `SDB_TASKBACK SELECTED` | not done (Move Up / Move Down in the tile menu) |
 | Resize | `OuterContentHostSizer` 4 px thumb at each tile's bottom (double-click = Auto Size again); `SidebarSizer` 2 px (Aero) / 6 px (Slate) thumb on the inner edge changes the bar width (message 1457, clamp 100..600) | the bar width: 7.1; the tile sizer drag not done |
@@ -816,7 +816,13 @@ Chrome (`tile.xaml` / `outertile.xaml`): the right-docked bar is Flipped (2.4.1)
 restore 1058/1059 and close 1061/1062 on hover) docks **right** and `TileForegroundPadder` (6) **left**: the foreground is x
 7..140 of the bar (133 wide) and y 3.. of the tile, where the 4074 Slate power tile's battery starts (`lh4074-181415.png`) and
 where the 4051 arrow sits (top-right). Bottom: the 4 px `OuterContentHostSizer` (1199/1200, Border 0,2,0,0). Slate repaints
-1000 under each tile (`tile_bg`). `TileUI` fades in over 800 ms. Plex (`tile_chrome`): TILEBACK under the whole tile, a 16 px
+1000 under each tile (`tile_bg`). Hover (`OuterContentHost.OnIsMouseOverChanged`, L41141): `OuterContentHostBack`, 1107 (150x12,
+white from ~18 % alpha at the inner edge to 0 at x 130, not flipped on the right-docked bar) with Height 10 at 0,0 of the host
+(`FillPanel.ArrangeCore` lays every child out at offset 0,0), fades to opacity 1 in 120 ms while the pointer is anywhere over
+the tile (its sizer included) and back to 0 in 80 ms: a faint band over the tile's top 10 rows, under the tile's content, so
+Slate's opaque 1000 covers it. Every sidebar tile, the pinned clock too (the pinned host's tiles are OuterContentHosts as
+well); the pointer stays the arrow (`DragButton#TileContent` sets no Cursor). The arrow glyph's own hover (1173 → 1174 over
+the side strip) is `TileArrow`'s. `TileUI` fades in over 800 ms. Plex (`tile_chrome`): TILEBACK under the whole tile, a 16 px
 side strip (TILEHEADERBACK, TILECHEVRONBACK pressed, the tile icon) fading in over 300 ms while the pointer is within the tile
 and out over 500 ms, a 7 px TILESIZER.
 

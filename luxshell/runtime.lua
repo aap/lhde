@@ -560,7 +560,17 @@ build_sidebar()
 local plex_tile_chrome
 local function tile_chrome(tile)
   if T.tile_chrome then return plex_tile_chrome(tile) end
-  local outer = N{ h = tile.height, layout = "dock" }
+  -- OuterContentHost (outertile.xaml, a FillPanel: every child at 0,0 over the whole host unless it has a size of its own):
+  -- HackImage#OuterContentHostBack 1107 (150x12, white from ~18 % at the inner edge to 0 at x 130; HackFlipHoriz only on a bar
+  -- that is not Flipped), Opacity 0, Height 10: the tile's hover look, a band over the top 10 rows at the full width.
+  -- OnIsMouseOverChanged animates its opacity to 1 in 120 ms when the pointer enters the host (the tile and its sizer) and to
+  -- 0 in 80 ms when it leaves (2.4.4). It lies under the tile, so Slate's opaque TileBackground (1000) covers it. The pointer
+  -- stays the arrow (DragButton#TileContent sets no Cursor). Every tile, the pinned clock included.
+  local host = N{ h = tile.height, layout = "fill", hoverable = true }
+  local band = host:add(N{ layout = "dock" })
+  tile.hover = band:add(N{ kind = "image", image = R(1107), dock = "top", h = 10, opacity = 0 })
+  host.on_within = function(self, inside) lh.animate(tile.hover, "opacity", inside and 1 or 0, inside and 120 or 80) end
+  local outer = host:add(N{ layout = "dock" })
   local sizer = outer:add(N{ kind = "button", dock = "bottom", h = 4, margin = {0, 2, 0, 0}, images = { normal = R(1199), hot = R(1200) } })  -- OuterContentHostSizer
   local body = outer:add(N{ dock = "fill", layout = "fill", clip = true })
   if T.tile_bg then body:add(N{ kind = "ninegrid", image = R(T.tile_bg) }) end                     -- Slate TileBackground (1000) ; Aero has none
@@ -579,9 +589,9 @@ local function tile_chrome(tile)
   -- menu (the arrow is the tile's only "options" glyph; right click anywhere on the tile gives the menu too)
   side.on_click = function(self, button) if button == 1 then if tile.flyout then lh.toggle_flyout(tile) else lh._emit("tile-menu", tile) end end end
   sizer.on_drag = function(self, dx, dy) end
-  tile.node = outer; tile.body = body
+  tile.node = host; tile.body = body
   ui:set{ opacity = 0 }; lh.animate(ui, "opacity", 1, 800)                                       -- TileUI fade-in 800 ms (2.4)
-  return outer
+  return host
 end
 
 -- pack key tile_chrome = { sizer, sizer_hot, sizer_h, sizer_grid, back, side_w, side, side_hot, side_pressed, fade_in, fade_out }:
