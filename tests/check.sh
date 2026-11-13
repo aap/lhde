@@ -94,6 +94,8 @@ else
     result "headless/alttab.sh$(grep -m1 '^skip' "$T/alttab.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/alttab.log"
     # a click outside an open menu ends it and acts where it was made (docs/CLIENT-PROTOCOL.md "Menus and clicks"), under luxwm
     tests/headless/menus.sh "$3" > "$T/menus.log" 2>&1; result headless/menus.sh $? "$T/menus.log"
+    # every IDC_ cursor as the X cursor theme's double arrows and kin (XFixes reads back the one shown)
+    tests/headless/cursors.sh "$2" > "$T/cursors.log" 2>&1; result headless/cursors.sh $? "$T/cursors.log"
     # a Win32 program's menu bar under jade4074 (4074's themed bar), luna (XP's flat bar) and classic, read back at measured points
     tests/headless/menubar.sh "$1" > "$T/menubar.log" 2>&1; rc=$?
     result "headless/menubar.sh$(grep -m1 '^skip' "$T/menubar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/menubar.log"

@@ -1330,7 +1330,8 @@ HCURSOR WINAPI SetCursor(HCURSOR c)
         { (LPCWSTR)IDC_SIZEWE, win::Cursor::SizeWE }, { (LPCWSTR)IDC_SIZENS, win::Cursor::SizeNS },
         { (LPCWSTR)IDC_SIZENWSE, win::Cursor::SizeNWSE }, { (LPCWSTR)IDC_SIZENESW, win::Cursor::SizeNESW },
         { (LPCWSTR)IDC_SIZEALL, win::Cursor::SizeAll }, { (LPCWSTR)IDC_HAND, win::Cursor::Hand },
-        { (LPCWSTR)IDC_NO, win::Cursor::No },
+        { (LPCWSTR)IDC_NO, win::Cursor::No }, { (LPCWSTR)IDC_APPSTARTING, win::Cursor::AppStarting },
+        { (LPCWSTR)IDC_HELP, win::Cursor::Help }, { (LPCWSTR)IDC_UPARROW, win::Cursor::UpArrow },
     };
     if (!c) { win::set_cursor(win::Cursor::None); return old; }
     for (auto& m : map) if (LoadCursorW(nullptr, m.id) == c) { win::set_cursor(m.shape); return old; }

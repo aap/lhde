@@ -81,7 +81,7 @@ struct WindowPos {          // lparam of WM_WINDOWPOSCHANGED
     uint32_t flags;
 };
 
-enum class Cursor { Arrow, IBeam, Wait, Cross, SizeWE, SizeNS, SizeNWSE, SizeNESW, SizeAll, Hand, No, None };
+enum class Cursor { Arrow, IBeam, Wait, Cross, SizeWE, SizeNS, SizeNWSE, SizeNESW, SizeAll, Hand, No, AppStarting, Help, UpArrow, None };   // sys::PointerShape's order
 
 bool init();
 void shutdown();

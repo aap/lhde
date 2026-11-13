@@ -51,7 +51,9 @@ struct Event {
 bool init();
 void shutdown();
 
-enum class PointerShape { Arrow, IBeam, Wait, Cross, SizeWE, SizeNS, SizeNWSE, SizeNESW, SizeAll, Hand, No, Hidden };
+// the Win32 cursors (IDC_ARROW ... IDC_UPARROW); win::Cursor has the same order
+enum class PointerShape { Arrow, IBeam, Wait, Cross, SizeWE, SizeNS, SizeNWSE, SizeNESW, SizeAll, Hand, No, AppStarting, Help, UpArrow,
+                          Hidden };
 
 // popup = undecorated, not managed by the window manager (menus, dropdowns).
 // argb = 32-bit TrueColor visual with its own colormap: present() then pushes

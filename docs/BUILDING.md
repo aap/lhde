@@ -32,9 +32,9 @@ the user's own files (settings below).
 ## Building
 
 Needs a C and C++17 compiler, GNU make, Python 3 (the standard library: every `make` runs
-`tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, xext, xkbcommon, freetype2, fontconfig,
-libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, luxshell);
-for the lux side also xfixes, xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4).
+`tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, xext, xcursor, xfixes, xkbcommon, freetype2,
+fontconfig, libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, luxshell);
+for the lux side also xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4).
 Every `.res` is checked in (`wux/rc/`, `wux/w32/stdres.res`, `flxp/rc/`, `tests/w32/test.res`):
 the mingw-w64 cross toolchain (`x86_64-w64-mingw32-windres`, which preprocesses with its gcc) is needed
 only when a `.rc` or a header it includes changes, and Wine's sources only to rebuild Wine's resources
@@ -49,7 +49,7 @@ luac5.4 (each test is skipped when its tool is missing).
 
 On Void Linux, everything above in one command:
 
-    xbps-install -S gcc make pkg-config python3 libX11-devel libXext-devel libxkbcommon-devel libXfixes-devel \
+    xbps-install -S gcc make pkg-config python3 libX11-devel libXext-devel libXcursor-devel libxkbcommon-devel libXfixes-devel \
         libXinerama-devel libXft-devel freetype-devel fontconfig-devel libpng-devel libjpeg-turbo-devel \
         libwebp-devel dbus-devel cairo-devel pango-devel lua54-devel \
         python3-Pillow 7zip cabextract xz tar \
@@ -122,7 +122,7 @@ Properties from the item menu (General first, Summary's description, two files i
 and Add Tag, the Explorer's Filter box under jade4074 over names and attributes, skipped without that style or user xattrs,
 luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`, clicks outside open menus under luxwm:
 `tests/headless/menus.sh`, a Win32 menu bar's pixels (plain, hot, open, inactive) under jade4074, luna and classic with
-ImageMagick: `tests/headless/menubar.sh`, the task band's folder picture against the Icons view's: `tests/headless/folderpic.sh`, flxp's memory on 600 6000 x 4000
+ImageMagick: `tests/headless/menubar.sh`, every IDC_ cursor shown under the X cursor theme's name (XFixes): `tests/headless/cursors.sh`, the task band's folder picture against the Icons view's: `tests/headless/folderpic.sh`, flxp's memory on 600 6000 x 4000
 JPEGs in the Thumbnails view at 256 px, paged through and into a subfolder: the peak RSS under 400 MB, the view's images within
 their 64 MB budget plus what is on screen, some evicted, skipped without ImageMagick: `tests/headless/thumbsmem.sh`) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when

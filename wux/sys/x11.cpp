@@ -16,6 +16,8 @@
 #include <X11/keysym.h>
 #include <xkbcommon/xkbcommon.h>
 #include <X11/extensions/shape.h>
+#include <X11/extensions/Xfixes.h>
+#include <X11/Xcursor/Xcursor.h>
 #include "sys.h"
 
 namespace sys {
@@ -572,15 +574,42 @@ void set_maximized(NativeWindow* w, int action)
 
 void* window_user(NativeWindow* w) { return w->user; }
 
+// The Win32 cursors as the X cursor theme has them: the theme's named cursors (Xcursor: the freedesktop names, then the
+// older ones themes carry as well), else the core cursor font's shape. Windows' size cursors are double-headed arrows; the
+// core font has none on the diagonals (its corner cursors point one way, wrong at the opposite corner), so its fallback
+// there is the bottom right / bottom left corner, where a size grip is. The cursor is named after the first theme name
+// (XFixesSetCursorName) so that a test reads back which one is up (XFixesGetCursorImage).
+struct PointerNames { const char* names[4]; unsigned core; };
+static const PointerNames pointer_names[] = {
+    { { "default", "left_ptr" }, 68 /*XC_left_ptr*/ },
+    { { "text", "xterm", "ibeam" }, 152 /*XC_xterm*/ },
+    { { "wait", "watch" }, 150 /*XC_watch*/ },
+    { { "crosshair", "cross" }, 34 /*XC_crosshair*/ },
+    { { "ew-resize", "sb_h_double_arrow", "size_hor", "h_double_arrow" }, 108 /*XC_sb_h_double_arrow*/ },
+    { { "ns-resize", "sb_v_double_arrow", "size_ver", "v_double_arrow" }, 116 /*XC_sb_v_double_arrow*/ },
+    { { "nwse-resize", "size_fdiag", "bd_double_arrow" }, 14 /*XC_bottom_right_corner*/ },
+    { { "nesw-resize", "size_bdiag", "fd_double_arrow" }, 12 /*XC_bottom_left_corner*/ },
+    { { "all-scroll", "fleur", "size_all", "move" }, 52 /*XC_fleur*/ },
+    { { "pointer", "hand2", "hand" }, 60 /*XC_hand2*/ },
+    { { "not-allowed", "crossed_circle", "forbidden" }, 0 /*XC_X_cursor*/ },
+    { { "progress", "left_ptr_watch", "half-busy" }, 150 /*XC_watch*/ },
+    { { "help", "question_arrow", "whats_this" }, 92 /*XC_question_arrow*/ },
+    { { "up-arrow", "sb_up_arrow", "center_ptr" }, 114 /*XC_sb_up_arrow*/ },
+};
+
 void set_cursor(NativeWindow* w, PointerShape shape)
 {
-    static ::Cursor cache[12];
-    static const unsigned shapes[] = { 68 /*XC_left_ptr*/, 152 /*xterm*/, 150 /*watch*/, 34 /*crosshair*/,
-        108 /*sb_h_double_arrow*/, 116 /*sb_v_double_arrow*/, 134 /*top_left_corner*/,
-        136 /*top_right_corner*/, 52 /*fleur*/, 60 /*hand2*/, 0 /*X_cursor*/, 0 };
-    int i = (int)shape;
+    static ::Cursor cache[sizeof pointer_names / sizeof pointer_names[0]];
     if (shape == PointerShape::Hidden) { XUndefineCursor(dpy, w->xw); return; }
-    if (!cache[i]) cache[i] = XCreateFontCursor(dpy, shapes[i]);
+    unsigned i = (unsigned)shape;
+    if (i >= sizeof cache / sizeof cache[0]) i = 0;
+    if (!cache[i]) {
+        const PointerNames& p = pointer_names[i];
+        for (const char* n : p.names) if (n && !cache[i]) cache[i] = XcursorLibraryLoadCursor(dpy, n);
+        if (!cache[i]) cache[i] = XCreateFontCursor(dpy, p.core);
+        int ev, err;
+        if (XFixesQueryExtension(dpy, &ev, &err)) XFixesSetCursorName(dpy, cache[i], p.names[0]);
+    }
     XDefineCursor(dpy, w->xw, cache[i]);
     XFlush(dpy);
 }
