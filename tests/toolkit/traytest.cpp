@@ -1,6 +1,6 @@
 // traytest: a minimal freedesktop system tray client (XEmbed), for testing
 // flxp-taskbar's notification area without a real tray application.
-//   build/traytest [COLOR [SECONDS]]    e.g. build/traytest red 30
+//   build/tests/traytest [COLOR [SECONDS]]    e.g. build/tests/traytest red 30
 // Docks one 16x16 icon (a filled disc on the tray's background), redraws on
 // Expose, prints what happens; button 1 toggles XEMBED_MAPPED off for 2 s,
 // button 3 quits.

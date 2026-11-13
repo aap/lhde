@@ -1,5 +1,5 @@
 // Text rendering test: draws a few GDI-style fonts into a bitmap, prints their
-// metrics and writes a PPM. Usage: build/text [out.ppm]
+// metrics and writes a PPM. Usage: build/tests/text [out.ppm]
 // Extra font dirs come from TEXT_FONT_DIRS (colon-separated).
 #include <stdio.h>
 #include <stdlib.h>

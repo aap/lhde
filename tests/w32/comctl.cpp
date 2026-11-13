@@ -2,7 +2,7 @@
 // and an address band, folder tree, file list, status bar; and a second
 // window with a tab control holding the remaining controls.
 //
-//   build/w32test/comctl [quit_ms]
+//   build/tests/w32/comctl [quit_ms]
 //
 // Notifications from the tree, list and toolbar go to stderr.
 #include <stdio.h>

@@ -1,6 +1,6 @@
 // The texts of the explorer's copy/move user interface (explorer/fileopui.h)
-// against XP's: shlwapi's StrFormatByteSize, copy.c's date line and CopyError's
-// messages. No window is made.
+// against XP's: shlwapi's StrFormatByteSize, the copy dialog's date line and its
+// error messages. No window is made.
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>

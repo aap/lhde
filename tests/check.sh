@@ -53,8 +53,8 @@ for f in "$styles"/*.msstyles "$styles"/*/*.msstyles; do
     [ -f "$f" ] || continue
     n=$((n + 1))
     build/bin/ut-dump "$f" --list > "$T/ut-dump.log" 2>&1; st=$?
-    # the true size of every frame part without a rect, as luxwm asks for it (a part absent or without a size exits 1; a crash
-    # on IMAGESELECTTYPE = SIZE without a rect was 139)
+    # the true size of every frame part without a rect, as luxwm asks for it (a part absent or without a size exits 1; a crash,
+    # as on IMAGESELECTTYPE = SIZE without a rect, exits 139)
     for p in CAPTION MAXCAPTION SMALLCAPTION FRAMELEFT FRAMERIGHT FRAMEBOTTOM CLOSEBUTTON MAXBUTTON MINBUTTON RESTOREBUTTON HELPBUTTON \
              SMALLCLOSEBUTTON; do
         [ $st = 0 ] || break

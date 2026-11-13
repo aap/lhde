@@ -299,7 +299,7 @@ int main(int, char** argv)
             check("newline dropped", "echoed", value("user.xdg.comment"));
             check("missing file", 0, write(dir + "/gone", *desc, "x", &err));
             check("missing file says so", 1, err.find("not there") != std::string::npos);
-            // a value longer than any fixed buffer (the reviewer's 5000-byte tag list): read whole, and Add Tag keeps every old tag
+            // a value longer than any fixed buffer (5000 bytes of tags): read whole, and Add Tag keeps every old tag
             std::string many;
             for (int i = 0; i < 625; i++) many += (i ? "," : "") + std::string("tag") + std::to_string(1000 + i);   // 4999 bytes
             if (setxattr(f.c_str(), "user.xdg.tags", many.data(), many.size(), 0) != 0) {

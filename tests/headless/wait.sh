@@ -1,4 +1,4 @@
-# Bounded waits for the headless scripts (sourced): poll for what a fixed sleep stood for, so a loaded machine only makes a
+# Bounded waits for the headless scripts (sourced): poll for a condition instead of a fixed sleep, so a loaded machine only makes a
 # test slower, not fail. Each gives up after its timeout (seconds) and returns 1.
 #   wait_for SECS COMMAND...       run COMMAND every 0.1 s until it succeeds
 #   start_xvfb DISPLAY ARGS...     wait for an earlier server on DISPLAY to be gone (the previous run's, still exiting), start

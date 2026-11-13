@@ -1,8 +1,8 @@
 #!/bin/sh
 # The modifier state GetKeyState reports (wux's key table) when Ctrl changes while another window has the keyboard: two
 # tests/w32/keystate windows, xdotool moving the focus between them. Ctrl pressed in the other window, then 1 here: the
-# WM_KEYDOWN of 1 must see Ctrl down (flxp's Ctrl+1..5 view keys did nothing then); Ctrl pressed here, released in the
-# other window, then 2 here: Ctrl must be up (it stayed down, and plain keys looked like Ctrl+key).
+# WM_KEYDOWN of 1 must see Ctrl down (else flxp's Ctrl+1..5 view keys do nothing); Ctrl pressed here, released in the
+# other window, then 2 here: Ctrl must be up (else plain keys look like Ctrl+key).
 # Needs Xvfb and xdotool. Usage: tests/headless/modkeys.sh [:DISPLAY]
 D=${1:-:75}
 T=$(mktemp -d)

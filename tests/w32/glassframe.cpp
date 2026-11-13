@@ -7,7 +7,7 @@
 // double-click maximises), the right edge resizes (HTRIGHT). Without
 // composition the header is painted opaque, Slate style.
 //
-//   build/w32test/glassframe [quit_ms]      Escape or q quits
+//   build/tests/w32/glassframe [quit_ms]      Escape or q quits
 //   FLXP_GLASS_ICON=file.ico                another 32x32 icon
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Copy A then B in one explorer process, paste each in another: the second Paste
-# must paste B (it pasted A again: the pasting process reused the list it had
-# read from the X CLIPBOARD the first time). xclip shows what is offered.
+# must paste B, not A again from the list the pasting process read from the X
+# CLIPBOARD the first time. xclip shows what is offered.
 # Needs Xvfb, xdotool, xclip. Usage: tests/headless/clipboard.sh [:DISPLAY]
 D=${1:-:71}
 T=$(mktemp -d)

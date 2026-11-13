@@ -1,6 +1,6 @@
 // GDI shim test: draws a classic-looking mock into a 32bpp DIB section via
 // a memory DC, checks a handful of win32 semantics, and writes a PPM.
-//   build/w32test/gditest [out.ppm]
+//   build/tests/w32/gditest [out.ppm]
 #include <stdio.h>
 #include <string.h>
 #include "w32/w32.h"

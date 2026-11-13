@@ -6,7 +6,7 @@
 // - AdjustWindowRectEx gives exactly the requested client size for a
 //   WM-framed window, and the dialog's client is the template's DLU size;
 // - a modal dialog keeps the focus when its disabled owner is activated.
-// Everything is logged to stderr; build/w32test/dlgkeys [quit_ms].
+// Everything is logged to stderr; build/tests/w32/dlgkeys [quit_ms].
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

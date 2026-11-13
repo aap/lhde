@@ -1,5 +1,5 @@
 // Tests for shell::fileops (copy/move engine, Job) and the paste/drop wrappers.
-// Usage: build/fileops_test [scratch-dir [other-filesystem-dir]]
+// Usage: build/tests/fileops_test [scratch-dir [other-filesystem-dir]]
 // Works only inside two fresh directories it makes (mkdtemp) under those
 // (defaults $TMPDIR or /tmp, and /dev/shm) and removes them at the end.
 #include <dirent.h>
@@ -415,7 +415,7 @@ static void test_overwrite()
     o.confirm = [&](const fileops::Conflict&) { return Answer::Yes; };
     r = fileops::run(Op::Copy, { t + "/g" }, u, o);
     CHECK(!r.ok && r.errors.size() == 1 && is_dir(u + "/g"));
-    // no callback: "Copy of f" (as before), for a move too
+    // no callback: "Copy of f", for a move too
     setup();
     r = fileops::run(Op::Move, { t + "/f" }, u);
     CHECK(r.ok && get(u + "/f") == "old f" && get(u + "/Copy of f") == "new f" && !exists(t + "/f"));
@@ -478,7 +478,7 @@ static void test_xp_rules()
     r = fileops::run(Op::Move, { t + "/ro1", t + "/ro2", t + "/rw" }, v, o);
     CHECK(r.ok && asked.size() == 2 && asked[0].kind == fileops::Conflict::MoveReadOnly && asked[1].src == t + "/ro2" && !asked[0].only);
     CHECK(exists(t + "/ro1") && !exists(t + "/ro2") && get(v + "/ro2") == "2" && get(v + "/rw") == "w");
-    // no callback: not asked (as before)
+    // no callback: not asked
     r = fileops::run(Op::Move, { t + "/ro1" }, v);
     CHECK(r.ok && get(v + "/ro1") == "1");
 

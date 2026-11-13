@@ -1,4 +1,4 @@
-// First real test of the shim: a window with Wine's classic controls.
+// The shim's classic controls: a window with Wine's buttons, edits, lists and combos.
 #include <stdio.h>
 #include "w32/w32.h"
 #include "w32/user.h"

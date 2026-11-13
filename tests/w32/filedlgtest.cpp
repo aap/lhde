@@ -1,7 +1,7 @@
 // GetOpenFileNameW / GetSaveFileNameW / GetOpenFileNameA through the shim
-// (src/w32/comdlg.cpp -> src/filedlg). An owner window is shown first so the
+// (wux/w32/comdlg.cpp -> flxp/filedlg). An owner window is shown first so the
 // dialog is owned (transient-for, disabled owner) as in a real program.
-//   build/w32test/filedlgtest [open|save|multi|ansi] [initial-dir]
+//   build/tests/w32/filedlgtest [open|save|multi|ansi] [initial-dir]
 // Prints the result fields; exit 0 = chosen, 1 = cancelled, 2 = error.
 #include <stdio.h>
 #include <stdlib.h>

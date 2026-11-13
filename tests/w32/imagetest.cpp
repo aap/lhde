@@ -1,7 +1,7 @@
 // Exercises image.cpp/syscolor.cpp: icons, bitmaps and image lists from a
 // .res module and from user32's built-in resources, drawn through DrawIconEx
 // and ImageList_Draw into a hand-made memory DC; writes a PPM.
-//   build/w32test/imagetest <comdlg32.res> <out.ppm>
+//   build/tests/w32/imagetest <comdlg32.res> <out.ppm>
 #define OEMRESOURCE
 #include <stdio.h>
 #include <string.h>
@@ -164,7 +164,7 @@ int main(int argc, char** argv)
     p.cbSize = sizeof p;
     p.i = 0; p.hdcDst = hdc; p.x = 424; p.y = 224; p.rgbBk = CLR_NONE; p.rgbFg = CLR_NONE;
     p.fStyle = ILD_TRANSPARENT; p.fState = ILS_ALPHA; p.Frame = 128;
-    // DI_MASK alone draws the mask; DI_IMAGE alone still alpha-blends (as Wine does for alpha icons).
+    // DI_MASK alone draws the mask; DI_IMAGE alone still alpha-blends an alpha icon.
     DrawIconEx(hdc, 404, 262, folder, 0, 0, 0, nullptr, DI_MASK);
     DrawIconEx(hdc, 440, 262, folder, 0, 0, 0, nullptr, DI_IMAGE);
     CHECK(ImageList_Remove(il2, 0) && ImageList_GetImageCount(il2) == 1);
