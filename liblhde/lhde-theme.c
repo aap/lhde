@@ -30,6 +30,9 @@
                                            kinds: theme style scheme frames pack navbar icons wallpaper fonts resources source):
                                            the path, exit 1 when no tree has it
      lhde-theme path VALUE                 a theme value as a path: absolute and ~/ as they are, else find (else where it would be)
+     lhde-theme terminal [--run [DIR]]     the terminal's command (settings.ini [commands] terminal, else the first of cmd,
+                                           urxvt, xterm, x-terminal-emulator on PATH); --run: run it in DIR (default the home)
+                                           in place of lhde-theme, %d the quoted directory (Quick Launch's Command Prompt)
      lhde-theme icon CLASS [INSTANCE] [--desktop ID] [--key KEY] [--size N] [--set ICONS]
                                            the icon a window of that WM_CLASS gets (lhde/icon.h: class map, desktop file, the
                                            generic one; CLASS "-" for none), or an icon key's: the step, the image size, a
@@ -56,7 +59,7 @@ static void usage(void)
                     "                  layer | layer-set KEY VALUE | layer-clear | save-as FILE [TITLE] | delete NAME | styles | schemes |\n"
                     "                  set-key NAME KEY VALUE | setting SEC KEY [VALUE] | style NAME |\n"
                     "                  explain [THEME | --files THEME] | dirs [--list | --windows | --user] | find REL | find KIND NAME | path VALUE |\n"
-                    "                  icon CLASS [INSTANCE] [--desktop ID] [--key KEY] [--size N] [--set ICONS]\n");
+                    "                  icon CLASS [INSTANCE] [--desktop ID] [--key KEY] [--size N] [--set ICONS] | terminal [--run [DIR]]\n");
     exit(2);
 }
 
@@ -109,6 +112,24 @@ int main(int argc, char **argv)
         return 0;
     }
     if (!strcmp(cmd, "path")) { if (argc < 3) usage(); printf("%s\n", lhde_data_resolve(argv[2], buf, sizeof buf)); return 0; }
+    if (!strcmp(cmd, "terminal")) {
+        char t[1024]; lhde_terminal_command(t, sizeof t);
+        if (argc < 3) { printf("%s\n", t); return 0; }
+        if (strcmp(argv[2], "--run")) usage();
+        const char *dir = argc > 3 ? argv[3] : getenv("HOME") ? getenv("HOME") : "/";
+        if (chdir(dir)) { perror(dir); return 1; }
+        /* %d: the directory, quoted for /bin/sh */
+        char q[PATH_MAX * 4 + 8], line[8192]; size_t o = 0; q[o++] = '\'';
+        for (const char *s = dir; *s && o < sizeof q - 6; s++) { if (*s == '\'') { memcpy(q + o, "'\\''", 4); o += 4; } else q[o++] = *s; }
+        q[o++] = '\''; q[o] = 0; o = 0;
+        for (const char *s = t; *s && o < sizeof line - 1; s++) {
+            if (s[0] == '%' && s[1] == 'd') { size_t l = strlen(q); if (o + l < sizeof line - 1) { memcpy(line + o, q, l); o += l; } s++; }
+            else line[o++] = *s;
+        }
+        line[o] = 0;
+        execl("/bin/sh", "sh", "-c", line, (char *)NULL);
+        perror("/bin/sh"); return 1;
+    }
     if (!strcmp(cmd, "icon")) {
         const char *cls = NULL, *inst = NULL, *desk = NULL, *key = NULL; int size = 32;
         for (int i = 2; i < argc; i++) {

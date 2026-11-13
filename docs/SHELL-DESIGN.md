@@ -741,7 +741,7 @@ grows. Switching autohide on jumps straight to 0 / 100.
 
 Right click on the bar outside the buttons. `ExtendedTaskbar.GetContextMenu` (L23627): *Minimize bar* / *Restore bar* (the
 sidebar's real state; 4074 passed constants and always said "Restore bar"), *Properties* (the settings flyout), separator,
-*Task Manager* (the first of xfce4-taskmanager, lxtask, gnome-system-monitor, mate-system-monitor, qps, else `xterm -e top`;
+*Task Manager* (the first of xfce4-taskmanager, lxtask, gnome-system-monitor, mate-system-monitor, qps, else `top` in the terminal of `[commands] terminal`;
 greyed when none; looked up with `io.popen`, since `os.execute` reports -1 under luxshell's ignored SIGCHLD), separator, *Show
 Desktop* / *Hide Desktop* (`_NET_SHOWING_DESKTOP`), *Cascade* (26 px steps, 60 % of the work area), *Tile Vertically*, *Tile
 Horizontally* (more than three windows: a grid, as TileWindows), through `_NET_MOVERESIZE_WINDOW` over the work area (client
@@ -920,10 +920,13 @@ one from `/sys/firmware/acpi/platform_profile` (read-only); brightness and "keep
 ### 8.4 Quick Launch (`tiles/quicklaunch.lua`)
 
 4074's QuickLaunchTile: the `.desktop` files of `[quicklaunch] dir` (default `~/.config/lhde/quicklaunch/`, created once with
-copies of the browser, the mail client, the file manager and a terminal; an emptied folder stays empty), file-name order,
-re-read on change (5 s poll). One row of 16 px icons at 28 px pitch, the first at 12,9 (the tray tile's geometry), 35 high,
-wrapping at 24 px (inferred). Click launches (`apps.lua A.launch`: field codes dropped, `Terminal=true` in xterm, counted in
-`~/.local/state/lhde/luxshell-mfu.ini`). Tooltips per item; menu *Open Quick Launch folder* (ours).
+copies of the browser, the mail client and the file manager, and `cmd.desktop`, Command Prompt: `lhde-theme terminal --run`,
+the terminal of settings.ini `[commands] terminal`; an emptied folder stays empty), file-name order, re-read on change (5 s
+poll). One row of 16 px icons at 28 px pitch, the first at 12,9 (the tray tile's geometry), 35 high, wrapping at 24 px
+(inferred). Icons: the entry's `Icon=` (apps.lua's XDG lookup, SVG converted), else liblhde's lookup by the file's name (the
+class map: `cmd.desktop` gets cmd.exe's icon; docs/THEME-FORMAT.md section 9), else the generic application icon
+(`lh.app_icon`), else imageres 1056. Click launches (`apps.lua A.launch`: field codes dropped, `Terminal=true` in the terminal,
+counted in `~/.local/state/lhde/luxshell-mfu.ini`). Tooltips per item; menu *Open Quick Launch folder* (ours).
 
 ### 8.5 Notification History (`tiles/notifyhistory.lua`, `notifylog.lua`)
 

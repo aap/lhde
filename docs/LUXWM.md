@@ -43,8 +43,8 @@ source"), `LHWM_ANIMATIONS=NAME` ("Animations"), `LHWM_DEBUG=1` (icon source per
 theme") and `quit` (clean exit, "EWMH and the shell").
 
 **Keys** come from `~/.config/lhde/keys` (lines `MODS+Key action [arg]`, MODS of `Mod4`/`Super`, `Mod1`/`Alt`, `Control`/`Ctrl`,
-`Shift`; `#` comments). Actions: `exec CMD`, `close`, `kill`, `cycle`, `maximize`, `minimize`, `sysmenu`, `workspace N`, `showdesktop`,
-`shell CMD`, `start`, `none`. Without the file the defaults: `Mod4+Return` urxvt, `Mod4+t` xterm, `Mod4+e` flxp (rox when flxp is not on
+`Shift`; `#` comments). Actions: `exec CMD`, `terminal` (settings.ini `[commands] terminal`, docs/SETTINGS.md), `close`, `kill`, `cycle`, `maximize`, `minimize`, `sysmenu`, `workspace N`, `showdesktop`,
+`shell CMD`, `start`, `none`. Without the file the defaults: `Mod4+Return terminal`, `Mod4+t` xterm, `Mod4+e` flxp (rox when flxp is not on
 PATH), `Mod4+r shell run`, `Mod4+d showdesktop`, `Mod4+s shell sidebar-stacking toggle`, `Mod4+h shell sidebar-mode toggle`, `Mod4+q` and `Mod1+F4` close, `Mod1+space
 sysmenu`, `Mod1+Tab`/`Mod4+Tab` and their `Shift+` forms `cycle`, `Mod4+Up` maximize, `Mod4+Down` minimize, `Mod4+1..4` `workspace
 0..3`, `Mod4+Shift+s shell screenshot_region` (Windows 10's snip key), `Mod4+Shift+f shell screenshot` (the full screen),

@@ -19,7 +19,7 @@ namespace shell {
 static const char template_text[] =
     "# flxp settings. An empty value means automatic; a switch is 1 or 0 (no other\n"
     "# spelling). Any key can be overridden for one run by the environment variable\n"
-    "# FLXP_<KEY> (FLXP_TERMINAL=xterm).\n"
+    "# FLXP_<KEY> (FLXP_TOOLBAR_ICONS=small).\n"
     "[flxp]\n"
     "\n"
     "# Every Windows file comes from the imported Windows tree through the session\n"
@@ -28,7 +28,8 @@ static const char template_text[] =
     "\n"
     "# What the desktop shares is in settings.ini (docs/SETTINGS.md): font\n"
     "# smoothing and the menu effects (Display Properties > Appearance > Effects),\n"
-    "# the start panel's pinned programs, the start menu, the session commands.\n"
+    "# the start panel's pinned programs, the start menu, the session commands\n"
+    "# and the terminal (Open Terminal Here: [commands] terminal).\n"
     "# The theme decides the icon set, the Explorer frame and navigation bar, the\n"
     "# taskbar and the wallpaper (Desktop.icons, Explorer.chrome, Explorer.navbar,\n"
     "# Shell.taskbar, Desktop.wallpaper: docs/THEME-FORMAT.md; Display Properties\n"
@@ -42,8 +43,6 @@ static const char template_text[] =
     "toolbar_icons =\n"
     "# The window's client size and position, WxH+X+Y.\n"
     "geometry =\n"
-    "# Open Terminal Here: a /bin/sh command, %d = the quoted directory (auto: urxvt).\n"
-    "terminal =\n"
 
     "# The longhorn frame's menu bar row: the folder-type gradient of Longhorn's\n"
     "# slate.msstyles (default, document, music, picture, video, contact, game;\n"

@@ -368,6 +368,12 @@ gets them by importing those media again (files already there are kept): `lhde-i
 `lhde-import --pack` of a pack made again with `lhde-pack`. `lhde-theme icon urxvt` says what a window of a class gets and
 where it comes from.
 
+The terminal every part of the desktop starts (Super+Return, Open Terminal Here, Quick Launch's Command Prompt, a
+`Terminal=true` program) is settings.ini `[commands] terminal` (docs/SETTINGS.md "The terminal"), by default the first of `cmd`,
+`urxvt`, `xterm`, `x-terminal-emulator` on PATH: a script `cmd` of your own that starts a terminal looking like cmd.exe is
+taken first. It runs in the folder it is opened for; for `Terminal=true` programs it gets `-e PROGRAM ARGS...`, so such a script
+passes its arguments on (`exec urxvt -bg '#000000' ... "$@"`).
+
 ## lhde-theme
 The resolver from the shell (docs/THEME-FORMAT.md, liblhde):
 ```
@@ -500,7 +506,7 @@ lhde-session stop                                    end the session: luxshell, 
 ```
 Environment: `LHDE_PICOM=0|1` forces the compositor off / on for the session, luxshell included; `LHDE_SHELL=0` without luxshell;
 `LHDE_DESKTOP=0` without flxp-desktop (luxshell then shows its own desktop layer); `LHDE_WM=fvwm` an fvwm2 session (`lab.fvwm2rc`);
-`LHDE_TERMINAL=COMMAND` (default urxvt, else xterm; `none` for no terminal); `LHDE_WINDOWS` another Windows tree. State and logs:
+`LHDE_TERMINAL=COMMAND` (default the terminal of settings.ini `[commands] terminal`; `none` for no terminal); `LHDE_WINDOWS` another Windows tree. State and logs:
 `$XDG_RUNTIME_DIR/lhde-session<DISPLAY>/` (`theme`, `shell`, `desktop`, `luxwm.log`, `luxshell.log`, `flxp-desktop.log`,
 `picom.log`, `session.log`). A real session without a D-Bus session bus gets one of its own, stopped with the session.
 

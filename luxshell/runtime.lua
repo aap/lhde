@@ -1249,7 +1249,7 @@ local function task_manager()
     for _, c in ipairs{ "xfce4-taskmanager", "lxtask", "gnome-system-monitor", "mate-system-monitor", "qps" } do
       if have(c) then taskmgr_cmd = c break end
     end
-    if not taskmgr_cmd and have("xterm") then taskmgr_cmd = "xterm -title 'Task Manager' -e top" end
+    if not taskmgr_cmd then taskmgr_cmd = lh.terminal():gsub("%%d", "~") .. " -e top" end   -- in the terminal ([commands] terminal)
   end
   return taskmgr_cmd or nil
 end

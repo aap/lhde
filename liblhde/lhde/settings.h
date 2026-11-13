@@ -63,6 +63,10 @@ const char *lhde_settings_get(const char *sec, const char *key, char *buf, size_
 int lhde_settings_set(const char *sec, const char *key, const char *value);
 /* forget the cached file (another writer changed it) */
 void lhde_settings_reload(void);
+/* the terminal (docs/SETTINGS.md [commands] terminal): that command line when set, else the first of cmd, urxvt, xterm,
+   x-terminal-emulator on PATH, else "xterm". A /bin/sh command; %d in it is the directory (the caller quotes it), and
+   programs run in it with " -e PROGRAM ARGS..." appended */
+const char *lhde_terminal_command(char *out, size_t n);
 
 #ifdef __cplusplus
 }

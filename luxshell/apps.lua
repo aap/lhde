@@ -5,7 +5,7 @@
 --   A.list()               visible entries sorted by name
 --   A.get(id)              one entry (id = "xterm.desktop") or nil
 --   A.parse(path, id)      one desktop file -> entry (Type=Application only) or nil
---   A.launch(e)            run it (field codes dropped, Terminal=true → xterm -e), count the launch in mfu.ini
+--   A.launch(e)            run it (field codes dropped, Terminal=true → the terminal -e: lh.terminal()), count the launch in mfu.ini
 --   A.mfu(n, skip)         the n most launched entries (skip = { id = true } for the pinned ones)
 --   A.icon(name, size)     a PNG path for an icon name or path at about size px, or nil
 --   A.default_browser(), A.default_mail()   desktop ids (xdg-settings / xdg-mime, else the first installed one)
@@ -106,7 +106,7 @@ end
 function A.command(e)
   local cmd = e.exec:gsub("%%%%", "\1"):gsub("%%[fFuUdDnNvmk]", ""):gsub("%%i", e.icon and ("--icon " .. q(e.icon)) or ""):gsub("%%c", q(e.name)):gsub("\1", "%%")
   cmd = trim(cmd)
-  if e.terminal then cmd = "xterm -e " .. cmd end
+  if e.terminal then cmd = lh.terminal():gsub("%%d", q(HOME)) .. " -e " .. cmd end
   return cmd
 end
 function A.launch(e)

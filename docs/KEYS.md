@@ -21,7 +21,7 @@ and Super alone when it binds neither Super key.
 | Super+D | show desktop: the visible windows minimised; again brings exactly those back if nothing changed meanwhile | `showdesktop` |
 | Super+S | the sidebar under the windows / on top of them | `shell sidebar-stacking toggle` |
 | Super+H | hide the sidebar / show it again: minimized into the taskbar and back, at once (the taskbar's sidebar toggle, 4074's) | `shell sidebar-mode toggle` |
-| Super+Return | a terminal (urxvt) | `exec urxvt` |
+| Super+Return | the terminal: settings.ini `[commands] terminal`, else the first of cmd, urxvt, xterm, x-terminal-emulator (docs/SETTINGS.md) | `terminal` |
 | Super+T | xterm | `exec xterm` |
 | Super+Q, Alt+F4 | close the active window | `close` |
 | Super+Up, Super+Down | maximise, minimise the active window | `maximize`, `minimize` |

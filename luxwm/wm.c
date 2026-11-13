@@ -4617,11 +4617,11 @@ compositor_check(void)
     theme_select();
 }
 
-/* ---- keybindings: ~/.config/lhde/keys (lines: MODS+Key action [arg]); actions: exec, close, kill, cycle, maximize, minimize, sysmenu (the window menu), workspace N, showdesktop, shell CMD (_LHSHELL_COMMAND), start (bare Super → _LHSHELL_START), none ---- */
+/* ---- keybindings: ~/.config/lhde/keys (lines: MODS+Key action [arg]); actions: exec, terminal ([commands] terminal: lhde_terminal_command), close, kill, cycle, maximize, minimize, sysmenu (the window menu), workspace N, showdesktop, shell CMD (_LHSHELL_COMMAND), start (bare Super → _LHSHELL_START), none ---- */
 struct keybind { unsigned mods; KeySym sym; char action[16]; char arg[240]; };
 static struct keybind keys[64]; static int nkeys = 0;
 static const char *default_keys[] = {
-    "Mod4+Return exec urxvt", "Mod4+t exec xterm", "Mod4+e exec if command -v flxp >/dev/null; then exec flxp; else exec rox; fi",
+    "Mod4+Return terminal", "Mod4+t exec xterm", "Mod4+e exec if command -v flxp >/dev/null; then exec flxp; else exec rox; fi",
     "Mod4+r shell run", "Mod4+d showdesktop", "Mod4+s shell sidebar-stacking toggle", "Mod4+h shell sidebar-mode toggle",
     "Mod4+Shift+f shell screenshot", "Mod4+Shift+w shell screenshot_window", "Mod4+Shift+s shell screenshot_region",
     "Mod4+q close", "Mod1+F4 close", "Mod1+space sysmenu", "Mod4+Tab cycle", "Mod1+Tab cycle", "Mod4+Shift+Tab cycle", "Mod1+Shift+Tab cycle", "Mod4+Up maximize", "Mod4+Down minimize",
@@ -4901,6 +4901,7 @@ static void handle_key_press(XEvent *e) {
         if (keys[i].sym != sym || keys[i].mods != mods) continue;
         const char *a = keys[i].action;
         if (!strcmp(a, "exec")) spawn(keys[i].arg);
+        else if (!strcmp(a, "terminal")) { char t[1024]; spawn(lhde_terminal_command(t, sizeof t)); }
         /* the window actions need an active window (Alt+F4 on the desktop closes nothing); Alt+Tab from the desktop first
            reactivates the last focused window */
         else if (!strcmp(a, "close") && client_active(f_client)) client_close(f_client);

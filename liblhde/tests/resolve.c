@@ -584,6 +584,25 @@ int main(void)
         unsetenv("LHDE_WINDOWS"); lhde_app_icons_set(NULL);
     }
 
+    /* lhde_terminal_command: [commands] terminal, else the first of cmd urxvt xterm x-terminal-emulator on PATH, else xterm */
+    {
+        char q[PATH_MAX + 64], t[256], *old = getenv("PATH") ? strdup(getenv("PATH")) : NULL;
+        snprintf(q, sizeof q, "%s/termbin", T); mkdirs(q); setenv("PATH", q, 1);
+        lhde_settings_set("commands", "terminal", NULL);
+        EQ(lhde_terminal_command(t, sizeof t), "xterm");                  /* none on PATH */
+        put("termbin/urxvt", "#!/bin/sh\n"); put("termbin/x-terminal-emulator", "#!/bin/sh\n");
+        snprintf(q, sizeof q, "%s/termbin/urxvt", T); chmod(q, 0755); snprintf(q, sizeof q, "%s/termbin/x-terminal-emulator", T); chmod(q, 0755);
+        EQ(lhde_terminal_command(t, sizeof t), "urxvt");
+        put("termbin/cmd", "#!/bin/sh\n"); snprintf(q, sizeof q, "%s/termbin/cmd", T);
+        EQ(lhde_terminal_command(t, sizeof t), "urxvt");                  /* not executable */
+        chmod(q, 0755);
+        EQ(lhde_terminal_command(t, sizeof t), "cmd");
+        CHECK(lhde_settings_set("commands", "terminal", "foot --working-directory %d") == 1);
+        EQ(lhde_terminal_command(t, sizeof t), "foot --working-directory %d");
+        lhde_settings_set("commands", "terminal", NULL);
+        if (old) { setenv("PATH", old, 1); free(old); }
+    }
+
     if (!getenv("LHDE_TEST_KEEP")) { char c[PATH_MAX + 32]; snprintf(c, sizeof c, "rm -rf '%s'", T); if (system(c)) {} }
     else fprintf(stderr, "kept %s\n", T);
     printf("%d passed, %d failed\n", passes, fails);

@@ -9,9 +9,6 @@
 		scene-node drawing is menu.lua before the commit that moved it onto the painter
 
 * sidebar
-	* unclear how quicklaunch icons are chosen
-		* perhaps tie into the grander lhde icon system?
-
 	* new tray icons (volume, brightness, touchpad are tiles/*.lua, SHELL-DESIGN 8.6):
 		* network/wifi
 		* bluetooth
