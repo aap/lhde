@@ -31,3 +31,10 @@ page; docs/USAGE.md "Metadata"). Next phases (todo_ideas/XATTR-DESIGN_CLAUDE.md 
 	the Advanced list's in-place editor is one line, so a value of several lines (notes) cannot be edited there as it is;
 	several files with different comments show an empty Comment without the "(several values)" cue (a multi-line edit has
 	no cue banner)
+* colour display, proposal (aap 2026-11-13: tags stay colourless while the basics are built; colour is a plain attribute, a name
+	or hex): draw it as an icon overlay badge, XP's idiom for per-item state (the shortcut arrow bottom left, the shared hand):
+	a dot of 8-10 px with a 1 px dark edge at the icon's bottom right in every view, scaled with the icon size; it never
+	collides with the selection (the label's highlight) or the shortcut arrow; Finder's underlay reads as a selection and its
+	bare dots after the name need a layout per view. Keep the Details column for sorting and grouping. A hex field in the
+	Metadata tab beside the swatch row later
+
