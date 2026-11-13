@@ -1,7 +1,7 @@
 #!/bin/sh
-# The tray tile (volume) with its system commands stood in by shell scripts on a PATH of their own (wpctl, pactl,
-# amixer: each logs its arguments to $TR_LOG and answers from $TR_STATE);
-# tiles.lua drives the tiles through a stand-in `lh`. No X display. Usage: tiles.sh [LUA]
+# The tray tiles (volume, brightness) with their system commands stood in by shell scripts on a PATH of their own
+# (wpctl, pactl, amixer, brightnessctl: each logs its arguments to $TR_LOG and answers from $TR_STATE) and a fake
+# backlight directory; tiles.lua drives the tiles through a stand-in `lh`. No X display. Usage: tiles.sh [LUA]
 cd "$(dirname "$0")/../.." || exit 1
 LUA=${1:-lua5.4}
 command -v "$LUA" >/dev/null 2>&1 || { echo "skip: no $LUA"; exit 0; }
@@ -27,7 +27,7 @@ AMIXER='read v < "$TR_STATE"; case "$*" in
 esac'
 run() {   # TEST STATE: a fresh PATH with the stubs set up before
     echo "$2" > "$T/state"; rm -f "$T/state.mute"; : > "$T/log"
-    TR_LOG="$T/log" TR_STATE="$T/state" PATH="$T/bin" "$LUA" luxshell/tests/tiles.lua luxshell "$1" || fails=$((fails + 1))
+    TR_LOG="$T/log" TR_STATE="$T/state" PATH="$T/bin" LHSHELL_BACKLIGHT="$T/backlight" "$LUA" luxshell/tests/tiles.lua luxshell "$1" || fails=$((fails + 1))
     rm -rf "$T/bin"; mkdir -p "$T/bin"
 }
 mkdir -p "$T/bin"
@@ -35,5 +35,13 @@ stub wpctl "$WPCTL"; stub pactl "$PACTL"; run volume-wpctl 0.40
 stub wpctl "$WPCTL_BROKEN"; stub pactl "$PACTL"; run volume-pactl 55
 stub amixer "$AMIXER"; run volume-amixer 30
 run volume-none 0
+mkdir -p "$T/backlight/acpi_video0" "$T/backlight/empty"; echo 600 > "$T/backlight/acpi_video0/brightness"; echo 1000 > "$T/backlight/acpi_video0/max_brightness"
+echo firmware > "$T/backlight/acpi_video0/type"
+run brightness 0
+echo 600 > "$T/backlight/acpi_video0/brightness"
+stub brightnessctl 'case "$*" in *set*) for a; do v=$a; done; echo "$v" > "$LHSHELL_BACKLIGHT/acpi_video0/brightness";; esac'
+TR_BRIGHTNESSCTL=1; export TR_BRIGHTNESSCTL; run brightness 0; unset TR_BRIGHTNESSCTL
+if [ "$(id -u)" != 0 ]; then chmod 444 "$T/backlight/acpi_video0/brightness"; run brightness-readonly 0; chmod 644 "$T/backlight/acpi_video0/brightness"; fi
+rm -rf "$T/backlight/acpi_video0"; run brightness-none 0
 [ $fails = 0 ] && echo "tiles: all passed" || echo "tiles: $fails failed"
 exit $fails

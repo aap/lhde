@@ -1,4 +1,4 @@
--- The tray tiles (tiles/volume.lua) against a stand-in `lh`: nodes are tables, timers and
+-- The tray tiles (tiles/volume.lua, brightness.lua) against a stand-in `lh`: nodes are tables, timers and
 -- lh.pipe run when the test says so (lh.pipe through io.popen, so the stub commands of tiles.sh on PATH answer), and the
 -- commands the tiles run are logged by those stubs. Usage: lua5.4 tiles.lua LUXSHELL_DIR TEST (tiles.sh sets the scene).
 local dir, test = arg[1], arg[2]
@@ -127,6 +127,35 @@ elseif test == "volume-none" then
   local t = sidebar_tile("volume")
   check("volume: no tool, the tooltip says so", tip(t.foreground) == "Volume: no wpctl, pactl or amixer found", tip(t.foreground))
   t:dispose()
+elseif test == "brightness" then
+  local bl = os.getenv("LHSHELL_BACKLIGHT") .. "/acpi_video0/"
+  local t = sidebar_tile("brightness")
+  local fg = t.foreground
+  check("brightness: 600 of 1000 is 60 %", tip(fg) == "Brightness: 60%" and t.label_node.text == "Brightness: 60%", tip(fg))
+  check("brightness: shown with a device", not t.hidden)
+  check("brightness: the sun", t.icon_node.name == "sun", t.icon_node.name)
+  clear_log(); fg.on_click(fg, 4); settle()
+  if os.getenv("TR_BRIGHTNESSCTL") then
+    check("brightness: wheel up 5 % through brightnessctl", log():find("brightnessctl %-q %-d acpi_video0 set 650") ~= nil, log())
+  else
+    check("brightness: wheel up 5 % written to sysfs", read(bl .. "brightness"):match("%d+") == "650", read(bl .. "brightness"))
+  end
+  write(bl .. "brightness", "200\n"); tick()
+  check("brightness: an outside change shows", tip(fg) == "Brightness: 20%", tip(fg))
+  fg.on_click(fg, 1)
+  check("brightness: popup with its caption and no Mute", find_text(t.fly[1], "Brightness") ~= nil and find_text(t.fly[1], "Mute") == nil)
+  lh.close_flyout(); t:dispose()
+elseif test == "brightness-readonly" then
+  local t = sidebar_tile("brightness")
+  clear_log(); t.foreground.on_click(t.foreground, 4); settle()
+  check("brightness: not writable, the tooltip says so", tip(t.foreground):find("not writable") ~= nil, tip(t.foreground))
+  t:dispose()
+elseif test == "brightness-none" then
+  local t = sidebar_tile("brightness")
+  check("brightness: no backlight, hidden", t.hidden == true and t.node.visible == false)
+  local tb, view = taskbar_tile("brightness")
+  check("brightness: no backlight, no taskbar icon", view.visible == false)
+  t:dispose(); tb:dispose()
 end
 print(string.format("%d checks, %d failed", n, fails))
 os.exit(fails == 0 and 0 or 1)

@@ -90,6 +90,15 @@ function shapes.speaker(v)
   end
   return L
 end
+-- sun: a yellow disc with an orange rim and eight rays
+function shapes.sun()
+  local rays = function(x, y) local dx, dy = x - 7.5, y - 7.5; local d = math.sqrt(dx * dx + dy * dy)
+    if d < 5.2 or d > 7.6 then return false end
+    for k = 0, 7 do local a = k * math.pi / 4; local px = math.abs(-dx * math.sin(a) + dy * math.cos(a)); local along = dx * math.cos(a) + dy * math.sin(a)
+      if along > 0 and px <= 0.75 then return true end end
+    return false end
+  return { { rays, solid("#e08a00") }, { disc(7.5, 7.5, 4.3), solid("#b86200") }, { disc(7.5, 7.5, 3.4), vgrad("#fff4a0", "#ffb400", 4, 11) } }
+end
 local cache = {}
 -- the pixels of an icon: { {x, y, w, "#aarrggbb"}, ... } (horizontal runs of one colour)
 function C.pixels(name)
