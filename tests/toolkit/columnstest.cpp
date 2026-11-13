@@ -1,6 +1,6 @@
 // The Details columns' layout (shell/columns.h): hiding and showing keep every
 // column's place and width, a header drag reorders the shown ones around the hidden
-// ones, an older file (the shown columns only) reads as before; and the per-folder
+// ones, an older file (the shown columns only) still reads; and the per-folder
 // records of flxp-views (shell::folderviews) on a scratch XDG_STATE_HOME: the view and
 // the columns of one folder kept apart from another's, a line of the older format read.
 #include <stdio.h>
@@ -36,7 +36,7 @@ int main()
     Layout l = builtin();
     check("builtin", "name:180 size:96 type:120 modified:120 -description:180 -tags:120 -comment:150 -color:100", format(l));
 
-    // aap's case: show Tags, hide Size, show Size again: Size at its own place, not last
+    // show Tags, hide Size, show Size again: Size at its own place, not last
     set_shown(l, TAGS, true);
     set_shown(l, SIZE, false);
     check("size hidden", "name type modified tags", ids(shown(l)));

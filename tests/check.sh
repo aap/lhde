@@ -108,7 +108,7 @@ else
     # Super+R: the start menu's Run dialog through luxwm, luxshell and flxp-startmenu; [commands] run instead when set
     tests/headless/runkey.sh "$1" > "$T/runkey.log" 2>&1; rc=$?
     result "headless/runkey.sh$(grep -m1 '^skip' "$T/runkey.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/runkey.log"
-    # a Win32 program's menu bar under jade4074 (4074's themed bar), luna (XP's flat bar) and classic, read back at measured points
+    # a Win32 program's menu bar under jade4074 (4074's themed bar), luna (XP's flat bar) and classic, read back at 4074's and XP's pixel values
     tests/headless/menubar.sh "$1" > "$T/menubar.log" 2>&1; rc=$?
     result "headless/menubar.sh$(grep -m1 '^skip' "$T/menubar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/menubar.log"
     # the task band's picture of a folder with two JPEGs is the Icons view's square (folderpictest)

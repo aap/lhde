@@ -1,7 +1,7 @@
 #!/bin/sh
 # A Win32 program's menu bar (Wine's user32 in wux with the menu painter: menu.c.patch, wuxtheme/menu.cpp) under luxwm on
-# Xvfb: tests/w32/menutest's bar read back with ImageMagick at points measured on Longhorn 4074's Notepad under Jade and on
-# XP. Under jade4074: the 1 px top row in MENU (244), the bar in BAR's flat image (233) and the line under it white, the item
+# Xvfb: tests/w32/menutest's bar read back with ImageMagick against 4074's Notepad under Jade and XP's.
+# Under jade4074: the 1 px top row in MENU (244), the bar in BAR's flat image (233) and the line under it white, the item
 # under the pointer hot (BARITEM: the 181 grey outline, 248 inside its top), the open one pushed (128 under its outline),
 # an inactive window's bar BAR's gradient (244 in the middle, white at the right end); under luna XP's flat bar (MENUBAR, the
 # hot and the open item MENUHILIGHT); under classic the 3D face bar, the hot item raised and the open one sunken. Needs Xvfb,
