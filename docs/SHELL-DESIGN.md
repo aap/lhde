@@ -841,7 +841,7 @@ property page, *Remove <Friendly Name> Tile* unless pinned; no separators).
   *Auto Size* (checked and greyed: tiles size to their content), *Move Up* / *Move Down* (greyed at the ends and for pinned
   tiles), *<Name> Tile Properties* (`properties()`, else the flyout; greyed without either), *Remove <Name> Tile* (not on pinned
   tiles). Friendly names: Classic Tray, Power, Clock, Quick Launch, Notification History; the tray tiles (8.6) Volume,
-  Brightness (their `name`; the parts list does not have them: a removed one comes back with the pack's list when
+  Brightness, Touchpad (their `name`; the parts list does not have them: a removed one comes back with the pack's list when
   `[sidebar] tiles` is deleted from luxshell-state.ini).
 
 All menus are `menu.lua` over wuxtheme's painter (section 16).
@@ -918,20 +918,20 @@ works; 4074's did nothing). Store: `~/.local/state/lhde/luxshell-notifications`,
 each (time, viewed, app, icon, summary, body; `\\ \t \n` escaped); `transient` notifications stay out; `CloseNotification`
 revokes, `replaces_id` updates in place; viewed once dismissed, clicked, re-shown or seen in the flyout.
 
-### 8.6 Tray tiles: Volume, Brightness (`tiles/volume.lua`, `brightness.lua`, `traycontrol.lua`)
+### 8.6 Tray tiles: Volume, Brightness, Touchpad (`tiles/volume.lua`, `brightness.lua`, `touchpad.lua`, `traycontrol.lua`)
 
 XP's notification-area controls as tiles (4074 had no such module): in the 4074 packs' `tiles` after Power and their
 `taskbar_tiles` after the tray, so the full sidebar shows each as a tile and the minimized sidebar's taskbar view as an icon
 beside the tray icons (the pinned block has none). Sidebar view: the tray tile's geometry, the 16 px icon at 5,6 of the
 foreground, 33 high, the value beside it at x 26 in the power tile's line style (Segoe UI 13 bold `#dddddd`): "Volume: 40%",
-"Muted: 40%", "Brightness: 60%". Taskbar view: the icon in a 20 px slot centred in the bar; its flyout opens
-above the bar at the pointer. Left click: the slider flyout, wheel: a step, middle click: the volume's
-mute. Tooltips are read when they show. Brightness hides (tile and taskbar icon) without a backlight.
+"Muted: 40%", "Brightness: 60%", "Touchpad: on". Taskbar view: the icon in a 20 px slot centred in the bar; its flyout opens
+above the bar at the pointer. Left click: the slider flyout (the touchpad: toggles), wheel: a step, middle click: the volume's
+mute. Tooltips are read when they show. Brightness and touchpad hide (tile and taskbar icon) without the device.
 
-Icons: none of the packs' images fits (4074's imageres and shell32 have no speaker or sun; XP's tray speaker is in
+Icons: none of the packs' images fits (4074's imageres and shell32 have no speaker, sun or touchpad; XP's tray speaker is in
 sndvol32 / stobject, which lhde-import does not take), so they are drawn: shapes sampled 4x4 per pixel into 1 px rect runs. A
 grey speaker with no, one (< 50 %) or two blue waves, muted: a red ring-and-slash on a white disc at its lower right (XP's
-muted overlay); an orange-rimmed sun with eight rays.
+muted overlay); an orange-rimmed sun with eight rays; a grey pad with two buttons, off: the same ring-and-slash.
 
 Slider flyout, after XP's tray volume popup (`sndvol32 /t`: the caption "Volume", a vertical trackbar loud at the top with
 ticks on both sides, a "Mute" check box under it, closed when it loses the focus); its pixel layout is ours, no reference of the
@@ -947,9 +947,10 @@ tile reads the value back.
 | --- | --- | --- | --- |
 | Volume | the first that answers of `wpctl get-volume @DEFAULT_AUDIO_SINK@` ("Volume: 0.40 [MUTED]"), `pactl get-sink-volume` + `get-sink-mute @DEFAULT_SINK@`, `amixer get Master` ("[40%] ... [on]"); `LHSHELL_VOLUME` forces one | `wpctl set-volume / set-mute`, `pactl set-sink-volume N% / set-sink-mute`, `amixer -q set Master N% / mute / unmute`; wheel 2 %, up to 100 % (a level above stays) | `pactl subscribe` (sink and server events, 50 ms debounce) when pactl is installed, else a read every 1 s |
 | Brightness | `/sys/class/backlight/<dev>/brightness`, `max_brightness`; the device of `type` firmware, else platform, else raw (the kernel's ranking); `LHSHELL_BACKLIGHT` another directory | `brightnessctl -q -d DEV set RAW` when installed, else a write to `brightness` when writable, else the tooltip says neither works; wheel 5 %, never below 1 % | a read every 1 s |
+| Touchpad | `xinput list`: the first slave pointer named *touchpad* or *trackpad* (any case); `xinput list-props ID`: `libinput Device Enabled`, else `Device Enabled` | `xinput set-prop ID '<that property>' 0/1` | `list-props` every 2 s; without a touchpad `xinput list` every 10 s |
 
 Tooltips: "Volume: 40%" (XP's), "Volume: 40% (muted)", on failure "Volume: no wpctl, pactl or amixer found" or "Volume:
-pactl: <its first line>"; "Brightness: 60%", "Brightness: 60% (not writable ...)". Tested
+pactl: <its first line>"; "Brightness: 60%", "Brightness: 60% (not writable ...)"; "Touchpad: on (click to turn it off)". Tested
 by `luxshell/tests/tiles.sh` (stub commands on a PATH of their own, a fake backlight directory; `tiles.lua` drives the tiles
 through a stand-in `lh`), part of `make check`.
 

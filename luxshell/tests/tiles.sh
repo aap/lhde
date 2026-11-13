@@ -1,6 +1,6 @@
 #!/bin/sh
-# The tray tiles (volume, brightness) with their system commands stood in by shell scripts on a PATH of their own
-# (wpctl, pactl, amixer, brightnessctl: each logs its arguments to $TR_LOG and answers from $TR_STATE) and a fake
+# The tray tiles (volume, brightness, touchpad) with their system commands stood in by shell scripts on a PATH of their own
+# (wpctl, pactl, amixer, brightnessctl, xinput: each logs its arguments to $TR_LOG and answers from $TR_STATE) and a fake
 # backlight directory; tiles.lua drives the tiles through a stand-in `lh`. No X display. Usage: tiles.sh [LUA]
 cd "$(dirname "$0")/../.." || exit 1
 LUA=${1:-lua5.4}
@@ -25,6 +25,12 @@ esac'
 AMIXER='read v < "$TR_STATE"; case "$*" in
 "get Master") echo "Simple mixer control '"'"'Master'"'"',0"; echo "  Mono: Playback 26 [$v%] [-12.00dB] [off]";;
 esac'
+XINPUT='case "$1" in
+list) printf "%s\n" "⎡ Virtual core pointer                    	id=2	[master pointer  (3)]" "⎜   ↳ Virtual core XTEST pointer              	id=4	[slave  pointer  (2)]" "⎜   ↳ SynPS/2 Synaptics TouchPad              	id=12	[slave  pointer  (2)]" "⎣ Virtual core keyboard                   	id=3	[master keyboard (2)]";;
+list-props) read v < "$TR_STATE"; printf "Device '"'"'SynPS/2 Synaptics TouchPad'"'"':\n\tDevice Enabled (185):\t%s\n\tlibinput Tapping Enabled (320):\t1\n\tlibinput Device Enabled (186):\t%s\n" "$v" "$v";;
+set-prop) echo "$4" > "$TR_STATE";;
+esac'
+XINPUT_NONE='[ "$1" = list ] && printf "%s\n" "⎡ Virtual core pointer                    	id=2	[master pointer  (3)]" "⎜   ↳ Virtual core XTEST pointer              	id=4	[slave  pointer  (2)]"'
 run() {   # TEST STATE: a fresh PATH with the stubs set up before
     echo "$2" > "$T/state"; rm -f "$T/state.mute"; : > "$T/log"
     TR_LOG="$T/log" TR_STATE="$T/state" PATH="$T/bin" LHSHELL_BACKLIGHT="$T/backlight" "$LUA" luxshell/tests/tiles.lua luxshell "$1" || fails=$((fails + 1))
@@ -43,5 +49,7 @@ stub brightnessctl 'case "$*" in *set*) for a; do v=$a; done; echo "$v" > "$LHSH
 TR_BRIGHTNESSCTL=1; export TR_BRIGHTNESSCTL; run brightness 0; unset TR_BRIGHTNESSCTL
 if [ "$(id -u)" != 0 ]; then chmod 444 "$T/backlight/acpi_video0/brightness"; run brightness-readonly 0; chmod 644 "$T/backlight/acpi_video0/brightness"; fi
 rm -rf "$T/backlight/acpi_video0"; run brightness-none 0
+stub xinput "$XINPUT"; run touchpad 1
+stub xinput "$XINPUT_NONE"; run touchpad-none 1
 [ $fails = 0 ] && echo "tiles: all passed" || echo "tiles: $fails failed"
 exit $fails

@@ -99,6 +99,16 @@ function shapes.sun()
     return false end
   return { { rays, solid("#e08a00") }, { disc(7.5, 7.5, 4.3), solid("#b86200") }, { disc(7.5, 7.5, 3.4), vgrad("#fff4a0", "#ffb400", 4, 11) } }
 end
+-- touchpad: a rounded pad with the two buttons under a divider; off adds the no sign
+function shapes.touchpad(v)
+  local L = {
+    { rrect(0.5, 1.5, 15.5, 14.5, 2.2), solid("#3a3a3a") },
+    { rrect(1.5, 2.5, 14.5, 13.5, 1.4), vgrad("#f2f2f2", "#b4b4b4", 2, 14) },
+    { any(rrect(1.5, 10, 14.5, 10.9, 0), rrect(7.6, 10, 8.4, 13.5, 0)), solid("#5a5a5a") },
+  }
+  if v == "off" then no_sign(L, 11.4, 11.4) end
+  return L
+end
 local cache = {}
 -- the pixels of an icon: { {x, y, w, "#aarrggbb"}, ... } (horizontal runs of one colour)
 function C.pixels(name)

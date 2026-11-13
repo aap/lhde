@@ -21,11 +21,8 @@
 * menupaint.c copied luxwm's old 4 px menu shadow; the painter now has XP's 5 px one (ut_menu_shadow_alpha, UT_MENU_SHADOW):
 	use it, as luxwm does now, and honour [effects] menu_shadows
 
-	* new tray icons (volume and brightness are tiles/*.lua, SHELL-DESIGN 8.6):
-		* easy:
-			* touchpad toggle
-		* harder:
-			* network/wifi
-			* bluetooth
-	* the sidebar menu's parts list (runtime.lua PARTS) lacks Volume, Brightness: a removed one only comes back
+	* new tray icons (volume, brightness, touchpad are tiles/*.lua, SHELL-DESIGN 8.6):
+		* network/wifi
+		* bluetooth
+	* the sidebar menu's parts list (runtime.lua PARTS) lacks Volume, Brightness, Touchpad: a removed one only comes back
 	  by deleting [sidebar] tiles; and the taskbar view's tiles (taskbar_tiles) cannot be removed by the user at all

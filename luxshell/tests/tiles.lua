@@ -1,4 +1,4 @@
--- The tray tiles (tiles/volume.lua, brightness.lua) against a stand-in `lh`: nodes are tables, timers and
+-- The tray tiles (tiles/volume.lua, brightness.lua, touchpad.lua) against a stand-in `lh`: nodes are tables, timers and
 -- lh.pipe run when the test says so (lh.pipe through io.popen, so the stub commands of tiles.sh on PATH answer), and the
 -- commands the tiles run are logged by those stubs. Usage: lua5.4 tiles.lua LUXSHELL_DIR TEST (tiles.sh sets the scene).
 local dir, test = arg[1], arg[2]
@@ -156,6 +156,21 @@ elseif test == "brightness-none" then
   local tb, view = taskbar_tile("brightness")
   check("brightness: no backlight, no taskbar icon", view.visible == false)
   t:dispose(); tb:dispose()
+elseif test == "touchpad" then
+  local t = sidebar_tile("touchpad")
+  local fg = t.foreground
+  check("touchpad: found by xinput, on", tip(fg) == "Touchpad: on (click to turn it off)" and t.icon_node.name == "touchpad-on", tip(fg))
+  check("touchpad: the label", t.label_node.text == "Touchpad: on", t.label_node.text)
+  clear_log(); fg.on_click(fg, 1); settle()
+  check("touchpad: a click turns it off", log():find("xinput set%-prop 12 libinput Device Enabled 0") ~= nil, log())
+  check("touchpad: off icon and tooltip", t.icon_node.name == "touchpad-off" and tip(fg) == "Touchpad: off (click to turn it on)", tip(fg))
+  write(os.getenv("TR_STATE"), "1\n"); tick()
+  check("touchpad: an outside change shows", t.state.enabled == true)
+  t:dispose()
+elseif test == "touchpad-none" then
+  local t = sidebar_tile("touchpad")
+  check("touchpad: none, hidden", t.hidden == true and t.node.visible == false)
+  t:dispose()
 end
 print(string.format("%d checks, %d failed", n, fails))
 os.exit(fails == 0 and 0 or 1)
