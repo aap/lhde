@@ -70,7 +70,12 @@ HANDLE load_image(const std::string& src, UINT type, int cx, int cy, UINT flags)
         if (hash == std::string::npos) return nullptr;
         HINSTANCE h = module_for(src.substr(3, hash - 3));
         if (!h) return nullptr;
-        return LoadImageW(h, MAKEINTRESOURCEW(atoi(src.c_str() + hash + 1)), type, cx, cy, depth_flag | flags);
+        std::string id = src.substr(hash + 1);
+        if (!id.empty() && id.find_first_not_of("0123456789") != std::string::npos) {   // a named resource (cmd.exe's IDI_APPICON)
+            std::u16string name = w32::utf16_of(id.c_str());
+            return LoadImageW(h, (LPCWSTR)name.c_str(), type, cx, cy, depth_flag | flags);
+        }
+        return LoadImageW(h, MAKEINTRESOURCEW(atoi(id.c_str())), type, cx, cy, depth_flag | flags);
     }
     std::u16string w = w32::utf16_of(src.c_str());
     return LoadImageW(nullptr, (LPCWSTR)w.c_str(), type, cx, cy, LR_LOADFROMFILE | depth_flag | flags);

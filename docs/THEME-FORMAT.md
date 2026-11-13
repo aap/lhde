@@ -226,3 +226,50 @@ settings.ini write: `_LH_SETTINGS_CHANGED`, and every client resolves the sessio
 | any dropped XP style | itself | - | off | - | none | - |
 Later: plex of other builds (4015, 4029, 4039), plex vision.
 
+
+## 9. Window and program icons (`icons/apps.ini`, liblhde `<lhde/icon.h>`)
+Every place that shows a window's or a program's icon asks liblhde one question, `lhde_app_icon(class, instance,
+desktop_id, size, ...)`: luxwm's caption and Alt+Tab switcher (docs/LUXWM.md "Task switcher"), luxshell's task buttons
+(docs/SHELL-DESIGN.md 3.1), flxp-taskbar's buttons, the Explorer's Open With list and the Properties sheet's "Opens with"
+row. First answer wins:
+
+| step | what |
+| --- | --- |
+| own | the window's `_NET_WM_ICON` (the caller reads it and passes it in) |
+| class | the class map below: the window's `WM_CLASS` class or instance -> an icon key |
+| desktop | the program's `.desktop` file: the id given, else the one whose `StartupWMClass` is the class or instance, else the one named like them (`xterm.desktop`, a reverse-DNS id ending in `.Class`); its `Icon=` through the XDG icon theme (the GTK icon theme, its `Inherits`, `hicolor`, then `/usr/share/pixmaps`; PNG files only) or as an absolute path |
+| (hint) | the window's `WM_HINTS` icon pixmap (xterm's): the consumers that read X try it here, before the generic icon |
+| generic | the icon set's `exe` key, the generic application icon (shell32.dll #3, XP's IDI_APPLICATION art) |
+
+A key is looked up in the session's icon set (`Desktop.icons` resolved: `path.icons`), then in its recipe's `[theme] fallback`
+recipes, then in the free chain `xp`, `2k`, `reactos`, then in Wine's set (flxp's `res/icons/wine.theme`): the first whose
+source file is imported. `lhde-theme icon CLASS [INSTANCE]` prints what a window of that class gets and from where;
+`lhde-theme icon --key KEY [--set ICONS]` one key's image.
+
+**The class map** is `[classes]` of `icons/apps.ini`, read from every data directory, the user's `~/.config/lhde/icons/apps.ini`
+first, then the shipped `share/icons/apps.ini`; within a file the first matching line wins:
+```
+[classes]
+urxvt rxvt* xterm st alacritty kitty foot *terminal* cmd = cmd   ; patterns: shell globs, without case, several to a line
+flxp-settings = display
+luxpad = notepad
+firefox* = browser
+```
+The right side is an icon key of the recipes; a value no recipe knows is taken as an XDG icon name or an absolute path.
+
+**The keys** of the window and program icons, in every recipe (`share/icons/*.theme` `[icons]`); the source files are
+imported by the source recipes (`share/sources/xp.ini`, `2k.ini`, `4074.ini`, `reactos.ini` take `cmd.exe`, `desk.cpl`,
+`notepad.exe`):
+
+| key | XP (and 4074: the same ids) | Windows 2000 | ReactOS |
+| --- | --- | --- | --- |
+| `exe` | shell32.dll #3 | shell32.dll #3 | shell32.dll #3 |
+| `cmd` (console windows) | cmd.exe `IDI_APPICON` | cmd.exe `IDI_APPICON` | cmd.exe #1 |
+| `display` (Display Properties) | desk.cpl #100 | desk.cpl #100 | desk.cpl #100 |
+| `notepad` | notepad.exe #2 | notepad.exe #1 | notepad.exe #521 |
+| `explorer` | explorer.exe #100 | explorer.exe #100 | explorer.exe #100 |
+| `browser` | explorer.exe #253 (the start panel's Internet) | shell32.dll #14 | explorer.exe #253 |
+| `mail` | explorer.exe #254 (the start panel's E-mail) | none: the free chain answers | explorer.exe #254 |
+
+A resource id in a recipe is a number or, as cmd.exe's, a name (`pe:cmd.exe#IDI_APPICON`). ReactOS answers every key of
+every recipe (make check-free checks it).

@@ -9,7 +9,7 @@
 # rewrites it only when it changes. A scene that is not imported is left out of the header with a message, and aurorademo
 # says so when asked for it.
 
-EXAMPLES_PKGS = x11 xext cairo cairo-xlib pangocairo
+EXAMPLES_PKGS = x11 xext cairo cairo-xlib pangocairo libpng
 EXAMPLES      = $(addprefix build/examples/,extendframe navdemo aurorademo)
 
 build/examples/extendframe: examples/extendframe.c $(LHDEA) $(UTSO)

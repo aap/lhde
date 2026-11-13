@@ -9,7 +9,10 @@
 #include "lhde/data.h"
 #include "lhde/theme.h"
 #include "lhde/settings.h"
+#include "lhde/icon.h"
 #include <errno.h>
+#include <png.h>
+#include <stdint.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,6 +92,69 @@ static void iset(const char *name, const char *title, const char *file, int usab
     struct isets *x = ud; (void)title; (void)file;
     if (x->n < 16) { snprintf(x->names[x->n], sizeof x->names[0], "%s", name); x->usable[x->n++] = usable; }
 }
+
+/* ---- lhde_app_icon's fake files: icons of one colour, as a .ico (32-bit DIB), a PNG and inside a minimal PE ---- */
+static size_t le(unsigned char *p, uint32_t v, int n) { for (int i = 0; i < n; i++) p[i] = (unsigned char)(v >> (8 * i)); return (size_t)n; }
+/* a 32-bit icon image of w x w in colour argb: BITMAPINFOHEADER, the XOR rows, an empty AND mask */
+static size_t dib(unsigned char *p, int w, uint32_t argb)
+{
+    size_t o = 0;
+    o += le(p + o, 40, 4); o += le(p + o, (uint32_t)w, 4); o += le(p + o, (uint32_t)(2 * w), 4); o += le(p + o, 1, 2); o += le(p + o, 32, 2);
+    memset(p + o, 0, 24); o += 24;
+    for (int i = 0; i < w * w; i++) o += le(p + o, argb, 4);
+    size_t mask = (size_t)((w + 31) / 32 * 4 * w); memset(p + o, 0, mask); o += mask;
+    return o;
+}
+/* a .ico with the sizes given (each in its own colour: colours[i]) */
+static void put_ico(const char *rel, int n, const int *sizes, const uint32_t *colours)
+{
+    static unsigned char b[1 << 16]; size_t o = 0, img[8], at[8];
+    o += le(b, 0, 2); o += le(b + o, 1, 2); o += le(b + o, (uint32_t)n, 2);
+    size_t dir = o; o += 16 * (size_t)n;
+    for (int i = 0; i < n; i++) { at[i] = o; img[i] = dib(b + o, sizes[i], colours[i]); o += img[i]; }
+    for (int i = 0; i < n; i++) {
+        unsigned char *e = b + dir + 16 * i; memset(e, 0, 16);
+        e[0] = e[1] = (unsigned char)sizes[i]; le(e + 4, 1, 2); le(e + 6, 32, 2); le(e + 8, (uint32_t)img[i], 4); le(e + 12, (uint32_t)at[i], 4);
+    }
+    char path[2 * PATH_MAX]; snprintf(path, sizeof path, "%s/%s", T, rel);
+    FILE *f = fopen(path, "wb"); if (!f) { perror(path); exit(2); } fwrite(b, 1, o, f); fclose(f);
+}
+/* a PE whose .rsrc holds RT_GROUP_ICON "IDI_APPICON" (a string name, as cmd.exe's) of one 16 px RT_ICON 1 in argb */
+static void put_pe(const char *rel, uint32_t argb)
+{
+    static unsigned char b[8192]; memset(b, 0, sizeof b);
+    b[0] = 'M'; b[1] = 'Z'; le(b + 60, 64, 4); memcpy(b + 64, "PE\0\0", 4);
+    unsigned char *coff = b + 68; le(coff, 0x14c, 2); le(coff + 2, 1, 2); le(coff + 16, 224, 2);
+    unsigned char *opt = b + 88; le(opt, 0x10b, 2); le(opt + 92, 16, 4);
+    unsigned char *sec = opt + 224; memcpy(sec, ".rsrc", 5);
+    unsigned char *r = b + 0x200; const uint32_t RVA = 0x1000;
+    /* root: types 3 and 14; 3 -> id 1 -> lang 1033 -> data; 14 -> "IDI_APPICON" -> lang 1033 -> data */
+    size_t root = 0, d3 = 32, d3l = 56, d14 = 80, d14l = 104, de3 = 128, de14 = 144, name = 160, grp = 192, ico = 224;
+    le(r + root + 14, 2, 2); le(r + root + 16, 3, 4); le(r + root + 20, 0x80000000u | d3, 4); le(r + root + 24, 14, 4); le(r + root + 28, 0x80000000u | d14, 4);
+    le(r + d3 + 14, 1, 2); le(r + d3 + 16, 1, 4); le(r + d3 + 20, 0x80000000u | d3l, 4);
+    le(r + d3l + 14, 1, 2); le(r + d3l + 16, 1033, 4); le(r + d3l + 20, (uint32_t)de3, 4);
+    le(r + d14 + 12, 1, 2); le(r + d14 + 16, 0x80000000u | name, 4); le(r + d14 + 20, 0x80000000u | d14l, 4);
+    le(r + d14l + 14, 1, 2); le(r + d14l + 16, 1033, 4); le(r + d14l + 20, (uint32_t)de14, 4);
+    const char *nm = "IDI_APPICON"; le(r + name, (uint32_t)strlen(nm), 2); for (size_t i = 0; nm[i]; i++) le(r + name + 2 + 2 * i, (uint32_t)nm[i], 2);
+    size_t isz = dib(r + ico, 16, argb);
+    le(r + grp + 2, 1, 2); le(r + grp + 4, 1, 2); r[grp + 6] = r[grp + 7] = 16; le(r + grp + 10, 1, 2); le(r + grp + 12, 32, 2); le(r + grp + 14, (uint32_t)isz, 4); le(r + grp + 18, 1, 2);
+    le(r + de3, RVA + (uint32_t)ico, 4); le(r + de3 + 4, (uint32_t)isz, 4); le(r + de14, RVA + (uint32_t)grp, 4); le(r + de14 + 4, 20, 4);
+    size_t total = ico + isz;
+    le(opt + 96 + 16, RVA, 4); le(opt + 96 + 20, (uint32_t)total, 4);
+    le(sec + 8, (uint32_t)total, 4); le(sec + 12, RVA, 4); le(sec + 16, (uint32_t)total, 4); le(sec + 20, 0x200, 4);
+    char path[2 * PATH_MAX]; snprintf(path, sizeof path, "%s/%s", T, rel);
+    FILE *f = fopen(path, "wb"); if (!f) { perror(path); exit(2); } fwrite(b, 1, 0x200 + total, f); fclose(f);
+}
+static void put_png(const char *rel, int w, uint32_t argb)
+{
+    char path[2 * PATH_MAX]; snprintf(path, sizeof path, "%s/%s", T, rel);
+    char d[2 * PATH_MAX]; snprintf(d, sizeof d, "%s", path); *strrchr(d, '/') = 0; mkdirs(d);
+    png_image im; memset(&im, 0, sizeof im); im.version = PNG_IMAGE_VERSION; im.width = (unsigned)w; im.height = (unsigned)w; im.format = PNG_FORMAT_BGRA;
+    uint32_t *px = malloc((size_t)w * w * 4); for (int i = 0; i < w * w; i++) px[i] = argb;
+    png_image_write_to_file(&im, path, 0, px, 0, NULL); free(px);
+}
+/* the first pixel and the size of an lhde_app_icon answer, freed */
+static unsigned long first_px(unsigned long *im, unsigned long *w) { unsigned long c = im ? im[2] : 0; if (w) *w = im ? im[0] : 0; free(im); return c; }
 
 int main(void)
 {
@@ -460,6 +526,62 @@ int main(void)
         CHECK(lhde_data_origin(o, rel, sizeof rel) == LHDE_TREE_WINDOWS); EQ(rel, "generated/frames/jade4074w/close.png");
         CHECK(lhde_data_origin(fd, rel, sizeof rel) == LHDE_TREE_SHIPPED); EQ(rel, "frames/jade4074w");
         unsetenv("LHDE_WINDOWS"); setenv("LHDE_DATA", flat, 1); setenv("XDG_DATA_DIRS", "/nonexistent", 1); lhde_data_reset();
+    }
+
+    /* lhde_app_icon (lhde/icon.h): a flat data directory with its own icon set zz (a .ico, a PE with a named group, a key
+       whose file is missing), the class map, a desktop file and an XDG icon theme of its own */
+    {
+        char q[PATH_MAX + 64];
+        mkdirs(T); snprintf(q, sizeof q, "%s/icdata/icons/zz", T); mkdirs(q);
+        put("icdata/icons/zz.theme", "[theme]\nname = ZZ\nbase = zz\n[icons]\ncmd = pe:zz.dll#IDI_APPICON\nexe = generic.ico\n"
+            "display = missing.ico\nnotepad = pad.ico\n");
+        put("icdata/icons/apps.ini", "[classes]\nzzterm* ZzTerm = cmd\nzzpad = notepad\nzzsettings = display\nzzxdg = zzicon\nzzabs = /nonexistent/x.png\n");
+        put_pe("icdata/icons/zz/zz.dll", 0xff00ff00u);
+        int s1[] = { 16 }; uint32_t c1[] = { 0xff0000ffu }; put_ico("icdata/icons/zz/generic.ico", 1, s1, c1);
+        int s2[] = { 16, 32 }; uint32_t c2[] = { 0xffff0000u, 0xff800000u }; put_ico("icdata/icons/zz/pad.ico", 2, s2, c2);
+        put("icxdg/applications/org.example.ZzApp.desktop", "[Desktop Entry]\nName=Zz\nIcon=zzapp\nExec=zzapp\n");
+        put("icxdg/applications/zzwm.desktop", "[Desktop Entry]\nName=Zz WM\nIcon=zzapp\nStartupWMClass=ZzWindow\n");
+        put("icxdg/icons/hicolor/index.theme", "[Icon Theme]\nName=Hicolor\nDirectories=16x16/apps,48x48/apps\n"
+            "[16x16/apps]\nSize=16\nType=Threshold\n[48x48/apps]\nSize=48\nType=Threshold\n");
+        put_png("icxdg/icons/hicolor/16x16/apps/zzapp.png", 16, 0xff00ffffu);
+        put_png("icxdg/icons/hicolor/48x48/apps/zzapp.png", 48, 0xffffff00u);
+        put_png("icxdg/icons/hicolor/48x48/apps/zzicon.png", 48, 0xff123456u);
+        snprintf(q, sizeof q, "%s/icdata", T); setenv("LHDE_DATA", q, 1);
+        snprintf(q, sizeof q, "%s/icxdg", T); setenv("XDG_DATA_HOME", q, 1);
+        setenv("XDG_DATA_DIRS", "/nonexistent", 1); unsetenv("LHDE_WINDOWS");
+        lhde_data_reset(); lhde_app_icons_set("zz");
+        unsigned long n, w; int step; char why[1024];
+        unsigned long *im = lhde_app_icon("ZzTerm", "zzterm", NULL, 16, NULL, 0, 0, &n, &step, why, sizeof why);
+        CHECK(im && n == 2 + 16 * 16 && step == LHDE_APPICON_CLASS); HAS(why, "class map: ZzTerm = cmd");
+        CHECK(first_px(im, &w) == 0xff00ff00u && w == 16);                                    /* the PE's named group */
+        CHECK(first_px(lhde_app_icon(NULL, "zzterm-256color", NULL, 16, NULL, 0, 0, &n, &step, NULL, 0), NULL) == 0xff00ff00u && step == LHDE_APPICON_CLASS);   /* a glob, the instance, no case */
+        CHECK(first_px(lhde_app_icon("zzpad", NULL, NULL, 16, NULL, 0, 0, &n, NULL, NULL, 0), &w) == 0xffff0000u && w == 16);   /* the .ico's 16 */
+        CHECK(first_px(lhde_app_icon("zzpad", NULL, NULL, 24, NULL, 0, 0, &n, NULL, NULL, 0), &w) == 0xff800000u && w == 32);   /* at or above */
+        CHECK(first_px(lhde_app_icon("ZZPAD", NULL, NULL, 64, NULL, 0, 0, &n, NULL, NULL, 0), &w) == 0xff800000u && w == 32);   /* else the largest */
+        /* the window's own icon first */
+        unsigned long own[2 + 4] = { 2, 2, 0x11223344u, 0, 0, 0 };
+        CHECK(first_px(lhde_app_icon("ZzTerm", NULL, NULL, 16, own, 6, 0, &n, &step, NULL, 0), &w) == 0x11223344u && w == 2 && step == LHDE_APPICON_OWN);
+        /* a key whose file is missing in every set: the class step does not answer, nor a desktop file: the generic icon */
+        im = lhde_app_icon("zzsettings", NULL, NULL, 16, NULL, 0, 0, &n, &step, why, sizeof why);
+        CHECK(first_px(im, NULL) == 0xff0000ffu && step == LHDE_APPICON_GENERIC); HAS(why, "exe = generic.ico");
+        CHECK(lhde_app_icon("zzsettings", NULL, NULL, 16, NULL, 0, LHDE_APPICON_NO_GENERIC, &n, &step, NULL, 0) == NULL && step == LHDE_APPICON_NONE);
+        CHECK(lhde_app_icon("zzabs", NULL, NULL, 16, NULL, 0, LHDE_APPICON_NO_GENERIC, &n, NULL, NULL, 0) == NULL);   /* a path that is not there */
+        /* a value no recipe knows: an XDG icon name */
+        CHECK(first_px(lhde_app_icon("zzxdg", NULL, NULL, 16, NULL, 0, 0, &n, &step, NULL, 0), &w) == 0xff123456u && w == 48 && step == LHDE_APPICON_CLASS);
+        /* desktop files: by StartupWMClass, by a reverse-DNS id ending in the class, by the id given; Icon= at the nearest size */
+        im = lhde_app_icon("ZzWindow", "zzwindow", NULL, 16, NULL, 0, 0, &n, &step, why, sizeof why);
+        CHECK(first_px(im, &w) == 0xff00ffffu && w == 16 && step == LHDE_APPICON_DESKTOP); HAS(why, "zzwm.desktop: Icon=zzapp");
+        CHECK(first_px(lhde_app_icon("ZzApp", NULL, NULL, 40, NULL, 0, 0, &n, &step, NULL, 0), &w) == 0xffffff00u && w == 48 && step == LHDE_APPICON_DESKTOP);
+        CHECK(first_px(lhde_app_icon(NULL, NULL, "org.example.ZzApp", 16, NULL, 0, 0, &n, &step, NULL, 0), &w) == 0xff00ffffu && step == LHDE_APPICON_DESKTOP);
+        CHECK(first_px(lhde_app_icon("nothing-like-it", NULL, NULL, 16, NULL, 0, 0, &n, &step, NULL, 0), NULL) == 0xff0000ffu && step == LHDE_APPICON_GENERIC);
+        CHECK(lhde_icon_key_image("nokey", 16, &n, NULL, 0) == NULL);
+        char key[64]; EQ(lhde_app_icon_key("xx", "zzterm2", key, sizeof key), "cmd");
+        /* the user's apps.ini is read first */
+        put("config/lhde/icons/apps.ini", "[classes]\nzzterm* = notepad\n");
+        unsetenv("LHDE_DATA"); snprintf(q, sizeof q, "%s/icdata", T); setenv("LHDE_WINDOWS", q, 1);   /* index/ missing: the user dir and ours */
+        setenv("LHDE_DATA", q, 1); lhde_data_reset(); lhde_app_icons_set("zz");
+        CHECK(first_px(lhde_app_icon("zzterm", NULL, NULL, 16, NULL, 0, 0, &n, &step, NULL, 0), NULL) == 0xffff0000u && step == LHDE_APPICON_CLASS);
+        unsetenv("LHDE_WINDOWS"); lhde_app_icons_set(NULL);
     }
 
     if (!getenv("LHDE_TEST_KEEP")) { char c[PATH_MAX + 32]; snprintf(c, sizeof c, "rm -rf '%s'", T); if (system(c)) {} }

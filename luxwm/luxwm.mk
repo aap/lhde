@@ -5,7 +5,7 @@
 #   build/luxwm/tests/frametest menutest switchertest shapetest desktopwin dockorder strutdock testwin
 #   (shapetest, tests/regress.sh: make check-luxwm; testwin: tests/headless/alttab.sh)
 
-LUXWM_PKGS   = x11 xext xfixes xinerama fontconfig xft cairo cairo-xlib pangocairo
+LUXWM_PKGS   = x11 xext xfixes xinerama fontconfig xft cairo cairo-xlib pangocairo libpng
 # berry's warnings; LUX_COPT (the top-level Makefile: -Os)
 LUXWM_CFLAGS = -std=c99 $(LUX_COPT) -Wall -Wextra -Wredundant-decls -Wshadow -Wno-deprecated-declarations -MMD -MP \
                -DHAVE_UXTHEME -Iluxwm -Iliblhde -idirafter . $(shell pkg-config --cflags $(LUXWM_PKGS))

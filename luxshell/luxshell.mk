@@ -5,7 +5,7 @@
 #   build/luxshell/tests/trayicon         an XEmbed tray icon for the notification area tile
 # The packs' text (share/packs/NAME/shell.lua) installs with share/; their images come from lhde-import (packs/<build>/...).
 
-LUXSHELL_PKGS   = x11 xext xfixes cairo cairo-xlib fontconfig freetype2 lua5.4 dbus-1
+LUXSHELL_PKGS   = x11 xext xfixes cairo cairo-xlib fontconfig freetype2 lua5.4 dbus-1 libpng
 LUXSHELL_CFLAGS = -std=gnu11 -O2 -g -Wall -Wextra -Wno-unused-parameter -Wno-misleading-indentation -MMD -MP -DHAVE_UXTHEME \
                   -Iluxshell -Iliblhde -idirafter . $(shell pkg-config --cflags $(LUXSHELL_PKGS))
 LUXSHELL_OBJS   = $(addprefix $(O)/luxshell/,luxshell.o scene.o text.o tray.o notify.o menupaint.o)

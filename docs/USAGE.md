@@ -353,6 +353,21 @@ lhde-theme layer-set Desktop.icons xp-hires                                     
 The 16 px images are the 1024 px pictures scaled down: softer than XP's hand-drawn 16 px icons; at 32 px and up they are
 sharper.
 
+### Window icons
+A window without an icon of its own gets one from the class map (docs/THEME-FORMAT.md section 9): terminals (urxvt, xterm,
+st, alacritty, kitty, foot, `*terminal*`, ...) cmd.exe's, Display Properties desk.cpl's Display icon, luxpad notepad.exe's;
+then its desktop file's `Icon=`, then the generic application icon. The same answer is in the caption, the Alt+Tab switcher,
+the task buttons and the Open With list. Your own patterns go first in `~/.config/lhde/icons/apps.ini`:
+```
+[classes]
+mpv = video
+my-terminal* = cmd
+```
+cmd.exe, desk.cpl and notepad.exe are part of the xp, 2k, 4074 and reactos imports; a Windows tree imported before they were
+gets them by importing those media again (files already there are kept): `lhde-import --iso` of the same ISOs, or
+`lhde-import --pack` of a pack made again with `lhde-pack`. `lhde-theme icon urxvt` says what a window of a class gets and
+where it comes from.
+
 ## lhde-theme
 The resolver from the shell (docs/THEME-FORMAT.md, liblhde):
 ```
@@ -373,6 +388,8 @@ lhde-theme style jade4074               what liblhde reads from a style (kind, f
 lhde-theme explain [THEME]              where every visible part comes from ("When something looks wrong" above); --files THEME
 lhde-theme dirs [--list|--windows|--user]   the three trees and the search order; --list for scripts
 lhde-theme find REL | find KIND NAME    one data file (exit 1 when no tree has it); lhde-theme path VALUE: a theme value as a path
+lhde-theme icon urxvt [INSTANCE]        the icon a window of that WM_CLASS gets (class map, desktop file, generic) and from where;
+                                        --key KEY [--set ICONS]: one icon key's image; --desktop ID, --size N
 ```
 
 ## Themes and switching them
