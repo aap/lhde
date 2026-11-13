@@ -1,5 +1,11 @@
 # Luxshell things
 
+* controls:
+	* currently: win+s toggles sidebar stacking. clicking icon toggles sidebar with animation
+	* want sidebar hidden/unhidden immediately (like longhorn)
+	* if we do keep the animation around as an option, also need to animate taskbar
+	* want: win+? shortcuts for stacking and hiding. which ones are free? win+h? want a list of shortcuts anyway
+
 * taskbar
 	* window buttons
 		* center buttons mode for plex and concepts
@@ -14,3 +20,12 @@
 		* perhaps tie into the grander lhde icon system?
 * menupaint.c copied luxwm's old 4 px menu shadow; the painter now has XP's 5 px one (ut_menu_shadow_alpha, UT_MENU_SHADOW):
 	use it, as luxwm does now, and honour [effects] menu_shadows
+
+	* new tray icons:
+		* easy:
+			* touchpad toggle
+			* screen brightness
+			* volume
+		* harder:
+			* network/wifi
+			* bluetooth
