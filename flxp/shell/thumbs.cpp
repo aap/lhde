@@ -243,6 +243,26 @@ static void save(const gdi::Bitmap* b, const std::string& path, const gdi::PngTe
 static std::atomic<int> g_decodes{0};
 int decodes() { return g_decodes; }
 
+// At most DECODES_AT_ONCE pictures decode at a time in the process, whichever loader (the view's two threads, the panes'
+// own) asks: each decode may hold a few MB (a JPEG at 1/8, a PNG's rows) up to libjpeg's 160 MB for a huge progressive one.
+static std::mutex g_turn_lock;
+static std::condition_variable g_turn_cv;
+static int g_decoding, g_decoding_most;
+struct DecodeTurn {
+    DecodeTurn()
+    {
+        std::unique_lock<std::mutex> l(g_turn_lock);
+        g_turn_cv.wait(l, [] { return g_decoding < DECODES_AT_ONCE; });
+        if (++g_decoding > g_decoding_most) g_decoding_most = g_decoding;
+    }
+    ~DecodeTurn()
+    {
+        { std::lock_guard<std::mutex> l(g_turn_lock); g_decoding--; }
+        g_turn_cv.notify_one();
+    }
+};
+int decodes_at_once_most() { std::lock_guard<std::mutex> l(g_turn_lock); return g_decoding_most; }
+
 static bool trace()
 {
     static int on = -1;
@@ -278,7 +298,11 @@ gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size)
     snprintf(sz, sizeof sz, "%lld", (long long)st.st_size);
     int ow = 0, oh = 0;
     g_decodes++;
-    gdi::Bitmap* img = gdi::load_image(path, cache_size, &ow, &oh);
+    gdi::Bitmap* img;
+    {
+        DecodeTurn turn;
+        img = gdi::load_image(path, cache_size, &ow, &oh);
+    }
     if (trace())
         fprintf(stderr, "thumbs: decode %s %dx%d at %dx%d\n", path.c_str(), ow, oh, img ? img->width : 0, img ? img->height : 0);
     if (!img) {
@@ -379,7 +403,7 @@ Loader::Loader(Notify notify, void* ctx, int threads) : impl_(new Impl)
     impl_->ctx = ctx;
     if (threads <= 0) {
         long n = sysconf(_SC_NPROCESSORS_ONLN);
-        threads = n < 2 ? 1 : n > 2 ? 2 : (int)n;   // two is plenty; each decode may hold a full-size image
+        threads = n < 2 ? 1 : n > 2 ? 2 : (int)n;   // two is plenty (and at most DECODES_AT_ONCE decode at a time)
     }
     for (int i = 0; i < threads; i++) impl_->threads.emplace_back([this] { impl_->run(); });
 }

@@ -43,6 +43,9 @@ gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size);
 // Thumbnails made from their pictures so far (decodes; not those read from the cache). FLXP_TRACE_THUMBS=1 prints a line
 // for each on stderr: the picture's size and the size it was decoded at.
 int decodes();
+// Pictures decoding at once in the process, whichever loader asks (the others wait their turn), and the most there were.
+enum { DECODES_AT_ONCE = 2 };
+int decodes_at_once_most();
 
 class Loader {
 public:

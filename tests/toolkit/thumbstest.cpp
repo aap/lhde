@@ -3,7 +3,7 @@
 // their full image in memory (the peak RSS, /proc/self/status VmHWM after resetting it through /proc/self/clear_refs,
 // grows by less than 16 MB), the PNG's reduction against the full decode, an interlaced PNG, the size ceilings; the
 // view's images bounded by bytes (thumbs::Slots: 300 inserts, the pinned ones kept, least recently used first); a
-// cancelled generation decodes nothing more (thumbs::Loader).
+// cancelled generation decodes nothing more, and three loaders decode at most two pictures at once (thumbs::Loader).
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -288,6 +288,18 @@ int main()
         for (size_t i = 23; i < 26; i++) loader.request(gen, (int)i, files[i], 0, 128);
         idle(loader);
         check("an old generation's requests: not made", shell::thumbs::decodes() == before && !loader.take(r));
+        // three loaders of two threads each (the view's and the panes'): still at most two decodes at a time
+        shell::thumbs::Loader a(nullptr, nullptr, 2), b2(nullptr, nullptr, 2), c(nullptr, nullptr, 2);
+        before = shell::thumbs::decodes();
+        for (size_t i = 26; i < 38; i++) {
+            shell::thumbs::Loader& l = i % 3 == 0 ? a : i % 3 == 1 ? b2 : c;
+            l.request(l.generation(), (int)i, files[i], 0, 256);
+        }
+        idle(a); idle(b2); idle(c);
+        check("three loaders: all twelve made", shell::thumbs::decodes() - before == 12, std::to_string(shell::thumbs::decodes() - before));
+        check("three loaders: at most two decodes at once", shell::thumbs::decodes_at_once_most() <= shell::thumbs::DECODES_AT_ONCE,
+              std::to_string(shell::thumbs::decodes_at_once_most()));
+        check("three loaders: two at once seen", shell::thumbs::decodes_at_once_most() == shell::thumbs::DECODES_AT_ONCE);
     }
 
     std::string cmd = "rm -rf '" + dir + "'";
