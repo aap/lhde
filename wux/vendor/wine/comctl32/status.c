@@ -114,13 +114,18 @@ STATUSBAR_ComputeHeight(STATUS_INFO *infoPtr)
     return height;
 }
 
+/* flxp: a Longhorn style's grip is 4074's dots (wux/w32/theme.cpp) */
+extern BOOL WUX_DrawLonghornSizeGrip(HWND hwnd, HDC hdc, const RECT *rc, BOOL fill);
+
 static void
-STATUSBAR_DrawSizeGrip (HTHEME theme, HDC hdc, LPRECT lpRect)
+STATUSBAR_DrawSizeGrip (HWND hwnd, HTHEME theme, HDC hdc, LPRECT lpRect)
 {
     RECT rc = *lpRect;
 
     TRACE("draw size grip %s\n", wine_dbgstr_rect(lpRect));
 
+    if (theme && WUX_DrawLonghornSizeGrip (hwnd, hdc, lpRect, FALSE))
+        return;
     if (theme)
     {
         SIZE gripperSize;
@@ -252,7 +257,7 @@ STATUSBAR_Refresh (STATUS_INFO *infoPtr, HDC hdc)
 
     if ((GetWindowLongW (infoPtr->Self, GWL_STYLE) & SBARS_SIZEGRIP)
             && !(GetWindowLongW (infoPtr->Notify, GWL_STYLE) & WS_MAXIMIZE))
-	    STATUSBAR_DrawSizeGrip (theme, hdc, &rect);
+	    STATUSBAR_DrawSizeGrip (infoPtr->Self, theme, hdc, &rect);
 
     return 0;
 }

@@ -132,6 +132,24 @@ static void publish_icons(HWND h)
     sys::set_icon(sys::window_for_user((void*)h), data);
 }
 
+// XP's SizeBoxHwnd: the scroll bars' corner of a window is a size grip when its top level is sizable and not maximised and
+// the corner sits in the top level's client bottom right (Notepad's Edit without the status bar); it draws the grip and hit
+// tests as HTBOTTOMRIGHT, and a press there sizes the top level
+static bool size_box(HWND h)
+{
+    HWND top = GetAncestor(h, GA_ROOT);
+    LONG st = GetWindowLongW(top, GWL_STYLE);
+    if (!(st & WS_THICKFRAME) || (st & WS_MAXIMIZE) || (GetWindowLongW(h, GWL_EXSTYLE) & WS_EX_LEFTSCROLLBAR)) return false;
+    RECT win, client;
+    GetWindowRect(h, &win);
+    if (GetWindowLongW(h, GWL_EXSTYLE) & WS_EX_CLIENTEDGE)
+        InflateRect(&win, -GetSystemMetrics(SM_CXEDGE), -GetSystemMetrics(SM_CYEDGE));
+    GetClientRect(top, &client);
+    MapWindowPoints(top, nullptr, (POINT*)&client, 2);
+    const int slack = 2 * GetSystemMetrics(SM_CXEDGE);
+    return win.right >= client.right - slack && win.bottom >= client.bottom - slack;
+}
+
 LRESULT nc_hit_test(HWND h, POINT pt)
 {
     win::Window* w = window_of(h);
@@ -188,7 +206,7 @@ LRESULT nc_hit_test(HWND h, POINT pt)
             if ((style & WS_VSCROLL) &&
                 ((((ex & WS_EX_LEFTSCROLLBAR) != 0) && (pt.x <= rcClient.left + GetSystemMetrics(SM_CXVSCROLL))) ||
                  (((ex & WS_EX_LEFTSCROLLBAR) == 0) && (pt.x >= rcClient.right - GetSystemMetrics(SM_CXVSCROLL)))))
-                return HTSIZE;
+                return size_box(h) ? HTBOTTOMRIGHT : HTSIZE;
             return HTHSCROLL;
         }
     }
@@ -258,10 +276,11 @@ void nc_paint(HWND h, HRGN clip)
     SCROLL_DrawNCScrollBar(h, hdc, style & WS_HSCROLL, style & WS_VSCROLL);
     if ((style & WS_VSCROLL) && (style & WS_HSCROLL)) {
         RECT r = rect;
-        if (ex & WS_EX_LEFTSCROLLBAR) r.right = r.left + GetSystemMetrics(SM_CXVSCROLL) + 1;
-        else r.left = r.right - GetSystemMetrics(SM_CXVSCROLL) + 1;
-        r.top = r.bottom - GetSystemMetrics(SM_CYHSCROLL) + 1;
-        FillRect(hdc, &r, GetSysColorBrush(COLOR_SCROLLBAR));
+        if (ex & WS_EX_LEFTSCROLLBAR) r.right = r.left + GetSystemMetrics(SM_CXVSCROLL);
+        else r.left = r.right - GetSystemMetrics(SM_CXVSCROLL);
+        r.top = r.bottom - GetSystemMetrics(SM_CYHSCROLL);   // the corner is CXVSCROLL x CYHSCROLL (Wine left a row and a column of it unpainted)
+        if (size_box(h)) WUX_DrawSizeGrip(h, hdc, &r);
+        else FillRect(hdc, &r, GetSysColorBrush(COLOR_SCROLLBAR));
     }
     ReleaseDC(h, hdc);
 }
@@ -390,8 +409,11 @@ extern "C" LRESULT WINAPI DefWindowProcW(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         case HTCAPTION: if (w->top && w->wm_decorated) SendMessageW(h, WM_SYSCOMMAND, SC_MOVE + HTCAPTION, lp); break;
         case HTLEFT: case HTRIGHT: case HTTOP: case HTTOPLEFT: case HTTOPRIGHT:
         case HTBOTTOM: case HTBOTTOMLEFT: case HTBOTTOMRIGHT:
-            // as Wine's NC_HandleNCLButtonDown: SC_SIZE + WMSZ_*
+            // as Wine's NC_HandleNCLButtonDown: SC_SIZE + WMSZ_*; a child's size grip (the scroll bars' corner) sizes its
+            // top level
             if (w->top && w->wm_decorated) SendMessageW(h, WM_SYSCOMMAND, SC_SIZE + wp - (HTLEFT - WMSZ_LEFT), lp);
+            else if (wp == HTBOTTOMRIGHT && (w->style & WS_CHILD) && size_box(h))
+                SendMessageW(GetAncestor(h, GA_ROOT), WM_SYSCOMMAND, SC_SIZE + WMSZ_BOTTOMRIGHT, lp);
             break;
         }
         return 0;

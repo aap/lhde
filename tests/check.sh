@@ -96,6 +96,9 @@ else
     tests/headless/menus.sh "$3" > "$T/menus.log" 2>&1; result headless/menus.sh $? "$T/menus.log"
     # every IDC_ cursor as the X cursor theme's double arrows and kin (XFixes reads back the one shown)
     tests/headless/cursors.sh "$2" > "$T/cursors.log" 2>&1; result headless/cursors.sh $? "$T/cursors.log"
+    # the size grip in luxpad's status bar and its scroll bars' corner: 4074's dots under jade4074, the double arrow, a drag sizes
+    tests/headless/grip.sh "$3" > "$T/grip.log" 2>&1; rc=$?
+    result "headless/grip.sh$(grep -m1 '^skip' "$T/grip.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/grip.log"
     # a Win32 program's menu bar under jade4074 (4074's themed bar), luna (XP's flat bar) and classic, read back at measured points
     tests/headless/menubar.sh "$1" > "$T/menubar.log" 2>&1; rc=$?
     result "headless/menubar.sh$(grep -m1 '^skip' "$T/menubar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/menubar.log"
