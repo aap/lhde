@@ -182,8 +182,8 @@ BOOL WINAPI SetSysColors(INT count, const INT* indices, const COLORREF* values)
     // Brushes and pens are updated in place, so handles already handed out
     // follow the new colours (Windows behaves the same for GetSysColorBrush).
     refresh_objects();
-    // FIXME: broadcast WM_SYSCOLORCHANGE once the user shim can. Until then
-    // refresh comctl32's colour cache directly (its controls do that on
+    // WM_SYSCOLORCHANGE is not broadcast (the user shim cannot), so comctl32's
+    // colour cache is refreshed directly (its controls do that on
     // WM_SYSCOLORCHANGE); the theme sets colours after comctl32 initialised.
     if (COMCTL32_RefreshSysColors) COMCTL32_RefreshSysColors();
     return TRUE;

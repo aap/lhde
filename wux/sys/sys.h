@@ -141,7 +141,7 @@ gdi::Point pointer_pos();
 gdi::Size screen_size();
 uint32_t ticks();    // monotonic milliseconds
 
-// Window-manager hints for dialogs (src/filedlg, the portal backend). The
+// Window-manager hints for dialogs (flxp/filedlg, the portal backend). The
 // native id is the X window id; owners may belong to other processes.
 NativeWindow* window_for_user(void* user);          // the native window created with this user pointer
 uint64_t native_id(NativeWindow* w);

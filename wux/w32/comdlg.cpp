@@ -1,5 +1,5 @@
 // comdlg32's file dialogs: GetOpenFileNameW/A, GetSaveFileNameW/A and
-// CommDlgExtendedError, mapped onto src/filedlg (the XP Explorer-style
+// CommDlgExtendedError, mapped onto flxp/filedlg (the XP Explorer-style
 // dialog re-created on the toolkit). Programs that do not link the file
 // dialog get CDERR_INITIALIZATION: filedlg::run is referenced weakly so the
 // shim does not drag the dialog into every binary (link $(FILEDLGLIB)).

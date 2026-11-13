@@ -1,7 +1,7 @@
 /* Force-included into every vendored Wine C file. Wine's code calls the
  * CRT's 16-bit wide string functions by their MSVCRT names; on this side
  * wchar_t is 16 bits only inside the vendored code (-fshort-wchar), so the
- * names are redirected to our own implementations in src/w32/crt.cpp. */
+ * names are redirected to our own implementations in wux/w32/crt.cpp. */
 #ifndef FLXP_CRT_H
 #define FLXP_CRT_H
 #include <stddef.h>

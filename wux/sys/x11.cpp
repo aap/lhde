@@ -67,8 +67,8 @@ static void set_xdnd_aware(::Window xw);
 
 // The X connection is gone (the server ended, or the client was killed): end the process at once. Xlib's default handler
 // calls exit(), which runs the static destructors on whichever thread noticed while the others still run; a program with a
-// thread of its own (flxp-taskbar's X worker, a std::thread at namespace scope) was then aborted by std::terminate, and two
-// threads noticing together raced in exit(). Process-wide: it covers every connection the program opens, not only this one.
+// thread of its own (flxp-taskbar's X worker, a std::thread at namespace scope) would be aborted by std::terminate, and two
+// threads noticing together would race in exit(). Process-wide: it covers every connection the program opens, not only this one.
 static int on_io_error(Display* d)
 {
     const char* name = d ? DisplayString(d) : nullptr;

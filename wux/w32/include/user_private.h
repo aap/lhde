@@ -1,5 +1,5 @@
 /* Replacement for Wine's user32 private user_private.h, backed by the flxp
- * shim (src/w32/user.cpp). */
+ * shim (wux/w32/user.cpp). */
 #ifndef FLXP_USER_PRIVATE_H
 #define FLXP_USER_PRIVATE_H
 #include "windef.h"

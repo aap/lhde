@@ -1299,8 +1299,8 @@ HCURSOR WINAPI GetCursor(void) { return g_cursor; }
 // pointer has rested inside the 4x4 hover rectangle for the hover time over the
 // window (or it has the capture), then hover tracking ends, as in win32. TME_QUERY reports
 // the window last tracked and what is still pending for it (Wine's themed button tracks
-// only when the query says nothing is: without TME_HOVER ever arriving, BST_HOT was never
-// set and push buttons, check and radio boxes had no hot state).
+// only when the query says nothing is: without TME_HOVER ever arriving, BST_HOT is never
+// set and push buttons, check and radio boxes have no hot state).
 static const UINT_PTR HOVER_TIMER = 0x7f7f7f7f;
 static HWND g_tme_hwnd;                 // the window last given to TrackMouseEvent
 static HWND g_hover_hwnd;               // TME_HOVER pending for this window

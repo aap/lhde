@@ -16,7 +16,7 @@ struct Toplevel {
     bool argb = false;      // native window is ARGB, backbuffer tracks alpha
 };
 
-static bool g_last_input_keyboard;   // the last input was a key press, not a click (XP's LINP_KEYBOARD)
+static bool g_last_input_keyboard;   // the last input was a key press, not a click
 
 struct Timer { Window* w; uintptr_t id; uint32_t interval; uint32_t due; void* callback; };
 

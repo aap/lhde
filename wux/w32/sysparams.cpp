@@ -189,7 +189,7 @@ BOOL WINAPI SystemParametersInfoW(UINT action, UINT param, void* pv, UINT)
         for (LOGFONTW* f : { &g_ncm.lfCaptionFont, &g_ncm.lfSmCaptionFont, &g_ncm.lfMenuFont, &g_ncm.lfStatusFont, &g_ncm.lfMessageFont })
             if (f->lfHeight > 0) f->lfHeight = -MulDiv(f->lfHeight, 96, 72);
         // MS Shell Dlg stays Tahoma under every style, as XP's and 4074's FontSubstitutes: 4074's Display Properties under
-        // Jade is Tahoma 8 (lh4074-205951.png: OK 73x21, Effects... 82x21), whatever the style's MSGBOXFONT says; a 4074 dialog
+        // Jade is Tahoma 8 (OK 73x21, Effects... 82x21), whatever the style's MSGBOXFONT says; a 4074 dialog
         // shown in Segoe UI (its About box) names the face in its template
         w32::set_shell_dlg("Tahoma");
         return TRUE;

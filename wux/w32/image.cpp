@@ -9,7 +9,7 @@
 //
 // HINSTANCE is a res::Module*. HINSTANCE NULL means user32's own resources
 // (OEM bitmaps, IDI_* icons, IDC_* cursors), which are Wine's
-// dlls/user32/resources compiled into src/w32/stdres.res by mkstdres.py and
+// dlls/user32/resources compiled into wux/w32/stdres.res by mkstdres.py and
 // linked in with .incbin.
 #include <stdio.h>
 #include <string.h>
@@ -360,8 +360,8 @@ static void final_size(int& cx, int& cy, int nw, int nh, UINT flags)
 }
 
 // flxp: shrinking an icon averages the source pixels each target pixel
-// covers (alpha-weighted colour), where nearest-pixel sampling dropped rows
-// and columns (a 128 px Longhorn icon at 96 or 48 lost its outline)
+// covers (alpha-weighted colour); nearest-pixel sampling would drop rows
+// and columns (a 128 px Longhorn icon at 96 or 48 would lose its outline)
 static gdi::Bitmap* shrink_box(const gdi::Bitmap* b, int w, int h)
 {
     gdi::Bitmap* o = gdi::create_bitmap(w, h);

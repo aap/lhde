@@ -887,7 +887,7 @@ BOOL WINAPI TransparentBlt(HDC hdst, INT xd, INT yd, INT wd, INT hd, HDC hsrc, I
 }
 
 // GRADIENT_FILL_RECT as GDI computes it: per channel 8.24 fixed point, start + pos * (((end - start) << 24) / len), truncated
-// (a 4051 caption gradient matches this to the bit; luxwm's classic frames were measured against it)
+// (4051's caption gradient is exactly this)
 static inline uint32_t gradient_channel(int c0, int c1, int64_t pos, int64_t len)
 {
     int64_t d = (((int64_t)c1 - c0) << 24) / len, v = ((int64_t)c0 << 24) + d * pos;
