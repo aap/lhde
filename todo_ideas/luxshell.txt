@@ -16,3 +16,5 @@
 		* network/wifi
 		* bluetooth
 	* the taskbar view's tiles (taskbar_tiles) cannot be removed by the user
+
+* the battery (power) tile is too bright (aap): compare against lh4074-193747.png and the fact sheet, tone the plate/text
