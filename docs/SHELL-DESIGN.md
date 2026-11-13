@@ -610,7 +610,7 @@ C: `luxshell.c` (surfaces, the EWMH client model, input, timers, the Lua API `lh
 overrides): `runtime.lua` (event bus, animation, packs, taskbar, sidebar and its modes, maximised mode, theme switching, classic
 bar and start-menu coordination, compositor, root commands), `session.lua` (the theme through liblhde, settings.ini, the state
 file, session commands), `settings.lua` (settings flyout, run box), `menu.lua`, `flyout.lua`, `toast.lua`, `notifylog.lua`,
-`tooltip.lua`, `apps.lua` (desktop entries, icon-theme lookup, launch counts), `traycontrol.lua` (the tray tiles' shared view,
+`tooltip.lua`, `apps.lua` (desktop entries, icon-theme lookup, launch counts), `traycontrol.lua` (the tray items' shared view,
 drawn icons, slider flyout and command queue, 8.6), `tiles/*.lua`.
 
 Events (`lh.on(name, fn)`, `lh._emit`): from C `windows`, `window(id)`, `desktop`, `maxmode`, `workarea`, `toplevel(win, map |
@@ -814,7 +814,8 @@ the sidebar entirely (unmapped, no strut, `_LHSHELL_CLOCK_VISIBLE` 0); its mode 
 The tile list is luxshell-state.ini `[sidebar] tiles` (`;`-separated, `none` = empty) with `[sidebar] tiles_base` = the pack's
 `tiles` it was made from: while the pack's list is unchanged the user's list holds, otherwise the pack's list wins. A tile added
 again goes to its place in the pack's order (else 4074's SidebarTiles order: notifyhistory, quicklaunch, notifications, power,
-then ours, volume, brightness, touchpad, then clock). Tiles are `luxshell/tiles/NAME.lua`, rebuilt on a pack switch, a mode change and a reload.
+clock). Tiles are `luxshell/tiles/NAME.lua`, rebuilt on a pack switch, a mode change and a reload; `volume`, `brightness` and
+`touchpad` in a saved list (they were tiles once) are left out: they are tray items now (8.6).
 
 Chrome (`tile.xaml` / `outertile.xaml`): the right-docked bar is Flipped (2.4.1), so `TileSideAreaBack` (9 px: arrow 1173/1174,
 restore 1058/1059 and close 1061/1062 on hover) docks **right** and `TileForegroundPadder` (6) **left**: the foreground is x
@@ -853,15 +854,12 @@ property page, *Remove <Friendly Name> Tile* unless pinned; no separators).
 - Sidebar menu: right click outside the tiles, or the Options glyph (under it, right-aligned). 4074's base items, then
   luxshell's group *Lock the Sidebar* and *Stacking* ▸ Top / Bottom, then the parts list in the screenshot's order: *Classic
   Tray* = `notifications`, *Notification History* = `notifyhistory`, *Quick Launch* = `quicklaunch`, *Power (Transient)* =
-  `power`, *Clock* = `clock`, and ours in alphabetical place among them: *Brightness* = `brightness`, *Touchpad* =
-  `touchpad`, *Volume* = `volume` (checked = in the tile list, a click adds or removes it; only in full mode), the other modules
-  greyed. The list stays inline as in 4074.
+  `power`, *Clock* = `clock` (checked = in the tile list, a click adds or removes it; only in full mode), the other modules
+  greyed. The list stays inline as in 4074. Volume, Brightness and Touchpad are tray items of the Classic Tray (8.6), not parts.
 - Tile menu: right click on a tile, or a click on its arrow when it has no flyout. The tile's `menu()`, a separator (ours),
   *Auto Size* (checked and greyed: tiles size to their content), *Move Up* / *Move Down* (greyed at the ends and for pinned
   tiles), *<Name> Tile Properties* (`properties()`, else the flyout; greyed without either), *Remove <Name> Tile* (not on pinned
-  tiles). Friendly names: Classic Tray, Power, Clock, Quick Launch, Notification History; the tray tiles (8.6) Volume,
-  Brightness, Touchpad (their `name`; the parts list does not have them: a removed one comes back with the pack's list when
-  `[sidebar] tiles` is deleted from luxshell-state.ini).
+  tiles). Friendly names: Classic Tray, Power, Clock, Quick Launch, Notification History.
 
 All menus are `menu.lua` over wuxtheme's painter (section 16).
 
@@ -903,7 +901,9 @@ rectangle hands; the 4074 shots without DWM show the light set under Jade and Sl
 The tray (section 10) in a tile. Geometry from the 4051 / 4074 quick-launch icon tiles (`4051-vm-now.png` y 19..51, icons at x
 1015 / 1043; `lh4074-181415.png` x 1017 / 1043): first icon at 5,6 in the foreground (12,9 in the tile), **28 px pitch** (5 per
 row in 133 px), height **33** for one row incl. the sizer, + 24 per extra row (inferred; no multi-row reference), animated on
-`tray(count)`. Hidden while another client owns the tray selection; minimized taskbar view: one row, 20 px apart, centred.
+`tray(count)`. After the docked icons the tray items Volume, Brightness, Touchpad (8.6) in the same slots. While another
+client owns the tray selection only the items show (the tile hidden when none does); minimized taskbar view: one row, 20 px
+apart, centred, the items after the tray's icons.
 
 ### 8.3 Power (`tiles/power.lua`)
 
@@ -940,15 +940,17 @@ works; 4074's did nothing). Store: `~/.local/state/lhde/luxshell-notifications`,
 each (time, viewed, app, icon, summary, body; `\\ \t \n` escaped); `transient` notifications stay out; `CloseNotification`
 revokes, `replaces_id` updates in place; viewed once dismissed, clicked, re-shown or seen in the flyout.
 
-### 8.6 Tray tiles: Volume, Brightness, Touchpad (`tiles/volume.lua`, `brightness.lua`, `touchpad.lua`, `traycontrol.lua`)
+### 8.6 Tray items: Volume, Brightness, Touchpad (`trayitems/volume.lua`, `brightness.lua`, `touchpad.lua`, `traycontrol.lua`)
 
-XP's notification-area controls as tiles (4074 had no such module): in the 4074 packs' `tiles` after Power and their
-`taskbar_tiles` after the tray, so the full sidebar shows each as a tile and the minimized sidebar's taskbar view as an icon
-beside the tray icons (the pinned block has none). Sidebar view: the tray tile's geometry, the 16 px icon at 5,6 of the
-foreground, 33 high, the value beside it at x 26 in the power tile's line style (Segoe UI 13 bold `#dddddd`): "Volume: 40%",
-"Muted: 40%", "Brightness: 60%", "Touchpad: on". Taskbar view: the icon in a 20 px slot centred in the bar; its flyout opens
-above the bar at the pointer. Left click: the slider flyout (the touchpad: toggles), wheel: a step, middle click: the volume's
-mute. Tooltips are read when they show. Brightness and touchpad hide (tile and taskbar icon) without the device.
+XP's notification-area controls as tray icons (XP's stobject puts the speaker in the notification area after the programs'
+icons; 4074 had no such module): items of the Classic Tray tile (`tiles/notifications.lua`, every pack that has it), not
+parts. In the sidebar they take the tray's 16 px slots after the docked XEmbed icons (5,6 of the foreground, 28 px across,
+rows 24 px apart; a third row of icons makes the tile 24 px taller), in the order volume, brightness, touchpad; in the
+minimized sidebar's taskbar view the same icons follow the tray's in 20 px slots, centred in the bar. An item hidden (no
+backlight, no touchpad) takes no slot. While another client owns the tray (flxp-taskbar), the tile shows the items alone (in
+the first slots), and hides when none is shown. Left click: the slider flyout (the touchpad: toggles), left of the sidebar at
+the tile's top, or from the taskbar above the bar at the pointer; wheel: a step; middle click: the volume's mute. Tooltips are
+read when they show. Each item runs its commands while its tile is up (one instance per tile view).
 
 Icons: none of the packs' images fits (4074's imageres and shell32 have no speaker, sun or touchpad; XP's tray speaker is in
 sndvol32 / stobject, which lhde-import does not take), so they are drawn: shapes sampled 4x4 per pixel into 1 px rect runs. A
@@ -963,9 +965,9 @@ from the top, a 100 px travel with 11 ticks (every 10 %, 3 px each side), a 21x1
 A press on the trackbar jumps the thumb there and drags it (the value is sent at most every 60 ms while dragging and once on
 release), the wheel steps; an outside change moves the thumb unless the pointer holds it. Commands run one at a time in order
 (`traycontrol.lua` `C.queue`: a waiting command of the same kind is replaced by the newer, so wheel bursts collapse), then the
-tile reads the value back.
+item reads the value back.
 
-| Tile | Reads | Sets | Follows outside changes |
+| Item | Reads | Sets | Follows outside changes |
 | --- | --- | --- | --- |
 | Volume | the first that answers of `wpctl get-volume @DEFAULT_AUDIO_SINK@` ("Volume: 0.40 [MUTED]"), `pactl get-sink-volume` + `get-sink-mute @DEFAULT_SINK@`, `amixer get Master` ("[40%] ... [on]"); `LHSHELL_VOLUME` forces one | `wpctl set-volume / set-mute`, `pactl set-sink-volume N% / set-sink-mute`, `amixer -q set Master N% / mute / unmute`; wheel 2 %, up to 100 % (a level above stays) | `pactl subscribe` (sink and server events, 50 ms debounce) when pactl is installed, else a read every 1 s |
 | Brightness | `/sys/class/backlight/<dev>/brightness`, `max_brightness`; the device of `type` firmware, else platform, else raw (the kernel's ranking); `LHSHELL_BACKLIGHT` another directory | `brightnessctl -q -d DEV set RAW` when installed, else a write to `brightness` when writable, else the tooltip says neither works; wheel 5 %, never below 1 % | a read every 1 s |
@@ -973,8 +975,9 @@ tile reads the value back.
 
 Tooltips: "Volume: 40%" (XP's), "Volume: 40% (muted)", on failure "Volume: no wpctl, pactl or amixer found" or "Volume:
 pactl: <its first line>"; "Brightness: 60%", "Brightness: 60% (not writable ...)"; "Touchpad: on (click to turn it off)". Tested
-by `luxshell/tests/tiles.sh` (stub commands on a PATH of their own, a fake backlight directory; `tiles.lua` drives the tiles
-through a stand-in `lh`), part of `make check`.
+by `luxshell/tests/tiles.sh` (stub commands on a PATH of their own, a fake backlight directory; `tiles.lua` drives the items
+and the Classic Tray tile hosting them through a stand-in `lh`: the slots after the docked icons, the wrap to a second row,
+the foreign tray, the taskbar view, the flyout placement), part of `make check`.
 
 ## 9. Toasts: `org.freedesktop.Notifications` (`notify.c`, `toast.lua`)
 

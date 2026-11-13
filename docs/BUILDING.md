@@ -142,7 +142,7 @@ from a desktop file, luxshell's task buttons and the Alt+Tab switcher with an xt
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).
-Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac -p`), its tray tiles
+Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac -p`), its tray items and the Classic Tray tile hosting them
 work against stub system commands (`luxshell/tests/tiles.sh`), every tile is in the sidebar menu's parts list
 (`luxshell/tests/parts.py`), and luxwm's frame
 regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a

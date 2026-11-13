@@ -9,7 +9,7 @@
 		scene-node drawing is menu.lua before the commit that moved it onto the painter
 
 * sidebar
-	* new tray icons (volume, brightness, touchpad are tiles/*.lua, SHELL-DESIGN 8.6):
+	* new tray icons (volume, brightness, touchpad are trayitems/*.lua in the Classic Tray tile, SHELL-DESIGN 8.6):
 		* network/wifi
 		* bluetooth
 	* the taskbar view's tiles (taskbar_tiles) cannot be removed by the user

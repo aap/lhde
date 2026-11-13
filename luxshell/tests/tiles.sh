@@ -1,5 +1,5 @@
 #!/bin/sh
-# The tray tiles (volume, brightness, touchpad) with their system commands stood in by shell scripts on a PATH of their own
+# The tray items (volume, brightness, touchpad) and the Classic Tray tile hosting them, with their system commands stood in by shell scripts on a PATH of their own
 # (wpctl, pactl, amixer, brightnessctl, xinput: each logs its arguments to $TR_LOG and answers from $TR_STATE) and a fake
 # backlight directory; tiles.lua drives the tiles through a stand-in `lh`. No X display. Usage: tiles.sh [LUA]
 cd "$(dirname "$0")/../.." || exit 1
@@ -51,5 +51,6 @@ if [ "$(id -u)" != 0 ]; then chmod 444 "$T/backlight/acpi_video0/brightness"; ru
 rm -rf "$T/backlight/acpi_video0"; run brightness-none 0
 stub xinput "$XINPUT"; run touchpad 1
 stub xinput "$XINPUT_NONE"; run touchpad-none 1
+stub wpctl "$WPCTL"; stub xinput "$XINPUT"; run host 0.40
 [ $fails = 0 ] && echo "tiles: all passed" || echo "tiles: $fails failed"
 exit $fails
