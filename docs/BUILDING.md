@@ -122,7 +122,9 @@ Properties from the item menu (General first, Summary's description, two files i
 and Add Tag, the Explorer's Filter box under jade4074 over names and attributes, skipped without that style or user xattrs,
 luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`, clicks outside open menus under luxwm:
 `tests/headless/menus.sh`, a Win32 menu bar's pixels (plain, hot, open, inactive) under jade4074, luna and classic with
-ImageMagick: `tests/headless/menubar.sh`, every IDC_ cursor shown under the X cursor theme's name (XFixes): `tests/headless/cursors.sh`, luxpad's size grips (the status
+ImageMagick: `tests/headless/menubar.sh`, every IDC_ cursor shown under the X cursor theme's name (XFixes): `tests/headless/cursors.sh`, Super+R
+opening the start menu's Run dialog (luxwm, luxshell, flxp-startmenu) and settings.ini `[commands] run` instead:
+`tests/headless/runkey.sh`, luxpad's size grips (the status
 bar's and the scroll bars' corner: the cursor over them, a drag sizes the window, 4074's dots under jade4074): `tests/headless/grip.sh`, the task band's folder picture against the Icons view's: `tests/headless/folderpic.sh`, flxp's memory on 600 6000 x 4000
 JPEGs in the Thumbnails view at 256 px, paged through and into a subfolder: the peak RSS under 400 MB, the view's images within
 their 64 MB budget plus what is on screen, some evicted, skipped without ImageMagick: `tests/headless/thumbsmem.sh`) on displays :71-:73

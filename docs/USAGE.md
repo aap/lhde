@@ -519,7 +519,7 @@ Default keys, override in `~/.config/lhde/keys` (one binding per line; docs/LUXW
 | Super+Return | terminal (urxvt), Super+t for xterm |
 | Super+e | flxp Explorer (ROX-Filer when flxp is not installed) |
 | Super+d | show desktop, as Windows' Win+D: minimises the visible windows (they stay minimised); Super+d again brings exactly those back, but only if nothing changed in between (no window restored, activated, opened or closed); otherwise it is a new "show desktop" |
-| Super+r | Run box (luxshell's own, via `_LHSHELL_COMMAND run`; or `Mod4+r exec rofi -show run` in your keys file) |
+| Super+r | Run: the start menu's Run dialog, as Start > Run... (`_LHSHELL_COMMAND run`, which luxshell hands to the start menu); settings.ini `[commands] run` runs something else instead (dmenu, rofi), as does `Mod4+r exec ...` in your keys file |
 | Super+Shift+S, Super+Shift+F, Super+Shift+W | a screenshot of a rectangle dragged with the mouse (Windows 10's snip key), of the full screen, of the active window with its frame (luxshot, "Screenshots" below; `_LHSHELL_COMMAND screenshot_region`, `screenshot`, `screenshot_window`, settings.ini `[commands]` of those names to run something else). Print is not bound, it may be your compose key: `Print shell screenshot` in the keys file binds it (`Mod1+Print shell screenshot_window`, `Shift+Print shell screenshot_region` likewise) |
 | Super+s | sidebar under the windows (part of the desktop) ⇄ on top of them, at once (`_LHSHELL_COMMAND sidebar-stacking toggle`; saved as `[sidebar] stacking`) |
 | Super+q or Alt+F4 | close window |
@@ -1094,7 +1094,7 @@ luxshell keeps the button pressed from the click (or Super) until the panel's wi
 | `[commands]` | `logoff`, `standby`, `shutdown`, `restart`, `lock` | session commands ("The session" above) |
 | `[commands]` | `taskbar` | the classic taskbar for `Shell.taskbar = classic` and, with `--start-menu-only`, the start-menu provider (default: `$LHSHELL_TASKBAR_CMD`, else `flxp-taskbar`) |
 | `[commands]` | `picom` | the compositor command for the rule above (default: `$LHSHELL_PICOM_CMD`, else picom with `picom-glass.conf` and glx) |
-| `[commands]` | `filemanager`, `run`, `search` | file manager for the places (default flxp, rox, else xdg-open); Run (default `rofi -show run` if installed, else luxshell's own run box); Search (default: luxshell's box, which starts the best-matching program) |
+| `[commands]` | `filemanager`, `run`, `search` | file manager for the places (default flxp, rox, else xdg-open); Run, Super+R (default: the start menu's Run dialog, as Start > Run...; luxshell's own run box when no start menu runs); Search (default: luxshell's box, which starts the best-matching program) |
 
 `~/.local/state/lhde/luxshell-state.ini` (`LHSHELL_STATE` another file): `[sidebar] tiles` = the tile order,
 `notifications;clock;power` (written by Move Up / Move Down; default: the pack's list). Beside it: `luxshell-mfu.ini` (the start

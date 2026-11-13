@@ -35,6 +35,7 @@ struct StartRequest {
     bool toggle = false;
     int x = 0, y = 0, w = 0, h = 0;
     bool from_root = false;         // the root broadcast (else luxshell's message to our owner window)
+    bool run = false;               // l[0] bit 1 (luxshell's Super+R): the Run dialog, not the menu
     uint32_t serial = 0;
 };
 

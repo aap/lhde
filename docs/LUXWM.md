@@ -55,7 +55,7 @@ binds it. A user file keeps its own bindings; `Mod4+d`, `Mod4+r`, `Mod4+s`, `Mod
 three `Mod4+Shift` screenshot bindings are added where that key is unbound there (never `Print`), and `Super_L`/`Super_R start`
 when the file binds neither Super key (`Super_L none` disables it). `shell CMD` sets the root property `_LHSHELL_COMMAND` = CMD
 (UTF8_STRING); luxshell's runtime.lua accepts `run`
-(lux's Run box), `sidebar-stacking toggle|top|bottom`, `taskbar KIND`, `sidebar-with-classic 0|1`, `settings`, `desktop N|next|prev`
+(Start > Run's dialog, or `[commands] run`), `sidebar-stacking toggle|top|bottom`, `taskbar KIND`, `sidebar-with-classic 0|1`, `settings`, `desktop N|next|prev`
 (N 0-based, through `_NET_CURRENT_DESKTOP`), `reload`, and runs any other word as the session command of that name (settings.ini
 `[commands]`, docs/SETTINGS.md): `screenshot`, `screenshot_window`, `screenshot_region` start luxshot. Every `exec` child does
 `chdir($HOME)` first.

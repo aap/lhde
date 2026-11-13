@@ -983,7 +983,8 @@ or struts). luxshell has no menu of its own; without a provider nothing opens (l
 
 **Provider protocol.** The provider owns the selection `_LH_STARTMENU_S<screen>`. luxshell owns `_LHSHELL_S<screen>` while it
 runs. `_LHSHELL_START` is a ClientMessage, format 32, `message_type` = `_LHSHELL_START`: `l[0]` = flags (bit 0 = toggle: close
-the menu if open, else open it; 0 = open, nothing if already open; other bits reserved, 0), `l[1..4]` = x, y, width, height of
+the menu if open, else open it; 0 = open, nothing if already open; bit 1 = the start menu's Run dialog instead of the menu
+(Start > Run..., the menu closed first; luxshell's Super+R), rect ignored; other bits reserved, 0), `l[1..4]` = x, y, width, height of
 the anchor rectangle in root coordinates (width or height 0 = no anchor: the provider opens at its own Start button, else
 bottom-left above the work area). The menu opens above the anchor with its left edge at the anchor's (below it when the
 anchor is in the upper half of the screen). Senders:
@@ -992,7 +993,8 @@ anchor is in the upper half of the screen). Senders:
    with `l[0]` = the key's timestamp and no rect; a root message without a rect always means "toggle, no anchor".
 2. **luxshell**, to the selection owner window itself (`XSendEvent(owner, False, 0)`): for a click on the Avalon Start button
    (flags 1, the button's rect) and for every root `_LHSHELL_START` (with a rect: flags and rect as received; without: flags 1
-   and the Avalon Start button's rect, or none without the Avalon taskbar).
+   and the Avalon Start button's rect, or none without the Avalon taskbar); for `_LHSHELL_COMMAND run` (luxwm's Super+R) flags 2
+   and no rect, unless settings.ini `[commands] run` names another program.
 
 A provider answers messages on its owner window and ignores root broadcasts while `_LHSHELL_S<screen>` has an owner (luxshell
 forwards them; answering both would toggle twice); without luxshell it may answer luxwm's broadcast itself. Its own Start
@@ -1041,7 +1043,8 @@ tiles_base`; `LHSHELL_STATE` overrides the path).
 **Settings flyout** (`settings.lua`; *Properties* in the taskbar and sidebar menus, `_LHSHELL_COMMAND settings`): two columns,
 the theme list (shipped themes whose visual style is imported, then the user's; *Save as...*) | composition (follow the theme / always on / always off: `Glass.composition` auto / 1 / 0 in the current layer),
 taskbar (Avalon / classic / none) and autohide, sidebar mode, stacking and *Also with the classic taskbar*, *Show the
-wallpaper*. Run box (`_LHSHELL_COMMAND run`, Super+R): a one-line command for sh (its search mode, the best matching application,
+wallpaper*. Super+R (`_LHSHELL_COMMAND run`) is settings.ini `[commands] run` when set, else the start-menu provider's Run
+dialog (Start > Run..., `_LHSHELL_START` flags 2), else, with no provider, luxshell's run box: a one-line command for sh (its search mode, the best matching application,
 else an existing path through the file manager, else the line as a command, is opened by nothing).
 
 **Fonts.** The theme's `path.fonts` directories become fontconfig application fonts and libuxtheme font directories (`lh.fonts`:
