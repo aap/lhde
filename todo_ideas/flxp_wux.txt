@@ -33,6 +33,13 @@
 * copy/move: Cancel rolls the current top-level item back (a folder copied half-way is removed again); XP keeps
 	what was copied. fileops' choice (all or nothing per item), kept for now
 
+* thumbnails that the memory bounds refuse: a progressive JPEG above about 53 MP (libjpeg keeps its coefficients, over the
+	160 MB cap), an interlaced PNG, BMP or ICO above 25 MP; a JPEG's embedded EXIF thumbnail (160 px) or a PNG's interlace
+	passes read row by row would give them one
+
+* the thumbnail disk cache (~/.cache/thumbnails) is never cleaned: the freedesktop spec leaves it to a cleaner; flxp could
+	drop large/ and normal/ entries of files that are gone or not opened for months
+
 ### details and task pane
 
 * 4074's (i) icon in the band's top right to flip between details and tasks (4051 is the target; undecided)
