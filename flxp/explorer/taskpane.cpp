@@ -305,7 +305,6 @@ void layout_for(HDC dc, int w)
         int right = imax(tx + 40, imin(w0, w) - PAD);
         put_top(dc, F_TITLE, shell::details::lh_title(g_info), tx, small() ? 6 : 7, WHITE, right);
         // the item's colour as a square after its name (a click opens the Metadata page): a provisional look
-        // (todo_ideas/xattribs.txt)
         if (g_info.kind == Kind::One)
             for (const shell::details::Row& r : g_info.rows)
                 if (r.id == "color")

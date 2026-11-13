@@ -383,7 +383,7 @@ const std::vector<Column>& all_columns()
         { (int)shell::SortBy::Description, "Description", 180, LVCFMT_LEFT },
         { (int)shell::SortBy::Tags, "Tags", 120, LVCFMT_LEFT },
         { (int)shell::SortBy::Comment, "Comment", 150, LVCFMT_LEFT },
-        { (int)shell::SortBy::Color, "Color", 100, LVCFMT_LEFT },   // a swatch and the name: a provisional look (todo_ideas/xattribs.txt)
+        { (int)shell::SortBy::Color, "Color", 100, LVCFMT_LEFT },   // a swatch and the name: a provisional look
     };
     return c;
 }
@@ -743,11 +743,10 @@ void sort_feedback(Browser& b)
 }
 
 // The filter narrows the list in place as the user types, every key at once (the
-// list refilled, the view and its scroll kept as fill_list keeps them). 4074's
-// screenshots show the "Filter by" box only empty (lh4074-180309.png, 4074-dwm.png)
-// and 4051's code shows it only in views at least 300 px wide (_ShouldShowFilters);
-// what it did to the list was a WinFS query not seen in the references, so the
-// narrowing in place, the words and their fields are our choice (shell/details.h).
+// list refilled, the view and its scroll kept as fill_list keeps them). 4074 draws
+// the "Filter by" box empty and 4051 shows it only in views at least 300 px wide;
+// its filtering was a WinFS query, so the narrowing in place, the words and their
+// fields are our choice (shell/details.h).
 bool passes(const Browser& b, const Item& it)
 {
     return const_cast<Browser&>(b).visible(it) && (b.query.empty() || shell::details::filter_matches(b.query, it));
