@@ -5,7 +5,8 @@
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh and runas.sh setfattr
-#                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, thumbsmem.sh ImageMagick); displays :71-:73,
+#                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick,
+#                thumbsmem.sh ImageMagick); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
 fails=0
@@ -108,6 +109,9 @@ else
     # Super+R: the start menu's Run dialog through luxwm, luxshell and flxp-startmenu; [commands] run instead when set
     tests/headless/runkey.sh "$1" > "$T/runkey.log" 2>&1; rc=$?
     result "headless/runkey.sh$(grep -m1 '^skip' "$T/runkey.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/runkey.log"
+    # Super+H hides and shows the sidebar at once, Super+S flips its stacking, the state survives a restart; [sidebar] animate = 1
+    tests/headless/sidebar.sh "$2" > "$T/sidebar.log" 2>&1; rc=$?
+    result "headless/sidebar.sh$(grep -m1 '^skip' "$T/sidebar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/sidebar.log"
     # a Win32 program's menu bar under jade4074 (4074's themed bar), luna (XP's flat bar) and classic, read back at 4074's and XP's pixel values
     tests/headless/menubar.sh "$1" > "$T/menubar.log" 2>&1; rc=$?
     result "headless/menubar.sh$(grep -m1 '^skip' "$T/menubar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/menubar.log"

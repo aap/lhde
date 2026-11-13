@@ -296,6 +296,9 @@ static int l_surface_layer(lua_State *L) { struct surface *s = check_surface(L, 
     XChangeProperty(dpy, s->win, atom[A_NET_WM_STATE], XA_ATOM, 32, PropModeReplace, (unsigned char *)st, ns); return 0; }
 static int l_surface_lower(lua_State *L) { struct surface *s = check_surface(L, 1); XLowerWindow(dpy, s->win); return 0; }
 static int l_surface_damage(lua_State *L) { surface_damage(check_surface(L, 1)); return 0; }
+/* surface:paint(): a damaged, mapped surface painted now instead of after the handlers (an instant sidebar mode change: the
+   wide taskbar is drawn before the sidebar over its corner unmaps, the sidebar before the taskbar narrows under it) */
+static int l_surface_paint(lua_State *L) { struct surface *s = check_surface(L, 1); if (s->dirty) surface_paint(s); return 0; }
 /* surface:press(node): node holds the press from now on (its on_drag, on_release), as when a drag rebuilt the buttons under the
    pointer (the taskbar's reorder: clear() dropped the pressed one); the press point stays. Only while a button is held. */
 static int l_surface_press(lua_State *L) {
@@ -940,7 +943,7 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"settings_path", l_settings_path}, {"config_file", l_config_file}, {"state_file", l_state_file}, {"settings_reload", l_settings_reload},
     {"cm_owner", l_cm_owner}, {"kill", l_kill}, {"fonts", l_fonts}, {"image_filter", l_image_filter}, {"image_flush", l_image_flush}, {"wm_moveresize", l_wm_moveresize}, {"menu_render", l_menu_render}, {NULL, NULL} };
 static const luaL_Reg nodemeth[] = { {"add", l_node_add}, {"remove", l_node_remove}, {"clear", l_node_clear}, {"set", l_node_set}, {"bounds", l_node_bounds}, {"measure", l_node_measure}, {"desired", l_node_desired}, {NULL, NULL} };
-static const luaL_Reg surfmeth[] = { {"root", l_surface_root}, {"show", l_surface_show}, {"hide", l_surface_hide}, {"move", l_surface_move}, {"raise", l_surface_raise}, {"lower", l_surface_lower}, {"set_layer", l_surface_layer}, {"damage", l_surface_damage}, {"id", l_surface_id}, {"press", l_surface_press},
+static const luaL_Reg surfmeth[] = { {"root", l_surface_root}, {"show", l_surface_show}, {"hide", l_surface_hide}, {"move", l_surface_move}, {"raise", l_surface_raise}, {"lower", l_surface_lower}, {"set_layer", l_surface_layer}, {"damage", l_surface_damage}, {"paint", l_surface_paint}, {"id", l_surface_id}, {"press", l_surface_press},
     {"background", l_surface_background}, {"round", l_surface_round}, {"grab", l_surface_grab}, {"ungrab", l_surface_ungrab}, {"icon_offset", l_surface_icon_offset}, {NULL, NULL} };
 
 int xerror_quiet;   /* > 0: expected errors (freeing an icon's Picture after the icon window died) are not logged */

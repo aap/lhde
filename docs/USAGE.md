@@ -523,6 +523,7 @@ the programs' fixed ones too, and which Super combinations are free.
 | Super+r | Run: the start menu's Run dialog, as Start > Run... (`_LHSHELL_COMMAND run`, which luxshell hands to the start menu); settings.ini `[commands] run` runs something else instead (dmenu, rofi), as does `Mod4+r exec ...` in your keys file |
 | Super+Shift+S, Super+Shift+F, Super+Shift+W | a screenshot of a rectangle dragged with the mouse (Windows 10's snip key), of the full screen, of the active window with its frame (luxshot, "Screenshots" below; `_LHSHELL_COMMAND screenshot_region`, `screenshot`, `screenshot_window`, settings.ini `[commands]` of those names to run something else). Print is not bound, it may be your compose key: `Print shell screenshot` in the keys file binds it (`Mod1+Print shell screenshot_window`, `Shift+Print shell screenshot_region` likewise) |
 | Super+s | sidebar under the windows (part of the desktop) ⇄ on top of them, at once (`_LHSHELL_COMMAND sidebar-stacking toggle`; saved as `[sidebar] stacking`) |
+| Super+h | hide the sidebar ⇄ show it: minimized into the taskbar and back to the mode it had, at once, as the taskbar's round toggle button (`_LHSHELL_COMMAND sidebar-mode toggle`; saved as `[sidebar] mode`) |
 | Super+q or Alt+F4 | close window |
 | Alt+Space | the window menu (Restore, Move, Size, Minimize, Maximize, Close; arrows, mnemonics, Enter, Esc); also a right click on the caption or a click on the caption icon (double click there: close) |
 | Alt+Space, M / S | keyboard move / size: arrows move (size: the first arrow picks the edge) in half-button steps, Ctrl+arrow 1 px, the mouse takes over, Enter or a click accepts, Esc puts the window back |
@@ -913,12 +914,14 @@ light blue) and open where you click, flipped to the left / upwards where they w
 
 **Autohide** (Avalon behaviour): the bar slides out (100 ms) as soon as the pointer is off it and no start menu, menu or
 flyout of the shell is open, leaving a 2 px sliver; touching the bottom edge brings it back. The strut is the sliver, so
-maximised windows use the full height. **Sidebar modes:** `full` (the whole sidebar), `minimized` (the sidebar slides away; the
+maximised windows use the full height. **Sidebar modes:** `full` (the whole sidebar), `minimized` (hidden: the sidebar goes; the
 tray icons and the clock move into the taskbar's right end next to the toggle button, the taskbar runs the full width; the
-round toggle button at the right end flips full/pinned ⇄ minimized, as in 4074), `pinned` (only the bottom block with the
+round toggle button at the right end and Super+h flip full/pinned ⇄ minimized, as the toggle in 4074), `pinned` (only the bottom block with the
 tray and the clock, glass behind it; it reserves a bottom strut of its height over the sidebar's columns, so maximised
 windows get the full width above it). `pinned` + autohide is the minimal mode: only the clock and the tray icons stay.
-Mode changes animate in 400 ms; `_NET_WORKAREA` follows (1280x800 lab: full 1130x770, minimized 1280x770, pinned 1280x662,
+Mode changes are instant, as in 4074 (no slide of either bar); `[sidebar] animate = 1` (Display Properties' Shell tab, *Slide
+the sidebar and the taskbar*) slides the sidebar in 400 ms with the taskbar's end following it. A minimized sidebar comes back
+in the mode it was minimized from, also after a restart; `_NET_WORKAREA` follows (1280x800 lab: full 1130x770, minimized 1280x770, pinned 1280x662,
 autohide makes the 770s 798; these are the `top` numbers). **Stacking** (`[sidebar] stacking`, Super+s, settings flyout
 *Sidebar*): the sidebar takes a lot of room, so it can live **under the windows like part of the desktop** and come **on top**
 with one key when you want to look at it.
@@ -1108,7 +1111,8 @@ luxshell keeps the button pressed from the click (or Super) until the panel's wi
 | `[taskbar]` | `start_menu` | the menu the classic bar's Start button opens: `panel` (XP's start panel, default) or `classic` (the classic popup menu); flxp-taskbar reads it at every open. Next to the Avalon bar the start menu is the panel. |
 | `[taskbar]` | `autohide` * | `0` (default) or `1` |
 | `[taskbar]` | `rows` * | 1 (default), 2 or 3: the top-edge drag writes it |
-| `[sidebar]` | `mode` * | `full` (default), `minimized`, `pinned` |
+| `[sidebar]` | `mode` * | `full` (default), `minimized`, `pinned`; Super+h minimizes and restores |
+| `[sidebar]` | `animate` * | `0` (default: mode changes at once, as 4074's) or `1` (the sidebar slides, the taskbar's end follows it) |
 | `[sidebar]` | `width` * | 100..600 px (default 150): the SidebarSizer drag writes it |
 | `[sidebar]` | `stacking` * | `top` (default: the sidebar is above the windows with its strut, runs the full height, on top at the corner, the taskbar is shortened by its width; 4074) or `bottom` (part of the desktop: under the windows, `_NET_WM_STATE_BELOW`, no strut; the Avalon taskbar spans the full width over it and the sidebar, in every mode, ends at its top; follows taskbar autohide). Super+s toggles it live; settings flyout *Sidebar* |
 | `[sidebar]` | `with_classic` * | `0` (default: no sidebar while the classic taskbar runs; its mode returns with the Avalon one) or `1` (the sidebar stays, above the classic bar) |

@@ -4629,7 +4629,7 @@ struct keybind { unsigned mods; KeySym sym; char action[16]; char arg[240]; };
 static struct keybind keys[64]; static int nkeys = 0;
 static const char *default_keys[] = {
     "Mod4+Return exec urxvt", "Mod4+t exec xterm", "Mod4+e exec if command -v flxp >/dev/null; then exec flxp; else exec rox; fi",
-    "Mod4+r shell run", "Mod4+d showdesktop", "Mod4+s shell sidebar-stacking toggle",
+    "Mod4+r shell run", "Mod4+d showdesktop", "Mod4+s shell sidebar-stacking toggle", "Mod4+h shell sidebar-mode toggle",
     "Mod4+Shift+f shell screenshot", "Mod4+Shift+w shell screenshot_window", "Mod4+Shift+s shell screenshot_region",
     "Mod4+q close", "Mod1+F4 close", "Mod1+space sysmenu", "Mod4+Tab cycle", "Mod1+Tab cycle", "Mod4+Shift+Tab cycle", "Mod1+Shift+Tab cycle", "Mod4+Up maximize", "Mod4+Down minimize",
     "Mod4+1 workspace 0", "Mod4+2 workspace 1", "Mod4+3 workspace 2", "Mod4+4 workspace 3", "Super_L start", "Super_R start", NULL };
@@ -4661,10 +4661,10 @@ static void keys_setup(void) {
        that binds none, so the start menu key works there too; "Super_L none" in the file turns it off */
     bool has_start = false; for (int i = 0; i < nkeys; i++) if (keys[i].sym == XK_Super_L || keys[i].sym == XK_Super_R) has_start = true;
     if (!has_start) { keys_add("Super_L start"); keys_add("Super_R start"); }
-    /* these defaults (show desktop, run, the sidebar's stacking toggle, the screenshot keys) apply to a user's keys file only where
+    /* these defaults (show desktop, run, the sidebar's stacking and minimize toggles, the screenshot keys) apply to a user's keys file only where
        the key is unbound there; never Print, which may be the user's compose key (a binding of their own in the file) */
     if (f) for (int i = 0; default_keys[i]; i++) {
-        if (strncmp(default_keys[i], "Mod4+d ", 7) && strncmp(default_keys[i], "Mod4+r ", 7) && strncmp(default_keys[i], "Mod4+s ", 7) &&
+        if (strncmp(default_keys[i], "Mod4+d ", 7) && strncmp(default_keys[i], "Mod4+r ", 7) && strncmp(default_keys[i], "Mod4+s ", 7) && strncmp(default_keys[i], "Mod4+h ", 7) &&
             strncmp(default_keys[i], "Mod4+Shift+f ", 13) && strncmp(default_keys[i], "Mod4+Shift+w ", 13) && strncmp(default_keys[i], "Mod4+Shift+s ", 13) &&
             strncmp(default_keys[i], "Mod1+space ", 11) && strncmp(default_keys[i], "Mod1+Shift+Tab ", 15) &&
             strncmp(default_keys[i], "Mod4+Shift+Tab ", 15)) continue;

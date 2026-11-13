@@ -641,7 +641,8 @@ surface layer would change).
 Any node: `hoverable`, `cursor` (sizewe, sizens, hand, arrow: the X cursor while the node is hot or pressed), handlers
 `on_click`, `on_press`, `on_release`, `on_hover`, `on_within`, `on_drag`, `icon_geometry_for = <client>` (section 5.3).
 `node:desired([w, h])` and `node:measure([wrap_width])` measure a subtree as layout would. Surfaces: `lh.surface{ name, type,
-popup, opaque, dock, strut, layer }`, `:move`, `:show`, `:hide`, `:raise`, `:lower`, `:set_layer`, `:background(color)`,
+popup, opaque, dock, strut, layer }`, `:move`, `:show`, `:hide`, `:raise`, `:lower`, `:set_layer`, `:paint()` (a damaged surface
+now, not after the handlers), `:background(color)`,
 `:round(r)` (XShape), `:grab()`/`:ungrab()` with `on_outside`, `on_key`, `on_enter`/`on_leave`, `:icon_offset(dx, dy)`.
 Nodes are reference counted; a Lua node's table lives as long as the C tree links it, so a replaced pack's tree is freed once
 nothing (animation, timer, tile) holds it. Image names: pack-relative paths (`4074/imageres/1187.png`), `@icon:<window>`,
@@ -771,20 +772,28 @@ first runs the full height under the taskbar; the restack comes last). A server 
 
 ### 7.3 Modes
 
-`[sidebar] mode` (default: the theme's `Shell.sidebar`, else full), from the toggle button (`_ToggleSidebar`), the menus and the
-settings flyout:
+`[sidebar] mode` (default: the theme's `Shell.sidebar`, else full), from the toggle button (`_ToggleSidebar`), Super+H (luxwm's
+`shell sidebar-mode toggle`, the same toggle), the menus and the settings flyout:
 
 - `full`: the layout above.
-- `minimized` (`SidebarControl.SetMinimized`): the sidebar slides out to the right (400 ms ease-in-out) and is unmapped, no
-  strut; the taskbar runs the full width with the pack's `taskbar_tiles` (4074 `Sidebar\TaskbarTiles`; else the pinned tiles) as
-  compact views (`tile:taskbar(host)`: the tray row, the digital time, the Quick Launch icons, the notification bell and count)
+- `minimized` (`SidebarControl.SetMinimized`), what hiding the sidebar is in 4074: the sidebar is unmapped, no strut; the
+  taskbar runs the full width with the pack's `taskbar_tiles` (4074 `Sidebar\TaskbarTiles`; else the pinned tiles) as compact
+  views (`tile:taskbar(host)`: the tray row, the digital time, the Quick Launch icons, the notification bell and count)
   at its right end; the toggle shows 1167.
 - `pinned` (ours, taste): the surface shrinks to the bottom block of `pinned_tiles` (notifications + clock), no options row; a
   **bottom** strut of the block's height over the sidebar's columns (luxwm's work area is one rectangle; a right strut would
   take the full width for a small block), so everything above is free desktop. With autohide on, only the clock and the tray
   icons remain: the "minimal" mode.
 
-Transitions slide or shrink over 400 ms ease-in-out; the struts take their final value when a transition starts.
+The toggle returns a minimized sidebar to the mode it was minimized from (full or pinned; luxshell-state.ini `[sidebar]
+restore`, so also after a restart); the mode itself is settings.ini's. A change is instant, as 4074's: `_ToggleSidebar` (L56520)
+flips `_fSidebarMinimized`, posts `SetMinimized` and re-docks both bars at once (`_UpdatePositions`, no animation of the bars;
+only the tiles' own hide and resize animate, 2.4.4). luxshell paints the bar that appears before the other changes (minimized:
+the full-width taskbar under the sidebar's corner, then the sidebar unmaps; back: the sidebar over the full-width taskbar, then
+the taskbar narrows), so no in-between state shows. `[sidebar] animate = 1` (ours, taste; Display Properties' Shell tab,
+*Slide the sidebar and the taskbar*): the sidebar slides or shrinks over 400 ms ease-in-out and the taskbar's right end
+follows its left edge every 25 ms tick (stacking bottom: the taskbar is the full width throughout); the struts take their final
+value when a transition starts.
 
 ### 7.4 Yielding to a bottom dock, the classic taskbar
 
@@ -1044,15 +1053,15 @@ the start-menu provider check, `[theme] name` (liblhde `lhde_theme_select`, whic
 
 **Settings.** settings.ini (`~/.config/lhde/settings.ini`, liblhde's store: unknown keys, comments and order kept, nothing
 written when a value is unchanged) holds the user's choices; luxshell's keys: `[taskbar] autohide rows`,
-`[sidebar] mode width stacking with_classic yield_bottom locked`, `[clock] pinned pack layout`, `[desktop] wallpaper
+`[sidebar] mode width stacking with_classic yield_bottom locked animate`, `[clock] pinned pack layout`, `[desktop] wallpaper
 = none, black, max_fade_ms`, `[quicklaunch] dir`, `[commands]`, `[fonts] smoothing` (menus); missing
 defaults are written on first run. After a write luxshell sends one root ClientMessage `_LH_SETTINGS_CHANGED` per handled event:
 `l[0]` = serial (root CARDINAL `_LH_SETTINGS_SERIAL` + 1, written first, never below the highest serial seen or the clock seed),
 `l[1]` = the section's atom when only one changed, else 0. On a received message (its own too) it re-reads the file 50 ms after
 the burst and applies every key that differs from what runs (theme, current layer, composition, taskbar, autohide, rows, sidebar
-mode / width / stacking / with_classic / locked, clock pinned and layout, desktop black, max_fade_ms, wallpaper, the start
+mode / width / stacking / with_classic / locked / animate, clock pinned and layout, desktop black, max_fade_ms, wallpaper, the start
 provider); an open settings flyout is rebuilt. Runtime state stays in `~/.local/state/lhde/luxshell-state.ini` (`[sidebar] tiles
-tiles_base`; `LHSHELL_STATE` overrides the path).
+tiles_base restore`; `LHSHELL_STATE` overrides the path).
 
 **Settings flyout** (`settings.lua`; *Properties* in the taskbar and sidebar menus, `_LHSHELL_COMMAND settings`): two columns,
 the theme list (shipped themes whose visual style is imported, then the user's; *Save as...*) | composition (follow the theme / always on / always off: `Glass.composition` auto / 1 / 0 in the current layer),
@@ -1086,11 +1095,12 @@ place, then the switch's theme steps. ~40 ms on the lab. `session/theme-reload.s
 
 **Root commands.** Root property `_LHSHELL_COMMAND` (UTF8 string; luxshell deletes it after reading:
 `xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND logoff`): `run`, `reload`, `settings`, `taskbar avalon|classic|none`,
-`sidebar-stacking top|bottom|toggle`, `sidebar-with-classic 0|1`, `desktop N|next|prev` (`_NET_CURRENT_DESKTOP`, 0-based), and
+`sidebar-stacking top|bottom|toggle`, `sidebar-mode full|minimized|pinned|toggle` (toggle: the taskbar's sidebar toggle),
+`sidebar-with-classic 0|1`, `desktop N|next|prev` (`_NET_CURRENT_DESKTOP`, 0-based), and
 the session commands `logoff`, `standby`, `shutdown`, `restart`, `lock` from settings.ini `[commands]`, else: logoff =
 `lhde-session stop` inside an lhde-session (its state directory exists), else `luxwmc quit` (luxwm exits cleanly, clients left
 mapped); standby = `zzz` if present, else `loginctl suspend`; shutdown = `loginctl poweroff`; restart = `loginctl reboot`;
-lock = `xlock` or `slock`. luxwm's keys send `shell CMD` this way (Super+R `run`, Super+S `sidebar-stacking toggle`).
+lock = `xlock` or `slock`. luxwm's keys send `shell CMD` this way (Super+R `run`, Super+S `sidebar-stacking toggle`, Super+H `sidebar-mode toggle`).
 
 ## 15. Text (`text.c`)
 

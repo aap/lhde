@@ -50,6 +50,7 @@
 #define IDC_AP_SBMODE      1206
 #define IDC_AP_SBSTACK     1207
 #define IDC_AP_SBCLASSIC   1208
+#define IDC_AP_SBANIMATE   1212
 #define IDC_AP_SBMODE_SRC  1226
 
 #define IDC_EF_SMOOTH   1301

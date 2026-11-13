@@ -92,7 +92,7 @@ void set_text(HWND dlg, int id, const std::string& s) { SetDlgItemTextW(dlg, id,
 struct State {
     std::string theme;
     Layer layer;
-    std::string sbmode, sbstack, sbclassic, smoothing;
+    std::string sbmode, sbstack, sbclassic, sbanimate, smoothing;   // [sidebar] animate: "1" | "0"
     std::string shadows;          // [effects] menu_shadows: "1" | "0"
     std::string cues;             // [effects] keyboard_cues: "0" (hide the underlines until Alt) | "1"
 };
@@ -140,6 +140,7 @@ State load_state()
     s.sbmode = store::get("sidebar", "mode");
     s.sbstack = store::sidebar_stacking();
     s.sbclassic = store::flag("sidebar", "with_classic", false) ? "1" : "0";
+    s.sbanimate = store::flag("sidebar", "animate", false) ? "1" : "0";
     s.smoothing = shell::font_smoothing();
     if (s.smoothing.empty()) s.smoothing = "standard";
     if (s.smoothing == "0") s.smoothing = "off";
@@ -882,6 +883,7 @@ void apply()
     if (cur.sbmode != committed.sbmode) edits.push_back(store::Edit{ "sidebar", "mode", cur.sbmode });
     if (cur.sbstack != committed.sbstack) edits.push_back(store::Edit{ "sidebar", "stacking", cur.sbstack });
     if (cur.sbclassic != committed.sbclassic) edits.push_back(store::Edit{ "sidebar", "with_classic", cur.sbclassic });
+    if (cur.sbanimate != committed.sbanimate) edits.push_back(store::Edit{ "sidebar", "animate", cur.sbanimate });
     if (cur.smoothing != committed.smoothing) edits.push_back(store::Edit{ "fonts", "smoothing", cur.smoothing });
     if (cur.shadows != committed.shadows) edits.push_back(store::Edit{ "effects", "menu_shadows", cur.shadows });
     if (cur.cues != committed.cues) edits.push_back(store::Edit{ "effects", "keyboard_cues", cur.cues });
@@ -1028,7 +1030,7 @@ void save_theme(HWND dlg)
     }
     State keep = cur;
     cur = load_state();
-    cur.sbmode = keep.sbmode; cur.sbstack = keep.sbstack; cur.sbclassic = keep.sbclassic; cur.smoothing = keep.smoothing;
+    cur.sbmode = keep.sbmode; cur.sbstack = keep.sbstack; cur.sbclassic = keep.sbclassic; cur.sbanimate = keep.sbanimate; cur.smoothing = keep.smoothing;
     cur.shadows = keep.shadows; cur.cues = keep.cues;
     committed = cur;
     refresh_all();
@@ -1046,7 +1048,7 @@ void delete_theme(HWND dlg)
     if (in_force) {
         State keep = cur;
         cur = load_state();
-        cur.sbmode = keep.sbmode; cur.sbstack = keep.sbstack; cur.sbclassic = keep.sbclassic; cur.smoothing = keep.smoothing;
+        cur.sbmode = keep.sbmode; cur.sbstack = keep.sbstack; cur.sbclassic = keep.sbclassic; cur.sbanimate = keep.sbanimate; cur.smoothing = keep.smoothing;
         cur.shadows = keep.shadows; cur.cues = keep.cues;
         committed = cur;
     } else {
@@ -1885,6 +1887,7 @@ void fill_shell(HWND dlg)
                                      : cur.sbmode.empty() ? "The theme's (Shell.sidebar); yours once changed" : "Your setting, for every theme");
     fill_list(dlg, IDC_AP_SBSTACK, s, cur.sbstack);
     CheckDlgButton(dlg, IDC_AP_SBCLASSIC, cur.sbclassic == "1" ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(dlg, IDC_AP_SBANIMATE, cur.sbanimate == "1" ? BST_CHECKED : BST_UNCHECKED);
     filling = false;
 }
 
@@ -1899,13 +1902,14 @@ INT_PTR CALLBACK shell_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         fill_shell(dlg);
         return TRUE;
     case WM_COMMAND:
-        if ((HIWORD(wp) == CBN_SELCHANGE || (HIWORD(wp) == BN_CLICKED && LOWORD(wp) == IDC_AP_SBCLASSIC)) && !filling) {
+        if ((HIWORD(wp) == CBN_SELCHANGE || (HIWORD(wp) == BN_CLICKED && (LOWORD(wp) == IDC_AP_SBCLASSIC || LOWORD(wp) == IDC_AP_SBANIMATE))) && !filling) {
             int id = LOWORD(wp);
             for (const ShellKey& k : kShell)
                 if (k.id == id) set_key(k.key, list_value(dlg, id, shell_items[id], value(k.key)));
             if (id == IDC_AP_SBMODE) cur.sbmode = list_value(dlg, id, kSbModes, cur.sbmode);
             if (id == IDC_AP_SBSTACK) cur.sbstack = list_value(dlg, id, kSbStacks, cur.sbstack);
             if (id == IDC_AP_SBCLASSIC) cur.sbclassic = IsDlgButtonChecked(dlg, IDC_AP_SBCLASSIC) == BST_CHECKED ? "1" : "0";
+            if (id == IDC_AP_SBANIMATE) cur.sbanimate = IsDlgButtonChecked(dlg, IDC_AP_SBANIMATE) == BST_CHECKED ? "1" : "0";
             refresh_all();
             changed(dlg);
             return TRUE;

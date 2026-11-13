@@ -10,7 +10,7 @@ The defaults, from luxwm's table (`luxwm/wm.c` `default_keys`). The keys file (d
 `MODS+Key action [arg]`, MODS of `Super`/`Mod4`, `Alt`/`Mod1`, `Ctrl`/`Control`, `Shift`, the key an X keysym name, `#`
 comments; actions `exec CMD`, `close`, `kill`, `cycle`, `maximize`, `minimize`, `sysmenu`, `workspace N`, `showdesktop`,
 `shell CMD` (a command for luxshell), `start`, `none`. Without the file these apply; with it, the file's lines, plus Super+D,
-Super+R, Super+S, Alt+Space, the Shift+Tab pair and the Super+Shift screenshot keys where the file leaves that key unbound,
+Super+R, Super+S, Super+H, Alt+Space, the Shift+Tab pair and the Super+Shift screenshot keys where the file leaves that key unbound,
 and Super alone when it binds neither Super key.
 
 | Keys | Action | luxwm action |
@@ -20,6 +20,7 @@ and Super alone when it binds neither Super key.
 | Super+E | the Explorer (flxp; rox without it) | `exec ...` |
 | Super+D | show desktop: the visible windows minimised; again brings exactly those back if nothing changed meanwhile | `showdesktop` |
 | Super+S | the sidebar under the windows / on top of them | `shell sidebar-stacking toggle` |
+| Super+H | hide the sidebar / show it again: minimized into the taskbar and back, at once (the taskbar's sidebar toggle, 4074's) | `shell sidebar-mode toggle` |
 | Super+Return | a terminal (urxvt) | `exec urxvt` |
 | Super+T | xterm | `exec xterm` |
 | Super+Q, Alt+F4 | close the active window | `close` |
@@ -42,16 +43,16 @@ accepts, Esc puts the window back.
 
 ### Which Super combinations are free
 
-In use by default: Super alone, Super+R, E, D, S, T, Q, Return, Up, Down, 1-4, Tab, Shift+Tab, Shift+S, Shift+F, Shift+W.
+In use by default: Super alone, Super+R, E, D, S, H, T, Q, Return, Up, Down, 1-4, Tab, Shift+Tab, Shift+S, Shift+F, Shift+W.
 
 | | used | free |
 | --- | --- | --- |
-| letters | D E Q R S T | A B C F G **H** I J K L M N O P U V W X Y Z |
+| letters | D E H Q R S T | A B C F G I J K L M N O P U V W X Y Z |
 | digits | 1 2 3 4 | 5 6 7 8 9 0 |
 | others | Return, Tab, Up, Down | Space, Left, Right, Home, End, Page Up/Down, Escape, BackSpace, Delete, F1-F12, comma, period, slash, minus, equal |
 | with Shift | Shift+S, Shift+F, Shift+W, Shift+Tab | every other |
 
-Super+H is free. What the Windows of the time gave the free ones, to keep in mind when choosing: XP Super+F Search, Super+M and
+What the Windows of the time gave the free ones, to keep in mind when choosing: XP Super+F Search, Super+M and
 Super+Shift+M minimise all and undo it, Super+L lock, Super+U Utility Manager, Super+F1 Help, Super+Break System Properties,
 Ctrl+Super+F Find Computers; Vista's Sidebar Super+Space (the Sidebar to the front) and Super+G (cycle its gadgets).
 

@@ -25,7 +25,7 @@ Two directories, one rule each. liblhde gives every path (`lhde_config_file`, `l
 
 | file | what |
 | --- | --- |
-| `luxshell-state.ini` | the tile order (`[sidebar] tiles`); `$LHSHELL_STATE` names another file |
+| `luxshell-state.ini` | the tile order (`[sidebar] tiles`), the mode the minimized sidebar returns to (`[sidebar] restore`); `$LHSHELL_STATE` names another file |
 | `luxshell-mfu.ini` | launch counts (`[mfu]` desktop id = count last-launch-epoch) |
 | `luxshell-notifications` | the notification history (tab-separated, newest last, at most 100) |
 | `luxshell-icons/<size>/` | icons converted to square PNGs (ImageMagick) |
@@ -61,12 +61,13 @@ comments, the order and the keys it does not know: it reads the whole file, chan
               max_fade_ms = 0            ; the bars' black layers in maximised mode: 0 at once, else a fade in ms (luxshell)
 [taskbar]     autohide = 0 ; rows = 1    ; 0 | 1; 1..3 (the top-edge drag)
               start_menu = panel         ; the classic bar's Start button: panel (XP's start panel) | classic (the popup menu) (flxp-taskbar)
-[sidebar]     mode = full                ; full | minimized | pinned (absent: the theme's Shell.sidebar)
+[sidebar]     mode = full                ; full | minimized | pinned (absent: the theme's Shell.sidebar; Super+H: minimized ⇄ back)
               width = 150                ; 100..600 (the sizer drag)
               stacking = top             ; top: above the windows, with its strut | bottom: under them, part of the desktop (Win+S)
               with_classic = 0           ; 1: the sidebar stays with the classic taskbar
               yield_bottom = 1           ; 1: ends above another dock's bottom strut | 0
               locked = 0                 ; 1: Lock the Sidebar (no width drag)
+              animate = 0                ; 0: hiding (minimized) and showing it is instant, as 4074's | 1: the sidebar slides, the taskbar follows
 [clock]       pinned = 1 ; pack = 4074-aero ; layout = default   ; the clock tile; pinned holds for the pack it was chosen in
 [quicklaunch] dir = ~/some/dir           ; the Quick Launch tile's folder (default ~/.config/lhde/quicklaunch/)
 [start]       pinned = a.desktop;b.desktop ; flxp's start panel: the pinned programs (desktop ids, terminal, explorer, commands)
@@ -85,7 +86,7 @@ and taken as unset (the default). One parser each: flxp's `shell::flag_value` (`
 compositor when the theme has glass frames), `VisualStyle.shellstyle`, `Explorer.chrome`, `Explorer.navbar_preset`; in
 flxp.ini an empty value is automatic for every key.
 
-luxshell writes the defaults of `[desktop] black max_fade_ms`, `[taskbar] autohide rows`, `[sidebar] width with_classic stacking`
+luxshell writes the defaults of `[desktop] black max_fade_ms`, `[taskbar] autohide rows`, `[sidebar] width with_classic stacking animate`
 and `[clock] layout` when they are missing. `[desktop] wallpaper = none` is the one per-user key the
 theme resolver applies (below the current layer; source `settings` in `lhde-theme resolve --why`); every other theme key is
 the theme's. The current layer is written by Display Properties, Set as Desktop Background, luxshell's flyout and
@@ -96,7 +97,7 @@ selecting another theme removes it (`lhde_theme_select`), Save As turns it into 
 
 | writer | what |
 | --- | --- |
-| Display Properties (flxp-settings: Themes, Desktop, Appearance, Effects) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[sidebar] mode with_classic stacking`, `[fonts]`, `[effects]`, theme files (Save As, Delete) |
+| Display Properties (flxp-settings: Themes, Desktop, Appearance, Effects) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[sidebar] mode with_classic stacking animate`, `[fonts]`, `[effects]`, theme files (Save As, Delete) |
 | luxshell (the settings flyout, its menus, drags, `_LHSHELL_COMMAND`) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[taskbar]`, `[sidebar]`, `[clock]`, theme files (Save As) |
 | flxp-desktop, the Explorer | Set as Desktop Background: the current layer's `Desktop.wallpaper` / `Desktop.mode` (and a `[desktop] wallpaper = none` cleared) |
 | lhde-session | `_LH_THEME` only (`theme NAME`; luxshell then writes the file); without a luxshell, `taskbar KIND` through `lhde-theme set-key`, `set` and `setting` |

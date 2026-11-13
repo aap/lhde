@@ -131,13 +131,15 @@ apply_fonts(theme_entry)
 --   the sidebar ends above another dock's bottom strut),
 --   stacking = top|bottom (top: 4074, the sidebar is above the windows (_NET_WM_STATE_ABOVE) with its strut, runs full height and
 --   the taskbar yields to it; bottom: part of the desktop, under the windows (_NET_WM_STATE_BELOW) with no strut, the taskbar runs
---   the full width over it and the sidebar ends at its top; Win+S = _LHSHELL_COMMAND "sidebar-stacking toggle" flips it at once).
+--   the full width over it and the sidebar ends at its top; Win+S = _LHSHELL_COMMAND "sidebar-stacking toggle" flips it at once),
+--   animate = 0|1 (0, default: a mode change is instant, as 4074's _ToggleSidebar, which re-docks the bars at once; 1: the
+--   sidebar slides or shrinks over 400 ms and the taskbar's right end follows its edge).
 --   [clock] pinned = 1|0 with pack = the pack it was chosen in (other packs use their own default, T.clock_pinned), layout
 --   [desktop] wallpaper = none (the picture off in every theme; else the theme's), black = 0|1 (0 = maximised mode only switches the bars' black layers; 1 = also the
 --   full-screen black of the desktop layer), max_fade_ms = 0 (the black layers switch at once) or the fade in ms
 --   (LHSHELL_WALLPAPER=0 forces the wallpaper off). Runtime state (the tile order) stays in state.ini.
 for _, d in ipairs{ { "desktop", "black", "0" }, { "taskbar", "autohide", "0" }, { "taskbar", "rows", "1" },
-                    { "sidebar", "width", "150" }, { "sidebar", "with_classic", "0" }, { "sidebar", "stacking", "top" },
+                    { "sidebar", "width", "150" }, { "sidebar", "with_classic", "0" }, { "sidebar", "stacking", "top" }, { "sidebar", "animate", "0" },
                     { "clock", "layout", "default" }, { "desktop", "max_fade_ms", "0" } } do
   if not S.has(d[1], d[2]) then S.set(d[1], d[2], d[3]) end
 end
@@ -150,6 +152,9 @@ local cfg = {
   rows = clamp(math.floor(tonumber(S.get("taskbar", "rows") or "") or 1), 1, ROWS_MAX),
   sidebar_w = tonumber(S.get("sidebar", "width") or ""),
   sb_bottom = S.get("sidebar", "stacking") == "bottom",   -- [sidebar] stacking = bottom: the sidebar under the windows
+  sb_animate = S.flag("sidebar", "animate", false),       -- [sidebar] animate = 1: mode changes slide (ours, taste); 0 at once (4074)
+  -- the mode the toggle restores from minimized (full or pinned), kept across restarts in luxshell-state.ini [sidebar] restore
+  last_mode = S.state_get("sidebar", "restore"),
   composition = "auto",                                   -- set below from the per-theme chain: auto | 1 | 0
   -- maximised windows do not black out the whole desktop (luxwm crossfades the frame to its dark maximised plate; only
   -- the bars' black layers fade). [desktop] black = 1: the full-screen black of the desktop layer too
@@ -198,6 +203,7 @@ local function clock_pinned()
 end
 cfg.clock_pinned = clock_pinned()
 if cfg.sidebar ~= "full" and cfg.sidebar ~= "minimized" and cfg.sidebar ~= "pinned" then cfg.sidebar = "full" end
+if cfg.last_mode ~= "full" and cfg.last_mode ~= "pinned" then cfg.last_mode = nil end
 local feh_mode = { fill = "--bg-fill", fit = "--bg-max", center = "--bg-center", tile = "--bg-tile", stretch = "--bg-scale" }
 local wp_applied        -- wallpaper|mode last put on the root (a settings reload only repaints when it changed)
 -- Another program owns the desktop (flxp-desktop: the session sets LHSHELL_DESKTOP=0 while it runs, see below, and
@@ -816,7 +822,8 @@ local function sb_yield()
   return y
 end
 sb.yield = sb_yield()
-local function tb_shown() return 0, screen_h - tb.h, tb_full() and screen_w or (screen_w - sidebar_w), tb.h end
+-- tb.follow_w: the width while an animated mode change slides the sidebar ([sidebar] animate = 1): the taskbar ends at its edge
+local function tb_shown() return 0, screen_h - tb.h, tb.follow_w or (tb_full() and screen_w or (screen_w - sidebar_w)), tb.h end
 -- the top of the bottom bar (start menu, flyouts, toasts sit above it): ours, or in the classic / none mode another dock's
 -- full-width bottom strut (flxp-taskbar), else the screen's bottom
 function lh.taskbar_shown_top() if tb_on() then return screen_h - tb.h end return screen_h - foreign_bottom(0, 0) end
@@ -889,9 +896,13 @@ end)
 
 -- Sidebar modes: full (right edge, full height, right strut = the width, 150), pinned (the bottom block of pinned tiles; a *bottom* strut
 -- of the block's height over the sidebar's columns, so the work area keeps the full width above it), minimized (unmapped,
--- no strut; the pinned tiles live in the taskbar, which runs the full width). Transitions slide/shrink in 400 ms
--- (ease-in-out, like the tile animations); the struts are set to their final value when a transition starts. With
--- [sidebar] stacking = bottom the sidebar reserves no strut in any mode (it is under the windows).
+-- no strut; the pinned tiles live in the taskbar, which runs the full width). A change is instant (4074's _ToggleSidebar
+-- re-docks both bars at once, _UpdatePositions): the bar that appears is painted before the one it covers changes (minimized:
+-- the wide taskbar under the sidebar's corner, then the sidebar unmaps; back: the sidebar over the full-width taskbar, then the
+-- taskbar narrows), so no in-between state shows. [sidebar] animate = 1 (ours, taste): the sidebar slides or shrinks in 400 ms
+-- (ease-in-out, like the tile animations) and the taskbar's right end follows its left edge; the struts take their final
+-- value when the transition starts. With [sidebar] stacking = bottom the sidebar reserves no strut in any mode (it is under the
+-- windows).
 local function pinned_height()
   local h = 0; for _, t in ipairs(sb.tile_list) do if not t.hidden then h = h + (t.height or 0) end end
   return math.max(30, h)
@@ -913,45 +924,70 @@ place_sidebar = function()
   if mode == "minimized" or sb_hidden() then sb.surface.strut = 0; sb.surface.dock = nil; sb_move(x, y, w, h); sb.surface:hide() else sb_move(x, y, w, h); sb.surface:show(); sb_stack() end
 end
 lh.place_sidebar = function() place_sidebar() end
-local function animate_sidebar(to, done)
+-- the taskbar's width while the sidebar slides (follow): it ends at the sidebar's left edge, between its two widths
+local function tb_follow()
+  tb.follow_w = clamp(math.floor(sb.geo.x + 0.5), screen_w - sb.w, screen_w); place_taskbar()
+end
+local function animate_sidebar(to, done, follow)
   if sb.anim then lh.cancel(sb.anim); sb.anim = nil end
   local from = { sb.geo.x, sb.geo.y, sb.geo.w, sb.geo.h }; local t0 = lh.now(); local ms = 400
   local function step()
     local t = math.min(1, (lh.now() - t0) / ms); local e = t < 0.5 and 2 * t * t or 1 - (-2 * t + 2) ^ 2 / 2
     sb_move(from[1] + (to[1] - from[1]) * e, from[2] + (to[2] - from[2]) * e, from[3] + (to[3] - from[3]) * e, from[4] + (to[4] - from[4]) * e)
+    if follow then tb_follow() end
     if t >= 1 then if sb.anim then lh.cancel(sb.anim); sb.anim = nil end if done then done() end return true end
   end
   if not step() then sb.anim = lh.timer(step, 25, true) end
 end
 local function update_toggle() if tb.toggle then tb.toggle:set{ images = toggle_images() } end end
-local function set_mode(m, instant)
+local function set_mode(m)
   if m == mode or (m ~= "full" and m ~= "minimized" and m ~= "pinned") then return end
   local old = mode; mode = m; cfg.sidebar = m; S.set("sidebar", "mode", m)
-  if old ~= "minimized" then cfg.last_mode = old end
+  if old ~= "minimized" and cfg.last_mode ~= old then cfg.last_mode = old; S.state_set("sidebar", "restore", old) end
   update_toggle()
+  if sb.anim then lh.cancel(sb.anim); sb.anim = nil end
+  tb.follow_w = nil
   if sb_hidden() then   -- classic taskbar without the sidebar: remember the mode, show it with the Avalon taskbar again
-    if sb.anim then lh.cancel(sb.anim); sb.anim = nil end
     tb.wide = m == "minimized"; build_sidebar(); build_tiles(); after_tiles(); place_sidebar(); return
   end
   local t0 = lh.now()
+  local function done() io.stderr:write(string.format("luxshell: sidebar %s -> %s, %d ms%s\n", old, m, lh.now() - t0, cfg.sb_animate and " (animated)" or "")) end
+  local follow = cfg.sb_animate and not cfg.sb_bottom   -- stacking = bottom: the taskbar runs the full width in every mode
   if m == "minimized" then
-    -- slide the sidebar out to the right, then the taskbar takes the full width with the pinned tiles at its right end
-    local x, y, w, h = sb_target(m); sb.surface.strut = 0; sb.surface.dock = nil; sb_move(sb.geo.x, sb.geo.y, sb.geo.w, sb.geo.h)
-    local function fin() sb.surface:hide(); build_tiles(); tb.wide = true; build_tb_tiles(); place_taskbar(); rebuild_tasks()
-      io.stderr:write(string.format("luxshell: sidebar %s -> %s, %d ms\n", old, m, lh.now() - t0)) end
-    if instant then fin() else animate_sidebar({ screen_w, sb.geo.y, sb.geo.w, sb.geo.h }, fin) end
+    -- the taskbar takes the full width with the pinned tiles at its right end, the sidebar goes (or slides out to the right)
+    build_tiles(); tb.wide = true; build_tb_tiles()
+    sb.surface.strut = 0; sb.surface.dock = nil; sb_move(sb.geo.x, sb.geo.y, sb.geo.w, sb.geo.h)
+    if cfg.sb_animate then
+      if follow then tb_follow() else place_taskbar() end
+      rebuild_tasks()
+      animate_sidebar({ screen_w, sb.geo.y, sb.geo.w, sb.geo.h }, function() sb.surface:hide(); tb.follow_w = nil; place_taskbar(); done() end, follow)
+    else
+      place_taskbar(); rebuild_tasks(); tb.surface:paint()
+      sb.surface:hide(); done()
+    end
     return
   end
-  if old == "minimized" then tb.wide = false; build_tb_tiles(); place_taskbar(); rebuild_tasks() end
   build_sidebar(); build_tiles(); after_tiles()
   local x, y, w, h, dock, strut = sb_target(m)
-  if old == "minimized" then sb_move(screen_w, y, w, h) end   -- slide in from the right edge
   sb.surface.dock, sb.surface.strut = dock, strut
-  sb_move(sb.geo.x, sb.geo.y, sb.geo.w, sb.geo.h)               -- the strut now (final value)
-  sb.surface:show(); sb_stack()
-  local function fin() sb_move(x, y, w, h); io.stderr:write(string.format("luxshell: sidebar %s -> %s, %d ms\n", old, m, lh.now() - t0)) end
-  if instant then fin() else animate_sidebar({ x, y, w, h }, fin) end
+  if old == "minimized" and cfg.sb_animate then
+    -- slide in from the right edge; the taskbar gives the tiles back and narrows behind the sidebar's edge
+    tb.wide = false; build_tb_tiles()
+    sb_move(screen_w, y, w, h); sb.surface:show(); sb_stack()
+    if follow then tb_follow() else place_taskbar() end
+    rebuild_tasks()
+    animate_sidebar({ x, y, w, h }, function() tb.follow_w = nil; place_taskbar(); done() end, follow)
+  elseif old == "minimized" then
+    sb_move(x, y, w, h); sb.surface:show(); sb_stack(); sb.surface:paint()
+    tb.wide = false; build_tb_tiles(); place_taskbar(); rebuild_tasks(); tb.surface:paint(); done()
+  else   -- full ⇄ pinned
+    sb_move(sb.geo.x, sb.geo.y, sb.geo.w, sb.geo.h)               -- the strut now (final value)
+    sb.surface:show(); sb_stack()
+    if cfg.sb_animate then animate_sidebar({ x, y, w, h }, done) else sb_move(x, y, w, h); done() end
+  end
 end
+-- the toggle (TaskbarToggleBar, 2.4.2; Super+H): full / pinned ⇄ minimized, back to the mode it was minimized from
+local function toggle_sidebar() if mode == "minimized" then set_mode(cfg.last_mode or "full") else set_mode("minimized") end end
 -- live sidebar width (SidebarSizer drag): applied at most every 25 ms (one Animator2 tick); luxwm refits maximised windows to
 -- the new _NET_WORKAREA on each strut change, so fewer steps are kinder to it
 function lh.sidebar_set_width(w)
@@ -1044,7 +1080,7 @@ end
 local function sidebar_menu_items()
   local items = {
     { text = mode == "minimized" and "&Restore bar" or "&Minimize bar", action = function()
-        if mode == "minimized" then set_mode(cfg.last_mode or "full") else set_mode("minimized") end end },
+        toggle_sidebar() end },
     { text = "&Properties", action = function() lh.settings_flyout(math.max(0, (sb.geo and sb.geo.x or screen_w) - 480)) end },
     { separator = true },
     { text = "&Lock the Sidebar", checked = cfg.sb_locked, action = function() lh.sidebar_set_locked(not cfg.sb_locked) end },
@@ -1123,10 +1159,10 @@ lh.on("clock-pinned", function(on)
   build_sidebar(); build_tiles(); after_tiles(); place_sidebar()
 end)
 -- the pinned block follows its tiles' heights (the tray tile grows by rows, 400 ms)
-lh.on("tray", function() if mode == "pinned" then lh.timer(function() if mode == "pinned" and not sb.anim then local x, y, w, h, dock, strut = sb_target("pinned"); sb.surface.strut = strut; animate_sidebar({ x, y, w, h }) end end, 450) end
+lh.on("tray", function() if mode == "pinned" then lh.timer(function() if mode == "pinned" and not sb.anim then local x, y, w, h, dock, strut = sb_target("pinned"); sb.surface.strut = strut; if cfg.sb_animate then animate_sidebar({ x, y, w, h }) else sb_move(x, y, w, h) end end end, 450) end
   if mode == "minimized" then lh.timer(rebuild_tasks, 0) end end)
 -- TaskbarToggleBar (2.4.2): full/pinned ⇄ minimized
-lh.on("toggle-sidebar", function() if mode == "minimized" then set_mode(cfg.last_mode or "full") else set_mode("minimized") end end)
+lh.on("toggle-sidebar", toggle_sidebar)
 
 function lh.shell_get(k)
   if k == "autohide" then return cfg.autohide elseif k == "sidebar" then return mode elseif k == "wallpaper" then return S.get("desktop", "wallpaper") ~= "none"
@@ -1209,7 +1245,7 @@ local function taskbar_menu(px, py)
   lh.close_flyout()
   lh.menu.open({
     { text = mode == "minimized" and "&Restore bar" or "&Minimize bar", disabled = sb_hidden(), action = function()
-        if mode == "minimized" then set_mode(cfg.last_mode or "full") else set_mode("minimized") end end },
+        toggle_sidebar() end },
     { text = "&Properties", action = function() lh.settings_flyout(px) end },
     { separator = true },
     { text = "Tas&k Manager", disabled = tm == nil, action = function() lh.spawn(tm) end },
@@ -1591,6 +1627,7 @@ local function reload_settings()
   local wc = S.flag("sidebar", "with_classic", false)
   if wc ~= cfg.with_classic then lh.set_sidebar_with_classic(wc) end
   cfg.sb_locked = S.flag("sidebar", "locked", false)
+  cfg.sb_animate = S.flag("sidebar", "animate", false)
   if clock_pinned() ~= cfg.clock_pinned then
     cfg.clock_pinned = clock_pinned()
     if mode == "full" then build_sidebar(); build_tiles(); after_tiles(); place_sidebar() end
@@ -1656,6 +1693,8 @@ lh.on("command", function()
   if verb == "taskbar" then lh.set_taskbar(arg) return end            -- _LHSHELL_COMMAND "taskbar avalon|classic|none"
   if c:match("^%s*settings%s*$") then lh.settings_flyout() return end   -- the settings flyout (e.g. with the classic bar, which has no way to it)
   if verb == "sidebar-stacking" then lh.set_sidebar_stacking(arg) return end   -- Win+S (luxwm "shell sidebar-stacking toggle"): top | bottom | toggle
+  -- Super+H (luxwm "shell sidebar-mode toggle"): toggle = the taskbar's sidebar toggle (full / pinned ⇄ minimized), else the mode
+  if verb == "sidebar-mode" then if arg == "toggle" then toggle_sidebar() else set_mode(arg) end return end
   if verb == "desktop" then lh.switch_desktop(arg) return end   -- desktop N (0-based, as _NET_CURRENT_DESKTOP) | next | prev
   if verb == "sidebar-with-classic" then lh.set_sidebar_with_classic(arg == "1") return end   -- _LHSHELL_COMMAND "sidebar-with-classic 0|1"
   S.run(c)
