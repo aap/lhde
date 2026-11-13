@@ -80,12 +80,11 @@ static BOOL CALLBACK MSGBOX_EnumProc(HWND hwnd, LPARAM lParam)
 static void MSGBOX_OnInit(HWND hwnd, LPMSGBOXPARAMSW lpmb)
 {
     HFONT hPrevFont;
-    RECT rect;
     HWND hItem;
     HDC hdc;
     int i, buttons;
-    int bspace, bw, bh, theight, tleft, wwidth, wheight, wleft, wtop, bpos;
-    int borheight, borwidth, iheight, ileft, iwidth, twidth, tiheight;
+    int bw, bh, wwidth, wheight, wleft, wtop, bpos;
+    int borheight, borwidth, tiheight;
     NONCLIENTMETRICSW nclm;
     HMONITOR monitor;
     MONITORINFO mon_info;
@@ -244,111 +243,121 @@ static void MSGBOX_OnInit(HWND hwnd, LPMSGBOXPARAMSW lpmb)
         NtUserDestroyWindow(GetDlgItem(hwnd, IDHELP));
     }
 
-    /* Position everything */
-    GetWindowRect(hwnd, &rect);
-    borheight = rect.bottom - rect.top;
-    borwidth  = rect.right - rect.left;
-    GetClientRect(hwnd, &rect);
-    borheight -= rect.bottom - rect.top;
-    borwidth  -= rect.right - rect.left;
-
-    /* Get the icon height */
-    GetWindowRect(GetDlgItem(hwnd, MSGBOX_IDICON), &rect);
-    MapWindowPoints(0, hwnd, (LPPOINT)&rect, 2);
-    if (!(lpmb->dwStyle & MB_ICONMASK))
+    /* lhde: XP's layout in place of Wine's: every length in dialog units of the box's own font, the template's MS Shell Dlg 8
+     * (Tahoma 8: 50 x 14 DLU buttons are 75 x 23 px), the text and the buttons' names in the message font. Margins 7 DLU
+     * around, 10 between the icon and the text and above the buttons, 4 between buttons; every button as wide as the widest
+     * button name in the message font plus two digits, at least 50 DLU; the text wraps at 5/8 of the work area (6/8, 7/8, then
+     * the whole screen while the box is taller than the work area); the box at least as wide as its caption and two caption
+     * buttons; the buttons centred, the text centred on the icon when it is shorter. XP takes the units from the message font,
+     * which is Tahoma 8 under every XP style; here a Longhorn style's larger message font (Segoe UI 9) changes the text only */
     {
-        rect.bottom = rect.top;
-        rect.right = rect.left;
-    }
-    iheight = rect.bottom - rect.top;
-    ileft = rect.left;
-    iwidth = rect.right - ileft;
+        static const WCHAR *names[] = { L"OK", L"Cancel", L"&Abort", L"&Retry", L"&Ignore", L"&Yes", L"&No", L"&Try Again",
+                                        L"&Continue", L"Help" };
+        RECT du = { 0, 0, 4, 8 }, wr, cr, tr;
+        int cxu, cyu, outx, outy, inx, gap, cxicon, cyicon, cxbuttons, cxfoo, cxcaption, cxmax, cxbox, cytext, cxtext;
+        int step, maxw;
+        HFONT capfont;
+        SIZE sz, zero;
+        WCHAR caption[256];
 
-    hdc = NtUserGetDC(hwnd);
-    hPrevFont = SelectObject( hdc, (HFONT)SendDlgItemMessageW( hwnd, MSGBOX_IDTEXT, WM_GETFONT, 0, 0 ));   /* lhde: the message font */
+        MapDialogRect(hwnd, &du);
+        cxu = du.right; cyu = du.bottom;
+        outx = MulDiv(7, cxu, 4); outy = MulDiv(7, cyu, 8);
+        inx = MulDiv(10, cxu, 4);
+        gap = MulDiv(4, cxu, 4);
+        bh = MulDiv(14, cyu, 8);
 
-    /* Get the number of visible buttons and their size */
-    bh = bw = 1; /* Minimum button sizes */
-    for (buttons = 0, i = IDOK; i <= IDCONTINUE; i++)
-    {
-        if (i == IDCLOSE) continue; /* No CLOSE button */
-	hItem = GetDlgItem(hwnd, i);
-	if (GetWindowLongW(hItem, GWL_STYLE) & WS_VISIBLE)
-	{
-	    WCHAR buttonText[1024];
-	    int w, h;
-	    buttons++;
-	    if (GetWindowTextW(hItem, buttonText, 1024))
-	    {
-		DrawTextW( hdc, buttonText, -1, &rect, DT_LEFT | DT_EXPANDTABS | DT_CALCRECT);
-		h = rect.bottom - rect.top;
-		w = rect.right - rect.left;
-		if (h > bh) bh = h;
-		if (w > bw)  bw = w ;
-	    }
-	}
-    }
-    bw = max(bw, bh * 2);
-    /* Button white space */
-    bh = bh * 2;
-    bw = bw * 2;
-    bspace = bw/3; /* Space between buttons */
+        GetWindowRect(hwnd, &wr);
+        GetClientRect(hwnd, &cr);
+        borwidth = (wr.right - wr.left) - cr.right;
+        borheight = (wr.bottom - wr.top) - cr.bottom;
 
-    /* Get the text size */
-    GetClientRect(GetDlgItem(hwnd, MSGBOX_IDTEXT), &rect);
-    rect.top = rect.left = rect.bottom = 0;
-    DrawTextW(hdc, lpszText, -1, &rect,
-              DT_LEFT | DT_EXPANDTABS | DT_WORDBREAK | DT_CALCRECT | DT_NOPREFIX);
-    /* Min text width corresponds to space for the buttons */
-    tleft = ileft;
-    if (iwidth) tleft += ileft + iwidth;
-    twidth = max((bw + bspace) * buttons + bspace - tleft, rect.right);
-    theight = rect.bottom;
+        hdc = NtUserGetDC(hwnd);
+        hPrevFont = SelectObject(hdc, (HFONT)SendDlgItemMessageW(hwnd, MSGBOX_IDTEXT, WM_GETFONT, 0, 0));
+        maxw = 0;
+        for (i = 0; i < ARRAY_SIZE(names); i++)
+        {
+            GetTextExtentPoint32W(hdc, names[i], lstrlenW(names[i]), &sz);
+            if (sz.cx > maxw) maxw = sz.cx;
+        }
+        GetTextExtentPoint32W(hdc, L"0", 1, &zero);
+        bw = max(MulDiv(50, cxu, 4), maxw + 2 * zero.cx);
 
-    SelectObject(hdc, hPrevFont);
-    NtUserReleaseDC( hwnd, hdc );
+        for (buttons = 0, i = IDOK; i <= IDCONTINUE; i++)
+        {
+            if (i == IDCLOSE) continue; /* No CLOSE button */
+            hItem = GetDlgItem(hwnd, i);
+            if (GetWindowLongW(hItem, GWL_STYLE) & WS_VISIBLE) buttons++;
+        }
+        cxbuttons = buttons * bw + (buttons - 1) * gap;
+        if (lpmb->dwStyle & MB_ICONMASK) { cxicon = GetSystemMetrics(SM_CXICON) + inx; cyicon = GetSystemMetrics(SM_CYICON); }
+        else cxicon = cyicon = 0;
+        cxfoo = 2 * outx;
 
-    tiheight = 16 + max(iheight, theight);
-    wwidth  = tleft + twidth + ileft + borwidth;
-    wheight = 8 + tiheight + bh + borheight;
+        capfont = CreateFontIndirectW(&nclm.lfCaptionFont);
+        i = GetWindowTextW(hwnd, caption, ARRAY_SIZE(caption));
+        if (capfont) SelectObject(hdc, capfont);
+        GetTextExtentPoint32W(hdc, caption, i, &sz);
+        SelectObject(hdc, (HFONT)SendDlgItemMessageW(hwnd, MSGBOX_IDTEXT, WM_GETFONT, 0, 0));
+        if (capfont) DeleteObject(capfont);
+        cxcaption = sz.cx + 2 * GetSystemMetrics(SM_CXSIZE);
 
-    /* Message boxes are always desktop centered, so query desktop size and center window */
-    monitor = MonitorFromWindow(lpmb->hwndOwner ? lpmb->hwndOwner : GetActiveWindow(), MONITOR_DEFAULTTOPRIMARY);
-    mon_info.cbSize = sizeof(mon_info);
-    GetMonitorInfoW(monitor, &mon_info);
-    wleft = (mon_info.rcWork.left + mon_info.rcWork.right - wwidth) / 2;
-    wtop = (mon_info.rcWork.top + mon_info.rcWork.bottom - wheight) / 2;
+        monitor = MonitorFromWindow(lpmb->hwndOwner ? lpmb->hwndOwner : GetActiveWindow(), MONITOR_DEFAULTTOPRIMARY);
+        mon_info.cbSize = sizeof(mon_info);
+        GetMonitorInfoW(monitor, &mon_info);
+        for (step = 5;; step++)
+        {
+            cxmax = step <= 7 ? MulDiv(mon_info.rcWork.right - mon_info.rcWork.left, step, 8)
+                              : mon_info.rcMonitor.right - mon_info.rcMonitor.left;
+            cxbox = cxmax - borwidth;
+            tr.left = tr.top = 0;
+            tr.right = cxbox - cxfoo - cxicon;
+            tr.bottom = mon_info.rcWork.bottom - mon_info.rcWork.top;
+            DrawTextW(hdc, lpszText, -1, &tr, DT_CALCRECT | DT_WORDBREAK | DT_EXPANDTABS | DT_NOPREFIX | DT_EXTERNALLEADING |
+                      DT_EDITCONTROL);
+            cxtext = tr.right - tr.left + cxicon + cxfoo;
+            cxbox = min(cxbox, max(cxtext, cxcaption));
+            cxbox = max(cxbox, cxbuttons + cxfoo);
+            cxtext = cxbox - cxfoo - cxicon;
+            tr.left = tr.top = 0;
+            tr.right = cxtext;
+            tr.bottom = mon_info.rcWork.bottom - mon_info.rcWork.top;
+            cytext = DrawTextW(hdc, lpszText, -1, &tr, DT_CALCRECT | DT_WORDBREAK | DT_EXPANDTABS | DT_NOPREFIX |
+                               DT_EXTERNALLEADING | DT_EDITCONTROL);
+            wheight = MulDiv(2 * 7 + 10 + 14, cyu, 8) + max(cyicon, cytext) + borheight;
+            if (wheight <= mon_info.rcWork.bottom - mon_info.rcWork.top || step > 7) break;
+        }
+        SelectObject(hdc, hPrevFont);
+        NtUserReleaseDC(hwnd, hdc);
+        wwidth = cxbox + borwidth;
 
-    /* lhde: the box is the owner's transient (WM_TRANSIENT_FOR, a modal dialog to the window manager) */
-    if (lpmb->hwndOwner) WUX_MsgBoxOwner(hwnd, lpmb->hwndOwner);
+        wleft = (mon_info.rcWork.left + mon_info.rcWork.right - wwidth) / 2;
+        wtop = (mon_info.rcWork.top + mon_info.rcWork.bottom - wheight) / 2;
 
-    /* Resize and center the window */
-    NtUserSetWindowPos( hwnd, 0, wleft, wtop, wwidth, wheight,
-                        SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW );
+        /* the box is the owner's transient (WM_TRANSIENT_FOR, a modal dialog to the window manager) */
+        if (lpmb->hwndOwner) WUX_MsgBoxOwner(hwnd, lpmb->hwndOwner);
 
-    /* Position the icon */
-    NtUserSetWindowPos( GetDlgItem(hwnd, MSGBOX_IDICON), 0, ileft, (tiheight - iheight) / 2, 0, 0,
-                        SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW );
+        NtUserSetWindowPos( hwnd, 0, wleft, wtop, wwidth, wheight, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW );
+        NtUserSetWindowPos( GetDlgItem(hwnd, MSGBOX_IDICON), 0, outx, outy, 0, 0,
+                            SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW );
+        NtUserSetWindowPos( GetDlgItem(hwnd, MSGBOX_IDTEXT), 0, cxicon + inx,
+                            outy + (cytext >= cyicon ? 0 : (cyicon - cytext) / 2), cxtext, cytext,
+                            SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW );
 
-    /* Position the text */
-    NtUserSetWindowPos( GetDlgItem(hwnd, MSGBOX_IDTEXT), 0, tleft, (tiheight - theight) / 2, twidth, theight,
-                        SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOREDRAW );
-
-    /* Position the buttons */
-    bpos = (wwidth - (bw + bspace) * buttons + bspace) / 2;
-    for (buttons = i = 0; i < ARRAY_SIZE(buttonOrder); i++) {
-
-	/* Convert the button order to ID* value to order for the buttons */
-	hItem = GetDlgItem(hwnd, buttonOrder[i]);
-	if (GetWindowLongW(hItem, GWL_STYLE) & WS_VISIBLE) {
-	    if (buttons++ == ((lpmb->dwStyle & MB_DEFMASK) >> 8)) {
-		NtUserSetFocus(hItem);
-		SendMessageW( hItem, BM_SETSTYLE, BS_DEFPUSHBUTTON, TRUE );
-	    }
-	    NtUserSetWindowPos( hItem, 0, bpos, tiheight, bw, bh,
-                                SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW );
-	    bpos += bw + bspace;
-	}
+        /* the buttons in XP's order, centred, outy above the bottom */
+        bpos = (cxbox - cxbuttons) / 2;
+        tiheight = (wheight - borheight) - outy - bh;
+        for (buttons = i = 0; i < ARRAY_SIZE(buttonOrder); i++) {
+            hItem = GetDlgItem(hwnd, buttonOrder[i]);
+            if (GetWindowLongW(hItem, GWL_STYLE) & WS_VISIBLE) {
+                if (buttons++ == ((lpmb->dwStyle & MB_DEFMASK) >> 8)) {
+                    NtUserSetFocus(hItem);
+                    SendMessageW( hItem, BM_SETSTYLE, BS_DEFPUSHBUTTON, TRUE );
+                }
+                NtUserSetWindowPos( hItem, 0, bpos, tiheight, bw, bh, SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOREDRAW );
+                bpos += bw + gap;
+            }
+        }
     }
 
     HeapFree( GetProcessHeap(), 0, buffer );

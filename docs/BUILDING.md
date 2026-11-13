@@ -118,7 +118,8 @@ UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair: `tests/headl
 an emoji typed into a UTF-8 file with CR LF and saved byte for byte, Ln/Col, Find, Go To, Save As Unicode through the Encoding
 box and back, a Latin-1 file as ANSI saved back unchanged, the unsaved-changes question, the remembered placement, a file
 dropped from flxp, a run with nothing imported), wux's MessageBoxW (its buttons per type,
-the default, Enter and Escape: tests/w32/msgbox), luxshot, luxattr: the Properties sheet's Metadata
+the default, Enter and Escape, XP's 75x23 buttons 6 px apart under classic, luna and jade4074 with the text in the message font:
+tests/w32/msgbox), luxshot, luxattr: the Properties sheet's Metadata
 and Advanced views driven with xdotool and checked with getfattr, and a run with nothing imported and an empty HOME, flxp's
 Properties from the item menu (General first, Metadata's description, its tag list, colour, multi-line comment and Run as, two
 files in one sheet with a tag added to both, a read-only file's message box)

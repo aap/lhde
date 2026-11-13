@@ -63,8 +63,11 @@ clipboard data, `FlxpWritePng` / `FlxpEncodePng`), plus `WuxWide` / `WuxUtf8` / 
 speaks. Strings to the API are UTF-16 (`L"..."` is 16-bit here; a character above U+FFFF is a surrogate pair, and typed it
 arrives as two `WM_CHAR`s, as on Windows); the A functions and the A text messages (`SendMessageA`'s `WM_SETTEXT`,
 `WM_GETTEXT`) read "ANSI" as UTF-8. `MessageBoxW` (and `MessageBoxA`, `MessageBoxIndirectW`) is
-Wine's message box (`wux/vendor/wine/user32/msgbox.c`): the icon, the text and the buttons the flags ask for, laid out by the
-text's size, in the message font (the style's MsgBoxFont, Tahoma 8 under XP), Escape giving Cancel, or OK in an OK box.
+Wine's message box (`wux/vendor/wine/user32/msgbox.c`) with XP's layout: the icon, the text and the buttons the flags ask for,
+measured in dialog units of MS Shell Dlg 8 (Tahoma 8: buttons 50 x 14 DLU = 75 x 23 px, 4 DLU apart, 7 DLU margins, 10 between
+the icon and the text and above the buttons; a button grows to its widest name), the text and the button names in the message
+font (the style's MsgBoxFont: Tahoma 8 under XP, Segoe UI 9 under Jade, which leaves the buttons 75 x 23; XP takes its units
+from the message font, which is Tahoma 8 under every XP style), Escape giving Cancel, or OK in an OK box.
 
 Besides the windows and controls, wux has what a document program reaches for: accelerator tables (`LoadAcceleratorsW`,
 `TranslateAcceleratorW`), a class's menu (`lpszMenuName`, also by number), `GetWindowPlacement` / `SetWindowPlacement` (the
