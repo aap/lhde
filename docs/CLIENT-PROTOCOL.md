@@ -372,8 +372,7 @@ system-menu button it hangs from) is the menu's. Escape closes the innermost men
   `MENU_KeyEscape` closes one level.
 - ReactOS's win32k (`win32ss/user/ntuser/menu.c`, `MENU_TrackMenu`) has the same: "If the message belongs to the menu, removes
   it from the queue / Else, end menu tracking", the press left in the queue.
-- XP's win32k (`windows/core/ntuser/kernel/mnloop.c`, `xxxHandleMenuMessages`, read as the reference) also leaves a press off
-  the menu in the queue when it dismisses the menu, a right press as well as a left one.
+- XP's win32k also leaves a press off the menu in the queue when it dismisses the menu, a right press as well as a left one.
 - From the documentation (TrackPopupMenu, Remarks): "To display a context menu for a notification icon, the current window must
   be the foreground window before the application calls TrackPopupMenu or TrackPopupMenuEx. Otherwise, the menu will not
   disappear when the user clicks outside of the menu or the window that created the menu (if it is visible)." SetCapture: it
