@@ -1,6 +1,6 @@
 #!/bin/sh
 # luxpad under Xvfb (no window manager), driven with xdotool, its status bar read from LUXPAD_TRACE=1's "status PART TEXT"
-# lines. A UTF-8 file with CR LF line ends and a character above U+FFFF opens as UTF-8 / Windows (CR + LF); an emoji typed
+# lines. The status bar off until View > Status Bar, which luxpad.ini keeps. A UTF-8 file with CR LF line ends and a character above U+FFFF opens as UTF-8 / Windows (CR + LF); an emoji typed
 # into it and Ctrl+S: the file has the emoji's four bytes where it was typed and is otherwise byte for byte what it was (the
 # 𝄞, the ü, every CR LF); Ln/Col after moving (Ln 2, Col 3); Find (Ctrl+F "third", Find Next: Ln 3, Col 6); Go To
 # (Ctrl+G 2: Ln 2, Col 1); Save As with the Encoding box on Unicode: UTF-16 LE with a BOM, the same text, CR LF; that file
@@ -49,6 +49,20 @@ save_as() {
     xdotool mousemove --window $W 14 9 click 1; sleep .5; xdotool key Down Down Down Down Return
     DW=$(wait_window 20 --name '^Save As$'); [ -n "$DW" ] && sleep .5
 }
+
+# 0. no status bar until View > Status Bar (a click on File, Right to View, Enter), which luxpad.ini keeps for the next runs
+printf 'x\n' > $T/files/first.txt
+run '^first.txt - luxpad$' $T/files/first.txt
+if [ -z "$W" ]; then fail "no luxpad window"; cat $T/err.log
+else
+    sleep .5
+    check "no status bar at first" "" "$(status encoding)"
+    xdotool mousemove --window $W 14 9 click 1; sleep .5; xdotool key Right Right Right; sleep .5; xdotool key Return
+    wait_for 5 is_status encoding "UTF-8"
+    check "View > Status Bar shows it" "UTF-8" "$(status encoding)"
+    quit
+    check "luxpad.ini keeps it" "statusbar = 1" "$(grep '^statusbar' $T/home/.config/lhde/luxpad.ini)"
+fi
 
 # 1. a UTF-8 file with CR LF and 𝄞 (U+1D11E), an emoji typed, Ctrl+S
 F=$T/files/crlf.txt
@@ -159,9 +173,10 @@ env -i PATH="$PATH" DISPLAY=$D HOME=$T/bare LHDE_WINDOWS=/nonexistent LUXPAD_TRA
 W=$(wait_window 30 --name '^bare.txt - luxpad$')
 if [ -z "$W" ]; then fail "no window with nothing imported"; cat $T/err.log
 else
-    check "nothing imported: opens, UTF-8" "UTF-8" "$(status encoding)"
+    ok "nothing imported: opens"
     quit
     [ -s $T/bare/.config/lhde/luxpad.ini ] && ok "luxpad.ini written in the empty HOME" || fail "no luxpad.ini in the empty HOME"
+    check "the empty HOME's luxpad.ini: no status bar" "statusbar = 0" "$(grep '^statusbar' $T/bare/.config/lhde/luxpad.ini)"
 fi
 
 stop_xvfb

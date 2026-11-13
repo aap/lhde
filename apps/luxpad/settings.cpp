@@ -112,7 +112,7 @@ void NOTEPAD_LoadSettingsFromRegistry(WINDOWPLACEMENT *pWP)
     lhde_ini *state = lhde_ini_load(state_path().c_str());
 
     /* Set the default values */
-    Globals.bShowStatusBar = TRUE;
+    Globals.bShowStatusBar = FALSE;   /* XP's Notepad starts without the status bar until View > Status Bar is chosen */
     Globals.bWrapLongLines = FALSE;
     ZeroMemory(&Globals.lfFont, sizeof(Globals.lfFont));
     Globals.lfFont.lfCharSet = DEFAULT_CHARSET;

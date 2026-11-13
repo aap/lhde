@@ -830,7 +830,8 @@ statistics say so (`IsTextUnicode`); else ANSI: a file that is not valid UTF-8 (
 are not UTF-8 are kept as they were and written back unchanged (they show as boxes). Save As has Notepad's **Encoding** box
 under "Save as type" (ANSI, Unicode, Unicode big endian, UTF-8, UTF-8 with BOM) and ReactOS's **Line endings** box (Windows
 CR + LF, Unix LF, Mac CR). The line ends are kept as read: a file's own kind is written back for every line (a file mixing
-them gets its most common). The status bar says, from the left, Ln and Col (XP's: lines of the text, a column counted in
+them gets its most common). The status bar is off until View > Status Bar turns it on, as in XP's Notepad, and stays as last chosen (luxpad.ini's
+`statusbar`, for every luxpad window after); it says, from the left, Ln and Col (XP's: lines of the text, a column counted in
 UTF-16 units from 1), the line ends and the encoding; XP hides it while Word Wrap is on, and so does luxpad (Go To is greyed
 then too). A character above U+FFFF (an emoji, 𝄞) is typed, saved and reloaded intact; the caret and Backspace take it as one.
 NUL characters in a file become spaces (the Edit control's text ends at a NUL), as Notepad does.
