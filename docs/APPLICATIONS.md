@@ -82,8 +82,10 @@ themed by the style; a dialog in "MS Shell Dlg" gets the theme's dialog font.
 ## What the shell layer offers (shell/shell.h)
 
 `shell::user_dir("PICTURES", "Pictures")` and the other XDG directories; `shell::spawn` and `shell::open_files` (launching, the
-way a double click opens); `shell::details::write(path, *shell::details::property("description"), text, &err)` and `"tags"`,
-`"comment"` (the annotations, written exactly as the Explorer writes them: docs/ANNOTATIONS.md), `read_stored`, `read_attr`,
+way a double click opens, a file's own Run as command first: `shell::run_as(path)`, `shell::run_file(path, command)`);
+`shell::details::write(path, *shell::details::property("description"), text, &err)` and `"tags"`, `"color"`, `"run"`,
+`"comment"` (the annotations, written exactly as the Explorer writes them: docs/ANNOTATIONS.md), `change_tags` (tags added
+and removed in one write), `known_tags` (the tags to offer in a tag box) and `remember_tags`, `palette`, `read_stored`, `read_attr`,
 `list_attrs` (every `user.*` name on a file), `infotip`, the Properties formats (`size_and_bytes`: "1.29 KB (1,331 bytes)",
 `long_date` with seconds, `thousands`);
 `shell::store::get` / `set` (settings.ini, with the change notification); `shell::session_theme()` (the theme's record);
@@ -91,7 +93,8 @@ way a double click opens); `shell::details::write(path, *shell::details::propert
 `flxp DIR`, `flxp --select FILE`. The win32 part (`shell/ui.h`): `shell::message_box(owner, title, text, MB_OK |
 MB_ICONEXCLAMATION)` (MessageBoxW with UTF-8 strings), `shell::icon_for(path, 32)` and `icon_for_key(key, px)` (the icon the
 Explorer shows, as an HICON), `load_image` (an icon theme's source, an .ico or "pe:FILE#ID", with LoadImageW),
-`shell::properties(owner, paths, options)` (the Properties sheet: General and Summary, as the Explorer's Properties opens it). The shell
+`shell::properties(owner, paths, options)` (the Properties sheet: General and Metadata, as the Explorer's Properties opens it),
+`shell::one_line_edit` (an edit whose paste joins the clipboard's lines). The shell
 layer's warnings on stderr start with the program's name (`shell::program_name()`, argv[0]'s basename).
 
 ## Trying it in the lab

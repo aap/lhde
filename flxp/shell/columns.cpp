@@ -11,7 +11,7 @@ namespace columns {
 
 static const struct { const char* name; int width; bool shown; } KNOWN[] = {
     { "name", 180, true }, { "size", 96, true }, { "type", 120, true }, { "modified", 120, true },
-    { "description", 180, false }, { "tags", 120, false }, { "comment", 150, false },
+    { "description", 180, false }, { "tags", 120, false }, { "comment", 150, false }, { "color", 100, false },
 };
 static const int N_KNOWN = (int)(sizeof KNOWN / sizeof KNOWN[0]);
 

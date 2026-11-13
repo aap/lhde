@@ -1,10 +1,10 @@
-// luxattr: the attributes editor (docs/USAGE.md "Descriptions and tags"), an application on the public entry point
+// luxattr: the attributes editor (docs/USAGE.md "Metadata"), an application on the public entry point
 // (wux/wux.h, shell/shell.h, apps/app.mk; docs/APPLICATIONS.md) that needs no lhde session.
 //
 //   luxattr [--general] FILE...
 //
 // The shell layer's Properties sheet (shell::properties, shell/ui.h: the one the Explorer's Properties opens) for the files
-// given, a directory being a file too, on its Summary page (--general: on General). Everything else is the sheet's: the
+// given, a directory being a file too, on its Metadata page (--general: on General). Everything else is the sheet's: the
 // pages, several files at once, the writing (shell::details::write, as the Explorer writes) and the error boxes.
 // Exit status: 0 something was written, 1 nothing, 2 bad usage or a file that is not there.
 #include <errno.h>
@@ -22,9 +22,9 @@
 static void usage(FILE* f)
 {
     fputs("usage: luxattr [--general] FILE...\n"
-          "  The Properties sheet of the files, on its Summary page: the description (user.lux.desc), tags (user.xdg.tags),\n"
-          "  comment (user.xdg.comment) and luxfs's names, Advanced >> every user.* extended attribute. --general opens it\n"
-          "  on the General page.\n"
+          "  The Properties sheet of the files, on its Metadata page: the description (user.lux.desc), tags (user.xdg.tags),\n"
+          "  colour (user.lux.color), comment (user.xdg.comment) and run as (user.lux.run), Advanced >> every user.* extended\n"
+          "  attribute. --general opens it on the General page.\n"
           "Exit status: 0 something was written, 1 nothing, 2 usage error or a file that is not there.\n", f);
 }
 

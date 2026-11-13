@@ -13,6 +13,7 @@
 #include "shell/util.h"
 #include "shell/columns.h"
 #include "shell/details.h"
+#include "shell/icons.h"
 #include "shell/lhtheme.h"
 #include "shell/dirwatch.h"
 #include "shell/thumbs.h"
@@ -383,6 +384,7 @@ const std::vector<Column>& all_columns()
         { (int)shell::SortBy::Description, "Description", 180, LVCFMT_LEFT },
         { (int)shell::SortBy::Tags, "Tags", 120, LVCFMT_LEFT },
         { (int)shell::SortBy::Comment, "Comment", 150, LVCFMT_LEFT },
+        { (int)shell::SortBy::Color, "Color", 100, LVCFMT_LEFT },   // a swatch and the name: a provisional look (todo_ideas/xattribs.txt)
     };
     return c;
 }
@@ -471,6 +473,9 @@ static bool build_columns(Browser& b)
     std::vector<int> arr;
     for (int id : order) arr.push_back((int)(std::find(ids.begin(), ids.end(), id) - ids.begin()));
     SendMessageW(b.list, LVM_SETCOLUMNORDERARRAY, (WPARAM)arr.size(), (LPARAM)arr.data());
+    // the Color column's swatch is its subitem's image, asked for when drawn (subitem_image; the others have none)
+    bool swatches = std::find(ids.begin(), ids.end(), (int)shell::SortBy::Color) != ids.end();
+    SendMessageW(b.list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_SUBITEMIMAGES, swatches ? LVS_EX_SUBITEMIMAGES : 0);
     SendMessageW(b.list, WM_SETREDRAW, TRUE, 0);
     return n > 0;
 }
@@ -667,13 +672,26 @@ static void put_item(Browser& b, size_t i, int group, bool insert)
         else if (id == (int)shell::SortBy::Type) text = it.type;
         else if (id == (int)shell::SortBy::Date) text = it.mtime ? shell::format_date(it.mtime) : "";
         else if (const shell::details::Property* p = shell::details::column_property((shell::SortBy)id))
-            text = p->type == shell::details::ValueType::List ? shell::details::tag_list(it.stored(p->xattr)) : it.stored(p->xattr);
+            text = shell::details::shown(*p, it.stored(p->xattr));
         std::u16string t = W(text);
         LVITEMW sub = {};
         sub.mask = LVIF_TEXT; sub.iItem = (int)i; sub.iSubItem = (int)k; sub.pszText = (LPWSTR)t.c_str();
         SendMessageW(b.list, LVM_SETITEMW, 0, (LPARAM)&sub);
     }
     if (b.tiles) put_tile_lines(b, i);
+}
+
+void subitem_image(Browser& b, NMLVDISPINFOW* di)
+{
+    if (!(di->item.mask & LVIF_IMAGE) || di->item.iSubItem <= 0) return;
+    size_t i = (size_t)di->item.lParam;
+    if (column_id(b, di->item.iSubItem) != (int)shell::SortBy::Color || i >= b.items.size()) return;
+    const shell::details::Color* c = shell::details::color(b.items[i].stored(shell::details::property("color")->xattr));
+    if (!c) return;
+    std::string key = shell::swatch_key(c->rgb);
+    // the list's small images are the icons, or the thumbnail squares (a zoomed Details view)
+    if ((HIMAGELIST)SendMessageW(b.list, LVM_GETIMAGELIST, LVSIL_SMALL, 0) == b.small) di->item.iImage = b.icon(key);
+    else if (thumbview::active()) di->item.iImage = thumbview::icon_image(key);
 }
 
 void fill_list(Browser& b)

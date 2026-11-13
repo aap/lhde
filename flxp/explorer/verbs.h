@@ -6,7 +6,7 @@
 // same shape with the unix additions: Open Terminal Here and Add to Bookmarks,
 // and the stored properties of shell/details.h: Add Tag... (every selected item
 // keeps its tags and gets the new ones); the rest is Properties (shell::properties,
-// shell/ui.h: General and Summary, for one or several items).
+// shell/ui.h: General and Metadata, for one or several items).
 // What differs between the views (how a folder opens, how they refresh, how a
 // rename starts) goes through a Host.
 #pragma once
@@ -81,7 +81,7 @@ DWORD drag_items(HWND from, const std::vector<Item>& items, HIMAGELIST il, const
 std::vector<std::string> drop_paths(const FLXPDROP* d);
 
 void open_items(const std::vector<Item>& items);
-void show_properties(const std::vector<Item>& items);   // the Properties sheet of their file-system items
+void show_properties(const std::vector<Item>& items, int page = 0);   // the Properties sheet of their file-system items (page 1: Metadata)
 void add_bookmark(const std::string& dir);
 
 // The wallpaper (flxp-desktop paints it). is_wallpaper_image: a local BMP, PNG or

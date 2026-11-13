@@ -45,8 +45,14 @@ bool open_terminal(const std::string& dir, std::string* err = nullptr);
 // A native program the user means to run when opening it (an executable ELF file).
 bool is_program(const std::string& path, const std::string& mime);
 
-// Open files the way a double click does: programs run, everything else
-// goes to its type's default application; grouped so one app gets all its files.
+// A file's own command (user.lux.run, docs/ANNOTATIONS.md; "" when not set): what a double click runs instead of its
+// type's program. run_file runs such a command on the file (details::run_command: /bin/sh -c, %f the quoted path),
+// detached, in the file's folder.
+std::string run_as(const std::string& path);
+bool run_file(const std::string& path, const std::string& command, std::string* err = nullptr);
+
+// Open files the way a double click does: a file with its own command (run_as) runs it, programs run, everything
+// else goes to its type's default application; grouped so one app gets all its files.
 bool open_files(const std::vector<std::string>& paths, std::string* err = nullptr);
 
 } // namespace shell

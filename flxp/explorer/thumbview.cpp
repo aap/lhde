@@ -523,6 +523,8 @@ void stop()
     g_pending.clear();
 }
 
+int icon_image(const std::string& key) { return g_on ? default_image(key, false) : -1; }
+
 void folder_changed()
 {
     if (g_loader) g_loader->cancel();

@@ -47,6 +47,7 @@
 #include "shell/lhdata.h"
 #include "shell/lhtheme.h"
 #include "shell/netres.h"
+#include "shell/ui.h"
 extern "C" {
 #include "commctrl.h"
 }
@@ -111,6 +112,8 @@ std::vector<Text> g_texts;             // the count, the title and the values
 RECT g_more = {}, g_props = {};        // "more", "all properties..." (empty: none)
 struct EditRow { RECT r; std::string id, raw; size_t text; };   // an editable value: where, which property, g_texts' index
 std::vector<EditRow> g_rows;
+struct Swatch { RECT r; COLORREF color; };   // the item's colour, a square after its name
+std::vector<Swatch> g_swatches;
 HWND g_edit;                           // the open editor (a row's), or null
 std::string g_edit_id, g_edit_raw, g_edit_path;
 bool g_edit_closing;
@@ -270,6 +273,7 @@ void layout_for(HDC dc, int w)
     g_texts.clear();
     g_links.clear();
     g_rows.clear();
+    g_swatches.clear();
     g_more = g_props = RECT{};
     bool sel = g_info.kind != Kind::Location;
     int w0;   // the preview's natural width (PreviewTaskPresenter's child 0)
@@ -303,6 +307,19 @@ void layout_for(HDC dc, int w)
         w0 = tx + 2 * COL + PAD;
         int right = imax(tx + 40, imin(w0, w) - PAD);
         put_top(dc, F_TITLE, shell::details::lh_title(g_info), tx, small() ? 6 : 7, WHITE, right);
+        // the item's colour as a square after its name (a click opens the Metadata page): a provisional look
+        // (todo_ideas/xattribs.txt)
+        if (g_info.kind == Kind::One)
+            for (const shell::details::Row& r : g_info.rows)
+                if (r.id == "color")
+                    if (const shell::details::Color* c = shell::details::color(r.raw)) {
+                        RECT t = g_texts.back().r;
+                        int s = small() ? 10 : 12, x = t.right + 8, y = (t.top + t.bottom) / 2 - s / 2 + 1;
+                        if (x + s > right) break;
+                        RECT sq = { x, y, x + s, y + s };
+                        g_swatches.push_back(Swatch{ sq, RGB((c->rgb >> 16) & 255, (c->rgb >> 8) & 255, c->rgb & 255) });
+                        if (r.editable) g_rows.push_back(EditRow{ sq, r.id, r.raw, (size_t)-1 });
+                    }
         if (!small()) {
             int lh = text_size(dc, F_LINE, "Ag").cy;
             int props_top = H - 14 - lh;
@@ -569,6 +586,14 @@ HBITMAP render(HDC wdc, int w)
             if (g_rows[k].text == i && g_hot == ROW_HOT - (int)k) { t.font = F_LINE_U; t.color = MORE_HOT; }
         draw_text(dc, t);
     }
+    for (const Swatch& s : g_swatches) {   // white-edged, to stand out on the band
+        HBRUSH edge = CreateSolidBrush(WHITE), fill = CreateSolidBrush(s.color);
+        FillRect(dc, &s.r, edge);
+        RECT in = { s.r.left + 1, s.r.top + 1, s.r.right - 1, s.r.bottom - 1 };
+        FillRect(dc, &in, fill);
+        DeleteObject(edge);
+        DeleteObject(fill);
+    }
     if (g_props.right > g_props.left)
         draw_text(dc, Text{ "all properties...", g_props, g_hot == -3 ? F_LINE_U : F_LINE, g_hot == -3 ? MORE_HOT : MORE_TEXT });
     for (size_t i = 0; i < g_links.size(); i++) {
@@ -681,6 +706,11 @@ void open_editor(size_t row)
     close_editor(true);
     if (row >= g_rows.size() || !g_wnd) return;
     const EditRow& r = g_rows[row];
+    // a colour is picked and a comment of several lines edited on the Properties sheet's Metadata page
+    if (r.id == "color" || r.raw.find('\n') != std::string::npos) {
+        if (g_cb.command) g_cb.command(ID_METADATA, true);
+        return;
+    }
     g_edit_id = r.id;
     g_edit_raw = r.raw;
     g_edit_path = g_info.path;
@@ -692,6 +722,7 @@ void open_editor(size_t row)
     SendMessageW(g_edit, WM_SETFONT, (WPARAM)g_fonts[F_LINE], TRUE);
     SendMessageW(g_edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(2, 2));
     SetWindowSubclass(g_edit, edit_subclass, 1, 0);
+    if (r.id == "description") shell::one_line_edit(g_edit);   // a pasted text of several lines as one
     SetFocus(g_edit);
     SendMessageW(g_edit, EM_SETSEL, 0, -1);
 }

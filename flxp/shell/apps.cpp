@@ -16,6 +16,7 @@
 #include <map>
 #include <set>
 #include "apps.h"
+#include "details.h"
 #include "config.h"
 #include "util.h"
 #include "mime.h"
@@ -563,11 +564,25 @@ bool is_program(const std::string& path, const std::string& mime)
     return true;
 }
 
+std::string run_as(const std::string& path)
+{
+    std::string cmd;
+    if (details::read_attr(path, details::property("run")->xattr, &cmd) != details::Read::Value) return "";
+    return trim(cmd).empty() ? "" : cmd;
+}
+
+bool run_file(const std::string& path, const std::string& command, std::string* err)
+{
+    return spawn({ "/bin/sh", "-c", details::run_command(command, path) }, dir_of(path), err);
+}
+
 bool open_files(const std::vector<std::string>& paths, std::string* err)
 {
     std::vector<std::pair<const App*, std::vector<std::string>>> groups;
     bool ok = true;
     for (const std::string& p : paths) {
+        std::string run = run_as(p);
+        if (!run.empty()) { if (!run_file(p, run, err)) ok = false; continue; }
         std::string mime = mime_type(p);
         if (is_program(p, mime)) { if (!spawn({ p }, dir_of(p), err)) ok = false; continue; }
         const App* a = default_app(mime);

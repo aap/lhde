@@ -104,7 +104,8 @@ header (the step-2 `LUXNAV_DIR` hook and build/compat are gone).
 
 `make check` first compiles a probe that calls glibc's wcslen in win32 C++ and fails if it compiles (`check-poison`:
 wchar_t is 16 bits there, `wux/w32/include/flxp_crt.h` poisons glibc's wide functions). `tests/check.sh` runs what needs no Microsoft files: kerneltest (the shim's
-kernel/CRT/registry/resource/usp10 parts), gditest, fileops_test, thumbstest (the thumbnails' memory bounds on pictures it writes: a 6000 x 4000 JPEG and a 4000 x 4000 PNG into 128 px thumbnails with the peak RSS growing by less than 16 MB, the PNG reduced row by row; the view's image budget over 300 inserts, the pinned ones kept; a cancelled loader generation
+kernel/CRT/registry/resource/usp10 parts), gditest, swatchtest (the Details Color column's square through an image list),
+fileops_test, thumbstest (the thumbnails' memory bounds on pictures it writes: a 6000 x 4000 JPEG and a 4000 x 4000 PNG into 128 px thumbnails with the peak RSS growing by less than 16 MB, the PNG reduced row by row; the view's image budget over 300 inserts, the pinned ones kept; a cancelled loader generation
 decoding nothing more, three loaders decoding at most two pictures at once), `tests/settings-lists.sh` (Display Properties' Desktop
 lists without a window: the backgrounds' order and selection, the icon sets; Appearance's "Windows and buttons", `--list
 appearance --pick STYLE`: classic, a bare style with and without a frame set, back to the theme's own, with the user's
@@ -117,9 +118,10 @@ UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair: `tests/headl
 an emoji typed into a UTF-8 file with CR LF and saved byte for byte, Ln/Col, Find, Go To, Save As Unicode through the Encoding
 box and back, a Latin-1 file as ANSI saved back unchanged, the unsaved-changes question, the remembered placement, a file
 dropped from flxp, a run with nothing imported), wux's MessageBoxW (its buttons per type,
-the default, Enter and Escape: tests/w32/msgbox), luxshot, luxattr: the Properties sheet's Summary
+the default, Enter and Escape: tests/w32/msgbox), luxshot, luxattr: the Properties sheet's Metadata
 and Advanced views driven with xdotool and checked with getfattr, and a run with nothing imported and an empty HOME, flxp's
-Properties from the item menu (General first, Summary's description, two files in one sheet, a read-only file's message box)
+Properties from the item menu (General first, Metadata's description, its tag list, colour, multi-line comment and Run as, two
+files in one sheet with a tag added to both, a read-only file's message box)
 and Add Tag, the Explorer's Filter box under jade4074 over names and attributes, skipped without that style or user xattrs,
 luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`, clicks outside open menus under luxwm:
 `tests/headless/menus.sh`, a Win32 menu bar's pixels (plain, hot, open, inactive) under jade4074, luna and classic with
@@ -128,7 +130,8 @@ opening the start menu's Run dialog (luxwm, luxshell, flxp-startmenu) and settin
 `tests/headless/runkey.sh`, luxpad's size grips (the status
 bar's and the scroll bars' corner: the cursor over them, a drag sizes the window, 4074's dots under jade4074): `tests/headless/grip.sh`, the task band's folder picture against the Icons view's: `tests/headless/folderpic.sh`, flxp's memory on 600 6000 x 4000
 JPEGs in the Thumbnails view at 256 px, paged through and into a subfolder: the peak RSS under 400 MB, the view's images within
-their 64 MB budget plus what is on screen, some evicted, skipped without ImageMagick: `tests/headless/thumbsmem.sh`) on displays :71-:73
+their 64 MB budget plus what is on screen, some evicted, skipped without ImageMagick: `tests/headless/thumbsmem.sh`, a double
+click and Enter on a file with Run as running its command: `tests/headless/runas.sh`) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).

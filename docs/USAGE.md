@@ -688,8 +688,8 @@ only what the window's chrome has, in the words of its era:
 What the Explorer says about the folder shown or the selection comes from one model (`flxp/shell/details.h`) shown two ways.
 Per kind of item (file, picture, song, folder, drive, a virtual folder such as My Computer) it lists properties from a small
 registry: the derived Type, Attributes, Date Modified, Size, Dimensions, File System, Free Space, Total Size, and the stored
-Description (`user.lux.desc`), Tags (`user.xdg.tags`) and Comment (`user.xdg.comment`), the extended attributes of
-docs/ANNOTATIONS.md (how to edit them: "Descriptions and tags" below).
+Description (`user.lux.desc`), Tags (`user.xdg.tags`), Comment (`user.xdg.comment`), Color (`user.lux.color`) and Run as
+(`user.lux.run`), the extended attributes of docs/ANNOTATIONS.md (how to edit them: "Metadata" below).
 
 **XP frame: the Details section.** The task pane's last section, under Places and Bookmarks, is XP's Details rollout. With nothing
 selected it describes the folder itself (its name in bold, "File Folder", Date Modified; My Computer "System Folder"; a drive "Local
@@ -725,56 +725,82 @@ all spelled `taskpane*`: `taskpane` (shown, `0 | 1`), `taskpane_compact` (`0 | 1
 87..246, default 126) and `taskpane_background` (`menubar`, default: the command bar's strip; `aurora`: the Longhorn demo's
 aurora bitmaps from `resources/demo`, a taste choice).
 
-## Descriptions and tags (flxp)
+## Metadata: descriptions, comments, tags, colours, run as (flxp)
 
-A file or folder can carry a one-line **description**, **tags** and a **comment**. They are extended attributes on the file
-itself (`user.lux.desc`, `user.xdg.tags`, `user.xdg.comment`; the names luxfs's `x` and `lsx` use, docs/ANNOTATIONS.md), so
-there is no database: they need a file system that keeps user attributes (ext4, btrfs, xfs, zfs, tmpfs; not FAT or many network
-mounts, where editing says so). Tags are stored comma-separated (`reference,4051`); typed, they may be separated by commas or
-semicolons, spaces around them are dropped, a tag given twice is kept once. Emptying a value removes the attribute. A value
-of any length is read whole; when an item's current value cannot be read (not readable by you, an I/O error), Add Tag, the
-Properties sheet and the task band's editor change nothing and say so, rather than replace what they did not see.
+A file or folder can carry a **description** (one line: what it is), a **comment** (free text of as many lines as it needs),
+**tags**, a **colour** and a **Run as** command. They are extended attributes on the file itself (`user.lux.desc`,
+`user.xdg.comment`, `user.xdg.tags`, `user.lux.color`, `user.lux.run`; the names luxfs's `x` and `lsx` use,
+docs/ANNOTATIONS.md), so there is no database: they need a file system that keeps user attributes (ext4, btrfs, xfs, zfs, tmpfs;
+not FAT or many network mounts, where editing says so). A line break typed or pasted into a description becomes a space.
+Tags are stored comma-separated (`reference,4051`); typed, they may be separated by commas or semicolons, spaces around them
+are dropped, a tag given twice is kept once. A colour is one of ten names (Red, Orange, Yellow, Green, Teal, Blue, Purple,
+Pink, Brown, Gray), stored in lower case (`red`). Emptying a value removes the attribute. A value of any length is read whole;
+when an item's current value cannot be read (not readable by you, an I/O error), Add Tag, the Properties sheet and the task
+band's editor change nothing and say so, rather than replace what they did not see.
+
+**Run as** is a command for that one file, in place of its type's program: `python3 %f`, `wine %f`, `xdg-open %f`. A double
+click, Open or Enter on the file runs it with `%f` replaced by the file's path (quoted; without `%f` the path goes at the
+end; `%%` is a percent sign), through `/bin/sh` in the file's folder, without asking, as a Windows shortcut runs its target.
+Open With still offers the programs of the file's type. It is yours: it travels with the file only where the file's
+attributes travel (below), so a file downloaded or copied without them has none.
 
 Where they show:
 - **Details view columns.** Right-click the column header for a check per column (Name, Size, Type, Date Modified, Description,
-  Tags, Comment) and More..., or View > Choose Details... (XP's dialog: check, Move Up / Move Down, Show / Hide, the selected
+  Tags, Comment, Color) and More..., or View > Choose Details... (XP's dialog: check, Move Up / Move Down, Show / Hide, the selected
   column's width); drag a column header to move the column. A click on a column header sorts by it (files without a value first).
   As in XP every column keeps its place in the order and its width whether it is shown or not: hiding one takes it out, showing
   it again puts it back where it was, at its width, and nothing else moves. Choose Details lists the columns in that order, the
   hidden ones at their places, so Move Up / Move Down also place a hidden one. Name is always shown. The attributes are only read
-  while one of their columns is shown or sorted by (or the filter looks at them).
+  while one of their columns is shown or sorted by (or the filter looks at them). Comment shows the first line and "…" when
+  there are more; Color, hidden by default, a small square in the colour and its name.
 - **Columns per folder.** As XP's view state, each folder keeps its own columns: what you change in one folder (the set, the
   order, the widths) stays with that folder, in its line of `~/.local/state/lhde/flxp-views` beside its view (only when it
   differs from the default); a folder of its own gets the default, `~/.local/state/lhde/flxp-columns`. Tools > Folder Options'
   Apply to All Folders makes the current folder's columns the default and forgets every folder's own, Reset All Folders goes
   back to XP's four (Name, Size, Type, Date Modified) and forgets them too. With "Remember each folder's view settings" off
   (`remember_views = 0`) the columns are one set for every folder, kept in `flxp-columns`.
-- **The infotip.** Resting the pointer on an item shows XP's tip: Type, Date Modified and Size, then Description, Tags and
-  Comment when they are set.
-- **The panes.** XP's Details rollout lists them when set (read-only, as XP's did); 4051's task band shows them for one item,
-  with "Add a description", "Add tags", "Add comments" when empty.
+- **The infotip.** Resting the pointer on an item shows XP's tip: Type, Date Modified and Size, then Description, Tags,
+  Comment (its first line), Color ("Color: Red") and "Runs with: python3" (the command's program) when they are set.
+- **The panes.** XP's Details rollout lists them when set (read-only, as XP's did; "Color: Red"); 4051's task band shows the
+  description, tags and the comment's first line for one item, with "Add a description", "Add tags", "Add comments" when
+  empty, and the colour as a square after the item's name. Run as shows in neither.
+
+Where a colour shows (the column's square and name, the band's square, the lines) is a first choice and may change.
 
 How to edit:
 - **The context menu** (Explorer and desktop): Add Tag... (one or several items: each keeps its tags and gets the new ones; the
-  drop-down offers the tags used in the folder) and Properties (one or several items: the sheet below; the rest of the editing
-  is there).
+  drop-down offers the known tags: the items' own, the ones you added lately, `~/.local/state/lhde/flxp-tags`, and those of
+  the other files in the folder) and Properties (one or several items: the sheet below; the rest of the editing is there).
 - **Properties**, the item's Properties sheet (XP's file Properties, titled "a.txt Properties", or "a.txt, b.txt, ...
   Properties" for several): General, where it opens as XP's does, shows the icon, name, type, Opens with and its Change...
   button (XP's Open With), location, size ("1.29 KB (1,331 bytes)"), what a folder contains and the dates (several items:
-  "N Files, M Folders", "All of type ..." or "Multiple Types", "All in ..." or "Various Folders", the total size). Summary, one
-  tab away, has an edit for Description, Tags ("a, b"), Comment and luxfs's Author, Source, Build, Notes and To do
-  (docs/ANNOTATIONS.md); Advanced >> shows every `user.*` attribute on the files with its stored value, any program's: F2 or a double click edits a value in place (Enter
-  keeps it, Escape drops it), New Attribute... adds one (a name without `user.` gets it), Remove or Delete removes the
-  selected ones, << Simple goes back. With several files a value they share is shown, else the edit is empty with "(several
-  values)" in grey, and what is typed is written to every file. OK writes and closes, Apply writes and stays, Cancel or Escape
-  drops; an emptied value removes the attribute. It writes as the Explorer does (the same code), so tags typed "a; b" are
-  stored `a,b`; a file it cannot change (read-only, not yours, no user attributes there) is named in a message box and the
-  sheet stays. After OK the Explorer refreshes the rows and the panes.
-- **luxattr**, the same sheet from a terminal: `luxattr FILE...` opens it on Summary (`--general` on General), for the files
+  "N Files, M Folders", "All of type ..." or "Multiple Types", "All in ..." or "Various Folders", the total size). **Metadata**,
+  one tab away, has:
+  - *Description*, one line (a pasted text of several lines comes in as one).
+  - *Tags*: the files' tags in a list, one a row, and above it a box whose drop-down offers the known tags (the files' own,
+    the ones you added lately, the folder's). Type a tag (or several, `a, b` or `a; b`) or pick one, then Add or Enter; select
+    rows (Shift and Ctrl for several) and Remove or Delete. With several files a tag only some of them have is grey; one you
+    add goes to all of them, one you remove leaves those that have it, and each keeps its other tags.
+  - *Color*: a row of squares, None first, then the ten colours; the chosen one is framed and named beside the label
+    ("Color: Red", "Color: (several)" when the files differ). Click one, or Alt+L, the arrow keys and Space.
+  - *Comment*, several lines (Enter starts a new line), with a scroll bar.
+  - *Run as*: the command (`python3 %f`), Browse... to pick the program in the file dialog (it writes `PROGRAM %f`); empty,
+    the file opens with its type's program again.
+
+  luxfs's Author, Source, Build, Notes and To do are in the Advanced view only. Advanced >> shows every `user.*` attribute on
+  the files with its stored value, any program's: F2 or a double click edits a value in place (Enter keeps it, Escape drops
+  it), New Attribute... adds one (a name without `user.` gets it), Remove or Delete removes the selected ones, << Simple goes
+  back. With several files a value they share is shown, else the edit is empty with "(several values)" in grey, and what is
+  typed is written to every file. OK writes and closes, Apply writes and stays, Cancel or Escape drops; an emptied value
+  removes the attribute. It writes as the Explorer does (the same code), so tags typed "a; b" are stored `a,b`; a file it
+  cannot change (read-only, not yours, no user attributes there) is named in a message box and the sheet stays. After OK the
+  Explorer refreshes the rows and the panes.
+- **luxattr**, the same sheet from a terminal: `luxattr FILE...` opens it on Metadata (`--general` on General), for the files
   given (a folder is a file too), without Change... It needs no session and nothing imported: on a bare X display it draws in
   wux's classic defaults; in a session it follows the theme like every lhde program. Exit status: 0 something was written,
   1 nothing, 2 a usage error or a missing file.
-- **The task band:** click a value or its invitation, type, Enter (or click elsewhere) keeps it, Escape drops it.
+- **The task band:** click a value or its invitation, type, Enter (or click elsewhere) keeps it, Escape drops it. A comment of
+  several lines and the colour's square open the Properties sheet on its Metadata page instead.
 - From a terminal: `x desc FILE "text"`, `x +tag FILE a b`, `lsx -t DIR` (luxfs), or `setfattr` / `getfattr`. The Explorer
   follows a change made elsewhere (inotify reports attribute changes).
 
@@ -804,7 +830,7 @@ file can bind it ("Keys in the session" above). A window comes up at once with t
   folder (`XDG_PICTURES_DIR`, from `~/.config/user-dirs.dirs`, else `~/Pictures`; made when missing); **Browse...** is the Save As
   dialog. A name without `.png` gets it; a name with a `/` is a path of its own.
 - **Description** and **Tags**: written on the file as the Explorer writes them (`user.lux.desc`, `user.xdg.tags`; tags separated
-  by commas or semicolons, "Descriptions and tags" above), so the Explorer shows them at once. An empty box writes nothing.
+  by commas or semicolons, "Metadata" above), so the Explorer shows them at once. An empty box writes nothing.
 - **Save** (Enter) writes the PNG and closes; a file of that name is replaced only after asking. **Copy** puts the picture on the
   clipboard as `image/png` (paste it into GIMP, a browser, a chat); luxshot then stays, without a window, until another program
   takes the clipboard, since an X clipboard lives in the program that offers it. **Open Folder** opens the folder in the Explorer

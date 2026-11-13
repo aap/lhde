@@ -55,6 +55,7 @@ void stop();                          // Stop: drop what is pending
 // sets each item's image and asks for the missing thumbnails.
 void fill(const std::vector<shell::Item>& items);
 void folder_changed();                // navigation: drop pending work and the cached images
+int icon_image(const std::string& key);   // an icon key's square in the view's image list (-1: none), as an icon's item gets
 void on_ready();                      // WM_THUMBS
 
 // A folder's picture as the view composes it, at any size and outside the view (the task band's preview): the

@@ -34,15 +34,18 @@ HICON icon_for(const std::string& path, int px);
 //             location, size ("1.29 KB (1,331 bytes)"), what a folder contains, the three dates with seconds, the
 //             permissions and owner, a link's target; for several items XP's "N Files, M Folders", "All of type X" /
 //             "Multiple Types", "All in DIR" / "Various Folders" and the total size.
-//   Summary   the stored properties (shell/details.h: Description, Tags, Comment) and luxfs's names (Author, Source, Build,
-//             Notes, To do: user.lux.*), one edit each; Advanced >> lists every user.* attribute with its value, edited in
-//             place (F2, a double click), New Attribute..., Remove. Several files: a shared value shows, else "(several
-//             values)", and what is typed goes to every file.
+//   Metadata  the registry's stored properties (shell/details.h): Description (one line), Tags (the files' tags in a list,
+//             one a row, a tag some of the files have in grey; a box with the known tags in its drop-down, Add or Enter
+//             adding what is typed to every file, Remove or Delete taking the selected ones from the files that have
+//             them), Color (a row of swatches, None first), Comment (several lines), Run as (a command, Browse... for
+//             the program); Advanced >> lists every user.* attribute with its value (luxfs's Author, Source, Build, Notes,
+//             To do among them), edited in place (F2, a double click), New Attribute..., Remove. Several files: a shared
+//             value shows, else "(several values)", and what is typed goes to every file.
 // OK writes and closes, Apply writes and stays, Cancel drops; every value through details::write (as the Explorer writes
 // it); an error (read-only, not yours, no user attributes) in a message box, the sheet staying. True when something was
 // written.
 struct PropertiesOptions {
-    int page = 0;                     // the page shown first: 0 General (XP's), 1 Summary
+    int page = 0;                     // the page shown first: 0 General (XP's), 1 Metadata
     std::string name;                 // one item: its name as the caller shows it (else the file's name)
     std::string type;                 // one item: its type as the caller shows it (else shell::type_name)
     std::string icon_key;             // one item: its icon key (else shell::icon_key of the name)
@@ -51,5 +54,7 @@ struct PropertiesOptions {
     std::function<bool(HWND page, const std::string& path, const std::string& mime)> change_program;
 };
 bool properties(HWND owner, const std::vector<std::string>& paths, const PropertiesOptions& o = PropertiesOptions());
+// A one-line edit's paste keeps every line of the clipboard, joined by spaces (the edit control alone keeps the first)
+void one_line_edit(HWND edit);
 
 } // namespace shell
