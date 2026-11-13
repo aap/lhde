@@ -66,3 +66,7 @@
 	string-carrying messages (LVM_/TVM_/TB_/TTM_/SB_/CB_/EM_, WM_SETTEXT/GETTEXT) and the GETDISPINFO notifications (a buffer
 	rule), all converting through the one pair (wux/w32/utf.h); both APIs coexist while flxp moves file by file (string-free
 	files first: filedlg/main, portal, wallpaper, xwm, preview)
+* wux posts WM_CHAR 0x7f (DEL) after the Delete key, which Windows does not: a list box with LBS_WANTKEYBOARDINPUT gets a
+	WM_CHARTOITEM for it (the Properties sheet's tag list answers -2), an edit or a control that types characters may see it
+* the file dialog's File name box completes inline: typing "python3" and Enter in /usr/bin chose python3-config (XP's
+	AutoComplete only suggests in its drop-down unless "Use inline AutoComplete" is on, which it is not by default)

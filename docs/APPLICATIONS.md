@@ -93,7 +93,8 @@ and removed in one write), `known_tags` (the tags to offer in a tag box) and `re
 `flxp DIR`, `flxp --select FILE`. The win32 part (`shell/ui.h`): `shell::message_box(owner, title, text, MB_OK |
 MB_ICONEXCLAMATION)` (MessageBoxW with UTF-8 strings), `shell::icon_for(path, 32)` and `icon_for_key(key, px)` (the icon the
 Explorer shows, as an HICON), `load_image` (an icon theme's source, an .ico or "pe:FILE#ID", with LoadImageW),
-`shell::properties(owner, paths, options)` (the Properties sheet: General and Summary, as the Explorer's Properties opens it). The shell
+`shell::properties(owner, paths, options)` (the Properties sheet: General and Metadata, as the Explorer's Properties opens it),
+`shell::one_line_edit` (an edit whose paste joins the clipboard's lines). The shell
 layer's warnings on stderr start with the program's name (`shell::program_name()`, argv[0]'s basename).
 
 ## Trying it in the lab

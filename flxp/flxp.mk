@@ -72,9 +72,10 @@ $(O)/flxp/settings/settings.o: flxp/rc/settings.res
 UT_PROBE = -Wl,-u,ut_open,-u,ut_close,-u,ut_format,-u,ut_list_classes,-u,ut_color,-u,ut_size,-u,ut_get_resource,-u,ut_prop,-u,ut_get_string,-u,ut_get_bitmap,-u,ut_free
 W32LINK = $(UT_PROBE) $(SHELLOBJS) $(SHELLUIOBJS) $(WUX_LINK)
 W32DEPS = $(SHELLOBJS) $(SHELLUIOBJS) $(WUXA) $(LUXNAVA) $(UTA)
-build/bin/flxp: $(EXPLOBJS) $(W32DEPS)
+# flxp links the file dialog for the Properties sheet's Run as Browse... (GetOpenFileNameW)
+build/bin/flxp: $(EXPLOBJS) $(FILEDLGLIB) $(W32DEPS)
 	@mkdir -p $(dir $@)
-	$(CXX) -o $@ $(EXPLOBJS) $(W32LINK) $(LDLIBS) -no-pie
+	$(CXX) -o $@ $(EXPLOBJS) $(FILEDLGLIB) $(W32LINK) $(LDLIBS) -no-pie
 build/bin/flxp-desktop: $(DESKOBJS) $(EXPLSHARED) $(FILEDLGLIB) $(W32DEPS)
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $(DESKOBJS) $(EXPLSHARED) $(FILEDLGLIB) $(W32LINK) $(LDLIBS) $(shell pkg-config --libs libpng libjpeg) -no-pie

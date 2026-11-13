@@ -1,7 +1,7 @@
 /* The Properties sheet's resource ids (flxp/rc/shell.rc; shell::properties, properties.cpp) */
 #pragma once
 #define IDD_GENERAL       100
-#define IDD_SUMMARY       101
+#define IDD_METADATA      101
 #define IDD_NEWATTR       102
 
 /* General */
@@ -29,10 +29,22 @@
 #define IDC_SEP4          131
 #define IDC_CHANGE        132
 
-/* Summary: the simple view's labels and edits are IDC_LABEL0 + i, IDC_FIELD0 + i (i < 8) */
-#define IDC_LABEL0        140
-#define IDC_FIELD0        150
-#define IDC_NOTE          160
+/* Metadata: the simple view's fields; the swatches are IDC_SWATCH0 + i (i < 11: None, then shell::details::palette()) */
+#define IDC_DESCL         140
+#define IDC_DESC          141
+#define IDC_TAGSL         142
+#define IDC_TAGEDIT       143
+#define IDC_TAGADD        144
+#define IDC_TAGLIST       145
+#define IDC_TAGREMOVE     146
+#define IDC_COLORL        147
+#define IDC_COMMENTL      148
+#define IDC_COMMENT       149
+#define IDC_RUNL          150
+#define IDC_RUN           151
+#define IDC_RUNBROWSE     152
+#define IDC_RUNHINT       153
+#define IDC_SWATCH0       180
 #define IDC_ADVANCED      161
 #define IDC_LIST          162
 #define IDC_NEW           163

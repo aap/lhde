@@ -1,10 +1,14 @@
 #!/bin/sh
 # flxp's Properties (the shell layer's sheet, shell::properties) from the item context menu, under Xvfb without a window
 # manager and with nothing imported: a right click on a tagged file, then r (P&roperties), opens "a.txt Properties" (XP's
-# caption) on General (Ctrl+Tab then reaches Summary, where Alt+D is the description); a description typed there, OK, and
-# getfattr has it, the tags kept. Add Tag... from the same menu adds a tag; with both files selected Properties is one sheet
-# ("a.txt, b.txt Properties") whose description goes to both. On a read-only file the write fails: a message box (wux's
-# MessageBoxW, captioned as the sheet) over the sheet, which stays; nothing is written; Escape closes the sheet.
+# caption) on General (Ctrl+Tab then reaches Metadata, where Alt+D is the description); a description typed there, OK, and
+# getfattr has it, the tags kept. Add Tag... from the same menu adds a tag. The Metadata page's widgets: two tags typed into
+# the tag box, each added with Enter, a tag removed from the list with Delete, the second swatch chosen with the keyboard
+# (Alt+L, Right, Space: Red), a comment of two lines (Enter in it is a new line), Run as typed; OK writes user.xdg.tags,
+# user.lux.color = red, user.xdg.comment with its newline and user.lux.run; a later description leaves the comment's lines.
+# With both files selected Properties is one sheet ("a.txt, b.txt Properties") whose description goes to both, a tag added
+# there goes to both, each keeping its own. On a read-only file the write fails: a message box (wux's MessageBoxW, captioned as
+# the sheet) over the sheet, which stays; nothing is written; Escape closes the sheet.
 # Needs Xvfb, xdotool, getfattr and setfattr; prints "skip: ..." and passes without them or without user xattrs on $TMPDIR.
 # Usage: tests/headless/properties.sh [:DISPLAY]
 D=${1:-:76}
@@ -46,7 +50,7 @@ explorer() {
 menu() { focus $W; xdotool mousemove --window $W 260 101 click 3; sleep .7; xdotool key "$1"; }
 close_explorer() { kill $P 2>/dev/null; wait $P 2>/dev/null; }
 
-# 1. one tagged file: Properties from the menu, General first, Summary's description, OK
+# 1. one tagged file: Properties from the menu, General first, Metadata's description, OK
 explorer "$F"
 if [ -z "$W" ]; then echo "FAIL no Explorer window"; fails=$((fails + 1)); else
     menu r
@@ -70,17 +74,54 @@ if [ -z "$W" ]; then echo "FAIL no Explorer window"; fails=$((fails + 1)); else
     fi
     check "a.txt: Add Tag" "red,work,blue" "$(attr user.xdg.tags "$F/a.txt")"
 
-    # 3. both selected (Ctrl+A in the list): one sheet, the description written to both
+    # 2b. the Metadata page's widgets: two tags added in the tag box (Enter adds), "work" removed from the list (Home, Down:
+    # the second row; Delete), the colour Red (Alt+L: None; Right: Red; Space), a comment of two lines, Run as; OK from Run as
+    menu r
+    S=$(wait_window 20 --name '^a\.txt Properties$')
+    if [ -z "$S" ]; then echo "FAIL no sheet for the widgets"; fails=$((fails + 1)); else
+        focus $S; xdotool key ctrl+Tab; sleep .5
+        xdotool key alt+t; sleep .2; xdotool type "green"; xdotool key Return; sleep .2
+        xdotool type "yellow"; xdotool key Return; sleep .2
+        xdotool key Tab Tab; sleep .2; xdotool key Home; sleep .1; xdotool key Down; sleep .1; xdotool key Delete; sleep .2
+        xdotool key alt+l; sleep .2; xdotool key Right; sleep .1; xdotool key space; sleep .2
+        xdotool key alt+o; sleep .2; xdotool type "line one"; xdotool key Return; xdotool type "line two"; sleep .2
+        xdotool key alt+r; sleep .2; xdotool type "python3 %f"; sleep .2
+        xdotool key Return
+        wait_for 10 gone '^a\.txt Properties$'
+        check "widgets: user.xdg.tags" "red,blue,green,yellow" "$(attr user.xdg.tags "$F/a.txt")"
+        check "widgets: user.lux.color" "red" "$(attr user.lux.color "$F/a.txt")"
+        check "widgets: user.lux.run" "python3 %f" "$(attr user.lux.run "$F/a.txt")"
+        check "widgets: user.xdg.comment" "line one
+line two" "$(attr user.xdg.comment "$F/a.txt")"
+        check "widgets: the description kept" "a described file" "$(attr user.lux.desc "$F/a.txt")"
+    fi
+    # a description changed later leaves the comment's lines
+    menu r
+    S=$(wait_window 20 --name '^a\.txt Properties$')
+    if [ -n "$S" ]; then
+        focus $S; xdotool key ctrl+Tab; sleep .5
+        xdotool key alt+d; sleep .2; xdotool key ctrl+a; xdotool type "described again"; sleep .2; xdotool key Return
+        wait_for 10 gone '^a\.txt Properties$'
+    fi
+    check "the comment survives" "line one
+line two" "$(attr user.xdg.comment "$F/a.txt")"
+    check "described again" "described again" "$(attr user.lux.desc "$F/a.txt")"
+
+    # 3. both selected (Ctrl+A in the list): one sheet, the description written to both; a tag added to both, each keeping
+    # its own
     focus $W; xdotool key ctrl+a; sleep .3
     menu r
     S=$(wait_window 20 --name '^a\.txt, b\.txt Properties$')
     check "two files: one sheet" "yes" "$([ -n "$S" ] && echo yes || echo no)"
     if [ -n "$S" ]; then
         focus $S; xdotool key ctrl+Tab; sleep .5
-        xdotool key alt+d; sleep .2; xdotool type "both"; sleep .2; xdotool key Return
+        xdotool key alt+d; sleep .2; xdotool type "both"; sleep .2
+        xdotool key alt+t; sleep .2; xdotool type "shared"; xdotool key Return; sleep .2; xdotool key Return
         wait_for 10 gone '^a\.txt, b\.txt Properties$'
         check "a.txt after two" "both" "$(attr user.lux.desc "$F/a.txt")"
         check "b.txt after two" "both" "$(attr user.lux.desc "$F/b.txt")"
+        check "a.txt: its tags and the shared one" "red,blue,green,yellow,shared" "$(attr user.xdg.tags "$F/a.txt")"
+        check "b.txt: the shared tag" "shared" "$(attr user.xdg.tags "$F/b.txt")"
     fi
 fi
 close_explorer

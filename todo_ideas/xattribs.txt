@@ -11,7 +11,7 @@ Future: synchronize local metadata catalog with local and remote filesystems
 
 For existing xattr tooling see ~/src/luxfs [note: perhaps move into lhde? or separate repo...]
 
-Phase 1 is in (columns, the 4051 band's editable rows with invitations, the infotip, Add Tag, the Properties sheet's Summary
+Phase 1 is in (columns, the 4051 band's editable rows with invitations, the infotip, Add Tag, the Properties sheet's Metadata
 page; docs/USAGE.md "Metadata"). Next phases (todo_ideas/XATTR-DESIGN_CLAUDE.md sections 3-4):
 * the invitation colour in the 4051 band and the Choose Details dialog's layout are unmeasured choices
 * where a colour (user.lux.color) shows is open: the Details column's 12 px square with the name, the band's square after
@@ -27,7 +27,7 @@ page; docs/USAGE.md "Metadata"). Next phases (todo_ideas/XATTR-DESIGN_CLAUDE.md 
 * the Explorer's panes do not follow an attribute changed by another program: inotify's IN_ATTRIB refreshes the rows
 	(browser::update), but changed_on_disk() does not refresh the Details rollout / 4051 band of the selection (setfattr in a
 	terminal: the pane shows the old value until the selection changes); the Properties sheet refreshes them after OK
-* the Properties sheet's Summary list of luxfs's names (author, source, build, notes, todo) is its own: the registry has description, tags
-	and comment only; they belong in the registry's data file when it comes (flxp would then show them too, if wanted)
-* the Properties sheet: a value with a newline (notes) in the Summary page's one-line edits; a binary value shows escaped (\xNN) in the
-	Advanced list but an edit of it is written back as text
+* the Properties sheet: a binary value shows escaped (\xNN) in the Advanced list but an edit of it is written back as text;
+	the Advanced list's in-place editor is one line, so a value of several lines (notes) cannot be edited there as it is;
+	several files with different comments show an empty Comment without the "(several values)" cue (a multi-line edit has
+	no cue banner)

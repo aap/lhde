@@ -1,6 +1,6 @@
 #!/bin/sh
-# luxattr (the shell layer's Properties sheet from a terminal, on its Summary page) under Xvfb (no window manager). Two
-# files with the same tags: the Summary page's Description typed, a tag added to Tags, OK writes both files as the Explorer
+# luxattr (the shell layer's Properties sheet from a terminal, on its Metadata page) under Xvfb (no window manager). Two
+# files with the same tags: the Metadata page's Description typed, a tag added in the tag box, OK writes both files as the Explorer
 # writes them (getfattr; build/tests/infotip reads them back); Advanced >>: New Attribute... adds user.zz, then a row removed (Delete) and one edited in place (F2); and a run with nothing at all
 # (LHDE_WINDOWS=/nonexistent, an empty HOME, no XDG variables) shows the sheet and exits 1 on Escape. A HOME and XDG
 # directories of its own. Needs Xvfb, xdotool, getfattr and setfattr (attr); prints "skip: ..." and passes without them
@@ -37,13 +37,13 @@ finish() {
     if kill -0 $P 2>/dev/null; then kill $P; wait $P; else wait $P; rc=$?; fi
 }
 
-# 1. the Summary page of two files: a description typed, a tag added, OK
+# 1. the Metadata page of two files: a description typed, a tag added in the tag box (Enter adds it), OK
 $B $A $C 2>$T/err1.txt & P=$!
 sheet 'a\.txt, b\.txt'
 if [ -z "$W" ]; then fail "no sheet for a.txt, b.txt"; kill $P; wait $P
 else
     xdotool key alt+d; sleep .2; xdotool type "Two test files"; sleep .2
-    xdotool key alt+t; sleep .2; xdotool key End; xdotool type ", three"; sleep .3
+    xdotool key alt+t; sleep .2; xdotool type "three"; xdotool key Return; sleep .3
     xdotool key Return
     finish
     [ $rc = 0 ] || fail "luxattr exited $rc after OK"

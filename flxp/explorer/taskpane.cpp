@@ -47,6 +47,7 @@
 #include "shell/lhdata.h"
 #include "shell/lhtheme.h"
 #include "shell/netres.h"
+#include "shell/ui.h"
 extern "C" {
 #include "commctrl.h"
 }
@@ -721,6 +722,7 @@ void open_editor(size_t row)
     SendMessageW(g_edit, WM_SETFONT, (WPARAM)g_fonts[F_LINE], TRUE);
     SendMessageW(g_edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(2, 2));
     SetWindowSubclass(g_edit, edit_subclass, 1, 0);
+    if (r.id == "description") shell::one_line_edit(g_edit);   // a pasted text of several lines as one
     SetFocus(g_edit);
     SendMessageW(g_edit, EM_SETSEL, 0, -1);
 }

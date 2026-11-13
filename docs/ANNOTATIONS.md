@@ -45,11 +45,12 @@ appended), in the file's folder, and asks nothing; Open With still offers the ty
 attributes travel (below): a copy made without them, a download or an archive unpacked without `--xattrs`, has none.
 
 The Properties sheet (`shell::properties` in `flxp/shell/ui`, docs/USAGE.md "Metadata": the Explorer's Properties,
-and `luxattr` from a terminal) is the GUI for all of them: its Summary
-page edits `desc`, `tags`, `comment` and `author`, `source`, `build`, `notes`, `todo`, and whose Advanced view lists, edits,
-adds and removes any `user.*` attribute, on one file or several at once. It writes through the same code as flxp
-(`shell::details::write`; any name the registry does not know as a text, trimmed), lists the names with
-`shell::details::list_attrs`, and luxattr needs no session.
+and `luxattr` from a terminal) is the GUI for all of them: its Metadata page edits `desc` (one line), `tags` (a list of the
+files' tags with a box to add from the known ones), `color` (a row of swatches), `comment` (several lines) and `run` (with a
+Browse... for the program), and its Advanced view lists, edits, adds and removes any `user.*` attribute (`author`, `source`,
+`build`, `notes`, `todo` among them), on one file or several at once. It writes through the same code as flxp
+(`shell::details::write` and `change_tags`; any name the registry does not know as a text, trimmed, its lines kept), lists the
+names with `shell::details::list_attrs`, and luxattr needs no session.
 
 ## Where they are set
 - `lhde-import` annotates what it writes into the Windows tree: originals get `author = microsoft`,
