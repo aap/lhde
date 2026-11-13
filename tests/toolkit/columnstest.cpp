@@ -34,7 +34,7 @@ int main()
 {
     enum { NAME, SIZE, TYPE, DATE, DESC, TAGS, COMMENT };
     Layout l = builtin();
-    check("builtin", "name:180 size:96 type:120 modified:120 -description:180 -tags:120 -comment:150", format(l));
+    check("builtin", "name:180 size:96 type:120 modified:120 -description:180 -tags:120 -comment:150 -color:100", format(l));
 
     // aap's case: show Tags, hide Size, show Size again: Size at its own place, not last
     set_shown(l, TAGS, true);
@@ -43,16 +43,16 @@ int main()
     set_width(l, SIZE, 77);   // (a width given while hidden is kept too)
     set_shown(l, SIZE, true);
     check("size back at its place", "name size type modified tags", ids(shown(l)));
-    check("size keeps its width", "name:180 size:77 type:120 modified:120 -description:180 tags:120 -comment:150", format(l));
+    check("size keeps its width", "name:180 size:77 type:120 modified:120 -description:180 tags:120 -comment:150 -color:100", format(l));
     set_shown(l, NAME, false);
     check("name stays shown", "name size type modified tags", ids(shown(l)));
 
     // a header drag: Date Modified before Size; the hidden Description keeps its place
     // between Date Modified and Tags' old neighbours
     reorder_shown(l, { NAME, DATE, SIZE, TYPE, TAGS });
-    check("dragged", "name:180 modified:120 size:77 type:120 -description:180 tags:120 -comment:150", format(l));
+    check("dragged", "name:180 modified:120 size:77 type:120 -description:180 tags:120 -comment:150 -color:100", format(l));
     reorder_shown(l, { NAME, TAGS, DATE, SIZE, TYPE });
-    check("tags dragged before a hidden one", "name:180 tags:120 modified:120 size:77 -description:180 type:120 -comment:150", format(l));
+    check("tags dragged before a hidden one", "name:180 tags:120 modified:120 size:77 -description:180 type:120 -comment:150 -color:100", format(l));
     // a hidden column shown again comes back at its slot
     set_shown(l, DESC, true);
     check("description back between size and type", "name tags modified size description type", ids(shown(l)));
@@ -65,9 +65,9 @@ int main()
     check("read back", format(l), format(r));
     check("same", "1", r == l ? "1" : "0");
     Layout old = parse("name:200 type:120 modified:100 tags:90\n", builtin());
-    check("older file", "name:200 type:120 modified:100 tags:90 -size:96 -description:180 -comment:150", format(old));
+    check("older file", "name:200 type:120 modified:100 tags:90 -size:96 -description:180 -comment:150 -color:100", format(old));
     check("empty file", format(builtin()), format(parse("", builtin())));
-    check("junk dropped, name shown, the unnamed hidden", "name:180 -size:96 type:120 -modified:120 -description:180 -tags:120 -comment:150",
+    check("junk dropped, name shown, the unnamed hidden", "name:180 -size:96 type:120 -modified:120 -description:180 -tags:120 -comment:150 -color:100",
           format(parse("-name -size bogus:3 name:9999 type", builtin())));
 
     // per folder: flxp-views on a scratch state directory

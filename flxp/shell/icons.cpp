@@ -250,8 +250,16 @@ bool refresh_icon_theme()
 
 int icon_theme_generation() { icon_theme(); return g_generation; }
 
+std::string swatch_key(unsigned rgb)
+{
+    char buf[16];
+    snprintf(buf, sizeof buf, "swatch:%06x", rgb & 0xffffff);
+    return buf;
+}
+
 std::string icon_file(const std::string& key)
 {
+    if (key.compare(0, 7, "swatch:") == 0) return key;
     const IconTheme& t = icon_theme();
     for (auto& kv : t.icons) if (kv.first == key) return kv.second;
     for (auto& kv : t.icons) if (kv.first == "document") return kv.second;

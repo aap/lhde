@@ -47,7 +47,10 @@ const IconTheme& icon_theme();
 // selects that theme when it names another one. True if it did.
 bool refresh_icon_theme();
 int icon_theme_generation();                             // + 1 on every selection
-std::string icon_file(const std::string& key);           // resolved source for a key ("" if unknown)
+std::string icon_file(const std::string& key);           // resolved source for a key ("" if unknown); a swatch key is its own
+// A colour swatch as an icon key and source ("swatch:ff0000"): load_image draws it (a square of 3/4 of the size, a 1 px
+// dark border, centred, transparent around it), so image lists take it as any other icon
+std::string swatch_key(unsigned rgb);
 std::string icon_theme_file(const std::string& name);    // the recipe a name selects ("" if none)
 
 // Windows art by resource id from lhde-import's resources/<build>: resource_file("xp", "explorer.exe") is that file in

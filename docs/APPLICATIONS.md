@@ -82,8 +82,10 @@ themed by the style; a dialog in "MS Shell Dlg" gets the theme's dialog font.
 ## What the shell layer offers (shell/shell.h)
 
 `shell::user_dir("PICTURES", "Pictures")` and the other XDG directories; `shell::spawn` and `shell::open_files` (launching, the
-way a double click opens); `shell::details::write(path, *shell::details::property("description"), text, &err)` and `"tags"`,
-`"comment"` (the annotations, written exactly as the Explorer writes them: docs/ANNOTATIONS.md), `read_stored`, `read_attr`,
+way a double click opens, a file's own Run as command first: `shell::run_as(path)`, `shell::run_file(path, command)`);
+`shell::details::write(path, *shell::details::property("description"), text, &err)` and `"tags"`, `"color"`, `"run"`,
+`"comment"` (the annotations, written exactly as the Explorer writes them: docs/ANNOTATIONS.md), `change_tags` (tags added
+and removed in one write), `known_tags` (the tags to offer in a tag box) and `remember_tags`, `palette`, `read_stored`, `read_attr`,
 `list_attrs` (every `user.*` name on a file), `infotip`, the Properties formats (`size_and_bytes`: "1.29 KB (1,331 bytes)",
 `long_date` with seconds, `thousands`);
 `shell::store::get` / `set` (settings.ini, with the change notification); `shell::session_theme()` (the theme's record);

@@ -30,8 +30,9 @@ Two directories, one rule each. liblhde gives every path (`lhde_config_file`, `l
 | `luxshell-notifications` | the notification history (tab-separated, newest last, at most 100) |
 | `luxshell-icons/<size>/` | icons converted to square PNGs (ImageMagick) |
 | `flxp-views` | per folder, one line: `PATH<tab>VIEW` (`icons@48`, `details`, `tiles@48+nonames`, ...), and `<tab>columns=LAYOUT` when the folder's Details columns differ from the default (VIEW may then be empty) |
-| `flxp-columns` | the default Details columns, one LAYOUT: every column in order, a hidden one with `-`, each with its width (`name:180 size:96 type:120 modified:120 -description:180 tags:120 -comment:150`); a column it does not name is hidden |
+| `flxp-columns` | the default Details columns, one LAYOUT: every column in order, a hidden one with `-`, each with its width (`name:180 size:96 type:120 modified:120 -description:180 tags:120 -comment:150 -color:100`); a column it does not name is hidden |
 | `flxp-view-sizes` | the size each view had last |
+| `flxp-tags` | the tags last added (Add Tag..., the Properties sheet), one a line, the latest first, at most 100: the tag boxes offer them |
 | `flxp-desktop-positions` | the desktop's icon positions |
 | `flxp-mfu`, `flxp-run-history` | the start panel's launch counts, the Run box's history |
 | `luxpad.ini` | luxpad's window (`[window]` x, y, width, height, maximized) and last search (`[search]` find, replace, match_case, whole_word, down) |

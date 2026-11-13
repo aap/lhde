@@ -1663,6 +1663,9 @@ static LRESULT on_notify(NMHDR* nm)
             open_item(ia->iItem);
             return 0;
         }
+        case LVN_GETDISPINFOW:
+            browser::subitem_image(g, (NMLVDISPINFOW*)nm);
+            return 0;
         case LVN_BEGINDRAG:
             drag_from_list(((NMLISTVIEW*)nm)->iItem);
             return 0;

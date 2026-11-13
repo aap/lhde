@@ -18,9 +18,11 @@
 //   drive     Type; File System; Free Space; Total Size                     type, free space
 //   virtual   Type ("System Folder")                                        type
 //   files and folders also: Description (user.lux.desc), Tags (user.xdg.tags),
-//   Comment (user.xdg.comment); XP shows them when set (read-only there, as
-//   XP's Details were), 4051 always, an empty one as its invitation ("Add a
-//   description", ...), and a click on one edits it (write()).
+//   Comment (user.xdg.comment, its first line); XP shows them when set
+//   (read-only there, as XP's Details were), 4051 always, an empty one as its
+//   invitation ("Add a description", ...), and a click on one edits it
+//   (write()). Color (user.lux.color): XP's line when set; the band shows it as
+//   a square after the name (Info::rows has its row), not as a line.
 //
 // XP: the name in bold above the lines; Type is the value alone, the others
 // "Label: value" (IDS_COLONSEPERATED); an empty value drops its line, as does
@@ -55,7 +57,9 @@ namespace details {
 // and its facts. The item kinds' lists name properties by id only, so
 // mappings can be added or renamed here (later from a data file: shipped
 // defaults with the user's overrides) without touching the lists.
-enum class ValueType { Text, List, Date, Size, Number };
+// Text is one line (a line break typed or pasted becomes a space) unless `multiline`; Color a name of palette();
+// Command a /bin/sh command line run on the file (run_command).
+enum class ValueType { Text, List, Date, Size, Number, Color, Command };
 struct Property {
     std::string id;                     // "tags"
     std::string label;                  // "Tags" (XP's "Label: value")
@@ -63,11 +67,12 @@ struct Property {
     std::string xattr;                  // "user.xdg.tags"; "" = derived
     bool editable = false;              // the user sets it (4051: a click on its row edits it)
     std::string invitation;             // shown while it is empty ("Add tags"), 4051 only
+    bool multiline = false;             // a Text of several lines (the comment): one row shows its first line and "..."
 };
 const std::vector<Property>& registry();                // the defaults, in code for now
 const Property* property(const std::string& id);        // null: unknown
-// The list's column of a stored property (SortBy::Description, Tags, Comment;
-// null for the derived columns), and the column of a property id (-1: none)
+// The list's column of a stored property (SortBy::Description, Tags, Comment,
+// Color; null for the derived columns), and the column of a property id (-1: none)
 const Property* column_property(SortBy col);
 int column_of(const std::string& id);
 
@@ -95,16 +100,46 @@ Read list_attrs(const std::string& path, std::vector<std::string>* names, int* e
 void read_stored(Item& it);                                          // into it.xattrs (a file-system item)
 std::vector<std::string> split_list(const std::string& text);        // "a, b;c\n" -> a, b, c (commas, semicolons, newlines)
 std::string join_list(const std::vector<std::string>& items);        // -> "a,b,c", as stored
-// The value the user typed for p on path: a list is split and joined again.
-// False with *err a sentence for a message box (the file system keeps no user
+// The value the user typed for p on path: a list is split and joined again; a
+// one-line text has its line breaks as spaces, a multi-line one its CR LF as LF;
+// a colour of the palette its lower-case name; every value trimmed. False with *err a sentence for a message box (the file system keeps no user
 // attributes, the file is not the user's or read-only, its current value could
 // not be read, ...). add_tags and remove_tag refuse the same way.
 bool write(const std::string& path, const Property& p, const std::string& text, std::string* err);
 bool add_tags(const std::string& path, const std::vector<std::string>& tags, std::string* err);   // keeping the others
 bool remove_tag(const std::string& path, const std::string& tag, std::string* err);
+// One read and one write: `add` appended (each split as typed: "a, b" is two), then `remove` taken out; the file's
+// other tags kept in their order. Nothing is written when nothing changes.
+bool change_tags(const std::string& path, const std::vector<std::string>& add, const std::vector<std::string>& remove,
+                 std::string* err);
+// The tags to offer where a tag is typed (Add Tag..., the Properties sheet): those of `paths`, then the recently used
+// ones (remember_tags), then those of the other files in the paths' folders (at most 2000 entries a folder); each once.
+std::vector<std::string> known_tags(const std::vector<std::string>& paths);
+// Tags the user just added, kept at the front of $XDG_STATE_HOME/lhde/flxp-tags (one a line, the last 100)
+void remember_tags(const std::vector<std::string>& tags);
+
+// A value on one row (the Details column, the panes, the infotip): a list as "a, b", a colour by its label ("Red"; an
+// unknown name as written), a multi-line text its first line and "..." (U+2026) when more follows.
+std::string shown(const Property& p, const std::string& value);
+std::string first_line(const std::string& text);
+
+// ---- colours (user.lux.color) ------------------------------------------------------------
+// A small named palette, stored as the lower-case name. VGA's sixteen where they have the colour (red, yellow, green, teal,
+// blue, purple, gray) and orange, pink and brown, which VGA lacks; chosen to read on white and on the task band's blue.
+struct Color { const char* name; const char* label; unsigned rgb; };   // rgb 0xRRGGBB
+const std::vector<Color>& palette();
+const Color* color(const std::string& value);           // by name, ASCII case ignored; null: none or unknown
+
+// ---- run as (user.lux.run) -----------------------------------------------------------------
+// What a file with `run` set opens with: a /bin/sh command line in which %f is the file, quoted ("python3 %f" ->
+// python3 '/a/b c.py'), %% a percent sign; without %f the quoted file is appended.
+std::string run_command(const std::string& command, const std::string& path);
+std::string run_program(const std::string& command);    // its program's name ("/usr/bin/python3 -u %f" -> "python3")
+
 // XP's infotip of a list item (defview's InfoTip lines, "Label: value" per
 // line): a file's Type, Date Modified and Size, a folder's Date Modified, then
-// Description, Tags and Comment when set (from it.xattrs, read when empty)
+// Description, Tags, Comment (its first line), Color and "Runs with: PROGRAM"
+// when set (from it.xattrs, read when empty)
 std::string infotip(const Item& it);
 
 // ---- the Filter box ------------------------------------------------------------------

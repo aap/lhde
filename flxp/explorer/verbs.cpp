@@ -217,9 +217,9 @@ static void delete_items(const std::vector<Item>& items_in)
     if (!err.empty()) error_box(err);
 }
 
-// Properties: the shell layer's sheet (shell::properties: General, Summary) on the selection's file-system items, General
-// first as XP's; General's Change... is the Explorer's Open With. What the sheet wrote refreshes the rows and the panes.
-void show_properties(const std::vector<Item>& in)
+// Properties: the shell layer's sheet (shell::properties: General, Metadata) on the selection's file-system items, General
+// first as XP's (page 1: Metadata first); General's Change... is the Explorer's Open With. What the sheet wrote refreshes the rows and the panes.
+void show_properties(const std::vector<Item>& in, int page)
 {
     std::vector<Item> items;
     for (const Item& it : in) if (is_fs(it)) items.push_back(it);
@@ -227,6 +227,7 @@ void show_properties(const std::vector<Item>& in)
     std::vector<std::string> paths;
     for (const Item& it : items) paths.push_back(it.path);
     shell::PropertiesOptions o;
+    o.page = page;
     if (items.size() == 1) {
         o.name = items[0].name;
         o.type = items[0].type;
@@ -294,15 +295,10 @@ static void add_tag(const std::vector<Item>& in)
     std::vector<std::string> have = selection_tags(items);
     a.note = "Separate several with commas. The tags the items have stay";
     a.note += have.empty() ? "." : " (" + shell::details::tag_list(shell::details::join_list(have)) + ").";
-    // the drop-down offers the tags used in the folder (the items' own first)
-    std::vector<std::string> offer = have;
-    std::string dir = shell::dir_of(items[0].path);
-    if (auto f = shell::folder_for(dir)) {
-        std::vector<Item> all;
-        f->enumerate(all, false);
-        if (all.size() <= 2000) offer = selection_tags(all);
-    }
-    a.suggestions = offer;
+    // the drop-down offers the known tags (the items' own, the recently used ones, the folder's), as the Properties sheet's
+    std::vector<std::string> paths;
+    for (const Item& it : items) paths.push_back(it.path);
+    a.suggestions = shell::details::known_tags(paths);
     a.dropdown = true;
     a.icon = item_icon(items);
     std::string text;
@@ -310,8 +306,9 @@ static void add_tag(const std::vector<Item>& in)
     if (a.icon) DestroyIcon(a.icon);
     std::vector<std::string> tags = shell::details::split_list(text);
     if (!ok || tags.empty()) return;
+    shell::details::remember_tags(tags);
+    paths.clear();
     std::string err;
-    std::vector<std::string> paths;
     for (const Item& it : items) {
         std::string e;
         if (!shell::details::add_tags(it.path, tags, &e)) { if (err.find(e) == std::string::npos) err += (err.empty() ? "" : "\n") + e; continue; }
@@ -389,6 +386,7 @@ bool run(int id)
     case ID_DELETE: delete_items(items); return true;
     case ID_RENAME: g_host->begin_rename(); return true;
     case ID_ADD_TAG: add_tag(items); return true;
+    case ID_METADATA: show_properties(items, 1); return true;
     case ID_PROPERTIES:
         if (items.empty()) g_host->background_properties();
         else show_properties(items);
@@ -534,7 +532,7 @@ void build_item_menu(HMENU m)
     AppendMenuW(m, MF_STRING, ID_DELETE, L"&Delete");
     AppendMenuW(m, MF_STRING | single, ID_RENAME, L"Rena&me");
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
-    // the stored properties (shell/details.h): tags for one or several items here, the rest in Properties' Summary page
+    // the stored properties (shell/details.h): tags for one or several items here, the rest on Properties' Metadata page
     AppendMenuW(m, MF_STRING, ID_ADD_TAG, L"Add Ta&g...");
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m, MF_STRING, ID_PROPERTIES, L"P&roperties");

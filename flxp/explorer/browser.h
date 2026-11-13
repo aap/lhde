@@ -166,6 +166,8 @@ bool wants_stored(const Browser& b);          // a stored column shown or sorted
 void column_menu(Browser& b, HWND owner, int x, int y);   // the header's menu at screen (x, y)
 void choose_details(Browser& b, HWND owner);  // XP's Choose Details dialog
 void sort_by_column(Browser& b, int index);   // a header click: that column, again the other way round
+// LVN_GETDISPINFOW: a Color subitem's image, its swatch in the list's small images now (provisional: todo_ideas/xattribs.txt)
+void subitem_image(Browser& b, NMLVDISPINFOW* di);
 void fill_list(Browser& b);            // the list from b.items (sorted), the selection after refresh
 void sort_feedback(Browser& b);        // the header's sort arrow and the tinted column
 // The filter (4074's "Filter by" box in the left pane, the header's search box): the

@@ -4,7 +4,7 @@
 # failures. Tests that need assets skip when these are absent:
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
-#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh setfattr
+#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh and runas.sh setfattr
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
@@ -35,6 +35,9 @@ result "lhdatatest ($(tail -n 1 "$T/lhdata.log"))" $? "$T/lhdata.log"
 # the Explorer's view model (shell/viewmodel.h): views, sizes, 4074's slider stops, memory
 build/tests/viewmodeltest > "$T/viewmodel.log" 2>&1
 result "viewmodeltest ($(tail -n 1 "$T/viewmodel.log"))" $? "$T/viewmodel.log"
+# a colour swatch as an icon (the Details view's Color column) through an image list
+build/tests/w32/swatchtest > "$T/swatch.log" 2>&1
+result "swatchtest ($(tail -n 1 "$T/swatch.log"))" $? "$T/swatch.log"
 # the details model (shell/details.h): XP's Details lines, 4051's band values
 build/tests/detailstest > "$T/details.log" 2>&1
 result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"
@@ -101,6 +104,9 @@ else
     result "headless/luxpad.sh$(grep -m1 '^skip' "$T/luxpad.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxpad.log"
     tests/headless/properties.sh "$3" > "$T/properties.log" 2>&1; rc=$?
     result "headless/properties.sh$(grep -m1 '^skip' "$T/properties.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/properties.log"
+    # a double click on a file with user.lux.run runs that command
+    tests/headless/runas.sh "$1" > "$T/runas.log" 2>&1; rc=$?
+    result "headless/runas.sh$(grep -m1 '^skip' "$T/runas.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/runas.log"
 fi
 
 [ $fails = 0 ] && echo "check: all passed" || echo "check: $fails failed"
