@@ -1,4 +1,4 @@
--- Longhorn notification toasts for org.freedesktop.Notifications (notify.c), after notification.xaml and the IL facts in
+-- Longhorn notification toasts for org.freedesktop.Notifications (notify.c), after notification.xaml and
 -- SHELL-DESIGN 2.4.5 (NotificationToast / NotifyWindow):
 --   FillPanel { Border#ToastBackground #FF000000 (Opacity 0 when Aero: glass);
 --     HackImage 4002 (205x60) HackNineGrid 7 > DockPanel {

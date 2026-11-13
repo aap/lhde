@@ -1,8 +1,8 @@
 -- The notification history behind the Notification History tile (tiles/notifyhistory.lua), 4074's NotificationData store
--- (GetAllNotifications; RulesEngine NotificationArrived / Revoked / Viewed, WCPClient IL). Every notification the
+-- (notifications arrive, are revoked, are viewed). Every notification the
 -- org.freedesktop.Notifications server (notify.c) receives lands here, whether or not the tile is shown, except those with the
--- `transient` hint (the spec's "bypass the history"). An app's CloseNotification revokes its entry (4074 NotificationRevoked);
--- replaces_id updates an entry in place. An entry is *viewed* (4074 _fViewed: the grey bubble 4013 instead of the yellow 4014)
+-- `transient` hint (the spec's "bypass the history"). An app's CloseNotification revokes its entry (as in 4074);
+-- replaces_id updates an entry in place. An entry is *viewed* (4074's grey bubble 4013 instead of the yellow 4014)
 -- once the user dismissed or clicked its toast, re-showed it from the history, or saw it in the history flyout; a toast that just
 -- timed out stays unviewed.
 -- Kept in ~/.local/state/lhde/luxshell-notifications, newest last, at most 100
@@ -11,7 +11,7 @@
 --   lh.notifylog.list()            entries oldest first: { key, id (this session's server id or nil), t, viewed, app, icon, summary, body }
 --   lh.notifylog.unread()          the number not viewed
 --   lh.notifylog.view(e) / view_all()   mark viewed;  lh.notifylog.clear()   "Delete All Notifications"
---   lh.notifylog.reshow(e)         the toast again (4074 Notification._Show with _fReshow), without its actions; marks it viewed
+--   lh.notifylog.reshow(e)         the toast again (as 4074 re-shows it), without its actions; marks it viewed
 -- Every change emits "notifylog".
 return function(ctx)
   local MAX = 100

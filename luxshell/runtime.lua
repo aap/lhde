@@ -1,5 +1,5 @@
 -- luxshell runtime: event bus, animation, theme pack loading, the Avalon taskbar + sidebar builders, tiles.
--- Facts (sizes, ids, triggers) come from docs/SHELL-DESIGN.md sections 2.2-2.4; comments cite them.
+-- Section numbers in the comments are docs/SHELL-DESIGN.md's.
 local lh = lh
 lh._handlers = {}
 function lh.on(ev, fn) lh._handlers[ev] = lh._handlers[ev] or {}; table.insert(lh._handlers[ev], fn) end
@@ -141,8 +141,8 @@ for _, d in ipairs{ { "desktop", "black", "0" }, { "taskbar", "autohide", "0" },
                     { "clock", "layout", "default" }, { "desktop", "max_fade_ms", "0" } } do
   if not S.has(d[1], d[2]) then S.set(d[1], d[2], d[3]) end
 end
-local SB_MIN, SB_MAX = 100, 600         -- _ValidateSize(v, 100, 150, 600) (2.4.2, L53528)
-local ROWS_MAX = 3                      -- Taskbar\RowCount 1..3 (Taskbar.Initialize, L51705)
+local SB_MIN, SB_MAX = 100, 600         -- the sidebar width: 100..600, default 150 (2.4.2)
+local ROWS_MAX = 3                      -- Taskbar\RowCount 1..3
 local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 local cfg = {
   autohide = S.flag("taskbar", "autohide", false),
@@ -183,7 +183,7 @@ local function tb_on() return cfg.taskbar == "avalon" end
 -- has the tray and the clock, _LHSHELL_CLOCK_VISIBLE = 0); its mode is kept and comes back with the Avalon taskbar. 1: the 4051
 -- layout, the sidebar yielding above the classic bar.
 cfg.with_classic = S.flag("sidebar", "with_classic", false)
--- [sidebar] locked = 1: "Lock the Sidebar" in the sidebar menu (CShellSidebar::SetLockBar, 2.4.6): no width drag on the sizer
+-- [sidebar] locked = 1: "Lock the Sidebar" in the sidebar menu (2.4.6): no width drag on the sizer
 cfg.sb_locked = S.flag("sidebar", "locked", false)
 local function sb_hidden() return cfg.taskbar == "classic" and cfg.with_classic ~= true end
 lh.sidebar_hidden = sb_hidden
@@ -241,7 +241,8 @@ local dk = nil
 if S.flag_value(os.getenv("LHSHELL_DESKTOP"), "LHSHELL_DESKTOP") ~= false then
   dk = {}
   -- opaque (24-bit): it is only ever mapped while black, and a solid window lets picom skip the full-screen blur behind it
-  -- (an ARGB one cost ~150-300 ms per composited frame during the maximise on the xrender lab). The Aurora will need ARGB again.
+  -- (an ARGB one costs ~150-300 ms per composited frame during the maximise under picom's xrender backend). The Aurora will need
+  -- ARGB.
   dk.surface = lh.surface{ name = "luxshell-desktop", type = "desktop", x = 0, y = 0, w = screen_w, h = screen_h, opaque = true }
   dk.root = N{ layout = "fill" }
   dk.black = dk.root:add(N{ kind = "rect", fill = "#000000", opacity = 0 })                        -- the maximised-mode black
@@ -250,7 +251,7 @@ if S.flag_value(os.getenv("LHSHELL_DESKTOP"), "LHSHELL_DESKTOP") ~= false then
 end
 
 ------------------------------------------------------------------ taskbar (SHELL-DESIGN 2.2)
-local sidebar_w = cfg.sidebar_w or T.sidebar.width   -- 150 (Sidebar\Width): the taskbar yields to the sidebar (CShellTaskbar::SetMixedTaskbarSidebar)
+local sidebar_w = cfg.sidebar_w or T.sidebar.width   -- 150 (Sidebar\Width): the taskbar yields to the sidebar
 -- 30 (Aero/Jade) per row: TaskList row = 30, buttons 29 high; GetTaskbarHeight = row * Taskbar\RowCount; pct: autohide visible percent
 local tb = { row_h = T.taskbar.height, rows = cfg.rows, pct = 100 }
 tb.h = tb.row_h * tb.rows
@@ -272,7 +273,7 @@ end
 -- pack key toggle = { slot = W, x = X }: the toggle's slot width and the glyph's x in it (default 29 and 5: Border 6, 4074)
 local function toggle_slot_w() return T.toggle and T.toggle.slot or 29 end
 -- pack key start_compose = { flag = id, flag_w, flag_h, text, font, color, text_pad = {l, t, r, b}, hot = id, checked = id }:
--- a Start button made of parts (4042 main's System.Windows.Desktop.StartButton: StackImageResourcePresenter { Control
+-- a Start button made of parts (4042 main's StartButton: StackImageResourcePresenter { Control
 -- StartButtonImage Dock Left, ThemeImage true size at the top left; Text StartButtonText Dock Fill "start" }), its width the
 -- flag plus the measured text; the button's own image only on hover (PointerFocused) and while the menu is open (FakePressed).
 -- Sets tb.start_w.
@@ -310,7 +311,7 @@ local function build_taskbar()          -- the node tree; the surface stays (bui
   tb.inner = body:add(N{ layout = "dock" })                                                      -- InnerTaskbar
   -- StartButton: Width 83, Height 29, Dock Left, Border(0,0,4,0) > HackBorder 1179/1180/1181
   -- StartButton.FakePressed (1181) while the start menu is open: the "checked" state
-  -- (in a canvas slot: on a taller bar of several rows it stays 29 high at the top, the first row (inferred, as XP))
+  -- (in a canvas slot: on a taller bar of several rows it stays 29 high at the top, the first row, as in XP)
   tb.start_w = T.start.w
   if T.start_compose then   -- built from parts, not one image per state: see start_composed
     tb.start_slot = tb.inner:add(N{ dock = "left", w = T.start.w, layout = "canvas" })
@@ -318,7 +319,7 @@ local function build_taskbar()          -- the node tree; the surface stays (bui
   else
   tb.start_slot = tb.inner:add(N{ dock = "left", w = T.start.w, layout = "canvas" })
   -- pack key start_dy (default 0): the whole button this many px lower, clipped at the bar bottom (the originals leave the bar's
-  -- last row below the pill; the user finds it odd). start_alpha (default 1): multiplies the three images' alpha (glass pill).
+  -- last row below the pill). start_alpha (default 1): multiplies the three images' alpha (glass pill).
   tb.start = tb.start_slot:add(N{ kind = "button", x = 0, y = T.start_dy or 0, w = T.start.w, h = T.start.h + (T.start_extend_bottom or 0), margin = {0, 0, 4, 0},
     grid = (T.start_extend_bottom or 0) > 0 and {0, 0, 1, 0} or nil, opacity = T.start_alpha or 1,
     images = { normal = R(1179), hot = R(1180), pressed = R(1181), checked = R(1181), hotchecked = R(1181) },
@@ -335,7 +336,7 @@ local function build_taskbar()          -- the node tree; the surface stays (bui
   tb.tbhost = tb.inner:add(N{ dock = "right", layout = "hbox" })
   tb.tasks = tb.inner:add(N{ dock = "fill", layout = "vbox", clip = true })                        -- TaskOverflowableCollection (rows of buttons)
   -- the height sizer: the horizontal bar's TaskbarSizer is Width 0 (Rotated); its rows change through the appbar's sizing edge
-  -- (CAvalonAppBar::_PtOnResizableEdge → SetTaskbarRowCount, 2.4.2): a 3 px SizeNS strip along the top edge, invisible
+  -- (2.4.2): a 3 px SizeNS strip along the top edge, invisible
   local edge = tb.root:add(N{ layout = "canvas" })
   tb.sizer = edge:add(N{ x = 0, y = 0, w = "100%", h = 3, hoverable = true, cursor = "sizens" })
   tb.sizer.on_press = function(self, button) if button == 1 then tb.drag_rows = tb.rows end end
@@ -447,7 +448,7 @@ local function rebuild_tasks()
   -- width rule (2.4.2): rows = the bar's rows; items per row from the count; width = min(140, w / itemsPerRow)
   local per = math.max(1, math.ceil(n / tb.rows))
   local width = math.min(T.taskbutton.max_w or 140, math.floor(avail / per))
-  -- pack key taskbutton.fill_w (4042 main, System.Windows.Desktop.TaskPresenter.OnUpdate): the buttons share the whole width,
+  -- pack key taskbutton.fill_w (4042 main): the buttons share the whole width,
   -- columns = min(items per row, max(1, floor(width / fill_w))), each width / columns (one window: one button over the bar)
   if T.taskbutton.fill_w then
     per = math.min(per, math.max(1, math.floor(avail / T.taskbutton.fill_w)))
@@ -503,12 +504,12 @@ local function build_sidebar()          -- the node tree (tiles: build_tiles); b
   sb.title = sb.main:add(N{ dock = "top", h = 17, layout = "dock" })
   sb.options = sb.title:add(N{ kind = "button", dock = "right", layout = "dock", w = 70, h = 17 })
   -- the HackImage is 9x6 in its Border (4,7,2,2) on the 17 px row: 6 high at y 7 (the bottom inset 4 keeps the docked image
-  -- from stretching to 8 rows), and 1176/1177's 10 columns go into 9 by dropping one, as both 4051-vm-now.png and
-  -- lh4074-181533.png show (nearest: exact; bilinear 34, the old stretched 9x8: 494 per pixel)
+  -- from stretching to 8 rows), and 1176/1177's 10 columns go into 9 by dropping one, as 4051 and 4074 draw it (nearest
+  -- filtering)
   sb.options_glyph = sb.options:add(N{ kind = "image", image = R(1176), w = 15, h = 17, dock = "right", margin = {4, 7, 2, 4}, filter = "nearest" })
   sb.options_text = sb.options:add(N{ kind = "text", text = "Options", color = "#ffffff", font = T.font, dock = "right", valign = "center", opacity = 0 })
   sb.options.on_hover = function(self, over) sb.options_glyph:set{ image = R(over and 1177 or 1176) }; lh.animate(sb.options_text, "opacity", over and 1 or 0, 120) end
-  sb.options.on_click = function(self, button) if button == 1 then lh._emit("sidebar-options") end end   -- SidebarControl._OnOptions: the sidebar menu
+  sb.options.on_click = function(self, button) if button == 1 then lh._emit("sidebar-options") end end   -- the sidebar menu
   sb.main:add(N{ kind = "image", image = R(1199), dock = "top", h = 2 })                             -- SidebarOptionsSeperator (1199 148x3, Height 2)
   sb.pinned = sb.main:add(N{ dock = "bottom", layout = "vbox" })                                     -- SBPinnedContentHostCollection (clock)
   sb.clocksep = sb.main:add(N{ kind = "image", image = R(1199), dock = "bottom", h = 3 })             -- SidebarClockSeperator Height 3
@@ -516,8 +517,8 @@ local function build_sidebar()          -- the node tree (tiles: build_tiles); b
   sb.add_sizer()
   sb.surface:root(sb.root)
 end
--- pack key sidebar.title = { h, image, hot, pressed, glyph, glyph_w, glyph_h, glyph_pad = {l, t, r, b} }: 4042 main's SidebarTitle
--- (System.Windows.Desktop.SidebarElement + Sidebarstylesheet_themed): a FillImageResourcePresenter band of Height 27 with
+-- pack key sidebar.title = { h, image, hot, pressed, glyph, glyph_w, glyph_h, glyph_pad = {l, t, r, b} }: 4042 main's SidebarTitle:
+-- a FillImageResourcePresenter band of Height 27 with
 -- ThemeImage(Sidebar, TITLEBACK) stretched, holding the SidebarOptions button over its whole width (no image at rest,
 -- FLYOUTOPTIONSBACK hot / pressed stretched), its text "Options" of Height 0 (never shown) and the glyph FLYOUTOPTIONSGLYPH
 -- (state 1 in every state) Dock Right, Padding 4,0,4,0, true size, centred
@@ -534,7 +535,7 @@ function sb.plex_title()
 end
 -- SidebarSizer (the Appbar's second DockPanel, over everything): TileThumb Width 2 (Aero, image 1201 Hidden: the visible edge
 -- is 1178's columns 0-1) or 6 (Slate, 1108 visible), Dock Left on the right-docked (Flipped) bar, Cursor SizeWE. Dragging it
--- sets the width live (_OnSizerDrag: width - HorizontalChange, message 1457; _ValidateSize clamps 100..600); the struts,
+-- sets the width live (width - HorizontalChange, clamped to 100..600); the struts,
 -- _NET_WORKAREA, the taskbar and the tiles follow; the width is kept in state.ini [sidebar] width on release.
 function sb.add_sizer()
   local sz = T.sidebar.sizer or { w = 2 }
@@ -548,8 +549,8 @@ build_sidebar()
 
 -- tile chrome (tile.xaml / outertile.xaml): Border(1,0,0,0) > FillPanel TileUI > DockPanel { side strip 9px (arrow 1173/1174, restore 1058, close 1061 on hover), top pad 3, right pad 6, foreground } ; 4px sizer strip 1199/1200 at the bottom.
 -- The right-docked sidebar is Flipped (Appbar.StuckPlace, 2.4.1), so TileSideAreaBack docks Right and TileForegroundPadder Left
--- (2.3.3): the arrow sits at the tile's top-right as in 4051-vm-now.png, and the foreground starts 7 px in (1 + 6), which is
--- where the 4074 Slate power tile's battery starts (lh4074-181415.png, x = 1010 on a sidebar at 1003). Foreground 133 x (h - 7).
+-- (2.3.3): the arrow sits at the tile's top-right as in 4051, and the foreground starts 7 px in (1 + 6), which is
+-- where the 4074 Slate power tile's battery starts. Foreground 133 x (h - 7).
 local plex_tile_chrome
 local function tile_chrome(tile)
   if T.tile_chrome then return plex_tile_chrome(tile) end
@@ -578,10 +579,10 @@ local function tile_chrome(tile)
 end
 
 -- pack key tile_chrome = { sizer, sizer_hot, sizer_h, sizer_grid, back, side_w, side, side_hot, side_pressed, fade_in, fade_out }:
--- 4042 main's tile (Application1.Tile, System.Windows.Desktop.Tile/OuterTile, Sidebarstylesheet_themed): TileBackgroundImage =
+-- 4042 main's tile (Tile / OuterTile): TileBackgroundImage =
 -- ThemeImage(Sidebar, TILEBACK) stretched under everything; the content over the whole tile; TileFadeButton Width 16, Dock Right on
 -- the Flipped bar, its FillAlphaPresenter opacity animated to 1 in 300 ms when the pointer is within the tile and back to 0 in
--- 500 ms (Tile._OnPropertyChanged, PointerFocusWithinWorkaround), holding TileSideButton = TILEHEADERBACK normal / hot, pressed
+-- 500 ms, holding TileSideButton = TILEHEADERBACK normal / hot, pressed
 -- TILECHEVRONBACK pressed (the tile menu); restore / close are 0x0 except for RMA tiles (none here); OuterTile's TileSizer
 -- TileThumb Height 7, Dock Bottom, TILESIZER normal (NineGridMargin 1,0,0,0) / hot. No top or side padding: a tile's own
 -- content keeps clear of the strip (tile:fgw() = width - 16).
@@ -630,7 +631,7 @@ function sb.tile_rect(tile) local x, y, w, h = tile.node:bounds(); return sb.geo
 -- The desktop layer switches at once both ways: on = the X window background is set to opaque
 -- black before the map, so the server paints it black in the same request stream as the map (no transparent first frame,
 -- no fade), off = unmapped at once. A 400 ms fade of a full-screen surface comes late: every frame re-composites and
--- re-blurs the whole screen in picom (xrender), ~230 ms per frame on the lab.
+-- re-blurs the whole screen in picom (xrender), ~230 ms per frame.
 function lh.set_maximized(on)
   if on == black_on then return end
   black_on = on
@@ -645,7 +646,7 @@ function lh.set_maximized(on)
   -- sets the value at once); otherwise SetMaximizedWindow's fade (400 ms in 4074)
   lh.animate(tb.black, "opacity", on and 1 or 0, cfg.max_fade_ms); lh.animate(sb.black, "opacity", on and 1 or 0, cfg.max_fade_ms)
 end
--- the native trigger is the foreground window being maximised (CTray::HandleFullScreenApp / _FindRudeApp): the active
+-- the native trigger is the foreground window being maximised: the active
 -- window when there is one, otherwise any visible window on the current desktop. luxwm computes exactly this and publishes
 -- it as _LHWM_MAXIMIZED_MODE (so its square-cornered frames and these layers switch together); the EWMH rule below is the
 -- fallback under another WM (single monitor; _NET_WM_STATE_MAXIMIZED_VERT+HORZ while a window fills the work area)
@@ -701,7 +702,7 @@ end
 local function pinned_names() return T.pinned_tiles or { "notifications", "clock" } end
 -- the tile list: state.ini [sidebar] tiles (written by Move Up / Move Down, Remove ... Tile and the sidebar menu's parts list;
 -- "none" = empty) as long as [sidebar] tiles_base still names the pack's own list it was made from (another pack, or the pack's
--- list edited, falls back to the pack's); an old state.ini without tiles_base: when it names the same tiles as the pack's
+-- list edited, falls back to the pack's); a state.ini without tiles_base: when it names the same tiles as the pack's
 local function tile_names()
   local own = S.state_get("sidebar", "tiles")
   local base = T.tiles or { "clock" }
@@ -733,7 +734,7 @@ local function build_tiles()
   end
 end
 tb.tile_list = {}
--- clock coordination (_ToggleClock, COMPOSITION.md 11): root _LHSHELL_CLOCK_VISIBLE (CARDINAL) = 1 while a clock tile of ours
+-- clock coordination: root _LHSHELL_CLOCK_VISIBLE (CARDINAL) = 1 while a clock tile of ours
 -- is on screen (the sidebar's, or the minimized sidebar's compact clock in the Avalon taskbar), else 0; the classic taskbar hides
 -- its own clock while it is 1. Deleted on exit (luxshell.c).
 local clock_vis
@@ -788,7 +789,7 @@ end
 -- _NET_WM_ICON_GEOMETRY keeps reporting the buttons where they are when the bar is shown (icon_offset).
 -- another dock's bottom strut over these columns (the classic flxp-taskbar runs the full width at the bottom; 4051 layout:
 -- the sidebar sits above it). Our own surfaces are not counted (lh.struts skips them), so in the avalon mode this is 0 and the
--- Avalon taskbar keeps yielding to the sidebar as before. [sidebar] yield_bottom = 0 turns it off.
+-- Avalon taskbar yields to the sidebar. [sidebar] yield_bottom = 0 turns it off.
 local function foreign_bottom(x0, x1)
   if not S.flag("sidebar", "yield_bottom", true) then return 0 end
   local b = 0
@@ -990,17 +991,15 @@ local function move_tile(t, dir)
 end
 
 ------------------------------------------------------------------ sidebar and tile context menus (Avalon ContextMenu, menu.lua "avalon")
--- Sources: lh4074-091929.png (the 4074 sidebar menu: "Minimize bar", "Properties", the parts list with checks, the transient
--- parts, "Clock") and the IL (res/4074/il/desktop.il): SidebarBaseMenu2.GetBaseContextMenu L17037 ("Minimize bar" / "Restore
--- bar" = ToggleMinimized, "Properties" = message 1379, the Taskbar and Start Menu Properties dialog, lh4074-091944.png),
--- SidebarControl.GetContextMenu L37721 (base items, separator, GetAddPartsMenu: Friendly Names, " (Multi-Instance)", then the
--- transient parts with " (Transient)", separator, "Clock" checked while the clock tile is shown), SidebarControl._OnOptions
--- L38583 (the Options button opens the same menu under itself), OuterTile._GetContextMenu L44524 (the tile's own items from
--- FireContextMenuEvent first, then "Auto Size" (checked), "Move Up" (disabled on the first tile), "Move Down" (disabled on the
--- last), "<Friendly Name> Tile Properties" when the tile has a property page, "Remove <Friendly Name> Tile" unless pinned).
+-- 4074's sidebar menu: the base items ("Minimize bar" / "Restore bar" = ToggleMinimized, "Properties" = message 1379, the
+-- Taskbar and Start Menu Properties dialog), separator, the parts list (Friendly Names with checks, " (Multi-Instance)", then
+-- the transient parts with " (Transient)"), separator, "Clock" checked while the clock tile is shown. The Options button opens
+-- the same menu under itself. A tile's menu: the tile's own items first, then "Auto Size" (checked), "Move Up" (disabled on the
+-- first tile), "Move Down" (disabled on the last), "<Friendly Name> Tile Properties" when the tile has a property page,
+-- "Remove <Friendly Name> Tile" unless pinned.
 -- Our additions, in their own group: "Lock the Sidebar" ([sidebar] locked) and "Stacking" ([sidebar] stacking).
 -- Mnemonics are ours (the 4074 Avalon menus draw none); "&" marks them (menu.lua).
--- The 4074 module list as the screenshot shows it; `id` = the tiles/<id>.lua that implements it, the others are greyed.
+-- The 4074 module list; `id` = the tiles/<id>.lua that implements it, the others are greyed.
 local PARTS = {
   { "Basket" }, { "Classic Tray", id = "notifications" }, { "Contacts" }, { "News Feed" }, { "Notification History", id = "notifyhistory" },
   { "People nearby" }, { "Quick Launch", id = "quicklaunch" }, { "Search" }, { "Slide Show" }, { "Sync" },
@@ -1057,13 +1056,13 @@ local function sidebar_menu_items()
   part({ "Clock", id = "clock" })
   return items
 end
--- x, y: the click (root coordinates); the menu flips left/up where it does not fit (TrackPopupMenu, as lh4074-091929.png)
+-- x, y: the click (root coordinates); the menu flips left/up where it does not fit (as TrackPopupMenu)
 local function sidebar_menu(x, y)
   lh.close_flyout()
   lh.menu.open(sidebar_menu_items(), x, y, { style = "avalon", grab = true, flip = true })
 end
 lh.sidebar_menu = sidebar_menu
--- the Options button (SidebarControl._OnOptions: PlacementTarget = the button, the default Bottom placement): under the button,
+-- the Options button (PlacementTarget = the button, the default Bottom placement): under the button,
 -- right-aligned with the bar's right edge
 lh.on("sidebar-options", function()
   if lh.menu.is_open() then lh.menu.close() return end
@@ -1079,7 +1078,7 @@ local function tile_index(t)   -- position among the visible tiles of its host (
 end
 local function tile_menu(t, x, y)
   local items = {}
-  if t.menu then for _, it in ipairs(t:menu()) do table.insert(items, it) end end   -- FireContextMenuEvent: the tile's own first
+  if t.menu then for _, it in ipairs(t:menu()) do table.insert(items, it) end end   -- the tile's own items first
   if #items > 0 then table.insert(items, { separator = true }) end
   local i, n = tile_index(t)
   local movable = mode == "full" and not t.pinned
@@ -1116,7 +1115,7 @@ end)
 -- the pinned block follows its tiles' heights (the tray tile grows by rows, 400 ms)
 lh.on("tray", function() if mode == "pinned" then lh.timer(function() if mode == "pinned" and not sb.anim then local x, y, w, h, dock, strut = sb_target("pinned"); sb.surface.strut = strut; animate_sidebar({ x, y, w, h }) end end, 450) end
   if mode == "minimized" then lh.timer(rebuild_tasks, 0) end end)
--- TaskbarToggleBar (_ToggleSidebar, 2.4.2): full/pinned ⇄ minimized
+-- TaskbarToggleBar (2.4.2): full/pinned ⇄ minimized
 lh.on("toggle-sidebar", function() if mode == "minimized" then set_mode(cfg.last_mode or "full") else set_mode("minimized") end end)
 
 function lh.shell_get(k)
@@ -1142,11 +1141,9 @@ function lh.shell_set(k, v)
   end
 end
 
--- the Avalon taskbar's context menu (right click on its empty part). ExtendedTaskbar.GetContextMenu (desktop.il L23627): the
--- sidebar's base items ("Minimize bar"/"Restore bar", "Properties"), separator, "Task Manager", separator, "Show Desktop" /
--- "Hide Desktop" (_fDesktopVisible), "Cascade", "Tile Vertically", "Tile Horizontally" (enabled with windows open). No screenshot
--- of it exists; the wording is the IL's. 4074 passes constants to the base items, so its taskbar always said "Restore bar";
--- ours follows the sidebar's state. Then luxshell's own group: autohide and the sidebar mode.
+-- the Avalon taskbar's context menu (right click on its empty part), 4074's: the sidebar's base items ("Minimize bar"/"Restore
+-- bar", "Properties"), separator, "Task Manager", separator, "Show Desktop" / "Hide Desktop", "Cascade", "Tile Vertically",
+-- "Tile Horizontally" (enabled with windows open). 4074's taskbar always says "Restore bar"; ours follows the sidebar's state. Then luxshell's own group: autohide and the sidebar mode.
 local function work_rect()   -- the area the windows get (our struts; another dock's bottom strut in the classic mode)
   local r = screen_w
   if not sb_hidden() and mode ~= "minimized" and not cfg.sb_bottom and sb.geo then r = sb.geo.x end
@@ -1287,7 +1284,7 @@ local function classic_start()
   if classic.pid and pid_is(classic.pid, classic.name or name) then return end
   local running = flxp_pids(false, name)
   if #running > 0 then classic.pid, classic.name = running[1], name; io.stderr:write("luxshell: taskbar: " .. name .. " already runs (" .. running[1] .. ")\n") return end
-  -- hand the tray over before it starts (a takeover races: icons answering its MANAGER while we still hand them back were lost
+  -- hand the tray over before it starts (a takeover races: icons answering its MANAGER while we still hand them back are lost
   -- by flxp-taskbar's ReparentNotify handling); our tile stays hidden while it starts and claims again if nobody took the tray
   if lh.tray_yield then lh.tray_yield(10000) end
   local env = { FLXP_TRAY_TAKEOVER = "1", FLXP_START_KEY = "1" }
@@ -1355,8 +1352,8 @@ end
 -- and the taskbar's width change in this one callback, painted in the same pass; windows are not moved (luxwm refits maximised
 -- ones to the new work area as for any strut change). A running mode animation is finished at once. The order keeps every
 -- in-between state the compositor might catch invisible: to bottom the taskbar first runs the full width (under the sidebar's
--- corner), to top the sidebar first runs the full height (under the taskbar); the restack comes last. (A server grab around
--- it was tried: on the xrender lab it froze picom halfway through a repaint, which showed for ~180 ms.)
+-- corner), to top the sidebar first runs the full height (under the taskbar); the restack comes last. No server grab around
+-- it: picom (xrender) would freeze halfway through a repaint, which shows for ~180 ms.
 -- switch the virtual desktop through the WM (EWMH _NET_CURRENT_DESKTOP request): a 0-based index, "next" or "prev" (wrapping
 -- at _NET_NUMBER_OF_DESKTOPS); for _LHSHELL_COMMAND "desktop ..." and a future sidebar tile
 function lh.switch_desktop(v)
@@ -1645,7 +1642,7 @@ lh.on("command", function()
   if not c or c == "" then return end
   local verb, arg = c:match("^%s*(%S+)%s+(%S+)%s*$")
   if c:match("^%s*run%s*$") then lh.run_box("run") return end          -- Super+r (luxwm "shell run"): luxshell's own Run box
-  if c:match("^%s*reload%s*$") then lh.reload_pack("_LHSHELL_COMMAND reload") return end   -- x11/theme-reload.sh: re-read the pack
+  if c:match("^%s*reload%s*$") then lh.reload_pack("_LHSHELL_COMMAND reload") return end   -- session/theme-reload.sh: re-read the pack
   if verb == "taskbar" then lh.set_taskbar(arg) return end            -- _LHSHELL_COMMAND "taskbar avalon|classic|none"
   if c:match("^%s*settings%s*$") then lh.settings_flyout() return end   -- the settings flyout (e.g. with the classic bar, which has no way to it)
   if verb == "sidebar-stacking" then lh.set_sidebar_stacking(arg) return end   -- Win+S (luxwm "shell sidebar-stacking toggle"): top | bottom | toggle

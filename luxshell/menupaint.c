@@ -30,9 +30,9 @@
 #include <lhde/data.h>
 
 #define MAXITEMS 64
-#define SHADOW 4   /* XP's menu drop shadow, right and bottom (luxwm/menu.c SHADOW: measured on the 4074 Slate window menu) */
+#define SHADOW 4   /* XP's menu drop shadow, right and bottom (luxwm/menu.c SHADOW, the 4074 Slate window menu's) */
 
-/* the drop shadow right of and below the W x H menu, alpha per pixel: luxwm/menu.c shadow_alpha, the same 4074 Slate measurement
+/* the drop shadow right of and below the W x H menu, alpha per pixel, as luxwm/menu.c shadow_alpha: 4074 Slate's
    (0.44 0.33 0.17 0.055 outwards, starting 5 px in from the far corner with a 4 px ramp) */
 static double shadow_alpha(int x, int y, int W, int H) {
     static const double p[5] = { 0, 0.44, 0.33, 0.17, 0.055 }, q[5] = { 0.12, 0.33, 0.65, 0.88, 1 };

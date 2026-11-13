@@ -1,13 +1,13 @@
--- Clock tile: analogclock.xaml + the clocksidebar*.xaml views (SHELL-DESIGN 2.3.4, "Clock tile modes" in the M6 status).
+-- Clock tile: analogclock.xaml + the clocksidebar*.xaml views (SHELL-DESIGN 2.3.4).
 --   state.ini [clock] pinned = 1 (4074: SBPinnedContentHostCollection at the bottom of the bar) | 0 (4051: a normal tile at
---             its place in the tile list, 4051-vm-now.png: ~96 px face, "6:37 AM, Oct 23" under it, tile 160 high)
+--             its place in the tile list: ~96 px face, "6:37 AM, Oct 23" under it, tile 160 high)
 --             [clock] layout = default | digtime | digtimemonthday | digtimeweekday | minical | cal ("Clock layout" in the
 --             tile's context menu; the 4074 property sheet clockfacessheet.xaml lists the same views)
--- Analog face: 4074's AnalogClockPanel (WCPClient SidebarClockSettings, ~/fun/longhorn/sidebar/CLOCK.md 1.1): seven image layers
+-- Analog face: 4074's AnalogClockPanel: seven image layers
 -- at design size 260, each rotated about its LayerOrigin: face 1074 (129.5,129.5), hour 1077 4x95 (1.5,75.5), minute 1078 4x125
 -- (1.5,105.5), anchor 1083 12x12 (5.5,5.5), second 1079 8x128 (3.5,98.5), glass 1076 (129.5,129.5); one 1 s timer, angles from
 -- whole seconds (the second hand ticks). The face set follows the theme's visual style (tile:face_set): slate* the light grey
--- set, jade* and aero* the dark-blue set 1188-1198 of 4074-dwm.png (its pivots are estimates, see "Corrections"), plex* the
+-- set, jade* and aero* the dark-blue set 1188-1198 of 4074's DWM (its hand pivots are estimates), plex* the
 -- Plex-era light set, anything else the light set; pack key clock_face = "dwm" | "light" | "plex" overrides.
 -- Text styles (clockresources.xaml): DigitalText Tahoma 8 white with ShadowText (black copy at 1,1); DigitalTime = "h:mm"
 -- #D8E4FF + "tt" #9EB5BB (Margin 2,0), bold where the view says FontWeight Bold; MiniCalendar: Border 1 #D3D3D3 { day
@@ -50,7 +50,7 @@ local FIRST_DAY = (function()
   return (w0 + fw - 1) % 7
 end)()
 local FMT = {
-  default = function() return short_time() .. ", " .. month_day() end,  -- "*LongTime": 4074 "5:57 AM, Oct 23" (lh4074-181541.png)
+  default = function() return short_time() .. ", " .. month_day() end,  -- "*LongTime": 4074 "5:57 AM, Oct 23"
   hm = function() return nozero(os.date("%I:%M")) end,                    -- XShortTime "h:mm"
   tt = function() return os.date("%p") end,                                -- XAMPM "tt"
   monthday = function() return os.date("%B %d") end,                       -- "*MonthDay" = en-US MonthDayPattern "MMMM dd"
@@ -72,7 +72,7 @@ function tile:face_set()
   if fam == "plex" then return "plex" end
   return "light"
 end
--- Plex: the Plex builds' clock is the light layered clock of 4042-4053 (CLOCK.md 3: the 260 px set 1074 face, 1076 glass,
+-- Plex: the Plex builds' clock is the light layered clock of 4042-4053 (the 260 px set 1074 face, 1076 glass,
 -- 1077/1078/1079 hands, 1083 hub on the same LayerOrigins, byte-identical in 4051; 4029/4039 had a 179 px set with full-size
 -- hand layers and the blue hover face 1075 instead, which this layer code does not draw). A Plex theme takes those ids from
 -- packs/4042/imageres (imageres.dll of build 4042, an lhde-import imageres recipe for 4042) when they are imported, else from
@@ -97,7 +97,7 @@ function tile:analog(parent, size, x, y)
   local set = self:face_set()
   local plex = set == "plex"
   if set == "dwm" then
-    -- the DWM's dark-blue set (4074-dwm.png); hand pivots estimated from that shot (tail ~22 design px, second hand ~35)
+    -- the DWM's dark-blue set; hand pivots estimated (tail ~22 design px, second hand ~35)
     clock:add(N{ kind = "image", image = R(1190), x = c - 263 * s / 2, y = c - 263 * s / 2, w = 263 * s, h = 263 * s })
     local hs, ms, ss = layer(1194, 12, 103, 93, 3), layer(1196, 12, 133, 123, 3), layer(1198, 15, 136, 124, 3)
     hands.hour, hands.minute, hands.second = layer(1193, 11, 122, 100), layer(1195, 11, 151, 129), layer(1197, 11, 163, 128)
@@ -155,25 +155,20 @@ function tile:digital_time(parent, x, y, bold)
   return w1 + 2 + w2
 end
 
--- 4042 main (pack key clock_layers = "full"; Microsoft.Windows.Client 6.0.3708 of 4042 main, System.Windows.Desktop.SideBarClock,
--- BaseSidebarClockSettings, ClockImageResourcePresenter, DigitalDateTimePresenter, System.Windows.Explorer ImageResource.Draw),
--- checked against the 4042 main desktop screenshots/4042mainwmptile.png (1024x768, sidebar at x 874):
---  * the clock is the tile's Background (Initialize: set_Background(SidebarPanel())), the whole tile width under the 16 px side
---    strip; SidebarPanel = BuildClockPanel(analog | digital time): a DockPanel, Padding 2,2,2,2 (PanelInfo 2,2,2,2) { DigitalClockTime
---    Dock Bottom, Width 100%, Height = DigitalFont measured on "A..Z0..9"; ClockElement Fill };
---  * AutoSize tile (Administrator TileInfo: fAutoSize 1): the analog part asks for its layers' own size, 179 (the 4029 set
---    1074/1076-1079 in 4042 main's imageres; BelowHandsLayers [1074], AboveHandsLayers [1076], no hub);
---  * face and glass: ImageResource SizingMode 2 = true size centred, shrunk uniformly when the panel is smaller; the hands:
---    scale = min(1, w / 179, h / 179) with the image point (89, 86) on the panel centre (the hands meet 3 px above the face's
---    centre in the shot too); so face = min(W - 4, 179) for a panel W wide, never magnified, panel height 179;
---  * the shot: face 141 px opaque (image 175 of 179 at 144/179) centred at x 74 of the 150 px bar: the panel is 148 wide (one
---    pixel kept free on each side of the tile, not in the code we read); clock tile 117..331 + sizer 332..338: 2 + 179 + 32 + 2,
---    the text box 32 for Arial 20 pt (26.7 px; our line box 30), its caps 3 rows under the box top;
---  * the time: DigitalFont Arial 20 (points: the shot's caps are 20 px) white over a black copy at +1,+1 (opaque black in the shot,
---    AltOpacity 0.65 in the code); the shot shows the short time "8:15 PM" starting 21 px into the bar: OnRender measures with
---    System.Drawing (advance + 1/6 em each side), centres that box (HorizontalAlignment Left in the element, so the centring is
---    the presenter's) and draws ShortString at its left. The code reads as LongString first when it fits: the shot wins (it
---    shows no seconds). ClockFace hover: 1075 (Sidebarstylesheet_themed).
+-- 4042 main (pack key clock_layers = "full"):
+--  * the clock is the tile's background, the whole tile width under the 16 px side strip: a DockPanel, Padding 2,2,2,2
+--    { DigitalClockTime Dock Bottom, Width 100%, Height = DigitalFont measured on "A..Z0..9"; ClockElement Fill };
+--  * an AutoSize tile: the analog part asks for its layers' own size, 179 (the 4029 set 1074/1076-1079 in 4042 main's
+--    imageres; below the hands 1074, above them 1076, no hub);
+--  * face and glass: true size centred, shrunk uniformly when the panel is smaller; the hands: scale = min(1, w / 179,
+--    h / 179) with the image point (89, 86) on the panel centre (the hands meet 3 px above the face's centre); so face =
+--    min(W - 4, 179) for a panel W wide, never magnified, panel height 179;
+--  * on a 150 px bar the face is 141 px opaque (image 175 of 179 at 144/179) centred at x 74: the panel is 148 wide (one
+--    pixel kept free on each side of the tile); the tile is 2 + 179 + 32 + 2 plus the sizer, the text box 32 for Arial 20 pt
+--    (26.7 px; our line box 30), its caps 3 rows under the box top;
+--  * the time: DigitalFont Arial 20 white over an opaque black copy at +1,+1, the short time ("8:15 PM", no seconds), its
+--    measure (advance + 1/6 em each side) centred and the string drawn at that box's left: "8:15 PM" starts 21 px into the
+--    bar. ClockFace hover: 1075.
 local ARIAL = "Arial 20"
 local function hm() return nozero(os.date("%I:%M %p")) end
 function tile:clock4042(fg, Wt)
@@ -181,8 +176,8 @@ function tile:clock4042(fg, Wt)
   local function P(id) return plex_image(R, id) end
   local em = 20 * 96 / 72
   local _, lh_ = measure("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", ARIAL)
-  local th = math.ceil(lh_) + 2                     -- 32 for Arial 20 pt: the shot's text box (tile 117..333, sizer from 332)
-  local x0 = 1 + 2                                  -- the tile's 1 px inset (shot) + the panel padding
+  local th = math.ceil(lh_) + 2                     -- 32 for Arial 20 pt
+  local x0 = 1 + 2                                  -- the tile's 1 px inset + the panel padding
   local aw, ah = Wt - 2 - 4, 179
   local cx, cy = x0 + aw / 2, 2 + ah / 2
   local fs = math.min(1, aw / 179, ah / 179)
@@ -199,8 +194,8 @@ function tile:clock4042(fg, Wt)
   local gs = math.min(1, aw / 175, ah / 175)
   fg:add(N{ kind = "image", image = P(1076), x = cx - 175 * gs / 2, y = cy - 175 * gs / 2, w = 175 * gs, h = 175 * gs })
   table.insert(self.analogs, hands)
-  -- the presenter centres the System.Drawing measure (advance + 1/6 em on each side) and draws the string at that box's left:
-  -- the shot's "8:15 PM" starts 21 px into the bar; one row up from our line box (the shot's caps 3 rows under the box top)
+  -- the measure (advance + 1/6 em on each side) centred, the string drawn at that box's left; one row up from our line box
+  -- (4042's caps are 3 rows under the box top)
   local function place(v) return x0 + math.floor((aw - (measure(v, ARIAL) + em / 3)) / 2) end
   local t = fg:add(N{ kind = "text", text = hm(), font = ARIAL, color = "#ffffff",
     x = place(hm()), y = 2 + ah - 1, w = aw, h = th, shadow = { dx = 1, dy = 1, color = "#ff000000" } })
@@ -214,17 +209,16 @@ local views = {}
 function views.default(self, fg, W)
   if not self.pinned and self.T.clock_layers == "full" then return self:clock4042(fg, self.sb and self.sb.w or 150) end
   if not self.pinned then
-    -- 4051, the tile sized by its content (WCPClient 4051, res-clock/il/wcpclient-4051-clock.il.txt):
-    --  * SideBarClock.SidebarPanel: DockPanel Margin 0,6,0,6 { DigitalClockTime Dock Bottom, Height = DigitalFont (Tahoma 10)
-    --    measured on "A..Z0..9"; AnalogClockPanel Fill, PanelMargin = ClockSidebarMargin 16,0, Bias 0,0 };
-    --  * AnalogClockPanel.MeasureCore: with no height limit (the tile measures its content at infinite height) the panel is
-    --    square by the width, MaxHeight = ClockSize 260 (BuildClock): panel height = min(W, 260);
-    --  * RotatedPanel.XForm (every layer): scale = min((w - 2 x 16) / 260, h / 260, 1), centred in the panel:
-    --    face = min(W - 32, 260), so it grows with the bar width up to the native 260.
-    -- Checked on the shots: 150 px bar (W 134): face 102 (grey edge 98 px, 4051-vm-now.png, lh4051-194203.png); 410 px bar
-    -- (W 393): face 260 (grey 252, x 821..1071 centred on the foreground, lh4051-163648.png). Rows on both: the panel starts
-    -- one row under the tile's top (the 6 px top margin does not show), the time glyphs 6 rows under it, the tile ends 3 rows
-    -- under the time line + the sizer: tile height = panel + 24 (158 and 284 rows, as measured).
+    -- 4051, the tile sized by its content:
+    --  * a DockPanel Margin 0,6,0,6 { DigitalClockTime Dock Bottom, Height = DigitalFont (Tahoma 10) measured on
+    --    "A..Z0..9"; AnalogClockPanel Fill, PanelMargin 16,0 };
+    --  * with no height limit (the tile measures its content at infinite height) the panel is square by the width, at most
+    --    260: panel height = min(W, 260);
+    --  * every layer: scale = min((w - 2 x 16) / 260, h / 260, 1), centred in the panel: face = min(W - 32, 260), so it
+    --    grows with the bar width up to the native 260.
+    -- A 150 px bar (W 134) has face 102 (grey edge 98 px); a 410 px bar (W 393) face 260 (grey 252, centred on the
+    -- foreground). The panel starts one row under the tile's top (the 6 px top margin does not show), the time glyphs 6 rows
+    -- under it, the tile ends 3 rows under the time line + the sizer: tile height = panel + 24 (158 and 284 rows).
     local ph = math.min(W, 260)
     local size = math.max(32, math.min(W - 32, 260))   -- MinHeight 32
     local py = -2
@@ -234,10 +228,9 @@ function views.default(self, fg, W)
     table.insert(self.texts, { node = t, fmt = FMT.default })
     return ph + 24
   end
-  -- clocksidebardefault.xaml: Border 0,2 { 80x80 AnalogClock centred; CenteredDigitalText "*LongTime" }. lh4074-181541.png:
-  -- separator 1199 at y 759..761, face y 765..844, text glyphs 847..854, screen bottom 864: the pinned host is 102 high and
-  -- has the face 3 rows under its top (one row above our tile chrome's foreground); face x 1041..1120 on the 150 px bar at 1002:
-  -- the host has no 9 px side strip, so face and text are centred over the foreground and that strip
+  -- clocksidebardefault.xaml: Border 0,2 { 80x80 AnalogClock centred; CenteredDigitalText "*LongTime" }. In 4074 the pinned
+  -- host is 102 high and has the face 3 rows under its top (one row above our tile chrome's foreground); the host has no 9 px
+  -- side strip, so face and text are centred over the foreground and that strip
   local HW = W + 9
   self:analog(fg, 80, math.ceil((HW - 80) / 2), -1)
   local t = fg:add(N{ kind = "text", text = FMT.default(), font = F, color = "#ffffff", align = "center", x = 0, y = 79, w = HW, h = 16, shadow = SHADOW })
@@ -245,7 +238,7 @@ function views.default(self, fg, W)
   return 102
 end
 -- digtime*: Border 0,4 { Grid [AnalogClock (Auto, centred vertically)] [5] [lines (Auto, centred vertically)] }, left-aligned.
--- The AnalogClockPanel has no size in these views; 56 px (40 next to the long weekday/date lines) is our choice (inferred).
+-- The AnalogClockPanel has no size in these views; 56 px (40 next to the long weekday/date lines) is our choice.
 local function digtime(lines, size)
   return function(self, fg, W)
     local n = #lines + 1
@@ -430,16 +423,16 @@ function tile:taskbar(host)
   tick(); self.timer = lh.timer(tick, 1000, true)
 end
 
------------------------------------------------------------------- the calendar flyout (4074 clockflyout.xaml, CLOCK.md 2)
+------------------------------------------------------------------ the calendar flyout (4074 clockflyout.xaml)
 -- A click on the tile (or its arrow) opens it, a second click on the tile, Escape or a click outside closes it (4074's Popup
--- CloseMode 2: it went away with the focus). tile.stay_open = true keeps it open until a click on the tile (flyout.lua: no grab, so no Escape either).
+-- CloseMode 2: it goes away with the focus). tile.stay_open = true keeps it open until a click on the tile (flyout.lua: no grab, so no Escape either).
 tile.stay_open = false
 -- Generic chrome (flyout.lua: 1175 nine-grid 53,3,3,3 at 70 % black on the ARGB popup, Slate 1109; the 17 px Options row; border
 -- 8,4,8,8 / Slate 4,0,4,4) around MainPanel: TimePanel 270 wide + the CalendarElement with margin 0,0,4,4. Content 493 x 303
--- gives Slate's 501x324 (lh4074-181636.png); Jade/Aero measures 510x336 (lh4074-181714.png x 634..1143, y 523..858) with the
--- calendar panel at the same content offset, so the Aero content is 4 rows taller here (one column short, kept at 493).
+-- gives Slate's 501x324; 4074's Jade/Aero flyout is 510x336 with the calendar panel at the same content offset, so the Aero
+-- content is 4 rows taller here (one column short, kept at 493).
 local FLY = { w = 493, h = 303, h_aero = 307, col = 270, face = 260 }
--- CalendarElement (basecalendarelement.xaml, IL74 ShowMonth), measured on lh4074-181714.png in panel coordinates: panel 1080
+-- CalendarElement (basecalendarelement.xaml), in panel coordinates: panel 1080
 -- 219x294 nine-grid 11; photo 1115 + month - 1 UniformToFill, 114 high, clipped to the frame's inside (rows 1..113, columns
 -- 1..217); 5 px; CalPanel 25 high (month title centred, Prev/Next 25x25 12 px in); the grid (margin 15,0,16,18, CellSpacing 5
 -- around the cells too: first column at 20) with every cell as wide as the widest entry + CalendarWideDataDelta 5. Glyph tops:
@@ -484,7 +477,7 @@ function tile:show_month(y, m)
   local hw, dw = 0, 0
   for _, s in ipairs(names) do hw = math.max(hw, (measure(s, CF.day))) end
   for _, c in ipairs(cells) do if c.text ~= "" then dw = math.max(dw, (measure(c.text, CF.today))) end end
-  -- Avalon measured 8 pt as 10.67 px with the font's unhinted advances ("Wed" 21.12 = the 26.12 column pitch of the shot); GDI's
+  -- Avalon lays 8 pt out as 10.67 px with the font's unhinted advances ("Wed" 21.12 = a 26.12 column pitch); GDI's
   -- hinted 11 px widths scaled by 32/33 come within a pixel of that over the seven columns
   hw, dw = hw * 32 / 33, dw * 32 / 33
   local cw = math.max(hw, dw) + (hw < dw and CAL.delta or 0)
@@ -515,15 +508,14 @@ function tile:flyout()
   local slate = self.T.family == "slate"
   local H = slate and FLY.h or FLY.h_aero
   local root = N{ layout = "canvas", w = FLY.w, h = H }
-  -- TimePanel: the 260 PolarCanvas with the AnalogClock at its full 260 (lh4074-181714.png: the face's grey 646..898 x 548..800,
-  -- centred on content 130,130, as the 260 px render of the layer stack)
+  -- TimePanel: the 260 PolarCanvas with the AnalogClock at its full 260, centred on content 130,130
   self.fly = { analogs = {}, texts = {} }
   local save_a, save_t = self.analogs, self.texts
   self.analogs, self.texts = self.fly.analogs, self.fly.texts
   local fs = FLY.face
-  self:analog(root, fs, 131 - fs / 2, 131 - fs / 2)   -- the shot has the face's centre one pixel right of and below 130,130
+  self:analog(root, fs, 131 - fs / 2, 131 - fs / 2)   -- 4074 has the face's centre one pixel right of and below 130,130
   -- FlyoutDigitalTime: CenteredDigitalTime at Tahoma 18 pt, normal weight: "h:mm" #D8E4FF + "tt" #9EB5BB 2 px apart, centred in the
-  -- 270 column, glyph tops at 269 (lh4074-181714.png: "5:59 AM" x 94..172, y 269..285)
+  -- 270 column, glyph tops at 269
   local tw = math.ceil(measure(FMT.hm(), CF.time) + 2 + measure(FMT.tt(), CF.time))
   local tx, ty = math.floor((FLY.col - tw) / 2), 269 - ASC[18]
   local hm, w1 = stext(root, FMT.hm(), CF.time, "#ffd8e4ff", tx, ty)
@@ -571,7 +563,7 @@ function tile:flyout()
   return root, FLY.w, H
 end
 -- 4074 places it at the tile's top, clamped to the screen bottom with 5 rows free, its right edge 9 px short of the screen
--- edge: over the bar and the pinned clock itself (lh4074-181636.png x 642..1142, y 535..858 on 1152x864)
+-- edge: over the bar and the pinned clock itself
 function tile:place(fw, fh)
   local sw, sh = lh.screen()
   local _, ty = self.sb.tile_rect(self)

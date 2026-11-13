@@ -739,7 +739,7 @@ void emit(const char *ev, int nargs) {
     /* calls lh._emit(ev, args...) with args already on the stack */
     lua_getglobal(L, "lh"); lua_getfield(L, -1, "_emit"); lua_remove(L, -2);
     if (!lua_isfunction(L, -1)) { lua_pop(L, 1 + nargs); return; }
-    lua_insert(L, -nargs - 1); lua_pushstring(L, ev); lua_insert(L, -nargs - 1);   /* fn, ev, args (was calling the first arg) */
+    lua_insert(L, -nargs - 1); lua_pushstring(L, ev); lua_insert(L, -nargs - 1);   /* fn, ev, args */
     if (lua_pcall(L, 1 + nargs, 0, 0)) { fprintf(stderr, "luxshell: event %s: %s\n", ev, lua_tostring(L, -1)); lua_pop(L, 1); }
 }
 static void call_handler(struct node *n, const char *name, int nargs) {
@@ -765,7 +765,7 @@ static void update_cursor(struct surface *s, struct node *n) {
 }
 /* node.on_within(self, inside): the pointer entered / left the node's subtree (the hot node is the node or one of its
    descendants), called on every node whose state changes (4042-plex's tile side strip fades in while the pointer is within the
-   tile: Tile.PointerFocusWithinWorkaround). The ancestor chains are referenced first: the handlers may rebuild the tree. */
+   tile). The ancestor chains are referenced first: the handlers may rebuild the tree. */
 static void within_notify(struct node *old, struct node *n) {
     struct node *a[64], *b[64]; int na = 0, nb = 0;
     for (struct node *x = old; x && na < 64; x = x->parent) { node_ref(x); a[na++] = x; }

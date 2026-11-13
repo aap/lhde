@@ -149,7 +149,7 @@ static void nine(cairo_t *cr, cairo_surface_t *img, int strip_count, int strip_i
             cairo_surface_t *piece = cairo_surface_create_for_rectangle(img, sx[i], sy[j], sw, sh);
             cairo_translate(cr, dx[i], dy[j]); cairo_scale(cr, dw / sw, dh / sh);
             /* stretched pieces: the pack's filter (nearest: pixman's 16.16 fixed-point stepping, which reproduces 4074's
-               1156 start button exactly, lh4074-181533.png) */
+               1156 start button exactly) */
             cairo_set_source_surface(cr, piece, 0, 0); cairo_pattern_set_filter(cairo_get_source(cr), (i == 1 || j == 1) ? cfilter(filter) : CAIRO_FILTER_NEAREST);
             cairo_pattern_set_extend(cairo_get_source(cr), CAIRO_EXTEND_PAD);
             cairo_surface_destroy(piece);   /* the pattern holds its own reference */

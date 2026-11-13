@@ -1,18 +1,18 @@
--- Notification History tile: 4074 NotificationHistoryTile + NotificationHistoryPanel + NotificationElement (WCPClient IL; the
--- store is luxshell/notifylog.lua). Tile icon imageres 4007 (the bell).
+-- Notification History tile: 4074 NotificationHistoryTile + NotificationHistoryPanel + NotificationElement (the store is
+-- luxshell/notifylog.lua). Tile icon imageres 4007 (the bell).
 -- The tile is a time line, not a list: NotificationHistoryPanel (Height 30, in a Canvas as the tile's Foreground) places the newest
 -- (at most 8) notifications as 19x16 speech bubbles (4014 unviewed / yellow, 4013 viewed / grey) along the bar's width by age:
---   span = max(30, minutes since the oldest shown); f = age / span, square-rooted when span > 30 (Transform);
+--   span = max(30, minutes since the oldest shown); f = age / span, square-rooted when span > 30;
 --   offset = (1 - f) * width (truncated), so the newest sits at the right edge and the oldest at the left;
---   neighbours whose offsets are <= 20 px apart join a stack of at most 4 (FixStacks / CombineStacks); a stack of n is
---   15 + 4 (n - 1) wide, pushed right of the previous one and then back left of the next (ArrangeCore's two passes), and its
+--   neighbours whose offsets are <= 20 px apart join a stack of at most 4; a stack of n is
+--   15 + 4 (n - 1) wide, pushed right of the previous one and then back left of the next (two passes), and its
 --   element j is drawn at (offset + 4 (j - 1), 15 - 4 (n - 1) + 4 j): a diagonal pile going down-right, the newest on top;
---   a ninth arrival drops the whole oldest stack (IsTooCrowded: more than 8 children); a 60 s timer re-spaces them.
--- Verified on lh4074-193747.png (Slate, 1152x864, bar at x 1002, tile y 62..98 = 3 + 30 + 4): one bubble at the left edge (its
--- element 4 px left of the foreground), a stack of three at offset 29, one at the right edge (offset 119 = 134 - 15).
--- Element: tooltip = arrival time + newline + header (or body); a click shows the toast again (_IconClicked → _Show, _fReshow).
--- A click on the tile elsewhere opens the flyout. Tile menu (_OnContextMenu): "Go to rules and alerts" (greyed: luxshell has no rules
--- engine) and our "Delete All Notifications". Empty: 4074 drew nothing; we write "No notifications" dimly (ours).
+--   a ninth arrival drops the whole oldest stack (more than 8 children); a 60 s timer re-spaces them.
+-- The tile is 3 + 30 + 4 high; an element at the left edge sits 4 px left of the foreground, one at the right edge at offset
+-- 119 (= 134 - 15) on a 150 px bar.
+-- Element: tooltip = arrival time + newline + header (or body); a click shows the toast again.
+-- A click on the tile elsewhere opens the flyout. Tile menu: "Go to rules and alerts" (greyed: luxshell has no rules
+-- engine) and our "Delete All Notifications". Empty: 4074 draws nothing; we write "No notifications" dimly (ours).
 local tile = { name = "Notification History", height = 37, tooltip = "Notification History" }
 local MAXN, JOIN, STACK = 8, 20, 4
 local F = "Segoe UI,Tahoma 8"

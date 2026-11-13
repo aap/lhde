@@ -1,7 +1,7 @@
--- Notification area tile: the freedesktop System Tray (XEmbed) hosted in the sidebar (tray.c, SHELL-DESIGN M4b).
--- Longhorn 4074 put the tray icons in a sidebar tile ("Notifications"); geometry follows the measured 4051/4074 icon tile
--- (4051-vm-now.png y 19..51, lh4074-181415.png y 97..130): 16x16 icons, first at 5,6 in the foreground (x 12 / y 9 in
--- the tile), 28 px pitch across (16 + 12); rows 24 px apart (inferred: one row is all the references show).
+-- Notification area tile: the freedesktop System Tray (XEmbed) hosted in the sidebar (tray.c).
+-- Longhorn 4074 puts the tray icons in a sidebar tile ("Notifications"); the geometry is the 4051/4074 icon tile's: 16x16
+-- icons, first at 5,6 in the foreground (x 12 / y 9 in the tile), 28 px pitch across (16 + 12); rows 24 px apart (our
+-- choice: 4051 and 4074 show one row).
 -- Height 33 for one row (incl. the 4 px sizer), + 24 per extra row, animated 400 ms ease-in-out (2.4.4).
 local tile = { name = "Notifications", height = 33 }
 function tile:initialize()

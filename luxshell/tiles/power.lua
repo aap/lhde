@@ -1,5 +1,5 @@
--- Power tile: powergauge.xaml (4074) with the battery drawn as in lh4074-181415.png ("Charging: 95%", Slate sidebar at x 1003):
--- tile body y 168..212 + 4 px sizer = 49; the XAML's rotated battery (RotateTransform 270 about 23,17, ScaleX .95) lands
+-- Power tile: powergauge.xaml (4074) with the battery drawn as 4074's Slate sidebar draws it ("Charging: 95%"):
+-- tile body 45 + 4 px sizer = 49; the XAML's rotated battery (RotateTransform 270 about 23,17, ScaleX .95) lands
 -- at x 7..24 / y 7..41 of the tile with the nub on top; gauge box #808080 104x19 at x 33, y 6, the ShinyGreen gauge inset
 -- 2 px (100x15) over a 40 % copy of itself and a 15 % GraySweep; text Segoe UI 13 bold #dddddd under the gauge, centred.
 -- Data: /sys/class/power_supply/BAT0 (capacity, status, energy_* / charge_*, power_now / current_now) and AC/online,

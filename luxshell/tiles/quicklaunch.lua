@@ -1,10 +1,10 @@
--- Quick Launch tile: 4074 QuickLaunchTile (WCPClient; 3683-4039 FolderViewTile): an ItemsControl over the Quick Launch folder
+-- Quick Launch tile: 4074 QuickLaunchTile (3683-4039 FolderViewTile): an ItemsControl over the Quick Launch folder
 -- (Application Data\Microsoft\Internet Explorer\Quick Launch) in a FlowPanel, item tooltips on (ItemControlToolTipEnabled), tile
 -- TooltipText = the folder's display name, tile icon imageres 1021 (the lightning). No flyout, no properties (the class has
--- Initialize and .ctor only), MultiInstance 0. Look (4051-vm-now.png, lh4074-193747.png: IE and mail icons): one row of 16 px
--- icons, 28 px pitch, the first at 12,9 in the tile (the tray tile's geometry, tiles/notifications.lua); the tile is 35 high with
--- its sizer (separators 35 rows apart: 4051 y 17/52, 4074 y 97/132); the FlowPanel wraps to further rows (24 px apart,
--- inferred) when the bar is too narrow (BetaWiki 4088: one icon per row on a narrow bar).
+-- Initialize and .ctor only), MultiInstance 0. Look (4051, 4074: IE and mail icons): one row of 16 px icons, 28 px pitch,
+-- the first at 12,9 in the tile (the tray tile's geometry, tiles/notifications.lua); the tile is 35 high with its sizer
+-- (separators 35 rows apart); the FlowPanel wraps to further rows (24 px apart, our choice) when the bar is too narrow
+-- (4088: one icon per row on a narrow bar).
 -- The folder: a directory of .desktop files, settings.ini [quicklaunch] dir, default ~/.config/lhde/quicklaunch/. When it does not
 -- exist it is created once with copies of the browser, the mail client, the file manager (flxp) and a terminal (4074's folder held
 -- IE and Outlook Express); an emptied folder stays empty. Shortcuts are shown in file-name order; the folder is re-read when it
@@ -101,7 +101,7 @@ function tile:initialize()
     if s ~= self.stamp then self.stamp = s; self.list = tile.entries(); self:relayout() end
   end, 5000, true)
 end
--- tile menu: the folder (4074 had no entries of its own; "Open Quick Launch folder" is ours)
+-- tile menu: the folder (4074 has no entries of its own; "Open Quick Launch folder" is ours)
 function tile:menu()
   return { { text = "&Open Quick Launch folder", action = function()
     local fm = lh.session.get("commands", "filemanager") or (lh.prog("flxp") ~= "flxp" and lh.prog("flxp") or "xdg-open")
