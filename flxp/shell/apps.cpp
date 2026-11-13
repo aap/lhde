@@ -406,7 +406,7 @@ bool set_default_app(const std::string& mime_in, const std::string& id, std::str
         }
     }
     L.set("Default Applications", mime, { id }, false);
-    // as GLib does: the default also becomes the first added association, and is no longer removed
+    // as GLib does: the default also becomes the first added association, and is taken off the removed ones
     std::vector<std::string> added = L.get("Added Associations", mime);
     added.erase(std::remove(added.begin(), added.end(), id), added.end());
     added.insert(added.begin(), id);

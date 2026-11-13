@@ -36,7 +36,7 @@ int max_size(Mode m);
 View clamped(View v);
 const char* mode_name(Mode m);            // "details", "tiles", "icons"
 // names as the views file and filedlg_view keep them: "details@20", "tiles@48",
-// "icons@96", "icons@96+nonames". parse also reads the earlier names (thumbnails,
+// "icons@96", "icons@96+nonames". parse also reads older names (thumbnails,
 // smallicons, list, "+thumbnails"): Thumbnails and Small Icons are Icons, List is
 // Details. *sized: whether the text gave a size (else v.size is the mode's start).
 std::string format(const View& v);
@@ -69,7 +69,7 @@ struct Memory {
     int icons = STOP_MEDIUM;              // the icon stop used last (4074's ModeDefault)
     Memory();
     // a view was shown: its stop keeps the size and, an icon stop, becomes "Icons"
-    // (4074 updated a stop only when the slider was dragged over it; here every way
+    // (4074 updates a stop only when the slider is dragged over it; here every way
     // of showing a view counts, so Icons comes back at the size last seen)
     void shown(const View& v);
     View recall(Mode m) const;            // the mode at the size it remembers

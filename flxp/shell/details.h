@@ -1,6 +1,6 @@
 // What the Explorer says about the folder shown or the selection: one model,
-// two presentations. XP's task pane shows it as the "Details" section (shell32
-// duiinfo.cpp), 4051's band as its preview (System.Windows.Explorer's
+// two presentations. XP's task pane shows it as the "Details" section,
+// 4051's band as its preview (System.Windows.Explorer's
 // WelcomePane and PreviewManager). No win32 here.
 //
 // The model is 4051's: per item kind a property list (4051's
@@ -9,7 +9,7 @@
 // editable, invitation}. XP and 4051 show the same rows, each in its own
 // order and format:
 //
-//   kind      XP's Details (selfreg.inx, the folders' GetDetailsEx)          4051's band
+//   kind      XP's Details                                                  4051's band
 //   file      Type; Attributes; Date Modified; Size                         size, date, type
 //   picture   Type; Dimensions; Size; Date Modified                         size, date, dimensions
 //   song      Size; Type (XP's Artist, Album, Year, Track, Duration:        size, date, type
@@ -23,7 +23,7 @@
 //   description", ...), and a click on one edits it (write()).
 //
 // XP: the name in bold above the lines; Type is the value alone, the others
-// "Label: value" (IDS_COLONSEPERATED); an empty value drops its line, as does
+// "Label: value"; an empty value drops its line, as does
 // a size of 0. Attributes lists Read-only (files only) and Hidden, joined by
 // ", ". Sizes as StrFormatByteSize ("198 bytes", "1.30 KB", "2.39 MB": three
 // digits, cut), Date Modified as SHFormatDateTime's long date with
@@ -53,8 +53,7 @@ namespace details {
 // A stored one names its extended attribute; a derived one (type, size, date,
 // dimensions, a drive's space) has no attribute and is computed from the item
 // and its facts. The item kinds' lists name properties by id only, so
-// mappings can be added or renamed here (later from a data file: shipped
-// defaults with the user's overrides) without touching the lists.
+// mappings can be added or renamed here without touching the lists.
 enum class ValueType { Text, List, Date, Size, Number };
 struct Property {
     std::string id;                     // "tags"
@@ -64,7 +63,7 @@ struct Property {
     bool editable = false;              // the user sets it (4051: a click on its row edits it)
     std::string invitation;             // shown while it is empty ("Add tags"), 4051 only
 };
-const std::vector<Property>& registry();                // the defaults, in code for now
+const std::vector<Property>& registry();                // the defaults
 const Property* property(const std::string& id);        // null: unknown
 // The list's column of a stored property (SortBy::Description, Tags, Comment;
 // null for the derived columns), and the column of a property id (-1: none)

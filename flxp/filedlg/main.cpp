@@ -13,7 +13,7 @@
 #include "w32/w32.h"
 #include "w32/user.h"
 
-// The shared start-up plumbing (src/shell/runtime.cpp: fonts, theme name ->
+// The shared start-up plumbing (shell/runtime.cpp: fonts, theme name ->
 // .msstyles, flxp.ini). Weak so this builds while that file does not exist.
 namespace shell {
 void setup_fonts() __attribute__((weak));

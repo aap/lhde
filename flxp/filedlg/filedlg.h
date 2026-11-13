@@ -1,15 +1,15 @@
 // The file Open/Save dialog in two looks, chosen like the explorer's frame
 // (filedlg= in flxp.ini, else the session theme's Explorer.chrome, luxwm):
 // - XP: comdlg32's "Explorer-style" GetOpenFileName / GetSaveFileName
-//   (filenew.cpp) re-created on this toolkit against the src/shell namespace.
+//   re-created on this toolkit against the flxp/shell namespace.
 //   Places bar, Look in combo, Back/Up/New Folder/Views toolbar, the file
 //   list, File name (with auto-append completion) and Files of type.
 // - Longhorn: the pre-reset Longhorn Save File concept and the 4074 Open
-//   dialog on the explorer's browsing widget (src/explorer/browser.h): the
+//   dialog on the explorer's browsing widget (explorer/browser.h): the
 //   header (Back/Forward, breadcrumb, search) on luxwm's glass or the theme's
 //   navigation bar, the 4074 command bar, the collapsible groups of places,
 //   the list grouped by type, a details band for Save, Hide Explorer.
-// Used by the shim's GetOpenFileNameW (src/w32/comdlg.cpp), the
+// Used by the shim's GetOpenFileNameW (wux/w32/comdlg.cpp), the
 // flxp-filedialog CLI and the xdg-desktop-portal backend.
 //
 // The caller must have initialised the shim (w32::init()). run() is modal and

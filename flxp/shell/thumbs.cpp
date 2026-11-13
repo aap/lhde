@@ -314,7 +314,7 @@ static gdi::Bitmap* fitted(gdi::Bitmap* b, int size)
     return s;
 }
 
-// XP folderthumb.cpp: the first pictures of a folder (it collects 8 candidates
+// XP's folder thumbnail: the first pictures of a folder (it collects 8 candidates
 // for 4 previews, in case some fail)
 static std::vector<gdi::Bitmap*> folder_minis(const std::string& dir, int mini)
 {

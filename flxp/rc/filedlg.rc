@@ -1,4 +1,4 @@
-/* flxp's file dialog (src/filedlg). The Open/Save template is XP's
+/* flxp's file dialog (filedlg/). The Open/Save template is XP's
  * NEWFILEOPENV2ORD from the public SDK's fileopen.dlg (the layout apps were
  * meant to copy for custom templates), in "MS Shell Dlg" 8 dialog units.
  * Build: make rc/filedlg.res (mingw windres); embedded by filedlg.cpp. */
@@ -31,7 +31,7 @@ BEGIN
     PUSHBUTTON      "&Help", pshHelp, 316, 218, 50, 14, WS_GROUP
 END
 
-/* The Longhorn look (src/filedlg/filedlg.cpp "Longhorn"): the controls the
+/* The Longhorn look (filedlg/filedlg.cpp "the Longhorn look"): the controls the
  * dialog manager needs (mnemonics, tab order, the default button) with
  * comdlg32's ids so the accept logic is shared; the header, command bar,
  * places pane and list are created in code and everything is laid out in

@@ -57,7 +57,7 @@ bool parse(const std::string& text, View& out, bool* sized)
     View v;
     for (;;) {   // flags, in any order
         if (ends_with(n, "+nonames")) v.hide_names = true;
-        else if (ends_with(n, "+thumbnails")) {}   // the earlier per-folder toggle: thumbnails are a setting now
+        else if (ends_with(n, "+thumbnails")) {}   // an older per-folder toggle: thumbnails are a setting
         else break;
     }
     if (n == "details" || n == "list") v.mode = Mode::Details;

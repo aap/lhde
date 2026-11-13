@@ -1,8 +1,8 @@
 // The file dialog (see filedlg.h). The XP look follows XP's comdlg32
-// filenew.cpp (CFileOpenBrowser): the template's lst1 list box is a
+// Explorer-style dialog: the template's lst1 list box is a
 // placeholder the view is created over, stc1 marks where the small toolbar
 // goes, ctl1 is the places bar (a wrapable toolbar themed as "Placesbar"),
-// cmb2 the owner-drawn Look in combo (PaintDriveLine), cmb13 the File name
+// cmb2 the owner-drawn Look in combo, cmb13 the File name
 // combo with edt1 hidden. The Longhorn look ("---- the Longhorn look") keeps
 // the bottom controls' ids and builds the rest from the explorer's browsing
 // widget. In both the view is the shared browser::Browser list (the dialog's
@@ -469,7 +469,7 @@ static void build_lookin(Dlg& d)
     InvalidateRect(d.lookin, nullptr, TRUE);
 }
 
-// XP MeasureDriveItems: "W" height + DRIVELIST_BORDER (3), at least a small icon
+// XP's Look in items: "W" height + a 3 px border, at least a small icon
 static void measure_lookin(HWND dlg, MEASUREITEMSTRUCT* mi)   // before WM_INITDIALOG: no Dlg yet
 {
     HDC hdc = GetDC(nullptr);
@@ -482,7 +482,7 @@ static void measure_lookin(HWND dlg, MEASUREITEMSTRUCT* mi)   // before WM_INITD
     mi->itemHeight = (UINT)std::max(h, 16);
 }
 
-// XP PaintDriveLine
+// a Look in item, drawn as XP's
 static void draw_lookin(Dlg& d, DRAWITEMSTRUCT* di)
 {
     if ((int)di->itemID < 0 || di->itemID >= d.lookin_list.size()) return;
@@ -537,7 +537,7 @@ static void fill_places(Dlg& d)
     SendMessageW(tb, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
     SetWindowTheme(tb, L"Placesbar", nullptr);
     bool themed = GetWindowTheme(tb) != nullptr;
-    // XP OnThemeActive: themed = no client edge, opaque, padding 2,2
+    // XP: themed = no client edge, opaque, padding 2,2
     LONG_PTR ex = GetWindowLongPtrW(tb, GWL_EXSTYLE);
     SetWindowLongPtrW(tb, GWL_EXSTYLE, themed ? (ex & ~WS_EX_CLIENTEDGE) : (ex | WS_EX_CLIENTEDGE));
     SetWindowPos(tb, nullptr, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOMOVE | SWP_FRAMECHANGED);
@@ -681,7 +681,7 @@ static void create_toolbar(Dlg& d)
 }
 
 // XP loads comctl32's IDB_VIEW_SMALL_COLOR + IDB_HIST_SMALL_COLOR; icon themes may supply
-// the real strips (filedlg_view / filedlg_hist), else Wine's built-in ones.
+// the real strips (filedlg_view / filedlg_hist), else the toolkit's built-in ones.
 static void load_toolbar_images(HWND tb, int* view0_out, int* hist0_out)
 {
     int view0 = 0, hist0 = 12;
@@ -767,7 +767,7 @@ static void update_ok_label(Dlg& d)
     SetDlgItemTextW(d.dlg, IDOK, WS(folder && !file ? std::string("&Open") : d.accept));
 }
 
-// XP SelFocusChange: the selected files (not folders) go into File name;
+// XP: the selected files (not folders) go into File name;
 // several are quoted. Folder mode puts the selected folder there.
 static void selection_to_name(Dlg& d)
 {
@@ -990,7 +990,7 @@ static void error(Dlg& d, const std::string& text)
     SendMessageW(d.name_edit, EM_SETSEL, 0, -1);
 }
 
-// XP CFileOpenBrowser::OnOKButton / ProcessEdit, for our namespace.
+// XP's OK button and typed name handling, for our namespace.
 static void on_ok(Dlg& d)
 {
     std::vector<int> sel = selected_indices(d);
@@ -1254,7 +1254,7 @@ static void init_dialog(Dlg& d, HWND owner)
     else CheckDlgButton(dlg, chx1, o.read_only ? BST_CHECKED : BST_UNCHECKED);
     ShowWindow(GetDlgItem(dlg, pshHelp), SW_HIDE);
     if (!o.show_read_only) {
-        // XP ReAdjustDialog: without Help and the read-only box, everything below the
+        // XP: without Help and the read-only box, everything below the
         // view moves down by the Help button's height plus the gap above it, and the
         // view grows by as much
         RECT help = child_rect(dlg, GetDlgItem(dlg, pshHelp)), cancel = child_rect(dlg, GetDlgItem(dlg, IDCANCEL));
@@ -1339,9 +1339,8 @@ static void init_dialog(Dlg& d, HWND owner)
 }
 
 // ---- the Longhorn look ------------------------------------------------------------
-// The pre-reset Longhorn Save File concept (image9.jpeg) and the 4074 Open
-// dialog (lh4074-180309.png), unified as Codex described them
-// (NOTES "The Longhorn file dialog"): top to bottom the explorer's header
+// The pre-reset Longhorn Save File concept and the 4074 Open dialog in one
+// layout: top to bottom the explorer's header
 // (Back/Forward, title, breadcrumb, search) on luxwm's glass or the theme's
 // navigation bar; the 4074 command bar (Up a Folder, New Folder, Change View)
 // on the theme's per-folder Rebar strip; the browser: the places pane in the
@@ -1373,7 +1372,7 @@ bool longhorn_look(const Options& o)
 }
 
 // filedlg_view: the view as the views file names it (browser::views: "icons@48", "tiles@64",
-// "details@16", "icons@96+nonames"; the earlier "thumbnails@96", "list+thumbnails" are read too)
+// "details@16", "icons@96+nonames"; older files' "thumbnails@96", "list+thumbnails" are read too)
 static int view_from_name(const std::string& name)
 {
     int v = browser::views::parse(name);
@@ -1587,7 +1586,7 @@ static COLORREF mix(COLORREF a, COLORREF b, int num, int den)
                GetBValue(a) + (GetBValue(b) - GetBValue(a)) * num / den);
 }
 
-// the concept's band (image9.jpeg, rows 472..563): light at the top, darkest
+// the concept's band: light at the top, darkest
 // about a third down, lighter again towards the bottom
 static const COLORREF BAND_TOP = RGB(228, 237, 252), BAND_MID = RGB(199, 214, 236), BAND_BOTTOM = RGB(212, 226, 243),
                       BAND_LINE = RGB(173, 192, 220), STRIP = RGB(244, 244, 244), LABEL = RGB(93, 110, 138),

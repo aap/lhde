@@ -194,7 +194,7 @@ void setup_fonts()
     // the imported Windows fonts (lhde's fonts/<build> with Tahoma)
     std::vector<std::string> fp = default_font_dirs();
     // ReactOS's free faces (fonts/reactos) in the fallback tier: a Windows build's Tahoma or Marlett wins a family both
-    // have (in one tier fontconfig picked ReactOS's Marlett over 4074's, and the classic caption glyphs came out small and grey)
+    // have (in one tier fontconfig can pick ReactOS's Marlett over 4074's, whose classic caption glyphs are small and grey)
     for (const std::string& d : fp) {
         gdi::add_font_dir(d.c_str(), d.size() > 8 && d.compare(d.size() - 8, 8, "/reactos") == 0);
         for (int i = 0; i < n_wanted; i++)

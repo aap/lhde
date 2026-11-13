@@ -1276,7 +1276,7 @@ void fill_walls(HWND dlg)
     st.stateMask = st.state = LVIS_SELECTED | LVIS_FOCUSED;
     SendMessageW(lv, LVM_SETITEMSTATE, (WPARAM)sel, (LPARAM)&st);
     SendMessageW(lv, WM_SETREDRAW, TRUE, 0);
-    // after the redraw is on again: the list's scroll range is only updated then (Wine's LISTVIEW_UpdateScroll), before it
+    // after the redraw is on again: the list's scroll range is only updated then; before it
     // the scroll to an entry past the first page stays at the top
     SendMessageW(lv, LVM_ENSUREVISIBLE, (WPARAM)sel, FALSE);
     InvalidateRect(lv, nullptr, TRUE);

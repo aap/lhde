@@ -1,6 +1,6 @@
 /* flxp-settings, the Display Properties (flxp, not Wine): XP desk.cpl's
  * property pages in dialog units for "MS Shell Dlg" 8. Build: make
- * rc/settings.res (mingw windres); embedded by src/settings/settings.cpp. */
+ * rc/settings.res (mingw windres); embedded by settings/settings.cpp. */
 #include <windows.h>
 #include <commctrl.h>
 #include "resource.h"

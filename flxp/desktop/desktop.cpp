@@ -51,7 +51,7 @@ using verbs::Ctx;
 
 namespace {
 
-const uint32_t DEFAULT_BACKGROUND = 0x3a6ea5;    // XP's desktop blue (58,110,165), as the classic screenshots
+const uint32_t DEFAULT_BACKGROUND = 0x3a6ea5;    // XP's classic desktop blue (58,110,165)
 enum { TIMER_WATCH = 2, TIMER_QUIT = 3, TIMER_FOLLOW = 4 };
 
 struct Desktop {

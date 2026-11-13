@@ -84,7 +84,7 @@ void append_popup(HMENU m, HMENU sub, const std::string& text)
 // (Windows Classic, and every look without a band of its own): items 20 px, the icon 5 px from the menu's edge
 // (user32 gives the item rectangle from the window's edge; its 3 px border is clipped), the text 29 px, 26 px
 // after the text to the menu's edge (the submenu arrow's room); a style with the Longhorn Menu class (UXMENU_SetBand,
-// lh4074-215101.png): the painter's item height (22 px in Segoe UI 9), the icon 10 px and the text 35 px from the
+// as 4074): the painter's item height (22 px in Segoe UI 9), the icon 10 px and the text 35 px from the
 // outline, 35 px after the text. The items and their icons are kept until the next Programs menu is built.
 struct BandItem { std::u16string text; HBITMAP icon = nullptr; };
 std::deque<BandItem> band_items;
@@ -162,8 +162,8 @@ HMENU programs_menu()
     return m;
 }
 
-// the theme files as liblhde lists them (the user's, the shipped ones; the bare styles are Display Properties' Appearance
-// tab now; docs/THEME-FORMAT.md), for Settings > Theme
+// the theme files as liblhde lists them (the user's, the shipped ones; the bare styles are on Display Properties'
+// Appearance tab; docs/THEME-FORMAT.md), for Settings > Theme
 HMENU themes_menu()
 {
     theme_cmds.clear();
@@ -523,7 +523,7 @@ bool draw_item(const DRAWITEMSTRUCT* di)
         HDC m = CreateCompatibleDC(dc);
         HGDIOBJ o = SelectObject(m, b->icon);
         BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-        // the 4074 band: the icon a pixel below the middle (lh4074-215101.png: 4 px above it, 2 below in 22 px)
+        // the 4074 band: the icon a pixel below the middle (4 px above it, 2 below in 22 px)
         int y = (r.top + r.bottom - bm.bmHeight) / 2 + (g.band ? 1 : 0);
         GdiAlphaBlend(dc, r.left + g.icon_x, y, bm.bmWidth, bm.bmHeight, m, 0, 0, bm.bmWidth, bm.bmHeight, bf);
         SelectObject(m, o);

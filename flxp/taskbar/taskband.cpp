@@ -1,9 +1,8 @@
-// The task band (explorer's CTaskBand, taskband.cpp in the XP SP1 source): a
-// comctl32 toolbar in list style with one button per window, themed
+// The task band (XP explorer's): a comctl32 toolbar in list style with one button per window, themed
 // TaskBand::Toolbar (TB_SETWINDOWTHEME "TaskBand"). Buttons are custom drawn
-// as XP's _HandleCustomDraw does (the checked button is the active window,
-// TaskBand.FLASHBUTTON for windows demanding attention) and sized by its
-// _GetIdealWidth: the band's width shared out, at most SM_CXMINIMIZED, at
+// as XP's are (the checked button is the active window,
+// TaskBand.FLASHBUTTON for windows demanding attention) and sized as XP's:
+// the band's width shared out, at most SM_CXMINIMIZED, at
 // least 1.8 caption buttons. Click activates or minimises the active one,
 // the middle button closes, the right one opens the window menu.
 #include <string.h>
@@ -74,7 +73,7 @@ int add_icon(const xwm::Task& t)
     return idx;
 }
 
-// taskband.cpp _OpenTheme: cxButtonSpacing 0 themed, 3 classic
+// XP's button spacing: 0 themed, 3 classic
 int spacing() { return th_tb ? 0 : 3; }
 
 void set_check_states()
@@ -83,7 +82,7 @@ void set_check_states()
         SendMessageW(tbw, TB_CHECKBUTTON, i.cmd, MAKELONG(i.t.id == active && !i.t.minimized, 0));
 }
 
-// taskband.cpp _GetIdealWidth / _SizeItems: one row
+// XP's ideal width: one row
 void size_buttons()
 {
     int n = (int)items.size();
@@ -189,7 +188,7 @@ void draw_item(NMTBCUSTOMDRAW* cd, Item& it)
     bool checked = st & CDIS_CHECKED, pressed = st & CDIS_SELECTED, hot = st & CDIS_HOT;
     SetBkMode(hdc, TRANSPARENT);
     COLORREF text = GetSysColor(COLOR_BTNTEXT);
-    HFONT font = checked ? g.font_caption_bold : g.font_caption;   // _HandleCustomDraw: the active task in bold
+    HFONT font = checked ? g.font_caption_bold : g.font_caption;   // XP: the active task in bold
     HFONT themed_font = nullptr;
     int d = 0;
     if (th_tb) {
@@ -225,7 +224,7 @@ void draw_item(NMTBCUSTOMDRAW* cd, Item& it)
             DrawEdge(hdc, &rc, EDGE_RAISED, BF_RECT);
         }
     }
-    // measured on 4051 (Slate, XP's explorer): icon 8 px in, text 3 px after it
+    // 4051 (Slate, XP's explorer): icon 8 px in, text 3 px after it
     int pad = th_tb ? 8 : 5;
     int ix = rc.left + pad + d, iy = rc.top + (rc.bottom - rc.top - 16) / 2 + d;
     if (it.image >= 0) ImageList_Draw(il, it.image, hdc, ix, iy, ILD_TRANSPARENT);
@@ -277,8 +276,8 @@ void theme_changed()
     th_tb = g.theme ? OpenThemeData(nullptr, g.horizontal() ? L"TaskBand::Toolbar" : L"TaskBandVert::Toolbar") : nullptr;
     if (g.theme && !th_tb) th_tb = OpenThemeData(nullptr, L"Toolbar");
     th_band = g.theme ? OpenThemeData(nullptr, L"TaskBand") : nullptr;
-    // taskband.cpp _OpenTheme: cxPad 20 themed (8 classic), no spacing themed (3 classic)
-    // (Wine's toolbar has no TB_SETMETRICS; the spacing is ours: size_buttons)
+    // XP: padding 20 themed (8 classic), no spacing themed (3 classic)
+    // (the toolbar has no TB_SETMETRICS; the spacing is ours: size_buttons)
     SendMessageW(tbw, TB_SETPADDING, 0, MAKELONG(g.theme ? 20 : 8, 0));
     SendMessageW(tbw, TB_SETMAXTEXTROWS, 0, 0);          // no labels: the buttons are custom drawn
     InvalidateRect(tbw, nullptr, TRUE);
@@ -368,7 +367,7 @@ bool command(UINT id)
 {
     Item* it = by_cmd(id);
     if (!it) return false;
-    // taskband.cpp _HandleClick: the active window is minimised, any other activated (and restored)
+    // XP: a click on the active window's button minimises it, on any other activates (and restores) that one
     if (it->t.id == active && !it->t.minimized) xwm::minimize(it->t.id);
     else xwm::activate(it->t.id);
     return true;

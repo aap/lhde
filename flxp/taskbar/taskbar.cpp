@@ -1,7 +1,6 @@
-// flxp-taskbar: the classic Windows XP taskbar (explorer's CTray, tray.cpp,
-// traynot.cpp, trayclok.cpp in the XP SP1 source, read as the spec), drawn
+// flxp-taskbar: the classic Windows XP taskbar (explorer's tray), drawn
 // through uxtheme from the session's visual style: the TaskBar background,
-// the Start button (Start::Button), the task band (taskband.cpp, a comctl32
+// the Start button (Start::Button), the task band (a comctl32
 // toolbar themed TaskBand::Toolbar), the notification area (TrayNotify, an
 // XEmbed system tray) and the clock (TrayNotify::Clock). Without a visual
 // style it is the classic 3D bar. One EWMH DOCK window on a screen edge with
@@ -56,7 +55,7 @@ std::string setting(const char* key, const char* fallback) { return shell::theme
 namespace {
 
 enum { TIMER_CLOCK = 1, TIMER_QUIT = 2 };
-const int TRAY_SLOT = 22;               // one notification icon: 16 px in a 22 px cell (traynot.cpp: 16 px buttons, TB_SETPADDING 2)
+const int TRAY_SLOT = 22;               // one notification icon: 16 px in a 22 px cell (XP: 16 px buttons, TB_SETPADDING 2)
 const int CLASSIC_EDGE = 2;             // the raised edge of the classic bar (SM_CXEDGE)
 
 HTHEME th_start, th_tray, th_clock;
@@ -83,7 +82,7 @@ void make_fonts()
     NONCLIENTMETRICSW ncm = {};
     ncm.cbSize = sizeof ncm;
     SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
-    // explorer's _hfontCapNormal / _hfontCapBold (taskband.cpp _InitFonts, trayclok.cpp)
+    // explorer's caption fonts for the task band and the clock: the caption font, normal and bold
     ncm.lfCaptionFont.lfWeight = FW_NORMAL;
     g.font_caption = CreateFontIndirectW(&ncm.lfCaptionFont);
     ncm.lfCaptionFont.lfWeight = FW_BOLD;
@@ -194,7 +193,7 @@ HFONT start_font(HDC hdc, bool& owned)
         owned = true;
         return CreateFontIndirectW(&lf);
     }
-    return g.font_caption_bold;     // tray.cpp _CreateStartFont: the caption font, bold
+    return g.font_caption_bold;     // XP's start font: the caption font, bold
 }
 
 // Button_GetIdealSize of the start button: flag + text + the content margins
@@ -217,10 +216,10 @@ void measure_start()
         SIZE ps = {};
         start_image_cy = SUCCEEDED(GetThemePartSize(th_start, nullptr, BP_PUSHBUTTON, PBS_NORMAL, nullptr, TS_TRUE, &ps)) ? ps.cy : 0;
         // a TRUESIZE button whose image carries the flag and the word (Watercolor Lite, the ReactOS styles: a 1-px FONT and a
-        // negative left content margin) is at least the image's width. Measured, not XP's code: their margins are tuned to
-        // Windows' text extent of "start" in that 1-px font (about 6 px Arial, 10 Tahoma Bold; FreeType's is 2), so on XP
-        // the button holds the whole image (2k3-205316.png: Watercolor Lite's art 4 px in; WinXP-193456/193504/193512.png:
-        // Lautus, Lunar, Mizu 2 px further right than with the bare ideal size, which centred the wider image off the bar)
+        // negative left content margin) is at least the image's width. Their margins are tuned to Windows' text extent of
+        // "start" in that 1-px font (about 6 px Arial, 10 Tahoma Bold; FreeType's is 2), so on XP the button holds the
+        // whole image (Watercolor Lite's art 4 px in; Lautus, Lunar, Mizu 2 px further right than with the bare ideal
+        // size, which centres the wider image off the bar)
         int st = 0;
         if (SUCCEEDED(GetThemeEnumValue(th_start, BP_PUSHBUTTON, PBS_NORMAL, TMT_SIZINGTYPE, &st)) && st == ST_TRUESIZE &&
             start_size.cx < ps.cx)
@@ -288,7 +287,7 @@ void measure_clock()
     if (clock_hidden) { clock_width = 0; return; }
     HDC hdc = GetDC(g.clock);
     HGDIOBJ old = SelectObject(hdc, g.font_caption);
-    // trayclok.cpp _GetMaxTimeSize: 11 and 23 o'clock with "00" of slop
+    // XP's clock width: 11 and 23 o'clock with "00" of slop
     struct tm tm = {};
     tm.tm_hour = 11; tm.tm_min = 59; tm.tm_mday = 28; tm.tm_mon = 8; tm.tm_year = 100;
     int w = 0;
@@ -311,7 +310,7 @@ void measure_clock()
 void arm_clock_timer()
 {
     time_t now = time(nullptr);
-    UINT ms = (UINT)(60 - now % 60) * 1000 + 50;     // re-armed for the next minute, as trayclok.cpp
+    UINT ms = (UINT)(60 - now % 60) * 1000 + 50;     // re-armed for the next minute, as XP's clock
     SetTimer(g.wnd, TIMER_CLOCK, ms, nullptr);
 }
 
@@ -326,7 +325,7 @@ TrayGeometry tray_geometry(int across)
     bool h = g.horizontal();
     MARGINS m = {};
     if (th_tray) GetThemeMargins(th_tray, nullptr, TNP_BACKGROUND, 0, TMT_CONTENTMARGINS, nullptr, &m);
-    else { m.cxLeftWidth = 1; m.cyTopHeight = 1; m.cxRightWidth = 1 + 2; m.cyBottomHeight = 1 + 2; }   // traynot.cpp: border + 2
+    else { m.cxLeftWidth = 1; m.cyTopHeight = 1; m.cxRightWidth = 1 + 2; m.cyBottomHeight = 1 + 2; }   // XP: border + 2
     int n = tray_on ? tray_icons : 0;
     if (h) {
         int inner_h = across - m.cyTopHeight - m.cyBottomHeight;
@@ -423,7 +422,7 @@ void layout()
         InflateRect(&in, -2, -2);
     }
     // task buttons across the bar: themed the bar's full thickness from its top (the TaskBand::Toolbar BUTTON images
-    // carry their own transparent rows: Luna 3 above and 2 below a 25-row plate; 4051-vm-now.png: the Slate plate from
+    // carry their own transparent rows: Luna 3 above and 2 below a 25-row plate; 4051's Slate plate from
     // row 2, i.e. a 30-row button at the bar's top); classic 22 px (SM_CYSIZE + 2 * SM_CYEDGE) in 2 px of space
     if (g.theme) { g.button_top = 0; g.button_height = h ? thick : 25; }
     else { g.button_top = in.top; g.button_height = h ? in.bottom - in.top : 22; }
@@ -437,13 +436,13 @@ void layout()
         int sx = g.theme ? 0 : in.left;
         // themed: at least the image's own height from the bar's top, the rows below the bar clipped. Luna's
         // 99x33 Start::Button is a 31-row green body over 2 rows of a lighter blue than the bar's bottom rows
-        // (sizing margins 13/14): squeezed into 30 rows those 2 rows showed as a blue line under the button;
-        // 4051-vm-now.png's Slate button is the image unsqueezed with its last rows off the screen
+        // (sizing margins 13/14): squeezed into 30 rows those 2 rows would show as a blue line under the button;
+        // 4051's Slate button is the image unsqueezed with its last rows off the screen
         int scy = start_image_cy > bh ? start_image_cy : bh;
         start = g.theme ? RECT{ 0, 0, start_size.cx, scy } : RECT{ sx, in.top, sx + start_size.cx, in.bottom };
         int tw = tray.right;
         OffsetRect(&tray, g.theme ? bw - tw : in.right - tw, g.theme ? 0 : in.top);
-        // tray.cpp: the task view starts at _sizeStart.cx + g_cxFrame + 1
+        // XP: the task view starts at the start button's width + SM_CXFRAME + 1
         RECT band = { start.right + GetSystemMetrics(SM_CXFRAME) + 1, g.button_top, tray.left - 3, g.button_top + g.button_height };
         band::place(band);
     } else {

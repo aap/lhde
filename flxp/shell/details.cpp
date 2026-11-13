@@ -1,7 +1,6 @@
-// The details model (details.h). The rules are XP's and 4051's, read from
-// shell32's duiinfo.cpp, prop.cpp and selfreg.inx, shlwapi's
-// StrFormatByteSizeW and SHFormatDateTimeW (XP SP1), and 4051's managed
-// preview pane (taskpane/managed.md in the Longhorn research); written anew.
+// The details model (details.h). The rules are XP's (shell32's details and
+// properties, shlwapi's StrFormatByteSizeW and SHFormatDateTimeW) and 4051's
+// managed preview pane.
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>

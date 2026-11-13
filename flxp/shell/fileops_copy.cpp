@@ -89,7 +89,7 @@ bool chain_contains(const std::string& path, const Id& anc)
     return found;
 }
 
-// XP's copy.c _HandleRename with PathYetAnotherMakeUniqueName: the template
+// XP's names for a copy into the same folder: the template
 // "Copy () of x" tried as "Copy of x", then "Copy (2) of x", "Copy (3) of x";
 // a name that already is "Copy (n) of x" is its own template ("Copy (n+..) of x",
 // from 2), while "Copy of x" becomes "Copy of Copy of x".
@@ -164,7 +164,7 @@ struct Engine {
         report();
     }
 
-    // XP's confirmation state (copy.c ConfirmFileOp and SetConfirmMaskAndText):
+    // XP's confirmation state:
     // what a question needs still asked, what a Yes / Yes to All takes off for
     // the rest of the operation, what No to All (Shift+No) answers from now on.
     // A Yes to replace a folder means its files are replaced without asking.

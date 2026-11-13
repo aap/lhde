@@ -184,8 +184,7 @@ END
  * (DLG_REPLACE_FOLDER), Confirm File Move (DLG_MOVE_FILE), the progress
  * dialog (DLG_MOVECOPYPROGRESS) and a message box for the copy and rename errors that is
  * sized to its text as user32's MessageBox. The texts are filled in at run
- * time; buttons a case does not offer are removed then (copy.c
- * HideConfirmButtons). */
+ * time; buttons a case does not offer are removed then, as XP's. */
 IDD_OP_REPLACEFILE DIALOGEX 0, 0, 280, 141
 STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Confirm File Replace"
