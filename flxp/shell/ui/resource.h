@@ -11,6 +11,7 @@
 #define IDC_TYPE          113
 #define IDC_OPENSL        114
 #define IDC_OPENS         115
+#define IDC_OPENSICON     199   // made at run time (properties.cpp show_opens_with): the program's icon
 #define IDC_LOCATION      116
 #define IDC_GSIZE         117
 #define IDC_CONTAINSL     118

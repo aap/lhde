@@ -29,11 +29,20 @@
      lhde-theme find REL | KIND NAME       a data file by its relative name (styles/jade4074.msstyles) or by kind (style jade4074;
                                            kinds: theme style scheme frames pack navbar icons wallpaper fonts resources source):
                                            the path, exit 1 when no tree has it
-     lhde-theme path VALUE                 a theme value as a path: absolute and ~/ as they are, else find (else where it would be) */
+     lhde-theme path VALUE                 a theme value as a path: absolute and ~/ as they are, else find (else where it would be)
+     lhde-theme terminal [--run [DIR]]     the terminal's command (settings.ini [commands] terminal, else the first of cmd,
+                                           urxvt, xterm, x-terminal-emulator on PATH); --run: run it in DIR (default the home)
+                                           in place of lhde-theme, %d the quoted directory (Quick Launch's Command Prompt)
+     lhde-theme icon CLASS [INSTANCE] [--desktop ID] [--key KEY] [--size N] [--set ICONS]
+                                           the icon a window of that WM_CLASS gets (lhde/icon.h: class map, desktop file, the
+                                           generic one; CLASS "-" for none), or an icon key's: the step, the image size, a
+                                           checksum of its pixels (FNV-1a over the ARGB values) and where it came from; exit 1
+                                           when nothing answers */
 #define _GNU_SOURCE
 #include "lhde/data.h"
 #include "lhde/theme.h"
 #include "lhde/settings.h"
+#include "lhde/icon.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +58,8 @@ static void usage(void)
     fprintf(stderr, "usage: lhde-theme list | resolve NAME [--files] [--why | --get KEY | --shell] | current | set NAME |\n"
                     "                  layer | layer-set KEY VALUE | layer-clear | save-as FILE [TITLE] | delete NAME | styles | schemes |\n"
                     "                  set-key NAME KEY VALUE | setting SEC KEY [VALUE] | style NAME |\n"
-                    "                  explain [THEME | --files THEME] | dirs [--list | --windows | --user] | find REL | find KIND NAME | path VALUE\n");
+                    "                  explain [THEME | --files THEME] | dirs [--list | --windows | --user] | find REL | find KIND NAME | path VALUE |\n"
+                    "                  icon CLASS [INSTANCE] [--desktop ID] [--key KEY] [--size N] [--set ICONS] | terminal [--run [DIR]]\n");
     exit(2);
 }
 
@@ -102,6 +112,44 @@ int main(int argc, char **argv)
         return 0;
     }
     if (!strcmp(cmd, "path")) { if (argc < 3) usage(); printf("%s\n", lhde_data_resolve(argv[2], buf, sizeof buf)); return 0; }
+    if (!strcmp(cmd, "terminal")) {
+        char t[1024]; lhde_terminal_command(t, sizeof t);
+        if (argc < 3) { printf("%s\n", t); return 0; }
+        if (strcmp(argv[2], "--run")) usage();
+        const char *dir = argc > 3 ? argv[3] : getenv("HOME") ? getenv("HOME") : "/";
+        if (chdir(dir)) { perror(dir); return 1; }
+        /* %d: the directory, quoted for /bin/sh */
+        char q[PATH_MAX * 4 + 8], line[8192]; size_t o = 0; q[o++] = '\'';
+        for (const char *s = dir; *s && o < sizeof q - 6; s++) { if (*s == '\'') { memcpy(q + o, "'\\''", 4); o += 4; } else q[o++] = *s; }
+        q[o++] = '\''; q[o] = 0; o = 0;
+        for (const char *s = t; *s && o < sizeof line - 1; s++) {
+            if (s[0] == '%' && s[1] == 'd') { size_t l = strlen(q); if (o + l < sizeof line - 1) { memcpy(line + o, q, l); o += l; } s++; }
+            else line[o++] = *s;
+        }
+        line[o] = 0;
+        execl("/bin/sh", "sh", "-c", line, (char *)NULL);
+        perror("/bin/sh"); return 1;
+    }
+    if (!strcmp(cmd, "icon")) {
+        const char *cls = NULL, *inst = NULL, *desk = NULL, *key = NULL; int size = 32;
+        for (int i = 2; i < argc; i++) {
+            if (!strcmp(argv[i], "--desktop") && i + 1 < argc) desk = argv[++i];
+            else if (!strcmp(argv[i], "--key") && i + 1 < argc) key = argv[++i];
+            else if (!strcmp(argv[i], "--size") && i + 1 < argc) size = atoi(argv[++i]);
+            else if (!strcmp(argv[i], "--set") && i + 1 < argc) lhde_app_icons_set(argv[++i]);
+            else if (!cls) cls = argv[i]; else if (!inst) inst = argv[i]; else usage();
+        }
+        static const char *steps[] = { "none", "own", "class", "desktop", "generic" };
+        unsigned long n = 0; int step = 0; char why[2048] = "";
+        unsigned long *im = key ? lhde_icon_key_image(key, size, &n, why, sizeof why)
+                                : lhde_app_icon(cls && strcmp(cls, "-") ? cls : NULL, inst, desk, size, NULL, 0, 0, &n, &step, why, sizeof why);
+        if (!im) { printf("none\n"); return 1; }
+        unsigned h = 2166136261u;
+        for (unsigned long i = 2; i < n; i++) for (int b = 0; b < 32; b += 8) { h ^= (unsigned)(im[i] >> b) & 255; h *= 16777619u; }
+        printf("%s %lux%lu %08x %s\n", key ? "key" : steps[step], im[0], im[1], h, why);
+        free(im);
+        return 0;
+    }
     if (!strcmp(cmd, "current")) {
         const char *v = lhde_settings_get("theme", "name", buf, sizeof buf);
         if (!v) { fprintf(stderr, "lhde-theme: no [theme] name in %s\n", lhde_settings_path(buf, sizeof buf)); return 1; }

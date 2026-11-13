@@ -18,6 +18,7 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include "xwm.h"
+#include "shell/icons.h"
 
 namespace xwm {
 
@@ -128,13 +129,14 @@ std::string get_title(::Window w)
 std::vector<unsigned long> hints_icon(::Window w);
 
 // _NET_WM_ICON: the smallest image of at least 16 px (else the largest),
-// box-filtered (or enlarged) to 16x16, straight alpha. Else the WM_HINTS
-// icon pixmap and mask (xterm, xclock and other Xt programs).
+// box-filtered (or enlarged) to 16x16, straight alpha. Else the shared lookup
+// (shell::window_icon: the class map, the desktop file, the WM_HINTS icon
+// pixmap and mask of xterm, xclock and other Xt programs, the generic icon).
 std::vector<uint32_t> get_icon(::Window w)
 {
     std::vector<uint32_t> out;
     std::vector<unsigned long> v;
-    if (!get_prop(w, atoms[A_ICON], XA_CARDINAL, 1 << 20, v) || v.size() < 3) v = hints_icon(w);
+    if (!get_prop(w, atoms[A_ICON], XA_CARDINAL, 1 << 20, v) || v.size() < 3) v = shell::window_icon(xd, w, 16, [](unsigned long x) { return hints_icon((::Window)x); });
     if (v.size() < 3) return out;
     size_t best = (size_t)-1; unsigned long bw = 0, bh = 0;
     for (size_t i = 0; i + 2 <= v.size();) {

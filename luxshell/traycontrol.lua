@@ -1,13 +1,14 @@
--- The shared part of the system tray tiles (tiles/volume.lua, tiles/brightness.lua, tiles/touchpad.lua): one 16 px icon
--- with its value beside it in the sidebar, the icon alone in the minimized sidebar's taskbar view, the XP volume popup's
--- shape as the flyout, and the commands they run (lh.pipe).
+-- The shared part of the system tray items (trayitems/volume.lua, brightness.lua, touchpad.lua): a 16 px icon in the tray
+-- beside the XEmbed icons (the Classic Tray tile and its view in the minimized sidebar's taskbar, tiles/notifications.lua),
+-- the XP volume popup's shape as the flyout, and the commands they run (lh.pipe).
 --   local C = dofile(lh.lua_dir .. "/traycontrol.lua")
---   return C.tile{ name, label = function(st) -> text, tooltip = function(st) -> text, icon = function(st) -> icon name,
+--   return C.item{ name, tooltip = function(st) -> text, icon = function(st) -> icon name,
 --                  start = function(self, update) (reads the value, calls update(st) on every change; returns nothing),
 --                  stop = function(self), click = function(self) | nil, middle = function(self) | nil,
 --                  wheel = function(self, dir) (+1 up, -1 down), slider = { title, get = function(st) -> 0..100,
---                  set = function(self, v, final), mute = { text, get = function(st) -> bool, set = function(self, on) } } | nil }
--- st.hidden hides the tile and its taskbar view (no such device); st is whatever the tile's start reports.
+--                  set = function(self, v, final), mute = { text, get = function(st) -> bool, set = function(self, on) } } | nil,
+--                  hidden_until_read = true (no icon before the first read) }
+-- st.hidden hides the item's icons, and it takes no tray slot (no such device); st is whatever the item's start reports.
 local C = {}
 
 ------------------------------------------------------------------ commands
@@ -234,77 +235,80 @@ function C.slider_flyout(self, sl)
   return root, W, 6 + 14 + 4 + H + 4 + (sl.mute and 4 + 13 + 6 or 6)
 end
 
------------------------------------------------------------------- the tile
--- Sidebar: the notification area tile's geometry (tiles/notifications.lua): the icon at 5,6 of the foreground (12,9 of the
--- tile), 33 high with the sizer; the value beside it as the power tile writes its line (Segoe UI 13 bold #dddddd).
--- Taskbar (the minimized sidebar's TBContentHost): the icon alone, centred in the bar, 20 px wide as the tray's icons.
--- Pointer: a left click opens the slider flyout (or does the tile's click), the wheel steps, a middle click does the tile's
--- middle (volume: mute); the tooltip is the tile's tooltip, read when it shows.
-function C.tile(def)
-  local tile = { name = def.name, height = 33 }
-  if def.slider then tile.flyout = function(self) return C.slider_flyout(self, def.slider) end end
-  function tile:flyout_closed() if self.flyout_cleanup then self.flyout_cleanup() end self.flyout_refresh = nil; self._show_mute = nil end
-  local function handlers(self, node, prev)
-    node.on_click = function(n, b)
-      if b == 4 then def.wheel(self, 1) elseif b == 5 then def.wheel(self, -1)
-      elseif b == 2 then if def.middle then def.middle(self) end
-      elseif b == 1 then
-        if def.click then def.click(self) elseif prev then prev(n, b) elseif def.slider then lh.toggle_flyout(self) end
+------------------------------------------------------------------ the tray item
+-- A tray item lives beside the XEmbed icons wherever the tray is shown (tiles/notifications.lua: the Classic Tray tile in the
+-- sidebar, its view in the minimized sidebar's taskbar): one 16 px icon per view, in the tray's slots after the docked icons.
+--   local cls = dofile(lh.lua_dir .. "/trayitems/volume.lua")
+--   local it = cls.new{ T = pack, sb = sidebar, tb = taskbar, tile = host tile, on_visibility = function(it) end }
+--   it:view(parent, { x = X, y = Y }, "sidebar" | "taskbar")   a canvas with the icon; it:start_once(); it:dispose()
+-- Pointer: a left click opens the slider flyout (or does the item's click), the wheel steps, a middle click does the item's
+-- middle (volume: mute); the tooltip is the item's tooltip, read when it shows. The flyout from the sidebar opens left of the
+-- bar at the tile's top; from the taskbar above the bar, centred on the pointer (as the Notification History tile's).
+function C.item(def)
+  local cls = { name = def.name }
+  function cls.new(ctx)
+    ctx = ctx or {}
+    local it = { name = def.name, def = def, T = ctx.T or {}, sb = ctx.sb, tb = ctx.tb, tile = ctx.tile, ctx = ctx, views = {} }
+    if def.slider then it.flyout = function(self) return C.slider_flyout(self, def.slider) end end
+    function it:flyout_closed() if self.flyout_cleanup then self.flyout_cleanup() end self.flyout_refresh = nil; self._show_mute = nil end
+    local function handlers(view)
+      view.node.on_click = function(_, b)
+        if b == 4 then def.wheel(it, 1) elseif b == 5 then def.wheel(it, -1)
+        elseif b == 2 then if def.middle then def.middle(it) end
+        elseif b == 1 then
+          it.anchor = view; it.node = view.node   -- flyout.lua: a press on the item itself is the toggle, not an outside click
+          if def.click then def.click(it) elseif def.slider then lh.toggle_flyout(it) end
+        end
       end
+      lh.tooltip(view.node, function() return def.tooltip(it.state or {}) end)
     end
-    lh.tooltip(node, function() return def.tooltip(self.state or {}) end)
+    function it:view(parent, t, where)
+      t = t or {}
+      local v = { where = where or "sidebar" }
+      v.node = C.icon(parent, { x = t.x or 0, y = t.y or 0 })
+      v.node:set{ visible = not self.hidden }
+      if self.state then v.node:show(def.icon(self.state)) end
+      table.insert(self.views, v)
+      handlers(v)
+      return v.node
+    end
+    function it:damage()
+      if self.sb and self.sb.surface then self.sb.surface:damage() end
+      if self.tb and self.tb.surface then self.tb.surface:damage() end
+    end
+    function it:update(st)
+      self.state = st
+      local name = def.icon(st)
+      for _, v in ipairs(self.views) do v.node:show(name) end
+      self:set_hidden(st.hidden and true or false)
+      if self.flyout_refresh and not st.hidden then self.flyout_refresh(st) end
+      self:damage()
+    end
+    function it:set_hidden(h)
+      if self.hidden == h then return end
+      self.hidden = h
+      if h and lh.flyout_tile == self then lh.close_flyout() end
+      for _, v in ipairs(self.views) do v.node:set{ visible = not h } end
+      if ctx.on_visibility then ctx.on_visibility(self) end
+    end
+    function it:start_once()
+      if self.started then return end
+      self.started = true
+      self:update({ hidden = def.hidden_until_read and true or nil })
+      def.start(self, function(st) self:update(st) end)
+    end
+    function it:place(fw, fh)
+      local sw, sh = lh.screen()
+      if self.anchor and self.anchor.where == "taskbar" or not self.sb then
+        local px = lh.pointer()
+        return math.max(0, math.min(px - fw // 2, sw - fw)), math.max(0, sh - (self.tb and self.tb.h or 30) - fh)
+      end
+      local _, ty = self.sb.tile_rect(self.tile)
+      return (self.sb.geo and self.sb.geo.x or self.sb.surface.x) - fw, math.max(0, math.min(ty or 0, sh - fh))
+    end
+    function it:dispose() if lh.flyout_tile == self then lh.close_flyout() end if def.stop then def.stop(self) end end
+    return it
   end
-  function tile:update(st)
-    self.state = st
-    local name = def.icon(st)
-    if self.icon_node then self.icon_node:show(name) end
-    if self.tb_icon then self.tb_icon:show(name) end
-    if self.label_node then self.label_node:set{ text = def.label(st) } end
-    self:set_hidden(st.hidden and true or false)
-    if self.flyout_refresh and not st.hidden then self.flyout_refresh(st) end
-    if self.node and self.sb and self.sb.surface then self.sb.surface:damage() end
-    if self.tb and self.tb.surface then self.tb.surface:damage() end
-  end
-  function tile:set_hidden(h)
-    if self.hidden == h then return end
-    self.hidden = h
-    if h and lh.flyout_tile == self then lh.close_flyout() end
-    if self.node then self.node:set{ visible = not h } end
-    if self.view then self.view:set{ visible = not h } end
-    if lh._emit then lh._emit("tile-visibility", self) end
-  end
-  function tile:initialize()
-    local fg = self.foreground
-    local row = fg:add(lh.node{ layout = "canvas" })
-    self.icon_node = C.icon(row, { x = 5, y = 6 })
-    self.label_node = row:add(lh.node{ kind = "text", text = "", font = self.T.power_font or "Segoe UI,Helvetica,Liberation Sans Bold 13px", color = "#dddddd",
-      x = 26, y = 4, w = 104, h = 20, valign = "center", ellipsis = true })
-    handlers(self, fg, fg.on_click)
-    self:start_once()
-  end
-  function tile:taskbar(host)
-    local bh = self.T.taskbar and self.T.taskbar.height or 30
-    local b = host:add(lh.node{ layout = "canvas", w = 20, h = bh, margin = { 2, 0, 0, 0 } })
-    self.view = b
-    self.tb_icon = C.icon(b, { x = 2, y = math.floor((bh - 16) / 2) })
-    handlers(self, b, nil)
-    self:start_once()
-  end
-  function tile:start_once()
-    if self.started then return end
-    self.started = true
-    self:update({ hidden = def.hidden_until_read and true or nil })
-    def.start(self, function(st) self:update(st) end)
-  end
-  -- the flyout from the taskbar view: above the bar, centred on the pointer (as the Notification History tile's)
-  function tile:place(fw, fh)
-    local sw, sh = lh.screen()
-    if not self.tb then local _, ty = self.sb.tile_rect(self)
-      return (self.sb.geo and self.sb.geo.x or self.sb.surface.x) - fw, math.max(0, math.min(ty, sh - fh)) end
-    local px = lh.pointer()
-    return math.max(0, math.min(px - fw // 2, sw - fw)), math.max(0, sh - (self.tb.h or 30) - fh)
-  end
-  function tile:dispose() if def.stop then def.stop(self) end end
-  return tile
+  return cls
 end
 return C

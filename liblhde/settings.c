@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 const char *lhde_config_dir(char *out, size_t n)
 {
@@ -61,6 +62,29 @@ const char *lhde_settings_get(const char *sec, const char *key, char *buf, size_
 {
     const char *v = lhde_ini_get(settings(), sec, key, buf, n);
     return v && v[0] ? v : NULL;
+}
+
+/* NAME is an executable file in a directory of $PATH */
+static int on_path(const char *name)
+{
+    const char *p = getenv("PATH");
+    char buf[8192]; snprintf(buf, sizeof buf, "%s", p && p[0] ? p : "/usr/local/bin:/usr/bin:/bin");
+    for (char *sv, *d = strtok_r(buf, ":", &sv); d; d = strtok_r(NULL, ":", &sv)) {
+        char f[PATH_MAX]; snprintf(f, sizeof f, "%s/%s", d[0] ? d : ".", name);
+        if (access(f, X_OK) == 0) return 1;
+    }
+    return 0;
+}
+
+/* the default order: cmd first (a user's own console-looking terminal script, ~/bin/cmd), then the terminals luxwm's keys
+   and lab.sh name */
+const char *lhde_terminal_command(char *out, size_t n)
+{
+    if (lhde_settings_get("commands", "terminal", out, n)) return out;
+    static const char *const order[] = { "cmd", "urxvt", "xterm", "x-terminal-emulator", NULL };
+    for (int i = 0; order[i]; i++) if (on_path(order[i])) { snprintf(out, n, "%s", order[i]); return out; }
+    snprintf(out, n, "xterm");
+    return out;
 }
 
 static const char HEADER[] =

@@ -1084,13 +1084,9 @@ void watch_settings(HWND page)
     if (sheet_old) return;
     w_settings = FlxpWatchRootProperty("_LH_SETTINGS_CHANGED");
     sheet_old = (WNDPROC)SetWindowLongPtrW(GetParent(page), GWLP_WNDPROC, (LONG_PTR)sheet_proc);
-    // desk.cpl's Display icon (IDI_DISPLAY 100) on the sheet, as the window and taskbar icon (_NET_WM_ICON); the icon
-    // theme's "display" key, none when the theme has no source for it (the window manager's default then)
-    std::string src = shell::icon_file("display");
-    const int sizes[3] = { 16, 48, 32 };   // ICON_SMALL, ICON_BIG, ICON_SMALL2
-    for (int i = 0; i < 3 && !src.empty(); i++)
-        if (HICON ic = (HICON)uiicons::load_themed(src, IMAGE_ICON, sizes[i], sizes[i], 0))
-            SendMessageW(GetParent(page), WM_SETICON, (WPARAM)i, (LPARAM)ic);
+    // desk.cpl's Display icon (IDI_DISPLAY 100) on the sheet, as the window and taskbar icon (_NET_WM_ICON): the icon sets'
+    // "display" key (this set, its fallbacks, the free chain); none when no set has it (the class map's answer then)
+    shell::set_window_icon_key(GetParent(page), "display");
 }
 
 bool common(HWND dlg, UINT msg, LPARAM lp, INT_PTR& ret)

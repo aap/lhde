@@ -216,6 +216,7 @@ INT_PTR CALLBACK dlg_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
     case WM_INITDIALOG: {
+        shell::set_window_icon_key(dlg, "image");   // the window icon: the icon set's picture icon
         RECT r;
         GetClientRect(GetDlgItem(dlg, IDC_PREVIEW), &r);
         make_preview(r.right - r.left, r.bottom - r.top);

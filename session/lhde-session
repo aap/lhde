@@ -27,7 +27,8 @@
 # The control commands act on $LHDE_DISPLAY, else on the one running session, else on $DISPLAY.
 # Environment: LHDE_PICOM=0/1 forces the compositor off/on for the session (luxshell too); LHDE_SHELL=0 without luxshell;
 # LHDE_DESKTOP=0 without flxp-desktop (luxshell then shows its own desktop layer); LHDE_WM=fvwm for an fvwm2 session (lab.fvwm2rc);
-# LHDE_TERMINAL=command (default urxvt, else xterm; none for no terminal); LHDE_WINDOWS another Windows tree (as every lhde program);
+# LHDE_TERMINAL=command (default the terminal: settings.ini [commands] terminal, else the first of cmd, urxvt, xterm,
+# x-terminal-emulator; none for no terminal); LHDE_WINDOWS another Windows tree (as every lhde program);
 # Settings: ~/.config/lhde/settings.ini and themes/ (docs/SETTINGS.md).
 # State: $XDG_RUNTIME_DIR/lhde-session<DISPLAY>/ (theme, shell, desktop, logs; luxshell's Log Off runs `lhde-session stop` when it exists).
 SELF=$(readlink -f "$0")
@@ -125,8 +126,9 @@ session() {
 	[ "$LHDE_WM" = fvwm ] && [ -z "$LHDE_PICOM" ] && lhpicom=yes   # fvwm: no luxshell to follow the theme
 	echo "lhde-session: theme $(cat "$STATE/theme"), picom $lhpicom, Windows files $LHDE_USER_DATA" >&2
 	[ "$lhpicom" = yes ] && picom_start
-	term=${LHDE_TERMINAL:-$(command -v urxvt || command -v xterm)}
-	[ -n "$term" ] && [ "$term" != none ] && (cd "$HOME" && setsid $term >/dev/null 2>&1 </dev/null &)
+	term=${LHDE_TERMINAL:-}
+	if [ -z "$term" ]; then (cd "$HOME" && setsid "$LHDE_THEME_TOOL" terminal --run "$HOME" >/dev/null 2>&1 </dev/null &)
+	elif [ "$term" != none ]; then (cd "$HOME" && setsid $term >/dev/null 2>&1 </dev/null &); fi
 	[ -x "$FLXPDESK" ] || echo 0 > "$STATE/desktop"
 	if [ "$LHDE_WM" = fvwm ]; then exec fvwm2 -f "$LHDE_SESSION_DIR/lab.fvwm2rc"; fi
 	# luxwm in a loop: a restart (or a crash) brings it back without ending the session

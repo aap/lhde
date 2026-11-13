@@ -22,11 +22,10 @@ return {
   sidebar = { width = 150, bg_grid = {0, 0, 0, 0}, sizer = { w = 6, image = 1108 } },
   tile_bg = 1000,                                         -- Slate repaints 1000 under each tile
   -- 4074 Administrator SidebarTiles: Search, Notification History, Quick Launch, Classic Tray (+ the transient Power, the pinned
-  -- Clock), top to bottom (luxshell has no Search tile); after Power luxshell's volume, brightness and touchpad (no 4074 module:
-  -- XP's tray icons as tiles; brightness and touchpad hide themselves without the device)
-  tiles = { "notifyhistory", "quicklaunch", "notifications", "power", "volume", "brightness", "touchpad", "clock" },
+  -- Clock), top to bottom (luxshell has no Search tile); volume, brightness and touchpad are tray items of the Classic Tray
+  tiles = { "notifyhistory", "quicklaunch", "notifications", "power", "clock" },
   pinned_tiles = { "notifications", "clock" },            -- sidebar modes pinned / minimized (SHELL-DESIGN 7.3)
-  taskbar_tiles = { "notifyhistory", "quicklaunch", "notifications", "volume", "brightness", "touchpad", "clock" },   -- minimized: 4074 TaskbarTiles (all five) + luxshell's three beside the tray
+  taskbar_tiles = { "notifyhistory", "quicklaunch", "notifications", "clock" },   -- minimized: 4074 TaskbarTiles (all five)
   -- popup menus: the 4074 Slate [sysmetrics] FLATMENUS colours (MENU, MENUTEXT, MENUHILIGHT, GRAYTEXT)
   menu = { bg = "#ffffff", text = "#373738", hot = "#edb078", hot_text = "#000000", border = "#969696", gray = "#969696" },
 }

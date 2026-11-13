@@ -356,6 +356,7 @@ NOTEPAD_WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_CREATE:
         Globals.hMainWnd = hWnd;
         Globals.hMenu = GetMenu(hWnd);
+        shell::set_window_icon_key(hWnd, "notepad");   /* the icon set's notepad.exe icon over our own (luxpad.ico) */
 
         DragAcceptFiles(hWnd, TRUE); /* Accept Drag & Drop */
 

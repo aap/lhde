@@ -20,6 +20,7 @@
 #include "config.h"
 #include "util.h"
 #include "mime.h"
+#include <lhde/settings.h>
 
 namespace shell {
 
@@ -517,7 +518,7 @@ bool spawn(const std::vector<std::string>& argv, const std::string& cwd, std::st
     return true;
 }
 
-std::string terminal_command() { return setting("terminal", "urxvt"); }
+std::string terminal_command() { char b[1024]; return lhde_terminal_command(b, sizeof b); }
 
 static std::string with_dir(std::string cmd, const std::string& dir)
 {
@@ -529,7 +530,7 @@ bool open_terminal(const std::string& dir, std::string* err)
 {
     std::string cmd = terminal_command();
     std::string prog = cmd.substr(0, cmd.find_first_of(" \t"));
-    if (!in_path(prog)) { if (err) *err = "The terminal program \"" + prog + "\" was not found. Set FLXP_TERMINAL or terminal= in " + settings_path() + "."; return false; }
+    if (!in_path(prog)) { if (err) *err = "The terminal program \"" + prog + "\" was not found. Set [commands] terminal in settings.ini (docs/SETTINGS.md)."; return false; }
     return spawn({ "/bin/sh", "-c", with_dir(terminal_command(), dir) }, dir, err);
 }
 

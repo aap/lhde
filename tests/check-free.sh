@@ -10,6 +10,8 @@
 #   - every shipped theme resolves: lhde-theme explain and explain --files succeed;
 #   - classic and the themes of build reactos resolve with nothing missing (classic: but its colour scheme, which ReactOS does
 #     not carry: the built-in Windows Standard);
+#   - every icon key of the icon set recipes (share/icons/*.theme) and every key the class map (share/icons/apps.ini) names
+#     has an image in the free set (lhde-theme icon --set reactos --key KEY: reactos itself, or Wine's for what ReactOS lacks);
 #   - luxwm's Windows Classic frames render through the frame regression (regress.sh --classic-only, ReactOS's Tahoma and Marlett)
 #     against a baseline of their own, build/luxwm/regress/baseline-free.sha256 (written on the first run); whether they equal the
 #     normal run's classic renders (whose fonts are the imported build's) is reported, not required.
@@ -64,6 +66,16 @@ done
 [ $fails -eq 0 ] || { echo "FAIL  free baseline: $fails of $n themes"; exit 1; }
 echo "ok    free baseline: $n themes resolve with only the free pack imported ($W, from $(basename "$iso")${walls:+ and $walls})"
 [ -z "$nowall" ] || echo "      (without the free themes' photos: no FREE_WALLPAPERS directory beside the ISO, their wallpaper is missing)"
+keys=$(sed -n '/^\[icons\]/,/^\[/{s/^\([a-z_0-9]*\) *=.*/\1/p}' share/icons/*.theme | sort -u)
+mapped=$(sed -n '/^\[classes\]/,/^\[/{s/^[^;[][^=]*= *\([a-z_0-9]*\) *$/\1/p}' share/icons/apps.ini | sort -u)
+nk=0 bad=
+for k in $keys $mapped; do
+	nk=$((nk + 1))
+	out=$("$lt" icon --set reactos --key "$k" --size 32 2>&1) || bad="$bad $k"
+	case "$out" in *"icons/wine.theme"*|*"icons/reactos.theme"*|none) ;; *) bad="$bad $k($out)";; esac
+done
+[ -z "$bad" ] || { echo "FAIL  free baseline: icon keys without an image in the free set:$bad"; exit 1; }
+echo "ok    free baseline: $nk icon keys (the recipes' and the class map's) have an image in the free set"
 R=$top/build/luxwm/regress
 st=0
 FRAMETEST_FONTS="$W/index/fonts/reactos" LUXWM_BASELINE="$R/baseline-free.sha256" luxwm/tests/regress.sh --classic-only "$R/out-free" \

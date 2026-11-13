@@ -9,10 +9,9 @@
 		scene-node drawing is menu.lua before the commit that moved it onto the painter
 
 * sidebar
-	* unclear how quicklaunch icons are chosen
-		* perhaps tie into the grander lhde icon system?
-
-	* new tray icons (volume, brightness, touchpad are tiles/*.lua, SHELL-DESIGN 8.6):
+	* new tray icons (volume, brightness, touchpad are trayitems/*.lua in the Classic Tray tile, SHELL-DESIGN 8.6):
 		* network/wifi
 		* bluetooth
 	* the taskbar view's tiles (taskbar_tiles) cannot be removed by the user
+
+* the battery (power) tile is too bright (aap): compare against lh4074-193747.png and the fact sheet, tone the plate/text

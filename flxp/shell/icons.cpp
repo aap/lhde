@@ -14,6 +14,7 @@
 #include "lhtheme.h"
 #include "gdi/bmp.h"
 #include "gdi/image.h"
+#include <lhde/icon.h>
 
 namespace shell {
 
@@ -214,6 +215,8 @@ bool select_icon_theme(const std::string& name)
     g_requested = name;
     g_generation++;
     std::string want = name.empty() ? "xp" : name;
+    std::string recipe = icon_theme_file(want);
+    lhde_app_icons_set(recipe.empty() ? nullptr : recipe.c_str());   // the window and program icons' keys (app_icon)
     if (load_icon_theme(want) && theme_usable(g_theme)) {
         drop_missing_toolbar(g_theme.toolbar);
         return true;
@@ -343,6 +346,51 @@ gdi::Bitmap* load_art(const std::string& src)
     if (res::find(m, res::Id(res::RT_BITMAP), res::Id((uint32_t)atoi(src.c_str() + hash + 1)), b)) out = gdi::decode_bmp(b.data, b.size);
     res::unload(m);
     return out;
+}
+
+// liblhde's image (one size, at or above px) box-filtered or enlarged to px x px
+static std::vector<unsigned long> fit(unsigned long* im, unsigned long n, int px)
+{
+    std::vector<unsigned long> out;
+    if (!im) return out;
+    unsigned long bw = im[0], bh = im[1];
+    if (n >= 2 + bw * bh && bw && bh && px > 0) {
+        out.assign(2 + (size_t)px * px, 0);
+        out[0] = out[1] = (unsigned long)px;
+        const unsigned long* src = im + 2;
+        for (int y = 0; y < px; y++)
+            for (int x = 0; x < px; x++) {
+                unsigned long x0 = x * bw / px, x1 = (x + 1) * bw / px, y0 = y * bh / px, y1 = (y + 1) * bh / px;
+                if (x1 <= x0) x1 = x0 + 1;
+                if (y1 <= y0) y1 = y0 + 1;
+                uint64_t a = 0, r = 0, g = 0, b = 0, k = 0;
+                for (unsigned long sy = y0; sy < y1 && sy < bh; sy++)
+                    for (unsigned long sx = x0; sx < x1 && sx < bw; sx++) {
+                        uint32_t p = (uint32_t)src[sy * bw + sx], pa = p >> 24;
+                        a += pa; r += ((p >> 16) & 255) * pa; g += ((p >> 8) & 255) * pa; b += (p & 255) * pa; k++;
+                    }
+                if (k && a) out[2 + (size_t)y * px + x] = (uint32_t)(a / k) << 24 | (uint32_t)(r / a) << 16 | (uint32_t)(g / a) << 8 | (uint32_t)(b / a);
+            }
+    }
+    free(im);
+    return out;
+}
+
+std::vector<unsigned long> app_icon(const std::string& wm_class, const std::string& instance, const std::string& desktop_id, int px, bool generic)
+{
+    icon_theme();   // the set selected, and handed to liblhde
+    unsigned long n = 0;
+    unsigned long* im = lhde_app_icon(wm_class.empty() ? nullptr : wm_class.c_str(), instance.empty() ? nullptr : instance.c_str(),
+                                      desktop_id.empty() ? nullptr : desktop_id.c_str(), px, nullptr, 0,
+                                      generic ? 0 : LHDE_APPICON_NO_GENERIC, &n, nullptr, nullptr, 0);
+    return fit(im, n, px);
+}
+
+std::vector<unsigned long> key_icon(const std::string& key, int px)
+{
+    icon_theme();
+    unsigned long n = 0;
+    return fit(lhde_icon_key_image(key.c_str(), px, &n, nullptr, 0), n, px);
 }
 
 } // namespace shell

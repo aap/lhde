@@ -1,4 +1,4 @@
--- Volume tile: XP's tray speaker (stobject / sndvol32) as a sidebar tile and a taskbar icon, on the default sink.
+-- Volume: XP's tray speaker (stobject / sndvol32), a tray item (traycontrol.lua C.item), on the default sink.
 -- Read and set through the first that answers of wpctl (PipeWire), pactl (PulseAudio, pipewire-pulse) and amixer (ALSA,
 -- Master): `wpctl get-volume @DEFAULT_AUDIO_SINK@` ("Volume: 0.40 [MUTED]"), `pactl get-sink-volume / get-sink-mute
 -- @DEFAULT_SINK@`, `amixer get Master` ("[40%] ... [on]"). Changes by other programs: `pactl subscribe` (sink and server events)
@@ -92,12 +92,11 @@ local function set_mute(self, on)
   self.run_set("mute", backends[self.backend].mute(on))
 end
 
-return C.tile{
+return C.item{
   name = "Volume",
   start = start, stop = stop,
   -- XP's tray speaker has no level steps; the waves (0 %: none, under 50 %: one, else two) are ours
   icon = function(st) if st.muted then return "speaker-muted" end local v = st.volume or 0; return "speaker-" .. (v <= 0 and 0 or v < 50 and 1 or 2) end,
-  label = function(st) if st.error then return "Volume: ?" end return (st.muted and "Muted: " or "Volume: ") .. (st.volume or 0) .. "%" end,
   tooltip = function(st) if st.error then return "Volume: " .. st.error end return "Volume: " .. (st.volume or 0) .. "%" .. (st.muted and " (muted)" or "") end,
   wheel = function(self, dir) local st = self.st; if not st or st.error then return end
     local v = st.volume or 0; if dir > 0 and v >= 100 then return end

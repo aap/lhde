@@ -353,6 +353,27 @@ lhde-theme layer-set Desktop.icons xp-hires                                     
 The 16 px images are the 1024 px pictures scaled down: softer than XP's hand-drawn 16 px icons; at 32 px and up they are
 sharper.
 
+### Window icons
+A window without an icon of its own gets one from the class map (docs/THEME-FORMAT.md section 9): terminals (urxvt, xterm,
+st, alacritty, kitty, foot, `*terminal*`, ...) cmd.exe's, Display Properties desk.cpl's Display icon, luxpad notepad.exe's;
+then its desktop file's `Icon=`, then the generic application icon. The same answer is in the caption, the Alt+Tab switcher,
+the task buttons and the Open With list. Your own patterns go first in `~/.config/lhde/icons/apps.ini`:
+```
+[classes]
+mpv = video
+my-terminal* = cmd
+```
+cmd.exe, desk.cpl and notepad.exe are part of the xp, 2k, 4074 and reactos imports; a Windows tree imported before they were
+gets them by importing those media again (files already there are kept): `lhde-import --iso` of the same ISOs, or
+`lhde-import --pack` of a pack made again with `lhde-pack`. `lhde-theme icon urxvt` says what a window of a class gets and
+where it comes from.
+
+The terminal every part of the desktop starts (Super+Return, Open Terminal Here, Quick Launch's Command Prompt, a
+`Terminal=true` program) is settings.ini `[commands] terminal` (docs/SETTINGS.md "The terminal"), by default the first of `cmd`,
+`urxvt`, `xterm`, `x-terminal-emulator` on PATH: a script `cmd` of your own that starts a terminal looking like cmd.exe is
+taken first. It runs in the folder it is opened for; for `Terminal=true` programs it gets `-e PROGRAM ARGS...`, so such a script
+passes its arguments on (`exec urxvt -bg '#000000' ... "$@"`).
+
 ## lhde-theme
 The resolver from the shell (docs/THEME-FORMAT.md, liblhde):
 ```
@@ -373,6 +394,8 @@ lhde-theme style jade4074               what liblhde reads from a style (kind, f
 lhde-theme explain [THEME]              where every visible part comes from ("When something looks wrong" above); --files THEME
 lhde-theme dirs [--list|--windows|--user]   the three trees and the search order; --list for scripts
 lhde-theme find REL | find KIND NAME    one data file (exit 1 when no tree has it); lhde-theme path VALUE: a theme value as a path
+lhde-theme icon urxvt [INSTANCE]        the icon a window of that WM_CLASS gets (class map, desktop file, generic) and from where;
+                                        --key KEY [--set ICONS]: one icon key's image; --desktop ID, --size N
 ```
 
 ## Themes and switching them
@@ -445,10 +468,11 @@ opening it again, a click on a task button closes it without switching; a click 
 there. The sources (Wine's and ReactOS's menu loop, Microsoft's documentation) and how it is done over X: docs/CLIENT-PROTOCOL.md
 "Menus and clicks". Any mouse button activates a window (left, middle or right), as in Windows.
 
-**Window icons.** Captions and task buttons show the window's `_NET_WM_ICON` (the size nearest at or above 16 px), else its
-`WM_HINTS` icon pixmap (xterm, xclock, Xt/Motif/FOX programs), else the theme's default icon: on the glass themes the Windows flag
-(`DEFAULTICON` of the msstyles), on the classic and Luna themes and on the taskbar the XP application icon. A window that changes its
-icon is redrawn at once.
+**Window icons.** Captions, the Alt+Tab switcher and task buttons show the window's `_NET_WM_ICON` (the size nearest at or above
+16 px), else what the class map or its desktop file gives ("Window icons" under "Getting the Windows resources": terminals get
+cmd.exe's), else its `WM_HINTS` icon pixmap (xclock, Xt/Motif/FOX programs), else the generic application icon, else the theme's
+default icon: on the glass themes the Windows flag (`DEFAULTICON` of the msstyles), on the classic and Luna themes the XP
+application icon. A window that changes its icon is redrawn at once.
 
 **Switching.**
 
@@ -482,7 +506,7 @@ lhde-session stop                                    end the session: luxshell, 
 ```
 Environment: `LHDE_PICOM=0|1` forces the compositor off / on for the session, luxshell included; `LHDE_SHELL=0` without luxshell;
 `LHDE_DESKTOP=0` without flxp-desktop (luxshell then shows its own desktop layer); `LHDE_WM=fvwm` an fvwm2 session (`lab.fvwm2rc`);
-`LHDE_TERMINAL=COMMAND` (default urxvt, else xterm; `none` for no terminal); `LHDE_WINDOWS` another Windows tree. State and logs:
+`LHDE_TERMINAL=COMMAND` (default the terminal of settings.ini `[commands] terminal`; `none` for no terminal); `LHDE_WINDOWS` another Windows tree. State and logs:
 `$XDG_RUNTIME_DIR/lhde-session<DISPLAY>/` (`theme`, `shell`, `desktop`, `luxwm.log`, `luxshell.log`, `flxp-desktop.log`,
 `picom.log`, `session.log`). A real session without a D-Bus session bus gets one of its own, stopped with the session.
 
@@ -900,16 +924,15 @@ light blue) and open where you click, flipped to the left / upwards where they w
   pinned tiles), *&lt;Name&gt; Tile Properties* (clock: a flyout with the layouts and the pinned switch; power: the power flyout;
   tray: greyed, it has none), *Remove &lt;Name&gt; Tile* (not on pinned tiles, as in 4074; the sidebar menu brings it back).
 
-**Volume, brightness, touchpad** (docs/SHELL-DESIGN.md 8.6). The 4074 packs put three tiles of luxshell's after Power, and their
-icons beside the tray in the minimized sidebar's taskbar view. *Volume*: the default output's level through PipeWire (`wpctl`),
+**Volume, brightness, touchpad** (docs/SHELL-DESIGN.md 8.6) are tray icons of luxshell's: in the Classic Tray tile after the
+programs' tray icons, and after them in the minimized sidebar's taskbar view. *Volume*: the default output's level through PipeWire (`wpctl`),
 PulseAudio (`pactl`) or ALSA (`amixer`), whichever is installed and answers (`LHSHELL_VOLUME=pactl` picks one); a click opens
-XP's small volume popup (the trackbar and *Mute*), the mouse wheel over the tile or icon changes it in 2 % steps, a middle click
+XP's small volume popup (the trackbar and *Mute*), the mouse wheel over the icon changes it in 2 % steps, a middle click
 mutes; the tooltip says "Volume: 40%", or which tool is missing or failing. *Brightness*: the backlight in
 `/sys/class/backlight`, set with `brightnessctl` when installed, else directly when the file is writable for you (the `video`
 group on many systems); the same popup, 5 % steps; not shown without a backlight. *Touchpad*: a click turns the touchpad off
-and on (`xinput`); not shown without one. A tile's menu removes it (*Remove Volume Tile*); the sidebar menu's parts list does
-not list them, so to get them back delete `[sidebar] tiles` from `~/.local/state/lhde/luxshell-state.ini` (the pack's list
-returns), or leave them out of a pack's `tiles` / `taskbar_tiles` for good.
+and on (`xinput`); not shown without one. They go and come with the Classic Tray tile. With the classic taskbar
+(flxp-taskbar holds the tray) they stay in the sidebar's Classic Tray tile, alone.
 - **Taskbar menu** (Avalon taskbar): right-click an empty part. 4074's items: *Minimize bar* / *Restore bar* (the sidebar),
   *Properties* (the settings flyout: theme list, Save as..., composition, taskbar kind and autohide, start menu, sidebar
   mode and stacking, wallpaper), *Task Manager* (the first of xfce4-taskmanager, lxtask, gnome-system-monitor,

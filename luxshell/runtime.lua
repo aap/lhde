@@ -84,6 +84,8 @@ lh.effective_theme = effective
 -- written when it does not describe this record yet (luxwm writes the same record when it resolves first)
 local function publish_resolved(e)
   if not e then return end
+  -- the window icons' keys from the theme's icon set (lh.app_icons: liblhde's lookup, the task buttons' icons)
+  lh.app_icons((e.v["path.icons"] or "") ~= "" and e.v["path.icons"] or (e.v["Desktop.icons"] == "wine" and "wine" or nil))
   local serial = lh.root_prop("_LH_SETTINGS_SERIAL"); if math.type(serial) ~= "integer" then serial = 0 end
   local mine = "theme=" .. e.name .. "\n" .. (e.record or "")
   local cur = lh.root_prop("_LH_THEME_RESOLVED")
@@ -729,12 +731,13 @@ local function pinned_names() return T.pinned_tiles or { "notifications", "clock
 -- the tile list: state.ini [sidebar] tiles (written by Move Up / Move Down, Remove ... Tile and the sidebar menu's parts list;
 -- "none" = empty) as long as [sidebar] tiles_base still names the pack's own list it was made from (another pack, or the pack's
 -- list edited, falls back to the pack's); a state.ini without tiles_base: when it names the same tiles as the pack's
+local TRAY_ITEMS = { volume = true, brightness = true, touchpad = true }   -- once tiles, now in the tray: dropped from a saved list
 local function tile_names()
   local own = S.state_get("sidebar", "tiles")
   local base = T.tiles or { "clock" }
   if own then
     local t, seen = {}, {}
-    for n in own:gmatch("[^;%s]+") do if n ~= "none" then table.insert(t, n); seen[n] = true end end
+    for n in own:gmatch("[^;%s]+") do if n ~= "none" and not TRAY_ITEMS[n] then table.insert(t, n); seen[n] = true end end
     if S.state_get("sidebar", "tiles_base") == table.concat(base, ";") then return t end
     local same = #t == #base; for _, n in ipairs(base) do if not seen[n] then same = false end end
     if same then return t end
@@ -1055,18 +1058,17 @@ end
 -- "Remove <Friendly Name> Tile" unless pinned.
 -- Our additions, in their own group: "Lock the Sidebar" ([sidebar] locked) and "Stacking" ([sidebar] stacking).
 -- Mnemonics are ours (the 4074 Avalon menus draw none); "&" marks them (menu.lua).
--- The 4074 module list with our Brightness, Touchpad and Volume tiles among them (alphabetical, as 4074's list); `id` = the
--- tiles/<id>.lua that implements it, the others are greyed.
+-- The 4074 module list (alphabetical, as 4074's list); `id` = the tiles/<id>.lua that implements it, the others are greyed.
+-- Volume, Brightness and Touchpad are tray items in the Classic Tray tile (tiles/notifications.lua), not parts.
 local PARTS = {
-  { "Basket" }, { "Brightness", id = "brightness" }, { "Classic Tray", id = "notifications" }, { "Contacts" }, { "News Feed" },
+  { "Basket" }, { "Classic Tray", id = "notifications" }, { "Contacts" }, { "News Feed" },
   { "Notification History", id = "notifyhistory" }, { "People nearby" }, { "Quick Launch", id = "quicklaunch" }, { "Search" },
-  { "Slide Show" }, { "Sync" }, { "Touchpad", id = "touchpad" }, { "Volume", id = "volume" },
+  { "Slide Show" }, { "Sync" },
 }
 local TRANSIENT = { { "Power (Transient)", id = "power" }, { "Web Host Tile (Transient)" } }
-local FRIENDLY = { notifications = "Classic Tray", power = "Power", clock = "Clock", quicklaunch = "Quick Launch", notifyhistory = "Notification History",
-                   volume = "Volume", brightness = "Brightness", touchpad = "Touchpad" }   -- the modules' Friendly Name
+local FRIENDLY = { notifications = "Classic Tray", power = "Power", clock = "Clock", quicklaunch = "Quick Launch", notifyhistory = "Notification History" }   -- the modules' Friendly Name
 local function friendly(t) return FRIENDLY[t.id] or t.name or t.id end
-local KNOWN_ORDER = { "notifyhistory", "quicklaunch", "notifications", "power", "volume", "brightness", "touchpad", "clock" }   -- 4074 SidebarTiles order, ours after power
+local KNOWN_ORDER = { "notifyhistory", "quicklaunch", "notifications", "power", "clock" }   -- 4074 SidebarTiles order
 local function tile_shown(id) for _, n in ipairs(tile_names()) do if n == id then return true end end return false end
 -- add (at its place in the pack's order, else before the next known tile) or remove a tile from the list; persisted
 local function set_tile_shown(id, on)
@@ -1247,7 +1249,7 @@ local function task_manager()
     for _, c in ipairs{ "xfce4-taskmanager", "lxtask", "gnome-system-monitor", "mate-system-monitor", "qps" } do
       if have(c) then taskmgr_cmd = c break end
     end
-    if not taskmgr_cmd and have("xterm") then taskmgr_cmd = "xterm -title 'Task Manager' -e top" end
+    if not taskmgr_cmd then taskmgr_cmd = lh.terminal():gsub("%%d", "~") .. " -e top" end   -- in the terminal ([commands] terminal)
   end
   return taskmgr_cmd or nil
 end

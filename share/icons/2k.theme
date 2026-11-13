@@ -32,9 +32,15 @@ trash = pe:shell32.dll#32
 help = pe:shell32.dll#24
 pictures = pe:resources/xp/shell32.dll#236   ; not in 2000's shell32 (mydocs.dll, ...): XP's, 4-bit frames
 control_panel = pe:shell32.dll#137
-display = pe:resources/4074/desk.cpl#100
 run = pe:shell32.dll#25
 recent = pe:shell32.dll#21
+; window and program icons (icons/apps.ini maps window classes to them; lhde/icon.h): exe above is the generic one
+cmd = pe:cmd.exe#IDI_APPICON
+display = pe:desk.cpl#100
+notepad = pe:notepad.exe#1
+explorer = pe:explorer.exe#100
+browser = pe:shell32.dll#14
+; mail: no envelope in Windows 2000's shell32 or explorer.exe (the free chain answers)
 
 [toolbar]
 ; browseui's IE5-era standard buttons (IDB_SHSTDHICOLOR 276 / HOTHICOLOR 277, 20 px; ..16 278/279)

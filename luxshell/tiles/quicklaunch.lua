@@ -6,9 +6,12 @@
 -- (separators 35 rows apart); the FlowPanel wraps to further rows (24 px apart, our choice) when the bar is too narrow
 -- (4088: one icon per row on a narrow bar).
 -- The folder: a directory of .desktop files, settings.ini [quicklaunch] dir, default ~/.config/lhde/quicklaunch/. When it does not
--- exist it is created once with copies of the browser, the mail client, the file manager (flxp) and a terminal (4074's folder held
--- IE and Outlook Express); an emptied folder stays empty. Shortcuts are shown in file-name order; the folder is re-read when it
--- changes (5 s poll). A click launches (apps.lua A.launch: field codes dropped, Terminal=true in xterm, counted in the MFU list).
+-- exist it is created once with copies of the browser, the mail client, the file manager (flxp) and cmd.desktop, Command Prompt:
+-- the terminal of settings.ini [commands] terminal through `lhde-theme terminal --run` (4074's folder held IE and Outlook
+-- Express); an emptied folder stays empty. Shortcuts are shown in file-name order; the folder is re-read when it changes (5 s
+-- poll). A click launches (apps.lua A.launch: field codes dropped, Terminal=true in the terminal, counted in the MFU list).
+-- Icons: the entry's Icon= (apps.lua A.icon: the XDG icon theme, SVG converted), else liblhde's lookup by the file's name (the
+-- class map: cmd.desktop gets cmd.exe's icon), else the generic application icon (lh.app_icon), else imageres 1056.
 local tile = { name = "Quick Launch", height = 35, tooltip = "Quick Launch" }
 local ICON, PITCH, ORIGIN = 16, { 28, 24 }, { 5, 6 }
 
@@ -37,12 +40,11 @@ local function populate(dir, A)
       if f then f:write("[Desktop Entry]\nType=Application\nName=Explorer\nGenericName=File Manager\nExec=" .. p .. " %F\nIcon=system-file-manager\nCategories=System;FileManager;\n"); f:close() end
     end
   end
-  local term
-  for _, id in ipairs{ "xterm.desktop", "org.gnome.Terminal.desktop", "org.kde.konsole.desktop", "xfce4-terminal.desktop", "Alacritty.desktop", "foot.desktop", "uxterm.desktop" } do
-    if A.get(id) then term = id break end
-  end
-  if not term then for _, e in ipairs(A.list()) do if e.categories.TerminalEmulator then term = e.id break end end end
-  add(term)
+  -- the standard terminal ([commands] terminal, read at every launch); no Icon=: the class map's cmd by the file's name
+  local lt = lh.prog("lhde-theme"):gsub("^'(.*)'$", "%1")
+  local f = io.open(dir .. "/cmd.desktop", "w")
+  if f then f:write("[Desktop Entry]\nType=Application\nName=Command Prompt\nComment=The terminal (settings.ini [commands] terminal)\nExec=" ..
+    lt .. " terminal --run\nCategories=System;TerminalEmulator;\n"); f:close() end
 end
 function tile.entries()
   local A, dir = lh.apps, tile.dir()
@@ -60,9 +62,10 @@ function tile.entries()
   return out
 end
 
--- one icon button: the entry's icon (icon theme / path, apps.lua A.icon), else imageres 1056 (the sidebar's default icon)
+-- one icon button: the entry's icon (icon theme / path, apps.lua A.icon), else liblhde's (the class map by the file's name,
+-- the generic application icon), else imageres 1056 (the sidebar's default icon)
 local function icon_button(parent, e, x, y, R)
-  local img = lh.apps.icon(e.icon, ICON) or R(1056)
+  local img = lh.apps.icon(e.icon, ICON) or (e.path and (lh.app_icon(e.path, ICON) or lh.app_icon(e.path, ICON, true))) or R(1056)
   local b = parent:add(lh.node{ kind = "button", x = x, y = y, w = ICON, h = ICON, layout = "fill" })
   b:add(lh.node{ kind = "image", image = img, w = ICON, h = ICON, filter = "best" })
   b.on_click = function(_, button) if button == 1 then lh.apps.launch(e) end end
