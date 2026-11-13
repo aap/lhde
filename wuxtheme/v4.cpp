@@ -149,7 +149,7 @@ bool bitmaps_premultiplied(res::Module* m)
         uint32_t hdr = u32(d), comp = u32(d + 16);
         int32_t w = i32(d + 4), h = i32(d + 8);
         uint16_t bpp; memcpy(&bpp, d + 14, 2);
-        if (bpp != 32) return false;                 // the old compiler kept 1..24 bpp images too
+        if (bpp != 32) return false;                 // older style compilers keep 1..24 bpp images too
         if (comp != 0 || w <= 0) continue;
         size_t n = (size_t)w * (size_t)(h < 0 ? -h : h) * 4;
         if (hdr + n > e.data.size) continue;

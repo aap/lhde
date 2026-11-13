@@ -1,4 +1,4 @@
-// The popup menu painter (menu.h): XP's popup menus as ntuser draws them (mncomput.c, mndraw.c; read, not copied), in the
+// The popup menu painter (menu.h): XP's popup menus as XP draws them, in the
 // visual style's colours and menu font, and the Longhorn / Vista Menu class where the style has one. Drawn with GDI into any
 // DC: user32's menus (wux, menu.c.patch) and luxwm's window menu (ut_menu_draw, ut.cpp) are the same pixels.
 #include <string.h>
@@ -72,7 +72,7 @@ void glyph(HDC dc, COLORREF c, int g, int x, int y)
 }
 
 // XP's submenu arrow (OBI_MENUARROW, Marlett '8' in the 13 px check-sized cell at the item's end): 4 x 7, its right column 6 px
-// before the item's end (WinXP-193221.png)
+// before the item's end
 void arrow(HDC dc, COLORREF c, int right, int y, int h)
 {
     int x = right - 9, top = y + (h - 7) / 2;
@@ -149,7 +149,7 @@ void UXMENU_InitLook(UXMENU_LOOK* L, HTHEME theme, const COLORREF* sys, BOOL fla
                 sep_t = m.cyTopHeight; sep_b = m.cyBottomHeight;
             }
         }
-    } else {   // XP's mndraw.c colours: the selected item MENUHILIGHT framed in HIGHLIGHT (flat), else HIGHLIGHT
+    } else {   // XP's colours: the selected item MENUHILIGHT framed in HIGHLIGHT (flat), else HIGHLIGHT
         L->t_norm = L->text; L->t_hot = L->hltext; L->t_dis = L->gray;
         if (!L->flat) L->hl = L->hlframe;
         L->t_dishot = L->gray == L->hl ? L->hltext : L->gray;
@@ -158,7 +158,7 @@ void UXMENU_InitLook(UXMENU_LOOK* L, HTHEME theme, const COLORREF* sys, BOOL fla
     DeleteDC(dc);
 
     // geometry (XP: 1 px outline + CXEDGE inside; item = text + CYEDGE + 2; separator CYMENUSIZE / 2 with the etch at its
-    // middle - 1; text after MNLEFTMARGIN + the 13 px check column + MNXSPACE; the 4074 menus measure the same: border 1 + 2,
+    // middle - 1; text after a 2 px margin + the 13 px check column + 4 px; 4074's menus are the same: border 1 + 2,
     // text 22 px in)
     L->pad = 3;
     L->item_h = L->th + item_t + item_b + (L->theme ? 0 : 2);
@@ -185,7 +185,7 @@ void UXMENU_SetBand(UXMENU_LOOK* L, HTHEME toolbar, HTHEME menuband)
     L->band_arrow = menuband && SUCCEEDED(GetThemeColor(menuband, 0, 0, TMT_TEXTCOLOR, &c)) ? c : L->t_norm;
     L->band_gutter = m.cxLeftWidth;
     L->pad = 0;
-    L->band_icon_x = 10;                    // lh4074-215101.png: the icon 10 px from the outline, the text 35 (gutter + 3)
+    L->band_icon_x = 10;                    // 4074: the icon 10 px from the outline, the text 35 (gutter + 3)
     L->band_text_x = L->band_gutter + 3;
     L->text_x = L->band_text_x;
 }
@@ -249,12 +249,12 @@ void UXMENU_DrawArrow(const UXMENU_LOOK* L, HDC dc, const RECT* rc, unsigned fla
 {
     int h = rc->bottom - rc->top;
     int cx, cy;
-    if (L->band) {          // lh4074-215101.png: 4x7 in the menu band's text colour, its right column 7 px before the edge
+    if (L->band) {          // 4074: 4x7 in the menu band's text colour, its right column 7 px before the edge
         int x = rc->right - 10, top = rc->top + (h - 6) / 2;
         for (int k = 0; k < 4; k++) fill(dc, L->band_arrow, x + k, top + k, 1, 7 - 2 * k);
         return;
     }
-    // the style's arrow: its right edge 6 px before the item's end (lh4074-195235.png: the 9 x 9 FLYOUTARROW of Slate)
+    // the style's arrow: its right edge 6 px before the item's end (4074: the 9 x 9 FLYOUTARROW of Slate)
     if (L->theme && part_size(L, dc, L->p_arrow, (flags & UXMENU_DISABLED) ? 2 : 1, &cx, &cy)) {
         part(L, dc, L->p_arrow, (flags & UXMENU_DISABLED) ? 2 : 1, rc->right - 6 - cx, rc->top + (h - cy) / 2, cx, cy);
         return;

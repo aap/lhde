@@ -178,7 +178,7 @@ int ut_draw_caption(uint32_t *pixels, int width, int height, int stride, const u
 void ut_set_font_smoothing(int mode);
 
 /* ---- Popup menus: the painter of wux's user32 menus (wuxtheme/menu.h), for a window manager's own menus. XP's popup menu
- * (ntuser mncomput.c / mndraw.c) in the style's [SysMetrics] colours and MENUFONT, with the Longhorn / Vista Menu class
+ * in the style's [SysMetrics] colours and MENUFONT, with the Longhorn / Vista Menu class
  * (POPUPBORDERS, POPUPITEM, SEPARATOR, CHECK, FLYOUTARROW, SYSTEM*) where the style has POPUPITEM; Windows Classic from a
  * colour table. docs/LUXWM.md "The window menu". ---- */
 typedef struct {

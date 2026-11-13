@@ -1,7 +1,7 @@
 /* The popup menu painter: one implementation of a themed popup menu, at the GDI level, for user32's menus in wux (menu.c.patch)
- * and, through ut_menu_* (ut.h), for luxwm's window menu. XP's own drawing (ntuser mncomput.c / mndraw.c) with the visual style's
+ * and, through ut_menu_* (ut.h), for luxwm's window menu. XP's own drawing with the visual style's
  * colours and font, and the Longhorn / Vista Menu class (POPUPBORDERS, POPUPITEM, SEPARATOR, CHECK, FLYOUTARROW, ...) where the
- * style has one, as Longhorn 4074's user32 drew it (lh4074-195235.png). docs/LUXWM.md "The window menu". */
+ * style has one, as Longhorn 4074's user32 draws it. docs/LUXWM.md "The window menu". */
 #ifndef WUXTHEME_MENU_H
 #define WUXTHEME_MENU_H
 #include "windef.h"
@@ -46,7 +46,7 @@ enum { UXMENU_GLYPH_NONE, UXMENU_GLYPH_RESTORE, UXMENU_GLYPH_MINIMIZE, UXMENU_GL
  * Menu class (NULL: XP's drawing in those colours); font: the menu font (copied; NULL: Tahoma 8) */
 void UXMENU_InitLook(UXMENU_LOOK *L, HTHEME theme, const COLORREF *sys, BOOL flat, const LOGFONTW *font);
 void UXMENU_FreeLook(UXMENU_LOOK *L);
-/* the look of the shell's menu band, as 4074's start menu cascades are (lh4074-215101.png): for a style with the Longhorn Menu
+/* the look of the shell's menu band, as 4074's start menu cascades are: for a style with the Longhorn Menu
  * class, toolbar = its StartMenu::Toolbar (kept by the look when used) and menuband = StartMenu::MenuBand: the toolbar's
  * background (outline, icon gutter, background) over the whole menu, items edge to edge without a margin (the hot item, the
  * Menu class's POPUPITEM, over the outline), the icon 10 px and the text gutter + 3 px in, the submenu arrow XP's 4x7 in the

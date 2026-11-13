@@ -1,7 +1,7 @@
 // libuxtheme.so without a window system: the few user32/window calls the
 // vendored uxtheme makes (DrawThemeParentBackground, dialog textures, the
 // non-client metrics msstyles.c reads) answered as if there were no windows.
-// flxp itself links src/w32/user.cpp and sysparams.cpp instead of this file.
+// flxp itself links wux/w32/user.cpp and sysparams.cpp instead of this file.
 #include <string.h>
 #include <time.h>
 #include "w32/w32.h"

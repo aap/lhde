@@ -831,7 +831,7 @@ int ut_draw_caption(uint32_t* pixels, int width, int height, int stride, const u
     COLORREF cap = GetSysColor(active ? COLOR_ACTIVECAPTION : COLOR_INACTIVECAPTION);
     COLORREF grad = GetSysColor(active ? COLOR_GRADIENTACTIVECAPTION : COLOR_GRADIENTINACTIVECAPTION);
     int L = r.left, ch = r.bottom - r.top;
-    if (flags & UT_DC_ICON) {   // xxxDrawCaptionTemp: the icon slot is the caption's height wide, filled with the solid colour
+    if (flags & UT_DC_ICON) {   // XP: the icon slot is the caption's height wide, filled with the solid colour
         int slot = ch < r.right - L ? ch : r.right - L;
         RECT s = { L, r.top, L + slot, r.bottom };
         fill_rect(dc.hdc(), s, cap);
@@ -985,8 +985,8 @@ int ut_menu_draw(const ut_menu_spec* spec, const ut_menu_item* items, int n, int
     return 1;
 }
 
-// XP's drop shadow (user32 shadow.c's grey levels; lh4074-195235.png shows the same values under 4074's menus over the white
-// list: 142 171 212 241 252 = alpha 113 84 43 14 3). Image rows top down; the right edge's corner starts CY_SHADOW rows down.
+// XP's drop shadow (its grey levels; 4074's menus have the same values, over white
+// 142 171 212 241 252 = alpha 113 84 43 14 3). Image rows top down; the right edge's corner starts CY_SHADOW rows down.
 namespace {
 const unsigned char kShadowRamp[UT_MENU_SHADOW] = { 113, 84, 43, 14, 3 };   // the right and bottom edges, outwards
 const unsigned char kShadowTopRight[UT_MENU_SHADOW][UT_MENU_SHADOW] = {    // rows 5..9, columns w..w+4
