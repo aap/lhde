@@ -166,7 +166,7 @@ REACTOS_SRC      ?= $(HOME)/lib/reactos-$(REACTOS_VERSION)
 FREE_WALLPAPERS  ?= $(HOME)/cfg/wallpaper
 FREE_PACK_VERSION = 1
 FREE_PACK_NAME    = lhde-resources-free-$(FREE_PACK_VERSION)
-# FREE_PACK_URL is a placeholder until the pack is published (aap: a release asset of the repository); FREE_PACK_SHA256 is the
+# FREE_PACK_URL is a placeholder until the pack is published (a release asset of the repository); FREE_PACK_SHA256 is the
 # sha256 of the pack make free-pack builds from the release's ISO and the photos
 FREE_PACK_URL    ?= https://github.com/aap/lhde/releases/download/resources/$(FREE_PACK_NAME).zip
 FREE_PACK_SHA256  = 30556f1ab8c590173e151b2d646cb5a40750044e5b0e647fc99e4de4feb5c724
