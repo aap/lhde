@@ -857,6 +857,11 @@ static void menu_look( HWND hwnd, const POPUPMENU *menu, UXMENU_LOOK *look )
 {
     UXMENU_OpenLook( hwnd, menu && (menu->dwStyle & UXMENU_MNS_BAND), look );
 }
+/* flxp: the menu bar's look: opened without the window, which OpenThemeData would give the Menu class as its window theme */
+static void bar_look( UXMENU_LOOK *look )
+{
+    UXMENU_OpenLook( NULL, FALSE, look );
+}
 static void menu_look_done( UXMENU_LOOK *look )
 {
     UXMENU_CloseLook( look );
@@ -1735,7 +1740,7 @@ static void MENU_DrawMenuItem( HWND hwnd, POPUPMENU *menu, HWND hwndOwner, HDC h
     {
         UXMENU_LOOK look;
         BOOL themed;
-        menu_look( hwnd, menu, &look );
+        bar_look( &look );
         themed = look.theme && look.p_baritem;
         if (themed)
         {
@@ -4940,7 +4945,7 @@ DWORD WINAPI DrawMenuBarTemp(HWND hwnd, HDC hDC, LPRECT lprect, HMENU hMenu, HFO
     {   /* flxp: a style's bar parts (the painter), else XP's flat or classic bar and the 3D face line under it */
         UXMENU_LOOK look;
         BOOL themed;
-        menu_look( hwnd, lppop, &look );
+        bar_look( &look );
         themed = UXMENU_DrawBar( &look, hDC, lprect, bar_active( hwnd ) );
         menu_look_done( &look );
         if (!themed)
