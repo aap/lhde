@@ -462,10 +462,11 @@ opening it again, a click on a task button closes it without switching; a click 
 there. The sources (Wine's and ReactOS's menu loop, Microsoft's documentation) and how it is done over X: docs/CLIENT-PROTOCOL.md
 "Menus and clicks". Any mouse button activates a window (left, middle or right), as in Windows.
 
-**Window icons.** Captions and task buttons show the window's `_NET_WM_ICON` (the size nearest at or above 16 px), else its
-`WM_HINTS` icon pixmap (xterm, xclock, Xt/Motif/FOX programs), else the theme's default icon: on the glass themes the Windows flag
-(`DEFAULTICON` of the msstyles), on the classic and Luna themes and on the taskbar the XP application icon. A window that changes its
-icon is redrawn at once.
+**Window icons.** Captions, the Alt+Tab switcher and task buttons show the window's `_NET_WM_ICON` (the size nearest at or above
+16 px), else what the class map or its desktop file gives ("Window icons" under "Getting the Windows resources": terminals get
+cmd.exe's), else its `WM_HINTS` icon pixmap (xclock, Xt/Motif/FOX programs), else the generic application icon, else the theme's
+default icon: on the glass themes the Windows flag (`DEFAULTICON` of the msstyles), on the classic and Luna themes the XP
+application icon. A window that changes its icon is redrawn at once.
 
 **Switching.**
 

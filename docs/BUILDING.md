@@ -135,7 +135,10 @@ strips and the corner, XP's ramp, none with `[effects] menu_shadows = 0`: `tests
 bar's and the scroll bars' corner: the cursor over them, a drag sizes the window, 4074's dots under jade4074): `tests/headless/grip.sh`, the task band's folder picture against the Icons view's: `tests/headless/folderpic.sh`, flxp's memory on 600 6000 x 4000
 JPEGs in the Thumbnails view at 256 px, paged through and into a subfolder: the peak RSS under 400 MB, the view's images within
 their 64 MB budget plus what is on screen, some evicted, skipped without ImageMagick: `tests/headless/thumbsmem.sh`, a double
-click and Enter on a file with Run as running its command: `tests/headless/runas.sh`) on displays :71-:73
+click and Enter on a file with Run as running its command: `tests/headless/runas.sh`, the window and program icons through
+liblhde's lookup, counted by colour in screenshots of a scratch icon set: the Open With list's and Properties' Opens with icon
+from a desktop file, luxshell's task buttons and the Alt+Tab switcher with an xterm (the class map's cmd) and Display Properties
+(its display key), none generic: `tests/headless/appicons.sh`) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).

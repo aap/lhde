@@ -4,6 +4,7 @@
 #include <lhde/data.h>
 #include <lhde/theme.h>
 #include <lhde/settings.h>
+#include <lhde/icon.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
@@ -426,10 +427,21 @@ void icon_register(const char *key, cairo_surface_t *s) {
     for (struct iconent *e = icons; e; e = e->next) if (!strcmp(e->key, key)) { if (e->s) cairo_surface_destroy(e->s); e->s = s; return; }
     struct iconent *e = calloc(1, sizeof *e); snprintf(e->key, sizeof e->key, "%s", key); e->s = s; e->next = icons; icons = e;
 }
+/* a task button's icon, as every lhde consumer finds it (liblhde lhde_app_icon, docs/THEME-FORMAT.md section 9): _NET_WM_ICON,
+   the class map and the desktop file (WM_CLASS), WM_HINTS, the generic application icon; the pack's default icon is the Lua
+   side's fallback when none answers */
 static void client_update_icon(struct client *c) {
     unsigned long n; int fmt; unsigned char *d = get_prop(c->w, atom[A_NET_WM_ICON], XA_CARDINAL, &n, &fmt);
     cairo_surface_t *s = (d && fmt == 32) ? icon_from_netwm((unsigned long *)d, n, 16) : NULL; if (d) XFree(d);
-    if (!s) s = icon_from_wmhints(c->w, 16);   /* then WM_HINTS; the theme's default icon is the Lua side's fallback */
+    unsigned long *im = NULL;
+    if (!s) {
+        XClassHint ch = { NULL, NULL }; XGetClassHint(dpy, c->w, &ch);
+        im = lhde_app_icon(ch.res_class, ch.res_name, NULL, 16, NULL, 0, LHDE_APPICON_NO_GENERIC, &n, NULL, NULL, 0);
+        if (ch.res_class) XFree(ch.res_class); if (ch.res_name) XFree(ch.res_name);
+    }
+    if (!s && !im) s = icon_from_wmhints(c->w, 16);
+    if (!s && !im) im = lhde_app_icon(NULL, NULL, NULL, 16, NULL, 0, 0, &n, NULL, NULL, 0);
+    if (im) { s = icon_from_netwm(im, n, 16); free(im); }
     c->has_icon = s != NULL;
     char key[64]; snprintf(key, sizeof key, "@icon:%lu", c->w);
     icon_register(key, s);
@@ -478,6 +490,15 @@ static void clients_refresh(void) {
     for (int i = 0; i < nclients; i++) clients[i].active = clients[i].w == active_win;
     stacking_refresh();
     emit("windows", 0);
+}
+/* lh.app_icons(ICONS): the icon set the window icons' keys come from (the resolved theme's path.icons, "wine", nil for the
+   session theme's); when it changed every task button's icon is read again ("windows") */
+static int l_app_icons(lua_State *L) {
+    static char cur[4096] = "\1"; const char *v = luaL_optstring(L, 1, "");
+    if (!strcmp(cur, v)) return 0;
+    snprintf(cur, sizeof cur, "%s", v); lhde_app_icons_set(v[0] ? v : NULL);
+    for (int i = 0; i < nclients; i++) client_update_icon(&clients[i]);
+    emit("windows", 0); return 0;
 }
 static int l_windows(lua_State *L) {
     lua_newtable(L); int k = 1;
@@ -991,7 +1012,7 @@ static int l_image_filter(lua_State *L) {
 cairo_surface_t *image_get_hook(const char *path);
 
 static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"timer", l_timer}, {"cancel", l_cancel}, {"windows", l_windows}, {"activate", l_activate}, {"minimize", l_minimize}, {"close", l_close}, {"window_menu", l_window_menu},
-    {"tray_start", l_tray_start}, {"tray_count", l_tray_count}, {"tray_manager", l_tray_manager}, {"tray_stop", l_tray_stop},
+    {"app_icons", l_app_icons}, {"tray_start", l_tray_start}, {"tray_count", l_tray_count}, {"tray_manager", l_tray_manager}, {"tray_stop", l_tray_stop},
     {"selection_owner", l_selection_owner}, {"watch_selection", l_watch_selection}, {"own_selection", l_own_selection}, {"send_message", l_send_message}, {"send_root_message", l_send_root_message}, {"atom", l_atom},
     {"set_root_cardinal", l_set_root_cardinal}, {"struts", l_struts}, {"spawn_pid", l_spawn_pid}, {"notification_closed", l_notification_closed}, {"notification_action", l_notification_action},
     {"spawn", l_spawn}, {"pipe", l_pipe}, {"pipe_close", l_pipe_close}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"mtime", l_mtime}, {"exists", l_exists}, {"trim", l_trim},

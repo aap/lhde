@@ -68,4 +68,17 @@ std::string shellstyle_dll(const std::string& msstyles, const std::string& color
 // An image from a source: "pe:PATH#ID" (that PE's RT_BITMAP ID) or an image file. Null if missing.
 gdi::Bitmap* load_art(const std::string& src);
 
+// The icon of a window or a program, the answer every lhde consumer shares (liblhde lhde_app_icon, docs/THEME-FORMAT.md
+// section 9): the class map of WM_CLASS (wm_class, instance), the desktop file (desktop_id, a .desktop id, or found by the
+// class), the generic application icon (generic false: not that one). One image of px x px in _NET_WM_ICON's layout
+// { px, px, ARGB (straight alpha)... }, scaled from the source's nearest size at or above; empty when nothing answers. The
+// keys come from the selected icon set (select_icon_theme hands it to liblhde).
+std::vector<unsigned long> app_icon(const std::string& wm_class, const std::string& instance, const std::string& desktop_id,
+                                    int px, bool generic = true);
+// An icon key of the icon sets in the same layout (liblhde: this set, its fallbacks, the free chain): empty when none has it
+std::vector<unsigned long> key_icon(const std::string& key, int px);
+// A window's icon when it has no _NET_WM_ICON (the caller reads that): the class map and desktop file of its WM_CLASS, then
+// hint(window) (its WM_HINTS pixmap as such an array, the caller's), then the generic icon; display is the X Display*
+std::vector<unsigned long> window_icon(void* display, unsigned long window, int px, std::vector<unsigned long> (*hint)(unsigned long));
+
 } // namespace shell

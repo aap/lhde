@@ -84,6 +84,8 @@ lh.effective_theme = effective
 -- written when it does not describe this record yet (luxwm writes the same record when it resolves first)
 local function publish_resolved(e)
   if not e then return end
+  -- the window icons' keys from the theme's icon set (lh.app_icons: liblhde's lookup, the task buttons' icons)
+  lh.app_icons((e.v["path.icons"] or "") ~= "" and e.v["path.icons"] or (e.v["Desktop.icons"] == "wine" and "wine" or nil))
   local serial = lh.root_prop("_LH_SETTINGS_SERIAL"); if math.type(serial) ~= "integer" then serial = 0 end
   local mine = "theme=" .. e.name .. "\n" .. (e.record or "")
   local cur = lh.root_prop("_LH_THEME_RESOLVED")

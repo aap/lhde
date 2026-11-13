@@ -32,6 +32,7 @@ int main(int argc, char** argv)
 {
     std::vector<std::string> args, files;
     shell::PropertiesOptions o;
+    o.window_icon = "settings";   // the sheet is luxattr's window
     o.page = 1;
     bool opts = true;
     for (int i = 1; i < argc; i++) {

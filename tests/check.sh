@@ -132,6 +132,9 @@ else
     result "headless/luxpad.sh$(grep -m1 '^skip' "$T/luxpad.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxpad.log"
     tests/headless/properties.sh "$3" > "$T/properties.log" 2>&1; rc=$?
     result "headless/properties.sh$(grep -m1 '^skip' "$T/properties.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/properties.log"
+    # the window and program icons (lhde_app_icon): Open With, Properties' Opens with, luxshell's task buttons, Alt+Tab
+    tests/headless/appicons.sh "$1" > "$T/appicons.log" 2>&1; rc=$?
+    result "headless/appicons.sh$(grep -m1 '^skip' "$T/appicons.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/appicons.log"
     # a double click on a file with user.lux.run runs that command
     tests/headless/runas.sh "$1" > "$T/runas.log" 2>&1; rc=$?
     result "headless/runas.sh$(grep -m1 '^skip' "$T/runas.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/runas.log"

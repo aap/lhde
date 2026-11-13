@@ -58,8 +58,20 @@ struct State {
     int app_image;
     bool always;
     OpenWith* out;
+    HIMAGELIST apps;   // the programs' icons (shell::app_hicon), the dialog's own
 };
 State* s;
+
+// a program's 16 px icon in the dialog's list: the shared lookup (its desktop file's Icon=, the class map, the generic
+// application icon), else the caller's application image
+static int app_image(const shell::App* app)
+{
+    HICON h = shell::app_hicon(app->id, 16);
+    if (!h) h = ImageList_GetIcon(s->small, s->app_image, ILD_NORMAL);
+    int idx = h ? ImageList_AddIcon(s->apps, h) : -1;
+    if (h) DestroyIcon(h);
+    return idx >= 0 ? idx : 30000;
+}
 
 static HTREEITEM add(HWND tree, HTREEITEM parent, const std::string& text, const shell::App* app)
 {
@@ -70,7 +82,7 @@ static HTREEITEM add(HWND tree, HTREEITEM parent, const std::string& text, const
     std::u16string t = W(text);
     ins.item.pszText = (LPWSTR)t.c_str();
     ins.item.lParam = (LPARAM)app;
-    ins.item.iImage = ins.item.iSelectedImage = app ? s->app_image : 30000;   // out of range: the group nodes draw no icon
+    ins.item.iImage = ins.item.iSelectedImage = app ? app_image(app) : 30000;   // out of range: the group nodes draw no icon
     return (HTREEITEM)SendMessageW(tree, TVM_INSERTITEMW, 0, (LPARAM)&ins);
 }
 
@@ -104,7 +116,7 @@ static INT_PTR CALLBACK proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         set_text(dlg, IDC_OW_TYPE, "Type: " + (desc.empty() ? s->mime : desc + " (" + s->mime + ")"));
         CheckDlgButton(dlg, IDC_OW_ALWAYS, s->always ? BST_CHECKED : BST_UNCHECKED);
         HWND tree = GetDlgItem(dlg, IDC_OW_TREE);
-        SendMessageW(tree, TVM_SETIMAGELIST, TVSIL_NORMAL, (LPARAM)s->small);
+        SendMessageW(tree, TVM_SETIMAGELIST, TVSIL_NORMAL, (LPARAM)s->apps);
         std::vector<const shell::App*> rec = shell::apps_for(s->mime);
         HTREEITEM first = nullptr;
         if (!rec.empty()) {
@@ -146,10 +158,12 @@ static INT_PTR CALLBACK proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
 bool choose_program(HWND owner, const std::string& file_name, const std::string& mime,
                     HICON file_icon, HIMAGELIST small, int app_image, bool always_default, OpenWith* out)
 {
-    openwith::State st = { file_name, mime, file_icon, small, app_image, always_default, out };
+    openwith::State st = { file_name, mime, file_icon, small, app_image, always_default, out,
+                           ImageList_Create(16, 16, ILC_COLOR32 | ILC_MASK, 16, 16) };
     openwith::s = &st;
     INT_PTR r = DialogBoxParamW(module(), MAKEINTRESOURCEW(IDD_OPENWITH), owner, openwith::proc, 0);
     openwith::s = nullptr;
+    ImageList_Destroy(st.apps);
     return r == IDOK;
 }
 

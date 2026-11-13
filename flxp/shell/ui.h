@@ -27,6 +27,15 @@ HANDLE load_image(const std::string& src, UINT type, int cx, int cy, UINT flags 
 HICON icon_for_key(const std::string& key, int px);
 // The icon the Explorer shows for a file or folder (its icon key by name and type) at px.
 HICON icon_for(const std::string& path, int px);
+// An image in _NET_WM_ICON's layout (shell::app_icon's, px x px) as an HICON; null when empty. The caller destroys it.
+HICON icon_from_argb(const std::vector<unsigned long>& im);
+// A program's icon by its desktop file id (shell::App::id: the Open With list, Properties' Opens with), at px: the shared
+// lookup (shell::app_icon) with the desktop file's Icon= first (a program's own icon), then the class map by the id's name
+// (xterm.desktop: cmd), then the generic application icon
+HICON app_hicon(const std::string& desktop_id, int px);
+// A program's own window icon from an icon key (WM_SETICON ICON_SMALL 16 px and ICON_BIG 32 px, so _NET_WM_ICON):
+// flxp-settings "display", luxpad "notepad", luxshot "image"; false (nothing set) when no icon set has the key
+bool set_window_icon_key(HWND w, const std::string& key);
 
 // The Properties sheet of files and folders (XP's file Properties; flxp's Properties verb, luxattr), titled "NAME
 // Properties" ("a.txt, b.txt, ... Properties" for several), modal to owner (null: a window of its own). Two pages:
@@ -49,6 +58,7 @@ struct PropertiesOptions {
     std::string name;                 // one item: its name as the caller shows it (else the file's name)
     std::string type;                 // one item: its type as the caller shows it (else shell::type_name)
     std::string icon_key;             // one item: its icon key (else shell::icon_key of the name)
+    std::string window_icon;          // the sheet's own window icon, an icon key (luxattr: "settings"); none when empty
     // General's Change... beside "Opens with" (one file, not a folder), shown when set: called with the sheet's page as the
     // owner and the file's MIME type; true when the default program changed (the page shows the new one)
     std::function<bool(HWND page, const std::string& path, const std::string& mime)> change_program;

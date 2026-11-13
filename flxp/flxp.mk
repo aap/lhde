@@ -20,6 +20,7 @@ SHELLOBJS = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/shell/*.cpp)) $(LHDE_OBJS)
 # liblhde (<lhde/data.h>, <lhde/theme.h>, <lhde/settings.h>): the data directories, the theme resolver and the settings
 # store; its objects are linked into every flxp program and test with the shell model
 $(O)/flxp/shell/lhdata.o $(O)/flxp/shell/lhtheme.o $(O)/flxp/shell/settings.o $(O)/flxp/settings/settings.o: CXXFLAGS += -Iliblhde
+$(O)/flxp/shell/icons.o: CXXFLAGS += -Iliblhde
 # the shell layer's win32 part (shell/ui.h): linked with wux, so not into the native toolkit tests
 SHELLUIOBJS = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/shell/ui/*.cpp))
 EXPLOBJS  = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/explorer/*.cpp))

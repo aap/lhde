@@ -714,9 +714,12 @@ system menu). Drag: past 4 px the button takes the place of the one under the po
 kept for the X session in the root property `_LHSHELL_TASK_ORDER` (window ids, decimal, space separated, all desktops), so a
 restarted luxshell keeps it; new windows go to the end.
 
-Icon: `_NET_WM_ICON`, the smallest image >= 16 (else the largest), scaled once with `CAIRO_FILTER_BEST`; else the `WM_HINTS`
-icon pixmap + mask; else the pack's `default_icon` (shell32 16/3, IDI_APPLICATION, as Explorer). Re-read on every
-`_NET_WM_ICON` / `WM_HINTS` PropertyNotify.
+Icon: the lookup every lhde consumer shares (liblhde `lhde_app_icon`, docs/THEME-FORMAT.md section 9; luxshell.c
+`client_update_icon`): `_NET_WM_ICON`, the smallest image >= 16 (else the largest), scaled once with `CAIRO_FILTER_BEST`; else
+the class map (`icons/apps.ini`: terminals cmd.exe's icon) and the window's desktop file; else the `WM_HINTS` icon pixmap +
+mask; else the generic application icon (the icon set's `exe`, shell32 #3, IDI_APPLICATION, as Explorer); else the pack's
+`default_icon`. Re-read on every `_NET_WM_ICON` / `WM_HINTS` PropertyNotify, and all of them when the theme's icon set changes
+(`lh.app_icons`, from the resolved record's `path.icons`).
 
 Text: `taskbar_text = "plain"` (white, 4074) or `"glow"` (black over a white halo, the GDI coverage blurred: `taskbar_glow = {
 color, text, size = 4, strength = 2.5 }`), also used by the minimized sidebar's taskbar clock.
@@ -1037,7 +1040,7 @@ stopped by its pid (after checking `/proc/PID/comm` and `DISPLAY` in `/proc/PID/
 
 | Need | Mechanism |
 | --- | --- |
-| Window list, activation, minimise, close | EWMH (`_NET_CLIENT_LIST`, `_NET_WM_STATE`, `_NET_ACTIVE_WINDOW`, `_NET_WM_ICON`, `WM_HINTS`, `_NET_CLOSE_WINDOW`) |
+| Window list, activation, minimise, close | EWMH (`_NET_CLIENT_LIST`, `_NET_WM_STATE`, `_NET_ACTIVE_WINDOW`, `_NET_WM_ICON`, `WM_HINTS`, `_NET_CLOSE_WINDOW`); a button's icon without `_NET_WM_ICON` is the shared lookup's (`shell::window_icon`: the class map, the desktop file, `WM_HINTS`, the generic icon; 6.2) |
 | Minimise target | flxp-taskbar sets `_NET_WM_ICON_GEOMETRY`; luxshell's hidden bar sets none |
 | Screen space | `_NET_WM_STRUT_PARTIAL` + dock type, full width; the sidebar is hidden or yields above it (7.4); flyouts, toasts and menus sit above it (`lh.taskbar_shown_top`) |
 | Tray | one XEmbed tray per display: before starting the bar luxshell hands its tray over (`lh.tray_yield`: icons back to the root, selection released, no reclaim for 10 s or until the new tray is up), since a takeover raced with flxp-taskbar's ReparentNotify handling |

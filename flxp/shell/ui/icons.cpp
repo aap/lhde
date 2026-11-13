@@ -88,6 +88,53 @@ HICON icon_for_key(const std::string& key, int px)
     return h;
 }
 
+HICON icon_from_argb(const std::vector<unsigned long>& im)
+{
+    if (im.size() < 3) return nullptr;
+    int w = (int)im[0], h = (int)im[1];
+    if (w <= 0 || h <= 0 || im.size() < 2 + (size_t)w * h) return nullptr;
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+    bi.bmiHeader.biWidth = w;
+    bi.bmiHeader.biHeight = -h;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    void* bits = nullptr;
+    HBITMAP color = CreateDIBSection(nullptr, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    if (!color || !bits) return nullptr;
+    uint32_t* px = (uint32_t*)bits;
+    for (size_t i = 0; i < (size_t)w * h; i++) px[i] = (uint32_t)im[2 + i];   // straight alpha, as an icon's
+    std::vector<uint8_t> zeros((size_t)((w + 15) / 16 * 2 * h));
+    HBITMAP mask = CreateBitmap(w, h, 1, 1, zeros.data());
+    ICONINFO ii = {};
+    ii.fIcon = TRUE;
+    ii.hbmColor = color;
+    ii.hbmMask = mask;
+    HICON ic = CreateIconIndirect(&ii);
+    DeleteObject(color);
+    DeleteObject(mask);
+    return ic;
+}
+
+// a program's desktop file Icon= is its own icon (a window's _NET_WM_ICON): first; then the class map by the id's name
+// (xterm.desktop, whose xterm-color.xpm is no PNG: cmd), then the generic icon
+HICON app_hicon(const std::string& desktop_id, int px)
+{
+    std::vector<unsigned long> im = app_icon("", "", desktop_id, px, false);
+    std::string stem = desktop_id.size() > 8 && desktop_id.compare(desktop_id.size() - 8, 8, ".desktop") == 0
+                           ? desktop_id.substr(0, desktop_id.size() - 8) : desktop_id;
+    if (im.empty()) im = app_icon("", stem, "", px);
+    return icon_from_argb(im);
+}
+
+bool set_window_icon_key(HWND w, const std::string& key)
+{
+    HICON s = icon_from_argb(key_icon(key, 16)), b = icon_from_argb(key_icon(key, 32));
+    if (s) SendMessageW(w, WM_SETICON, ICON_SMALL, (LPARAM)s);
+    if (b) SendMessageW(w, WM_SETICON, ICON_BIG, (LPARAM)b);
+    return s || b;
+}
+
 HICON icon_for(const std::string& path, int px)
 {
     struct stat st;
