@@ -1,34 +1,31 @@
-// The task band (taskpane.h): 4051's preview pane, measured on the 4051
-// screenshots at 1:1 (lh4051-152854/152900 nothing selected, 152336/152329 one
-// file, 152415/152354 one picture, 152420/152358 four pictures; the band
-// starts under the command bar, x from its left edge) and laid out with the
-// rules of System.Windows.Explorer (taskpane/managed.md):
+// The task band (taskpane.h): 4051's preview pane at 1:1 (the band starts
+// under the command bar, x from its left edge):
 // - the editable rows (a stored property's value or invitation, one item):
 //   the hand over them, underlined while hot; a click puts an edit box in the
 //   row's place (white, the line's font, the column's width), Enter or leaving
 //   it keeps the value (the explorer writes the attribute), Escape drops it.
-// - PreviewManager: padding 18 left; the preview box (the band's height - 22
+// - the layout: padding 18 left; the preview box (the band's height - 22
 //   + the 30 px overhang = the height + 8 wide: 134 expanded, 56 compact);
 //   18 px; the title (14 pt) and the metadata, two 180 px columns of 8 pt
-//   rows 17 px apart from y 36, "all properties..." (white in the screenshots,
-//   not the sheet's #C4ECFD; pointer over #F3B680) on the last line, 14 px above the bottom; the preview's natural
+//   rows 17 px apart from y 36, "all properties..." (white as 4051 draws it,
+//   not its style sheet's #C4ECFD; pointer over #F3B680) on the last line, 14 px above the bottom; the preview's natural
 //   width ends 18 px after the two columns.
 // - a framed picture: 2 px white, fitted into the box less 12 (122 x 92 for
 //   800 x 600 expanded, 44 x 33 compact), its bottom 10 px below the band; the
 //   stack's front one 1 - (n-1)/6 * 0.3 of that, the ones behind it 7 and 6 px
-//   further up and left each (ShellViewMultiSelectPreviewer: up to 7, the scale
-//   stepping down; its opacity steps do not show in 152420: drawn opaque).
+//   further up and left each (up to 7, the scale stepping down; opaque, as
+//   4051 shows them).
 // - an icon: 128 px expanded, 48 compact, its bottom 11 px below the band.
-// - WelcomePane: "N" 18 pt, " items" 12 pt, "in this folder" 10 pt, from the
+// - nothing selected: "N" 18 pt, " items" 12 pt, "in this folder" 10 pt, from the
 //   left 18 and the bottom 14; compact on one line ("in this folder" 5 px
 //   after).
-// - PreviewTaskPresenter / OverflowCanvas: the tasks start 8 px right of the
+// - the tasks start 8 px right of the
 //   preview's natural width (123 for the count; compact without a selection:
 //   half the band), nothing when fewer than 200 px are left; 189 px columns,
 //   26 px rows (5 + 16 + 5) from y 12, the icon then 4 px then the 10 pt text
 //   in #DBE9F3; compact: one row, the tasks side by side.
-// The faded folder image of the count, the aurora and the band's ends are as
-// before (lh4051-232843.png, the PDC 2003 demo's resources).
+// The faded folder image of the count, the aurora and the band's ends are
+// 4051's (the PDC 2003 demo's resources).
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -56,13 +53,13 @@ namespace {
 using shell::details::Info;
 using shell::details::Kind;
 
-// The band's height below the command bar (4051: PreviewSplitter Min 150, Max
-// 270, MiniModeHeight 72, all less HeightOffset 24): expanded 126 by default,
+// The band's height below the command bar (4051: the splitter between 150
+// and 270, compact 72, all less the command bar's 24): expanded 126 by default,
 // dragged by the bottom edge between EXP_MIN and EXP_MAX (taskpane_height);
 // compact (taskpane_compact = 1, Preview off) 48. A drag under SPLIT makes it
 // compact, a compact one dragged to SPLIT expands it ((72 + 150) / 2 - 24); an
 // expanded band that would leave the list less than LIST_MIN rows shows
-// compact (4051's _OnDragDelta clamps to the total - 150).
+// compact (4051 clamps the drag to the total - 150).
 const int EXP_DEFAULT = 126, EXP_MIN = 126, EXP_MAX = 246, COMPACT_H = 48, SPLIT = 87, GRIP = 4, LIST_MIN = 150;
 const int HANG = 16;                   // the rows the preview may hang below the band (its 10 px, the shadow)
 const int PAD = 18, COL = 180, LINE_Y = 36, LINE_H = 17, TASK_COL = 189, TASK_ROW = 26, TASK_Y = 12, TASK_MIN = 200;
@@ -270,9 +267,9 @@ void layout_for(HDC dc, int w)
     g_rows.clear();
     g_more = g_props = RECT{};
     bool sel = g_info.kind != Kind::Location;
-    int w0;   // the preview's natural width (PreviewTaskPresenter's child 0)
+    int w0;   // the preview's natural width
     if (!sel) {
-        // WelcomePane: the count over the folder's image
+        // nothing selected: the count over the folder's image
         std::string n = std::to_string(g_info.count), items = shell::details::lh_items_word(g_info.count);
         bool infolder = g_info.count != 0;
         int x = PAD, end;
@@ -296,7 +293,7 @@ void layout_for(HDC dc, int w)
             w0 = imax(123, end + PAD);
         }
     } else {
-        // PreviewManager: the title, the values in two columns, all properties
+        // a selection: the title, the values in two columns, all properties
         int tx = text_x();
         w0 = tx + 2 * COL + PAD;
         int right = imax(tx + 40, imin(w0, w) - PAD);
@@ -383,8 +380,8 @@ void draw_text(HDC dc, const Text& t)
 
 // an icon of the theme at `size`, alpha-blended with `alpha`. AlphaBlend wants
 // premultiplied colour and the icon's alpha in the source; DrawIconEx into a
-// plain DIB leaves the alpha byte at 0 (which made AlphaBlend add the icon to
-// the gradient), so the icon is drawn over black (= premultiplied colour) and
+// plain DIB leaves the alpha byte at 0 (AlphaBlend would add the icon to the
+// gradient), so the icon is drawn over black (= premultiplied colour) and
 // over white, and the alpha is what the two differ by.
 void draw_icon(HDC dc, const std::string& key, int size, int x, int y, int alpha)
 {
@@ -773,7 +770,7 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             ClientToScreen(h, &s);
             g_cb.more(sel, s.x, s.y);
         } else if (i == -3 && g_cb.command) {
-            g_cb.command(ID_PROPERTIES, true);     // MoreButton: the selection's "properties" verb
+            g_cb.command(ID_PROPERTIES, true);     // the selection's "properties" verb
         } else if (i <= ROW_HOT) {
             open_editor((size_t)(ROW_HOT - i));
         } else if (i >= 0 && g_cb.command) {

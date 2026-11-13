@@ -1,7 +1,6 @@
-// Copy and move with XP's user interface (fileopui.h). Behaviour, texts and
-// layouts follow XP SP1's shell32 copy.c (ConfirmFileOp, CopyError,
-// CopyMoveRetry, FOUIThreadProc, SetProgressText, SetProgressTime); the
-// templates are rc/explorer.rc's IDD_OP_*.
+// Copy and move with XP's user interface (fileopui.h): XP SP1's behaviour,
+// texts and layouts (the confirmations, the errors, Retry, the progress
+// dialog); the templates are rc/explorer.rc's IDD_OP_*.
 #include "res/res.h"   // before the win32 headers: their macros clash with its names
 #include <errno.h>
 #include <stdio.h>
@@ -58,7 +57,7 @@ std::string byte_size(uint64_t n)
     return std::string(num) + " " + orders[order];
 }
 
-// copy.c BuildDateLine: IDS_DATESIZELINE "%s\nmodified: %s" with SHFormatDateTime
+// XP's date line: "%s\nmodified: %s" with SHFormatDateTime
 // (FDTF_LONGDATE | FDTF_RELATIVE | FDTF_LONGTIME): "Today"/"Yesterday" for the
 // weekday, ", " before the time
 std::string date_line(uint64_t size, int64_t mtime)
@@ -79,7 +78,7 @@ std::string date_line(uint64_t size, int64_t mtime)
     return s + "\nmodified: " + d + ", " + rest + ", " + clock;
 }
 
-// shell32's IDS_REASONS_* for the errno (CopyError: the system's own text otherwise)
+// shell32's IDS_REASONS_* for the errno (XP: the system's own text otherwise)
 static std::string reason_text(const Error& e)
 {
     switch (e.reason) {
@@ -117,7 +116,7 @@ ErrorText error_text(Op op, const Error& e)
     ErrorText t;
     bool move = op == Op::Move;
     t.title = move ? "Error Moving File or Folder" : "Error Copying File or Folder";
-    if (e.code == ENOSPC || e.code == EDQUOT) {   // CopyMoveRetry: IDS_DESTFULL, titled IDS_COPY / IDS_MOVE
+    if (e.code == ENOSPC || e.code == EDQUOT) {   // XP: IDS_DESTFULL, titled IDS_COPY / IDS_MOVE
         t.title = move ? "Move" : "Copy";
         t.text = "The disk in the destination drive is full.\n\nInsert a new disk to continue.";
         t.retry = true;
@@ -126,7 +125,7 @@ ErrorText error_text(Op op, const Error& e)
     std::string name = e.path.empty() ? "file" : shell::base_of(e.path);
     struct stat st;
     bool dir = !e.path.empty() && lstat(e.path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
-    // CopyError: a file is named without its extension (PathRemoveExtension for OPER_DOFILE)
+    // XP: a file is named without its extension (a file operation, not a folder's)
     size_t dot = name.rfind('.');
     if (!dir && dot != std::string::npos && dot > 0) name.resize(dot);
     std::string verb;
@@ -257,7 +256,7 @@ struct Confirm {
     HICON icons[3] = {};
 };
 
-// copy.c HideConfirmButtons(hdlg, IDCANCEL): No takes Cancel's place, Yes No's;
+// XP: No takes Cancel's place, Yes No's;
 // Yes to All and Cancel are destroyed (hidden ones would keep their accelerators)
 static void yes_no_only(HWND h)
 {
@@ -306,7 +305,7 @@ static INT_PTR CALLBACK confirm_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         }
         SetWindowTextW(text, WS(s));
         SendDlgItemMessageW(h, IDC_OP_ICON, STM_SETICON, (WPARAM)cf->icons[0], 0);
-        // one file, not inside a folder: Yes and No alone (bShowCancel); a folder always has Cancel
+        // one file, not inside a folder: Yes and No alone; a folder always has Cancel
         if (c.only && !c.folder) yes_no_only(h);
         keep_above(h, true);
         return TRUE;
@@ -468,7 +467,7 @@ struct Running {
     bool asking = false;        // a question is open (the timer must not ask again)
     bool finished = false;
     bool same_fs = false;       // a move by renames: progress counts items only
-    // the progress dialog (copy.c FOUIThreadProc, SetProgressText, SetProgressTime)
+    // the progress dialog
     HWND dlg = nullptr;
     DWORD start = 0, shown_at = 0;
     bool cancelled = false;
@@ -488,7 +487,7 @@ enum { WM_OP_NOTIFY = WM_APP + 0x51 };
 
 static void notify(void*) { PostThreadMessageW(0, WM_OP_NOTIFY, 0, 0); }   // wakes the waiting loop
 
-// the questions belong to the progress dialog while it is up (copy.c: hwndDlgParent)
+// the questions belong to the progress dialog while it is up
 static HWND dialog_owner(Running& r)
 {
     if (r.dlg && IsWindow(r.dlg) && IsWindowVisible(r.dlg)) return r.dlg;
@@ -520,14 +519,14 @@ static Answer ask(Running& r, const Conflict& c)
 // ---- the progress dialog -------------------------------------------------------------------
 
 enum {
-    SHOW_PROGRESS_TIMEOUT = 1000,   // copy.c: the dialog comes up when the operation still runs after a second
+    SHOW_PROGRESS_TIMEOUT = 1000,   // XP: the dialog comes up when the operation still runs after a second
     MINSHOWTIME = 1000,             // and once up it stays at least a second
     MS_TIMESLICE = 2000,            // the time estimate is sampled every 2 seconds
     MIN_MINTIME4FEEDBACK = 5,       // and shown from 5 seconds left
     TIMER_ANIM = 1, TIMER_ESTIMATE = 2, TIMER_PLACE = 3,
 };
 
-// copy.c CountProgressPoints: a point per 32 KB (none for moves by rename), one per file and
+// XP's progress: a point per 32 KB (none for moves by rename), one per file and
 // folder (two for a move across filesystems: the original is removed too)
 static uint64_t points(const Running& r, uint64_t bytes, uint64_t items)
 {
@@ -535,7 +534,7 @@ static uint64_t points(const Running& r, uint64_t bytes, uint64_t items)
     return bytes / 32768 + items * (r.op == Op::Move ? 2 : 1);
 }
 
-// copy.c SetProgressTimeEst
+// XP's time left
 static std::string time_text(uint64_t left)
 {
     char buf[64];
@@ -545,7 +544,7 @@ static std::string time_text(uint64_t left)
     return buf;
 }
 
-// copy.c SetProgressText: the file's name, and "From 'a' to 'b'" with the two folders' names, each
+// XP: the file's name, and "From 'a' to 'b'" with the two folders' names, each
 // compacted to half the room the words leave
 static void progress_text(Running& r, const Progress& p)
 {
@@ -575,7 +574,7 @@ static void progress_text(Running& r, const Progress& p)
     ReleaseDC(to, hdc);
 }
 
-// copy.c SetProgressTime: the rate over the last slice, averaged with the earlier one (1:2)
+// XP: the rate over the last slice, averaged with the earlier one (1:2)
 static void estimate(Running& r)
 {
     Progress p = r.job->progress();
@@ -659,7 +658,7 @@ static INT_PTR CALLBACK progress_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return TRUE;
     }
     case WM_COMMAND:
-        if (LOWORD(wp) == IDCANCEL && r) {   // copy.c: bAbort, and the dialog hides
+        if (LOWORD(wp) == IDCANCEL && r) {   // XP: Cancel aborts, and the dialog hides
             r->cancelled = true;
             r->job->cancel();
             ShowWindow(h, SW_HIDE);
@@ -806,7 +805,7 @@ bool rename(HWND owner, const std::string& path, const std::string& typed, std::
     if (code) {
         Error err;
         err.what = "Cannot rename"; err.path = path; err.code = code;
-        std::string shown = old;   // CopyError: a file without its extension
+        std::string shown = old;   // XP's error text: a file without its extension
         if (!folder && !oext.empty()) shown.resize(shown.size() - oext.size());
         std::string why = code == EEXIST ? "A file with the name you specified already exists. Specify a different file name." : reason_text(err);
         box(owner, "Error Renaming File or Folder", "Cannot rename " + shown + ": " + why, MB_OK | MB_ICONHAND);

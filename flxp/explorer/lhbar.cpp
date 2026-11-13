@@ -1,5 +1,5 @@
-// Measured on lh4051-225221.png (the Administrator folder, a Document folder):
-// the row under the header is the top of the Document::Rebar.BACKGROUND
+// 4051's command bar in a Document folder: the row under the header is the
+// top of the Document::Rebar.BACKGROUND
 // strip (slate.msstyles bitmap 179 in 4051, 196 in 4074; 838x8, sizing
 // margins 1 1 1 0): a 1 px highlight row, then edge (36,67,142) rising to
 // (85,115,187) at the centre and falling again, symmetric about the window's

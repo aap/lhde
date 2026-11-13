@@ -76,7 +76,7 @@ static preview::Pictures* g_pics;
 struct DetailText { RECT r; std::string text; bool bold; };
 static std::vector<DetailText> g_dtext;      // content coordinates
 static RECT g_dpic;                          // the mini preview (content coordinates; empty: none)
-enum { PREVIEW_W = 150, PREVIEW_H = 100, INFO_GAP = 5 };   // CDUIView's 150 x 100; NameSpaceItemInfo's top margin
+enum { PREVIEW_W = 150, PREVIEW_H = 100, INFO_GAP = 5 };   // XP's 150 x 100 and top margin
 
 // XDG user dirs ($XDG_CONFIG_HOME/user-dirs.dirs: XDG_PICTURES_DIR="$HOME/Pictures")
 std::string user_dir(const char* key, const char* fallback)
@@ -135,8 +135,8 @@ static void fill_bookmarks(Group& g)
         e.icon = e.path.empty() ? "network" : "folder";
         g.items.push_back(e);
     }
-    // (4051's "more" under its WinFS views folded other views, lh4051-194216.png,
-    // not a long list of links: every bookmark shows; no "Bookmark this folder":
+    // (4051's "more" under its WinFS views folded other views, not a long
+    // list of links: every bookmark shows; no "Bookmark this folder":
     // folders are dropped on the group, the menus elsewhere add the current one)
 }
 
@@ -194,7 +194,7 @@ static Look g_look;
 static void free_bmp(Bmp& b) { if (b.h) DeleteObject(b.h); b = Bmp(); }
 
 // A shellstyle.dll bitmap ("pe:DLL#ID") as a premultiplied DIB: 32bpp ones keep
-// their alpha (rcbmp(...,2,255,...)), others are keyed on magenta.
+// their alpha (as XP draws them), others are keyed on magenta.
 static Bmp load_bmp(const std::string& src)
 {
     Bmp out;
@@ -227,7 +227,7 @@ static Bmp load_bmp(const std::string& src)
 static COLORREF mix(COLORREF a, COLORREF b, int num, int den);
 
 // The section chevrons without shellstyle.dll (the free baseline: ReactOS has no web view and no shellstyle; docs/USAGE.md),
-// drawn here after XP's IDB_UP/IDB_UPHOT/IDB_DOWN/IDB_DOWNHOT (themes/themedir/shellstyle in the XP SP1 source): the glyph is
+// drawn here after XP's IDB_UP/IDB_UPHOT/IDB_DOWN/IDB_DOWNHOT: the glyph is
 // two 2-px chevrons four rows apart, 7 px wide, apex at column 9, rows 5-12 (up) or 6-13 (down). Luna (21x23): on a pale disc
 // (radius about 8.3 around (9.5, 9), a ring in the pane's colour, white inside shading to the ring at the bottom, a faint
 // shadow down and to the right). Classic (21x21): the glyph alone, the hot one inside a raised 17x16 frame.
@@ -364,14 +364,14 @@ static bool placeholder_part(HTHEME th, int part, int state, int w, int h, size_
 
 using shell::lower;
 
-// style.uix of themes/themedir/shellstyle/{blue,homestead,metallic,classic}
+// the look of XP's shellstyle variants (blue, homestead, metallic, classic)
 static void load_look(HWND h)
 {
     for (Bmp* b : { &g_look.head, &g_look.up, &g_look.up_hot, &g_look.down, &g_look.down_hot }) free_bmp(*b);
     if (g_look.theme) CloseThemeData(g_look.theme);
     g_look = Look();
     if (g_grp) {
-        // the groups look: 4051's white pane (lh4051-194203/195027.png) with
+        // the groups look: 4051's white pane with
         // the pre-reset concepts' groups - link-blue names, the +/- expanders
         // of Media Player's "Music Links" tree, the Save File concept's group
         // names with 16 px icons under them
@@ -429,12 +429,12 @@ static void load_look(HWND h)
         if (!placeholder_part(t, EBP_NORMALGROUPCOLLAPSE, 1, 19, 19, 2) && !placeholder_part(t, EBP_NORMALGROUPHEAD, 0, 180, 25, 3))
             return;
         // the style's ExplorerBar images are placeholders (ReactOS's styles) and it has no shellstyle.dll of its own: as XP
-        // does (SHGetShellStyleHInstance falls back to system32's, the classic one), the classic pane in the style's system
-        // colours (measured: XP SP3 with ReactOS's Lunar and Lautus, ~/fun/longhorn/screenshots/WinXP-193456.png, -193504.png)
+        // does (it falls back to system32's shellstyle.dll, the classic one), the classic pane in the style's system
+        // colours
         CloseThemeData(t);
         g_look = Look();
     }
-    if (variant.empty()) {   // classic (class_ss / classic style.uix)
+    if (variant.empty()) {   // classic
         g_look.kind = Classic;
         g_look.pane1 = g_look.pane2 = GetSysColor(COLOR_WINDOW);
         g_look.body = GetSysColor(COLOR_WINDOW);
@@ -475,8 +475,8 @@ static void load_look(HWND h)
 static void make_fonts()
 {
     if (g_font) { DeleteObject(g_font); DeleteObject(g_bold); DeleteObject(g_under); DeleteObject(g_bold_under); }
-    // the icon title font, as the tree it stands for: Tahoma 8 under Slate and Luna (style.uix's Tahoma 8pt), Segoe UI 9 under
-    // Jade (4074-dwm.png: "Storage Favorites" in Segoe UI), the scheme's under classic
+    // the icon title font, as the tree it stands for: Tahoma 8 under Slate and Luna, Segoe UI 9 under
+    // Jade (4074's "Storage Favorites"), the scheme's under classic
     LOGFONTW lf = {};
     SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof lf, &lf, 0);
     g_font = CreateFontIndirectW(&lf);
@@ -489,15 +489,14 @@ static void make_fonts()
 }
 
 // ---- layout --------------------------------------------------------------------------------
-// shellstyle (measured on screenshots/explorer_xp_1.png, which agrees with
-// style.uix): sections 12 px in from the pane (after its 1 px border), the
+// XP's task pane: sections 12 px in from the pane (after its 1 px border), the
 // first 12 px down, 15 px apart; header 25 high (2 px border + the 23 px
 // chevron), title at +12; the box: 1 px border, padding 12 left/right and 10
 // top/bottom, rows 16 px (or the wrapped name) 4 px apart, icon then 6 px then
 // the name.
 
 enum { HEAD_H = 25, PAD_X = 12, PAD_Y = 10, ROW_GAP = 4, SECTION_GAP = 15 };
-// the groups look: the Filter box at (8, 8) as 4074's (lh4074-180309.png),
+// the groups look: the Filter box at (8, 8) as 4074's,
 // group rows 22 px with the expander box at 6..14 and the title 5 px after it
 // (XP's Folders tree: the 9 px glyph centred in the 19 px indent, the icon at 19,
 // so 5 clear columns between them), entries 20 px with the icon at 22 and the
@@ -774,7 +773,7 @@ static void draw_group_header(HDC dc, const Group& g, int gi, int dy)
     SelectObject(dc, of);
 }
 
-// the Details section's content (NameSpaceItemInfo: the default foreground,
+// the Details section's content (XP: the default foreground,
 // black; classic: the window text)
 static void draw_details(HDC dc, int dy)
 {
@@ -1382,15 +1381,15 @@ static void make_filter()
 {
     g_filter = CreateWindowExW(WS_EX_CLIENTEDGE, L"Edit", nullptr, WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
         GR_X, GR_BOX_Y, 110, GR_BOX_H, g_wnd, nullptr, nullptr, nullptr);
-    // the pane's font (the icon title font): 4074-dwm.png's "Filter by" is Segoe UI 9 under Jade, as "Storage Favorites"
+    // the pane's font (the icon title font): 4074's "Filter by" is Segoe UI 9 under Jade, as "Storage Favorites"
     SendMessageW(g_filter, WM_SETFONT, (WPARAM)g_font, FALSE);
     SendMessageW(g_filter, EM_SETCUEBANNER, TRUE, (LPARAM)L"Filter by");
     g_filter_old = (WNDPROC)SetWindowLongPtrW(g_filter, GWLP_WNDPROC, (LONG_PTR)filter_proc);
 }
 
 // the Details section open: places_details once the user folded or opened
-// it, else XP's default (CDUIView::_ShowSectionExpanded: open where the
-// folder's web view layout is SFVMWVL_DETAILS, My Computer)
+// it, else XP's default (open where the folder's web view shows details:
+// My Computer)
 static bool details_open()
 {
     int s = shell::setting_flag_auto("places_details");

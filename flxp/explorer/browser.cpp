@@ -76,9 +76,9 @@ void extend_frame(HWND frame)
     // vision header ends in them itself (header::extend_top)
     MARGINS m = { 0, 0, header::extend_top(), 0 };
     DwmExtendFrameIntoClientArea(frame, &m);
-    DWORD flags = FLXP_DWMFF_NO_ICON;      // browseui: WTNCA_NODRAWCAPTION | NODRAWICON
+    DWORD flags = FLXP_DWMFF_NO_ICON;      // as 4074's Explorer: WTNCA_NODRAWCAPTION | NODRAWICON
     // the caption keeps the title when the header does not show it (the Small
-    // size, lh4074-195235.png, or the title switched off)
+    // size, or the title switched off)
     if (header::draws_title()) flags |= FLXP_DWMFF_NO_TITLE;
     if (header::client_caption()) flags |= FLXP_DWMFF_CLIENT_CAPTION;
     DWORD was = 0;
@@ -170,7 +170,7 @@ static struct stat g_stamp;                  // the file as last read (other win
 static bool enabled() { return shell::setting_flag("remember_views", true); }
 
 // "icons@64" (the size: the Longhorn hosts), "tiles@48", "icons@96+nonames",
-// "details+thumbnails" (the earlier toggle), ...; -1 if not a view
+// "details+thumbnails" (the toggle), ...; -1 if not a view
 int parse(const std::string& text)
 {
     std::string name = text;
@@ -201,12 +201,11 @@ std::string name_of(int view)
     return "";
 }
 
-// The view of a folder never shown (XP's global default, g_dfs): default_view
+// The view of a folder never shown (XP's global default): default_view
 // (the XP frame) or default_view_longhorn in flxp.ini, set by Folder Options'
 // Apply to All Folders; empty = flxp's own: Details in the XP frame (XP's
 // Icons/Tiles are not ours), Icons at 48 px (4074's Medium Icons; thumbnails
-// show by the thumbnails setting) in the Longhorn hosts (the user's "default
-// should be icon view with thumbnails")
+// show by the thumbnails setting) in the Longhorn hosts
 static const char* default_key(bool zoomable) { return zoomable ? "default_view_longhorn" : "default_view"; }
 int builtin_default(bool zoomable) { return zoomable ? (int)LVS_ICON | 48 << ZOOM_SHIFT : (int)LVS_REPORT; }
 int default_view(bool zoomable)
@@ -243,7 +242,7 @@ static void load()
 // the view to show a folder in: the stored one, else the one it was last shown
 // in by this window, else the default view (XP: a folder without a bag gets the
 // default, not the view of the folder it came from; only with remember_views
-// off does the current view carry over, = -1, see NOTES "How XP picks")
+// off does the current view carry over, = -1)
 int lookup(const std::string& folder, bool zoomable)
 {
     if (!enabled() || folder.empty()) return -1;
@@ -402,7 +401,7 @@ HWND create_list(Browser& b, HWND parent, int id, DWORD style, DWORD exstyle, co
 
 const std::vector<Column>& all_columns()
 {
-    // XP's details defaults (measured): 180, 96, 120, 120; the stored ones as XP's Comments (150)
+    // XP's details defaults: 180, 96, 120, 120; the stored ones as XP's Comments (150)
     static const std::vector<Column> c = {
         { (int)shell::SortBy::Name, "Name", 180, LVCFMT_LEFT },
         { (int)shell::SortBy::Size, "Size", 96, LVCFMT_RIGHT },
@@ -606,7 +605,7 @@ static void make_groups(Browser& b, std::vector<int>& group_of)
         return lower(x) < lower(y);
     });
     order.erase(std::unique(order.begin(), order.end()), order.end());
-    // the Longhorn explorer's headers count their items ("File Folder (2)", lh4074-224845)
+    // the Longhorn explorer's headers count their items ("File Folder (2)")
     bool counts = b.zoomable && !GetPropW(b.list, L"flxp_concept_groups");
     for (size_t g = 0; g < order.size(); g++) {
         LVGROUP lg = {};
@@ -690,7 +689,7 @@ void fill_list(Browser& b)
     b.filling = false;
 }
 
-// XP defview _SetSortFeedback: the sort column gets HDF_SORTUP/DOWN in the
+// XP: the sort column gets HDF_SORTUP/DOWN in the
 // header and becomes the list's selected (tinted) column
 void sort_feedback(Browser& b)
 {
@@ -980,7 +979,7 @@ void history_menu(Browser& b, HWND owner, bool back, int x, int y)
     }
 }
 
-// XP's Tiles show the extra large icons (defview _SetTileview: SHIL_EXTRALARGE, 48 px)
+// XP's Tiles show the extra large icons (SHIL_EXTRALARGE, 48 px)
 enum { XP_TILE_PX = 48 };
 
 // the view as the menus see it: LVS_*, VIEW_THUMBNAILS or VIEW_TILES (XP); LVS_REPORT,
@@ -1001,8 +1000,7 @@ int view_code(const Browser& b)
 
 // ---- zoom (the Longhorn hosts) ----------------------------------------------------
 
-// 4051's slider (shell32 CIconSizeSlider, doc/4051-explorer-research.md section
-// 4): positions 0..100, size = floor(16 * 16^(pos/100)); its ticks every 10
+// 4051's slider: positions 0..100, size = floor(16 * 16^(pos/100)); its ticks every 10
 // are the levels: 16 21 27 36 48 64 84 111 147 194 256
 int zoom_at(int pos)
 {
@@ -1084,7 +1082,7 @@ static void remember_shown(const View& v)
 }
 
 // A view code (the views file, Folder Options, the menus) as a View; a size the view
-// cannot have (none, or the earlier codes' Icons size on Details) is the one it remembers
+// cannot have (none, or an Icons size given with Details) is the one it remembers
 static View view_of_code(int code)
 {
     int size = (code >> ZOOM_SHIFT) & 0x1ff;
@@ -1124,7 +1122,7 @@ static int line_height(HWND list)
     return tm.tmHeight > 0 ? (int)tm.tmHeight : 13;
 }
 
-// A tile's lines under the name, as 4051/4074's TileInfo lists them (REGINST): "Label: value",
+// A tile's lines under the name, as 4051/4074's TileInfo lists them: "Label: value",
 // the first two that are not empty: a folder its Type; a picture Dimensions, Type, Size; a
 // drive Percent Full, Free Space; any other file Type, Size, Date Modified
 enum { TILE_SUBITEM = 8, TILE_LINES = 3 };   // the subitems that hold them (listview.c: beyond the columns)
@@ -1155,9 +1153,9 @@ static std::vector<std::string> lh_tile_lines(const Item& it)
     return out;
 }
 
-// XP's: the values alone, in the two slots XP's list view has (defview TILEVIEWLINES): the
-// column the folder is sorted by first unless it is Name (comctl32 lvtile.c _GetNextColumn),
-// then the type's TileInfo (shell32 selfreg.inx): any file "prop:Type;Size", a picture
+// XP's: the values alone, in the two slots XP's list view has: the
+// column the folder is sorted by first unless it is Name,
+// then the type's TileInfo: any file "prop:Type;Size", a picture
 // "prop:Dimensions;Type;Size", a folder or drive Folder's "prop:Size", which they do not have
 // (so only the sorted column shows under their names); the properties XP reads from a
 // program's version resource or a song's tags are not read here, those files show Type and Size
@@ -1228,7 +1226,7 @@ static void lh_set(Browser& b, View v, bool navigating)
     if (want != style) SetWindowLongW(b.list, GWL_STYLE, (LONG)want);
     SendMessageW(b.list, LVM_SETVIEW, tiles ? LV_VIEW_TILE : details ? LV_VIEW_DETAILS : LV_VIEW_ICON, 0);
     // the column header above every view (LVS_EX_HEADERINALLVIEWS: 4051/4074's sort and filter row);
-    // Details selects whole rows (4051's LISTITEM underlay per row, lh4051-194831)
+    // Details selects whole rows (4051's LISTITEM underlay per row)
     SendMessageW(b.list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_HIDELABELS | LVS_EX_BORDERSELECT | LVS_EX_HEADERINALLVIEWS | LVS_EX_FULLROWSELECT,
                  (v.mode == Mode::Icons && v.hide_names ? LVS_EX_HIDELABELS : 0) | LVS_EX_HEADERINALLVIEWS | (details ? LVS_EX_FULLROWSELECT : 0));
 
@@ -1246,12 +1244,12 @@ static void lh_set(Browser& b, View v, bool navigating)
         SendMessageW(b.list, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)(details ? b.large : icons));
     }
 
-    // the cells (measured: 4051/4074 tiles 218 x 56 at 48 px, 186 x 26 at 16 px; 4074's
+    // the cells (4051/4074 tiles 218 x 56 at 48 px, 186 x 26 at 16 px; 4074's
     // icons 77 x 69 at 16 px, 116 x 148 at about 72, 139 x 163 at about 90, 277 high at
     // about 175: the height grows by 1.3 per pixel of image; 4051 hidden names 110 x 105 at 96)
     int lh = line_height(b.list);
     if (tiles) {
-        int lines = px >= 48 ? 2 : 0;   // 4051 _SetTileViewInfo: cLines 0 below 48 px, 2 from 48
+        int lines = px >= 48 ? 2 : 0;   // 4051: 0 lines below 48 px, 2 from 48
         LVTILEVIEWINFO tvi = {};
         tvi.cbSize = sizeof tvi; tvi.dwMask = LVTVIM_COLUMNS; tvi.cLines = lines;
         SendMessageW(b.list, LVM_SETTILEVIEWINFO, 0, (LPARAM)&tvi);
@@ -1318,8 +1316,8 @@ bool view_command(Browser& b, int vc)
 
 // ---- XP's views -------------------------------------------------------------------------
 
-// XP's Tiles: the list view's tiles as XP's defview sets them (CDefView::_SetView: autosized,
-// TILEVIEWLINES 2 lines, a 1 px label margin), the extra large icons (_SetTileview: SHIL_EXTRALARGE);
+// XP's Tiles: the list view's tiles as XP sets them (autosized, 2 lines, a 1 px label margin),
+// the extra large icons (SHIL_EXTRALARGE);
 // the lines are XP's (xp_tile_lines)
 static void xp_tiles(Browser& b, bool navigating)
 {
@@ -1460,7 +1458,7 @@ bool zoom_command(Browser& b, int id, int first)
     return true;
 }
 
-// The magnifier's drop-down (4051's CIconSizeSlider): a 74x150 popup with a
+// The magnifier's drop-down (4051's): a 74x150 popup with a
 // 40x125 vertical trackbar at (17, 12), 0..100 with ticks every 10, the big
 // end at the top; the zoom follows the thumb (snapped to the ticks, the
 // levels). Escape, Enter or a click elsewhere close it.

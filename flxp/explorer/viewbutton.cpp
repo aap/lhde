@@ -1,5 +1,4 @@
-// Build 4074's view control (viewbutton.h). Geometry from the 4074 XAML and
-// lh4074-195348/-195353/-195358/-225249 (the button and the popup measured):
+// Build 4074's view control (viewbutton.h). 4074's geometry:
 //   the split button: 60 x 22 (imageres 7410-7412 stretched, corners kept) and
 //     16 x 22 (7407-7409, the arrows 7413 centred), 2 px from the pane's left
 //     and 1 px above its bottom; the view's picture fitted into 22 x 20 at

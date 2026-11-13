@@ -1,5 +1,4 @@
-// Build 4074's view control (System.Windows.Explorer's ViewButton and
-// ViewModeSlider; the viewbutton, splitbutton and viewpopup XAML), at the
+// Build 4074's view control, at the
 // bottom left of the Explorer's left pane: a split button "View" (imageres
 // 7410-7412 and 7407-7409, the arrows 7413) whose left part goes to the next
 // view (Details -> Tiles -> Icons, each as it was last) and shows the view's

@@ -59,7 +59,7 @@ bool header_hittest(HWND frame, LPARAM lp, LRESULT* result);
 // Active or inactive as the window manager draws the frame (_NET_ACTIVE_WINDOW
 // through luxwm), else the focus state the host tracks (WM_ACTIVATE).
 bool frame_active(HWND frame, bool focus_active);
-// The window's icon follows the folder (4051's CShellBrowser2::v_SetIcon): the
+// The window's icon follows the folder (as 4051's does): the
 // icon theme's key at 16, 32 and 48 px as WM_SETICON (the shim publishes them
 // as _NET_WM_ICON for the window manager and the taskbar)
 void set_window_icon(HWND frame, const std::string& key);
@@ -177,7 +177,7 @@ int menu_view(const Browser& b);       // LVS_*, VIEW_THUMBNAILS, VIEW_TILES (XP
 int view_code(const Browser& b);
 // view: a view code (LVS_*, VIEW_THUMBNAILS, VIEW_TILES; the Longhorn hosts'
 // VIEW_NONAMES_FLAG, the size above ZOOM_SHIFT, none: the one the view remembers;
-// earlier codes are read as the nearest view). navigating: the folder's remembered
+// other codes are read as the nearest view). navigating: the folder's remembered
 // view, applied before refresh() fills the list (no refill or icon restore here,
 // and nothing stored).
 void set_view(Browser& b, int view, bool navigating = false);

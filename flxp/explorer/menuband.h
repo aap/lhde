@@ -1,5 +1,5 @@
-// The menu band: XP's Explorer menu is a toolbar band in the rebar (browseui's
-// CMenuBand), not a system menu bar. This is a compact re-interpretation:
+// The menu band: XP's Explorer menu is a toolbar band in the rebar, not a
+// system menu bar. This is a compact re-interpretation:
 // text buttons for the top-level items, popups tracked below them, hover and
 // arrow keys moving between menus, Alt/F10 keyboard access.
 #pragma once

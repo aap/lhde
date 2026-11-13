@@ -1,17 +1,16 @@
-// Geometry measured on the reference (~/fun/longhorn/screenshots/4074-dwm.png,
-// the Documents window; client contents from y=151, client left x=254), all
-// relative to the bottom of the header (C) and the client's left edge:
+// 4074's geometry (the Documents window), all relative to the bottom of the
+// header (C) and the client's left edge:
 //   title "Documents"   ink x 77, cap top C-51, baseline C-39, 12 px caps,
 //                       84 px wide, thin: Segoe UI 13pt (h17; seguibk.ttf of
 //                       the 4074 Fonts) gives exactly 84 px and 12 rows on
-//                       glass (ours: x 77..160 against 331..414 there)
+//                       glass
 //   breadcrumb          "Documents" ink 57 px, 9 px caps, ink x 89, baseline
 //                       C-14: Segoe UI 9pt (h12) has the same rows, 59 px;
 //                       Tahoma at the same sizes without Segoe UI (heavier)
 //   separator           a 4x7 triangle (50,50,50), 24 px after the text, the
 //                       next segment 23 px after it
 //   text colour         navy (5,6,62) on glass with a white TextGlow,
-//                       (0,2,92) on the opaque Slate header (lh4074-181415.png)
+//                       (0,2,92) on the opaque Slate header
 //   right part          a vertical divider R-91 (glass: a light line; Slate: a
 //                       dark line with a light one left of it), the search
 //                       and favourites buttons right of it
@@ -49,7 +48,7 @@ namespace header {
 
 namespace {
 
-const int REF_HEADER = 76;        // frame top to client contents in 4074-dwm.png
+const int REF_HEADER = 76;        // frame top to client contents in 4074
 // the navigation buttons (4074's "framelet": Microsoft.Windows.Client.dll's
 // framelet_{back,forward}_{rest,hover,pressed,disabled}.png, 38x54 and 27x54,
 // the forward plate continuing the back plate's right edge), then directly the
@@ -74,14 +73,14 @@ std::vector<Crumb> g_crumbs;
 int g_hot = -1, g_pressed = -1;      // segment under the mouse / pressed (its name part)
 bool g_hot_arrow;                    // the mouse is on g_hot's arrow part
 int g_open = -1;                     // the segment whose drop-down is open
-bool g_bar_hot;                      // the mouse is over the bar: the field shows (lh4074-224731.png)
+bool g_bar_hot;                      // the mouse is over the bar: the field shows
 HWND g_addr;                         // the bar as an edit field (Ctrl+L, a click on its empty part)
 WNDPROC g_addr_old;
 bool g_editing;
 bool g_tracking, g_quiet;
 int g_divider;
 
-// 4074's Toolbar Size and Toolbars (the system menu of lh4074-1952*.png), our
+// 4074's Toolbar Size and Toolbars (its system menu), our
 // View > Toolbars: the size and which elements show (header.h). Read from
 // <prefix>header_size / <prefix>header_<element> (the file dialog: filedlg_).
 int g_hsize = SIZE_MEDIUM;
@@ -89,7 +88,7 @@ bool g_show[ELEMENTS] = { true, true, true, true, true };
 std::string g_prefix, g_default_size = "medium";
 const char* const SIZE_NAMES[4] = { "small", "medium", "large", "xlarge" };
 const char* const ELEMENT_KEYS[ELEMENTS] = { "header_buttons", "header_title", "header_breadcrumb", "header_search", "header_favorites" };
-// the Large and Extra-Large sizes: Medium's rows plus empty ones below (lh4074-195250/195258.png:
+// the Large and Extra-Large sizes: Medium's rows plus empty ones below (4074:
 // 108 and 125 rows from the frame's top edge against 76)
 int extra_rows() { return g_hsize == SIZE_LARGE ? 32 : g_hsize == SIZE_XLARGE ? 49 : 0; }
 bool small_size() { return g_hsize == SIZE_SMALL; }
@@ -221,8 +220,8 @@ bool glass()
 bool navbar_mode() { return g_mode == NAVBAR; }
 const navbar::Skin& sk() { return navbar::skin(); }
 std::string g_buttons_setting = "auto";   // header_button_images: auto/theme, or framelets
-// header_button_images (the setting was header_buttons before that became the
-// Back/Forward toggle; header_buttons=framelets is still understood)
+// header_button_images; header_buttons = framelets means the same (header_buttons
+// is otherwise the Back/Forward toggle)
 std::string button_images_setting()
 {
     std::string v = shell::theme_setting("header_button_images");
@@ -231,9 +230,8 @@ std::string button_images_setting()
 }
 // The theme's Back/Forward/Favorites (TravelBack/TravelFwd/Favorites::
 // AnimationButton) without the band as well: 4074's composited header is the
-// same browseui navbar without its background (COMPOSITION.md 16.5), and
-// 4051 under Luna draws Luna's own travel buttons on its header
-// (lh4051-232843.png), so the buttons are the style's own in every mode
+// same navigation bar without its background, and 4051 under Luna draws
+// Luna's own travel buttons on its header, so the buttons are the style's own in every mode
 // (aero/Jade: the grey glass ones, green when hot). The Avalon framelets
 // only when the style has none (or header_button_images=framelets).
 bool themed_free() { return g_mode != NAVBAR && g_buttons_setting != "framelets" && navbar::skin().buttons; }
@@ -241,9 +239,8 @@ bool nb_buttons() { return navbar_mode() || themed_free(); }
 
 // The rows, top down, in every mode (glass, navigation bar, luxwm's pixmap):
 // with CLIENT_CAPTION the caption's rows that luxwm leaves to the client
-// (top_off), then the band - 4051's navigation bar (doc/4051-explorer-
-// research.md section 1): Medium 54 rows (Slate 4074's 49-row art: 53), Small
-// 36 (lh4074-195235.png) -, then Large's / Extra-Large's empty rows. The
+// (top_off), then the band - 4051's navigation bar: Medium 54 rows (Slate
+// 4074's 49-row art: 53), Small 36 -, then Large's / Extra-Large's empty rows. The
 // travel buttons end on the band's last row (their drop-down flush with it);
 // the header's last row is the band's dark line (paint_bottom).
 const int SMALL_BAND = 36;
@@ -251,7 +248,7 @@ int medium_band() { return nb_buttons() ? sk().height : NAV_H; }
 int band_rows() { return small_size() ? SMALL_BAND : medium_band(); }
 int top_off() { int t = g_height - band_rows() - extra_rows(); return t > 0 ? t : 0; }
 int base_height() { return top_off() + band_rows(); }      // below the band (Large/XL: their empty rows follow)
-int title_baseline() { return base_height() - 39; }       // the framelets' layout (4074-dwm.png)
+int title_baseline() { return base_height() - 39; }       // the framelets' layout (4074's)
 int travel_h();
 int btn_top() { return base_height() - travel_h(); }      // the travel buttons' first row: their last on the band's
 int nav_top() { return btn_top(); }
@@ -276,12 +273,12 @@ int variant()
 bool nb_fonts() { return nb_buttons() && g_nb_title; }
 HFONT title_font() { return nb_fonts() ? g_nb_title : g_title_font; }
 HFONT crumb_font(bool hot) { return nb_fonts() ? (hot ? g_nb_crumb_hot : g_nb_crumb) : (hot ? g_crumb_hot : g_crumb_font); }
-// the text's left edge: the measured ink starts one column right of it
+// the text's left edge: the ink starts one column right of it
 int travel_right();
 int title_x() { return !g_show[SHOW_BUTTONS] ? 14 : nb_buttons() ? sk().title_x - 1 : TITLE_X; }
 int crumb_x()
 {
-    if (small_size()) return g_show[SHOW_BUTTONS] ? travel_right() + 14 : 12;   // lh4074-195235.png: ink 15 px after the buttons
+    if (small_size()) return g_show[SHOW_BUTTONS] ? travel_right() + 14 : 12;   // 4074: ink 15 px after the buttons
     return !g_show[SHOW_BUTTONS] ? 14 : nb_buttons() ? sk().crumb_x - 1 : CRUMB_X;
 }
 // the separator's room: gap, glyph, gap
@@ -290,10 +287,10 @@ int arrow_width() { return navbar_mode() ? sk().arrow[0].w : ARROW_W; }
 int arrow_right_gap() { return navbar_mode() ? sk().arrow_gap_r : ARROW_GAP_R; }
 // The right part with the theme's buttons: where the gripper, the magnifier,
 // the star and the search box (while open) go, by size and elements shown.
-// Medium (4074-dwm.png, lh4074-181608.png): gripper, magnifier and star at the
+// Medium: gripper, magnifier and star at the
 // navigation bar's places; Large and Extra-Large: no gripper, the small (Large)
 // or normal (Extra-Large) magnifier and star at the bottom; Small: the small
-// ones on the buttons' row (lh4074-195235/195250/195258.png).
+// ones on the buttons' row.
 struct Right {
     int grip_x = -1;                 // -1: none
     int grip_y = 0;                  // the gripper's rows are the theme's, this many rows down
@@ -439,8 +436,8 @@ void soft_line(HDC dc, int x, int y0, int y1, COLORREF c, int peak)
     DeleteObject(bmp);
 }
 
-// The opaque header of the non-composited 4074 Explorer (lh4074-181415.png,
-// row 124): a horizontal gradient that brightens towards a light band left of
+// The opaque header of the non-composited 4074 Explorer: a horizontal
+// gradient that brightens towards a light band left of
 // the divider, darkens to it, and rises again to the right edge.
 void paint_slate(HDC dc, int R, int H)
 {
@@ -680,7 +677,7 @@ gdi::Bitmap* draw_button(bool fwd, State st)
     return b;
 }
 
-// 4074-dwm.png shows the disabled Back button grey and translucent over the
+// 4074 draws the disabled Back button grey and translucent over the
 // glass (about (170,170,170) at 62 %), not the blue of the disabled image:
 // Avalon's disabled look. Done to the disabled images, premultiplied.
 void grey_out(HBITMAP b)
@@ -711,7 +708,7 @@ void draw_framelets()
 // Small (header_small_buttons = auto | even | uneven): even = the theme's
 // SmallTravelBack/Fwd (4074's styles: the same size, as 4074 has them);
 // uneven = the big pair - bigger Back, smaller Forward, as 4051's art and the
-// concepts (image9.jpeg, lh_winhec_proto_10.jpg) - box-filtered to the small
+// concepts - box-filtered to the small
 // height, the drop-down's rows kept 1:1 at the bottom (navbar::shrink). auto:
 // even where the style has the Small parts, else uneven (4051, the framelets).
 // The style is independent of glass. `even` without Small parts is uneven.
@@ -911,13 +908,13 @@ void paint_nav(HDC dc)
 }
 
 // ---- the opaque header ------------------------------------------------------------
-// Without composition 4074's header is browseui's navigation bar (COMPOSITION.md
-// 16): the theme's Navbar::Rebar band over the client width with its splitter,
+// Without composition 4074's header is its navigation bar: the theme's
+// Navbar::Rebar band over the client width with its splitter,
 // the travel and favorites buttons, a gripper and the magnifier, fonts and
 // colours from the theme by focus and maximise state (navbar.h). Styles
 // without one (Luna) get luxwm's _LHWM_HEADER_PIXMAP: the caption band as the
 // frame draws it, continued down over the header (active or inactive by focus),
-// under the glass layout as 4051 drew its header under Luna (lh4051-232843.png).
+// under the glass layout as 4051 drew its header under Luna.
 
 Mode choose_mode()
 {
@@ -1122,10 +1119,10 @@ double segment(int x, int y, double x0, double y0, double x1, double y1, double 
     return n / 16.0;
 }
 
-// The search button: 4074's grey glass magnifier (lh4074-181608.png: a lens
+// The search button: 4074's grey glass magnifier (a lens
 // of about 20 px with a dark rim and a light line across it, a thin light
 // handle down to the left), 4051's coloured one (light blue lens, orange
-// handle); drawn, 4x4 supersampled - only without the Longhorn files now
+// handle); drawn, 4x4 supersampled - only without the Longhorn files
 // (search_icon(): shell32's own icon).
 HBITMAP draw_magnifier(bool colour)
 {
@@ -1160,7 +1157,7 @@ HBITMAP draw_magnifier(bool colour)
     return h;
 }
 
-// The real one (doc/4051-explorer-research.md section 3): not a theme part
+// 4051's own: not a theme part
 // but shell32.dll's icon group 23 (Search), its 32x32 image, which 4051 draws
 // at (cw-81, 11); from the theme's Longhorn resources (slate4051: 4051's
 // coloured glass, the 4074 themes: 4074's). Null without the Longhorn files:
@@ -1202,9 +1199,8 @@ HBITMAP search_icon()
 }
 
 // The header's last row, once, in every mode, size and state: 4051's clean
-// edge (doc/4051-explorer-research.md section 2). 4074 draws Rebar.SPLITTER
-// (a dark and a light row) over its navigation bar's last four rows, which
-// end in the bar's own dark row: three lines (lh4074-195242.png y 168..171);
+// edge. 4074 draws Rebar.SPLITTER (a dark and a light row) over its
+// navigation bar's last four rows, which end in the bar's own dark row: three lines;
 // 4051 has only the bar's dark row (33,36,36). So: the theme's Navbar (or
 // InactiveNavbar) background's own last row - its maximised variants have
 // none (Slate's MaxNavbar ends in the band colour) and take the restored
@@ -1364,7 +1360,7 @@ bool paint_pixmap(HDC dc, int R, int H)
                    GetBValue(c) + (GetBValue(to) - GetBValue(c)) * pct / 100);
     };
     // the theme's NavbarBase gripper instead; not Rebar.GRIPPER's dots (4051
-    // under Luna has a plain line there: lh4051-232843.png)
+    // under Luna has a plain line there)
     if (themed_free() && !sk().gripper_tile) return true;
     if (themed_free() ? right_layout(R).grip_x < 0 : !g_show[SHOW_SEARCH]) return true;
     int dx = themed_free() ? right_layout(R).grip_x : g_divider;
@@ -1449,7 +1445,7 @@ void apply_mode(Mode m)
     g_nav_hot = g_nav_pressed = NONE;
 }
 
-// ---- the breadcrumb bar as 4074 builds it (lh4074-224731.png, NOTES) --------------
+// ---- the breadcrumb bar as 4074 builds it ------------------------------------------
 // A field behind the segments (shown while the mouse is over it, a drop-down is
 // open or it is being edited), each segment a split button: the name
 // (navigates) and an arrow part over the separator after it (drops the
@@ -1596,7 +1592,7 @@ void paint_segment(HDC dc, int i, int state, int arrow_state)
         return;
     }
     if (state == 2 || arrow_state == 2) {
-        // pressed/open: sunken, the dark edge and a light inner top (Codex on lh4074-224731.png)
+        // pressed/open: sunken, the dark edge and a light inner top
         vgradient(dc, s.left + 1, a.left, s.top + 1, s.bottom - 1, RGB(164, 172, 174), RGB(122, 130, 132));
         vgradient(dc, a.left, s.right - 1, s.top + 1, s.bottom - 1, RGB(122, 130, 132), RGB(157, 165, 167));
         fill(dc, s.left + 1, s.top + 1, s.right - 1, s.top + 2, RGB(203, 211, 214));
@@ -1656,7 +1652,7 @@ void open_menu(int i)
         if (paths.size() >= 250) break;
     }
     if (paths.empty()) AppendMenuW(m, MF_STRING | MF_GRAYED, 0, L"(Empty)");
-    POINT pt = { 0, g_height };    // flush under the header (lh4074-193810.png)
+    POINT pt = { 0, g_height };    // flush under the header (4074)
     if (vision()) {
         vision_menu_begin(LHNAV_SEP_OF(i), (int*)&pt.x);
     } else {
@@ -1787,7 +1783,7 @@ void paint(HDC dc)
     bool caption = false;            // luxwm's caption band under the glass layout
     if (on_glass) {
         FlxpClearRect(dc, &rc);   // luxwm's plate shows through
-        if (themed_free()) paint_right(dc, R);   // 4074-dwm.png: gripper, magnifier, star
+        if (themed_free()) paint_right(dc, R);   // 4074: gripper, magnifier, star
         else if (g_show[SHOW_SEARCH]) soft_line(dc, g_divider, top_off() + 2, base_height() - 4, RGB(255, 255, 255), 210);
     } else if (navbar_mode()) {
         paint_navbar(dc, R, H);
@@ -1822,7 +1818,7 @@ void paint(HDC dc)
     int top;
     HFONT tf = caption ? g_title_bold : title_font();
     if (nb_buttons() && (tf == g_nb_title || tf == g_title_bold)) {
-        // the navigation bar's measured capitals, in every mode
+        // the navigation bar's capitals, in every mode
         top = top_off() + sk().title_cap - (tf == g_nb_title ? g_nb_title_off : g_title_bold_off);
     } else {
         int asc = 0;
@@ -1865,7 +1861,7 @@ void paint(HDC dc)
             continue;
         }
         // the separator: a right-pointing 4x7 triangle on the text's lower rows,
-        // outlined 1 px white (the triangle grown by its 4 neighbours, as measured)
+        // outlined 1 px white (the triangle grown by its 4 neighbours, as 4074 draws it)
         int ax = c.text.right + ARROW_GAP_L, ab = crumb_baseline();
         for (int k = 0; k < ARROW_W; k++) {
             fill(dc, ax + k - 1, ab - 7 + k, ax + k, ab - k, RGB(253, 254, 251));
@@ -2853,14 +2849,14 @@ bool client_caption()
 
 // The same rows in every mode (top_off(), band_rows()): glass and luxwm's
 // pixmap have the navigation bar's metrics, under luxwm's caption as the bar is.
-// Small (lh4074-195235.png): 36 rows, the caption keeps the title (59 rows from
+// Small: 36 rows, the caption keeps the title (59 rows from
 // a 24-row caption's top edge to the dark line); Medium: the band, 54 (Slate
 // 4074: 53; 4051: 24 + 54 = 78 from the frame's top edge); Large / Extra-Large:
 // 32 / 49 more. CLIENT_CAPTION (glass, the title in the header): luxwm gives the
 // client its caption rows too (from the top border); they stay empty above the
-// band, so the band is where it is without the flag - 4074-dwm.png's own
-// placement (the title and Back button across the caption rows, 76 rows from
-// the frame's top) gave way to the one layout of the navigation bar.
+// band, so the band is where it is without the flag: the one layout of the
+// navigation bar, not 4074's own glass placement (the title and Back button
+// across the caption rows, 76 rows from the frame's top).
 int height_for_caption(int caption_h)
 {
     if (!g_settings_read) read_settings();
@@ -3035,7 +3031,7 @@ void set_folder(const std::shared_ptr<shell::Folder>& f)
         chain.insert(chain.begin(), c);
     };
     // flxp.ini breadcrumb_home = 0 (Folder Options' "Display the full path"): a folder under the home folder as the real path,
-    // Computer > Local Disk (/) > u > aap > ..., instead of the namespace's Home > ...
+    // Computer > Local Disk (/) > home > user > ..., instead of the namespace's Home > ...
     const char* home = getenv("HOME");
     std::string fp = f->path();
     bool full = home && *home && fp[0] == '/' && !shell::setting_flag("breadcrumb_home", true) &&

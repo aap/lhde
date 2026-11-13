@@ -22,7 +22,7 @@ static bool g_cues = true;      // the mnemonics are underlined now (set_cues)
 enum { TIMER_CUES = 1 };
 
 // XP's menu bar underlines its mnemonics while Alt is held, in keyboard mode and while a menu it opened from the keyboard is
-// open (xxxDrawMenuBarUnderlines), and hides them again after (unless SPI_GETKEYBOARDCUES: always)
+// open, and hides them again after (unless SPI_GETKEYBOARDCUES: always)
 static void set_cues(bool on)
 {
     BOOL always = FALSE;
@@ -117,7 +117,7 @@ static void track(int index, bool keyboard)
     set_cues(GetKeyState(VK_MENU) < 0);
 }
 
-// XP's menu band draws in the menu font (browseui menuband.cpp: _hFontMenu from NONCLIENTMETRICS lfMenuFont): the style's
+// XP's menu band draws in the menu font (NONCLIENTMETRICS lfMenuFont): the style's
 // MENUFONT, Segoe UI 9 under Jade and Aero
 static HFONT g_font;
 static void set_font()
@@ -139,7 +139,7 @@ static void rebuild()
     for (size_t i = 0; i < texts.size(); i++) {
         TBBUTTON& b = btns[i];
         memset(&b, 0, sizeof b);
-        b.iBitmap = I_IMAGECALLBACK;   // XP (mnstatic.cpp): iIcon = -1, no image list; the 1px bitmap slot still counts for the width
+        b.iBitmap = I_IMAGECALLBACK;   // XP: iIcon = -1, no image list; the 1px bitmap slot still counts for the width
         b.idCommand = 1000 + (int)i;
         b.fsState = TBSTATE_ENABLED;
         b.fsStyle = BTNS_BUTTON | BTNS_AUTOSIZE | BTNS_SHOWTEXT | BTNS_DROPDOWN;   // whole button drops (no DRAWDDARROWS)
@@ -194,7 +194,7 @@ HWND create(HWND rebar, HWND owner, HMENU menu, int band_id)
     SendMessageW(g_tb, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
     SendMessageW(g_tb, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_MIXEDBUTTONS | TBSTYLE_EX_HIDECLIPPEDBUTTONS);
     SendMessageW(g_tb, TB_SETMAXTEXTROWS, 1, 0);
-    // XP (shell32 menuband/mnstatic.cpp): the menu band is never themed, so an
+    // XP: the menu band is never themed, so an
     // open menu title shows the classic sunken flat-button edge even under Luna
     SetWindowTheme(g_tb, L"", L"");
     SendMessageW(g_tb, TB_SETBITMAPSIZE, 0, MAKELONG(0, 0));   // XP: TB_SETIMAGELIST(NULL) -> SetBitmapSize(0,0) -> 1x1 slot, button height 16->1: max(1,13)+6 = 19
@@ -212,9 +212,9 @@ HWND create(HWND rebar, HWND owner, HMENU menu, int band_id)
     rb.fStyle = RBBS_NOGRIPPER | RBBS_USECHEVRON;
     rb.hwndChild = g_tb;
     rb.wID = (UINT)band_id;
-    // XP (browseui itbar.cpp GetBandInfo): band height = first button's height (22px: 16px bitmap slot + 6)
+    // XP: band height = first button's height (22px: 16px bitmap slot + 6)
     rb.cxMinChild = (UINT)sz.cx; rb.cyMinChild = (UINT)(item.bottom - item.top); rb.cyChild = rb.cyMinChild; rb.cx = (UINT)sz.cx;
-    // Measured on classic XP: the menu band's buttons start 1px further right
+    // Classic XP: the menu band's buttons start 1px further right
     // than the toolbar's (under Luna they start right at the band margin).
     if (!GetWindowTheme(rebar)) { rb.fMask |= RBBIM_HEADERSIZE; rb.cxHeader = 1; }
     SendMessageW(rebar, RB_INSERTBANDW, 0, (LPARAM)&rb);
@@ -226,7 +226,7 @@ void fonts_changed()
     if (!g_tb) return;
     set_font();
     rebuild();
-    // the band follows the buttons' new height (itbar.cpp GetBandInfo: the first button's)
+    // the band follows the buttons' new height (the first button's)
     RECT item = {0, 0, 0, 0};
     SendMessageW(g_tb, TB_GETITEMRECT, 0, (LPARAM)&item);
     SIZE sz = {0, 0};
@@ -251,7 +251,7 @@ LRESULT on_notify(NMHDR* nm, bool* handled)
     *handled = false;
     if (nm->hwndFrom != g_tb) return 0;
     if (nm->code == NM_CUSTOMDRAW) {
-        // XP mnbase.cpp: a horizontal menu band of an inactive window draws its
+        // XP: a horizontal menu band of an inactive window draws its
         // text in COLOR_3DSHADOW
         NMTBCUSTOMDRAW* cd = (NMTBCUSTOMDRAW*)nm;
         *handled = true;

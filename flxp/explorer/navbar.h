@@ -1,5 +1,5 @@
-// The Longhorn 4074/4051 navigation bar without composition: what browseui's
-// CNavBar draws from the visual style (~/fun/longhorn/COMPOSITION.md 16).
+// The Longhorn 4074/4051 navigation bar without composition: what 4074's
+// Explorer draws from the visual style.
 // Its background is the theme part Navbar::Rebar.BACKGROUND (Inactive-,
 // Max-, MaxInactiveNavbar by focus and maximise state) over the client
 // width, ending in its own dark last row (4074's Rebar.SPLITTER over the
@@ -82,8 +82,8 @@ void draw_row(HDC dc, const Img& img, int row, const RECT& dst, int left, int ri
 // The image's premultiplied pixels (top-down), null if it has none
 const uint32_t* pixels(const Img& img);
 void free_image(Img& img);
-// A travel button at a smaller height T (the concepts' uneven small pair,
-// image9.jpeg, lh_winhec_proto_10.jpg): the rows above the drop-down (split
+// A travel button at a smaller height T (the concepts' uneven small pair):
+// the rows above the drop-down (split
 // = CUSTOMSPLITRECT's top) area-averaged (box filter) by T / h, the
 // drop-down's rows 1:1 at the bottom over them, box-filtered across only,
 // except the glyph's columns [g0, g1], copied unscaled. split = h: the whole

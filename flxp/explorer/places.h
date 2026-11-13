@@ -1,5 +1,5 @@
 // The left pane when the Folders tree is off: common places and the GTK
-// bookmarks, where XP shows its task pane (shell32 DUI "shellstyle").
+// bookmarks, where XP shows its task pane.
 //
 // XP look (visual styles and classic, the explorer's XP frame): sections as
 // XP's "Other Places" - a header with the title in Tahoma 8 bold and the
@@ -28,7 +28,7 @@
 // files are refused; on another group's entry the files go there.
 //
 // The XP look's last section, Details (the explorer: Options::details), is
-// XP's Details rollout (shell32 duiinfo.cpp): the mini preview of one picture
+// XP's Details rollout: the mini preview of one picture
 // (fitted into 150 x 100, left), the name in bold, the type and the
 // "Label: value" lines of shell/details.h, each wrapped, 5 px apart (the type
 // right under the name), black (classic: the window text); several items:

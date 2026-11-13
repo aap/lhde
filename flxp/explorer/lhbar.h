@@ -15,7 +15,7 @@ namespace lhbar {
 // menubar_gradient, menubar_text, menubar_msstyles; see flxp.ini).
 void init();
 // false with menubar_style=theme: the row keeps the visual style's own rebar
-// (as 4051's bar under Luna, lh4051-232843.png) and nothing here applies
+// (as 4051's bar under Luna) and nothing here applies
 bool enabled();
 // WM_THEMECHANGED: reads the settings again (they may come from the session theme)
 void theme_changed();

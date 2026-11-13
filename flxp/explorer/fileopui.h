@@ -1,4 +1,4 @@
-// Copy and move as XP's shell does them (shell32 copy.c): the operation runs on
+// Copy and move as XP's shell does them: the operation runs on
 // a worker thread (shell::fileops::Job) while the caller's windows stay live;
 // name clashes ask Confirm File Replace / Confirm Folder Replace, a read-only
 // file being moved asks Confirm File Move, a failure is reported when it
@@ -23,8 +23,8 @@ shell::fileops::Result run(HWND owner, shell::fileops::Op op, const std::vector<
 // gives that here so they work meanwhile (true: handled).
 void set_message_filter(bool (*filter)(MSG& msg));
 
-// Renaming as XP's shell does it (shapi.cpp SHRenameFileEx, its errors in
-// CopyError's words): blanks around the name dropped; "/" (the one character
+// Renaming as XP's shell does it (its errors in the copy engine's words):
+// blanks around the name dropped; "/" (the one character
 // a name cannot have here), an empty or too long name refused in a "Rename"
 // box; a changed extension of a known type asks "If you change a file name
 // extension, the file may become unusable." (Yes/No); a name that is taken is
@@ -34,7 +34,7 @@ void set_message_filter(bool (*filter)(MSG& msg));
 // typed (edit_again).
 bool rename(HWND owner, const std::string& path, const std::string& typed, std::string* new_path);
 // A list view's label edit of item again, with text in it, all of it selected,
-// once the current edit has ended (defview: LVN_ENDLABELEDIT -> LVM_EDITLABEL).
+// once the current edit has ended (XP's view: LVN_ENDLABELEDIT -> LVM_EDITLABEL).
 void edit_again(HWND list, int item, const std::string& text);
 
 // The texts XP shows for an error (exposed for the tests): the message box's

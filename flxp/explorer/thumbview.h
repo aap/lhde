@@ -1,11 +1,11 @@
 // Thumbnails in the list view, in two styles.
 //
-// XP's Thumbnails view (defview dvthumbnail.cpp): the list in LVS_ICON with an
+// XP's Thumbnails view: the list in LVS_ICON with an
 // image list of thumbnail_size squares (default 96), LVS_EX_BORDERSELECT (the
 // 1 px outline and the 3 px selection frame, vendored listview.c) and XP's
 // icon spacing (cxIcon/4 + size + 1 + 20 across). Pictures are fitted into the
 // square on the window colour; everything else shows its 48 px icon centred in
-// it (XP's CreateDefaultThumbnail), folders XP's folder thumbnail with up to
+// it (XP's default thumbnail), folders XP's folder thumbnail with up to
 // four pictures of their contents.
 //
 // The Longhorn hosts (set_longhorn; 4051/4074, docs/USAGE.md "The Explorer's views (flxp)"): the

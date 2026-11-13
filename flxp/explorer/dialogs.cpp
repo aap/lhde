@@ -563,7 +563,7 @@ static INT_PTR CALLBACK view_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         return TRUE;
     case WM_COMMAND:
         if (LOWORD(wp) == IDC_FO_APPLYALL) {
-            // XP's question (shell32 IDS_APPLYALLFOLDERS... wording from memory)
+            // XP's question
             if (ask(dlg, "This will cause all folders to match the current folder's view settings. Do you want to continue?")) {
                 o->default_view = o->current_view;
                 if (o->apply_all) o->apply_all(*o);

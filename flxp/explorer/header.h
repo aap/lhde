@@ -4,7 +4,7 @@
 // lies on the window manager's glass (the frame extended into the client,
 // docs/CLIENT-PROTOCOL.md: transparent with glowing text). Without
 // composition it is opaque: the navigation bar of the session theme's
-// Longhorn msstyles (navbar.h, COMPOSITION.md 16.4: Navbar::Rebar,
+// Longhorn msstyles (navbar.h: Navbar::Rebar,
 // splitter, travel/favorites buttons, fonts and colours by focus and
 // maximise state), else luxwm's _LHWM_HEADER_PIXMAP (the caption band
 // continued, e.g. Luna) under the glass layout, else (no luxwm) the 4074
@@ -42,12 +42,12 @@ void set_tools(const std::vector<Tool>& tools);
 void enable_tool(int id, bool on);
 bool tool_rect(int id, RECT* screen);
 
-// 4074's Toolbar Size and Toolbars (its system menu, lh4074-1952*.png), as
+// 4074's Toolbar Size and Toolbars (its system menu), as
 // settings (flxp.ini, View > Toolbars): <prefix>header_size = small | medium |
 // large | xlarge, and <prefix>header_buttons / _title / _breadcrumb / _search /
 // _favorites = 1 | 0. Small: one row under the frame's caption (which keeps the
 // title) with the small Back/Forward buttons, the breadcrumb, the small
-// magnifier and star; Medium: the 76 rows of 4074-dwm.png (title over the
+// magnifier and star; Medium: 4074's 76 rows (title over the
 // breadcrumb); Large / Extra-Large: Medium plus 32 / 49 empty rows, the
 // magnifier and star (small / normal) at the bottom.
 enum Size { SIZE_SMALL, SIZE_MEDIUM, SIZE_LARGE, SIZE_XLARGE };
@@ -100,8 +100,8 @@ void theme_changed();                                // the session theme: reloa
 HWND search_box();
 std::string buttons_source();                        // where the Back/Forward/Favorites images come from per mode
 std::string framelet_source();                       // where the Back/Forward images come from (path and the setting), or "drawn ..."
-std::string background_source();
-std::string metrics_info();                          // the rows per size, the travel buttons' places and style, the lower edge (--info)                     // what the header is painted on now (glass, navigation bar, pixmap/gradient)
+std::string background_source();                     // what the header is painted on now (glass, navigation bar, pixmap/gradient)
+std::string metrics_info();                          // the rows per size, the travel buttons' places and style, the lower edge (--info)
 void set_history(bool can_back, bool can_forward);  // enables the Back/Forward buttons
 void edit_address();                                 // Ctrl+L: the breadcrumb becomes an edit field with the path (Enter goes, Esc leaves)
 

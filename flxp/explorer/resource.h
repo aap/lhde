@@ -71,8 +71,8 @@
 #define IDC_TX_TEXT         1713
 #define IDC_TX_NOTE         1714
 
-// file operations (fileopui.cpp): XP's shell32 DLG_REPLACE_FILE, DLG_REPLACE_FOLDER,
-// DLG_MOVE_FILE, DLG_MOVECOPYPROGRESS and a message box for the errors
+// file operations (fileopui.cpp): XP's Confirm File Replace, Confirm Folder Replace,
+// Confirm File Move and progress dialogs, and a message box for the errors
 #define IDD_OP_REPLACEFILE  110
 #define IDD_OP_REPLACEFOLDER 111
 #define IDD_OP_MOVEFILE     112

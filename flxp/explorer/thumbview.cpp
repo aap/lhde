@@ -170,8 +170,8 @@ static void draw_icon(Square& sq, const std::string& key, int px, int x, int y)
 
 // ---- the Longhorn pictures: the photo frame --------------------------------------------
 
-// The frame around a picture (measured in 4051/4074, the spec's section 2.3; lh4074-195358
-// at about 208 px, from the outside: left 251 240 223, top 251 223, right 240 201, bottom
+// The frame around a picture (4051/4074; at about 208 px, from the outside:
+// left 251 240 223, top 251 223, right 240 201, bottom
 // 251 223 on white, i.e. a soft shadow darker to the right; a 1 px line, 201 at the top,
 // 173 elsewhere; a mat graded 255 at the top to 233 at the bottom, about size/28 wide):
 // the shadow's inner rings only at smaller sizes, nothing below 32 px.
@@ -244,7 +244,7 @@ static void put_art(Square& sq, int id)
     DestroyIcon(ic);
 }
 
-// 4074 shell32 (the spec's section 3.2): on a 512 canvas, the photo is drawn column by
+// 4074 shell32: on a 512 canvas, the photo is drawn column by
 // column as a keystone whose left edge stands at x 204 from y 488 up, with a flat shadow
 // of 33 columns on the back wall when the photo is opaque; the canvas is scaled into the
 // thumbnail between the back (#389) and the front (#390)
@@ -341,7 +341,7 @@ static int default_image(const std::string& key, bool folder)
     return idx;
 }
 
-// XP folderthumb.cpp: the folder icon at thumbnail size, the pictures in a
+// XP: the folder icon at thumbnail size, the pictures in a
 // 2x2 layout (96: 40 px cells at x 7/49, y 11/52; scaled for other sizes)
 static int mini_size() { return (40 * g_size + 48) / 96; }
 
@@ -367,7 +367,7 @@ static int picture_image(const gdi::Bitmap* b)
     Square sq;
     if (!begin(sq)) return -1;
     if (g_lh) framed(sq, b);
-    else put(sq, b, (g_size - b->width) / 2, (g_size - b->height) / 2);   // XP CalculateAspectRatio: centred
+    else put(sq, b, (g_size - b->width) / 2, (g_size - b->height) / 2);   // XP: centred
     return finish(sq);
 }
 
@@ -420,8 +420,8 @@ bool enter_at(int px, bool small_slot, HIMAGELIST large, HIMAGELIST small)
     }
     SendMessageW(g_list, LVM_SETIMAGELIST, LVSIL_NORMAL, (LPARAM)g_il);
     if (g_lh) return true;   // (the browser sets the spacing of the Longhorn views)
-    // dvthumbnail.cpp _SetThumbview: border select, the thumbnail image list,
-    // spacing cxIcon/4 + size + 1 and 20 more "so people find the background"
+    // XP's Thumbnails view: border select, the thumbnail image list,
+    // spacing cxIcon/4 + size + 1 and 20 more (room to click the background)
     if (g_size >= 48) SendMessageW(g_list, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_BORDERSELECT, LVS_EX_BORDERSELECT);
     int cxicon = GetSystemMetrics(SM_CXICON);
     if (g_size >= 48) SendMessageW(g_list, LVM_SETICONSPACING, 0, MAKELPARAM(cxicon / 4 + g_size + 1 + 20, 0));

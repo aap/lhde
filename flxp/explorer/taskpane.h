@@ -1,11 +1,8 @@
 // The horizontal task band of 4051's Explorer (frame=longhorn, optional:
 // taskpane=1 / --taskpane / View > Task Band): the band under the command bar,
-// left to right the preview, the details and the tasks, as 4051's preview pane
-// (System.Windows.Explorer's PreviewTaskPresenter; taskpane/managed.md in the
-// Longhorn research; lh4051-152854/152900, 152336/152329, 152415/152354,
-// 152420/152358.png):
+// left to right the preview, the details and the tasks, as 4051's preview pane:
 // - nothing selected: the folder's image faded at the left and "N items" /
-//   "in this folder" over it (WelcomePane), the folder's tasks;
+//   "in this folder" over it, the folder's tasks;
 // - one item: its thumbnail (a picture, framed in white) or its icon, the
 //   name, the values of shell/details (two 180 px columns, an empty editable
 //   property as its invitation) and "all properties..."; a click on an

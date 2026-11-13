@@ -1,12 +1,11 @@
-// Measured placements (client coordinates, cw = client width; COMPOSITION.md
-// 16.3 and template matches of the theme bitmaps on the screenshots):
-//   Slate 4074 (lh4074-181608.png): Back at (2,0), Favorites at (cw-46,0),
+// The placements (client coordinates, cw = client width):
+//   Slate 4074: Back at (2,0), Favorites at (cw-46,0),
 //     title ink x 83 rows 4..18, crumbs ink x 83 rows 31..38, white; the
 //     separator ink 15 px after the text; gripper x cw-92 rows 2..47
-//   Jade 4074 (lh4074-181415/181440.png): Back at (2,0), Favorites at
+//   Jade 4074: Back at (2,0), Favorites at
 //     (cw-46,5), title ink x 77 rows 6..22, crumbs ink x 89 rows 35..43,
 //     separator ink 23 px after the text; gripper x cw-91 rows 4..50
-//   Slate 4051 (lh4051-225158.png): Back at (2,0), Favorites at (cw-46,5),
+//   Slate 4051: Back at (2,0), Favorites at (cw-46,5),
 //     band 54 rows (the background's last row is its dark line), title ink
 //     x 81 rows 3..15, crumbs black, ink x 83 rows 30..40, a dot gripper
 //     at x cw-95 (Rebar.GRIPPER tiled: a dot every 7 rows from row 3)
@@ -23,7 +22,7 @@ namespace navbar {
 
 namespace {
 
-// The placements, measured per family (the images, fonts and colours are the
+// The placements, per family (the images, fonts and colours are the
 // theme's): picked by the travel images' height and the splitter
 struct Layout {
     const char* name;
@@ -226,9 +225,8 @@ void load_skin()
         s.gripper_tile = s.gripper.bmp && ut_get_enum(st.t, "Rebar", st.part("Rebar", "GRIPPER"), 0, st.sizingtype, &type) && type == 2;   // ST_TILE
     }
     // the Medium band: the travel art's height, its drop-down on the band's
-    // dark last row (4051, doc/4051-explorer-research.md section 1); 4074's
-    // short Slate art (49 rows) keeps the measured 53 (lh4074-195242.png) with
-    // the art at the band's bottom. The splitter is never drawn (section 2).
+    // dark last row (4051); 4074's short Slate art (49 rows) keeps 4074's 53
+    // rows with the art at the band's bottom. The splitter is never drawn.
     int bh = s.back[ACTIVE][NORMAL].h;
     s.height = bh < 52 ? bh + 4 : bh;
     const Layout& L = bh < 52 ? layouts[0] : s.splitter.bmp ? layouts[1] : layouts[2];

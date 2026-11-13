@@ -48,7 +48,7 @@ extern "C" {
 #include "w32/flxp_shell.h"
 #undef small      // rpcndr.h (through dwmapi.h)
 #ifndef TB_SETDROPDOWNGAP
-#define TB_SETDROPDOWNGAP (WM_USER + 100)   // comctrlp.h (XP private)
+#define TB_SETDROPDOWNGAP (WM_USER + 100)   // comctl32's private message
 #endif
 }
 #include "browser.h"
@@ -184,7 +184,7 @@ static void icons_changed()
 }
 
 // ---- Go button ----------------------------------------------------------------
-// XP browseui address.cpp: the Go button is a one-button list toolbar inside the
+// XP: the Go button is a one-button list toolbar inside the
 // ComboBoxEx window, which is subclassed so that its inner combo leaves room on
 // the right (cx - cxGo - 2) and the button sits at cx - cxGo, vertically centred
 // on the inner combo. The strip under the button shows the rebar background.
@@ -259,9 +259,9 @@ static HIMAGELIST glyphs(const std::string& src, int size)
 {
     HBITMAP bmp = (HBITMAP)load_themed(src, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
     if (!bmp) return nullptr;
-    // The SP1 bitmap is 24-bit; the XP (SP3) one the screenshots show has
-    // rounded alpha corners: per corner 0.05 at the corner pixel, 0.56 next
-    // to it, 0.93 one further (measured), everything else opaque.
+    // SP1's bitmap is 24-bit; SP3's has rounded alpha corners: per corner
+    // 0.05 at the corner pixel, 0.56 next to it, 0.93 one further,
+    // everything else opaque.
     DIBSECTION ds = {};
     if (GetObjectW(bmp, sizeof ds, &ds) == sizeof ds && ds.dsBm.bmBits && ds.dsBm.bmBitsPixel == 32 && ds.dsBm.bmWidth >= 3) {
         int w = ds.dsBm.bmWidth, h = ds.dsBm.bmHeight < 0 ? -ds.dsBm.bmHeight : ds.dsBm.bmHeight;
@@ -308,7 +308,7 @@ static void create(HWND cbx)
 } // namespace gobutton
 
 // ---- Folders explorer bar --------------------------------------------------------
-// XP browseui browbs.cpp (CBrowserBandSite): the tree is a band in a vertical
+// XP: the tree is a band in a vertical
 // band site whose band header carries the title ("Folders", menu font, at x 6)
 // and an etch line at the header's bottom; a flat toolbar with the close (X)
 // button sits at the top right. The band site is a rebar, so under a visual
@@ -319,7 +319,7 @@ static void on_command(int id);
 
 namespace bandsite {
 
-const int TITLE = 22;          // _uTitle: text height 13 + CY_ETCH 2 + CY_FLUFF 7
+const int TITLE = 22;          // text height 13 + the etch 2 + 7
 HWND g_close = nullptr;
 HFONT g_font = nullptr;
 
@@ -339,9 +339,8 @@ static void layout_children()
     int h = header();
     if (g.tree) SetWindowPos(g.tree, nullptr, 0, h, rc.right, rc.bottom - h, SWP_NOZORDER | SWP_NOACTIVATE);
     if (g_close) {
-        // _PositionToolbars: x = right - width - 1, y = the band's top margin
-        // (0). This matches three of the four XP screenshots; in the Luna/large
-        // one the X sits 4px further left (unexplained).
+        // XP: x = right - width - 1, y = the band's top margin (0); under
+        // Luna with large icons XP has the X 4px further left.
         RECT br = {}; SendMessageW(g_close, TB_GETITEMRECT, 0, (LPARAM)&br);
         int w = br.right - br.left, bh = br.bottom - br.top;
         int x = rc.right - w - 1;
@@ -368,13 +367,13 @@ static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         HTHEME th = OpenThemeData(h, L"Rebar");
         if (th) { DrawThemeBackground(th, dc, 0, 0, &rc, nullptr); CloseThemeData(th); }
         else FillRect(dc, &rc, GetSysColorBrush(COLOR_BTNFACE));
-        // title and etch line (browbs.cpp _OnCDNotify)
+        // title and etch line
         int top = top_margin();
         HGDIOBJ of = SelectObject(dc, g_font);
         SetBkMode(dc, TRANSPARENT);
         SetTextColor(dc, GetSysColor(COLOR_BTNTEXT));
         SIZE ts = {}; GetTextExtentPoint32W(dc, L"Folders", 7, &ts);
-        TextOutW(dc, 6, top + ((TITLE - 2) - ts.cy) / 2, L"Folders", 7);   // CX_TEXTOFFSET, centred above the etch
+        TextOutW(dc, 6, top + ((TITLE - 2) - ts.cy) / 2, L"Folders", 7);   // 6 px in, centred above the etch
         SelectObject(dc, of);
         RECT e = { 0, top + TITLE - 2, rc.right, top + TITLE - 1 };
         FillRect(dc, &e, GetSysColorBrush(COLOR_BTNSHADOW));
@@ -401,13 +400,13 @@ static void create(HWND frame)
         0, 0, 0, 0, frame, (HMENU)IDC_BANDSITE, nullptr, nullptr);
     NONCLIENTMETRICSW ncm = {}; ncm.cbSize = sizeof ncm;
     SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
-    g_font = CreateFontIndirectW(&ncm.lfMenuFont);   // _GetTitleFont: the menu font
+    g_font = CreateFontIndirectW(&ncm.lfMenuFont);   // XP: the menu font
     // the close button: browseui's browtb.bmp (13x11 cells, the X is cell 1),
     // drawn navy (0,2,92) on XP SP3 where SP1's bitmap has it black
     g_close = CreateWindowExW(0, TOOLBARCLASSNAMEW, nullptr,
         WS_VISIBLE | WS_CHILD | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | CCS_NODIVIDER | CCS_NOMOVEY | CCS_NOPARENTALIGN | CCS_NORESIZE,
         0, 0, 30, 18, g.bandsite, (HMENU)IDC_BANDCLOSE, nullptr, nullptr);
-    SetWindowTheme(g_close, L"", L"");   // measured: the button keeps its classic size under Luna
+    SetWindowTheme(g_close, L"", L"");   // XP: the button keeps its classic size under Luna
     SendMessageW(g_close, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
     SendMessageW(g_close, TB_SETBITMAPSIZE, 0, MAKELONG(13, 11));
     HBITMAP bmp = (HBITMAP)load_themed(shell::icon_theme().toolbar.close, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
@@ -448,10 +447,10 @@ static void create(HWND frame)
 } // namespace bandsite
 
 // ---- brand band -------------------------------------------------------------
-// XP browseui brand.cpp: a fixed-size band the rebar keeps at the right end of
+// XP's brand: a fixed-size band the rebar keeps at the right end of
 // the first row. The "micro" brand is a strip of square frames (shell32
 // IDB_BRAND_BITMAP_MICRO, 22x22, frame 0 = the static logo) painted centred on
-// the strip's top-left colour (clrBkStat).
+// the strip's top-left colour.
 
 namespace brand {
 
@@ -512,7 +511,7 @@ static void create(HWND rebar)
     rb.fStyle = RBBS_FIXEDSIZE | RBBS_NOGRIPPER;
     rb.hwndChild = h;
     rb.wID = IDC_BRAND;
-    // measured on XP: the white brand area is 38 wide (+ the etch's white column), the row 22 high
+    // XP: the white brand area is 38 wide (+ the etch's white column), the row 22 high
     rb.cxMinChild = 38; rb.cyMinChild = (UINT)g_size; rb.cyChild = (UINT)g_size; rb.cx = 38;
     SendMessageW(rebar, RB_INSERTBANDW, 1, (LPARAM)&rb);
 }
@@ -559,7 +558,7 @@ static void update_details()
     shell::details::Info in = shell::details::describe(sel, shell::details::location_item(*g.folder), (int)g.items.size(), focus);
     // pictures: where thumbnails are allowed (thumbnails, thumbnails_network)
     bool pictures = g.folder->is_filesystem() && shell::thumbs::enabled_for(g.folder->path());
-    // XP: no mini preview in the Thumbnails view (CDUIView::ShouldShowMiniPreview)
+    // XP: no mini preview in the Thumbnails view
     if (xp) places::set_details(in, pictures && browser::view_code(g) != VIEW_THUMBNAILS, g.folder->path() == "::computer");
     if (g.taskband) taskpane::set_details(in, pictures);
 }
@@ -761,7 +760,7 @@ void Explorer::shown()
     ci.mask = CBEIF_TEXT | CBEIF_IMAGE | CBEIF_SELECTEDIMAGE;
     ci.iItem = -1;
     std::u16string addr = W(folder->is_filesystem() ? folder->path() : folder->name());
-    if (const char* t = getenv("FLXP_ADDRESS_TEXT")) addr = W(t);   // testing: show what a reference screenshot shows
+    if (const char* t = getenv("FLXP_ADDRESS_TEXT")) addr = W(t);   // testing: a fixed address text
     ci.pszText = (LPWSTR)addr.c_str();
     ci.iImage = ci.iSelectedImage = icon_for(folder->icon());
     SendMessageW(address, CBEM_SETITEMW, 0, (LPARAM)&ci);
@@ -980,7 +979,7 @@ static void caption_hole(HWND frame) { browser::caption_hole(frame); }
 static void header_refit(HWND frame) { browser::header_refit(frame, layout); }
 
 // ---- the Longhorn 4051 command bar (frame=longhorn) ------------------------------
-// lh4051-*.png: the menu band and, on the same row after a gap, a small list
+// 4051: the menu band and, on the same row after a gap, a small list
 // toolbar - a red-crossed page, Search, Folders, Views (drop-down), a magnifier
 // with a drop-down and a details-view button shown checked - all on the folder
 // type's coloured gradient (lhbar). No Back/Forward (the header has them),
@@ -989,7 +988,7 @@ static void header_refit(HWND frame) { browser::header_refit(frame, layout); }
 // browser strip with the crossed page), else the icon theme's small strip.
 namespace lhtool {
 
-// shell32 strip 216/217 (doc/4051-explorer-research.md section 3): 17 the
+// shell32 strip 216/217: 17 the
 // glass (Search and the zoom's drop-down), 40 the preview pane button; IE's 206/207: 2 Stop
 enum { SHELL_DELETE = 10, SHELL_SEARCH = 17, SHELL_DETAILS = 23, SHELL_PREVIEW = 40, SHELL_VIEWS = 32, SHELL_FOLDERS = 43, IE_STOP = 2 };
 
@@ -1078,7 +1077,7 @@ static void create()
         { i_details, ID_DETAILS_TOGGLE, TBSTATE_ENABLED, BTNS_BUTTON | BTNS_AUTOSIZE, {0}, 0, (INT_PTR)L"Preview" },
     };
     SendMessageW(g_tb, TB_ADDBUTTONSW, sizeof tb / sizeof tb[0], (LPARAM)tb);
-    // the gaps measured on lh4051-225221.png: 14 after the crossed page, 10 before Views
+    // 4051's gaps: 14 after the crossed page, 10 before Views
     const int gaps[][2] = { { 1, 14 }, { 4, 10 } };
     for (auto& gp : gaps) {
         TBBUTTONINFOW bi = {};
@@ -1135,7 +1134,7 @@ static void changed()
 
 static void sync_taskpane();
 // the status bar: on in the XP frame, off in the Longhorn one (4051's Explorer
-// default, CShellBrowser2::_LoadStatusBar); View > Status Bar remembers it per frame
+// default); View > Status Bar remembers it per frame
 static bool status_setting()
 {
     return g.longhorn ? shell::setting_flag("statusbar_longhorn", false) : shell::setting_flag("statusbar", true);
@@ -1189,7 +1188,7 @@ static void create_children(HWND frame)
     SendMessageW(g.toolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
     SendMessageW(g.toolbar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_MIXEDBUTTONS | TBSTYLE_EX_DRAWDDARROWS | TBSTYLE_EX_HIDECLIPPEDBUTTONS);
     SendMessageW(g.toolbar, TB_SETMAXTEXTROWS, 1, 0);
-    SendMessageW(g.toolbar, TB_SETDROPDOWNGAP, (WPARAM)(GetSystemMetrics(SM_CXEDGE) / 2), 0);   // browseui itbar.cpp
+    SendMessageW(g.toolbar, TB_SETDROPDOWNGAP, (WPARAM)(GetSystemMetrics(SM_CXEDGE) / 2), 0);   // as XP's toolbar
     SendMessageW(g.toolbar, TB_SETBITMAPSIZE, 0, MAKELONG(24, 24));
     int i_back = HIST_BACK, i_fwd = HIST_FORWARD, i_up, i_search = HIST_FAVORITES, i_folders = HIST_VIEWTREE, i_views;
     if (load_toolbar_theme()) {
@@ -1202,11 +1201,11 @@ static void create_children(HWND frame)
     }
     static const wchar_t* labels[] = { L"Back", L"Forward", L"Up", L"Search", L"Folders", L"Views" };
     TBBUTTON tb[] = {
-        // XP's list-style toolbar autosizes every button (browseui's c_tbExplorer relies on it)
+        // XP's list-style toolbar autosizes every button
         { i_back, ID_BACK, TBSTATE_ENABLED, BTNS_BUTTON | BTNS_AUTOSIZE | BTNS_SHOWTEXT | BTNS_DROPDOWN, {0}, 0, (INT_PTR)labels[0] },
         { i_fwd, ID_FORWARD, TBSTATE_ENABLED, BTNS_BUTTON | BTNS_AUTOSIZE | BTNS_DROPDOWN, {0}, 0, (INT_PTR)labels[1] },
         { i_up, ID_UP, TBSTATE_ENABLED, BTNS_BUTTON | BTNS_AUTOSIZE, {0}, 0, (INT_PTR)labels[2] },
-        { 6, 0, TBSTATE_ENABLED, BTNS_SEP, {0}, 0, 0 },   // browseui CX_SEPARATOR
+        { 6, 0, TBSTATE_ENABLED, BTNS_SEP, {0}, 0, 0 },   // XP's separator width
         { i_search, ID_SEARCH, TBSTATE_ENABLED, BTNS_BUTTON | BTNS_AUTOSIZE | BTNS_SHOWTEXT, {0}, 0, (INT_PTR)labels[3] },
         { i_folders, ID_FOLDERS, (BYTE)(TBSTATE_ENABLED | (g.show_folders ? TBSTATE_CHECKED : 0)), BTNS_CHECK | BTNS_AUTOSIZE | BTNS_SHOWTEXT, {0}, 0, (INT_PTR)labels[4] },
         { 6, 0, TBSTATE_ENABLED, BTNS_SEP, {0}, 0, 0 },
@@ -1237,22 +1236,22 @@ static void create_children(HWND frame)
     rb.fStyle = RBBS_NOGRIPPER | RBBS_USECHEVRON | RBBS_BREAK;   // own row below the menu band
     rb.hwndChild = g.toolbar;
     rb.wID = IDC_TOOLBAR;
-    // XP (browseui itbar.cpp GetBandInfo): band height = first button's height
+    // XP: band height = first button's height
     // (30 for 24px glyphs classic, 38 under Luna whose button sizing margins add 4px per side)
     rb.cxMinChild = tbsize.cx; rb.cyMinChild = (UINT)(tbitem.bottom - tbitem.top); rb.cyChild = rb.cyMinChild; rb.cx = tbsize.cx;
-    // Measured on XP/Luna (large and small icons): the toolbar sits 4px further
-    // right than the menu band (both start after the 2px Rebar.Band margin).
-    // Not explained by the SP1 rebar/itbar source; emulated with a header.
+    // XP/Luna (large and small icons): the toolbar sits 4px further right
+    // than the menu band (both start after the 2px Rebar.Band margin); a band
+    // header makes up the difference.
     if (GetWindowTheme(g.rebar)) { rb.fMask |= RBBIM_HEADERSIZE; rb.cxHeader = 4; }
     SendMessageW(g.rebar, RB_INSERTBANDW, (WPARAM)-1, (LPARAM)&rb);
     rb.fMask = RBBIM_STYLE | RBBIM_CHILD | RBBIM_CHILDSIZE | RBBIM_SIZE | RBBIM_TEXT | RBBIM_ID;
     rb.fStyle = RBBS_NOGRIPPER | RBBS_BREAK;
     rb.hwndChild = g.address;
     rb.wID = IDC_ADDRESS;
-    rb.lpText = (LPWSTR)L"A&ddress";   // browseui IDS_BAND_ADDRESS2
+    rb.lpText = (LPWSTR)L"A&ddress";   // XP's label
     HWND combo = (HWND)SendMessageW(g.address, CBEM_GETCOMBOCONTROL, 0, 0);
     int item_h = (int)SendMessageW(combo ? combo : g.address, CB_GETITEMHEIGHT, (WPARAM)-1, 0);
-    // XP address.cpp GetBandInfo: the band is as high as the inner combo box
+    // XP: the band is as high as the inner combo box
     RECT crc = {}; GetWindowRect(combo ? combo : g.address, &crc);
     rb.cxMinChild = 200; rb.cyMinChild = (UINT)(crc.bottom - crc.top); rb.cx = 600;
     (void)item_h;
@@ -1294,7 +1293,7 @@ static void create_children(HWND frame)
     g.tree_root = tree_insert(TVI_ROOT, root->name(), root->path(), root->icon(), true);
 
     // file list
-    // XP's defview list has no client edge in Explorer (measured)
+    // XP's defview list has no client edge in Explorer
     g.list = CreateWindowExW(0, WC_LISTVIEWW, nullptr,
         WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_TABSTOP | LVS_REPORT | LVS_SHOWSELALWAYS | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE | LVS_EDITLABELS,
         0, 0, 0, 0, frame, (HMENU)IDC_LIST, nullptr, nullptr);
@@ -2496,7 +2495,7 @@ int main(int argc, char** argv)
     std::string geo = shell::setting("geometry");
     if (!geo.empty()) sscanf(geo.c_str(), "%dx%d+%d+%d", &gw, &gh, &gx, &gy);   // client size and position
     HWND frame = CreateWindowExW(0, L"flxp_explorer", L"flxp", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, gx, gy, gw, gh, nullptr, nullptr, nullptr, nullptr);
-    if (const char* b = getenv("FLXP_BACK")) navigate(b);   // testing: a page to go back to (screenshots compare with Back enabled)
+    if (const char* b = getenv("FLXP_BACK")) navigate(b);   // testing: a page to go back to (Back enabled)
     if (!navigate(start)) navigate("::desktop");
     if (!select.empty()) { g.select_after_refresh = select; browser::fill_list(g); }   // after the view the folder chose
     g.w_active = FlxpWatchRootProperty("_NET_ACTIVE_WINDOW");   // luxwm's active frame (sync_active)

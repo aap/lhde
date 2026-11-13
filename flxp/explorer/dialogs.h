@@ -13,7 +13,7 @@ namespace dialogs {
 
 HINSTANCE module();   // rc/explorer.res (the templates of every dialog here and in fileopui.cpp)
 
-// XP's "Open With" (shell32 openwith.cpp): recommended and other programs,
+// XP's "Open With": recommended and other programs,
 // "Always use the selected program to open this kind of file".
 struct OpenWith { std::string app_id; bool always = false; };
 bool choose_program(HWND owner, const std::string& file_name, const std::string& mime,
