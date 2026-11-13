@@ -48,12 +48,12 @@ struct theme {
     /* Explorer plate (LgFrameExplorer, msstyles STREAM 484): used instead of plate[] for an extended frame whose top reaches into the
        client (LUXWM.md "Explorer plate"). NULL = none (the normal plate's caption rows are stretched as before) */
     cairo_surface_t *plate_x[2];        /* active, inactive */
-    int xi_t, xi_r, xi_b, xi_l;         /* explorer_insets: its 9-grid (desksrv: top 73, the rest like the normal plate) */
+    int xi_t, xi_r, xi_b, xi_l;         /* explorer_insets: its 9-grid (4074: top 73, the rest like the normal plate) */
     int x_r0, x_r1, x_line;             /* explorer_rows: band rows [r0, r1) stretched to fit the header, inner light/dark lines at
                                            rows x_line, x_line + 1 (they end up on the header's last two rows) */
     double glass_alpha;
                                         /* glass_alpha: plate alpha factor (plates only; 1 = as the texture says) */
-    int fog_on;                         /* theme key fog = 1: draw captionfog.png over extended headers (COMPOSITION.md 15: 4074 has no fog band; default 0) */
+    int fog_on;                         /* theme key fog = 1: draw captionfog.png over extended headers (4074 has no fog band; default 0) */
     int glass_square;                   /* glass_alpha_mode = square: plate alpha a -> a * a (5048's double application), then * glass_alpha */
     /* maximised plates (LUXWM.md "Maximised mode"): LGFRAMEMAX / MAXEXPLORER (msstyles STREAM 493 / 494) drawn instead of the
        squared normal plate while maximised. NULL = none (the squared normal plate) */
@@ -67,7 +67,7 @@ struct theme {
        1:1 from the top down to the header and puts the texture's inner lines on its last two rows (never scaled vertically; rows past
        the band repeat its last row); deco_h > 0: the frame's own decoration is the top deco_h rows (the caption buttons' hit
        rectangles and _LHWM_CAPTION_RECT are clipped to it; _LHWM_FRAME_METRICS field 18); cap_border >= 0: the rows kept above a
-       CLIENT_CAPTION client instead of the side border (wm_theme_caption_border). Defaults 0, 0, -1: the old behaviour */
+       CLIENT_CAPTION client instead of the side border (wm_theme_caption_border). Defaults 0, 0, -1: off */
     int x_crop, deco_h, cap_border;
     unsigned gen;                       /* load count (frame.c: identifies the theme in the crossfade cache) */
     /* maximised caption text (LUXWM.md "Maximised caption text"): text_max_active / text_max_inactive / glow_max (default: the
@@ -78,7 +78,7 @@ struct theme {
        classic/Luna the XP application icon (shell32 #3) */
     cairo_surface_t *defic[4]; int ndefic;
     /* libuxtheme source (LUXWM.md "libuxtheme source"): the open style (ut_theme *), NULL = the theme directory's PNG cache. msstyles
-       mode then draws the Window parts live (frame_ut.c), DWM mode took its textures from the CompositedWindow streams */
+       mode then draws the Window parts live (frame_ut.c), DWM mode takes its textures from the CompositedWindow streams */
     void *ut;
     int ut_fmt;                         /* 3 XP, 4 Longhorn-compiled */
     char ut_src[1200];                  /* "PATH (colour, size, vN)" for the logs */

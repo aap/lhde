@@ -134,8 +134,7 @@ int wm_fut_ms_load(struct theme *t, int aa_set, int hint_set) {
         m->tile = ut_get_enum(u, "Window", id, 0, pst, &v) && v == 2;   /* ST_TILE */
         m->ut_live = 1;
         /* IMAGEGLYPH with CONTENTMARGINS (the caption buttons): XP selects the glyph (IMAGEFILE1..5) for and centres it in the
-           content rect (imagefile.cpp DrawBackground: GetBackgroundContentRect, SelectCorrectImageFile(&rc)); the library's Wine
-           draw.c uses the whole rect, a size larger and off by the margins. Its bitmaps then go through frame.c's nine-grid and glyph
+           content rect; the library's DrawThemeBackground uses the whole rect, a size larger and off by the margins. Its bitmaps then go through frame.c's nine-grid and glyph
            rule instead (the same pixels the PNG cache has) */
         if (p >= MP_CLOSE && ut_get_enum(u, "Window", id, 0, P("GLYPHTYPE"), &v) && v == 1 && (m->cm[0] || m->cm[1] || m->cm[2] || m->cm[3])) {
             int vertical = ut_get_enum(u, "Window", id, 0, P("IMAGELAYOUT"), &v) && v == 0;   /* IL_VERTICAL */
@@ -171,7 +170,7 @@ void wm_fut_ms_draw(cairo_t *cr, const struct theme *t, int p, int state, int x,
     if (h > sh && sh > 0 && top + bot >= sh && top < sh) {
         /* taller than the bitmap, but its SIZINGMARGINS cover every row (Luna Silver's MAXCAPTION: 26 rows, 9 + 17): only luxwm's
            header continuation of a maximised caption asks for that (XP draws MAXCAPTION exactly CAPTIONBARHEIGHT + 1 high; its
-           ninegrid2.cpp has no middle to stretch, Wine leaves the rows empty). As frame.c's nine-grid: the part at its own height,
+           nine-grid has no middle to stretch, the library leaves the rows empty). As frame.c's nine-grid: the part at its own height,
            the rows between the margins repeat source row `top` */
         cairo_surface_t *a = part_image(t->ut, m->ut_part, state, w, sh), *s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
         unsigned char *sp = cairo_image_surface_get_data(a), *dp = cairo_image_surface_get_data(s);
@@ -190,7 +189,7 @@ void wm_fut_ms_draw(cairo_t *cr, const struct theme *t, int p, int state, int x,
     cairo_set_source_surface(cr, s, x, y); cairo_paint(cr); cairo_surface_destroy(s);
 }
 
-/* ---- DWM: CompositedWindow PNGSTREAMs for the theme directory's file names (COMPOSITION.md 3; ids of the 4074 styles) ---- */
+/* ---- DWM: CompositedWindow PNGSTREAMs for the theme directory's file names (ids of the 4074 styles) ---- */
 static const struct { const char *file, *part; int half, gray; } pngmap[] = {
     { "plate_active.png", "LGFRAME", 0, 0 },                     /* 483: active top half, inactive bottom half */
     { "plate_inactive.png", "LGFRAME", 1, 0 },

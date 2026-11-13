@@ -459,7 +459,7 @@ close_wm(void)
 
     /* clean exit (luxwmc quit, SHELL-DESIGN 14): clients stay where they are and mapped; windows parked off screen on other
        workspaces come back; minimised ones stay unmapped with WM_STATE Iconic, so the next luxwm adopts them minimised again
-       (berry set every client Withdrawn here, which made a restarted WM lose the minimised ones). Frames go away. */
+       (Withdrawn would make a restarted WM lose the minimised ones). Frames go away. */
     for (int i = 0; i < WORKSPACE_NUMBER; i++)
         for (struct client *c = c_list[i]; c != NULL; c = c->next) {
             if (c->hidden && !c->minimized)
@@ -2433,7 +2433,7 @@ client_monocle(struct client *c)
    can show (or drop) its black layer at the moment the window starts to grow (or shrink); then the animation: none with a compositor
    (Longhorn 4074 and 5048 resize instantly), except with the animation style ANIM_INVENTED picom's geometry animation (_LHWM_ANIMATE = ANIM_BUSY on
    client and frame for 400 ms, picom-glass.conf); without a compositor XP's caption flight from the old to the new rectangle
-   (minmax.c: xxxMinMaximize animates SW_MAXIMIZE/SW_RESTORE with IDANI_CAPTION too) */
+   (XP animates SW_MAXIMIZE/SW_RESTORE with IDANI_CAPTION too) */
 static void
 max_transition(struct client *c, bool to_max, int x, int y, int w, int h)
 {
@@ -2469,7 +2469,7 @@ max_transition(struct client *c, bool to_max, int x, int y, int w, int h)
 /* the geometry change of a maximise or restore in one step: frame and client go straight to their final rectangles (with the final
    margins: to_max is the state they are for) in one batch, and the frame is painted once, there. With a compositor the batch and the
    paint run under a server grab, so picom cannot compose a frame in between (done as steps, a move at the old size, a resize, a
-   paint, the client re-placed and a second paint, picom on the lab showed windows missing or at the old size for 60..80 ms) */
+   paint, the client re-placed and a second paint, the compositor shows windows missing or at the old size for 60..80 ms) */
 static void
 client_geom_max(struct client *c, int x, int y, int w, int h, bool to_max)
 {
@@ -3473,9 +3473,8 @@ switch_ws(int ws)
     }
     ewmh_update_stacking();
     ewmh_set_active_desktop(ws);
-    /* berry discarded the whole event queue here (XSync(display, True)), which also dropped a pager's
-       _NET_ACTIVE_WINDOW sent right after _NET_CURRENT_DESKTOP (xdotool windowactivate, taskbars); only the
-       EnterNotify events caused by moving windows around need dropping */
+    /* only the EnterNotify events caused by moving windows around are dropped: discarding the whole queue (XSync(display, True))
+       would also drop a pager's _NET_ACTIVE_WINDOW sent right after _NET_CURRENT_DESKTOP (xdotool windowactivate, taskbars) */
     XSync(display, False);
     { XEvent ev; while (XCheckMaskEvent(display, EnterWindowMask, &ev)) ; }
 }
@@ -4272,7 +4271,7 @@ client_retheme(struct client *c, const struct theme *old)
     ewmh_set_frame_extents(c);
     client_set_icon(c);   /* sized by the theme's icon_size */
     /* theme switches follow a compositor coming or going, when the server redirects or unredirects every window: have the
-       client repaint (an Expose) so it does not keep the contents it had while the compositor changed (seen with urxvt) */
+       client repaint (an Expose) so it does not keep the contents it had while the compositor changed (urxvt does) */
     XClearArea(display, c->window, 0, 0, 0, 0, True);
     if (c->mono && !c->hidden)
         client_apply_max(c);
@@ -4620,7 +4619,7 @@ static void keys_setup(void) {
        that binds none, so the start menu key works there too; "Super_L none" in the file turns it off */
     bool has_start = false; for (int i = 0; i < nkeys; i++) if (keys[i].sym == XK_Super_L || keys[i].sym == XK_Super_R) has_start = true;
     if (!has_start) { keys_add("Super_L start"); keys_add("Super_R start"); }
-    /* newer defaults (show desktop, run, the sidebar's stacking toggle, the screenshot keys) apply to a user's keys file only where
+    /* these defaults (show desktop, run, the sidebar's stacking toggle, the screenshot keys) apply to a user's keys file only where
        the key is unbound there; never Print, which may be the user's compose key (a binding of their own in the file) */
     if (f) for (int i = 0; default_keys[i]; i++) {
         if (strncmp(default_keys[i], "Mod4+d ", 7) && strncmp(default_keys[i], "Mod4+r ", 7) && strncmp(default_keys[i], "Mod4+s ", 7) &&
@@ -4815,7 +4814,7 @@ static void cycle_run(XKeyEvent *kev, unsigned mods, bool reverse) {
 /* Super alone: the "start" binding grabs the bare Super key (the keyboard is then luxwm's until Super is released, so the
    Mod4 bindings still arrive here); any other key or a button press in between cancels it; the release sends the
    _LHSHELL_START client message to the root (luxshell toggles its start menu). Unbound Super+key combinations are swallowed
-   while Super is held (they never reached clients through the old Mod4 grabs either when bound). */
+   while Super is held. */
 static void handle_key_release(XEvent *e) {
     XKeyEvent *ev = &e->xkey; KeySym sym = XkbKeycodeToKeysym(display, ev->keycode, 0, 0);
     if (!(sym == XK_Super_L || sym == XK_Super_R) || !super_down) return;
@@ -4976,7 +4975,7 @@ sysmenu_command(void *arg, int id)
 }
 
 /* open the window menu of c with its top-left corner at x, y (root); flags WMMENU_KEYBOARD / WMMENU_FLIP; button: the button still
-   held (0 none); from_icon: a double click on the caption icon closes the window. Greyed as xxxSetSysMenu (mnsys.c) greys: Restore
+   held (0 none); from_icon: a double click on the caption icon closes the window. Greyed as XP greys them: Restore
    unless maximised; Move, Size and Maximize while maximised; Size for a window whose size hints fix its size; a minimised window
    (the taskbar's menu): Move, Size and Minimize, Restore the default item. Close is the default item otherwise (bold), with its
    accelerator. */
@@ -5272,7 +5271,7 @@ kb_edges(int hit, int *kx, int *ky)
     *ky = hit == HIT_T || hit == HIT_TL || hit == HIT_TR ? -1 : hit == HIT_B || hit == HIT_BL || hit == HIT_BR ? 1 : 0;
 }
 
-/* the keyboard move/size step (movesize.c: max(SM_CXSIZE / 2, 1), Ctrl 1 px): half a caption button, at least one size-hint
+/* the keyboard move/size step (XP's: max(SM_CXSIZE / 2, 1), Ctrl 1 px): half a caption button, at least one size-hint
    increment when sizing */
 static int
 kb_step(struct client *c, bool ctrl, bool size, bool horz)
@@ -5328,7 +5327,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         repeat_was = XkbGetDetectableAutoRepeat(display, NULL);
         XkbSetDetectableAutoRepeat(display, True, NULL);   /* a held arrow repeats as presses only, its release is real */
         Window rw, cw; int wx, wy; unsigned m; XQueryPointer(display, root, &rw, &cw, &rx0, &ry0, &wx, &wy, &m);
-        /* movesize.c: the pointer goes to the middle of the caption (move) or of the window (size) */
+        /* as XP: the pointer goes to the middle of the caption (move) or of the window (size) */
         int l, r, t, b; margins(c, &l, &r, &t, &b);
         px = c->geom.x + c->geom.width / 2;
         py = hit == HIT_CAPTION ? c->geom.y + MAX(t, 2) / 2 : c->geom.y + c->geom.height / 2;
@@ -5444,7 +5443,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
                 if (!dy) dy = held[3] - held[2];
                 bool ctrl = (ev.xkey.state & ControlMask) != 0;
                 int nkx = kbsize && !kx ? dx : 0, nky = kbsize && !ky ? dy : 0;
-                if (nkx || nky) {   /* a new edge (both: a corner): the pointer onto it, nothing moves yet (movesize.c NoOffset) */
+                if (nkx || nky) {   /* a new edge (both: a corner): the pointer onto it, nothing moves yet (as XP) */
                     int ax = nkx ? (nkx < 0 ? c->geom.x : c->geom.x + c->geom.width - 1) : vx;
                     int ay = nky ? (nky < 0 ? c->geom.y : c->geom.y + c->geom.height - 1) : vy;
                     KB_PICK(nkx, nky, ax, ay);
@@ -5461,7 +5460,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         case MotionNotify:
             p_ev++; while (XCheckTypedEvent(display, MotionNotify, &ev)) p_ev++;   /* only the latest position */
             if (kbsize && hit == HIT_NONE) {
-                /* the mouse picks the edges: the border or corner it is on (movesize.c: a hit test on every move in WMSZ_KEYSIZE), or
+                /* the mouse picks the edges: the border or corner it is on (XP hit-tests on every move while sizing by keyboard), or
                    the ones it moves towards, from where it is (no jump): past 5 x DRAG_THRESHOLD (20 px), both edges of a corner when the
                    move is within about 23 degrees of the diagonal (the shorter axis at least 0.4 of the longer) */
                 int mx = ev.xmotion.x_root - px, my = ev.xmotion.y_root - py, m = MAX(abs(mx), abs(my)), nkx = 0, nky = 0;
@@ -5542,7 +5541,7 @@ drag_run(struct client *c, int hit, int px, int py, unsigned button, bool keyboa
         fprintf(stderr, "luxwm prof: drag %s %.0f ms, %d motion events, %d steps, step avg %.2f max %.2f ms (incl. XSync); "
                 "%.0f frame_paints, each: paint %.2f shape %.2f upload %.2f ms\n", hit == HIT_CAPTION ? "move" : "resize",
                 now_ms() - p_start, p_ev, p_n, p_step / p_n, p_max, wm_frame_prof_ms[3], wm_frame_prof_ms[0] / wm_frame_prof_ms[3], wm_frame_prof_ms[1] / wm_frame_prof_ms[3], wm_frame_prof_ms[2] / wm_frame_prof_ms[3]);
-    if (kb_end) XWarpPointer(display, None, root, 0, 0, 0, 0, rx0, ry0);   /* movesize.c: ptRestore when the keyboard ended it */
+    if (kb_end) XWarpPointer(display, None, root, 0, 0, 0, 0, rx0, ry0);   /* as XP: the pointer back when the keyboard ended it */
     XUngrabPointer(display, CurrentTime);
     if (keyboard) { XUngrabKeyboard(display, CurrentTime); if (!repeat_was) XkbSetDetectableAutoRepeat(display, False, NULL); }
     if (cancel) {
@@ -5756,13 +5755,12 @@ anim_icon_rect(struct client *c, int *x, int *y, int *w, int *h)
 static int muldiv(int a, int b, int c) { double v = (double)a * b / c; return (int)(v < 0 ? v - 0.5 : v + 0.5); }
 
 /* Without a compositor: XP's minimise/restore/maximise animation, drawn on the root window.
-   XP (windows/core/ntuser/kernel/minmax.c) only ever uses IDANI_CAPTION: xxxDrawAnimatedRects -> xxxAnimateCaption flies the
+   XP only ever uses IDANI_CAPTION: DrawAnimatedRects flies the
    active caption bar (CYCAPTION - 1 rows, inside the window borders, drawn once at the larger of the two widths and cut to the
    current width from the left) from the start to the end rectangle: left, top and width move linearly with the elapsed time,
-   x = start + MulDiv(delta, elapsed, CMS_ANIMATION) with CMS_ANIMATION = 250 ms, a UserSleep(1) between frames (so the tick
+   x = start + MulDiv(delta, elapsed, CMS_ANIMATION) with CMS_ANIMATION = 250 ms, a 1 ms sleep between frames (so the tick
    rate, 10..16 ms, sets the frame count: ~16..25 frames), the screen under the caption saved and restored each frame. The XOR
-   wireframe (AnimateFrame / DrawWireFrame, 1 px white XOR pen) is Win95 code that XP compiles out ("DISABLE OLD ANIMATION FOR
-   M7"); ANIMATE_WIREFRAME draws XOR rectangles (3 px, GXxor) with the same timing instead.
+   wireframe (1 px white XOR pen) is Win95's, which XP does not draw; ANIMATE_WIREFRAME draws XOR rectangles (3 px, GXxor) with the same timing instead.
 
    XP locks the screen for the whole 250 ms; holding the X server grab that long freezes every other client (an xclock misses its
    tick). Only each frame's erase + draw runs under the grab (well under a millisecond); between frames the server
@@ -5877,7 +5875,7 @@ anim_classic(struct client *c, int fx, int fy, int fw, int fh, int tx, int ty, i
         strip = XGetImage(display, pm, 0, 0, (unsigned)sw, (unsigned)cy, AllPlanes, ZPixmap);   /* the server's pixel format */
         XFreePixmap(display, pm);
         if (!strip) { XFreeGC(display, g); return; }
-        /* xxxAnimateCaption: a rectangle taller than the caption is inset by the window borders */
+        /* as XP: a rectangle taller than the caption is inset by the window borders */
         if (fh > cy + l) { fx += l; fy += l; fw -= 2 * l; }
         if (th > cy + l) { tx += l; ty += l; tw -= 2 * l; }
     }

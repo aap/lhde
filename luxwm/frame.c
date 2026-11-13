@@ -94,7 +94,7 @@ static int ms_load(struct theme *t, const char *dir) {
     return t->ms[MP_CAPTION].img[0][0] != NULL;
 }
 
-/* uxtheme's nine-grid source index for destination pixel i (ninegrid2.cpp): 32.32 fixed-point nearest neighbour starting half a step
+/* XP uxtheme's nine-grid source index for destination pixel i: 32.32 fixed-point nearest neighbour starting half a step
    in; corners copied 1:1 while a middle remains, otherwise the corners share the destination in proportion to their margins */
 static int ng_stretch(int i, int D, int S) {
     if (D <= 0 || S <= 0) return 0;
@@ -200,9 +200,9 @@ static void ms_paint(cairo_t *cr, const struct theme *t, int w, int h, const cha
         if (fr->count) ms_part(cr, t, MP_FRAMERIGHT, fs, w - cnb, ch + et, cnb, h - ch - et - cnb);
         if (fb->count) ms_part(cr, t, MP_FRAMEBOTTOM, fs, 0, h - cnb, w, cnb);
     }
-    /* full-screen maximised (nctheme.cpp NcPaintCaption, fFullMaxed): the MAXCAPTION background rect is the caption rect inset by
+    /* full-screen maximised (as XP's uxtheme paints it): the MAXCAPTION background rect is the caption rect inset by
        cnBorders on top, left and right, i.e. exactly the visible w x (CAPTIONBARHEIGHT + 1) band; only the buttons and the text keep
-       their window-relative offsets (ox, oy). Drawing the bitmap over the whole off-screen rect put its edge rows/columns inside. */
+       their window-relative offsets (ox, oy). Over the whole off-screen rect the bitmap's edge rows/columns would land inside. */
     if (cap->count) {
         if (maximized) ms_part(cr, t, capp, fs, 0, 0, w, t->ms_cap_h + 1 + et);
         else ms_part(cr, t, capp, fs, ox, oy, W, ch + et);
@@ -315,7 +315,7 @@ void wm_frame_fonts_report(const struct theme *t) {
 }
 
 /* ---- Windows Classic (LUXWM.md "Windows Classic frames"): no visual style; the non-client area as user32 paints it (Windows 2000/XP
-   with the classic look: xxxDrawCaptionBar, DrawEdge, DrawFrame, DrawFrameControl(DFC_CAPTION), xxxDrawCaptionTemp) from the
+   with the classic look: the caption bar, DrawEdge, DrawFrame, DrawFrameControl(DFC_CAPTION), DrawCaptionTemp) from the
    classic system colours and metrics of the theme record (Colors.*, Metrics.*; docs/THEME-FORMAT.md section 2a).
    Geometry (sizable overlapped window, WS_EX_WINDOWEDGE): DrawEdge(EDGE_RAISED) 2 px, the sizing border Metrics.borderwidth px in
    ACTIVEBORDER / INACTIVEBORDER, 1 px COLOR_3DFACE: cnBorders = 3 + borderwidth (the msstyles geometry); the caption bar
@@ -464,7 +464,7 @@ static void px_ring(uint32_t *px, int S4, int W, int H, unsigned c, int *x, int 
 }
 
 /* caption buttons: close 2 px from the caption's right, then CXEDGE, max and min touching; (captionwidth - 2) x (captionheight - 4),
-   CYEDGE below the caption top (xxxDrawCaptionBar) */
+   CYEDGE below the caption top */
 static void cl_btn_rect(const struct theme *t, int w, int slot, int maximized, int *bx, int *by, int *bw, int *bh) {
     int cnb = 3 + t->ms_border, off = maximized ? -cnb : 0, right = (maximized ? w + cnb : w) - cnb;
     *bw = t->cl_capw - 2; *bh = t->ms_cap_h - 4; *by = off + cnb + 2;
@@ -521,7 +521,7 @@ static void classic_paint(cairo_t *cr, const struct theme *t, int w, int h, cons
         ut_draw_frame_control(px, W, H, stride, &br, UT_DFC_CAPTION, st, C);
         leftmost = bx;
     }
-    /* xxxDrawCaptionTemp over (x .. leftmost - CXEDGE): the icon slot (filled here, the icon drawn below), the gradient, the text */
+    /* DrawCaptionTemp over (x .. leftmost - CXEDGE): the icon slot (filled here, the icon drawn below), the gradient, the text */
     int L = x, R = leftmost - 2;
     if (R > L) {
         ut_font f; memset(&f, 0, sizeof f);
@@ -812,7 +812,7 @@ int wm_frame_shape_rects(const struct theme *t, cairo_surface_t *img, int maximi
         const uint32_t *row = NULL; int rw = w;
         /* a caption row painted transparent across the whole width is outside the region, as GetThemeBackgroundRegion leaves it:
            the ReactOS styles' CAPTION has transparent top rows, Watercolor Lite's (sizing margins 0 / 23, TILE) is shorter than
-           the band and its empty middle leaves the top rows unpainted; the window starts below them (2k3-205316.png) */
+           the band and its empty middle leaves the top rows unpainted; the window starts below them */
         if (cap_rows && y < cap_rows) {
             const uint32_t *pr = (const uint32_t *)(d + y * st); int x = 0;
             while (x < w && (int)(pr[x] >> 24) < sa) x++;
@@ -992,7 +992,7 @@ static void grid_paint(cairo_t *cr, cairo_surface_t *img, int nx, const double *
 }
 
 /* the maximised plate (LGFRAMEMAX, or MAXEXPLORER under an Explorer-style header of H = m_t + ext->t rows) over w x h. Columns: a
-   9-grid with max_insets left/right (aero: 0 0, desksrv's LgFrameMax margins: the whole width stretches). Rows: plain 9-grid with
+   9-grid with max_insets left/right (aero: 0 0, 4074's LgFrameMax margins: the whole width stretches). Rows: plain 9-grid with
    max_insets top/bottom; MAXEXPLORER: [0, mx_r0) 1:1, the band [mx_r0, mx_r1) stretched to H - 2, the inner lines [mx_line, +2) on the
    header's last two rows, the body from mx_line + 2 down to the bottom inset, then the bottom edge 1:1 */
 static void plate_max(cairo_t *cr, const struct theme *t, cairo_surface_t *img, double w, double h, const struct frame_ext *e, int explorer) {
@@ -1144,7 +1144,7 @@ void wm_frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window
     }
     if (stage != None) {
         /* the upload is through first; then resize, shape and copy go out as one short batch under a server grab, so no other
-           client's request (the compositor's) runs between them: without the grab picom on the lab still caught, in about one
+           client's request (the compositor's) runs between them: without the grab a compositor catches, in about one
            drag of two, the client resized but the frame's right band not yet copied */
         XSync(dpy, False);
         XGrabServer(dpy);
@@ -1285,7 +1285,7 @@ void wm_frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const 
         pango_font_description_free(fd); g_object_unref(lay);
     }
     /* 4. edge overlay: its texture reaches overlay_outset px past the plate on each side (811x615 vs 801x607: 4 left/right,
-       3 top/bottom once its highlight line is put on the plate's inset-1 line, as in the 4074 screenshots). Outside the plate
+       3 top/bottom once its highlight line is put on the plate's inset-1 line, as 4074 draws it). Outside the plate
        only its soft halo would remain, which the window then clips to a square at the rounded corners, so mask it with the
        plate's own alpha: nothing of the frame sticks out past the plate's corner radius. */
     if (fading) { if (opat) { cairo_set_source(cr, opat); cairo_paint_with_alpha(cr, 1 - mf); } return; }   /* fades out with the plate */

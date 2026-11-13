@@ -84,8 +84,8 @@
 #ifndef ANIMATE
 #define ANIMATE true
 #endif
-/* luxwm: the maximise/restore plate crossfade of DWM themes with plate_max (LUXWM.md "Maximised mode"), in ms. 0 (the default, aap's
-   choice): no fade, the plate switches in the same paint as the geometry change, no timer; e.g. 400 fades in step with
+/* luxwm: the maximise/restore plate crossfade of DWM themes with plate_max (LUXWM.md "Maximised mode"), in ms. 0 (the default): no
+   fade, the plate switches in the same paint as the geometry change, no timer; e.g. 400 fades in step with
    luxshell's black layers (which are instant too) */
 #ifndef MAX_FADE_MS
 #define MAX_FADE_MS 0
@@ -93,8 +93,8 @@
 #ifndef ANIMATE_WIREFRAME
 #define ANIMATE_WIREFRAME false
 #endif
-/* luxwm: which compositor animation set picom-glass.conf applies (the value luxwm writes to _LHWM_ANIMATE; LUXWM.md "Animations",
-   COMPOSITION.md 14): ANIM_4074 = Longhorn 4074's DWM (open and restore from minimised fade in over 350 ms with a slight scale-in
+/* luxwm: which compositor animation set picom-glass.conf applies (the value luxwm writes to _LHWM_ANIMATE; LUXWM.md "Animations"):
+   ANIM_4074 = Longhorn 4074's DWM (open and restore from minimised fade in over 350 ms with a slight scale-in
    standing in for the 3D swing; minimise, close, maximise instant), ANIM_5048 = the April 2005 uDWM curve (266 ms, sqrt progress),
    ANIM_INVENTED = luxwm's own 250 ms shrink to the bottom edge on minimise and picom's geometry animation on maximise (not
    Longhorn), ANIM_4074PLUS = 4074's fade + gentle centre zoom on open, the invented grow on restore from minimised and shrink on minimise, no picom

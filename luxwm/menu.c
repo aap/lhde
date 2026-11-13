@@ -87,7 +87,7 @@ static void strip_amp(const char *s, char *out, size_t n, int *mn) {
     out[o] = 0;
 }
 
-/* the drop shadow right of and below the W x H menu, alpha per pixel (ut_menu_shadow_alpha: XP's, measured the same on 4074),
+/* the drop shadow right of and below the W x H menu, alpha per pixel (ut_menu_shadow_alpha: XP's, the same on 4074),
    unless Display Properties' Effects turned "Show shadows under menus" off (settings.ini [effects] menu_shadows = 0) */
 static int shadow_on(void) {
     char b[16]; const char *v = lhde_settings_get("effects", "menu_shadows", b, sizeof b);
