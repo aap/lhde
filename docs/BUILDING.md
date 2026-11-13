@@ -139,7 +139,9 @@ click and Enter on a file with Run as running its command: `tests/headless/runas
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).
-Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac -p`), and luxwm's frame
+Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac -p`), its tray tiles
+work against stub system commands (`luxshell/tests/tiles.sh`), every tile is in the sidebar menu's parts list
+(`luxshell/tests/parts.py`), and luxwm's frame
 regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a
 baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the first run); skipped
 without imported styles.

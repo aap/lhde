@@ -1055,15 +1055,18 @@ end
 -- "Remove <Friendly Name> Tile" unless pinned.
 -- Our additions, in their own group: "Lock the Sidebar" ([sidebar] locked) and "Stacking" ([sidebar] stacking).
 -- Mnemonics are ours (the 4074 Avalon menus draw none); "&" marks them (menu.lua).
--- The 4074 module list; `id` = the tiles/<id>.lua that implements it, the others are greyed.
+-- The 4074 module list with our Brightness, Touchpad and Volume tiles among them (alphabetical, as 4074's list); `id` = the
+-- tiles/<id>.lua that implements it, the others are greyed.
 local PARTS = {
-  { "Basket" }, { "Classic Tray", id = "notifications" }, { "Contacts" }, { "News Feed" }, { "Notification History", id = "notifyhistory" },
-  { "People nearby" }, { "Quick Launch", id = "quicklaunch" }, { "Search" }, { "Slide Show" }, { "Sync" },
+  { "Basket" }, { "Brightness", id = "brightness" }, { "Classic Tray", id = "notifications" }, { "Contacts" }, { "News Feed" },
+  { "Notification History", id = "notifyhistory" }, { "People nearby" }, { "Quick Launch", id = "quicklaunch" }, { "Search" },
+  { "Slide Show" }, { "Sync" }, { "Touchpad", id = "touchpad" }, { "Volume", id = "volume" },
 }
 local TRANSIENT = { { "Power (Transient)", id = "power" }, { "Web Host Tile (Transient)" } }
-local FRIENDLY = { notifications = "Classic Tray", power = "Power", clock = "Clock", quicklaunch = "Quick Launch", notifyhistory = "Notification History" }   -- the modules' Friendly Name
+local FRIENDLY = { notifications = "Classic Tray", power = "Power", clock = "Clock", quicklaunch = "Quick Launch", notifyhistory = "Notification History",
+                   volume = "Volume", brightness = "Brightness", touchpad = "Touchpad" }   -- the modules' Friendly Name
 local function friendly(t) return FRIENDLY[t.id] or t.name or t.id end
-local KNOWN_ORDER = { "notifyhistory", "quicklaunch", "notifications", "power", "clock" }   -- 4074 SidebarTiles order
+local KNOWN_ORDER = { "notifyhistory", "quicklaunch", "notifications", "power", "volume", "brightness", "touchpad", "clock" }   -- 4074 SidebarTiles order, ours after power
 local function tile_shown(id) for _, n in ipairs(tile_names()) do if n == id then return true end end return false end
 -- add (at its place in the pack's order, else before the next known tile) or remove a tile from the list; persisted
 local function set_tile_shown(id, on)

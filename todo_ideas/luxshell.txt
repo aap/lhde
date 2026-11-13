@@ -15,5 +15,4 @@
 	* new tray icons (volume, brightness, touchpad are tiles/*.lua, SHELL-DESIGN 8.6):
 		* network/wifi
 		* bluetooth
-	* the sidebar menu's parts list (runtime.lua PARTS) lacks Volume, Brightness, Touchpad: a removed one only comes back
-	  by deleting [sidebar] tiles; and the taskbar view's tiles (taskbar_tiles) cannot be removed by the user at all
+	* the taskbar view's tiles (taskbar_tiles) cannot be removed by the user

@@ -811,7 +811,7 @@ the sidebar entirely (unmapped, no strut, `_LHSHELL_CLOCK_VISIBLE` 0); its mode 
 The tile list is luxshell-state.ini `[sidebar] tiles` (`;`-separated, `none` = empty) with `[sidebar] tiles_base` = the pack's
 `tiles` it was made from: while the pack's list is unchanged the user's list holds, otherwise the pack's list wins. A tile added
 again goes to its place in the pack's order (else 4074's SidebarTiles order: notifyhistory, quicklaunch, notifications, power,
-clock). Tiles are `luxshell/tiles/NAME.lua`, rebuilt on a pack switch, a mode change and a reload.
+then ours, volume, brightness, touchpad, then clock). Tiles are `luxshell/tiles/NAME.lua`, rebuilt on a pack switch, a mode change and a reload.
 
 Chrome (`tile.xaml` / `outertile.xaml`): the right-docked bar is Flipped (2.4.1), so `TileSideAreaBack` (9 px: arrow 1173/1174,
 restore 1058/1059 and close 1061/1062 on hover) docks **right** and `TileForegroundPadder` (6) **left**: the foreground is x
@@ -850,7 +850,8 @@ property page, *Remove <Friendly Name> Tile* unless pinned; no separators).
 - Sidebar menu: right click outside the tiles, or the Options glyph (under it, right-aligned). 4074's base items, then
   luxshell's group *Lock the Sidebar* and *Stacking* ▸ Top / Bottom, then the parts list in the screenshot's order: *Classic
   Tray* = `notifications`, *Notification History* = `notifyhistory`, *Quick Launch* = `quicklaunch`, *Power (Transient)* =
-  `power`, *Clock* = `clock` (checked = in the tile list, a click adds or removes it; only in full mode), the other modules
+  `power`, *Clock* = `clock`, and ours in alphabetical place among them: *Brightness* = `brightness`, *Touchpad* =
+  `touchpad`, *Volume* = `volume` (checked = in the tile list, a click adds or removes it; only in full mode), the other modules
   greyed. The list stays inline as in 4074.
 - Tile menu: right click on a tile, or a click on its arrow when it has no flyout. The tile's `menu()`, a separator (ours),
   *Auto Size* (checked and greyed: tiles size to their content), *Move Up* / *Move Down* (greyed at the ends and for pinned
