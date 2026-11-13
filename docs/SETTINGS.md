@@ -75,7 +75,7 @@ comments, the order and the keys it does not know: it reads the whole file, chan
               run = dmenu_run            ; Super+R runs this instead of the start menu's Run dialog (the default: unset)
               screenshot = luxshot --screen ; screenshot_window = luxshot --window ; screenshot_region = luxshot --region   ; luxwm's Super+Shift+F/W/S (luxshell; the defaults)
 [fonts]       smoothing = standard       ; off | standard | cleartype (flxp, luxwm's menus; luxshell uses fontconfig's)
-[effects]     menu_shadows = 1           ; XP's drop shadow under menus (wux's popup menus, luxwm's window menu)
+[effects]     menu_shadows = 1           ; XP's drop shadow under menus (wux's popup menus, luxwm's window menu, luxshell's menus)
               keyboard_cues = 0          ; 0: mnemonics underlined only after Alt (XP's default); 1: always
 ```
 

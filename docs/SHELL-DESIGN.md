@@ -1124,8 +1124,9 @@ Every menu (sidebar, tiles, the Avalon taskbar, the notification history) is dra
 (`lh.menu_render`: `ut_menu_layout` / `ut_menu_draw`, the pixels of flxp's menus and luxwm's window menu) in the session
 theme: the style's Menu class where it has one (Aero / Jade POPUPITEM band, separators, check marks, cascade arrows), its
 `[SysMetrics]` colours, FLATMENUS and MENUFONT; Windows Classic from the scheme's `Colors.*` and `Metrics.menufont`; smoothing
-from `[fonts] smoothing`, else the theme's `Fonts.smoothing`; Marlett registered for the classic glyphs; XP's 4 px drop shadow
-(luxwm's 4074 Slate measurement; without a compositor the screen under it, darkened, copied before the map). One image node per
+from `[fonts] smoothing`, else the theme's `Fonts.smoothing`; Marlett registered for the classic glyphs; XP's 5 px drop shadow
+(`UT_MENU_SHADOW`, the alpha of `ut_menu_shadow_alpha`: the same pixels as luxwm's window menu and wux's popup menus; without a
+compositor the screen under it, darkened, copied before the map; none with settings.ini `[effects] menu_shadows = 0`). One image node per
 level (`@menu:<depth>`), redrawn on selection, with a hoverable node over each item from the painter's layout. This is **not**
 4074's Avalon ContextMenu, by choice (taste: menus look the same everywhere): `lh4074-091929.png` has a white plate, a 1 px
 #919191 frame and a 1 px shadow, 19 px rows with an 18 px MENUHILIGHT bar whose top row is 30 % and bottom row 40 % lighter,

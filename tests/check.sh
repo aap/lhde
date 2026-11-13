@@ -5,7 +5,8 @@
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh and runas.sh setfattr
-#                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick,
+#                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick, menushadow.sh
+#                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick,
 #                thumbsmem.sh ImageMagick); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
@@ -112,6 +113,9 @@ else
     # Super+H hides and shows the sidebar at once, Super+S flips its stacking, the state survives a restart; [sidebar] animate = 1
     tests/headless/sidebar.sh "$2" > "$T/sidebar.log" 2>&1; rc=$?
     result "headless/sidebar.sh$(grep -m1 '^skip' "$T/sidebar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/sidebar.log"
+    # luxshell's menu shadow is luxwm's (XP's 5 px, ut_menu_shadow_alpha), none with [effects] menu_shadows = 0
+    tests/headless/menushadow.sh "$3" > "$T/menushadow.log" 2>&1; rc=$?
+    result "headless/menushadow.sh$(grep -m1 '^skip' "$T/menushadow.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/menushadow.log"
     # a Win32 program's menu bar under jade4074 (4074's themed bar), luna (XP's flat bar) and classic, read back at 4074's and XP's pixel values
     tests/headless/menubar.sh "$1" > "$T/menubar.log" 2>&1; rc=$?
     result "headless/menubar.sh$(grep -m1 '^skip' "$T/menubar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/menubar.log"

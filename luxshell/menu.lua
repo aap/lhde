@@ -2,7 +2,7 @@
 -- drawn by wuxtheme's popup menu painter (lh.menu_render, menupaint.c: ut_menu_layout / ut_menu_draw, the pixels of flxp's
 -- user32 menus and luxwm's window menu) in the session theme's visual style: its Menu class where it has one (the Aero / Jade
 -- POPUPITEM band, separators, check marks, cascade arrows), [SysMetrics] colours, FLATMENUS and MENUFONT; Windows Classic from
--- the scheme's colours and Metrics.menufont; XP's 4 px drop shadow (as luxwm's). Item geometry is the
+-- the scheme's colours and Metrics.menufont; XP's 5 px drop shadow (wuxtheme's, as luxwm's; none with [effects] menu_shadows = 0). Item geometry is the
 -- painter's layout; this file keeps the input, the keyboard, the mnemonics, the cascades and the placement.
 -- 4074's own Avalon ContextMenu (Slate: white, 1 px #919191 frame and a 1 px shadow, 19 px rows with an 18 px MENUHILIGHT
 -- bar, text 17 px in) does not take the style's look; the painter's is used on purpose, so that menus look the same

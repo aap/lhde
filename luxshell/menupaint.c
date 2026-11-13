@@ -4,7 +4,8 @@
    system's ([fonts] smoothing, else the theme's Fonts.smoothing). The pixels go into an image registered as an "@..." key (an
    image node's source), with XP's menu drop shadow added right and below; menu.lua keeps the input and the placement.
 
-   lh.menu_render(items, sel, opts) -> { image = KEY, w =, h = (the menu, without the shadow), shadow = 4, pad =,
+   lh.menu_render(items, sel, opts) -> { image = KEY, w =, h = (the menu, without the shadow), shadow = 5 (0: [effects]
+                                          menu_shadows = 0), pad =,
                                           rows = { { y =, h = }, ... } (each item's top and height in the menu) }, or nil
      items: { { text = "&Move", accel = "Alt+F4", separator =, disabled =, checked =, radio =, default = (bold), submenu = (any
               value: the cascade arrow) }, ... } (at most 64)
@@ -30,18 +31,14 @@
 #include <lhde/data.h>
 
 #define MAXITEMS 64
-#define SHADOW 4   /* XP's menu drop shadow, right and bottom (luxwm/menu.c SHADOW, the 4074 Slate window menu's) */
-
-/* the drop shadow right of and below the W x H menu, alpha per pixel, as luxwm/menu.c shadow_alpha: 4074 Slate's
-   (0.44 0.33 0.17 0.055 outwards, starting 5 px in from the far corner with a 4 px ramp) */
-static double shadow_alpha(int x, int y, int W, int H) {
-    static const double p[5] = { 0, 0.44, 0.33, 0.17, 0.055 }, q[5] = { 0.12, 0.33, 0.65, 0.88, 1 };
-    int dx = x - W + 1, dy = y - H + 1;
-    if (dx >= 1 && dy >= 1) return dx <= SHADOW && dy <= SHADOW ? p[dx] * p[dy] / p[1] : 0;
-    if (dx >= 1 && dx <= SHADOW) { int k = y - 5; return k < 0 ? 0 : p[dx] * (k < 5 ? q[k] : 1); }
-    if (dy >= 1 && dy <= SHADOW) { int k = x - 5; return k < 0 ? 0 : p[dy] * (k < 5 ? q[k] : 1); }
-    return 0;
+/* XP's menu drop shadow right of and below the menu, UT_MENU_SHADOW (5) px, alpha per pixel from wuxtheme's
+   ut_menu_shadow_alpha: the same as luxwm's window menu and wux's popup menus; none when Display Properties' Effects turned
+   "Show shadows under menus" off (settings.ini [effects] menu_shadows = 0), as luxwm/menu.c shadow_on */
+static int shadow_on(void) {
+    char b[16]; const char *v = lhde_settings_get("effects", "menu_shadows", b, sizeof b);
+    return !v || !*v || strcmp(v, "0") != 0;
 }
+static double shadow_alpha(int x, int y, int W, int H) { return ut_menu_shadow_alpha(x, y, W, H) / 255.0; }
 
 /* the check marks, radio dots and arrows the painter draws from Marlett where the style has no part for them (Windows Classic,
    XP's styles): the first imported fonts/<build>/marlett.ttf, registered as a single file with libwuxtheme's text; ReactOS's free
@@ -177,7 +174,7 @@ int l_menu_render(lua_State *L) {
 
     int w = 0, h = 0, pad = 0, iy[MAXITEMS], ih[MAXITEMS];
     if (!ut_menu_layout(&spec, it, n, &w, &h, &pad, iy, ih) || w <= 0 || h <= 0) { lua_pushnil(L); return 1; }
-    int W = w + SHADOW, H = h + SHADOW;
+    int sh = shadow_on() ? UT_MENU_SHADOW : 0, W = w + sh, H = h + sh;
     cairo_surface_t *s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, W, H);
     if (cairo_surface_status(s) != CAIRO_STATUS_SUCCESS) { cairo_surface_destroy(s); lua_pushnil(L); return 1; }
     cairo_surface_flush(s);
@@ -209,7 +206,7 @@ int l_menu_render(lua_State *L) {
     lua_createtable(L, 0, 6);
     lua_pushstring(L, keyb); lua_setfield(L, -2, "image");
     lua_pushinteger(L, w); lua_setfield(L, -2, "w"); lua_pushinteger(L, h); lua_setfield(L, -2, "h");
-    lua_pushinteger(L, SHADOW); lua_setfield(L, -2, "shadow"); lua_pushinteger(L, pad); lua_setfield(L, -2, "pad");
+    lua_pushinteger(L, sh); lua_setfield(L, -2, "shadow"); lua_pushinteger(L, pad); lua_setfield(L, -2, "pad");
     lua_createtable(L, n, 0);
     for (int i = 0; i < n; i++) {
         lua_createtable(L, 0, 2);
