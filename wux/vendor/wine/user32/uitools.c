@@ -912,7 +912,7 @@ static BOOL UITOOLS95_DrawFrameButton(HDC hdc, LPRECT rc, UINT uState)
 static BOOL UITOOLS95_DrawFrameCaption(HDC dc, LPRECT r, UINT uFlags)
 {
     /* lhde: Windows sizes the Marlett glyph from the button's inside (within the 2 px push-button edge): a cell of
-       min(width, height) square, centred there (Wine took the whole button's square less 2, two pixels too big for XP's
+       min(width, height) square, centred there (Wine takes the whole button's square less 2, two pixels too big for XP's
        16 x 14 caption button) */
     int iw = r->right - r->left - 4, ih = r->bottom - r->top - 4;
     int SmallDiam = iw < ih ? iw : ih;

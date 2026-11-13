@@ -700,7 +700,7 @@ HEADER_Refresh (HEADER_INFO *infoPtr, HDC hdc)
     rcRest.left = x;
     if ((x <= rect.right) && RectVisible(hdc, &rcRest) && (infoPtr->uNumItem > 0)) {
         if (theme != NULL) {
-            /* flxp: XP's header.c draws the empty rest with part 0 (the bar);
+            /* flxp: XP's header draws the empty rest with part 0 (the bar);
              * Wine's normal item is the same look in XP's styles */
             if (header_see_through_background (theme, hdc, &rcRest)) ;
             else

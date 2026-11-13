@@ -86,7 +86,7 @@ typedef struct _THEME_FILE {
     PTHEME_CLASS classes;
     PTHEME_PROPERTY metrics;
     PTHEME_IMAGE images;
-    void *v4;   /* flxp: the Longhorn-compiled (PACKTHEM_VERSION 4) reader's state, src/uxtheme/v4.cpp */
+    void *v4;   /* flxp: the Longhorn-compiled (PACKTHEM_VERSION 4) reader's state, wuxtheme/v4.cpp */
 } THEME_FILE, *PTHEME_FILE;
 
 typedef struct _UXINI_FILE *PUXINI_FILE;
@@ -95,7 +95,7 @@ HRESULT MSSTYLES_OpenThemeFile(LPCWSTR lpThemeFile, LPCWSTR pszColorName, LPCWST
 void MSSTYLES_CloseThemeFile(PTHEME_FILE tf);
 HRESULT MSSTYLES_SetActiveTheme(PTHEME_FILE tf, BOOL setMetrics);
 PTHEME_CLASS MSSTYLES_OpenThemeClass(LPCWSTR pszAppName, LPCWSTR pszClassList, UINT dpi);
-/* flxp: libuxtheme (src/uxtheme) opens and reads theme files that are not the active theme */
+/* flxp: libuxtheme (wuxtheme/) opens and reads theme files that are not the active theme */
 void MSSTYLES_ParseThemeFile(PTHEME_FILE tf);
 PTHEME_CLASS MSSTYLES_OpenThemeFileClass(PTHEME_FILE tf, LPCWSTR pszAppName, LPCWSTR pszClassList, UINT dpi);
 BOOL MSSTYLES_LookupPartStateName(LPCWSTR pszClass, int iPartId, int iStateId, LPCWSTR *pszPart, LPCWSTR *pszState);
@@ -130,7 +130,7 @@ BOOL UXINI_FindSection(PUXINI_FILE uf, LPCWSTR lpName);
 LPCWSTR UXINI_GetNextValue(PUXINI_FILE uf, DWORD *dwNameLen, LPCWSTR *lpValue, DWORD *dwValueLen);
 BOOL UXINI_FindValue(PUXINI_FILE uf, LPCWSTR lpName, LPCWSTR *lpValue, DWORD *dwValueLen);
 
-/* flxp: the Longhorn-compiled format (PACKTHEM_VERSION 4), read by src/uxtheme/v4.cpp:
+/* flxp: the Longhorn-compiled format (PACKTHEM_VERSION 4), read by wuxtheme/v4.cpp:
  * the variant for a colour/size, and its property records as the same text the
  * XP ini would hold (so the property getters and draw.c work unchanged). */
 struct flxp_v4_record {

@@ -54,7 +54,7 @@
 #include "controls.h"
 #include "user_private.h"
 #include "wine/debug.h"
-/* flxp: popup menus are drawn by wuxtheme's painter (the same pixels as luxwm's window menu): XP's mndraw.c in the style's
+/* flxp: popup menus are drawn by wuxtheme's painter (the same pixels as luxwm's window menu): XP's drawing in the style's
  * colours and menu font, the Longhorn / Vista Menu class where the style has one */
 #include "uxtheme.h"
 #include "../../../../wuxtheme/menu.h"
@@ -172,8 +172,8 @@ static UINT     ODitemheight; /* default owner drawn item height */
  * be tracked at the same time.  */
 static HWND top_popup;
 static HMENU top_popup_hmenu;
-/* flxp: the mnemonics of the menus being tracked are underlined (XP's MENUSTATE fUnderline): a menu opened from the keyboard
- * (the last input was a key press, LINP_KEYBOARD), and every submenu of it; SPI_GETKEYBOARDCUES underlines them always */
+/* flxp: the mnemonics of the menus being tracked are underlined, as XP's are: a menu opened from the keyboard
+ * (the last input was a key press), and every submenu of it; SPI_GETKEYBOARDCUES underlines them always */
 static BOOL menu_cues;
 extern BOOL MENU_LastInputKeyboard(void);
 
@@ -1161,8 +1161,8 @@ static void MENU_CalcItemSize( HDC hdc, MENUITEM *lpitem, HWND hwndOwner,
         return;
     }
 
-    /* flxp: a popup's item as XP's mncomput.c sizes it (the painter's geometry): the check column, the text, the accelerator
-     * column after the widest text plus a gap (xTab: where the text ends), the arrow column; bitmaps as Wine has them */
+    /* flxp: a popup's item as XP sizes it (the painter's geometry): the check column, the text, the accelerator
+     * column after the widest text plus a gap (from where the text ends), the arrow column; bitmaps as Wine has them */
     if (!menuBar && look)
     {
         int tw = 0, aw = 0, n = 0, h = look->item_h;

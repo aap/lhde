@@ -186,7 +186,7 @@ typedef struct
     INT      iGrabbedBand;/* band number of band whose gripper was grabbed */
 
     HDPA     bands;       /* pointer to the array of rebar bands */
-    MARGINS  mBand;       /* flxp: themed RP_BAND content margins (XP rebar.cpp _mBand) */
+    MARGINS  mBand;       /* flxp: themed RP_BAND content margins (as XP keeps them) */
 } REBAR_INFO;
 
 /* fStatus flags */
@@ -305,7 +305,7 @@ static const char * const band_maskname[] = {
 
 static const WCHAR themeClass[] = L"Rebar";
 
-/* flxp: XP's _CacheThemeInfo: cache the band content margins. XP lays every
+/* flxp: cache the band content margins, as XP does. XP lays every
  * band out inside them (x starts at cxLeftWidth, each band adds left+right,
  * each row adds top+bottom); Luna's Rebar.Band has ContentMargins 2,0,0,0. */
 static void REBAR_CacheThemeInfo(REBAR_INFO *infoPtr)
@@ -316,7 +316,7 @@ static void REBAR_CacheThemeInfo(REBAR_INFO *infoPtr)
         memset(&infoPtr->mBand, 0, sizeof(infoPtr->mBand));
 }
 
-/* flxp: horizontal space a band takes besides its cx (XP _FudgeWidth without the edge) */
+/* flxp: horizontal space a band takes besides its cx (XP's, without the edge) */
 #define BAND_MARGINS_CX(infoPtr) ((infoPtr)->mBand.cxLeftWidth + (infoPtr)->mBand.cxRightWidth)
 
 static CHAR *
@@ -647,7 +647,7 @@ REBAR_DrawBand (HDC hdc, const REBAR_INFO *infoPtr, REBAR_BAND *lpBand)
 	    oldcolor = SetTextColor (hdc, new);
 	}
 	{
-	    /* flxp: XP _DrawBand: the text starts at the caption's left, its top is
+	    /* flxp: XP: the text starts at the caption's left, its top is
 	     * (band centre - font height / 2 - 1), drawn with prefix processing,
 	     * through DrawThemeText (theme font and TextColor) when themed */
 	    TEXTMETRICW tm;
@@ -810,7 +810,7 @@ REBAR_CalcHorzBand (const REBAR_INFO *infoPtr, UINT rstart, UINT rend)
 
           lpBand->rcChild.left  = lpBand->rcBand.left + lpBand->cxHeader;
           lpBand->rcChild.right = lpBand->rcBand.right - REBAR_POST_CHILD;
-          /* flxp: XP (_ResizeChildren) gives a fixed-size band's child all of the band */
+          /* flxp: XP gives a fixed-size band's child all of the band */
           if (lpBand->fStyle & RBBS_FIXEDSIZE)
               lpBand->rcChild.right = lpBand->rcBand.right;
 
@@ -1200,7 +1200,7 @@ static void REBAR_SetRowRectsX(const REBAR_INFO *infoPtr, INT iBeginBand, INT iE
             lpBand->rcBand.left = xPos;
             lpBand->rcBand.right = xPos + lpBand->cxEffective;
         }
-        xPos += lpBand->cxEffective + SEP_WIDTH + BAND_MARGINS_CX(infoPtr);   /* flxp: XP _BandWidth */
+        xPos += lpBand->cxEffective + SEP_WIDTH + BAND_MARGINS_CX(infoPtr);   /* flxp: XP's band width */
     }
 }
 
@@ -1402,7 +1402,7 @@ static void REBAR_LayoutRow(const REBAR_INFO *infoPtr, int iBeginBand, int iEndB
     {
         if (*piRow > 0)
             *pyPos += SEP_WIDTH;
-        *pyPos += infoPtr->mBand.cyTopHeight;    /* flxp: XP _Recalc */
+        *pyPos += infoPtr->mBand.cyTopHeight;    /* flxp: as XP */
         *pyPos = REBAR_SetBandsHeight(infoPtr, iBeginBand, iEndBand, *pyPos);
         *pyPos += infoPtr->mBand.cyBottomHeight;
     }
@@ -1707,7 +1707,7 @@ REBAR_ValidateBand (const REBAR_INFO *infoPtr, REBAR_BAND *lpBand)
 	RECT rcText = {0, 0, 0, 0};
 
 	lpBand->fStatus |= HAS_TEXT;
-	/* flxp: XP _BandCalcTextExtent: the theme font when themed, and DT_CALCRECT
+	/* flxp: XP: the theme font when themed, and DT_CALCRECT
 	 * so that a '&' prefix does not count */
 	if (!theme || FAILED(GetThemeTextExtent (theme, hdc, 0, 0, lpBand->lpText, -1, DT_CALCRECT, NULL, &rcText)))
 	    DrawTextW (hdc, lpBand->lpText, -1, &rcText, DT_CALCRECT);

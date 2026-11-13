@@ -122,7 +122,7 @@ typedef struct
     RECT     rcBound;         /* bounding rectangle */
     INT      nButtonHeight;
     INT      nButtonWidth;
-    INT      nStringHeight;   /* flxp: tallest button string (XP dyIconFont) */
+    INT      nStringHeight;   /* flxp: tallest button string (as XP keeps it) */
     INT      iDropDownGap;    /* flxp: XP TB_SETDROPDOWNGAP */
     INT      nBitmapHeight;
     INT      nBitmapWidth;
@@ -202,7 +202,7 @@ typedef enum
 #define SEPARATOR_WIDTH    8
 #define TOP_BORDER         2
 #define BOTTOM_BORDER      2
-#define DDARROW_WIDTH      TOOLBAR_DDArrowWidth()   /* flxp: XP uses SM_CYMENUCHECK (v6 TBInitMetrics) */
+#define DDARROW_WIDTH      TOOLBAR_DDArrowWidth()   /* flxp: XP (comctl32 v6) uses SM_CYMENUCHECK */
 static inline int TOOLBAR_DDArrowWidth(void) { return GetSystemMetrics(SM_CYMENUCHECK); }
 #define ARROW_HEIGHT       3
 #define INSERTMARK_WIDTH   2
@@ -873,7 +873,7 @@ TOOLBAR_DrawSepDDArrow(const TOOLBAR_INFO *infoPtr, const NMTBCUSTOMDRAW *tbcd, 
     if (pressed)
         offset = (dwItemCDFlag & TBCDRF_NOOFFSET) ? 0 : 1;
 
-    /* flxp: XP draws the arrow with DrawScrollArrow (Marlett); measured on
+    /* flxp: XP draws the arrow with DrawScrollArrow (Marlett); under
      * classic XP its triangle is 2px right of and 1px below Wine's */
     {
     RECT rcGlyph = *rcArrow;
@@ -889,17 +889,17 @@ TOOLBAR_DrawSepDDArrow(const TOOLBAR_INFO *infoPtr, const NMTBCUSTOMDRAW *tbcd, 
     }
 }
 
-/* flxp: measured on XP/Luna (screenshots/luna_exp_*, large and small icons):
+/* flxp: XP/Luna (large and small icons):
  * a themed split drop-down button that shows only its image (Explorer's
  * Forward) is 7px wider than the classic bitmap + listgap + 2*cxEdge + arrow,
  * and its image sits 2px right of the centre of the part left of the arrow
  * (large: 52 wide, glyph at +9; small: 44, +9). A split button with text
  * (Back) is 1px wider than classic (72 / 64), the image-only button's
  * arrow glyph is 1px left of where Back's sits, the whole drop-down Views
- * keeps the classic width. The XP SP1
- * source attributes this to GetThemeBackgroundExtent/ContentRect of
- * TP_SPLITBUTTON, which Luna gives no ContentMargins; the exact rule is not
- * derivable from it, so reproduce the measurement. */
+ * keeps the classic width. XP takes
+ * this from GetThemeBackgroundExtent/ContentRect of
+ * TP_SPLITBUTTON, which Luna gives no ContentMargins; the rule is not
+ * derivable from the style, so these are XP's pixels. */
 #define THEMED_SPLIT_IMAGE_EXTRA   7
 #define THEMED_SPLIT_IMAGE_SHIFT   2
 #define THEMED_SPLIT_TEXT_EXTRA    1
@@ -915,7 +915,7 @@ static BOOL TOOLBAR_IsThemedSplitImageOnly(const TOOLBAR_INFO *infoPtr, const TB
         (infoPtr->dwExStyle & TBSTYLE_EX_MIXEDBUTTONS) && !(btnPtr->fsStyle & BTNS_SHOWTEXT);
 }
 
-/* flxp: XP's toolbar dither (image.cpp g_hbrMonoDither) starts with 0xAAAA,
+/* flxp: XP's toolbar dither starts with 0xAAAA,
  * Wine's shared 55AA brush has the opposite phase (checked buttons) */
 static HBRUSH TOOLBAR_DitherBrush(void)
 {
@@ -1000,7 +1000,7 @@ TOOLBAR_DrawButton (const TOOLBAR_INFO *infoPtr, TBUTTON_INFO *btnPtr, HDC hdc, 
         rcArrow.left = right;
     }
 
-    /* flxp: content placement after comctl32 v6 (XP) TBDrawButton/DrawFace.
+    /* flxp: content placement as comctl32 v6 (XP) does it.
      * The content rectangle excludes the drop-down arrow (also for whole
      * drop-down buttons, whose background still covers the arrow). */
     {
@@ -1163,7 +1163,7 @@ TOOLBAR_DrawButton (const TOOLBAR_INFO *infoPtr, TBUTTON_INFO *btnPtr, HDC hdc, 
                 stateId = TS_HOT;
                 
             DrawThemeBackground (theme, hdc, TP_DROPDOWNBUTTON, stateId, &rcArrow, NULL);
-            /* flxp: measured, the image-only split button's arrow glyph sits 1px further left */
+            /* flxp: XP: the image-only split button's arrow glyph sits 1px further left */
             if (TOOLBAR_IsThemedSplitImageOnly(infoPtr, btnPtr))
             {
                 RECT rcGlyph = rcArrow;
@@ -1187,7 +1187,7 @@ TOOLBAR_DrawButton (const TOOLBAR_INFO *infoPtr, TBUTTON_INFO *btnPtr, HDC hdc, 
     if (hasDropDownArrow && !drawSepDropDownArrow)
     {
         /* flxp: XP draws the whole-drop-down arrow with DrawScrollArrow (a Marlett
-         * glyph in an 11px font, pager.cpp); measured on XP its 5x3 triangle
+         * glyph in an 11px font); on XP its 5x3 triangle
          * starts 2px left of the 13px arrow area (TOOLBAR_DrawArrow adds 2), 1px below centre */
         OffsetRect(&rcArrow, -4, 1);
         if (tbcd.nmcd.uItemState & (CDIS_DISABLED | CDIS_INDETERMINATE))
@@ -1677,14 +1677,14 @@ static int TOOLBAR_ThemePart(const TOOLBAR_INFO *infoPtr, const TBUTTON_INFO *bt
     return TP_BUTTON;
 }
 
-/* flxp: XP's GrowToolbar/TBWidthOfButton enlarge themed buttons by the theme
- * background extent of the button part (XP SP1 source).  Measured on XP SP3
- * with Luna (screenshots/luna_exp_*): 24px glyph buttons are 38px tall and
+/* flxp: XP enlarges themed buttons by the theme
+ * background extent of the button part.  On XP
+ * with Luna: 24px glyph buttons are 38px tall and
  * 16px ones 30px, i.e. the height grows by the part's top+bottom SizingMargins
  * (4+4), while the width stays at the classic cxPad + text + 2*cxEdge +
  * bitmap + listgap (the checked "Folders" button is 74px wide and its icon
  * and text sit at the classic offsets).  Luna declares ContentMargins = 0, so
- * the growth cannot be the extent; replicate what is observed. */
+ * the growth cannot be the extent; this reproduces XP's sizes. */
 static void TOOLBAR_ThemeGrowButton(const TOOLBAR_INFO *infoPtr, int partId, SIZE *size)
 {
     MARGINS m;
@@ -1694,8 +1694,8 @@ static void TOOLBAR_ThemeGrowButton(const TOOLBAR_INFO *infoPtr, int partId, SIZ
     size->cy += m.cyTopHeight + m.cyBottomHeight;
 }
 
-/* flxp: rewritten after comctl32 v6 (XP) GrowToolbar(GT_INSIDE) for the
- * toolbar-wide size (btnPtr == NULL) and TBWidthOfButton for autosized
+/* flxp: comctl32 v6's (XP's) button size, for the
+ * toolbar-wide size (btnPtr == NULL) and for autosized
  * buttons.  The bitmap slot (16x16 by default) always counts for the height,
  * even without an image list, and text-only (I_IMAGENONE) list buttons do
  * not get the bitmap gap.  bHasBitmap means "iBitmap != I_IMAGENONE". */
@@ -1708,7 +1708,7 @@ static SIZE TOOLBAR_MeasureButton(const TOOLBAR_INFO *infoPtr, SIZE sizeString,
 
     if (infoPtr->dwStyle & TBSTYLE_LIST)
     {
-        /* HeightWithString: max(bitmap, text) + cyPad */
+        /* max(bitmap, text) + cyPad */
         sizeButton.cy = max(infoPtr->nBitmapHeight, sizeString.cy) + infoPtr->szPadding.cy;
         if (btnPtr)
         {
@@ -1732,7 +1732,7 @@ static SIZE TOOLBAR_MeasureButton(const TOOLBAR_INFO *infoPtr, SIZE sizeString,
     }
     else
     {
-        /* HeightWithString: bitmap, 1px, text below it */
+        /* bitmap, 1px, text below it */
         sizeButton.cy = infoPtr->nBitmapHeight + infoPtr->szPadding.cy;
         if (sizeString.cy > 0)
             sizeButton.cy += sizeString.cy + 1;
@@ -4605,7 +4605,7 @@ TOOLBAR_SetButtonSize (TOOLBAR_INFO *infoPtr, LPARAM lParam)
 
     cx = max(cx, infoPtr->szPadding.cx + infoPtr->nBitmapWidth);
     cy = max(cy, infoPtr->szPadding.cy + infoPtr->nBitmapHeight);
-    {   /* flxp: XP GrowToolbar applies the theme extent here too */
+    {   /* flxp: XP applies the theme extent here too */
         SIZE s = { cx, cy };
         TOOLBAR_ThemeGrowButton(infoPtr, TP_BUTTON, &s);
         cx = s.cx; cy = s.cy;
@@ -6174,7 +6174,7 @@ TOOLBAR_NCCreate (HWND hwnd, WPARAM wParam, const CREATESTRUCTW *lpcs)
     infoPtr->szPadding.cx = DEFPAD_CX;
     infoPtr->szPadding.cy = DEFPAD_CY;
     infoPtr->iListGap = DEFLISTGAP;
-    infoPtr->iDropDownGap = 2*GetSystemMetrics(SM_CXEDGE);   /* flxp: XP DROPDOWN_GAP */
+    infoPtr->iDropDownGap = 2*GetSystemMetrics(SM_CXEDGE);   /* flxp: XP's default gap */
     infoPtr->iTopMargin = default_top_margin(infoPtr);
     infoPtr->dwStyle = lpcs->style;
     infoPtr->tbim.iButton = -1;
@@ -6931,7 +6931,7 @@ ToolbarWindowProc (HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case TB_GETIDEALSIZE:
 	    return TOOLBAR_GetIdealSize (infoPtr, wParam, lParam);
 
-	case TB_UNKWN464:   /* flxp: this is XP's TB_SETDROPDOWNGAP (comctrlp.h), browseui's itbar sends cxEdge/2 */
+	case TB_UNKWN464:   /* flxp: this is XP's TB_SETDROPDOWNGAP; XP's Explorer toolbar sends cxEdge/2 */
 	    infoPtr->iDropDownGap = (INT)wParam;
 	    TOOLBAR_CalcToolbar(infoPtr);
 	    InvalidateRect(hwnd, NULL, TRUE);

@@ -378,7 +378,7 @@ static void COMBOEX_AdjustEditPos (const COMBOEX_INFO *infoPtr)
     if (!infoPtr->hwndEdit) return;
 
     if (infoPtr->himl && !(infoPtr->dwExtStyle & CBES_EX_NOEDITIMAGEINDENT)) {
-        /* flxp: XP CCGetIconSize: the list's icon size, also while it is still empty */
+        /* flxp: XP: the list's icon size, also while it is still empty */
         INT cx = 0, cy = 0;
         ImageList_GetIconSize(infoPtr->himl, &cx, &cy);
         xioff = cx + CBE_SEP;
@@ -391,7 +391,7 @@ static void COMBOEX_AdjustEditPos (const COMBOEX_INFO *infoPtr)
     /* reposition the Edit control based on whether icon exists */
     COMBOEX_GetComboFontSize (infoPtr, &mysize);
     TRACE("Combo font x %ld, y %ld\n", mysize.cx, mysize.cy);
-    /* flxp: XP ComboEx_SizeEditBox: one border in from the combo client minus
+    /* flxp: XP's edit box: one border in from the combo client minus
      * its 2px edge, after the icon and COMBO_MARGIN (4) */
     x = rect.left + GetSystemMetrics(SM_CXBORDER) + xioff;
     w = rect.right - x - GetSystemMetrics(SM_CXVSCROLL);
@@ -1345,7 +1345,7 @@ static LRESULT COMBOEX_DrawItem (COMBOEX_INFO *infoPtr, DRAWITEMSTRUCT const *di
 
     if (TRACE_ON(comboex)) COMBOEX_DumpItem (item);
 
-    /* flxp: XP ComboEx_OnDrawItem: the edit field's image starts at the item
+    /* flxp: XP's items: the edit field's image starts at the item
      * rect's left, list items are indented by COMBO_BORDER (3) */
     xbase = (dis->itemState & ODS_COMBOEXLBOX) ? dis->rcItem.left + 3 : dis->rcItem.left;
     if ((item->mask & CBEIF_INDENT) && (dis->itemState & ODS_COMBOEXLBOX)) {

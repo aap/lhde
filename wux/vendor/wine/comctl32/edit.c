@@ -2763,7 +2763,7 @@ static void EDIT_EM_SetMargins(EDITSTATE *es, INT action,
                 }
                 else
                 {
-                    /* flxp: XP comctl32 v6 Edit_SetMargin: min(aveCharWidth / 2,
+                    /* flxp: XP comctl32 v6's default margins: min(aveCharWidth / 2,
                      * the largest negative A (left) / C (right) width) */
                     ABC abc[256];
                     int neg_a = 0, neg_c = 0, i;
@@ -3503,7 +3503,7 @@ static LRESULT EDIT_WM_LButtonDown(EDITSTATE *es, DWORD keys, INT x, INT y)
  */
 /* flxp: X's PRIMARY: the selected text, as X programs offer theirs (not for
    passwords); the middle button pastes it */
-BOOL WINAPI FlxpSetSelectionText(BOOL primary, const WCHAR *text, INT len);   /* src/w32/flxp_shell.h */
+BOOL WINAPI FlxpSetSelectionText(BOOL primary, const WCHAR *text, INT len);   /* wux/w32/flxp_shell.h */
 HGLOBAL WINAPI FlxpGetSelectionText(BOOL primary);
 static void EDIT_FlxpPrimary(const EDITSTATE *es)
 {
@@ -3532,7 +3532,7 @@ static LRESULT EDIT_WM_LButtonUp(EDITSTATE *es)
  */
 static LRESULT EDIT_WM_MButtonDown(EDITSTATE *es, INT x, INT y)
 {
-    /* flxp: X's middle click: PRIMARY's text at the pointer (Wine pasted the clipboard) */
+    /* flxp: X's middle click: PRIMARY's text at the pointer (Wine pastes the clipboard) */
     HGLOBAL h;
     BOOL after_wrap;
     INT c;

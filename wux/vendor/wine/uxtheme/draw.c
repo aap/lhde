@@ -496,7 +496,7 @@ static inline BOOL UXTHEME_SizedBlt (HDC hdcDst, int nXOriginDst, int nYOriginDs
 }
 
 /* flxp: an edge piece of a nine-grid: sized (tiled/stretched) along the edge
- * and, when the margins were shrunk, scaled across it (XP ninegrid2.cpp).
+ * and, when the margins were shrunk, scaled across it (as XP does).
  * along_x: the piece runs horizontally (top/bottom edge). */
 static BOOL UXTHEME_SidedBlt (HDC hdcDst, int xDst, int yDst, int wDst, int hDst,
                               HDC hdcSrc, int xSrc, int ySrc, int wSrc, int hSrc,
@@ -636,9 +636,9 @@ static HRESULT UXTHEME_DrawImageGlyph(HTHEME hTheme, HDC hdc, int iPartId,
 
     topleft.x = pRect->left;
     topleft.y = pRect->top;
-    if(halign == HA_CENTER)      topleft.x += (dstSize.x-srcSize.x)/2;   /* flxp: XP imagefile.cpp centres (dst - src) / 2 */
+    if(halign == HA_CENTER)      topleft.x += (dstSize.x-srcSize.x)/2;   /* flxp: XP centres (dst - src) / 2 */
     else if(halign == HA_RIGHT)  topleft.x += dstSize.x-srcSize.x;
-    if(valign == VA_CENTER)      topleft.y += (dstSize.y-srcSize.y)/2;   /* flxp: XP imagefile.cpp centres (dst - src) / 2 */
+    if(valign == VA_CENTER)      topleft.y += (dstSize.y-srcSize.y)/2;   /* flxp: XP centres (dst - src) / 2 */
     else if(valign == VA_BOTTOM) topleft.y += dstSize.y-srcSize.y;
 
     if(!UXTHEME_Blt(hdc, topleft.x, topleft.y, srcSize.x, srcSize.y,
@@ -827,11 +827,11 @@ static HRESULT UXTHEME_DrawImageBackground(HTHEME hTheme, HDC hdc, int iPartId,
         GetThemeEnumValue(hTheme, iPartId, iStateId, TMT_HALIGN, &halign);
 
         if (halign == HA_CENTER)
-            rcDst.left += (dstSize.x-drawSize.x)/2;   /* flxp: XP imagefile.cpp centres (dst - src) / 2 */
+            rcDst.left += (dstSize.x-drawSize.x)/2;   /* flxp: XP centres (dst - src) / 2 */
         else if (halign == HA_RIGHT)
             rcDst.left = rcDst.right - drawSize.x;
         if (valign == VA_CENTER)
-            rcDst.top  += (dstSize.y-drawSize.y)/2;   /* flxp: XP imagefile.cpp centres (dst - src) / 2 */
+            rcDst.top  += (dstSize.y-drawSize.y)/2;   /* flxp: XP centres (dst - src) / 2 */
         else if (valign == VA_BOTTOM)
             rcDst.top = rcDst.bottom - drawSize.y;
         rcDst.right = rcDst.left + drawSize.x;
@@ -852,11 +852,11 @@ static HRESULT UXTHEME_DrawImageBackground(HTHEME hTheme, HDC hdc, int iPartId,
 
         GetThemeMargins(hTheme, hdc, iPartId, iStateId, TMT_SIZINGMARGINS, NULL, &sm);
 
-        /* flxp: XP ninegrid2.cpp: when the destination is smaller than both
+        /* flxp: XP: when the destination is smaller than both
          * margins, the margins are split in proportion (left*dst/(left+right),
          * rounding down) and the corner/side pieces are shrunk (nearest
-         * sampling) rather than clipped. Wine scaled by the image size and
-         * blitted the pieces 1:1, which put e.g. Luna's toolbar separator
+         * sampling) rather than clipped. Wine scales by the image size and
+         * blits the pieces 1:1, which puts e.g. Luna's toolbar separator
          * line one pixel too far right. */
         ssm = sm;
         if (sm.cyTopHeight + sm.cyBottomHeight > dstSize.y) {
@@ -896,8 +896,8 @@ static HRESULT UXTHEME_DrawImageBackground(HTHEME hTheme, HDC hdc, int iPartId,
         srcCenterHeight  = srcSize.y - (ssm.cyTopHeight + ssm.cyBottomHeight);
         /* flxp: margins that cover the whole image (4074 Slate's TaskBand::Toolbar
          * BUTTON: 28 rows, margins 16 + 12) leave no source middle; stretched
-         * taller, XP's ninegrid2 fills the middle from the row at the boundary
-         * (the top part's last row); Wine drew nothing there (a transparent
+         * taller, XP's nine-grid fills the middle from the row at the boundary
+         * (the top part's last row); Wine draws nothing there (a transparent
          * streak across the task buttons). The middle then is that row/column. */
         srcMidLeft = rcSrc.left + ssm.cxLeftWidth;
         srcMidTop  = rcSrc.top + ssm.cyTopHeight;

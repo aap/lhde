@@ -1218,11 +1218,11 @@ static BOOL alpha_blend_image( HIMAGELIST himl, HDC dest_dc, int dest_x, int des
     }
     else if (state & ILS_SATURATE)
     {
-        /* flxp: XP image.cpp TrueSaturateBits: gray = (54r + 183g + 19b) >> 8,
-         * then an alpha image is blended at constant alpha 150 (SP1 source;
-         * the XP screenshots' disabled Forward glyph fits 157 best). (Wine also
-         * multiplied by the alpha here, which the premultiply below does again,
-         * making disabled glyphs far too dark.) */
+        /* flxp: XP's ILS_SATURATE: gray = (54r + 183g + 19b) >> 8, then an
+         * alpha image is blended at constant alpha 150. (Wine also
+         * multiplies by the alpha here, which the premultiply below does
+         * again, making disabled glyphs far too dark.)
+         */
         for (i = 0, ptr = bits; i < cx * cy; i++, ptr++)
         {
             DWORD gray = (((*ptr & 0x00ff0000) >> 16) * 54 +

@@ -1541,7 +1541,7 @@ BOOL MSSTYLES_LookupProperty(LPCWSTR pszPropertyName, int *dwPrimitive, int *dwI
 BOOL MSSTYLES_LookupEnum(LPCWSTR pszValueName, int dwEnum, int *dwValue)
 {
     DWORD item = 0;
-    /* flxp: v4 styles (src/uxtheme/v4.cpp) give enum values as numbers */
+    /* flxp: v4 styles (wuxtheme/v4.cpp) give enum values as numbers */
     if(pszValueName[0] >= '0' && pszValueName[0] <= '9') {
         int v = 0;
         LPCWSTR p = pszValueName;
@@ -1564,7 +1564,7 @@ BOOL MSSTYLES_LookupEnum(LPCWSTR pszValueName, int dwEnum, int *dwValue)
 }
 
 /**********************************************************************
- * flxp: reverse lookups for libuxtheme's listings (src/uxtheme)
+ * flxp: reverse lookups for libuxtheme's listings (wuxtheme/)
  */
 BOOL MSSTYLES_LookupPartStateName(LPCWSTR pszClass, int iPartId, int iStateId, LPCWSTR *pszPart, LPCWSTR *pszState)
 {

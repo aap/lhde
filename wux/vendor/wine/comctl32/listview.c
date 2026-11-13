@@ -321,8 +321,8 @@ typedef struct tagLISTVIEW_INFO
   BOOL bTile;
   INT nTileLines;
   /* flxp: XP's tiles (LVM_SETTILEVIEWINFO with LVTVIM_LABELMARGIN, as XP's
-     defview sets them): comctl32 6.0's lvtile.c layout instead of 4051's,
-     the tile autosized as its ListView_RecalcTileSize (LVTVIF_AUTOSIZE); the
+     defview sets them): comctl32 6.0's tile layout instead of 4051's,
+     the tile autosized as comctl32 6.0 does it (LVTVIF_AUTOSIZE); the
      icon spacing it takes over is given back when the view ends */
   BOOL bTileXP, bTileAutoSize, bTileSpacingSaved, bTileSavedAuto;
   RECT rcTileLabelMargin;
@@ -414,8 +414,8 @@ typedef struct tagLISTVIEW_INFO
 #define TILE_ICON_LEFT               4
 #define TILE_TEXT_GAP                5
 #define TILE_INSET                   2
-/* flxp: XP's tiles (comctl32 6.0 lvtile.c): g_cxLabelMargin (SM_CXEDGE) and
-   g_cyIconMargin (SM_CYEDGE) around and between the parts, an autosized tile
+/* flxp: XP's tiles (comctl32 6.0): a label margin of SM_CXEDGE and
+   an icon margin of SM_CYEDGE around and between the parts, an autosized tile
    20 'm's wide for the text (TILELABELRATIO) */
 #define XPTILE_CX                    2
 #define XPTILE_CY                    2
@@ -1084,7 +1084,7 @@ static void customdraw_fill(NMLVCUSTOMDRAW *lpnmlvcd, const LISTVIEW_INFO *infoP
     lpnmlvcd->iSubItem = lplvItem->iSubItem;
     if (lplvItem->state & LVIS_SELECTED) lpnmlvcd->nmcd.uItemState |= CDIS_SELECTED;
     /* flxp: the drop target of a drag (LVIS_DROPHILITED) is drawn selected with the
-       focus, as XP's listview does; Wine drew nothing for it */
+       focus, as XP's listview does; Wine draws nothing for it */
     if (lplvItem->state & LVIS_DROPHILITED) lpnmlvcd->nmcd.uItemState |= CDIS_SELECTED | CDIS_DROPHILITED;
     if (lplvItem->state & LVIS_FOCUSED) lpnmlvcd->nmcd.uItemState |= CDIS_FOCUS;
     if (lplvItem->iItem == infoPtr->nHotItem) lpnmlvcd->nmcd.uItemState |= CDIS_HOT;
@@ -1130,7 +1130,7 @@ static BOOL LISTVIEW_HasThemedItems(const LISTVIEW_INFO *infoPtr)
     return theme && IsThemePartDefined(theme, LVP_LISTITEM, 0);
 }
 
-/* flxp: XP's GetSortColor(10, clr) (lvrept.c): the colour 10% more saturated (a
+/* flxp: XP's sort colour (10%): the colour 10% more saturated (a
    near-white one a little darker), black #808080; the sorted column's shade of
    the background, and the tile lines' grey of the text colour */
 static COLORREF LISTVIEW_SortColor(COLORREF clr)
@@ -1150,8 +1150,8 @@ static COLORREF LISTVIEW_SortColor(COLORREF clr)
     return RGB(c[0], c[1], c[2]);
 }
 
-/* flxp: the sorted column's shade in Details (LVM_SETSELECTEDCOLUMN; XP lvrept.c
-   GetSortColor(10, the background): white becomes #F7F7F7, as 4074's and XP's
+/* flxp: the sorted column's shade in Details (LVM_SETSELECTEDCOLUMN; XP's
+   sort colour of the background): white becomes #F7F7F7, as 4074's and XP's
    Name column); not in group view. FALSE when the column is not shaded. */
 static BOOL LISTVIEW_SortedColumnColor(const LISTVIEW_INFO *infoPtr, INT nSubItem, COLORREF *clr)
 {
@@ -2498,7 +2498,7 @@ static inline INT xp_tile_state_cx(const LISTVIEW_INFO *infoPtr)
     return infoPtr->himlState ? infoPtr->iconStateSize.cx : 0;
 }
 
-/* XP's tile text (lvtile.c TCalculateSubItemRect, ListView_TRecomputeLabelSize):
+/* XP's tile text (comctl32 6.0's subitem rects and label size):
    the name on one line, or wrapped to two where it does not fit and a line is
    left for it (then one tile line fewer); the lines' widest text, at most the
    room right of the image. Returns the lines under the name in lines[]. */
@@ -2595,7 +2595,7 @@ static void LISTVIEW_GetItemMetrics(const LISTVIEW_INFO *infoPtr, const LVITEMW 
 
 	if (is_xp_tile(infoPtr))
 	{
-	    /* flxp: XP (lvtile.c ListView_TGetRects, the image drawn g_cxLabelMargin
+	    /* flxp: XP (the image drawn a label margin
 	       into its part, centred in the tile less the margins) */
 	    Icon.left   = Box.left + 2 * XPTILE_CX + state_width;
 	    Icon.top    = Box.top + XPTILE_CY + (infoPtr->nItemHeight - 2 * XPTILE_CY - infoPtr->iconSize.cy) / 2;
@@ -2756,15 +2756,15 @@ calc_label:
 	    Label.top  = Box.top + ICON_TOP_PADDING_HITABLE +
 		         infoPtr->iconSize.cy + ICON_BOTTOM_PADDING;
 	    /* flxp: border select (thumbnails) has XP's 4 px between the image
-	       and the label (lvicon.c g_cyLabelSpace), clear of the 3 px frame */
+	       and the label, clear of the 3 px frame */
 	    if (infoPtr->dwLvExStyle & LVS_EX_BORDERSELECT) Label.top += 2;
 	    Label.right = Label.left + labelSize.cx;
 	    Label.bottom = Label.top + infoPtr->nItemHeight;
 	    if (!oversizedBox && labelSize.cy > infoPtr->ntmHeight)
 	    {
 		labelSize.cy = min(Box.bottom - Label.top, labelSize.cy);
-		/* flxp: comctl32's label is two lines at most unless focused (XP
-		   lvicon.c CLIP_HEIGHT; 4051/4074's "Downloaded Program Files") */
+		/* flxp: comctl32's label is two lines at most unless focused (XP,
+		   4051/4074's "Downloaded Program Files") */
 		labelSize.cy = min(labelSize.cy, 2 * infoPtr->ntmHeight);
 		labelSize.cy /= infoPtr->ntmHeight;
 		labelSize.cy = max(labelSize.cy, 1);
@@ -3230,7 +3230,7 @@ static void LISTVIEW_RefreshGroups(const LISTVIEW_INFO *infoPtr, HDC hdc)
         len = g->header ? lstrlenW(g->header) : 0;
         if (theme)
         {
-            /* flxp: 4051/4074 (lh4074-224845): the header image 8 px in from both sides,
+            /* flxp: 4051/4074: the header image 8 px in from both sides,
                the title in HEADING1TEXTCOLOR 7 px in, the collapse (expanded) or expand
                button at the right end */
             RECT box = { r.left + 8, r.top + 4, r.right - 8, r.top + 4 + imgh };
@@ -5247,7 +5247,7 @@ static BOOL LISTVIEW_FillBkgnd(const LISTVIEW_INFO *infoPtr, HDC hdc, const RECT
 
         FillRect(hdc, lprcBox, infoPtr->hBkBrush);
     }
-    /* flxp: the sorted column shaded down to the bottom (XP listview.c, the erase) */
+    /* flxp: the sorted column shaded down to the bottom (as XP erases it) */
     if (infoPtr->hBkBrush && LISTVIEW_SortedColumnColor(infoPtr, -1, &sorted))
     {
         RECT col, r;
@@ -5378,7 +5378,7 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
 
     /* flxp: on a transparent icon list (the desktop) a selected label still
        gets its highlight box, as XP's (prepaint_setup made the DC opaque) */
-    /* flxp: not under the item being edited (lvicon.c: its label is erased, the edit box is it) */
+    /* flxp: not under the item being edited (XP: its label is erased, the edit box is it) */
     if (!themed && !(infoPtr->hwndEdit && item->iItem == infoPtr->nEditLabelItem && item->iSubItem == 0) &&
         (nmlvcd->clrTextBk != CLR_NONE || (infoPtr->uView == LV_VIEW_ICON && GetBkMode(nmlvcd->nmcd.hdc) == OPAQUE)))
         ExtTextOutW(nmlvcd->nmcd.hdc, background->left, background->top, ETO_OPAQUE, background, NULL, 0, NULL);
@@ -5411,7 +5411,7 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
         }
         else
             infoPtr->rcFocus = rcLabel;
-        /* flxp: XP's tile focus takes in the label's margins (lvtile.c rcFocus) */
+        /* flxp: XP's tile focus takes in the label's margins */
         if (is_xp_tile(infoPtr))
         {
             infoPtr->rcFocus.left -= infoPtr->rcTileLabelMargin.left;
@@ -5449,7 +5449,7 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
             style = ILD_SELECTED;
         else
             style = ILD_NORMAL;
-        /* flxp: border select leaves a selected image as it is (XP lvicon.c) */
+        /* flxp: border select leaves a selected image as it is (XP) */
         if (border_select && !(item->state & LVIS_CUT)) style = ILD_NORMAL;
         /* flxp: so does a themed item background (4051) */
         if (themed && !(item->state & LVIS_CUT)) style = ILD_NORMAL;
@@ -5459,7 +5459,7 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
                          item->state & LVIS_CUT ? RGB(255, 255, 255) : CLR_DEFAULT,
                          style | (item->state & LVIS_OVERLAYMASK));
 
-        /* flxp: LVS_EX_BORDERSELECT (XP lvicon.c, the thumbnail view): a 1 px
+        /* flxp: LVS_EX_BORDERSELECT (XP's thumbnail view): a 1 px
            outline over the icon cell's edge in the outline colour (default
            COLOR_BTNFACE); selected, a 3 px frame outside the cell instead,
            COLOR_HIGHLIGHT with the focus, COLOR_BTNFACE without
@@ -5509,8 +5509,8 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
                            (infoPtr->bFocus || (infoPtr->dwStyle & LVS_SHOWSELALWAYS));
         RECT r = rcLabel;
 
-        /* XP: a name too long for one line wraps to two (lvtile.c DT_LVTILEWRAP), the
-           lines in GetSortColor(10, the text colour) (#808080 for black) */
+        /* XP: a name too long for one line wraps to two, the
+           lines in the sort colour of the text colour (#808080 for black) */
         if (is_xp_tile(infoPtr)) n = LISTVIEW_XPTileText(infoPtr, item->iItem, item->pszText, &name_lines, &width, lines, 8);
         else n = LISTVIEW_TileLines(infoPtr, item->iItem, lines, 8);
         r.bottom = r.top + name_lines * infoPtr->ntmHeight;
@@ -5551,7 +5551,7 @@ static void LISTVIEW_DrawItemPart(LISTVIEW_INFO *infoPtr, LVITEMW *item, const N
         rcLabel.bottom--;
 
     /* flxp: icon labels on a transparent list (the desktop) get XP's drop
-       shadow (nt5src lvicon.c: clrBk CLR_NONE and not selected -> SHDT_SHADOWTEXT;
+       shadow (XP: clrBk CLR_NONE and not selected -> SHDT_SHADOWTEXT;
        here: drawn transparent, i.e. not highlighted
        -> DrawShadowText(white, black, 2, 2)); XP switches it with the
        ListviewShadow setting, Vista with LVS_EX_TRANSPARENTSHADOWTEXT */
@@ -6875,14 +6875,14 @@ static LRESULT CALLBACK EditLblWndProcA(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
     return EditLblWndProcT(hwnd, uMsg, wParam, lParam, FALSE);
 }
 
-/* flxp: comctl32 6's in-place edit (lvicon.c ListView_DoOnEditLabel): in the
+/* flxp: comctl32 6's in-place edit: in the
    icon view a centred multi-line box that wraps the name as the label does */
 static inline BOOL edit_wraps(const LISTVIEW_INFO *infoPtr)
 {
     return infoPtr->uView == LV_VIEW_ICON && !is_tile(infoPtr) && !hide_labels(infoPtr) && !(infoPtr->dwStyle & LVS_NOLABELWRAP);
 }
 
-/* flxp: comctl32 6's ListView_SetEditSize / SetEditInPlaceSize, on every
+/* flxp: comctl32 6's edit box size, on every
    change of the text: wrapping, the box is as wide as the label wraps (a
    quarter of the item at least) and as tall as the wrapped name, centred on
    the label's middle; on one line it is as wide as the text and four
@@ -6923,9 +6923,9 @@ static void LISTVIEW_SetEditSize(LISTVIEW_INFO *infoPtr)
     else   /* LISTVIEW_DrawItemText: one line from IMAGE_PADDING in, centred vertically */
     {
         OffsetRect(&rc, label.left + IMAGE_PADDING, label.top + (label.bottom - label.top - rc.bottom) / 2);
-        rc.right += 4 * 2;   /* g_cxLabelMargin * 4: room to type */
+        rc.right += 4 * 2;   /* the label margin * 4: room to type */
     }
-    rc.right += 2;   /* g_cyEdge: a little more for blanks */
+    rc.right += 2;   /* SM_CYEDGE: a little more for blanks */
     GetClientRect(infoPtr->hwndSelf, &client);
     IntersectRect(&rc, &rc, &client);
     /* the edit's formatting rectangle in its window (EM_GETRECT: inside the margins, the border
@@ -7024,7 +7024,7 @@ static HWND LISTVIEW_EditLabelT(LISTVIEW_INFO *infoPtr, INT nItem, BOOL isW)
 
     TRACE("disp text=%s\n", debugtext_t(dispInfo.item.pszText, isW));
 
-    /* flxp: comctl32 6 (lvicon.c ListView_OnEditLabel): the item in view, the box sized by
+    /* flxp: comctl32 6: the item in view, the box sized by
        LISTVIEW_SetEditSize (the text may have changed in LVN_BEGINLABELEDIT), shown, the
        text scrolled to its end and all of it selected */
     LISTVIEW_EnsureVisible(infoPtr, nItem, FALSE);
@@ -9698,9 +9698,9 @@ static DWORD LISTVIEW_SetIconSpacing(LISTVIEW_INFO *infoPtr, INT cx, INT cy)
 
 static inline void set_icon_size(SIZE *size, HIMAGELIST himl, BOOL is_small);
 
-/* flxp: XP's autosized tile (lvtile.c ListView_RecalcTileSize): the image and
+/* flxp: XP's autosized tile: the image and
    20 'm's of text with the margins wide, the image or the name and its lines
-   high, 2 g_cyIconMargin above and below; it is the icon spacing while the
+   high, 2 icon margins above and below; it is the icon spacing while the
    view lasts (the spacing before is kept for LISTVIEW_EndXPTile) */
 static void LISTVIEW_XPTileAutoSize(LISTVIEW_INFO *infoPtr)
 {
@@ -13061,7 +13061,7 @@ static LRESULT LISTVIEW_Command(LISTVIEW_INFO *infoPtr, WPARAM wParam, LPARAM lP
     switch (HIWORD(wParam))
     {
 	case EN_UPDATE:
-	    /* flxp: the box follows the text as comctl32 6's does (ListView_OnCommand) */
+	    /* flxp: the box follows the text as comctl32 6's does */
 	    if (IsWindowVisible(infoPtr->hwndEdit)) LISTVIEW_SetEditSize(infoPtr);
 	    break;
 	case EN_KILLFOCUS:

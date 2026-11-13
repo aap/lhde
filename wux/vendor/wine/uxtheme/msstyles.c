@@ -106,7 +106,7 @@ HRESULT MSSTYLES_OpenThemeFile(LPCWSTR lpThemeFile, LPCWSTR pszColorName, LPCWST
         goto invalid_theme;
     }
     version = *(WORD*)LoadResource(hTheme, hrsc);
-    /* flxp: Longhorn's compiled styles (4042-4074, 5048's aero): src/uxtheme/v4.cpp */
+    /* flxp: Longhorn's compiled styles (4042-4074, 5048's aero): wuxtheme/v4.cpp */
     if(version == 4)
     {
         hr = FLXP_V4_Open(hTheme, pszColorName, pszSizeName, &v4,
@@ -265,7 +265,7 @@ HRESULT MSSTYLES_SetActiveTheme(PTHEME_FILE tf, BOOL setMetrics)
  *      MSSTYLES_ParseThemeFile
  *
  * flxp: read the properties of a theme file without making it the active
- * theme or applying its system metrics (libuxtheme, src/uxtheme)
+ * theme or applying its system metrics (libuxtheme, wuxtheme/)
  */
 void MSSTYLES_ParseThemeFile(PTHEME_FILE tf)
 {
@@ -958,7 +958,7 @@ static void parse_sysmetric(PTHEME_FILE tf, struct PARSECOLORSTATE *colorState,
 }
 
 /* flxp: the Longhorn-compiled format: the records of the selected variant,
- * already in the ini's text form (src/uxtheme/v4.cpp) */
+ * already in the ini's text form (wuxtheme/v4.cpp) */
 static void MSSTYLES_ParseV4(PTHEME_FILE tf, BOOL setMetrics)
 {
     const struct flxp_v4_record *r;
@@ -1138,7 +1138,7 @@ PTHEME_CLASS MSSTYLES_OpenThemeClass(LPCWSTR pszAppName, LPCWSTR pszClassList, U
     return MSSTYLES_OpenThemeFileClass(tfActiveTheme, pszAppName, pszClassList, dpi);
 }
 
-/* flxp: MSSTYLES_OpenThemeClass for any theme file (libuxtheme, src/uxtheme) */
+/* flxp: MSSTYLES_OpenThemeClass for any theme file (libuxtheme, wuxtheme/) */
 PTHEME_CLASS MSSTYLES_OpenThemeFileClass(PTHEME_FILE tf, LPCWSTR pszAppName, LPCWSTR pszClassList, UINT dpi)
 {
     PTHEME_CLASS cls = NULL;
@@ -1382,7 +1382,7 @@ static BOOL prepare_alpha (HBITMAP bmp, BOOL* hasAlpha, BOOL *hasDefaultTranspar
     /* AlphaBlend() wants premultiplied alpha, so do that now */
     while (premultiplied && n-- > 0)
     {
-        /* flxp: Longhorn's compiler stored the images premultiplied already;
+        /* flxp: Longhorn's compiler stores the images premultiplied already;
          * only where alpha is 0 the colour is made 0 too */
         if (!p[3]) p[0] = p[1] = p[2] = 0;
         p += 4;
@@ -1493,9 +1493,9 @@ static BOOL MSSTYLES_GetNextToken(LPCWSTR lpStringStart, LPCWSTR lpStringEnd, LP
     start = cur;
     while(cur < lpStringEnd && *cur != ',') cur++;
     end = cur;
-    /* flxp: trim trailing blanks inside [start, end). Wine looked at *end itself and stepped
-     * back onto the token's last character when the value ended in a blank (the line's \r),
-     * so a last token lost its last letter: "Tahoma, 8, Bold" was not bold, Luna's
+    /* flxp: trim trailing blanks inside [start, end). Looking at *end itself steps back onto
+     * the token's last character when the value ends in a blank (the line's \r), so a
+     * last token would lose its last letter: "Tahoma, 8, Bold" would not be bold, Luna's
      * "Franklin Gothic Medium, 14, italic" start button not italic */
     while(end > start && isSpace(end[-1])) end--;
 

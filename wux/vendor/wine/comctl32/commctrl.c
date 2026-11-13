@@ -1660,7 +1660,7 @@ LRESULT WINAPI SetPathWordBreakProc(HWND hwnd, BOOL bSet)
 int WINAPI DrawShadowText(HDC hdc, LPCWSTR text, UINT length, RECT *rect, DWORD flags,
                           COLORREF crText, COLORREF crShadow, int offset_x, int offset_y)
 {
-    /* flxp: XP's DrawShadowText (comctl32 v6 blur.cpp) instead of Wine's
+    /* flxp: XP's DrawShadowText (comctl32 v6) instead of Wine's
        offset-text semi-stub: the text is drawn into a 32bpp buffer with a 5px
        margin, every touched pixel becomes fully covered, the coverage is box-
        blurred 4 wide and 5 high (the sum of 5 rows over 4: up to 1.25 gain,
