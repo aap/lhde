@@ -28,7 +28,7 @@ Source shorthands:
 | `slate51` | `res/4051/slate_longhorn.ini` + `res/4051/slate.msstyles/BITMAP_<id>_1033.bmp`, `BLOB_<id>_1033.png` |
 | `imageres` | `res/4074/imageres.dll/PNGFILE_<id>_1033.png` (same files as `mock/assets/imageres/<id>.png`) |
 | `xaml/*` | `res/4074/xaml/xaml_sidebar_*.xaml`, `xaml_notification_notification.xaml` |
-| `XP` | `~/lib/nt5src/Source/XPSP1/NT/shell/explorer/{tray,taskband,traynot,trayclok}.cpp` |
+| `XP` | XP's shell: the taskbar, the task band, the notification area and the clock (2.1.3) |
 | `il` | `res/4074/il/desktop.il` (System.Windows.Desktop IL dump) |
 | `sym` | `res/sym4051/explorer_syms.txt`, `res/sym4051/system_syms.txt` |
 | `sdk` | `wim/sdk4051/lhsdk/LHSDK/shell/sidebar/`, `.../samples/shellcore/` |
@@ -116,43 +116,57 @@ dark, lighter dark; `jade74` 466 similar): normal = light grey plate, hot = whit
 dark, disabled = dark, checked (active window) = dark, hotchecked = lighter dark. In the 4051
 screenshot the active "Computer" button is the dark plate, matching CHECKED.
 The 3-state `Start::Button` strip is NORMAL (dark slate pill), HOT (bright green), PRESSED (dark
-green); in `slate51` 335 the flag logo is **not** in the bitmap: explorer draws `IDB_START`
-(`tray.cpp:3916-3925`, `start.bmp`) as the button image and the string `IDS_START` = "start"
-(`explorer.rc:306`); the 4051 screenshot shows only the flag, so 4051 either shipped an empty
-string or a logo-only `IDB_START` **(inferred)**. But the 4051 explorer.exe (and the 4051chk one) has no
-bitmap 143 (`IDB_START`), 176 or 178 at all, and the start button of `4051-vm-now.png` is not the 335 pill: it is imageres
+green); in `slate51` 335 the flag logo is **not** in the bitmap: explorer draws its bitmap 143
+(the flag) as the button image and the string "start"; the 4051 screenshot shows only the flag, so 4051 either shipped an empty
+string or a logo-only bitmap 143 **(inferred)**. But the 4051 explorer.exe (and the 4051chk one) has no
+bitmap 143, 176 or 178 at all, and the start button of `4051-vm-now.png` is not the 335 pill: it is imageres
 1156 (the Avalon `StartButton` image, 74x23, flag included) drawn 79x29 **bilinear** at the bar's top-left, which reproduces
 the shot to a mean squared error of 0.2 per pixel (nearest 249). Only the task band (dark 146 px plates = 349) and the bar
 background are the classic parts. See "4051 vs 4074 Slate" in section 5.
 
-#### 2.1.3 Composition and metrics confirmed in the XP SP1 source
+#### 2.1.3 Composition and metrics of XP's taskbar
 
-| Fact | Source |
-| --- | --- |
-| Task button height = `tbm.cyPad + g_cySize` where `g_cySize = GetSystemMetrics(SM_CYSIZE)` (`initcab.cpp:754`); the band reports `ptActual.y = g_cySize + 2*g_cyEdge`, min horizontal width `3 * buttonHeight`, `ptIntegral.y = buttonHeight + cyButtonSpacing` | `taskband.cpp:537-556`, `5665-5673` |
-| Themed toolbar metrics: `cxPad = 20` (8 unthemed), `cyBarPad = 0`, `cxButtonSpacing = cyButtonSpacing = 0` (3 unthemed) | `taskband.cpp:5847-5851` |
-| Ideal button width: `iIdeal = winWidth / cols` (minus spacing when cols > 1), clamped to `iMax = g_cxMinimized` (`SM_CXMINIMIZED`, 160 on a default XP) for a horizontal bar; `iMin = (g_cySize + 2*g_cxEdge) * 1.8 + textSpace` horizontally, `g_cySize + 2*g_cxEdge` vertically | `taskband.cpp:1425-1466` |
-| Remainder pixels are spread over the first buttons (`_SizeItems(iIdeal, iRemainder)`) | `taskband.cpp:1586-1590` |
-| When forced to `iMin`: group (glom) first, else add scroll bars; ungroup when `cOpenSlots >= 2` | `taskband.cpp:1577-1650` |
-| Grouping registry: `Advanced\TaskbarGlomming` (bool), `Advanced\TaskbarGroupSize` with `GLOM_OLDEST 0` (default), `GLOM_BIGGEST 1`, `GLOM_SIZE 2` (>= 2 means "group when the group has that many"); a group of one is never shown grouped; `g_rgNoGlom` exclusion list | `taskband.cpp:38-44, 63, 2905-2955, 6250-6263` |
-| Group button needs 1.2x height vertically for the drop arrow | `taskband.cpp:545` |
-| Start button: text `IDS_START`/`IDS_STARTCLASSIC`; `_sizeStart` from `Button_GetIdealSize` (theme CONTENTMARGINS + text extent); height = `max(ideal, TBC_BUTTONHEIGHT)` when themed; text dropped when the bar is narrower than the button | `tray.cpp:620-662`, `3904-3929` |
-| Taskbar default thickness: `_sStuckWidths.cy = _sizeStart.cy + 2*(g_cyDlgFrame + g_cyBorder)`; horizontal task view starts at `_sizeStart.cx + g_cxFrame + 1`, vertical at `_sizeStart.cy + g_cyTabSpace` | `tray.cpp:492-497`, `921`, `932` |
-| Stuck rect: snapped to the monitor edge; themed and sizable adds the sizing bar (`_AdjustRectForSizingBar`); unthemed inflates by `g_cxEdge, g_cyEdge` | `tray.cpp:1030-1054` |
-| Autohide: `IDT_AUTOHIDE` polls every 500 ms; hides when the cursor is outside the stuck rect inflated by `4*g_cxEdge, 4*g_cyEdge`, the tray is not active, no start pane and no system menu is up, no balloon | `tray.cpp:3850-3855`, `4082-4115` |
-| Unhide: mouse movement over the hidden bar beyond `SM_CXDOUBLECLK*SM_CYDOUBLECLK` restarts a 50 ms `IDT_AUTOUNHIDE`; on expiry, if the cursor is still inside → `Unhide()` | `tray.cpp:3883-3900`, `4118-4133` |
-| Hidden rect leaves `g_cxFrame/2` (SM_CXFRAME is 4 → 2 px) visible at the edge | `tray.cpp:3618-3650` |
-| Slide animation: `_dtSlideHide = 400 ms`, `_dtSlideShow = 200 ms` (0 on `SM_SLOWMACHINE`); linear interpolation of the rect, one step per `ONEFRAME` = 20 ms, only when `SPI_GETMENUANIMATION` and full-window drag are on | `tray.cpp:1866-1880`, `3503-3600` |
-| Tray clock: format `LOCALE_STIMEFORMAT` through `GetTimeFormat(..., TIME_NOSECONDS, ...)`; min size = max(AM text, PM text) with a two-digit "slop", height `text + 4*g_cyBorder`, at least `g_cySize + g_cyEdge`; adds a day line and a short-date line when `cyMax` allows (vertical bar); tooltip shows the long date; timer re-armed for the next minute | `trayclok.cpp:85, 147-154, 446-470, 532-603` |
-| Tray layout: content rect from `GetThemeBackgroundContentRect(TNP_BACKGROUND)` (i.e. the 19 7 0 0 CONTENTMARGINS above); icon toolbar 16 px buttons (`SM_CXSMICON`), height trimmed to a multiple of the button size, centred; clock to the right (bottom when vertical), chevron `_szChevron` to the left | `traynot.cpp:1982-2060`, `1648` |
-| Tray timers: chevron info tip 30 s, rude-app hide 10 s, balloon 10 s | `traynot.cpp:30-34`, `tray.cpp:129` |
-| Persistence: `Explorer\StuckRects2\Settings` = `TVSD {dwSize, lSignature<0, dwFlags (TVSD_AUTOHIDE, TVSD_HIDECLOCK, ...), uStuckPlace, SIZE sStuckWidths, RECT rcLastStuck}`; `Advanced\TaskbarSizeMove` | `tray.h:75-96`, `tray.cpp:514, 614, 1414` |
+XP's shell (the taskbar, the task band, the notification area and the clock) does this:
+
+- Task button height = the toolbar's `cyPad` + `SM_CYSIZE`; the band reports `ptActual.y = SM_CYSIZE + 2*SM_CYEDGE`, a minimum
+  horizontal width of `3 * buttonHeight`, `ptIntegral.y = buttonHeight + cyButtonSpacing`.
+- Themed toolbar metrics: `cxPad = 20` (8 unthemed), `cyBarPad = 0`, `cxButtonSpacing = cyButtonSpacing = 0` (3 unthemed).
+- Ideal button width: the bar's width / columns (minus spacing when columns > 1), clamped to `SM_CXMINIMIZED` (160 on a default
+  XP) for a horizontal bar; the minimum is `(SM_CYSIZE + 2*SM_CXEDGE) * 1.8 + the text space` horizontally,
+  `SM_CYSIZE + 2*SM_CXEDGE` vertically.
+- Remainder pixels are spread over the first buttons.
+- When forced to the minimum width: group (glom) first, else add scroll bars; ungroup when two or more slots are free.
+- Grouping registry: `Advanced\TaskbarGlomming` (bool), `Advanced\TaskbarGroupSize`: 0 the oldest group (default), 1 the biggest,
+  >= 2 "group when the group has that many"; a group of one is never shown grouped; a built-in list of programs is never grouped.
+- A group button needs 1.2x height vertically for the drop arrow.
+- Start button: the text "start" (the classic "Start"); its size is the button's ideal size (`BCM_GETIDEALSIZE`: theme
+  CONTENTMARGINS + text extent); themed, the height is at least the minimum button height; the text is dropped when the bar is
+  narrower than the button.
+- Taskbar default thickness: the start button's height + `2*(SM_CYDLGFRAME + SM_CYBORDER)`; a horizontal task view starts at the
+  start button's width + `SM_CXFRAME` + 1, a vertical one below the start button and a tab space.
+- Stuck rect: snapped to the monitor edge; themed and sizable adds the sizing bar; unthemed inflates by `SM_CXEDGE, SM_CYEDGE`.
+- Autohide: a timer polls every 500 ms; the bar hides when the cursor is outside the stuck rect inflated by `4*SM_CXEDGE,
+  4*SM_CYEDGE`, the tray is not active, no start pane and no system menu is up, no balloon.
+- Unhide: mouse movement over the hidden bar beyond `SM_CXDOUBLECLK*SM_CYDOUBLECLK` restarts a 50 ms timer; on expiry, if the
+  cursor is still inside, the bar unhides.
+- The hidden rect leaves `SM_CXFRAME/2` (SM_CXFRAME is 4 → 2 px) visible at the edge.
+- Slide animation: 400 ms to hide, 200 ms to show (0 on `SM_SLOWMACHINE`); linear interpolation of the rect, one step per 20 ms
+  frame, only when `SPI_GETMENUANIMATION` and full-window drag are on.
+- Tray clock: format `LOCALE_STIMEFORMAT` through `GetTimeFormat(..., TIME_NOSECONDS, ...)`; min size = max(AM text, PM text)
+  with a two-digit "slop", height `text + 4*SM_CYBORDER`, at least `SM_CYSIZE + SM_CYEDGE`; adds a day line and a short-date
+  line when the height allows (vertical bar); the tooltip shows the long date; the timer is re-armed for the next minute.
+- Tray layout: content rect from `GetThemeBackgroundContentRect(TNP_BACKGROUND)` (i.e. the 19 7 0 0 CONTENTMARGINS above);
+  icon toolbar 16 px buttons (`SM_CXSMICON`), height trimmed to a multiple of the button size, centred; clock to the right
+  (bottom when vertical), the chevron to the left.
+- Tray timers: chevron info tip 30 s, rude-app hide 10 s, balloon 10 s.
+- Persistence: `Explorer\StuckRects2\Settings` holds the size, a negative signature, flags (autohide, hide clock, ...), the
+  docked edge, the stuck widths (a SIZE) and the last stuck rect (a RECT); `Advanced\TaskbarSizeMove`.
 
 Measured on the 4051 screenshot (Slate, 1152x864): taskbar occupies rows 836..863 = **28 px**
-(= the 50x28 `BACKGROUNDBOTTOM` bitmap, so `_sizeStart.cy + 8 = 28`, start button 20 px tall
+(= the 50x28 `BACKGROUNDBOTTOM` bitmap, so the start button's height + 8 = 28, start button 20 px tall
 **(inferred)**); start button x = 0..~77 (pill) with the task band starting at x = 84; the single
-task button "Computer" is x = 84..230 = **146 px** (one window, so `iIdeal` was clamped by
-`g_cxMinimized`-ish logic; XP's 160 would give 160, so 4051's `SM_CXMINIMIZED` or `cxPad`
+task button "Computer" is x = 84..230 = **146 px** (one window, so the ideal width was clamped by
+an `SM_CXMINIMIZED`-like limit; XP's 160 would give 160, so 4051's `SM_CXMINIMIZED` or `cxPad`
 differs **(inferred)**); tray at the far right shows only the 19x20 chevron bubble, no clock;
 the bar stops at x ≈ 1002 where the sidebar begins.
 
@@ -401,7 +415,7 @@ Line numbers are `desktop.il` lines ("L…"). All Avalon sizes are measure units
 | Group flyout | `TaskGroupFlyout` DockPanel **MaxWidth 200**, Popup CloseMode 2 placed at the button; sets `ExtendedTaskbar.ShowingUI` (keeps an autohide bar open) | L20815-20926 |
 | Grouping | `TaskbarGlomming` (default **1**) and `TaskbarGroupSize` (default **0**) from `Explorer\Advanced` (key name inferred from a mangled literal); GroupSize 0 = group only when buttons do not fit (`_OnChildrenWontFit` gloms the largest group); N = group when count == N, ungroup below; `_OnExtraSpace` ungroups the biggest group when horizontal `cxFree/150 >= count` or vertical `count*29-29 <= cyFree` | L19174-19230, 20055-20139, 20602-20675 |
 | Drag-over activation | hovering a drag over a TaskGroup 250 ms, TaskItem 500 ms, StartButton 1000 ms (opens the start menu) | L21402, 22067, 52524 |
-| Autohide geometry | `_GetRect`: the window keeps its full size and is shifted so `2 + (size-2)*pct/100` px stay on screen → **2 px visible when hidden** (same as XP's `g_cxFrame/2`) | L53719 |
+| Autohide geometry | `_GetRect`: the window keeps its full size and is shifted so `2 + (size-2)*pct/100` px stay on screen → **2 px visible when hidden** (same as XP's `SM_CXFRAME/2`) | L53719 |
 | Autohide animation | `_iSidebarVisiblePercent` / `_rgiTaskbarVisiblePercent[i]`; focus-within change starts `SetTimer(20 ms)` (id 3 sidebar, 100+i taskbar); each tick pct ± 20 → **5 steps x 20 ms = 100 ms**, linear; when autohide is switched on the bar jumps to 100 or 0 immediately | L54873-54970, 55644-55830 |
 | Focus-within (keeps an autohide bar open) | sidebar: `IsMouseOver || ShowingFlyout || any tile FocusWithin` (L38232); taskbar: `IsMouseOver || ShowingUI` (L23527) | |
 | Multi-monitor | one `ExtendedTaskbar` per extra monitor when `Taskbar\Monitor = -1`; bars clipped to their monitor with `SetWindowRgn`; `SetWindowPos(... SWP_ASYNCWINDOWPOS|NOACTIVATE|NOZORDER)` | L54295, 55205 |
@@ -517,22 +531,22 @@ flyout window and the properties window, and calls `initialize()` after `sidebar
 | Skip taskbar-less windows | `WS_EX_TOOLWINDOW`, owned windows | skip `_NET_WM_WINDOW_TYPE` dock/toolbar/menu/splash/utility/dialog-with-transient, `_NET_WM_STATE_SKIP_TASKBAR`, windows with `WM_TRANSIENT_FOR` |
 | Active (checked) button | `HSHELL_WINDOWACTIVATED`, `TB_CHECKBUTTON` | root `_NET_ACTIVE_WINDOW` |
 | Minimised state (restore on click) | `IsIconic` | `_NET_WM_STATE_HIDDEN` in the client's `_NET_WM_STATE` (published by luxwm, with `WM_STATE` Iconic; minimised is separate from berry's workspace "hide") |
-| Click: activate or minimise if active | `_HandleClick`: minimise when already foreground | send `_NET_ACTIVE_WINDOW` client message (source 2 = pager) or `_NET_WM_STATE` add `_NET_WM_STATE_HIDDEN` / `XIconifyWindow` |
+| Click: activate or minimise if active | minimise when already foreground | send `_NET_ACTIVE_WINDOW` client message (source 2 = pager) or `_NET_WM_STATE` add `_NET_WM_STATE_HIDDEN` / `XIconifyWindow` |
 | Title / icon | `WM_GETTEXT`, `WM_GETICON` small 16 px | `_NET_WM_NAME` (UTF8), else `WM_NAME`; icon rule in 6.2 |
 | Flashing (`TaskBand.FLASHBUTTON`, Avalon `TaskButton.Flash` 1183) | `HSHELL_FLASH` | `_NET_WM_STATE_DEMANDS_ATTENTION` (read; drawing not done) |
-| Grouping | `TaskbarGlomming`, `TaskbarGroupSize`, group when forced to `iMin` | not done; would be: group key = `WM_CLASS` class (XP uses the exe path), the same rules (group of ≥ 2 only, GLOM_OLDEST default, ungroup when ≥ 2 open slots), the group button with count + Marlett "u" (Avalon) and a popup list |
-| Button width (classic) | `iIdeal = (W - fixed) / n` clamped to [`1.8*(cySize+2*edge)+textspace`, `cxMinimized`]; remainder to the first buttons | flxp-taskbar (section 12) |
+| Grouping | `TaskbarGlomming`, `TaskbarGroupSize`, group when forced to the minimum width | not done; would be: group key = `WM_CLASS` class (XP uses the exe path), the same rules (group of ≥ 2 only, GLOM_OLDEST default, ungroup when ≥ 2 open slots), the group button with count + Marlett "u" (Avalon) and a popup list |
+| Button width (classic) | `(W - fixed) / n` clamped to [`1.8*(cySize+2*edge)+textspace`, `cxMinimized`]; remainder to the first buttons | flxp-taskbar (section 12) |
 | Button width / rows (Avalon) | height 29 per row, rows `clamp(h/29, 1, 4)`; columns `max(1, w/130)`; width `min(140, w/itemsPerRow)`; overflow to the chevron below 60 px, pull back above 70 px (2.4.2) | 6.1, 6.2; the measured 140 px pitch confirms |
 | Group popup (Avalon) | `TaskGroupFlyout` MaxWidth 200, items = icon + title; drag-over opens a group after 250 ms, an item after 500 ms, the start button after 1000 ms | not done |
 | Window context menu (Avalon) | End Task, Restore, Move, Size, Minimize, Maximize, Close (SC_* via WM_SYSCOMMAND, disabled by window styles); group: End Group Tasks, Cascade, Tile Vertically/Horizontally, Minimize/Restore/Close Group; taskbar: Task Manager, Show Desktop, Cascade, Tile, properties (2.4.2) | the taskbar menu (6.5): `_NET_SHOWING_DESKTOP`, cascade / tile through `_NET_MOVERESIZE_WINDOW` |
 | Tooltips | toolbar tooltips with the full title | not done for task buttons (tiles have them, `tooltip.lua`) |
-| Right click | window system menu (`TBC_SYSMENUCOUNT`) | luxwm's window menu at the pointer (`_GTK_SHOW_WINDOW_MENU`, 6.2) |
+| Right click | window system menu | luxwm's window menu at the pointer (`_GTK_SHOW_WINDOW_MENU`, 6.2) |
 
 ### 3.2 Appbar placement, struts, autohide
 
 | Behaviour | Reference | luxshell |
 | --- | --- | --- |
-| Reserve the screen edge | `SHAppBarMessage(ABM_SETPOS)`; stuck rect = edge strip of `_sStuckWidths` | `_NET_WM_WINDOW_TYPE_DOCK` + `_NET_WM_STRUT_PARTIAL` (bottom = the bar's height; right = 150 over the full height); luxwm keeps `_NET_WORKAREA` and maximises and places inside it |
+| Reserve the screen edge | `SHAppBarMessage(ABM_SETPOS)`; stuck rect = edge strip of the stuck widths | `_NET_WM_WINDOW_TYPE_DOCK` + `_NET_WM_STRUT_PARTIAL` (bottom = the bar's height; right = 150 over the full height); luxwm keeps `_NET_WORKAREA` and maximises and places inside it |
 | Taskbar yields to the sidebar | `SetMixedTaskbarSidebar`, screenshot: taskbar ends at x=1130 | taskbar strut `bottom_start_x..bottom_end_x = 0..W-150` and window width `W-150` while the sidebar is on top (7.2) |
 | Autohide (classic) | 500 ms poll, hide when pointer outside rect + 4*edge and not active; show on pointer movement > dblclk distance after 50 ms; slide 400 ms out / 200 ms in, 20 ms frames; 2 px remain visible | flxp-taskbar (section 12) |
 | Autohide (Avalon) | driven by "focus within" (mouse over, flyout or popup open, tile focus); visible percent ± 20 every 20 ms = 100 ms linear slide; `2 + (size-2)*pct/100` px visible; a bar jumps to 0/100 when autohide is toggled (2.4.2) | 6.4 |
@@ -946,7 +960,7 @@ another WM.
 
 ## 12. The classic taskbar (flxp-taskbar)
 
-The msstyles-themed classic taskbar is Win32 explorer code (`tray.cpp`, `taskband.cpp`, `traynot.cpp`, `trayclok.cpp`: a rebar
+The msstyles-themed classic taskbar is Win32 explorer code (XP's tray, task band, notification area and clock: a rebar
 with `TaskBand::Toolbar`, `Start::Button`, the `TrayNotify` toolbar and clock, all uxtheme classes, 2.1), so it lives on the
 flxp toolkit, which has Wine's comctl32 rebar / toolbar / tooltips and the uxtheme renderer; rebuilding it in luxshell's scene
 would duplicate that toolkit with less fidelity. luxshell keeps the Avalon bars and the sidebar, as 4051 ran the Avalon start
@@ -976,7 +990,7 @@ stopped by its pid (after checking `/proc/PID/comm` and `DISPLAY` in `/proc/PID/
 
 ## 13. The start menu
 
-Longhorn's Avalon shell has no start menu of its own; 4074's is the XP start panel (DirectUI, `sfthost.cpp`) skinned by the
+Longhorn's Avalon shell has no start menu of its own; 4074's is the XP start panel (DirectUI) skinned by the
 msstyles `StartPanel` class, Win32 code next to the classic taskbar. So the start menu is flxp's: flxp-taskbar's start panel,
 and next to the Avalon taskbar (or none) **flxp-startmenu** (flxp-taskbar by another name: the start panel without bar, tray
 or struts). luxshell has no menu of its own; without a provider nothing opens (logged).

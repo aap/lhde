@@ -254,7 +254,7 @@ XP's system menu, drawn by luxwm (`menu.c`, `menu.h`). **Opened by** Alt+Space (
 release, like `WM_CONTEXTMENU`, at the pointer; it flips left/up at the monitor edge), a click on the caption icon (`wm_frame_icon_rect()`;
 a double click there, the second press within 500 ms, closes the window as XP's), and a `_GTK_SHOW_WINDOW_MENU` client message
 (CLIENT-PROTOCOL.md: luxshell's task buttons, GTK's client-side headers) at the point it names, also for a minimised window. Alt+Space
-and the icon put it under the caption at the frame's left border. Items, mnemonics and greying as `mnsys.c` `xxxSetSysMenu`:
+and the icon put it under the caption at the frame's left border. Items, mnemonics and greying as XP's win32k sets them:
 **R**estore (greyed unless maximised or minimised; the default item while minimised), **M**ove and **S**ize (greyed while maximised or
 minimised; Size also for a fixed-size window), Mi**n**imize (greyed while minimised), Ma**x**imize (greyed while maximised, or for a
 fixed-size window), Move to **D**esktop (luxwm's own, "Virtual desktops"), separator, **C**lose (the default item, bold, unless
@@ -570,8 +570,8 @@ borderwidth=N;captionwidth=N;captionheight=N;captionfont=...;menufont=...` (ever
 menu's icon cell, `_LHWM_FRAME_METRICS` (text colours `captiontext` / `inactivecaptiontext`) and the size-hint gap fill (`btnface`) take
 the msstyles geometry. Log: `luxwm: theme slate4074: Windows Classic frames (style classic, scheme brick)`.
 
-`classic_paint` is user32's non-client painting (Windows 2000 / XP `xxxDrawCaptionBar`, `DrawEdge`, `DrawFrame`,
-`DrawFrameControl(DFC_CAPTION)`, `xxxDrawCaptionTemp`, GDI's `GradientFill`) for a sizable overlapped window with `WS_EX_WINDOWEDGE`. It
+`classic_paint` is user32's non-client painting (Windows 2000 / XP win32k's caption bar and `DrawCaption`, `DrawEdge`, `DrawFrame`,
+`DrawFrameControl(DFC_CAPTION)`, GDI's `GradientFill`) for a sizable overlapped window with `WS_EX_WINDOWEDGE`. It
 paints into an ARGB image of the frame's size with libwuxtheme's classic helpers (`ut_draw_edge`, `ut_draw_frame_control`,
 `ut_draw_caption`: Wine's user32 `DrawEdge` / `DrawFrameControl` and wux's GDI with the frame's colour table as the system colours) and
 composites it; Display Properties' classic sample (the Appearance tab with "Windows Classic style") draws its inactive, active and
@@ -984,15 +984,13 @@ and restore go through `max_transition()`.
   so picom imports it one frame (30..50 ms on the lab) after the client.
 - **Without a compositor** luxwm draws XP's animation itself (`anim_classic`), on the root with the server grabbed, from the frame
   rectangle to the taskbar button (`_NET_WM_ICON_GEOMETRY`, written by luxshell; fallback a 160x24 rectangle at the bottom-left of the
-  work area) and back on restore, and from the old to the new rectangle on maximise/restore (XP does that too). Reference:
-  `nt5src/.../windows/core/ntuser/kernel/minmax.c`. XP uses only `IDANI_CAPTION`: `xxxDrawAnimatedRects` (line 1051) calls
-  `xxxAnimateCaption` (line 567), which flies the active caption bar: `cy = CYCAPTION - 1` rows, rectangles taller than a caption inset by
-  the window borders, the strip drawn once at the larger width and cut from the left to the current width, left/top/width moved linearly
-  with the elapsed time, `start + MultDiv(delta, elapsed, CMS_ANIMATION)` with `CMS_ANIMATION = 250`, `UserSleep(1)` between frames, the
-  screen under the strip saved and restored every frame. The XOR wireframe (`AnimateFrame`/`DrawWireFrame`) is Win95 code XP compiles out
-  ("DISABLE OLD ANIMATION FOR M7", `#if 0`). luxwm flies the caption (the frame's caption rows painted focused, inside the borders, over
-  black; save-under with `XCopyArea` and `IncludeInferiors`) with a 10 ms sleep per frame: 25..26 frames in ~255 ms. `ANIMATE_WIREFRAME
-  true` draws XOR rectangles instead (3 px, `GXxor` with white ^ black, same timing). Each frame is `XSync`ed; the screen afterwards is
+  work area) and back on restore, and from the old to the new rectangle on maximise/restore (XP does that too). XP's win32k uses
+  only `IDANI_CAPTION`: its animated rectangles fly the active caption bar: `SM_CYCAPTION - 1` rows, rectangles taller than a
+  caption inset by the window borders, the strip drawn once at the larger width and cut from the left to the current width,
+  left/top/width moved linearly with the elapsed time, `start + delta * elapsed / 250` (250 ms in all), a 1 ms sleep between
+  frames, the screen under the strip saved and restored every frame. The Win95 XOR wireframe animation is compiled out of XP.
+  luxwm flies the caption (the frame's caption rows painted focused, inside the borders, over black; save-under with `XCopyArea`
+  and `IncludeInferiors`) with a 10 ms sleep per frame: 25..26 frames in ~255 ms. `ANIMATE_WIREFRAME true` draws XOR rectangles instead (3 px, `GXxor` with white ^ black, same timing). Each frame is `XSync`ed; the screen afterwards is
   what it was.
 
 ## Known gaps
