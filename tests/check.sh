@@ -53,6 +53,9 @@ result "settings-lists ($(tail -n 1 "$T/settings-lists.log"))" $? "$T/settings-l
 # lhde-import's Aero patches (by sha256, the unknown one by its bytes) and which dropped-in styles get a frame set, stand-in files
 python3 -I tests/aero-patches.py > "$T/aero-patches.log" 2>&1
 result "aero-patches ($(tail -n 1 "$T/aero-patches.log"))" $? "$T/aero-patches.log"
+# docs/KEYS.md against luxwm's default key table: every default listed, the Super keys it calls free unbound
+python3 -I tests/keys-doc.py > "$T/keys-doc.log" 2>&1
+result "keys-doc ($(tail -n 1 "$T/keys-doc.log"))" $? "$T/keys-doc.log"
 # libwuxtheme through its own API: every style the user imported
 styles=${LHDE_STYLES:-$(build/bin/lhde-theme find styles 2>/dev/null)}   # liblhde's lookup: the Windows tree's index/styles (docs/LAYOUT.md)
 n=0

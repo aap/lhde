@@ -109,7 +109,8 @@ decoding nothing more, three loaders decoding at most two pictures at once), `te
 lists without a window: the backgrounds' order and selection, the icon sets; Appearance's "Windows and buttons", `--list
 appearance --pick STYLE`: classic, a bare style with and without a frame set, back to the theme's own, with the user's
 `jade4074.msstyles` copied under other names, skipped without it), `tests/aero-patches.py` (lhde-import's table of Aero
-patches and which styles get a frame set, on stand-in files), and the
+patches and which styles get a frame set, on stand-in files), `tests/keys-doc.py` (docs/KEYS.md lists every default of luxwm's
+key table, and the Super keys it calls free are unbound), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
 incl. GTK, the file dialog in both looks, the modifier keys across a focus change, typed text into the Edit control as
 UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair: `tests/headless/typing.sh`), luxpad (`tests/headless/luxpad.sh`:

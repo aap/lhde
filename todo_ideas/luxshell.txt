@@ -4,7 +4,7 @@
 	* currently: win+s toggles sidebar stacking. clicking icon toggles sidebar with animation
 	* want sidebar hidden/unhidden immediately (like longhorn)
 	* if we do keep the animation around as an option, also need to animate taskbar
-	* want: win+? shortcuts for stacking and hiding. which ones are free? win+h? want a list of shortcuts anyway
+	* want: win+? shortcuts for stacking and hiding (the list of shortcuts and the free Super keys, Super+H among them: docs/KEYS.md)
 
 * taskbar
 	* window buttons
