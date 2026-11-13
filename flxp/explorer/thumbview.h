@@ -19,7 +19,10 @@
 // spacing and selection; this only makes the images.
 //
 // Pictures come from shell/thumbs on worker threads; an item shows its default
-// image at once and the thumbnail replaces it when it arrives.
+// image at once and the thumbnail replaces it when it arrives. Only the items on
+// screen and a screen around them are asked for (again when the list scrolls),
+// and the view keeps at most shell::thumbs::Slots' 64 MB of thumbnails plus
+// those on screen, the least recently used going back to their default image.
 #pragma once
 #include <string>
 #include <vector>

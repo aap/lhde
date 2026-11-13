@@ -5,7 +5,7 @@
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh and runas.sh setfattr
-#                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick); displays :71-:73,
+#                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, thumbsmem.sh ImageMagick); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
 fails=0
@@ -44,6 +44,9 @@ result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"
 # the Details columns' layout (shell/columns.h) and the per-folder records of flxp-views, on a scratch state directory
 build/tests/columnstest > "$T/columns.log" 2>&1
 result "columnstest ($(tail -n 1 "$T/columns.log"))" $? "$T/columns.log"
+# the thumbnails' memory bounds (shell/thumbs.h, gdi/image.h): big pictures into small thumbnails without their full image
+build/tests/thumbstest > "$T/thumbs.log" 2>&1
+result "thumbstest ($(tail -n 1 "$T/thumbs.log"))" $? "$T/thumbs.log"
 # lhde-import's overwrite policy (kept without --force, written with it) on a scratch tree and a stand-in file
 tests/import-policy.sh > "$T/import.log" 2>&1
 result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"
@@ -96,6 +99,9 @@ else
     tests/headless/menus.sh "$3" > "$T/menus.log" 2>&1; result headless/menus.sh $? "$T/menus.log"
     # the task band's picture of a folder with two JPEGs is the Icons view's square (folderpictest)
     tests/headless/folderpic.sh "$2" > "$T/folderpic.log" 2>&1; result headless/folderpic.sh $? "$T/folderpic.log"
+    # flxp's peak RSS on 600 6000 x 4000 JPEGs at 256 px, the view's images within their budget (needs ImageMagick)
+    tests/headless/thumbsmem.sh "$1" > "$T/thumbsmem.log" 2>&1; rc=$?
+    result "headless/thumbsmem.sh ($(tail -n 1 "$T/thumbsmem.log"))" $rc "$T/thumbsmem.log"
     tests/headless/luxshot.sh "$1" > "$T/luxshot.log" 2>&1; rc=$?
     result "headless/luxshot.sh$(grep -m1 '^skip' "$T/luxshot.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxshot.log"
     tests/headless/luxattr.sh "$2" > "$T/luxattr.log" 2>&1; rc=$?

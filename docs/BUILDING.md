@@ -105,7 +105,8 @@ header (the step-2 `LUXNAV_DIR` hook and build/compat are gone).
 `make check` first compiles a probe that calls glibc's wcslen in win32 C++ and fails if it compiles (`check-poison`:
 wchar_t is 16 bits there, `wux/w32/include/flxp_crt.h` poisons glibc's wide functions). `tests/check.sh` runs what needs no Microsoft files: kerneltest (the shim's
 kernel/CRT/registry/resource/usp10 parts), gditest, swatchtest (the Details Color column's square through an image list),
-fileops_test, `tests/settings-lists.sh` (Display Properties' Desktop
+fileops_test, thumbstest (the thumbnails' memory bounds on pictures it writes: a 6000 x 4000 JPEG and a 4000 x 4000 PNG into 128 px thumbnails with the peak RSS growing by less than 16 MB, the PNG reduced row by row; the view's image budget over 300 inserts, the pinned ones kept; a cancelled loader generation
+decoding nothing more, three loaders decoding at most two pictures at once), `tests/settings-lists.sh` (Display Properties' Desktop
 lists without a window: the backgrounds' order and selection, the icon sets; Appearance's "Windows and buttons", `--list
 appearance --pick STYLE`: classic, a bare style with and without a frame set, back to the theme's own, with the user's
 `jade4074.msstyles` copied under other names, skipped without it), `tests/aero-patches.py` (lhde-import's table of Aero
@@ -122,7 +123,9 @@ Properties from the item menu (General first, Metadata's description, its tag li
 files in one sheet with a tag added to both, a read-only file's message box)
 and Add Tag, the Explorer's Filter box under jade4074 over names and attributes, skipped without that style or user xattrs,
 luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`, clicks outside open menus under luxwm:
-`tests/headless/menus.sh`, the task band's folder picture against the Icons view's: `tests/headless/folderpic.sh`, a double
+`tests/headless/menus.sh`, the task band's folder picture against the Icons view's: `tests/headless/folderpic.sh`, flxp's memory on 600 6000 x 4000
+JPEGs in the Thumbnails view at 256 px, paged through and into a subfolder: the peak RSS under 400 MB, the view's images within
+their 64 MB budget plus what is on screen, some evicted, skipped without ImageMagick: `tests/headless/thumbsmem.sh`, a double
 click and Enter on a file with Run as running its command: `tests/headless/runas.sh`) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
