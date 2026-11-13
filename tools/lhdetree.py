@@ -5,7 +5,7 @@ The Windows tree, $LHDE_WINDOWS (default ${XDG_DATA_HOME:-~/.local/share}/lhde-w
   <source>/      the raw files of one build exactly as the resource pack has them: system32/ themes/ fonts/ wallpapers/ setup/,
                  source.ini (the rules they were taken with and what lhde-import derives from them)
   local/         files that come from no source: themes/NAME.msstyles (+ NAME/Shell) dropped in with lhde-import --style,
-                 schemes/ (lhde-schemes), resources/NAME/, wallpapers/NAME/, fonts/NAME/ copied by hand or from aap's workspace
+                 schemes/ (lhde-schemes), resources/NAME/, wallpapers/NAME/, fonts/NAME/ copied by hand or from the research workspace (--from-workspace)
   generated/     everything derived: frames/<set>/ (PNGs, manifest.ini, theme.ini of a set we do not ship),
                  packs/<build>/ (PNGs, manifest-*.ini), schemes/*.scheme (from a source's HIVEDEF.INF),
                  aurora/<scene>-<source>.json (the aurora scenes' layer lists, manifest-*.ini).
@@ -107,9 +107,9 @@ def _link(target, link):
     return True
 
 
-# styles dropped in by hand that lhde used to call by another name: old -> new. reindex renames local/themes/OLD.msstyles
-# (and OLD/ with its Shell/) to NEW when NEW is not there, so a tree imported before the rename keeps working; the frame
-# sets made from the old name are made again under the new one by lhde-import --regenerate (docs/USAGE.md "The Aero patches for 4074")
+# styles dropped in by hand under an older name of theirs: OLD -> NEW. reindex renames local/themes/OLD.msstyles (and
+# OLD/ with its Shell/) to NEW when NEW is not there, so a tree that has the style as OLD keeps working; the frame sets
+# made from OLD are made again under NEW by lhde-import --regenerate (docs/USAGE.md "The Aero patches for 4074")
 STYLE_RENAMED = {'aero-patch': 'realaero'}
 
 

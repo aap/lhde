@@ -5,7 +5,7 @@
 - `lhde-import`: fills the Windows tree (`$LHDE_WINDOWS`, else `~/.local/share/lhde-windows`: `<source>/` as in the pack,
   `local/`, `generated/`, `index/`; docs/LAYOUT.md "The three trees") from a pack (`--pack`), or from an ISO, WIM or Windows
   directory (`--iso`, `--wim`, `--dir`: packed into a temporary pack first, the build detected), a dropped-in style (`--style`),
-  aap's workspace (`--from-workspace`); then runs the recipes (frame sets, luxshell's pack images, the aurora scenes) into `generated/` with a
+  a research workspace (`--from-workspace`); then runs the recipes (frame sets, luxshell's pack images, the aurora scenes) into `generated/` with a
   manifest each (`--regenerate` makes all of it again, `--reindex` the symlinks). docs/USAGE.md "Getting the Windows resources".
 - `lhde-schemes` (`lhdeschemes.py`): the classic Appearance schemes from a Windows 2000 / XP / Server 2003 medium's
   `HIVEDEF.INF` (or the ISO) into the Windows tree's `local/schemes/` (looked up as `styles/<scheme>.scheme`); lhde-import runs

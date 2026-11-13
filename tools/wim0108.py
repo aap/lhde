@@ -7,7 +7,7 @@ Run with python -I.  Usage:
   wim0108.py WIM extract IMAGE OUTDIR [PATTERN ...]   (fnmatch on the full path, case-insensitive)
   wim0108.py WIM meta IMAGE OUT          dump the raw decompressed metadata resource
 
-Format as reverse-engineered (see COMPOSITION.md section 20):
+Format:
   header (126 bytes): u32 size 0x7e, u32 version 0x00010801, u32 flags 0x00010003, u32 0,
     reshdr lookup table @0x10, 24 zero bytes @0x31, reshdr XML @0x49, zero pad to 0x7e.
   reshdr (33 bytes): u8 flags (2 metadata, 4 compressed), u56 stored size, u8 0,

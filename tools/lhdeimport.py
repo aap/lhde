@@ -210,7 +210,7 @@ def dib_image(d, premultiplied=None, tcolor=None, rounded=False):
         return im
     pre = premultiplied if premultiplied is not None else bool(alphas - {0, 255})
     if pre:
-        h_ = (lambda a: a // 2) if rounded else (lambda a: 0)   # luxshell's start panels were made with floor, 5048's frames rounded
+        h_ = (lambda a: a // 2) if rounded else (lambda a: 0)   # luxshell's start panels unpremultiply with floor, 5048's frames rounded
         im.putdata([(min(255, (r * 255 + h_(a)) // a), min(255, (g * 255 + h_(a)) // a), min(255, (b * 255 + h_(a)) // a), a) if a else (0, 0, 0, 0)
                     for r, g, b, a in im.getdata()])
     return im
@@ -1250,7 +1250,7 @@ def r_frames_classic(data, target, args):
 
 
 def r_frames_udwm(data, target, args):
-    """5048's glass: uDWM.dll's own BITMAP resources (COMPOSITION.md 14.4/15; 32-bit premultiplied): 1000 the plate (active top
+    """5048's glass: uDWM.dll's own BITMAP resources (32-bit premultiplied): 1000 the plate (active top
     half, inactive bottom), 1002 the maximised plate, 1003 min, 1005 max, 1007 restore, 1009 close, 1011 / 1013 the glows"""
     build = args[0] if args else '5048'
     rel = 'resources/%s/uDWM.dll' % build
@@ -1359,8 +1359,8 @@ def ut_sections(ut, style, color, prefixes):
 
 
 def r_packs_aero5112(data, target, args):
-    """packs/5112/imageres: the Vista 5112 taskbar art of aero.msstyles 5112 under the Aero imageres ids it replaces (was
-    luxshell/shellpack-aero5112.sh): the Start pill (bitmap#502, 3 states) with the flag (explorer.exe icon 7103) and "Start"
+    """packs/5112/imageres: the Vista 5112 taskbar art of aero.msstyles 5112 under the Aero imageres ids it replaces: the
+    Start pill (bitmap#502, 3 states) with the flag (explorer.exe icon 7103) and "Start"
     (Segoe UI 5112), the bar (#298), task buttons (#517) widened, the flash button (#296), the tray background (#528)"""
     from PIL import Image, ImageDraw, ImageFont, ImageFilter
     style, build = args[0], args[1] if len(args) > 1 else '5112'
@@ -1537,7 +1537,7 @@ def regenerate(W, force=True):
 
 
 # the recipes a style dropped in by hand feeds (lhde-import --style NAME, --styles; regenerate): kind, target, spec. realaero is
-# Lucas Brooks' RealAero (lhdetree.AERO_PATCHES: its releases; once called aero-patch, lhdetree.STYLE_RENAMED), the one style
+# Lucas Brooks' RealAero (lhdetree.AERO_PATCHES: its releases; aero-patch is its other name, lhdetree.STYLE_RENAMED), the one style
 # whose frame sets ship (share/frames/realaero, aerovision); every other style with 4074's CompositedWindow parts (an Aero patch
 # under its own name: twiwmtb-aero, ...) gets style_recipes' frame set of its name
 STYLE_RECIPES = {'realaero': [('frames', 'realaero', 'composited realaero'), ('frames', 'aerovision', 'vision realaero')]}

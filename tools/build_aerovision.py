@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Build the caption buttons of the aerovision frame set (docs/NAVBAR.md "Vision caption buttons").
 
-Aero vision's frame decoration ends 15 px below the frame's top edge, right under the caption buttons (aap's todo: "the actual
-frame decoration should end exactly below the 3 buttons, no space below, i count 15 pixels from the top"). The aero sprites
+Aero vision's frame decoration ends 15 px below the frame's top edge, right under the caption buttons, with no space below them.
+The aero sprites
 (close/max/min/restore.png: 4 frames of 14 rows, normal / hot / pressed / inactive) sit at button_top = 2 and so end on frame
 row 15, one row below the plate's pill (plate rows 2..14) and below the 15 px deco. The vision set drops one sprite row per
 frame so the buttons are 13 rows high and end on row 14 with the pill; the widths stay (27 + 25 + 43 = 95 columns fill the
-plate's pill exactly with button_right = 5, aap's tuning of aero), so the only change is the row. Which row is a knob:
+plate's pill exactly with aero's button_right = 5), so the only change is the row. Which row is a knob:
 
     --drop-row N   sprite row removed from every frame (default 11: the light inner line above the dark bottom line; the glyphs
                    and the glossy top half are untouched; 0..13)
@@ -15,7 +15,7 @@ Output: vision_close.png, vision_max.png, vision_min.png, vision_restore.png in 
 named close.png etc. on purpose: those names are replaced by the style's CompositedWindow streams when luxwm reads the msstyles
 through libuxtheme (frame_ut.c wm_fut_png); theme.ini names them with `button_files`.
 
-The concept art (lh_concepts/1456384117.or.45878.png) shows a pill about 13 px high hanging from the top edge with three
+The Longhorn concept art shows a pill about 13 px high hanging from the top edge with three
 buttons of about 26/25/37 px; ours keep aero's 27/25/43 because the pill is baked into the plate texture at that width.
 
 usage: python3 -I build_aerovision.py [--drop-row N] AERO_DIR OUT_DIR

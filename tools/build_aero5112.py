@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the aero5112 frame set from the DWMWindow class of the Vista 5112 aero.msstyles (COMPOSITION.md 21).
+"""Build the aero5112 frame set from the DWMWindow class of the Vista 5112 aero.msstyles.
 5112 has no frame bitmaps in uDWM.dll: uDWM reads the frame through GetThemeStream from DWMWindow parts whose DISKSTREAM
 property names an RT 'STREAM' PNG (straight alpha, IMAGECOUNT states stacked vertically). The frame is piecewise (top / left /
 right / bottom, DWMGlass:: or DWMMetal:: variant); luxwm wants one nine-sliced plate per state, so the pieces are composed into an

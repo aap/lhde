@@ -27,9 +27,9 @@ SIZINGBORDERWIDTH (system default 1 when absent), CAPTIONFONT, CAPTIONTEXT/INACT
 Window.<PART> sections (IMAGECOUNT, IMAGELAYOUT, SIZINGMARGINS, SIZINGTYPE, CAPTIONMARGINS, CONTENTALIGNMENT,
 TEXTSHADOW*), with uxtheme's lookup order state section -> part section -> [Window] -> [globals].
 
-Bitmaps are RT_BITMAP DIBs with a BMP file header. uxtheme's rules (imagefile.cpp): a 32-bit image with any
+Bitmaps are RT_BITMAP DIBs with a BMP file header. uxtheme's rules: a 32-bit image with any
 alpha value outside {0,255} is premultiplied ARGB (un-premultiplied here, PNG is straight alpha); otherwise its
-alpha is used as a 1-bit mask when it holds both 0 and 255 (Longhorn; XP ignored it) and otherwise, when the part is TRANSPARENT, TRANSPARENTCOLOR (default magenta) becomes transparent.
+alpha is used as a 1-bit mask when it holds both 0 and 255 (Longhorn; XP ignores it) and otherwise, when the part is TRANSPARENT, TRANSPARENTCOLOR (default magenta) becomes transparent.
 """
 import io
 import os
@@ -70,8 +70,8 @@ def parse_ini(path, text=None, xp=False):
             k, v = k.strip().upper(), v.strip()
             if xp and not k.endswith('FONT'):
                 v = ' '.join(v.replace(',', ' ').split())
-            # a property given twice: the first one counts (XP uxtheme render.cpp GetValueIndex returns the first match of the
-            # packed list, which the parser fills in source order; Wine's MSSTYLES_AddProperty keeps the first; libuxtheme too).
+            # a property given twice: the first one counts (XP's uxtheme takes the first in source order; so do Wine's
+            # uxtheme and libuxtheme).
             # Luna's [Window.MaxCaption] says SizingType = stretch, then Tile: stretch
             cur.setdefault(k, v)
     return secs
@@ -124,8 +124,8 @@ def load_dib(path, transparent, tcolor=(255, 0, 255), data=None, xp_alpha=False)
         alpha = buf[3::4]
         partial = any(0 < a < 255 for a in alpha)
         # Longhorn's uxtheme also honours 0/255-only alpha (the 4074 glyph strips are black where alpha is 0 and
-        # contain no magenta; the caption's rounded corners are alpha 0), unlike XP which ignored it
-        binary = not partial and 0 in alpha and 255 in alpha and not xp_alpha   # XP (imagefile.cpp): such alpha is ignored
+        # contain no magenta; the caption's rounded corners are alpha 0), unlike XP, which ignores it
+        binary = not partial and 0 in alpha and 255 in alpha and not xp_alpha   # XP ignores such alpha
         im = Image.frombuffer('RGBA', (w, abs(h)), buf, 'raw', 'BGRA', 0, 1).copy()
         px = im.load()
         for y in range(im.height):
