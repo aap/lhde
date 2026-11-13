@@ -4766,7 +4766,7 @@ static unsigned keycode_modmask(KeyCode kc) {
     XFreeModifiermap(mm);
     return m;
 }
-/* XP's IsAltTabWindow in EWMH terms: a normal or dialog window (no type counts as normal), not _NET_WM_STATE_SKIP_TASKBAR or
+/* XP's Alt+Tab rule in EWMH terms: a normal or dialog window (no type counts as normal), not _NET_WM_STATE_SKIP_TASKBAR or
    _SKIP_PAGER (WS_EX_TOOLWINDOW) */
 static bool cycle_listed(struct client *c) {
     Atom ty; int fmt; unsigned long n = 0, after; unsigned char *d = NULL; bool ok = true;
@@ -4817,7 +4817,7 @@ static void cycle_run(XKeyEvent *kev, unsigned mods, bool reverse) {
     Window cand[256]; int n = cycle_candidates(cand, 256);
     if (!n) return;
     unsigned need = mods & ~(unsigned)ShiftMask;
-    if (n == 1) {   /* one window: switched to at once, no switcher (appswitch.c ProcessHotKey) */
+    if (n == 1) {   /* one window: switched to at once, no switcher */
         struct client *c = get_client_from_window(cand[0]);
         if (c && c->window == cand[0]) client_manage_focus(c);
         if (need & Mod4Mask) super_down = false;

@@ -7,7 +7,7 @@
 #include <X11/Xlib.h>
 #include "frame.h"
 
-/* the layout: ReactOS user32 controls/appswitch.c (its CoolSwitch defaults and constants; not measured on XP) */
+/* the layout: CoolSwitch's defaults and constants (not checked against XP's pixels) */
 enum { SWITCH_COLS = 7, SWITCH_ROWS = 3,       /* CoolSwitchColumns, CoolSwitchRows */
        SWITCH_ICON = 32, SWITCH_ICON_MARGIN = 4, SWITCH_ITEM_MARGIN = 4, SWITCH_MARGIN = 8, SWITCH_TEXT_MARGIN = 4,
        SWITCH_CELL = SWITCH_ICON + 2 * SWITCH_ICON_MARGIN + 2 * SWITCH_ITEM_MARGIN,   /* CX_ITEM_SPACE: 48 */

@@ -1,7 +1,6 @@
-/* luxwm: the Alt+Tab task switcher window (switcher.h; docs/LUXWM.md "Task switcher"). The layout and the drawing follow ReactOS's
-   user32 controls/appswitch.c (OnPaint, PrepareWindow, the CoolSwitch window styles), which reimplements XP's user32 switcher:
-   the client area is COLOR_3DFACE; each entry is a 40 x 40 item (the 32 px icon and 4 px around it) in a 48 px cell, 8 px from the
-   edge; the selected item gets two 1 px rectangles in COLOR_HIGHLIGHT; fewer entries than columns are centred; below the grid
+/* luxwm: the Alt+Tab task switcher window (switcher.h; docs/LUXWM.md "Task switcher"). The layout and the drawing are those of a
+   reimplementation of XP's user32 switcher (CoolSwitch), not checked against XP's pixels: the client area is COLOR_3DFACE;
+   each entry is a 40 x 40 item (the 32 px icon and 4 px around it) in a 48 px cell, 8 px from the edge; the selected item gets two 1 px rectangles in COLOR_HIGHLIGHT; fewer entries than columns are centred; below the grid
    the selected window's title in a pushed push button (DrawFrameControl DFCS_BUTTONPUSH | DFCS_PUSHED), centred, one line,
    end ellipsis, COLOR_BTNTEXT, as tall as the font plus 4 px above and below; the window has WS_EX_DLGMODALFRAME, a 3 px dialog
    frame (EDGE_RAISED and one row of COLOR_3DFACE). More entries than 7 x 3: the grid shows the last 21 up to the selection. */
@@ -16,7 +15,7 @@
 #include <cairo/cairo-xlib.h>
 #include <wuxtheme/ut.h>
 
-#define DT_SWITCH 0x8825   /* DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS (appswitch.c), and DT_NOPREFIX: a title's '&' is text */
+#define DT_SWITCH 0x8825   /* DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS, and DT_NOPREFIX: a title's '&' is text */
 
 struct wm_switcher {
     struct wm_switcher_env env;
@@ -47,7 +46,7 @@ static void layout(int n, struct lay *L) {
 }
 void wm_switcher_size(int n, int *w, int *h) { struct lay L; layout(n, &L); *w = L.cw + 2 * SWITCH_FRAME; *h = L.ch + 2 * SWITCH_FRAME; }
 
-/* the first entry shown: the grid scrolls so that the selection is its last item when it lies past it (appswitch.c nShift) */
+/* the first entry shown: the grid scrolls so that the selection is its last item when it lies past it */
 static int shift_of(int sel, int shown) { return sel >= shown ? sel - shown + 1 : 0; }
 /* the top left of shown item i (window coordinates: the frame included) */
 static void item_pos(const struct lay *L, int i, int *x, int *y) {
@@ -143,7 +142,7 @@ struct wm_switcher *wm_switcher_open(const struct wm_switcher_env *e, const stru
         s->items[i].window = items[i].window;
     }
     wm_switcher_size(n, &s->W, &s->H);
-    /* centred on the monitor (ResizeAndCenter: the client area centred, the frame around it) */
+    /* centred on the monitor (the client area centred, the frame around it) */
     int x = e->bx + (e->bw - s->W) / 2, y = e->by + (e->bh - s->H) / 2;
     Display *d = e->dpy;
     s->back = XCreatePixmap(d, e->root, s->W, s->H, DefaultDepth(d, e->screen));

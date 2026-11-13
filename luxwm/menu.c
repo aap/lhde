@@ -315,8 +315,8 @@ static int popup(const struct wm_menu_env *e, int x, int y, const struct wm_menu
                 if (parent) result = SUB_ALL;   /* elsewhere the whole menu goes */
                 bool on_icon = e->dbl_w > 0 && rx >= e->dbl_x && rx < e->dbl_x + e->dbl_w && ry >= e->dbl_y && ry < e->dbl_y + e->dbl_h;
                 if (on_icon && !parent && ms_now() - t0 < e->dbl_ms) result = WMMENU_DBLCLICK;
-                /* a click outside ends the menu and goes on to the window under the pointer (XP's menu loop: "terminate
-                   menus, and let button pass through"), luxwm's own frames included; the caption icon that opened the menu
+                /* a click outside ends the menu and goes on to the window under the pointer (XP's menus end and let
+                   the button pass through), luxwm's own frames included; the caption icon that opened the menu
                    is the menu's own button (XP's system menu button): it only closes it (or, double-clicked, the window) */
                 XAllowEvents(dpy, on_icon ? SyncPointer : ReplayPointer, CurrentTime);
                 if (!on_icon) replayed = true;
