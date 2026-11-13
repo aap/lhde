@@ -1,19 +1,19 @@
 /* aurorademo: Longhorn's two "Aurora" effects, played from their original numbers (build/examples/aurora_data.h):
    the Explorer preview-pane aurora "APPA" (jade.msstyles STREAM 481, 4074/4082) recoloured for a folder type over the pane's
-   band gradient, and the desktop aurora (desktopaurora.baml, MILDesktop=1). Spec: aurora.md in the research workspace.
+   band gradient, and the desktop aurora (desktopaurora.baml, MILDesktop=1).
    build: make examples (build/examples/aurorademo). The tables are read from the user's Windows tree: lhde-import's [aurora]
    recipes (share/sources/4074.ini) write generated/aurora/{previewpane,desktop}-4074.json, make turns them into the header
    (tools/lhdeaurora.py); a scene not imported is left out and asking for it says so.
    usage: aurorademo [pane [FOLDER] | desktop] [-s SPEED] [-w WxH] [-f] [-t SECONDS] [-j THREADS] [-b FRAMES]
      pane     1000x148 (the aurora cell of a ~1000 px Explorer pane); FOLDER document music picture video contact message game
-              default (default: picture). The 1080x160 scene is stretched non-uniformly to the window, as Explorer did.
+              default (default: picture). The 1080x160 scene is stretched non-uniformly to the window, as Explorer does.
      desktop  800x600, the 800x600 scene stretched to the window
      -s speed (1 = original timing)  -w window size  -f root-sized  -t start at this scene time
      -j render threads (horizontal bands; default one per CPU, at most 16)
      -b render FRAMES offscreen, print ms/frame and exit (AURORADEMO_PNG=FILE saves the last frame)
      keys: f cycles the folder type, q / Escape quit
    Rendering: source-over alpha only, as the original. Gradients are linear in the path's bounding box (isolines
-   perpendicular in bbox space for the pane, in path space for the desktop: aurora.md 3.3), every animation is evaluated from one monotonic clock, opacity groups are composited as
+   perpendicular in bbox space for the pane, in path space for the desktop), every animation is evaluated from one monotonic clock, opacity groups are composited as
    layers (cairo_push_group). The desktop's watermark text is not drawn. */
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -40,7 +40,7 @@
 #define DESKTOP_SCENE (&desktop_scene)
 #endif
 
-/* Aurora.c_rgColorMap by ShellView.FolderType, and the pane band (edge, centre, edge) behind it (taskpane/managed.md) */
+/* the aurora colour per folder type, and the pane band (edge, centre, edge) behind it */
 static const struct folder { const char *name; unsigned aurora, edge, centre; } folders[] = {
     {"document", 0x5190DA, 0x24438E, 0x5573BB}, {"music", 0xDA5151, 0x741414, 0xD84848},
     {"picture", 0x6F4970, 0x260827, 0x69466A},  {"video", 0x6F4970, 0x260827, 0x69466A},
@@ -68,7 +68,7 @@ static cairo_pattern_t *paint(const struct au_paint *p, const double *bb, unsign
     cairo_matrix_t B = {bb[2], 0, 0, bb[3], bb[0], bb[1]}, G = {p->gt[0], p->gt[1], p->gt[2], p->gt[3], p->gt[4], p->gt[5]}, A;
     cairo_matrix_multiply(&A, &G, &B);
     double x0 = p->sx, y0 = p->sy, vx = p->ex - p->sx, vy = p->ey - p->sy, vv = vx * vx + vy * vy;
-    if (p->pathspace) {   /* [gradient-space fix] desktop: start/end scaled into the bbox, isolines perpendicular in path space */
+    if (p->pathspace) {   /* desktop: start/end scaled into the bbox, isolines perpendicular in path space */
         double x1 = p->ex, y1 = p->ey;
         cairo_matrix_transform_point(&A, &x0, &y0); cairo_matrix_transform_point(&A, &x1, &y1);
         if ((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0) < 1e-12) return NULL;
@@ -86,7 +86,7 @@ static cairo_pattern_t *paint(const struct au_paint *p, const double *bb, unsign
     cairo_pattern_t *pat = cairo_pattern_create_linear(x0, y0, x0 + gx / gg, y0 + gy / gg);
     for (int i = 0; i < p->nstops; i++) {
         unsigned c = p->stops[i].argb;
-        if (tint && (c & 0xFFFFFF) == 0x5190DA) c = (c & 0xFF000000) | tint;   /* Aurora._AdjustAurora: hue swap, alpha kept */
+        if (tint && (c & 0xFFFFFF) == 0x5190DA) c = (c & 0xFF000000) | tint;   /* the folder type's hue swap, alpha kept */
         cairo_pattern_add_color_stop_rgba(pat, p->stops[i].off, (c >> 16 & 255) / 255., (c >> 8 & 255) / 255., (c & 255) / 255.,
                                           (c >> 24) / 255. * alpha);
     }

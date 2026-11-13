@@ -26,7 +26,7 @@
 
    -n: _LHWM_FRAME_FLAGS NO_HEADER_PIXMAP (16): without composition luxwm publishes no _LHWM_HEADER_PIXMAP and we draw the header
    gradient ourselves (flxp draws its own navbar for Slate/Jade). The key n toggles the flag live (luxwm frees the pixmap and
-   deletes the property when it is set, renders one again when it is cleared). With -c the caption buttons were part of that
+   deletes the property when it is set, renders one again when it is cleared). With -c the caption buttons are part of that
    pixmap; without it they are only on luxwm's decoration window, so we cut _LHWM_CAPTION_RECT out of our bounding shape as well
    (not only the input shape) and they show through.
 
