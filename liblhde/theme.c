@@ -646,8 +646,8 @@ static void choose_style(lhde_theme *t, lhde_style_info *si)
         if (!si->broken) return;
         snprintf(broken, sizeof broken, "%s", si->broken_why);   /* XP refuses such a style: so do we */
     }
-    /* luna: the builds' Luna when XP's is not imported; aero-patch: RealAero's old name (lhde-import renames the file, an
-       older theme file still says aero-patch: lhdetree.STYLE_RENAMED) */
+    /* luna: the builds' Luna when XP's is not imported; aero-patch: RealAero's other name (lhde-import imports the file as
+       realaero, a theme file may still say aero-patch: lhdetree.STYLE_RENAMED) */
     static const char *const alt[][3] = { { "luna", "luna4051", "luna4074" }, { "luna-xp", "luna", "luna4051" },
                                           { "aero-patch", "realaero", NULL }, { NULL, NULL, NULL } };
     for (int i = 0; alt[i][0]; i++) {
