@@ -8,6 +8,7 @@
 D=${1:-:75}
 TOP=$(cd "$(dirname "$0")/../.." && pwd)
 B=$TOP/build/bin/luxattr
+. "$(dirname "$0")/xattrs.sh"   # getfattr / setfattr over extattr where attr is not installed (FreeBSD)
 for t in Xvfb xdotool getfattr setfattr; do command -v $t >/dev/null 2>&1 || { echo "skip: needs $t"; exit 0; }; done
 T=$(mktemp -d)
 mkdir -p $T/home/.config $T/files $T/bare

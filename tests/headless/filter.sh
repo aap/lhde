@@ -9,6 +9,7 @@
 D=${1:-:74}
 TOP=$(cd "$(dirname "$0")/../.." && pwd)
 B=$TOP/build/bin/flxp
+. "$(dirname "$0")/xattrs.sh"   # getfattr / setfattr over extattr where attr is not installed (FreeBSD)
 for t in Xvfb xdotool setfattr; do command -v $t >/dev/null 2>&1 || { echo "skip: needs $t"; exit 0; }; done
 styles=$("$TOP/build/bin/lhde-theme" find styles 2>/dev/null)   # the user's (or LHDE_WINDOWS's) tree, before the scratch home
 [ -f "$styles/jade4074.msstyles" ] || { echo "skip: no jade4074 style imported"; exit 0; }
