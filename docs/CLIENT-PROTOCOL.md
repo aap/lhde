@@ -33,6 +33,7 @@ the client needs to know only *where* the glass is, not how it is drawn.
 | `_LHWM_DESKTOP_LAYER` | desktop window | client | CARDINAL | "Desktop windows" |
 | `_LH_DROP_SHADOW` | override-redirect window | client | CARDINAL | "Drop shadows" |
 | `_LHWM_SWITCHER` | luxwm's Alt+Tab switcher window | luxwm | CARDINAL[4] | "The task switcher window" |
+| `_MOTIF_WM_HINTS` | client toplevel | client | 5 x CARDINAL | the functions decide the caption buttons ("What the client does"); decorations 0: no frame |
 | `_NET_FRAME_EXTENTS` | client toplevel | luxwm | CARDINAL[4] | the real frame margins outside the client; an extension (inside the client) does not change them |
 | `_LHWM_COMPOSITED` | root | luxwm | CARDINAL 0/1 | "Root properties" |
 | `_LHWM_THEME` | root | luxwm | STRING | "Root properties" |
@@ -264,7 +265,11 @@ slate4074, jade4074, the luna and basic* themes, classic) keep `_LHWM_COMPOSITED
 1. Create the toplevel with a 32-bit TrueColor visual and its own colormap (`XMatchVisualInfo(..., 32, TrueColor, ...)`,
    `CWColormap|CWBorderPixel|CWBackPixel` as in `examples/extendframe.c`).
 2. Set `_LHWM_EXTEND_FRAME` (e.g. `0 0 60 0`) and `_LHWM_FRAME_FLAGS` (`NO_TITLE`) before mapping; normal WM hints otherwise
-   (`WM_NAME`, `_NET_WM_ICON`, `WM_NORMAL_HINTS`, ...).
+   (`WM_NAME`, `_NET_WM_ICON`, `WM_NORMAL_HINTS`, ...). The caption buttons follow `_MOTIF_WM_HINTS`' functions (flags bit 0,
+   `MWM_HINTS_FUNCTIONS`; `MWM_FUNC_MINIMIZE` 8, `MWM_FUNC_MAXIMIZE` 16), as Windows' follow `WS_MINIMIZEBOX` and `WS_MAXIMIZEBOX`:
+   neither, Close alone (wux writes `MOVE | CLOSE`, 0x24, for a message box or a property sheet, 0x26 with `RESIZE`); one missing, that
+   one disabled (a minimise button that does nothing, docs/LUXWM.md "Caption buttons"); a fixed size (`WM_NORMAL_HINTS` min == max) also
+   disables maximise. wux writes no property for a window with all three of `WS_THICKFRAME`, `WS_MINIMIZEBOX` and `WS_MAXIMIZEBOX`.
 3. Paint: clear the header to transparent black and draw the content on top with proper alpha (OVER); the rest opaque. When
    `_LHWM_COMPOSITED` is 0, paint the header opaque: `_LHWM_HEADER_PIXMAP` under the content, or a gradient of its own when there is
    none (another WM).

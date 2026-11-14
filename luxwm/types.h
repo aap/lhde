@@ -52,6 +52,8 @@ struct client {
        aspect as h/w minimum (min_a) and w/h maximum (max_a), 0: none */
     int base_w, base_h, inc_w, inc_h, min_w, min_h, max_w, max_h;
     float min_a, max_a;
+    unsigned mwm_funcs;                 /* _MOTIF_WM_HINTS functions in effect (MWM_FUNC_*; all of them without the hint), read at map and on
+                                           PropertyNotify (docs/LUXWM.md "Size hints", "Caption buttons") */
     long fext[4];                       /* _NET_FRAME_EXTENTS last written (fext_set) */
     bool fext_set;
 };

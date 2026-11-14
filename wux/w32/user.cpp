@@ -1142,11 +1142,27 @@ BOOL WINAPI PeekMessageA(MSG* out, HWND h, UINT min, UINT max, UINT flags) { ret
 BOOL WINAPI TranslateMessage(const MSG* msg)
 {
     if (!msg || (msg->message != WM_KEYDOWN && msg->message != WM_SYSKEYDOWN)) return FALSE;
+    const win::Message* found = nullptr;
     for (auto it = g_recent.rbegin(); it != g_recent.rend(); ++it) {
-        if (hwnd_of(it->w) == msg->hwnd && it->msg == msg->message && it->wp == msg->wParam && it->time == msg->time)
-            return win::translate_message(*it) ? TRUE : FALSE;
+        if (hwnd_of(it->w) == msg->hwnd && it->msg == msg->message && it->wp == msg->wParam && it->time == msg->time) {
+            found = &*it;
+            break;
+        }
     }
-    return FALSE;
+    if (found && found->text[0]) return win::translate_message(*found) ? TRUE : FALSE;
+    // a key message without the X key's text (posted, as user32's menu code posts VK_RETURN to drop the popup an
+    // Alt+mnemonic chose): the keys whose character does not depend on the layout get it, as ToUnicode gives them
+    char c = msg->wParam == VK_RETURN ? '\r' : msg->wParam == VK_ESCAPE ? 0x1b : msg->wParam == VK_BACK ? 0x08
+           : msg->wParam == VK_TAB ? '\t' : msg->wParam == VK_SPACE ? ' ' : 0;
+    if (!c || (GetKeyState(VK_CONTROL) & 0x8000)) return FALSE;
+    win::Message m;
+    memset(&m, 0, sizeof m);
+    m.w = window_of(msg->hwnd);
+    if (!m.w) return FALSE;
+    m.msg = msg->message; m.wp = msg->wParam; m.lp = msg->lParam; m.time = msg->time;
+    m.pt = gdi::Point{msg->pt.x, msg->pt.y};
+    m.text[0] = c;
+    return win::translate_message(m) ? TRUE : FALSE;
 }
 
 LRESULT WINAPI DispatchMessageW(const MSG* msg)

@@ -14,3 +14,7 @@
 
 * Alt+Tab switcher: its geometry is ReactOS appswitch.c's (48 px cells, 8 px margins, the title box font height + 8), not measured;
   take a VM screenshot of XP's and of 4074's switcher (classic and Luna/Jade, 3 and 9 windows) and compare (docs/LUXWM.md "Task switcher")
+* luxwm has no help button (?) for a window with WS_EX_CONTEXTHELP (XP's property sheets and Display Properties show it beside
+	Close) and draws no disabled min button for a window with maximize but not minimize
+* a message box and a property sheet show an icon in luxwm's caption (the program's, else the theme's default); XP's have none
+  (WS_EX_DLGMODALFRAME / DS_MODALFRAME): wux would have to say so (no _NET_WM_ICON is not enough, luxwm then draws its default)

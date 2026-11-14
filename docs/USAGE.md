@@ -657,6 +657,25 @@ whose `Explorer.chrome` is auto, the 4051 or 4074 header at its Small size (the 
 says longhorn, and the XP chrome for the vision header; it follows luxwm starting, stopping or crashing within a few seconds
 (docs/CLIENT-PROTOCOL.md "Without luxwm").
 
+## The Open and Save dialog (flxp-filedialog)
+
+lhde's programs and, through the xdg-desktop-portal backend `flxp-portal`, other programs' file choosers show XP's Open and
+Save dialog (or the Longhorn one under a Longhorn theme). The File name box takes what is typed as it is: it does not complete
+the name inline (XP's AutoComplete only suggests unless "Use inline AutoComplete" is on, and it is off by default), so
+`python3` and Enter in a folder that also holds `python3-config` opens `python3`. A name with `*` or `?` filters the list,
+a folder's name (or a path ending in `/`) goes there, quoted names choose several files.
+
+## Show in Folder (org.freedesktop.FileManager1)
+
+Firefox's and Chromium's "Show in Folder", and other programs that show a file in the file manager, ask the session bus for
+`org.freedesktop.FileManager1`. flxp-desktop owns the name while it runs; ShowItems opens each item's folder in an Explorer
+window with the item selected (`flxp --select ITEM`, one window per folder), ShowFolders opens the folders (`flxp DIR...`),
+ShowItemProperties shows the items' Properties sheet on General (`flxp --properties ITEM...`). Without a session, the bus
+starts `flxp-desktop --filemanager1` from the service file `make install` puts in `DBUSSERVICEDIR`: the same service with no
+desktop, which leaves after five idle minutes or when a starting flxp-desktop takes the name over. The bus starts it with its
+own environment, so `DISPLAY` must be in it (`dbus-update-activation-environment DISPLAY`; the bus lhde-session starts has it). Another
+file manager that already owns the name keeps it (flxp-desktop says so on stderr); `FLXP_FM1_DEBUG=1` logs every request.
+
 ## The Explorer's views (flxp)
 
 In the Longhorn frame (and the Longhorn file dialog) the Explorer's list has build 4074's three views, each at an image size:

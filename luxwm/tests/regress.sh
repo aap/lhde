@@ -18,6 +18,7 @@
 #   ext60.png      FRAMETEST_EXT="0 0 60 0"   (extendframe's header; caption band continued by 60 rows)
 #   ext46.png      FRAMETEST_EXT="0 0 46 1"   (the 4074 Explorer header: 27 + 46 = 73 rows, NO_TITLE), focused
 #   ext46u.png     the same, inactive         ext46max.png    the same, maximised
+#   closeonly.png  FRAMETEST_EXT="0 0 0 0 131072" (FRAME_CLOSE_ONLY), 480x200, focused, the pointer over Close
 #   vision49.png, vision49max.png  only for frame sets with header_mode = crop (aerovision): FRAMETEST_EXT="0 0 22 0 9"
 #   classic/ classic.xl/ classic.hc/  Windows Classic frames (style = classic): the built-in Windows Standard scheme, its Extra
 #                  Large Fonts metrics, High Contrast colours with a 6 px border (specs "|classic|KEY=VALUE;...")
@@ -77,6 +78,8 @@ render_one() { # SPEC OUTDIR [vision]
 	FRAMETEST_EXT="0 0 46 0 1" "$ft" "$1" "$2/ext46.png"  640 480 "Frame test window" 1   > "$2/ext46.txt"
 	FRAMETEST_EXT="0 0 46 0 1" "$ft" "$1" "$2/ext46u.png" 640 480 "Frame test window" 0   > "$2/ext46u.txt"
 	FRAMETEST_EXT="0 0 46 0 1" "$ft" "$1" "$2/ext46max.png" 640 480 "Frame test window" 1 1 > "$2/ext46max.txt"
+	# Close the only caption button (FRAME_CLOSE_ONLY: a message box, a property sheet), focused with the pointer over it
+	FRAMETEST_EXT="0 0 0 0 131072" "$ft" "$1" "$2/closeonly.png" 480 200 "Frame test window" 1 0 close > "$2/closeonly.txt"
 	# vision frame sets (header_mode = crop): the navdemo header, 15 + 30 + 2 = 47 glass rows and the line pair (H = 27 + 22 = 49),
 	# CLIENT_CAPTION | NO_TITLE (9), focused and maximised
 	if [ "$3" = vision ]; then

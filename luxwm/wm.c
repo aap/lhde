@@ -502,6 +502,30 @@ client_fixed(const struct client *c)
     return c->max_w > 0 && c->max_h > 0 && c->min_w == c->max_w && c->min_h == c->max_h;
 }
 
+/* _MOTIF_WM_HINTS functions (MWM_HINTS_FUNCTIONS, the hint's first flag): the bits a window allows; with MWM_FUNC_ALL set the
+   bits listed are the ones it does not. No hint (or no functions flag): all of them. */
+enum { MWM_FUNC_ALL = 1, MWM_FUNC_RESIZE = 2, MWM_FUNC_MOVE = 4, MWM_FUNC_MINIMIZE = 8, MWM_FUNC_MAXIMIZE = 16, MWM_FUNC_CLOSE = 32 };
+#define MWM_FUNCS (MWM_FUNC_RESIZE | MWM_FUNC_MOVE | MWM_FUNC_MINIMIZE | MWM_FUNC_MAXIMIZE | MWM_FUNC_CLOSE)
+static unsigned
+read_mwm_funcs(Window w)
+{
+    Atom mwm = XInternAtom(display, "_MOTIF_WM_HINTS", False), ty; int fmt; unsigned long n, after; unsigned char *d = NULL;
+    unsigned f = MWM_FUNCS;
+    if (XGetWindowProperty(display, w, mwm, 0, 5, False, mwm, &ty, &fmt, &n, &after, &d) == Success && d) {
+        long *h = (long *)d;
+        if (n >= 2 && fmt == 32 && (h[0] & 1)) f = (h[1] & MWM_FUNC_ALL) ? MWM_FUNCS & ~(unsigned)h[1] : (unsigned)h[1] & MWM_FUNCS;
+        XFree(d);
+    }
+    return f;
+}
+
+/* the caption buttons a window has, as Windows draws them from WS_MINIMIZEBOX and WS_MAXIMIZEBOX (wux's _MOTIF_WM_HINTS carry
+   them): neither function, Close alone (a message box, a property sheet); one of them, both buttons with the other disabled;
+   maximise also not for a window whose size hints fix its size */
+static bool client_no_max(const struct client *c) { return client_fixed(c) || !(c->mwm_funcs & MWM_FUNC_MAXIMIZE); }
+static bool client_no_min(const struct client *c) { return !(c->mwm_funcs & MWM_FUNC_MINIMIZE); }
+static bool client_close_only(const struct client *c) { return !(c->mwm_funcs & (MWM_FUNC_MINIMIZE | MWM_FUNC_MAXIMIZE)); }
+
 static void
 draw_text(struct client *c, bool focused)
 {
@@ -510,7 +534,8 @@ draw_text(struct client *c, bool focused)
     bool comp = compositor && theme.mode == THEME_DWM, cc = (c->ext_flags & FRAME_CLIENT_CAPTION) != 0;
     unsigned pf = (unsigned)c->ext_flags & ~(unsigned)FRAME_NO_HEADER_PIXMAP;   /* the painter's flags (NO_HEADER_PIXMAP is header_update's) */
     unsigned flags = pf | (cc ? FRAME_NO_TITLE | FRAME_NO_ICON : 0);   /* CLIENT_CAPTION: title and icon are the client's */
-    if (client_fixed(c)) flags |= FRAME_MAX_DISABLED;
+    if (client_close_only(c)) flags |= FRAME_CLOSE_ONLY;
+    else if (client_no_max(c)) flags |= FRAME_MAX_DISABLED;
     /* extended frame: only while composited (glass); in client pixels, clamped to the client */
     if ((c->has_ext || pf) && comp) {
         int l, r, t, b; margins(c, &l, &r, &t, &b);
@@ -525,10 +550,10 @@ draw_text(struct client *c, bool focused)
         }
         /* CLIENT_CAPTION: the client starts above the normal caption bottom (t < nt); the plate's band is measured from there */
         if (!ext.sheet) ext.t = MAX(ext.t + t - nt, 0);
-    } else if (!comp && (flags & (FRAME_NO_TITLE | FRAME_NO_ICON | FRAME_MAX_DISABLED))) {   /* msstyles: NO_TITLE / NO_ICON only, a normal frame otherwise */
-        memset(&ext, 0, sizeof ext); ext.flags = flags & (FRAME_NO_TITLE | FRAME_NO_ICON | FRAME_MAX_DISABLED); e = &ext;
-    } else if (flags & FRAME_MAX_DISABLED) {   /* glass without an extension: only the disabled maximise */
-        memset(&ext, 0, sizeof ext); ext.flags = FRAME_MAX_DISABLED; e = &ext;
+    } else if (!comp && (flags & (FRAME_NO_TITLE | FRAME_NO_ICON | FRAME_MAX_DISABLED | FRAME_CLOSE_ONLY))) {   /* msstyles: NO_TITLE / NO_ICON only, a normal frame otherwise */
+        memset(&ext, 0, sizeof ext); ext.flags = flags & (FRAME_NO_TITLE | FRAME_NO_ICON | FRAME_MAX_DISABLED | FRAME_CLOSE_ONLY); e = &ext;
+    } else if (flags & (FRAME_MAX_DISABLED | FRAME_CLOSE_ONLY)) {   /* glass without an extension: only the buttons' flags */
+        memset(&ext, 0, sizeof ext); ext.flags = flags & (FRAME_MAX_DISABLED | FRAME_CLOSE_ONLY); e = &ext;
     }
     /* an opaque client hides the plate under it: that part is neither painted nor uploaded (LUXWM.md "Performance") */
     /* the client's rectangle: the hinted size, which may leave part of the frame's client area free (LUXWM.md "Size hints") */
@@ -1384,6 +1409,11 @@ handle_property_notify(XEvent *e)
         if (ip != c->icon_pm || im != c->icon_mask) { c->icon_pm = ip; c->icon_mask = im; client_set_icon(c); draw_text(c, client_active(c)); }
         return;
     }
+    if (ev->atom == XInternAtom(display, "_MOTIF_WM_HINTS", False)) {   /* the caption buttons follow the functions */
+        unsigned f = read_mwm_funcs(c->window);
+        if (f != c->mwm_funcs) { c->mwm_funcs = f; draw_text(c, client_active(c)); }
+        return;
+    }
     if (ev->atom == XA_WM_NORMAL_HINTS) {   /* set, changed or deleted: re-read and refit (LUXWM.md "Size hints") */
         client_read_hints(c);
         if (c->fullscreen)
@@ -2173,6 +2203,7 @@ manage_new_window(Window w, XWindowAttributes *wa)
     XSelectInput(display, w, PropertyChangeMask);
     client_read_ext(c);
     client_read_hints(c);   /* WM_NORMAL_HINTS: the size is fitted by the client_refresh below */
+    c->mwm_funcs = read_mwm_funcs(w);
     { int l, r, t, b; margins(c, &l, &r, &t, &b);
       if (!adopting && c->decorated) wm_theme_margins(&theme, &l, &r, &t, &b);   /* new: normal margins, CLIENT_CAPTION then grows the client up into the caption */
       c->geom.x = wa->x;
@@ -2540,7 +2571,7 @@ client_set_restore(struct client *c, int x, int y, int w, int h)
 static void
 client_maximize(struct client *c)
 {
-    if (c->mono || c->fullscreen || client_fixed(c))
+    if (c->mono || c->fullscreen || client_no_max(c))
         return;
     client_set_restore(c, c->hidden ? c->x_hide : c->geom.x, c->geom.y, c->geom.width, c->geom.height);
     if (c->hidden) {   /* minimised: applied by client_show */
@@ -3429,7 +3460,7 @@ snap_target(struct client *c, int hit, int x, int y)
     if (hit == HIT_CAPTION) {
         if (x <= ax) return SNAP_LEFT;
         if (x >= ax + aw - 1) return SNAP_RIGHT;
-        if (y <= ay) return SNAP_MAX;
+        if (y <= ay) return client_no_max(c) ? SNAP_NONE : SNAP_MAX;
         return SNAP_NONE;
     }
     if ((hit == HIT_T && y <= ay) || (hit == HIT_B && y >= ay + ah - 1)) return SNAP_VERT;
@@ -4931,7 +4962,9 @@ static int
 client_hit(struct client *c, int x, int y)
 {
     int hit = wm_frame_hit_ex(&theme, c->geom.width, c->geom.height, x, y, c->mono);
-    if (client_fixed(c) && (hit == HIT_MAX || (hit >= HIT_L && hit <= HIT_BR))) return HIT_NONE;   /* HTBORDER: a fixed frame */
+    if (client_fixed(c) && hit >= HIT_L && hit <= HIT_BR) return HIT_NONE;   /* HTBORDER: a fixed frame */
+    if (client_close_only(c) && (hit == HIT_MAX || hit == HIT_MIN)) return HIT_CAPTION;   /* no button there */
+    if ((hit == HIT_MAX && client_no_max(c)) || (hit == HIT_MIN && client_no_min(c))) return HIT_NONE;   /* a disabled button */
     if (hit == HIT_CAPTION && (c->ext_flags & FRAME_CLIENT_CAPTION) && !c->mono) {
         int l, r, t, b; margins(c, &l, &r, &t, &b);
         if (y < t) {
@@ -5044,7 +5077,8 @@ sysmenu_command(void *arg, int id)
 
 /* open the window menu of c with its top-left corner at x, y (root); flags WMMENU_KEYBOARD / WMMENU_FLIP; button: the button still
    held (0 none); from_icon: a double click on the caption icon closes the window. Greyed as XP greys them: Restore
-   unless maximised; Move, Size and Maximize while maximised; Size for a window whose size hints fix its size; a minimised window
+   unless maximised; Move, Size and Maximize while maximised; Size for a window whose size hints fix its size; Minimize and Maximize
+   without their function (_MOTIF_WM_HINTS), a fixed-size window with Close alone gets the dialog menu (Move, Close); a minimised window
    (the taskbar's menu): Move, Size and Minimize, Restore the default item. Close is the default item otherwise (bold), with its
    accelerator. */
 static void
@@ -5082,7 +5116,13 @@ wm_menu_open(struct client *c, int x, int y, unsigned flags, unsigned button, bo
         e.dbl_x = c->geom.x + ix; e.dbl_y = c->geom.y + iy; e.dbl_w = iw; e.dbl_h = ih; e.dbl_ms = 500;
     }
     LOGP("window menu for 0x%lx at %d,%d%s", w, x, y, flags & WMMENU_KEYBOARD ? " (keyboard)" : "");
-    int r = wm_menu_popup(&e, x, y, it, (int)(sizeof it / sizeof it[0]), flags, button);
+    struct wm_menu_item *items = it; int nitems = (int)(sizeof it / sizeof it[0]);
+    if (client_no_min(c) && !mini) it[3].flags |= WMMENU_DISABLED;
+    if (client_no_max(c)) it[4].flags |= WMMENU_DISABLED;
+    /* a dialog (Close its only button, its size fixed: a message box, a property sheet): XP's dialog menu, Move and Close */
+    struct wm_menu_item dlg[2] = { it[1], it[7] };
+    if (client_close_only(c) && fixed && !mini) { items = dlg; nitems = 2; }
+    int r = wm_menu_popup(&e, x, y, items, nitems, flags, button);
     if (r == WMMENU_DBLCLICK) sysmenu_command(arg, SC_CLOSE_ID);
 }
 

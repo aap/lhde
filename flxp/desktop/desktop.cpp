@@ -37,6 +37,7 @@
 #include "explorer/uiicons.h"
 #include "explorer/verbs.h"
 #include "wallpaper.h"
+#include "filemanager1.h"
 #include "w32/w32.h"
 #include "w32/user.h"
 extern "C" {
@@ -853,6 +854,8 @@ void usage(FILE* f)
         "  --wallpaper FILE          BMP, PNG, JPEG or WebP, until the theme changes (else the theme's Desktop.wallpaper)\n"
         "  --wallpaper-mode MODE     stretch, center, tile, fill or fit\n"
         "  --theme NAME|PATH, --classic   as for flxp\n"
+        "  --filemanager1            only the org.freedesktop.FileManager1 service (Show in Folder), no desktop: what the\n"
+        "                            session bus starts when no flxp-desktop runs\n"
         "  --quit-after MS           close after MS milliseconds (testing)\n");
 }
 
@@ -860,10 +863,10 @@ void usage(FILE* f)
 static bool loop_keys(MSG& msg)
 {
     bool in_list = GetFocus() == g.list;
-    if (in_list && ((msg.message == WM_KEYDOWN && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
+    if (in_list && (((msg.message == WM_SYSKEYDOWN || msg.message == WM_KEYDOWN) && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
                     (msg.message == WM_KEYUP && msg.wParam == VK_APPS))) { context_menu(POINT{ -1, -1 }); return true; }
     if (in_list && msg.message == WM_KEYDOWN && msg.wParam == VK_APPS) return true;
-    if (in_list && msg.message == WM_KEYUP && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) return true;
+    if (in_list && (msg.message == WM_SYSKEYUP || msg.message == WM_KEYUP) && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) return true;
     if (msg.message == WM_KEYDOWN && msg.wParam == VK_F5) { fill(); return true; }
     if (in_list && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000)) {
         if (msg.wParam == 'A') {
@@ -896,6 +899,7 @@ int main(int argc, char** argv)
         else if (a == "--classic") setenv("FLXP_THEME", "classic", 1), unsetenv("FLXP_THEME_FOLLOWED");
 
         else if (a == "--quit-after") quit_ms = atoi(value());
+        else if (a == "--filemanager1") return fm1::run_service(explorer_exe());
         else { fprintf(stderr, "flxp-desktop: unknown option %s\n", a.c_str()); usage(stderr); return 2; }
     }
     shell::write_settings_template();
@@ -929,6 +933,9 @@ int main(int argc, char** argv)
     SetFocus(g.list);
     SetTimer(h, TIMER_WATCH, 2000, nullptr);
     if (quit_ms) SetTimer(h, TIMER_QUIT, (UINT)quit_ms, nullptr);
+    // org.freedesktop.FileManager1, taken from an activated flxp-desktop --filemanager1 (filemanager1.h)
+    int fm1_fd = fm1::start(explorer_exe(), true);
+    if (fm1_fd >= 0) { sys::watch_fd(fm1_fd, [](int, void*) { fm1::handle(); }, nullptr); fm1::handle(); }
 
     fileopui::set_message_filter(loop_keys);   // the same keys while a copy runs
     MSG msg;

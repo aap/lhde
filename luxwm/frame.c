@@ -211,6 +211,7 @@ static void ms_paint(cairo_t *cr, const struct theme *t, int w, int h, const cha
        (8-image XP strips: 4 per frame state; the Longhorn 10-image strips: 5 per frame state, the 5th unused here) */
     int leftmost = W + ox;
     for (int slot = 0; slot < 3; slot++) {
+        if (slot > 0 && ext && (ext->flags & FRAME_CLOSE_ONLY)) break;   /* Close alone, where it always is */
         int part = slot == 0 ? MP_CLOSE : slot == 2 ? MP_MIN : maximized ? MP_RESTORE : MP_MAX;
         const struct mspart *b = &t->ms[part]; if (!b->count) continue;
         int bx, by, bw, bh; ms_btn_rect(t, w, slot, maximized, &bx, &by, &bw, &bh); leftmost = bx;
@@ -518,6 +519,7 @@ static void classic_paint(cairo_t *cr, const struct theme *t, int w, int h, cons
     /* buttons (DrawFrameControl DFC_CAPTION) */
     int leftmost = x + fw;
     for (int slot = 0; slot < 3; slot++) {
+        if (slot > 0 && ext && (ext->flags & FRAME_CLOSE_ONLY)) break;   /* Close alone, where it always is */
         int bx, by, bw, bh; cl_btn_rect(t, w, slot, maximized, &bx, &by, &bw, &bh);
         bx -= ox; by -= oy;
         if (bw < 4 || bh < 4 || bx < x) break;
@@ -1234,7 +1236,10 @@ void wm_frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const 
         fog_band(cr, t->fog, ml + ext->l, 0, w - ml - mr - ext->l - ext->r, mt + ext->t);
     }
     /* 2. caption buttons with glow plates for hot/pressed */
+    int close_only = (flags & FRAME_CLOSE_ONLY) != 0, last = t->norder - 1;   /* last: the leftmost button drawn */
+    if (close_only) for (int i = 0; i < t->norder; i++) if (t->order[i] == BTN_CLOSE) last = i;
     for (int i = 0; i < t->norder; i++) {
+        if (close_only && t->order[i] != BTN_CLOSE) continue;
         int bx, by, bw, bh; int b = button_rect(t, w, i, maximized, &bx, &by, &bw, &bh);
         int hit = hit_of_slot(t, i); int state = !focused ? 3 : 0;
         int dis = hit == HIT_MAX && (flags & FRAME_MAX_DISABLED);   /* the sprites have no disabled frame: the inactive one, faded */
@@ -1277,7 +1282,7 @@ void wm_frame_paint_cr3(cairo_t *cr, const struct theme *t, int w, int h, const 
     if (title && *title) {
         PangoLayout *lay = pango_cairo_create_layout(cr); PangoFontDescription *fd = pango_font_description_from_string(t->font);
         pango_layout_set_font_description(lay, fd); pango_layout_set_text(lay, title, -1);
-        int bx, by, bw, bh; button_rect(t, w, t->norder - 1, maximized, &bx, &by, &bw, &bh);
+        int bx, by, bw, bh; button_rect(t, w, last, maximized, &bx, &by, &bw, &bh);
         pango_layout_set_width(lay, (bx - t->title_x - 8) * PANGO_SCALE); pango_layout_set_ellipsize(lay, PANGO_ELLIPSIZE_END);
         int tw, th; pango_layout_get_pixel_size(lay, &tw, &th);
         double tx = icon ? t->title_x : t->icon_x + 2, ty = (t->m_t - th) / 2.0;

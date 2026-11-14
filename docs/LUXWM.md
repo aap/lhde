@@ -73,7 +73,8 @@ maximise crossfade at weight t, `FRAMETEST_FONTS="DIR[;DIR]"` registers font dir
 [KEYBOARD]]]` renders the window menu (`MENUTEST_FONTS` likewise), `build/luxwm/tests/switchertest THEMESPEC out.png N [SEL]` the
 Alt+Tab switcher with N entries ("Task switcher"; it prints the window size). `luxwm/tests/regress.sh` (`make check-luxwm`, part of `make check`)
 renders, for every frame set in `share/frames`, the strip, `normal`, `unfocused`, `max`, `ext60` (`0 0 60 0`) and the Explorer cases
-`ext46`/`ext46u`/`ext46max` (`0 0 46 0` with `NO_TITLE`) at 640x480 with frametest's text output; `vision49`/`vision49max` for
+`ext46`/`ext46u`/`ext46max` (`0 0 46 0` with `NO_TITLE`) at 640x480 with frametest's text output; `closeonly` (480x200,
+`FRAME_CLOSE_ONLY`, the pointer over Close); `vision49`/`vision49max` for
 `header_mode = crop` sets; `NAME.classic/` for the glass sets whose style has a non-composited look of its own (aero5048, aero5112);
 and `classic/`, `classic.xl/` (Extra Large metrics 24/24, Tahoma -19 bold), `classic.hc/` (High Contrast Black colours, borderwidth
 6, 31/31, Tahoma -24 bold) for Windows Classic. It compares their SHA-256 with a baseline made on this machine
@@ -300,9 +301,10 @@ a double click there, the second press within 500 ms, closes the window as XP's)
 (CLIENT-PROTOCOL.md: luxshell's task buttons, GTK's client-side headers) at the point it names, also for a minimised window. Alt+Space
 and the icon put it under the caption at the frame's left border. Items, mnemonics and greying as XP's win32k sets them:
 **R**estore (greyed unless maximised or minimised; the default item while minimised), **M**ove and **S**ize (greyed while maximised or
-minimised; Size also for a fixed-size window), Mi**n**imize (greyed while minimised), Ma**x**imize (greyed while maximised, or for a
-fixed-size window), Move to **D**esktop (luxwm's own, "Virtual desktops"), separator, **C**lose (the default item, bold, unless
-minimised) with `Alt+F4` right-aligned.
+minimised; Size also for a fixed-size window), Mi**n**imize (greyed while minimised, or without the minimise function), Ma**x**imize
+(greyed while maximised, for a fixed-size window or without the maximise function), Move to **D**esktop (luxwm's own, "Virtual
+desktops"), separator, **C**lose (the default item, bold, unless minimised) with `Alt+F4` right-aligned. A fixed-size window with
+Close as its only button (a message box, a property sheet: "Caption buttons") gets XP's dialog menu instead, **M**ove and **C**lose.
 
 Opened from the keyboard the first item is selected (greyed or not, as `MNFindNextValidItem`, which skips only separators) and the
 mnemonics are underlined (XP's keyboard cues; a key press shows them in a mouse-opened menu too; always with settings.ini `[effects]
@@ -511,8 +513,8 @@ ClearType's fringes stronger, now and then an advance rounding by 1 px after a f
 0.7 (`seguibk.ttf`), which the theme's fonts load, and the Jade Task Manager caption fits it better than Tahoma (`docs/history/THEMES.md`
 "Fonts"). The Display Properties "Active Window" sample is not a real window (its text 1 px further right, 1 px higher for Jade, a light
 band under its caption); real windows match in position. Not implemented: SMALLCAPTION/tool windows, MINCAPTION, the help button, a
-disabled min button (no X11 equivalent of WS_MINIMIZEBOX is consulted; max is disabled for fixed-size windows, "Size hints"),
-DPI-scaled image selection (96 dpi assumed).
+min button drawn disabled (a window with maximise but no minimise function keeps an enabled-looking min button that does nothing;
+"Caption buttons"), DPI-scaled image selection (96 dpi assumed).
 
 ### XP visual styles (Luna)
 
@@ -977,12 +979,17 @@ cells and no strip they never repaint.
   `btnface`), as if the border went on around the client. `_NET_FRAME_EXTENTS` is the frame around the client as it lies (a maximised
   urxvt: `0 4 27 2` on aero4074, `0 4 20 9` on slate4074), written only when it changes.
 - **Fixed size** (`client_fixed`: minimum and maximum equal; wux writes min == max == its size for a win32 window without
-  `WS_THICKFRAME`, following every resize it makes itself, plus `_MOTIF_WM_HINTS` without resize and maximize: flxp's dialogs, property
-  sheets, message boxes). In every frame mode its edges and corners are a plain border (`client_hit`: `HTBORDER`, no size cursor; a drag
+  `WS_THICKFRAME`, following every resize it makes itself: flxp's dialogs, property sheets, message boxes). In every frame mode its edges and corners are a plain border (`client_hit`: `HTBORDER`, no size cursor; a drag
   there neither sizes nor moves); a modifier resize drag, `_NET_WM_MOVERESIZE` 0..7 and the window menu's Size do nothing; maximise is off
   (button, double click, Super+Up, the menu's Maximize greyed) and the maximise button is drawn disabled (msstyles: the strip's disabled
   image; classic: `DFCS_INACTIVE`; DWM sprites have none, so the inactive one at 45 %; `FRAME_MAX_DISABLED`, luxwm's own bit above the
   client's `_LHWM_FRAME_FLAGS`).
+- **Caption buttons** (`client_close_only`, `client_no_min`, `client_no_max`): the `_MOTIF_WM_HINTS` functions (read at map and on
+  every PropertyNotify; `MWM_FUNC_ALL` with bits means all but those, no hint means all) decide them as Windows decides them from
+  `WS_MINIMIZEBOX` and `WS_MAXIMIZEBOX`, which wux writes as those functions: neither minimise nor maximise, Close alone, at its own
+  place, the caption reaching up to it and the empty slots caption to the pointer (`FRAME_CLOSE_ONLY`, luxwm's own bit beside
+  `FRAME_MAX_DISABLED`; every frame mode; the frame regression's `closeonly.png`); no maximise, the maximise button disabled as for a
+  fixed size; no minimise, the min button does nothing and the menu's Minimize is greyed.
 - **ConfigureRequest:** only the fields in the request's `value_mask` are applied (berry applied all, so a client that asked for a size
   before it was placed was moved back to 0,0); the requested size is fitted like any other.
 - **Not refitted, on purpose:** a `CLIENT_CAPTION` toggle and a theme switch of a `CLIENT_CAPTION` client keep the frame (the client

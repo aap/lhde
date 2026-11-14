@@ -1,6 +1,6 @@
 #!/bin/sh
 # luxpad under Xvfb (no window manager), driven with xdotool, its status bar read from LUXPAD_TRACE=1's "status PART TEXT"
-# lines. The status bar off until View > Status Bar, which luxpad.ini keeps. A UTF-8 file with CR LF line ends and a character above U+FFFF opens as UTF-8 / Windows (CR + LF); an emoji typed
+# lines. The status bar off until View > Status Bar (Alt+V from the Edit control drops View, S), which luxpad.ini keeps. A UTF-8 file with CR LF line ends and a character above U+FFFF opens as UTF-8 / Windows (CR + LF); an emoji typed
 # into it and Ctrl+S: the file has the emoji's four bytes where it was typed and is otherwise byte for byte what it was (the
 # 𝄞, the ü, every CR LF); Ln/Col after moving (Ln 2, Col 3); Find (Ctrl+F "third", Find Next: Ln 3, Col 6); Go To
 # (Ctrl+G 2: Ln 2, Col 1); Save As with the Encoding box on Unicode: UTF-16 LE with a BOM, the same text, CR LF; that file
@@ -50,14 +50,20 @@ save_as() {
     DW=$(wait_window 20 --name '^Save As$'); [ -n "$DW" ] && sleep .5
 }
 
-# 0. no status bar until View > Status Bar (a click on File, Right to View, Enter), which luxpad.ini keeps for the next runs
+# 0. no status bar until View > Status Bar (Alt+V, S), which luxpad.ini keeps for the next runs
 printf 'x\n' > $T/files/first.txt
 run '^first.txt - luxpad$' $T/files/first.txt
 if [ -z "$W" ]; then fail "no luxpad window"; cat $T/err.log
 else
     sleep .5
     check "no status bar at first" "" "$(status encoding)"
-    xdotool mousemove --window $W 14 9 click 1; sleep .5; xdotool key Right Right Right; sleep .5; xdotool key Return
+    # Alt+V from the Edit control drops View at once (a menu window shows), S chooses Status Bar
+    n0=$(xdotool search --onlyvisible --name '' 2>/dev/null | wc -l)
+    xdotool key alt+v
+    dropped() { [ "$(xdotool search --onlyvisible --name '' 2>/dev/null | wc -l)" -gt $n0 ]; }
+    wait_for 5 dropped
+    check "Alt+V drops View" "yes" "$(dropped && echo yes)"
+    xdotool key s
     wait_for 5 is_status encoding "UTF-8"
     check "View > Status Bar shows it" "UTF-8" "$(status encoding)"
     quit

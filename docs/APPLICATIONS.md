@@ -97,7 +97,8 @@ and removed in one write), `known_tags` (the tags to offer in a tag box) and `re
 `long_date` with seconds, `thousands`);
 `shell::store::get` / `set` (settings.ini, with the change notification); `shell::session_theme()` (the theme's record);
 `shell::mime_type`; `shell::trash`, the copy engine (`fileops_job.h`); `shell::thumbs`; the Explorer itself as a program:
-`flxp DIR`, `flxp --select FILE`. The win32 part (`shell/ui.h`): `shell::message_box(owner, title, text, MB_OK |
+`flxp DIR`, `flxp --select FILE`, `flxp --properties ITEM...` (the Properties sheet alone, on General), or from
+another toolkit the session bus's `org.freedesktop.FileManager1` (docs/USAGE.md). The win32 part (`shell/ui.h`): `shell::message_box(owner, title, text, MB_OK |
 MB_ICONEXCLAMATION)` (MessageBoxW with UTF-8 strings), `shell::icon_for(path, 32)` and `icon_for_key(key, px)` (the icon the
 Explorer shows, as an HICON), `load_image` (an icon theme's source, an .ico or "pe:FILE#ID", with LoadImageW),
 `shell::set_window_icon_key(hwnd, "notepad")` (the program's own window icon from an icon key: luxpad's notepad, luxshot's image,

@@ -71,9 +71,6 @@
 	in Add or Remove Programs as one scrolled list of groups); with PREFIX=~/.local the role file and make install's
 	lhde-mimeapps.list are one path (the role file covers both of its lines, the folders and editor roles)
 
-* flxp does not own org.freedesktop.FileManager1 (ShowFolders, ShowItems): Firefox's "Show in Folder" and Chromium's ask
-	that D-Bus name first and select the file in the window, and only without it open the folder through GIO
-	(inode/directory's default, lhde-mimeapps.list's flxp)
 
 ### details and task pane
 
@@ -81,6 +78,8 @@
 
 ## misc
 
+* the Properties sheet's General page draws the "Opens with" program's icon over the start of its name ("[icon]pad" for luxpad,
+	seen in the lab under luna and jade4074 with luxattr --general)
 * flxp-filedialog: a right click right after the pointer arrives in the list opens the context menu and closes it at once (seen
 	under Xvfb with xdotool mousemove + click 3; tests/headless/filedlg.sh clicks again); a real mouse may never do this, check
 	(xdotool's click sends press and release in one burst; Xorg lets such a release past a synchronous grab's freeze,
@@ -93,11 +92,6 @@
 	its template under the Longhorn styles (the one dialog that does)
 * a dropped menu under Jade has a 1 px white line inside its outline where 4074's Notepad menu is the 245 grey of its body
 	(lh4074-083401.png: the Edit menu's outline at x=78, 245 from x=79); the window menu matched lh4074-195235.png
-* Alt+letter on a menu bar highlights the menu but does not drop its popup (luxpad: Alt+O shows Format highlighted, nothing
-	opens; XP opens it); a click works, and F10 then Down in menutest, but F10 in luxpad goes to its Edit
-* a message box and a property sheet get minimize and maximize buttons from luxwm (seen in the lab under luna and jade4074;
-	luxpad's Find, Replace and Font dialogs too); XP's have Close only (a sheet also ?): wux's fixed-size _MOTIF_WM_HINTS keeps
-	MWM_FUNC_MINIMIZE whatever the style's WS_MINIMIZEBOX (an owned dialog is now its owner's transient)
 
 ## strings: UTF-8 as wux's only public API (survey 2026-11-12)
 * today: 127 W functions, 72 A functions (thin converters; GetACP() = CP_UTF8, so "ANSI" already means UTF-8), 425 neutral;
@@ -108,7 +102,5 @@
 	string-carrying messages (LVM_/TVM_/TB_/TTM_/SB_/CB_/EM_, WM_SETTEXT/GETTEXT) and the GETDISPINFO notifications (a buffer
 	rule), all converting through the one pair (wux/w32/utf.h); both APIs coexist while flxp moves file by file (string-free
 	files first: filedlg/main, portal, wallpaper, xwm, preview)
-* wux posts WM_CHAR 0x7f (DEL) after the Delete key, which Windows does not: a list box with LBS_WANTKEYBOARDINPUT gets a
-	WM_CHARTOITEM for it (the Properties sheet's tag list answers -2), an edit or a control that types characters may see it
-* the file dialog's File name box completes inline: typing "python3" and Enter in /usr/bin chose python3-config (XP's
-	AutoComplete only suggests in its drop-down unless "Use inline AutoComplete" is on, which it is not by default)
+* Ctrl+digit posts WM_CHAR of the digit (keystate: Ctrl+1 gives char 0x31); Windows gives none for Ctrl+1..9 (only the ASCII
+	control characters: Ctrl+A..Z, Ctrl+[, Ctrl+], Ctrl+Backspace's 0x7f)

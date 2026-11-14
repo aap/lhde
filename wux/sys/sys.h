@@ -161,9 +161,12 @@ uint64_t native_id(NativeWindow* w);
 void set_transient_for(NativeWindow* w, uint64_t owner_id, bool modal);   // + _NET_WM_WINDOW_TYPE_DIALOG
 bool native_window_rect(uint64_t id, gdi::Rect& screen_rect);            // a foreign window's rect, frame excluded
 void set_min_size(NativeWindow* w, int cx, int cy);
-// a window the user cannot resize or maximize (win32: a caption without WS_THICKFRAME): WM_NORMAL_HINTS min == max == its
-// size, following set_window_rect, and _MOTIF_WM_HINTS functions without resize and maximize
+// a window the user cannot resize (win32: a caption without WS_THICKFRAME): WM_NORMAL_HINTS min == max == its size,
+// following set_window_rect
 void set_fixed_size(NativeWindow* w, bool fixed);
+// what the window manager may do with it, as _MOTIF_WM_HINTS functions (move and close always): resize (WS_THICKFRAME),
+// minimize (WS_MINIMIZEBOX), maximize (WS_MAXIMIZEBOX); all three: no property (the frame's caption buttons follow them)
+void set_wm_functions(NativeWindow* w, bool resize, bool minimize, bool maximize);
 // _NET_WM_ICON: width, height, then width*height ARGB pixels, for each size (empty: removed)
 void set_icon(NativeWindow* w, const std::vector<unsigned long>& data);
 

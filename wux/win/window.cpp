@@ -965,7 +965,11 @@ bool set_argb(Window* w, bool on)
 void style_changed(Window* w)
 {
     if (!is_window(w) || !w->top || !w->wm_decorated) return;
-    sys::set_fixed_size(w->top->native, (w->style & WS_CAPTION) == WS_CAPTION && !(w->style & WS_THICKFRAME));
+    bool fixed = (w->style & WS_CAPTION) == WS_CAPTION && !(w->style & WS_THICKFRAME);
+    sys::set_fixed_size(w->top->native, fixed);
+    // the caption buttons: Close alone without WS_MINIMIZEBOX and WS_MAXIMIZEBOX (a message box, a property sheet), else both
+    // with the missing one disabled; a fixed size cannot be maximized
+    sys::set_wm_functions(w->top->native, !fixed, (w->style & WS_MINIMIZEBOX) != 0, (w->style & WS_MAXIMIZEBOX) && !fixed);
 }
 
 bool is_argb(Window* w) { return is_window(w) && w->top && w->top->argb; }
@@ -1598,13 +1602,18 @@ static void handle_event(const sys::Event& ev)
         if (vk == VK_MENU) g_keys[VK_LMENU] = down;
         Window* f = is_window(g_focus) ? g_focus : (is_window(g_active) ? g_active : t);
         bool alt = (ev.mods & sys::ModAlt) != 0 || (down && vk == VK_MENU);
-        uint32_t msg = down ? (alt ? WM_SYSKEYDOWN : WM_KEYDOWN) : (alt ? WM_SYSKEYUP : WM_KEYUP);
+        // F10 is a system key as Alt+key is (WM_SYSKEYDOWN without the context bit): DefWindowProc enters the menu bar with
+        // it, whatever control has the focus
+        bool sys = alt || vk == VK_F10;
+        uint32_t msg = down ? (sys ? WM_SYSKEYDOWN : WM_KEYDOWN) : (sys ? WM_SYSKEYUP : WM_KEYUP);
         bool ext = false;
         uint32_t scan = scan_from_vk(vk, &ext);
         LParam lp = 1 | (LParam)scan << 16 | (ext ? 0x01000000 : 0) | (down ? 0 : (LParam)0xC0000000) | (alt ? 0x20000000 : 0);
-        // Alt+key keeps its text: translate_message turns it into WM_SYSCHAR (dialog and menu mnemonics)
-        post_full(f, msg, vk, lp, ev.time, ev.root, (down && !(ev.mods & sys::ModControl)) ? ev.text : nullptr);
-        if (down && (ev.mods & sys::ModControl) && !alt && ev.text[0]) {
+        // Alt+key keeps its text: translate_message turns it into WM_SYSCHAR (dialog and menu mnemonics). Delete has no
+        // character on Windows (X's keysym gives it DEL, 0x7f): no WM_CHAR, where Backspace's 0x08 and Escape's 0x1b are one
+        const char* text = vk == VK_DELETE ? "" : ev.text;
+        post_full(f, msg, vk, lp, ev.time, ev.root, (down && !(ev.mods & sys::ModControl)) ? text : nullptr);
+        if (down && (ev.mods & sys::ModControl) && !alt && text[0]) {
             // control characters still produce WM_CHAR (e.g. ^A, ^C) the way X reports them
             Message m; memset(&m, 0, sizeof m);
             m.w = f; m.msg = WM_KEYDOWN; m.wp = vk; m.time = ev.time; m.pt = ev.root;
