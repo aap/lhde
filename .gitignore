@@ -15,3 +15,5 @@ __pycache__/
 # aurorademo's tables: Microsoft-derived numbers, made by make examples into build/examples/ from the Windows tree
 # (tools/lhdeaurora.py), never committed
 examples/aurora_data.h
+/lhde_winthemes
+/lhde_winthemes.zip

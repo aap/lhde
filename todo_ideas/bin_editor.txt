@@ -1,0 +1,20 @@
+# ood - binary editor in various formats
+
+* UI inspired by xvi32
+* but focus on octal
+* for PDPs and general purpose
+
+* 8-bit bytes, octal/hex
+* words
+	* 36 bits (PDP-10 &c: octal)
+	* 18 bits (PDP-1, PDP-7 &c: octal)
+	* 16 bits (PDP-11: octal, many others: hex)
+	* ...
+* various encodings (especially for 36 bits), see larsb's pdp10-its-disassembler
+* other formats:
+	* ascii, FIODEC, flexowriter, ...
+	* squoze/radix50
+	* sixbit
+	* ???
+
+* more later
