@@ -5,6 +5,7 @@
 #include <lhde/theme.h>
 #include <lhde/settings.h>
 #include <lhde/icon.h>
+#include <lhde/hw.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
@@ -547,7 +548,7 @@ static int l_spawn(lua_State *L) { const char *cmd = luaL_checkstring(L, 1); if 
    without blocking; on_line(line) for each line (without the newline), on_done() at end of file (the command exited or closed
    its stdout). Returns an id, nil when the pipe or fork failed. lh.pipe_close(id) ends it early: the group gets SIGTERM, on_done
    is not called. The children get SIGTERM when luxshell exits (PR_SET_PDEATHSIG, and pipes_stop on the way out). stdin is
-   /dev/null, stderr is luxshell's. The tray tiles' system commands (tiles/volume.lua: `pactl subscribe`, `wpctl get-volume`). */
+   /dev/null, stderr is luxshell's. */
 #define MAXPIPES 32
 struct lpipe { int fd, id; pid_t pid; int line_ref, done_ref; size_t len; char buf[4096]; };
 static struct lpipe lpipes[MAXPIPES]; static int nlpipes, next_pipe_id = 1;
@@ -600,6 +601,105 @@ static void pipe_read(int id) {
     }
 }
 static void pipes_stop(void) { while (nlpipes) pipe_free(nlpipes - 1, true); }
+/* lh.fork_call(fn, on_line [, on_done], ...): fn(...) in a child of luxshell (fork: the child has the same Lua state), its
+   results sent back through a pipe the main loop reads as an lh.pipe's: each result one line per field, "KEY\tT\tVALUE" with
+   T s (string), n (number) or b (boolean), a table's fields by their keys and a plain value under its position ("1");
+   newlines in strings become spaces. For calls that may block (the hardware layer running wpctl or xinput: traycontrol.lua
+   C.hw). Returns an id as lh.pipe, nil when the fork failed. */
+static void fc_write(int fd, const char *k, lua_State *L, int idx) {
+    char line[4400]; int t = lua_type(L, idx); const char *v; char num[64];
+    if (t == LUA_TSTRING) v = lua_tostring(L, idx);
+    else if (t == LUA_TNUMBER) { if (lua_isinteger(L, idx)) snprintf(num, sizeof num, "%lld", (long long)lua_tointeger(L, idx)); else snprintf(num, sizeof num, "%.17g", lua_tonumber(L, idx)); v = num; }
+    else if (t == LUA_TBOOLEAN) v = lua_toboolean(L, idx) ? "true" : "false";
+    else return;
+    int n = snprintf(line, sizeof line, "%s\t%c\t%s", k, t == LUA_TSTRING ? 's' : t == LUA_TNUMBER ? 'n' : 'b', v);
+    if (n < 0) return; if ((size_t)n >= sizeof line - 1) n = sizeof line - 2;
+    for (int i = 0; i < n; i++) if (line[i] == '\n') line[i] = ' ';
+    line[n++] = '\n'; if (write(fd, line, (size_t)n) < 0) _exit(1);
+}
+static int l_fork_call(lua_State *L) {
+    luaL_checktype(L, 1, LUA_TFUNCTION); luaL_checktype(L, 2, LUA_TFUNCTION);
+    if (nlpipes >= MAXPIPES) { lua_pushnil(L); return 1; }
+    int fds[2]; if (pipe(fds) < 0) { lua_pushnil(L); return 1; }
+    pid_t parent = getpid(), pid = fork();
+    if (pid < 0) { close(fds[0]); close(fds[1]); lua_pushnil(L); return 1; }
+    if (pid == 0) {
+        setpgid(0, 0); lhde_parent_death_signal(SIGTERM); if (getppid() != parent) _exit(1);
+        signal(SIGCHLD, SIG_DFL); signal(SIGPIPE, SIG_DFL);
+        close(fds[0]); close(ConnectionNumber(dpy));
+        int top = lua_gettop(L), base = top; lua_pushvalue(L, 1); for (int i = 4; i <= top; i++) lua_pushvalue(L, i);
+        if (lua_pcall(L, top > 3 ? top - 3 : 0, LUA_MULTRET, 0)) { fc_write(fds[1], "error", L, -1); _exit(1); }
+        for (int r = base + 1; r <= lua_gettop(L); r++) {
+            if (lua_type(L, r) == LUA_TTABLE) {
+                lua_pushnil(L);
+                while (lua_next(L, r)) { if (lua_type(L, -2) == LUA_TSTRING) fc_write(fds[1], lua_tostring(L, -2), L, -1); lua_pop(L, 1); }
+            } else { char k[16]; snprintf(k, sizeof k, "%d", r - base); fc_write(fds[1], k, L, r); }
+        }
+        _exit(0);
+    }
+    setpgid(pid, pid); close(fds[1]); fcntl(fds[0], F_SETFL, O_NONBLOCK); fcntl(fds[0], F_SETFD, FD_CLOEXEC);
+    struct lpipe *p = &lpipes[nlpipes++]; p->fd = fds[0]; p->pid = pid; p->id = next_pipe_id++; p->len = 0;
+    p->line_ref = ref_of(L, 2); p->done_ref = lua_isfunction(L, 3) ? ref_of(L, 3) : LUA_NOREF;
+    lua_pushinteger(L, p->id); return 1;
+}
+
+/* the hardware layer (lhde/hw.h; docs/SHELL-DESIGN.md 8.6): lh.hw_battery(), lh.hw_backlight(), lh.hw_volume(),
+   lh.hw_touchpad() -> a table of lhde_hw_fields' keys; lh.hw_backlight_set(percent), lh.hw_volume_set(percent),
+   lh.hw_volume_mute(true | false | nil: toggle), lh.hw_touchpad_set(on) -> true, or nil and the reason; lh.hw_describe() ->
+   the back ends, one line each. The volume and touchpad calls may run a program and wait for it: the tray items call them
+   through lh.fork_call. lh.hw_watch("volume" | "battery", fn) -> an id, or nil when the system has no event source for it
+   (then the caller reads on a timer): fn() after a change, fn("ended") when the source ended; lh.hw_unwatch(id). */
+static void hw_field(const char *key, int type, const char *s, double n, void *ud) {
+    lua_State *L = ud;
+    if (type == 's') lua_pushstring(L, s); else if (type == 'b') lua_pushboolean(L, n != 0);
+    else if (n == floor(n) && fabs(n) < 1e15) lua_pushinteger(L, (lua_Integer)n); else lua_pushnumber(L, n);
+    lua_setfield(L, -2, key);
+}
+static int hw_push(lua_State *L, int what, const void *rec) { lua_newtable(L); lhde_hw_fields(what, rec, hw_field, L); return 1; }
+static int l_hw_battery(lua_State *L) { lhde_battery b; lhde_hw_battery(&b); return hw_push(L, LHDE_HW_BATTERY, &b); }
+static int l_hw_backlight(lua_State *L) { lhde_backlight b; lhde_hw_backlight(&b); return hw_push(L, LHDE_HW_BACKLIGHT, &b); }
+static int l_hw_volume(lua_State *L) { lhde_volume v; lhde_hw_volume(&v); return hw_push(L, LHDE_HW_VOLUME, &v); }
+static int l_hw_touchpad(lua_State *L) { lhde_touchpad t; lhde_hw_touchpad(&t); return hw_push(L, LHDE_HW_TOUCHPAD, &t); }
+static int hw_result(lua_State *L, int r) { if (r == 0) { lua_pushboolean(L, 1); return 1; } lua_pushnil(L); lua_pushstring(L, lhde_hw_error()); return 2; }
+static int l_hw_backlight_set(lua_State *L) { return hw_result(L, lhde_hw_backlight_set((int)luaL_checknumber(L, 1))); }
+static int l_hw_volume_set(lua_State *L) { return hw_result(L, lhde_hw_volume_set((int)luaL_checknumber(L, 1))); }
+static int l_hw_volume_mute(lua_State *L) { return hw_result(L, lhde_hw_volume_mute(lua_isnoneornil(L, 1) ? -1 : lua_toboolean(L, 1))); }
+static int l_hw_touchpad_set(lua_State *L) { return hw_result(L, lhde_hw_touchpad_set(lua_toboolean(L, 1))); }
+static int l_hw_describe(lua_State *L) { char b[4096]; lua_pushstring(L, lhde_hw_describe(LHDE_HW_ALL, b, sizeof b)); return 1; }
+#define MAXWATCH 16
+struct hwwatch { int id, what, ref; };
+static struct hwwatch hwwatches[MAXWATCH]; static int nhwwatches, next_watch_id = 1;
+static int hw_watch_fd(int what) { return what == LHDE_HW_VOLUME ? lhde_hw_volume_fd() : lhde_hw_battery_fd(); }
+static int l_hw_watch(lua_State *L) {
+    const char *w = luaL_checkstring(L, 1); luaL_checktype(L, 2, LUA_TFUNCTION);
+    int what = !strcmp(w, "volume") ? LHDE_HW_VOLUME : !strcmp(w, "battery") ? LHDE_HW_BATTERY : 0;
+    if (!what || nhwwatches >= MAXWATCH || hw_watch_fd(what) < 0) { lua_pushnil(L); return 1; }
+    struct hwwatch *h = &hwwatches[nhwwatches++]; h->id = next_watch_id++; h->what = what; h->ref = ref_of(L, 2);
+    lua_pushinteger(L, h->id); return 1;
+}
+static void hw_watch_free(int i) {
+    luaL_unref(L, LUA_REGISTRYINDEX, hwwatches[i].ref); hwwatches[i] = hwwatches[--nhwwatches];
+    if (!nhwwatches) lhde_hw_close();                                 /* the `pactl subscribe` child ends with its last watcher */
+}
+static int l_hw_unwatch(lua_State *L) {
+    int id = (int)luaL_checkinteger(L, 1);
+    for (int i = 0; i < nhwwatches; i++) if (hwwatches[i].id == id) { hw_watch_free(i); lua_pushboolean(L, 1); return 1; }
+    lua_pushboolean(L, 0); return 1;
+}
+/* after the source of what was readable: its watchers' callbacks (they may watch and unwatch: found again by id) */
+static void hw_watch_fire(int what) {
+    int r = what == LHDE_HW_VOLUME ? lhde_hw_volume_poll() : lhde_hw_battery_poll();
+    if (r == 0) return;
+    int ids[MAXWATCH], n = 0;
+    for (int i = 0; i < nhwwatches; i++) if (hwwatches[i].what == what) ids[n++] = hwwatches[i].id;
+    for (int k = 0; k < n; k++)
+        for (int i = 0; i < nhwwatches; i++) if (hwwatches[i].id == ids[k]) {
+            push_ref(L, hwwatches[i].ref); int nargs = 0; if (r < 0) { lua_pushstring(L, "ended"); nargs = 1; }
+            if (r < 0) { luaL_unref(L, LUA_REGISTRYINDEX, hwwatches[i].ref); hwwatches[i] = hwwatches[--nhwwatches]; }
+            if (lua_pcall(L, nargs, 0, 0)) { fprintf(stderr, "luxshell: hw_watch: %s\n", lua_tostring(L, -1)); lua_pop(L, 1); }
+            break;
+        }
+}
 /* lh.set_desktop(n): ask the WM to switch to desktop n (EWMH _NET_CURRENT_DESKTOP client message to the root) */
 static int l_set_desktop(lua_State *L) { long n = (long)luaL_checkinteger(L, 1); send_root_message(root, atom[A_NET_CURRENT_DESKTOP], n, CurrentTime, 0); return 0; }
 static int l_desktop(lua_State *L) { unsigned long n; int fmt; unsigned char *d = get_prop(root, atom[A_NET_CURRENT_DESKTOP], XA_CARDINAL, &n, &fmt); lua_pushinteger(L, d ? ((long *)d)[0] : 0); if (d) XFree(d); return 1; }
@@ -1069,7 +1169,7 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"app_icons", l_app_icons}, {"terminal", l_terminal}, {"app_icon", l_app_icon}, {"tray_start", l_tray_start}, {"tray_count", l_tray_count}, {"tray_manager", l_tray_manager}, {"tray_stop", l_tray_stop},
     {"selection_owner", l_selection_owner}, {"watch_selection", l_watch_selection}, {"own_selection", l_own_selection}, {"send_message", l_send_message}, {"send_root_message", l_send_root_message}, {"atom", l_atom},
     {"set_root_cardinal", l_set_root_cardinal}, {"struts", l_struts}, {"spawn_pid", l_spawn_pid}, {"notification_closed", l_notification_closed}, {"notification_action", l_notification_action},
-    {"spawn", l_spawn}, {"pipe", l_pipe}, {"pipe_close", l_pipe_close}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"getpid", l_getpid}, {"display_procs", l_display_procs}, {"proc_args", l_proc_args}, {"child_alive", l_child_alive}, {"mtime", l_mtime}, {"exists", l_exists}, {"trim", l_trim},
+    {"spawn", l_spawn}, {"pipe", l_pipe}, {"pipe_close", l_pipe_close}, {"fork_call", l_fork_call}, {"hw_battery", l_hw_battery}, {"hw_backlight", l_hw_backlight}, {"hw_volume", l_hw_volume}, {"hw_touchpad", l_hw_touchpad}, {"hw_backlight_set", l_hw_backlight_set}, {"hw_volume_set", l_hw_volume_set}, {"hw_volume_mute", l_hw_volume_mute}, {"hw_touchpad_set", l_hw_touchpad_set}, {"hw_describe", l_hw_describe}, {"hw_watch", l_hw_watch}, {"hw_unwatch", l_hw_unwatch}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"getpid", l_getpid}, {"display_procs", l_display_procs}, {"proc_args", l_proc_args}, {"child_alive", l_child_alive}, {"mtime", l_mtime}, {"exists", l_exists}, {"trim", l_trim},
     {"data_find", l_data_find}, {"data_resolve", l_data_resolve}, {"data_resolve_dir", l_data_resolve_dir},
     {"component_dir", l_component_dir},
     {"theme_resolve", l_theme_resolve}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},
@@ -1124,11 +1224,20 @@ int main(int argc, char **argv) {
            Xlib's queue; poll() on the socket would then sleep on events already read, up to the next timer (the clock's
            1 s), which would start the maximise black layers late */
         if (XEventsQueued(dpy, QueuedAlready) > 0 || notify_pending()) timeout = 0;
-        struct pollfd p[2 + MAXPIPES] = { { xfd, POLLIN, 0 }, { dfd, POLLIN, 0 } }; int ids[MAXPIPES], np = nlpipes;   /* dfd < 0: poll skips it */
-        for (int i = 0; i < np; i++) { p[2 + i] = (struct pollfd){ lpipes[i].fd, POLLIN, 0 }; ids[i] = lpipes[i].id; }
-        if (poll(p, 2 + np, timeout) > 0) for (int i = 0; i < np; i++) if (p[2 + i].revents) pipe_read(ids[i]);
+        /* the hardware layer's event sources (lh.hw_watch), when watched: -1 when not, which poll skips */
+        int vfd = -1, bfd = -1;
+        for (int i = 0; i < nhwwatches; i++) { if (hwwatches[i].what == LHDE_HW_VOLUME) vfd = lhde_hw_volume_fd(); else bfd = lhde_hw_battery_fd(); }
+        struct pollfd p[4 + MAXPIPES] = { { xfd, POLLIN, 0 }, { dfd, POLLIN, 0 }, { vfd, POLLIN, 0 }, { bfd, POLLIN, 0 } };   /* dfd < 0: poll skips it */
+        int ids[MAXPIPES], np = nlpipes;
+        for (int i = 0; i < np; i++) { p[4 + i] = (struct pollfd){ lpipes[i].fd, POLLIN, 0 }; ids[i] = lpipes[i].id; }
+        if (poll(p, 4 + np, timeout) > 0) {
+            for (int i = 0; i < np; i++) if (p[4 + i].revents) pipe_read(ids[i]);
+            if (p[2].revents) hw_watch_fire(LHDE_HW_VOLUME);
+            if (p[3].revents) hw_watch_fire(LHDE_HW_BATTERY);
+        }
     }
     pipes_stop();
+    lhde_hw_close();
     emit("exit", 0);                                                  /* runtime.lua: stops the classic taskbar it started */
     tray_stop();
     XDeleteProperty(dpy, root, atom[A_LHSHELL_CLOCK_VISIBLE]); XSync(dpy, False);   /* nobody shows a sidebar clock any more */

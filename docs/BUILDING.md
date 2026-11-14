@@ -146,8 +146,18 @@ flxp-desktop, flxp-taskbar). What differs, all behind `liblhde/compat.h` (one he
   `char_traits<wchar_t>` through the wide-string builtins, which would call the libc's 32-bit `wmemchr`, `wmemcmp` and
   `wcslen`; `flxp_crt.h` makes them 16-bit loops.
 - No mingw windres package: a `.res` whose `.rc` looks newer (a checkout's times) is kept as checked in, with a warning.
-- Not there yet (todo_ideas/repo.txt): the brightness and battery tray items and tiles read Linux's `/sys/class` and show
-  nothing; the volume item works through pactl when PulseAudio is installed, not through mixer(8).
+- The hardware (the power tile, the Volume, Brightness and Touchpad items of luxshell and flxp-taskbar, `lhde-hw`) is
+  liblhde's layer's FreeBSD back end (`liblhde/hw_freebsd.c`, docs/APPLICATIONS.md "Hardware"): the battery from the
+  `hw.acpi.battery` sysctls and `hw.acpi.acline` (every battery together; changes from devd's socket,
+  `/var/run/devd.seqpacket.pipe`), the backlight through `/dev/backlight/backlight0`'s ioctls (the i915 driver registers it
+  when `i915kms` is loaded; `backlight(8)` when they fail), the volume through the OSS mixer of `hw.snd.default_unit`
+  (`/dev/mixerN`: `vol`, its mute mask; `mixer(8)` when the ioctls fail, pactl when there is no mixer device; read every
+  second: the mixer has no change events). sndio is not a back end: on FreeBSD it sits on the same OSS mixer, which the layer
+  reads directly. The touchpad is the X server's (`xinput`, as on Linux): Xorg's libinput driver adds psm's evdev device
+  (`hw.psm.synaptics_support=1`, `kern.evdev.rcpt_mask=12`) as "SynPS/2 Synaptics TouchPad", which the item finds by its
+  name. Permissions: the mixer devices are 0666 and the sysctls and devd's socket readable by everyone; the backlight
+  device is root:video 0660, so a user who sets it is in the `video` group (as root: `pw groupmod video -m USER`, then log in
+  again); without it the item shows the level and its tooltip names the group. `lhde-hw describe` says what is used.
 
 ### luxnav (the explorer header's vision mode)
 
@@ -218,8 +228,8 @@ missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).
 Then the lux side (`make check-lux`): liblhde's hardware layer over recorded trees for both systems and stub commands
 (`build/liblhde/tests/hw`: batteries, backlights, the volume back ends, the OSS mute, the touchpad), luxshell builds and its
-Lua parses (`luac -p`), its tray items and the Classic Tray tile hosting them
-work against stub system commands (`luxshell/tests/tiles.sh`), every tile is in the sidebar menu's parts list
+Lua parses (`luac -p`), its tray items, the power tile and the Classic Tray tile hosting them work over that layer with a
+fake tree and stub system commands (`luxshell/tests/tiles.sh`), every tile is in the sidebar menu's parts list
 (`luxshell/tests/parts.py`), and luxwm's frame
 regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a
 baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the first run); skipped

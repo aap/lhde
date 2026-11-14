@@ -2,8 +2,9 @@
 -- tile body 45 + 4 px sizer = 49; the XAML's rotated battery (RotateTransform 270 about 23,17, ScaleX .95) lands
 -- at x 7..24 / y 7..41 of the tile with the nub on top; gauge box #808080 104x19 at x 33, y 6, the ShinyGreen gauge inset
 -- 2 px (100x15) over a 40 % copy of itself and a 15 % GraySweep; text Segoe UI 13 bold #dddddd under the gauge, centred.
--- Data: /sys/class/power_supply/BAT0 (capacity, status, energy_* / charge_*, power_now / current_now) and AC/online,
--- polled every 30 s. Click = flyout (powerflyout.xaml, 194 px wide on white) with the details.
+-- Data: liblhde's hardware layer (lh.hw_battery: /sys/class/power_supply on Linux, the hw.acpi.battery sysctls on FreeBSD;
+-- every battery together), read every 30 s and on the layer's battery events (lh.hw_watch "battery": the kernel's uevents,
+-- devd). Click = flyout (powerflyout.xaml, 194 px wide on white) with the details.
 local tile = { name = "Power", height = 49 }
 local brushes = {   -- powergauge.xaml LinearGradientBrushes (vertical; the battery's ShinyWhite runs across after the 270° turn)
   ShinyWhite  = { {0, "#cdc7af"}, {0.10, "#cdc7af"}, {0.25, "#dddddd"}, {0.40, "#cdc7af"}, {0.8, "#cdc7af"}, {1, "#ada76f"} },
@@ -14,22 +15,16 @@ local brushes = {   -- powergauge.xaml LinearGradientBrushes (vertical; the batt
   GraySweep   = { dir = "h", {0, "#000000"}, {0.8, "#777777"}, {1, "#888888"} },
 }
 local function brush(name, dir) local b = { dir = dir or brushes[name].dir }; for i, s in ipairs(brushes[name]) do b[i] = s end return b end
-local PS = os.getenv("LHSHELL_POWER_SUPPLY") or "/sys/class/power_supply"
-
 local function rd(path) local f = io.open(path); if not f then return nil end local v = f:read("l"); f:close(); return v end
-local function num(path) local v = rd(path); return v and tonumber(v) end
+local STATUS = { charging = "Charging", discharging = "Discharging", full = "Full", idle = "Not charging" }
+local function given(v) if v == "" or v == 0 then return nil end return v end
 function tile.read()
-  local b = PS .. "/" .. (os.getenv("LHSHELL_BATTERY") or "BAT0") .. "/"
-  local s = { present = rd(b .. "status") ~= nil, status = rd(b .. "status") or "Unknown", capacity = num(b .. "capacity"), ac = num(PS .. "/AC/online") == 1,
-              model = rd(b .. "model_name"), tech = rd(b .. "technology") }
-  local now, full, rate = num(b .. "energy_now"), num(b .. "energy_full"), num(b .. "power_now")          -- µWh, µW
-  if not now then now, full, rate = num(b .. "charge_now"), num(b .. "charge_full"), num(b .. "current_now") end   -- µAh, µA
-  s.now, s.full, s.rate, s.unit = now, full, rate, num(b .. "energy_now") and "Wh" or "Ah"
-  if not s.capacity and now and full and full > 0 then s.capacity = math.floor(now * 100 / full + 0.5) end
-  if rate and rate > 0 and now then
-    if s.status == "Discharging" then s.hours = now / rate elseif s.status == "Charging" and full then s.hours = (full - now) / rate end
-  end
-  return s
+  local b = lh.hw_battery()
+  return { present = (b.count or 0) > 0, count = b.count or 0, status = STATUS[b.state] or "Unknown",
+           capacity = (b.percent or -1) >= 0 and b.percent or nil, ac = b.ac == true,
+           model = given(b.model), tech = given(b.technology),
+           now = given(b.now), full = given(b.full), rate = given(b.rate), unit = given(b.unit) or "Wh",
+           hours = (b.minutes or -1) >= 0 and b.minutes / 60 or nil }
 end
 local function hm(h) if not h then return nil end local m = math.floor(h * 60 + 0.5); return string.format("%dh%02d", m // 60, m % 60) end
 function tile.label(s)
@@ -83,8 +78,13 @@ function tile:initialize()
     if self.flyout_refresh then self.flyout_refresh(s) end
   end
   refresh(); self.timer = lh.timer(refresh, 30000, true)
+  self.watch = lh.hw_watch("battery", function(ended) if ended then self.watch = nil else refresh() end end)
 end
-function tile:dispose() if self.timer then lh.cancel(self.timer) end if self.pulse then lh.cancel(self.pulse) end end
+function tile:dispose()
+  if self.timer then lh.cancel(self.timer) end
+  if self.pulse then lh.cancel(self.pulse) end
+  if self.watch then lh.hw_unwatch(self.watch); self.watch = nil end
+end
 
 -- powerflyout.xaml: white DockPanel Width 194; HeadingText #808080 bold 14 margin 8; GaugeParent margin 8; 1 px #808080 rules
 -- (margin 8,12,8,0); "Power Plans" with three radio rows (read-only here: /sys/firmware/acpi/platform_profile)
@@ -99,14 +99,14 @@ function tile:flyout()
   local function row(k, v) local r = col:add(lh.node{ layout = "dock", margin = {8, 1, 8, 1} })
     r:add(lh.node{ kind = "text", text = k, font = "Segoe UI,Tahoma 12px", color = "#808080", dock = "left", w = 82 })
     r:add(lh.node{ kind = "text", text = v, font = "Segoe UI,Tahoma 12px", color = "#000000", dock = "fill", ellipsis = true }) end
-  heading(string.format("Power Status (%d)", s.present and 1 or 0))
+  heading(string.format("Power Status (%d)", s.count or 0))
   local gp = col:add(lh.node{ h = 40, layout = "fill", margin = {8, 0, 8, 6} })
   local g = build_gauge(gp, 0, 0, W - 16 - 26, 1, "Segoe UI,Tahoma Bold 12px", "#404040"); g.update(s)
   row("Status", s.status .. (s.ac and " (on AC)" or ""))
   row("Charge", (s.capacity or 0) .. "%")
   if s.hours then row(s.status == "Charging" and "Until full" or "Remaining", hm(s.hours)) end
-  if s.rate and s.rate > 0 then row("Rate", string.format("%.1f %s", s.rate / 1e6, s.unit == "Wh" and "W" or "A")) end
-  if s.now and s.full then row("Capacity", string.format("%.1f / %.1f %s", s.now / 1e6, s.full / 1e6, s.unit)) end
+  if s.rate and s.rate > 0 then row("Rate", string.format("%.1f %s", s.rate, s.unit == "Wh" and "W" or "A")) end
+  if s.now and s.full then row("Capacity", string.format("%.1f / %.1f %s", s.now, s.full, s.unit)) end
   if s.model then row("Battery", s.model .. (s.tech and (" " .. s.tech) or "")) end
   line()
   heading("Power Plans")

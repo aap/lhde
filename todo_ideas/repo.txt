@@ -7,15 +7,16 @@
 	tree (aap: not worried; decide when the aurora goes into flxp)
 
 ## FreeBSD (docs/BUILDING.md "FreeBSD")
-* the hardware tray items and tiles: brightness (backlight(8), /dev/backlight/*), battery (acpiconf -i 0 / hw.acpi.battery.*),
-	volume (mixer(8); wpctl/pactl when PipeWire/PulseAudio run), touchpad; flxp/shell/traycontrol.cpp and luxshell's
-	trayitems/brightness.lua, tiles/power.lua read /sys/class
+* the hardware layer's FreeBSD battery is the sysctls' sum: no model, capacity or per-battery rows in the power flyout
+	(ACPIIO_BATT_GET_BIX / GET_BST on /dev/acpi, group operator, would give them); the touchpad item is unverified on a
+	real X server there (Xvfb has none; Xorg's log on soma shows the libinput "SynPS/2 Synaptics TouchPad" it looks for)
 * check FreeBSD 15's inotify for IN_ATTRIB of a watched folder's entries (its sys/inotify.h lists only CLOSE_WRITE, DELETE,
 	MODIFY and MOVED_* as entry events): without it the attribute columns of a file changed elsewhere wait for F5; a
 	per-file watch or an mtime/ctime poll of the shown rows would do it
-* the headless tests start luxshell, whose volume item's `pactl subscribe` autospawns pulseaudio where PulseAudio is installed
-	(soma): it writes ~/.config/pulse into the test's scratch HOME after the test removed it (an empty tmp.* directory in
-	/tmp per luxshell test) and lives on until it idles out; the tests could set PULSE_SERVER to nothing or kill it
+* the headless tests start luxshell, whose volume item's `pactl subscribe` (the hardware layer's event source on Linux)
+	autospawns pulseaudio where PulseAudio is installed but not running: it writes ~/.config/pulse into the test's scratch
+	HOME after the test removed it and lives on until it idles out; the tests could set PULSE_SERVER to nothing or kill it
+	(FreeBSD reads the OSS mixer and starts no pactl)
 
 * lhde on Fedora (soma now dual-boots it; aap): a second Linux distribution for the out-of-the-box test, and the place
 	for a Wayland port experiment later (wux's X layer is wux/sys/x11.cpp; luxwm is X11 through and through)

@@ -1,6 +1,6 @@
 -- The shared part of the system tray items (trayitems/volume.lua, brightness.lua, touchpad.lua): a 16 px icon in the tray
 -- beside the XEmbed icons (the Classic Tray tile and its view in the minimized sidebar's taskbar, tiles/notifications.lua),
--- the XP volume popup's shape as the flyout, and the commands they run (lh.pipe).
+-- the XP volume popup's shape as the flyout, and the calls of the hardware layer they make in a child (C.hw).
 --   local C = dofile(lh.lua_dir .. "/traycontrol.lua")
 --   return C.item{ name, tooltip = function(st) -> text, icon = function(st) -> icon name,
 --                  start = function(self, update) (reads the value, calls update(st) on every change; returns nothing),
@@ -11,34 +11,36 @@
 -- st.hidden hides the item's icons, and it takes no tray slot (no such device); st is whatever the item's start reports.
 local C = {}
 
------------------------------------------------------------------- commands
--- C.run(cmd, done): runs cmd (sh -c, stdout and stderr) without blocking, done(lines) when it has exited
-function C.run(cmd, done)
-  local lines = {}
-  return lh.pipe(cmd .. " 2>&1", function(l) table.insert(lines, l) end, function() if done then done(lines) end end)
+------------------------------------------------------------------ the hardware layer
+-- C.hw(name, done, ...): lh[name](...) (lh.hw_volume, lh.hw_volume_set, ...: liblhde's hardware layer, which may run a
+-- program and wait for it) in a child of luxshell (lh.fork_call), done(result) in the main loop: the table the call
+-- returned, or { true } / { nil, reason } for a set ([1], [2])
+function C.hw(name, done, ...)
+  local t = {}
+  return lh.fork_call(lh[name], function(l)
+    local k, ty, v = l:match("^([^\t]*)\t(%a)\t(.*)$")
+    if not k then return end
+    if ty == "n" then v = tonumber(v) elseif ty == "b" then v = v == "true" end
+    t[tonumber(k) or k] = v
+  end, function() if done then done(t) end end, ...)
 end
--- C.queue(after): runs commands one at a time, in order; a command queued under a key while others wait replaces the waiting
--- one of that key (the wheel's steps collapse to the last), after() once the queue is empty (the tile reads the value back)
+-- C.queue(after): runs calls of C.hw one at a time, in order; a call queued under a key while others wait replaces the
+-- waiting one of that key (the wheel's steps collapse to the last), after() once the queue is empty (the item reads back)
+--   local q = C.queue(read); q("volume", "hw_volume_set", 40)
 function C.queue(after)
   local busy, order, pending = false, {}, {}
   local function nextc()
     local k = table.remove(order, 1)
     if not k then busy = false; if after then after() end return end
-    local cmd = pending[k]; pending[k] = nil
-    if not C.run(cmd, nextc) then nextc() end
+    local job = pending[k]; pending[k] = nil
+    if not C.hw(job[1], function() nextc() end, table.unpack(job, 2, job.n)) then nextc() end
   end
-  return function(key, cmd)
+  return function(key, name, ...)
     if pending[key] == nil then table.insert(order, key) end
-    pending[key] = cmd
+    pending[key] = table.pack(name, ...)
     if not busy then busy = true; nextc() end
   end
 end
--- C.have(prog): the program is on PATH (once per tile load: `command -v`, no fork of the program itself)
-function C.have(prog)
-  local p = io.popen("command -v " .. prog .. " 2>/dev/null"); if not p then return false end
-  local o = p:read("l"); p:close(); return o ~= nil and o ~= ""
-end
-function C.quote(s) return "'" .. tostring(s):gsub("'", "'\\''") .. "'" end
 
 ------------------------------------------------------------------ icons
 -- No picture of the packs fits (4074's imageres and shell32 have no speaker, sun or touchpad; XP's tray speaker is
