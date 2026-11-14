@@ -12,7 +12,7 @@ sessions are started. The repository, one build for the parts that were separate
 | `luxwm/`    | the window manager: Longhorn frames (DWM glass frame sets, classic frames from the style through wuxtheme), EWMH, animations; `luxwmc`; `tests/` (frametest, regress) | x11 `lhwm/` |
 | `luxnav/`   | libluxnav, the Longhorn navigation bar (the vision header; C API `lhnav_*`, `lhnav.h`), linked into flxp and navdemo | x11 `lhnav/` |
 | `luxshell/` | the Avalon bars, sidebar, tiles, toasts, start menu: C core + Lua (`*.lua`, `tiles/`) | x11 `lhshell/` (without `assets/`) |
-| `liblhde/`  | liblhde (`<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`): the three trees and every lookup in them, the theme resolver, the settings store; `lhde-theme` (with `explain` and `dirs`); `tests/resolve.c` | new (was `lhtheme/`) |
+| `liblhde/`  | liblhde (`<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`, `<lhde/hw.h>`): the three trees and every lookup in them, the theme resolver, the settings store, the hardware layer; `lhde-theme` (with `explain` and `dirs`), `lhde-hw`; `tests/resolve.c`, `tests/hw.c` | new (was `lhtheme/`) |
 | `session/`  | `lhde-session` (start, theme, taskbar, shell, picom, desktop, stop), `lab.sh` (the headless bench), `lhwall.sh`, theme-reload/-watch, picom configs | x11 `xinitrc.lab`, `second-display.sh`, `lab.sh`, ... |
 | `apps/`     | lhde's applications on the public entry point (`wux/wux.h`, `shell/shell.h`, the recipe `apps/app.mk`; docs/APPLICATIONS.md): `luxshot` (screenshots), `luxattr` (the attributes editor), `luxpad` (the notepad), `skeleton` (the one to copy) | new |
 | `examples/` | extendframe, navdemo, aurorademo (its tables made at build time from the Windows tree) | x11 `examples/` |
@@ -88,7 +88,7 @@ tree). Per component: `make wux`, `make wuxtheme`, `make flxp`, `make tests`, `m
 `make luxshell`, `make examples`, `make apps`.
 
 `make install` installs program files only (docs/LAYOUT.md "The three trees"): `bin/` (the six flxp programs, ut-dump,
-luxwm, luxwmc, luxshell, luxshot, luxattr, luxpad, lhde-theme, lhde-session, lhde-import, lhde-pack, lhde-schemes, lhde-mime), `lib/` (`libwuxtheme`, `libluxnav`, `liblhde` `.so.1` + `.so`, `liblhde.a`, `pkgconfig/`),
+luxwm, luxwmc, luxshell, luxshot, luxattr, luxpad, lhde-theme, lhde-hw, lhde-session, lhde-import, lhde-pack, lhde-schemes, lhde-mime), `lib/` (`libwuxtheme`, `libluxnav`, `liblhde` `.so.1` + `.so`, `liblhde.a`, `pkgconfig/`),
 `lib/lhde/` (`PKGLIBDIR`: the code that is not a binary: `luxshell/` the Lua, `session/` lhde-session's helpers and lab.sh,
 `tools/` lhde-import's Python), `share/lhde/` (`DATADIR`: our shipped text, `themes/ navbar/ icons/ sources/ frames/*/theme.ini
 packs/*/shell.lua`, flxp's `res/icons`), `include/`,
@@ -118,7 +118,7 @@ with GNU make (FreeBSD's make is not):
     LHDE_TEST_DISPLAYS=":71 :72 :73" gmake check
 
 `gmake check` there runs everything `make check` runs on Linux: the shim's and the toolkit's tests, the scripts, liblhde's
-resolver, luxshell's Lua, and the headless scripts under Xvfb, the attribute ones (luxattr, properties, filter, runas,
+resolver and hardware layer, luxshell's Lua, and the headless scripts under Xvfb, the attribute ones (luxattr, properties, filter, runas,
 luxshot) through `getextattr` / `setextattr` (`tests/headless/xattrs.sh`: attr's getfattr and setfattr do not exist there).
 What skips there and why: swatchtest without a `DISPLAY`; luxwm's frame regression and ut-dump without the frame sets'
 styles (a tree with the free pack only); fileops_test's moves between two file systems when its scratch directories share
@@ -216,7 +216,9 @@ luxshell's Log Off and by `lhde-session stop` with nothing left: `tests/headless
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).
-Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac -p`), its tray items and the Classic Tray tile hosting them
+Then the lux side (`make check-lux`): liblhde's hardware layer over recorded trees for both systems and stub commands
+(`build/liblhde/tests/hw`: batteries, backlights, the volume back ends, the OSS mute, the touchpad), luxshell builds and its
+Lua parses (`luac -p`), its tray items and the Classic Tray tile hosting them
 work against stub system commands (`luxshell/tests/tiles.sh`), every tile is in the sidebar menu's parts list
 (`luxshell/tests/parts.py`), and luxwm's frame
 regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a
