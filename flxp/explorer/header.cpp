@@ -2800,6 +2800,7 @@ LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 }
 
 bool g_settings_read;
+bool g_lhwm = true;                 // luxwm is the window manager (set_lhwm)
 
 
 // <prefix>header_size and the elements; the dialog's (prefix filedlg_) fall
@@ -2819,6 +2820,7 @@ void read_settings()
     if (sz == "small" || sz == "tiny") g_hsize = SIZE_SMALL;
     else if (sz == "large") g_hsize = SIZE_LARGE;
     else if (sz == "xlarge" || sz == "extralarge" || sz == "extra-large" || sz == "huge") g_hsize = SIZE_XLARGE;
+    if (!g_lhwm) g_hsize = SIZE_SMALL;     // another window manager's caption has the title (set_lhwm)
     for (int i = 0; i < ELEMENTS; i++) {
         int v = shell::setting_flag_auto(g_prefix + ELEMENT_KEYS[i]);
         if (v < 0 && !g_prefix.empty()) v = shell::setting_flag_auto(ELEMENT_KEYS[i]);
@@ -2920,8 +2922,16 @@ bool draws_title() { if (!g_settings_read) read_settings(); return vision() || (
 
 void set_size(Size sz)
 {
-    g_hsize = sz;
+    g_hsize = g_lhwm ? sz : SIZE_SMALL;    // (the choice is kept for luxwm)
     shell::write_setting(g_prefix + "header_size", SIZE_NAMES[sz]);
+}
+
+bool set_lhwm(bool on)
+{
+    if (on == g_lhwm) return false;
+    g_lhwm = on;
+    if (g_settings_read) read_settings();
+    return true;
 }
 
 void set_shown(Element e, bool on)

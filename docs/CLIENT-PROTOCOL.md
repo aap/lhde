@@ -271,6 +271,24 @@ slate4074, jade4074, the luna and basic* themes, classic) keep `_LHWM_COMPOSITED
 4. Input in the header: "Caption behaviour in the client".
 5. Watch the root as in "Theme changes".
 
+## Without luxwm
+
+The header continues luxwm's frame, so a client decides from the window manager, not from the theme alone: luxwm runs when the
+root's `_NET_SUPPORTING_WM_CHECK` names a window whose own `_NET_SUPPORTING_WM_CHECK` names itself and whose `_NET_WM_NAME` is
+`lhwm` (EWMH; luxwm writes it with its NUL, `"lhwm\0"`). Under another window manager or none, the other caption shows the
+title and nobody paints a plate, so flxp (the Explorer and the file dialog, `browser::want_longhorn`) draws:
+
+- `Explorer.chrome = auto`: the XP chrome (toolbar and Address bar);
+- `longhorn` with the 4051 / 4074 header: the header at its Small size (back and forward, the breadcrumb, the search and
+  favourites buttons; no title row), opaque, under the other window manager's caption; the chosen size returns with luxwm;
+- `longhorn` with the vision header (`Explorer.navbar = vision`): the XP chrome, since its title and caption buttons are
+  luxwm's deco rows (CLIENT_CAPTION).
+
+flxp watches `_NET_SUPPORTING_WM_CHECK` and decides again 0.7 s after it changes (a luxwm restart deletes and rewrites it),
+and asks every 2 s while luxwm is believed to run: a luxwm that is killed or crashes leaves the property naming a window that
+is gone. `FLXP_WM_LOG=1` prints each decision (`flxp: window manager FVWM: chrome longhorn, header 36 rows (small)`),
+`FLXP_LHWM=1` / `0` answers the question for a run (tests). `tests/headless/nowm.sh` checks it.
+
 `examples/extendframe.c` (Xlib, Xext, cairo, pangocairo, liblhde) does all of it: a 60 px glass header with a big title, an icon
 placeholder and a fake breadcrumb over an opaque white body, drag, double-click, right-edge resize, the opaque fallback and the
 theme handling. `make`, then `DISPLAY=:9 build/examples/extendframe [-c] [-n]` on any display running luxwm; Escape or q quits.

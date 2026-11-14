@@ -624,6 +624,13 @@ out, the next segment's folder bold and selected), the chevron after the last se
 Escape or a click outside closes it. The icons come from the theme's `path.resources` (its build's shell32.dll; nav.ini
 `icon_dir` overrides it), the star from the visual style.
 
+## The Explorer under another window manager (flxp)
+
+The Longhorn header is part of luxwm's frame. Under another window manager, or none, flxp draws the XP chrome for a theme
+whose `Explorer.chrome` is auto, the 4051 or 4074 header at its Small size (the title is in the other caption) for one that
+says longhorn, and the XP chrome for the vision header; it follows luxwm starting, stopping or crashing within a few seconds
+(docs/CLIENT-PROTOCOL.md "Without luxwm").
+
 ## The Explorer's views (flxp)
 
 In the Longhorn frame (and the Longhorn file dialog) the Explorer's list has build 4074's three views, each at an image size:

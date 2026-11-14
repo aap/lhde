@@ -71,7 +71,7 @@ pack     = 4074-aero            ; packs/, for taskbar = avalon
 sidebar  = full                 ; full | minimized | pinned | none
 
 [Explorer]
-chrome   = longhorn             ; auto | xp | longhorn: the Explorer's own look
+chrome   = longhorn             ; auto | xp | longhorn: the Explorer's own look (without luxwm: CLIENT-PROTOCOL "Without luxwm")
 navbar   = 4074                 ; 4051 | 4074 | vision | none (later 5048, 5112): a layout family
 navbar_preset = medium          ; family-specific size: 4074 small|medium|large|xlarge; vision small|big
 taskpane = top                  ; top | bottom: where flxp's Longhorn task band goes, under the command bar (4051) or under the

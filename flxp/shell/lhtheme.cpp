@@ -153,6 +153,48 @@ bool session_theme_from(const std::string& name, const std::string& published, u
     return resolve_theme(name, out, err);
 }
 
+namespace {
+int ignore_x_error(Display*, XErrorEvent*) { return 0; }
+
+::Window window_prop(Display* dpy, ::Window w, Atom a)
+{
+    Atom type; int format; unsigned long count, after; unsigned char* data = nullptr;
+    ::Window v = 0;
+    if (XGetWindowProperty(dpy, w, a, 0, 1, False, XA_WINDOW, &type, &format, &count, &after, &data) == Success && data) {
+        if (format == 32 && count == 1) v = (::Window)*(unsigned long*)data;
+        XFree(data);
+    }
+    return v;
+}
+}
+
+std::string window_manager_name()
+{
+    const char* d = getenv("DISPLAY");
+    if (!d || !*d) return "";
+    static Display* dpy = XOpenDisplay(nullptr);   // kept: the Explorer asks every few seconds (a killed luxwm says nothing)
+    if (!dpy) return "";
+    // a window manager that died leaves the property naming a window that is gone: errors are expected here
+    XSync(dpy, False);
+    int (*old)(Display*, XErrorEvent*) = XSetErrorHandler(ignore_x_error);
+    Atom check = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
+    std::string out;
+    ::Window w = window_prop(dpy, DefaultRootWindow(dpy), check);
+    if (w && window_prop(dpy, w, check) == w) {
+        Atom type; int format; unsigned long count, after; unsigned char* data = nullptr;
+        if (XGetWindowProperty(dpy, w, XInternAtom(dpy, "_NET_WM_NAME", False), 0, 256, False, AnyPropertyType, &type, &format,
+                               &count, &after, &data) == Success && data) {
+            if (format == 8) out.assign((const char*)data, count);
+            XFree(data);
+        }
+        while (!out.empty() && out.back() == 0) out.pop_back();   // luxwm's has its NUL in it
+        if (out.empty()) out = "?";
+    }
+    XSync(dpy, False);
+    XSetErrorHandler(old);
+    return out;
+}
+
 bool read_session_theme(SessionTheme& out, std::string* err)
 {
     const char* d = getenv("DISPLAY");

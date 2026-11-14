@@ -59,6 +59,9 @@ Size size();
 bool shown(Element e);
 bool draws_title();                 // the header shows the title (else the frame's caption: Small, or Title off)
 void set_size(Size s);              // stored; the host refits (browser::header_refit)
+// luxwm runs (browser::lhwm_running): without it the header has the Small size, whatever is chosen (the other window
+// manager's caption shows the title); true if that changed (the host refits)
+bool set_lhwm(bool on);
 void set_shown(Element e, bool on); // stored; Title also wants a refit (the caption's flags)
 enum { MENU_IDS = 9 };
 // View > Toolbars under this header, ids first..first+MENU_IDS-1: the elements

@@ -23,8 +23,9 @@ setfattr -n user.xdg.tags -v "red,work" "$F/alpha.txt"
 setfattr -n user.xdg.tags -v "blue" "$F/beta.txt"
 setfattr -n user.lux.desc -v "A red sunset" "$F/gamma.png"
 setfattr -n user.xdg.comment -v "work in progress" "$F/delta.md"
+# FLXP_LHWM=1: the full 4074 header, as under luxwm (without a window manager flxp would draw the Small one)
 export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config XDG_DATA_HOME=$T/home/.local/share XDG_STATE_HOME=$T/home/.local/state \
-       XDG_CACHE_HOME=$T/home/.cache LHDE_WINDOWS=${styles%/index/styles} DISPLAY=$D FLXP_TRACE_LIST=1
+       XDG_CACHE_HOME=$T/home/.cache LHDE_WINDOWS=${styles%/index/styles} DISPLAY=$D FLXP_TRACE_LIST=1 FLXP_LHWM=1
 unset LHDE_DATA LHDE_SETTINGS
 printf '[theme]\nname = jade4074\n' > $T/home/.config/lhde/settings.ini
 printf '[flxp]\ntaskpane = 0\nstatusbar_longhorn = 1\n' > $T/home/.config/lhde/flxp.ini
