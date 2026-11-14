@@ -34,7 +34,8 @@ bool read_desktop_file(const std::string& path, App& out);
 // installed, not removed [Default Applications] entry of the type, else its first association (Added Associations, then
 // MimeType= in data-directory order); else the same for its nearest ancestor, and so on.
 const App* default_app(const std::string& mime);        // null if none
-// where the default comes from: layer "user" (the user's files), "lhde" (a lhde-mimeapps.list), "desktop" (another
+// where the default comes from: layer "user" (the user's files), "role" (the role file, shell/roles.h: a role's program;
+// shell::role_of names the role), "lhde" (a lhde-mimeapps.list), "desktop" (another
 // desktop's file), "system" (the distribution's), "claimant" (no file sets one: the first association; file = its
 // desktop file), "" (none); type = the type or ancestor it was found for
 struct AppSource { const App* app = nullptr; std::string type, file, layer; };

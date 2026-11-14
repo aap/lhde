@@ -16,6 +16,12 @@ std::string mime_type_for_name(const std::string& filename);     // globs only; 
 std::string mime_canonical(const std::string& type);             // resolves aliases
 std::vector<std::string> mime_parents(const std::string& type);  // all ancestors, nearest first (text/* -> text/plain, -> application/octet-stream)
 bool mime_is_a(const std::string& type, const std::string& ancestor);
+// a type's own parents: subclasses' lines for it, text/plain for a text/* type, application/octet-stream for a type with
+// neither (not inode/*); canonical
+std::vector<std::string> mime_direct_parents(const std::string& type);
+// every type the database knows: its types files, the globs' types, both sides of subclasses, the aliases' targets;
+// canonical, sorted
+std::vector<std::string> mime_all_types();
 std::string mime_comment(const std::string& type);               // "PNG image"; "" if unknown
 std::string mime_icon_key(const std::string& type);              // our icon key ("image", "text", ...); "" if no mapping
 

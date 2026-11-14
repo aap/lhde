@@ -31,6 +31,7 @@ $PREFIX/share/lhde/                  shipped data, our text only (DATADIR)
   frames/SET/theme.ini (+ nav.ini)     frame-set tuning; the pixels are generated, below
   packs/PACK/shell.lua                 luxshell's packs
   res/icons/                           flxp's own (Wine's) icons, luxpad.ico (ReactOS's notepad icon)
+  applications/roles.ini               the default programs' roles (docs/SETTINGS.md "Default programs")
 $PREFIX/lib/lhde/                    code that is not a binary (PKGLIBDIR)
   luxshell/                            luxshell's Lua (runtime.lua, tiles/, ...)
   session/                             lhde-session's helpers: lhde-paths.sh, lhwall.sh, lab.sh, theme-*.sh, picom configs

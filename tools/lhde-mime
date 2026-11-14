@@ -15,10 +15,19 @@ usage:
                                   flxp's Open With and Folder Options do
   lhde-mime reset TYPE            the user's lines for TYPE out of ~/.config/mimeapps.list: lhde's or the distribution's
                                   default again
+  lhde-mime roles                 the default programs by role (roles.ini): each role's types, its program and why, the
+                                  installed programs it offers; the terminal ([commands] terminal)
+  lhde-mime role ROLE [APP|none|-]
+                                  print the role's choice, or set it: settings.ini [programs] ROLE = APP (a desktop file
+                                  id), none (XP's "Use my current ...": the role sets nothing) or - (lhde's default
+                                  again), then roles apply
+  lhde-mime roles apply           write the role file (~/.local/share/applications/lhde-mimeapps.list) from the roles: one
+                                  [Default Applications] line per type of each role; lhde-session runs it at start
   lhde-mime check                 the audit: programs claiming types they are unlikely to handle (a music player claiming
                                   folders, catch-all claims), the verdicts that follow, defaults naming desktop files that
                                   do not exist, duplicate lines, mimeinfo.cache files out of date, legacy files, lhde's
-                                  defaults not read (XDG_CURRENT_DESKTOP)
+                                  defaults not read (XDG_CURRENT_DESKTOP), a role's program not installed, a role file
+                                  out of date
 The environment's XDG_* variables decide which files are read, as for every program."""
 import os
 import sys
@@ -135,6 +144,61 @@ def list_cmd(db, mode):
     return 0
 
 
+def roles_cmd(db):
+    e = db.env
+    rs, sets = db.roles()
+    programs = M.read_programs(e)
+    print('roles.ini: %s' % (', '.join(e.short(p) for p in M.roles_ini_paths(e)) or 'none found'))
+    print('settings:  %s [programs]' % e.short(e.settings))
+    print('the role file: %s%s' % (e.short(e.roles_file), '' if os.path.isfile(e.roles_file) else ' (not written yet)'))
+    if 'lhde' not in e.desktops:
+        print('  read only when XDG_CURRENT_DESKTOP names lhde (it is %s)' % (':'.join(e.desktops) or 'not set'))
+    for r in rs:
+        id_, how = M.role_choice(db, r, programs)
+        types = sets.get(r.id, [])
+        print()
+        print('%s  %s: %s (%s)' % (r.id, r.label, id_ or 'nothing', how))
+        print('  types:      %d%s' % (len(types), ': ' + ' '.join(types[:8]) + (' ...' if len(types) > 8 else '') if types else ''))
+        cand = M.role_candidates(db, r, types)
+        print('  candidates: %s' % (' '.join(('*' if c == id_ else '') + c for c in cand) or 'none installed'))
+    print()
+    import subprocess
+    term = None
+    for d in (os.path.join(M.HERE, '..', 'build', 'bin'), os.path.join(M.HERE, '..', '..', '..', 'bin')):
+        if os.access(os.path.join(d, 'lhde-theme'), os.X_OK):
+            term = subprocess.run([os.path.join(d, 'lhde-theme'), 'terminal'], capture_output=True, text=True).stdout.strip()
+            break
+    print('terminal  settings.ini [commands] terminal%s' % (': ' + term if term else ''))
+    return 0
+
+
+def role_cmd(db, role, value):
+    rs, sets = db.roles()
+    r = next((x for x in rs if x.id == role), None)
+    if not r:
+        print('lhde-mime: no role %s (the roles: %s)' % (role, ' '.join(x.id for x in rs)), file=sys.stderr)
+        return 1
+    if value is None:
+        id_, how = M.role_choice(db, r, M.read_programs(db.env))
+        print('%s: %s (%s)' % (role, id_ or 'nothing', how))
+        return 0
+    v = '' if value == '-' else M.desktop_id(value)
+    if v and v != 'none' and not db.app(v):
+        print('lhde-mime: %s is not installed (%s)' % (v, ', '.join(db.env.short(d) for d in db.env.app_dirs())),
+              file=sys.stderr)
+        return 1
+    try:
+        M.set_role(db.env, role, v)
+    except OSError as ex:
+        print('lhde-mime: %s' % ex, file=sys.stderr)
+        return 1
+    db2 = M.Db(db.env)
+    M.apply_roles(db2)
+    id_, how = M.role_choice(db2, r, M.read_programs(db2.env))
+    print('%s: %s (%s); %s written' % (role, id_ or 'nothing', how, db.env.short(db.env.roles_file)))
+    return 0
+
+
 def main(argv):
     if len(argv) < 2 or argv[1] in ('-h', '--help', 'help'):
         print(__doc__.split('usage:', 1)[1] if len(argv) >= 2 else __doc__)
@@ -168,6 +232,14 @@ def main(argv):
         print('%s: %s; now %s because %s' % (t, 'the user\'s lines removed from ' + db.env.short(db.user_file()) if had else
                                               'the user\'s file sets nothing for it', a.id if a else 'nothing', why))
         return 0
+    if cmd == 'roles' and len(argv) == 2:
+        return roles_cmd(db)
+    if cmd == 'roles' and len(argv) == 3 and argv[2] == 'apply':
+        changed = M.apply_roles(db)
+        print('%s %s' % (db.env.short(db.env.roles_file), 'written' if changed else 'unchanged'))
+        return 0
+    if cmd == 'role' and len(argv) in (3, 4):
+        return role_cmd(db, argv[2], argv[3] if len(argv) == 4 else None)
     if cmd == 'check' and len(argv) == 2:
         found = M.check(db)
         for kind, text in found:
@@ -175,7 +247,7 @@ def main(argv):
         print('%d finding%s' % (len(found), '' if len(found) == 1 else 's'))
         return 0
     print('usage: lhde-mime explain FILE|TYPE | list [--programs|--types|--defaults|--user] | default TYPE APP | reset TYPE '
-          '| check', file=sys.stderr)
+          '| roles [apply] | role ROLE [APP|none|-] | check', file=sys.stderr)
     return 2
 
 

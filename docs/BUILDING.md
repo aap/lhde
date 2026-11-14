@@ -165,7 +165,8 @@ key table, and the Super keys it calls free are unbound), `build/tests/filetypes
 the extensions, where a default comes from, Change and Restore, the actions' copy, the user's extensions), `tests/mime.py` (which program opens a type on a scratch XDG tree
 with a distribution, lhde's `lhde-mimeapps.list` and a home: lhde-mime's verdicts against the spec's order, flxp's reader
 (`build/tests/assoctest default`), `xdg-mime query default` and `gio mime` against them when installed, `lhde-mime default` /
-`reset` and `check`'s findings), and the
+`reset` and `check`'s findings; the default programs by role: the roles' type sets, the role file's lines from lhde-mime and
+flxp alike, the user's file over the role file over lhde's, a role switched with one command), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
 incl. GTK, the file dialog in both looks, the modifier keys across a focus change, typed text into the Edit control as
 UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair: `tests/headless/typing.sh`), luxpad (`tests/headless/luxpad.sh`:

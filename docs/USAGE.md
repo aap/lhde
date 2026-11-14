@@ -917,7 +917,8 @@ remembers), both written when it exits (docs/SETTINGS.md). No printing, no Help 
 ## File types and programs (lhde-mime)
 
 Which program opens a file comes from the freedesktop files every program reads (docs/SETTINGS.md "Associations" has the
-order): your choices in `~/.config/mimeapps.list` beat lhde's defaults (`lhde-mimeapps.list`: folders open in flxp, text in
+order): your choices for one type in `~/.config/mimeapps.list` beat your default programs by role (the text editor, the image
+viewer, ...: docs/SETTINGS.md "Default programs"), which beat lhde's defaults (`lhde-mimeapps.list`: folders open in flxp, text in
 luxpad), which beat the distribution's; a type nobody sets a default for opens with its first claimant, the first program
 whose desktop file names it (`MimeType=`). That last rule is how a music player ends up opening folders: deadbeef's desktop
 file claims `inode/directory`, update-desktop-database lists it first in `/usr/share/applications/mimeinfo.cache`, and without
@@ -937,11 +938,17 @@ a default Firefox's "Open containing folder" (GIO) and xdg-open run it. In an lh
 - `lhde-mime default TYPE APP` (`lhde-mime default inode/directory flxp.desktop`) writes your choice to `~/.config/mimeapps.list`
   the way flxp's Open With does (the default, and the program first among the added associations); `lhde-mime reset TYPE` takes
   your lines for the type out again, so lhde's or the distribution's default applies.
+- `lhde-mime roles`: the default programs by role: each role's types (how many, the first), its program and why (your choice,
+  lhde's default, none installed), the installed programs it offers; the terminal. `lhde-mime role editor` prints one role's
+  choice, `lhde-mime role editor gedit` sets it (`settings.ini [programs] editor = gedit.desktop`) and applies the roles,
+  `lhde-mime role editor none` leaves the text types to your other files ("Use my current text editor"), `lhde-mime role editor
+  -` gives lhde's default back; `lhde-mime roles apply` writes the role file from the settings (lhde-session does at start).
 - `lhde-mime check`: programs claiming types they are unlikely to handle (a player claiming folders, a non-browser claiming web
   links, catch-all claims such as `application/octet-stream`), the verdicts that follow from them, defaults naming desktop files
   that no longer exist, a key twice in one group, `mimeinfo.cache` files that miss or invent claims (GIO and xdg-open see only
   the cache: a desktop file in `~/.local/share/applications` claims nothing for them until `update-desktop-database
-  ~/.local/share/applications`), legacy `defaults.list` files, and lhde's defaults not read (`XDG_CURRENT_DESKTOP` without lhde).
+  ~/.local/share/applications`), legacy `defaults.list` files, lhde's defaults not read (`XDG_CURRENT_DESKTOP` without lhde), a
+  role's program that is not installed, and a role file that does not say what the roles say.
 
 flxp, GIO and xdg-open differ in two places, both shown by explain: flxp reads the claims from the desktop files themselves
 (GIO and xdg-open from `mimeinfo.cache`), and xdg-open looks up only the exact type (no parent types, no Removed

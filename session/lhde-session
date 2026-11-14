@@ -35,6 +35,7 @@
 # LHDE_TERMINAL=command (default the terminal: settings.ini [commands] terminal, else the first of cmd, urxvt, xterm,
 # x-terminal-emulator; none for no terminal); LHDE_WINDOWS another Windows tree (as every lhde program);
 # Set for the session: XDG_CURRENT_DESKTOP=lhde and DESKTOP_SESSION=lhde (lhde-mimeapps.list, docs/SETTINGS.md "Associations");
+# at start the role file of the default programs (lhde-mime roles apply, docs/SETTINGS.md "Default programs");
 # LHDE_DISPLAY=<display>, the display the control commands of the session's programs act on (luxshell's Log Off);
 # LHDE_SESSION_TAG=<display>.<pid>, by which stop finds what an attached, nested or xsession session started.
 # Settings: ~/.config/lhde/settings.ini and themes/ (docs/SETTINGS.md).
@@ -138,6 +139,9 @@ session() {
 	# default programs, installed in share/applications) only when XDG_CURRENT_DESKTOP names lhde; xdg-utils, which knows no
 	# lhde, takes its generic path, which reads the same files (docs/SETTINGS.md "Associations")
 	export XDG_CURRENT_DESKTOP=lhde DESKTOP_SESSION=lhde
+	# the default programs by role (settings.ini [programs], roles.ini) into the role file, so a text type installed since the
+	# last session follows its role (lhde-mime roles apply; docs/SETTINGS.md "Default programs")
+	m=$(lhde_bin lhde-mime) && [ -n "$m" ] && "$m" roles apply >/dev/null 2>&1
 	[ "$LHDE_MODE" = real ] && [ -f "$HOME/.xinit_all" ] && . "$HOME/.xinit_all"   # the user's own X startup, real sessions only
 	[ -f "$HOME/.Xresources" ] && xrdb "$HOME/.Xresources" 2>/dev/null
 	# a session bus for luxshell's notification server (toasts via notify-send); a tty login has none. Ours, ended with the session
