@@ -26,6 +26,10 @@ result "kerneltest ($(tail -n 1 "$T/kerneltest.log"))" $? "$T/kerneltest.log"
 # GDI semantics drawn into a DIB section
 build/tests/w32/gditest "$T/gditest.ppm" > "$T/gditest.log" 2>&1
 result gditest $? "$T/gditest.log"
+# font linking (share/fonts/fontlink.ini, then fontconfig): a character the face lacks drawn and measured with a face that
+# has it, Latin pixel for pixel as without linking
+build/tests/w32/fontlink > "$T/fontlink.log" 2>&1
+result "fontlink ($(tail -n 1 "$T/fontlink.log"))" $? "$T/fontlink.log"
 # the copy/move engine (in fresh directories under $TMPDIR and /dev/shm)
 build/tests/fileops_test > "$T/fileops.log" 2>&1
 result "fileops_test ($(tail -n 1 "$T/fileops.log"))" $? "$T/fileops.log"

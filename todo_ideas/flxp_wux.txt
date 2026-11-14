@@ -95,8 +95,6 @@
 	(lh4074-083401.png: the Edit menu's outline at x=78, 245 from x=79); the window menu matched lh4074-195235.png
 * Alt+letter on a menu bar highlights the menu but does not drop its popup (luxpad: Alt+O shows Format highlighted, nothing
 	opens; XP opens it); a click works, and F10 then Down in menutest, but F10 in luxpad goes to its Edit
-* no font fallback in GDI: a character the font lacks is its missing glyph (an emoji in luxpad's Lucida Console is a box,
-	stored and saved right); Vista's Uniscribe and fontconfig would take a face that has it
 * a message box and a property sheet get minimize and maximize buttons from luxwm (seen in the lab under luna and jade4074;
 	luxpad's Find, Replace and Font dialogs too); XP's have Close only (a sheet also ?): wux's fixed-size _MOTIF_WM_HINTS keeps
 	MWM_FUNC_MINIMIZE whatever the style's WS_MINIMIZEBOX (an owned dialog is now its owner's transient)

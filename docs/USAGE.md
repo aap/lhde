@@ -448,6 +448,21 @@ use the Segoe UI that 4074 ships (`fonts/4074/seguibk.ttf`, version 0.7) instead
 with wuxtheme's GDI text, the glyphs flxp and luxnav draw (whole-pixel stems instead of pango's fractional positions). In Aero
 vision the task buttons' text is black on a white halo (pack `4074-aerovision`, `taskbar_text`).
 
+**Font linking (wux).** A character the text's face lacks is drawn, and measured, with a face that has it, as Windows' font
+linking does (the registry's FontLink\SystemLink, then Uniscribe's fallback): first the faces `share/fonts/fontlink.ini` links
+to the family (`[SystemLink]`, `Tahoma = MS UI Gothic, Gulim, SimSun, PMingLiU`, XP's own lines; a copy in
+`~/.config/lhde/fonts/fontlink.ini` is read instead), then fontconfig's faces for the family that have the character (the
+theme's fonts, the imported ones, ReactOS's, the system's: Noto, DejaVu, Unifont, an emoji font). The linked face is taken at
+the font's height, weight and style and drawn on its baseline, clipped to its ascent and descent, so a line keeps its height;
+the face's own glyphs do not change. The missing glyph (a box) remains only when no installed face has the character. With XP's
+East Asian faces among the fonts (msgothic.ttc, gulim.ttc, simsun.ttc, mingliu.ttc) Japanese, Korean and Chinese look as on
+an XP with East Asian support (their hand-tuned bitmaps at 8 and 9 pt); without them fontconfig's CJK face (or Unifont) draws
+them. Emoji are monochrome, in the text colour, as GDI draws them: colour-only faces
+(Noto Color Emoji's bitmaps) are passed over for an outline face (Noto Emoji, DejaVu Sans, Symbola, ReactOS's Verdana). Symbol
+fonts (Marlett, Wingdings) are never linked; a default-ignorable character the face lacks (a variation selector, a zero-width
+joiner) draws nothing. luxshell's and luxnav's text (wuxtheme's GDI) takes fontconfig's faces, and the link table when the
+program loads it (`ut_load_font_links`); luxwm's captions are pango's, which has its own fallback.
+
 **Dialog fonts (wux).** "MS Shell Dlg" and "MS Shell Dlg 2", the face of dialog templates and of `DEFAULT_GUI_FONT`, stand for
 Tahoma under every style, as XP's and 4074's FontSubstitutes have it: 4074's Display Properties under Jade is Tahoma 8 (its OK
 button 73x21). A 4074 dialog shown in Segoe UI (its About box) names the face in its template; so does ours. The Explorer's Filter
@@ -925,7 +940,9 @@ UTF-16 units from 1), the line ends and the encoding; XP hides it while Word Wra
 then too). A character above U+FFFF (an emoji, 𝄞) is typed, saved and reloaded intact; the caret and Backspace take it as one.
 NUL characters in a file become spaces (the Edit control's text ends at a NUL), as Notepad does.
 
-The font is Lucida Console 10 as XP's (a monospaced face when the Windows fonts are not imported: `fc-match monospace`);
+The font is Lucida Console 10 as XP's (a monospaced face when the Windows fonts are not imported: `fc-match monospace`); a
+character it lacks comes from a linked face (Font linking above: the fixed-pitch MS Gothic, GulimChe, NSimSun, MingLiU for
+East Asian text, a choice; an emoji in monochrome);
 Font... is comdlg32's Font dialog over every installed family. What luxpad keeps: `~/.config/lhde/luxpad.ini` (`[luxpad]`
 `font`, `font_size`, `font_weight`, `font_italic`, `wrap`, `statusbar`; what you chose) and `~/.local/state/lhde/luxpad.ini`
 (`[window]` `x`, `y`, `width`, `height`, `maximized`; `[search]` `find`, `replace`, `match_case`, `whole_word`, `down`; what it

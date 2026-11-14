@@ -141,7 +141,7 @@ TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimpo
 # XSESSIONDIR with BINDIR filled in
 install-data:
 	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(BINDIR) \
-	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \
+	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources $(DESTDIR)$(DATADIR)/fonts \
 	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools $(DESTDIR)$(APPDIR) $(DESTDIR)$(XSESSIONDIR) \
 	           $(DESTDIR)$(THUMBNAILERDIR)
 	install -m 644 share/applications/lhde-mimeapps.list $(DESTDIR)$(APPDIR)/
@@ -152,6 +152,7 @@ install-data:
 	chmod 644 $(DESTDIR)$(XSESSIONDIR)/lhde.desktop
 	install -m 644 share/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
 	install -m 644 share/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
+	install -m 644 share/fonts/fontlink.ini $(DESTDIR)$(DATADIR)/fonts/
 	install -m 644 share/icons/*.theme share/icons/apps.ini $(DESTDIR)$(DATADIR)/icons/
 	install -m 644 share/sources/*.ini share/sources/free-wallpapers-LICENSE.txt $(DESTDIR)$(DATADIR)/sources/
 	for d in share/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
@@ -167,7 +168,7 @@ uninstall-data:
 	      $(DESTDIR)$(BINDIR)/lhde-mime $(DESTDIR)$(APPDIR)/lhde-mimeapps.list $(DESTDIR)$(XSESSIONDIR)/lhde.desktop \
 	      $(addprefix $(DESTDIR)$(THUMBNAILERDIR)/,$(notdir $(wildcard share/thumbnailers/lhde-*.thumbnailer)))
 	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar \
-	       $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources $(DESTDIR)$(DATADIR)/applications \
+	       $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources $(DESTDIR)$(DATADIR)/applications $(DESTDIR)$(DATADIR)/fonts \
 	       $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
 	-rmdir $(DESTDIR)$(PKGLIBDIR)
 

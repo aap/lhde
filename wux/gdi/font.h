@@ -73,4 +73,16 @@ std::vector<FaceInfo> list_faces();
 void set_font_smoothing(int mode);        // SMOOTH_* (true = Standard, false = off)
 int font_smoothing();
 
+// Font linking (Windows' FontLink\SystemLink and Uniscribe's fallback): a character a font's face lacks is drawn, and
+// measured, with the first face that has it, at the font's lfHeight, weight and style, on its baseline and clipped to
+// its ascent and descent: the link table's faces for the family in order, then fontconfig's faces for the family (the
+// theme's, the imported, the free, the system's; outline faces only). The missing glyph only when none has it. Symbol
+// fonts and control characters are not linked.
+// The link table: an ini file's [SystemLink] section, "Family = Linked, Linked, ..." (share/fonts/fontlink.ini); a later
+// call replaces it, a missing file empties it. Fonts created afterwards use it.
+bool load_font_links(const char* path);
+void set_font_fallback(bool on);          // off: every missing character is the missing glyph (tests); default on
+// the family of the face that draws cp in f: its own, a linked one, "" for the missing glyph
+std::string glyph_family(const Font* f, uint32_t codepoint);
+
 } // namespace gdi

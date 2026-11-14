@@ -30,7 +30,7 @@ Decisions in force (from that history):
 | navbar | `navbar/NAME.ini` | navigation-bar layout family: `4051`, `4074`, `vision` (later `5048`, `5112`) |
 | icons | `icons/NAME.theme` | an icon set recipe (keys -> `resources/<build>/shell32.dll#id`, or `file:PACK/PATH` of an icon pack imported with `lhde-import --icons`: docs/USAGE.md "Icon packs") |
 | wallpaper | `wallpapers/[GROUP/]NAME.ext` | one `/` allowed: the build group (`4074/Bliss`) |
-| fonts | `fonts/NAME/` | per build (`4074`, `5112`), then fontconfig |
+| fonts | `fonts/NAME/`; `fonts/fontlink.ini` (shipped) | per build (`4074`, `5112`), then fontconfig; `fontlink.ini` is font linking's table, Windows' FontLink\SystemLink (`[SystemLink]` `Family = Linked, ...`): the faces that draw what a family lacks, before fontconfig's choice (docs/USAGE.md "Font linking") |
 | resources | `resources/BUILD/` | the build's DLLs (shell32, imageres, explorer, browseui, Avalon) |
 
 Names: `[a-z0-9._-]+` (wallpapers: plus one `/`). Importers name by build (`aero5048`, `aero5112`,
