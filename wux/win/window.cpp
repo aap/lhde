@@ -965,7 +965,11 @@ bool set_argb(Window* w, bool on)
 void style_changed(Window* w)
 {
     if (!is_window(w) || !w->top || !w->wm_decorated) return;
-    sys::set_fixed_size(w->top->native, (w->style & WS_CAPTION) == WS_CAPTION && !(w->style & WS_THICKFRAME));
+    bool fixed = (w->style & WS_CAPTION) == WS_CAPTION && !(w->style & WS_THICKFRAME);
+    sys::set_fixed_size(w->top->native, fixed);
+    // the caption buttons: Close alone without WS_MINIMIZEBOX and WS_MAXIMIZEBOX (a message box, a property sheet), else both
+    // with the missing one disabled; a fixed size cannot be maximized
+    sys::set_wm_functions(w->top->native, !fixed, (w->style & WS_MINIMIZEBOX) != 0, (w->style & WS_MAXIMIZEBOX) && !fixed);
 }
 
 bool is_argb(Window* w) { return is_window(w) && w->top && w->top->argb; }

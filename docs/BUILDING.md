@@ -189,7 +189,8 @@ and Add Tag, the Explorer's Filter box under jade4074 over names and attributes,
 luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`, clicks outside open menus under luxwm:
 `tests/headless/menus.sh`, a Win32 menu bar's pixels (plain, hot, open, inactive) under jade4074, luna and classic with
 ImageMagick: `tests/headless/menubar.sh`, the menu bar from the keyboard (Alt+letter drops its popup, F10 enters the bar without
-dropping, from the window and from an Edit control in it): `tests/headless/menukeys.sh`, flxp switched luna -> jade4074 -> classic and classic -> jade4074 -> luna against a fresh
+dropping, from the window and from an Edit control in it): `tests/headless/menukeys.sh`, the caption buttons luxwm gives a message box,
+a property sheet and luxpad's Find (Close alone) and an overlapped window (all three) under classic: `tests/headless/capbuttons.sh`, flxp switched luna -> jade4074 -> classic and classic -> jade4074 -> luna against a fresh
 start under the last theme (icons, colours, bands, xwd and ImageMagick): `tests/headless/themeswitch.sh`, flxp's chrome with no
 window manager, luxwm started, killed and under fvwm2 (the Small header without the title row, the full one, the vision header's XP
 chrome; the log and the band's row in the pixels): `tests/headless/nowm.sh`, Folder Options' File Types page on a scratch home and

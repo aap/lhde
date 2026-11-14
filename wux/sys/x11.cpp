@@ -41,7 +41,8 @@ struct NativeWindow {
     bool transient = false, transient_modal = false;
     uint64_t transient_owner = 0;
     int min_w = 0, min_h = 0;
-    bool fixed = false;     // set_fixed_size: min == max size hints, no MWM resize / maximize
+    bool fixed = false;     // set_fixed_size: min == max size hints
+    unsigned wm_funcs = 0;  // set_wm_functions: the _MOTIF_WM_HINTS functions written (0: no property)
     std::vector<unsigned long> icon;   // _NET_WM_ICON (set_icon), put back likewise
     // set_drop_shadow: the shadow's own window, under this one while it is mapped
     bool shadow_own = false;   // _LH_DROP_SHADOW = 1: the shadow is ours (or none), not the compositor's
@@ -138,12 +139,13 @@ static void put_frame_props(NativeWindow* w)
     }
 }
 
-// _MOTIF_WM_HINTS of a fixed-size window: functions all but resize and maximize (MWM_FUNC_ALL with those bits
-// excluding them), decorations left to the window manager
-static void put_fixed_mwm(NativeWindow* w)
+// _MOTIF_WM_HINTS functions (MWM_HINTS_FUNCTIONS with the MWM_FUNC_* bits listed), decorations left to the window manager;
+// none: the property removed (every function)
+static void put_mwm_functions(NativeWindow* w)
 {
     Atom mwm = XInternAtom(dpy, "_MOTIF_WM_HINTS", False);
-    long h[5] = { 1 /* MWM_HINTS_FUNCTIONS */, 1 | 2 | 16 /* MWM_FUNC_ALL, minus RESIZE and MAXIMIZE */, 0, 0, 0 };
+    if (!w->wm_funcs) { XDeleteProperty(dpy, w->xw, mwm); return; }
+    long h[5] = { 1 /* MWM_HINTS_FUNCTIONS */, (long)w->wm_funcs, 0, 0, 0 };
     XChangeProperty(dpy, w->xw, mwm, mwm, 32, PropModeReplace, (const unsigned char*)h, 5);
 }
 
@@ -207,7 +209,7 @@ static void make_xwindow(NativeWindow* w)
         hints.min_width = hints.max_width = r.width(); hints.min_height = hints.max_height = r.height();
     }
     XSetWMNormalHints(dpy, w->xw, &hints);
-    if (w->fixed) put_fixed_mwm(w);
+    if (w->wm_funcs) put_mwm_functions(w);
     // WM_CLASS = <program>, "Flxp": lets picom/WM rules and xdotool --class find us
     XClassHint ch;
     ch.res_name = (char*)lhde_progname();
@@ -1890,7 +1892,6 @@ void set_fixed_size(NativeWindow* w, bool fixed)
     w->fixed = fixed;
     if (fixed) {
         put_fixed_hints(w, w->rect.width(), w->rect.height());
-        put_fixed_mwm(w);
     } else {
         XSizeHints hints = {};
         long supplied = 0;
@@ -1898,8 +1899,18 @@ void set_fixed_size(NativeWindow* w, bool fixed)
         hints.flags &= ~PMaxSize;
         if (!w->min_w && !w->min_h) hints.flags &= ~PMinSize;
         XSetWMNormalHints(dpy, w->xw, &hints);
-        XDeleteProperty(dpy, w->xw, XInternAtom(dpy, "_MOTIF_WM_HINTS", False));
     }
+    XFlush(dpy);
+}
+
+void set_wm_functions(NativeWindow* w, bool resize, bool minimize, bool maximize)
+{
+    if (!w) return;
+    unsigned f = resize && minimize && maximize ? 0
+               : 4 /* MOVE */ | 32 /* CLOSE */ | (resize ? 2u : 0u) | (minimize ? 8u : 0u) | (maximize ? 16u : 0u);
+    if (f == w->wm_funcs) return;
+    w->wm_funcs = f;
+    put_mwm_functions(w);
     XFlush(dpy);
 }
 
