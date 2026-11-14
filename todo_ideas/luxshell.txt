@@ -15,3 +15,8 @@
 	* the taskbar view's tiles (taskbar_tiles) cannot be removed by the user
 
 * the battery (power) tile is too bright (aap): compare against lh4074-193747.png and the fact sheet, tone the plate/text
+
+* KDE Connect integration (aap, 2026-11-14: "the sidebar tiles will almost write themselves"): kdeconnectd speaks D-Bus
+	(org.kde.kdeconnect: devices, battery, notifications, media control, clipboard, file share, find my phone); tiles and
+	tray items on that bus without KDE: a phone tile (battery, notifications mirrored into the notification tile, ring),
+	send-to-phone in flxp's context menu

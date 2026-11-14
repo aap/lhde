@@ -23,3 +23,6 @@
 * the headless tests start luxshell, whose volume item's `pactl subscribe` autospawns pulseaudio where PulseAudio is installed
 	(soma): it writes ~/.config/pulse into the test's scratch HOME after the test removed it (an empty tmp.* directory in
 	/tmp per luxshell test) and lives on until it idles out; the tests could set PULSE_SERVER to nothing or kill it
+
+* lhde on Fedora (soma now dual-boots it; aap): a second Linux distribution for the out-of-the-box test, and the place
+	for a Wayland port experiment later (wux's X layer is wux/sys/x11.cpp; luxwm is X11 through and through)
