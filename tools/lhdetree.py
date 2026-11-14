@@ -293,6 +293,64 @@ import errno
 import re
 
 ANNOTATE = {'on': True, 'warned': False}
+
+# Extended attributes by their Linux names (user.NAME): os.getxattr / setxattr / listxattr where Python has them (Linux);
+# elsewhere (FreeBSD) extattr(2)'s user namespace through ctypes, where user.lux.desc is `lux.desc` (getextattr user
+# lux.desc FILE). ENOATTR: the errno of an attribute that is not there (ENODATA on Linux, ENOATTR on FreeBSD).
+ENOATTR = getattr(errno, 'ENODATA', None) or getattr(errno, 'ENOATTR', 87)
+if hasattr(os, 'getxattr'):
+    getxattr, setxattr, listxattr = os.getxattr, os.setxattr, os.listxattr
+else:
+    import ctypes
+    import ctypes.util
+    _libc = ctypes.CDLL(ctypes.util.find_library('c'), use_errno=True)
+    _NS_USER = 1   # EXTATTR_NAMESPACE_USER
+    for _f in ('extattr_get_file', 'extattr_set_file', 'extattr_list_file'):
+        getattr(_libc, _f).restype = ctypes.c_ssize_t
+    _libc.extattr_get_file.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_void_p, ctypes.c_size_t]
+    _libc.extattr_set_file.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t]
+    _libc.extattr_list_file.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t]
+
+    def _fail(path):
+        e = ctypes.get_errno()
+        raise OSError(e, os.strerror(e), path)
+
+    def _attr(path, name):
+        if not name.startswith('user.'):
+            raise OSError(errno.EOPNOTSUPP, os.strerror(errno.EOPNOTSUPP), path)
+        return os.fsencode(path), name[5:].encode('utf-8')
+
+    def getxattr(path, name):
+        p, a = _attr(path, name)
+        n = _libc.extattr_get_file(p, _NS_USER, a, None, 0)
+        if n < 0:
+            _fail(path)
+        b = ctypes.create_string_buffer(max(n, 1))
+        n = _libc.extattr_get_file(p, _NS_USER, a, b, n)
+        if n < 0:
+            _fail(path)
+        return b.raw[:n]
+
+    def setxattr(path, name, value):
+        p, a = _attr(path, name)
+        if _libc.extattr_set_file(p, _NS_USER, a, value, len(value)) < 0:
+            _fail(path)
+
+    def listxattr(path):
+        p = os.fsencode(path)
+        n = _libc.extattr_list_file(p, _NS_USER, None, 0)
+        if n < 0:
+            _fail(path)
+        b = ctypes.create_string_buffer(max(n, 1))
+        n = _libc.extattr_list_file(p, _NS_USER, b, n)
+        if n < 0:
+            _fail(path)
+        raw, out, i = b.raw[:n], [], 0
+        while i < len(raw):   # a length byte, then the name
+            k = raw[i]
+            out.append('user.' + raw[i + 1:i + 1 + k].decode('utf-8', 'replace'))
+            i += 1 + k
+        return out
 A_AUTHOR, A_BUILD, A_SOURCE, A_DESC, A_TAGS = 'user.lux.author', 'user.lux.build', 'user.lux.source', 'user.lux.desc', 'user.xdg.tags'
 
 
@@ -317,12 +375,12 @@ def xput(path, attrs, replace=False):
         try:
             if not replace:
                 try:
-                    os.getxattr(path, k)
+                    getxattr(path, k)
                     continue
                 except OSError as e:
-                    if e.errno != errno.ENODATA:
+                    if e.errno != ENOATTR:
                         raise
-            os.setxattr(path, k, v.encode('utf-8'))
+            setxattr(path, k, v.encode('utf-8'))
         except (OSError, AttributeError) as e:
             _warn(path, e)
             if getattr(e, 'errno', None) in (errno.ENOTSUP, errno.EOPNOTSUPP):
@@ -335,8 +393,8 @@ def copy_xattrs(src, dst):
     if not ANNOTATE['on'] or os.path.islink(src) or not os.path.exists(dst):
         return
     try:
-        names = [n for n in os.listxattr(src) if n.startswith('user.')]
-        vals = {n: os.getxattr(src, n).decode('utf-8', 'replace') for n in names}
+        names = [n for n in listxattr(src) if n.startswith('user.')]
+        vals = {n: getxattr(src, n).decode('utf-8', 'replace') for n in names}
     except OSError:
         return
     xput(dst, vals)
@@ -490,7 +548,7 @@ def _annotate_generated_dir(W, d, kind, mpath, build_of):
 
 def _xget(path, k):
     try:
-        return os.getxattr(path, k).decode('utf-8', 'replace')
+        return getxattr(path, k).decode('utf-8', 'replace')
     except (OSError, AttributeError):
         return None
 

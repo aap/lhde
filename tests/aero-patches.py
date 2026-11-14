@@ -76,14 +76,14 @@ try:
     imp(jadeish, 'zzglass')
     imp(stand, 'zzplain')
     try:
-        os.setxattr(W, 'user.lhde-test', b'1')
+        T.setxattr(W, 'user.lhde-test', b'1')
         xattrs = True
     except OSError:
         xattrs = False
     if xattrs:
-        d = os.getxattr(os.path.join(W, 'local', 'themes', 'aero_demo.msstyles'), T.A_DESC).decode()
+        d = T.getxattr(os.path.join(W, 'local', 'themes', 'aero_demo.msstyles'), T.A_DESC).decode()
         check('--style: the unknown patch annotated', unk[1][T.A_DESC], d)
-        d = os.getxattr(os.path.join(W, 'local', 'themes', 'zzplain.msstyles'), T.A_DESC).decode()
+        d = T.getxattr(os.path.join(W, 'local', 'themes', 'zzplain.msstyles'), T.A_DESC).decode()
         check('--style: another style annotated by name', 'zzplain visual style (dropped in with lhde-import --style)', d)
     else:
         print('skip annotations: no user extended attributes in %s' % t)

@@ -634,10 +634,31 @@ def detect(medium, sources, tmp):
     return None, '; '.join(tried)
 
 
-def _tar_xattrs():
-    """GNU tar keeps the user.* attributes (the annotations of docs/ANNOTATIONS.md) in a pax archive; --no-annotate: none"""
+_GNU_TAR = []
+
+
+def gnu_tar():
+    """GNU tar's name: tar on Linux, gtar where tar is another (FreeBSD's bsdtar; archivers/gtar); None without one"""
+    if not _GNU_TAR:
+        found = None
+        for t in ('tar', 'gtar'):
+            try:
+                if shutil.which(t) and 'GNU tar' in subprocess.run([t, '--version'], capture_output=True, text=True).stdout:
+                    found = t
+                    break
+            except OSError:
+                pass
+        _GNU_TAR.append(found)
+    return _GNU_TAR[0]
+
+
+def _tar_xattrs(gnu=True):
+    """tar keeps the user.* attributes (the annotations of docs/ANNOTATIONS.md) in a pax archive; --no-annotate: none.
+    GNU tar names them with --xattrs-include; bsdtar's --xattrs takes them all"""
     import lhdetree
-    return ['--xattrs', '--xattrs-include=user.*'] if lhdetree.ANNOTATE['on'] else []
+    if not lhdetree.ANNOTATE['on']:
+        return []
+    return ['--xattrs', '--xattrs-include=user.*'] if gnu else ['--xattrs']
 
 
 def manifest_head(profile='museum', themes=None):
@@ -661,12 +682,15 @@ def write_pack(pack, lines, tarball, head=None):
         rep = REPRODUCIBLE['on']   # lhde-pack --reproducible: the same bytes from the same files
         same = ['--sort=name', '--owner=0', '--group=0', '--numeric-owner', '--format=gnu',
                 '--mtime=@%d' % int(os.environ.get('SOURCE_DATE_EPOCH') or 0)] if rep else []
+        tar = gnu_tar()
+        if not tar:
+            die('a .tar pack is made with GNU tar, and there is none (FreeBSD: pkg install gtar); lhde-pack --zip makes a .zip')
         if shutil.which('zstd'):
             out = pack.rstrip('/') + '.tar.zst'
-            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), *same, '-I', 'zstd -19 -T%d' % (1 if rep else 0), '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
+            subprocess.run([tar, '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), *same, '-I', 'zstd -19 -T%d' % (1 if rep else 0), '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
         else:
             out = pack.rstrip('/') + '.tar.xz'
-            subprocess.run(['tar', '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), *same, '-I', 'xz -9e -T%d' % (1 if rep else 0), '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
+            subprocess.run([tar, '-C', os.path.dirname(pack.rstrip('/')), *_tar_xattrs(), *same, '-I', 'xz -9e -T%d' % (1 if rep else 0), '-cf', out, os.path.basename(pack.rstrip('/'))], check=True)
         log('pack archive %s (%.1f MB)' % (out, os.path.getsize(out) / 1e6))
         return out
 
@@ -891,13 +915,15 @@ def unpack(path, tmp):
             z.extractall(d)
         subs = [os.path.join(d, x) for x in os.listdir(d)]
         return subs[0] if len(subs) == 1 and os.path.isdir(subs[0]) and not os.path.exists(os.path.join(subs[0], 'source.ini')) else d
-    comp = ['-I', 'zstd -d'] if path.endswith('.zst') else []
-    r = subprocess.run(['tar', '-C', d, *_tar_xattrs(), *comp, '-xf', path])   # restores the user.* annotations
+    gnu = gnu_tar()   # else bsdtar, which knows zstd by itself
+    tar = gnu or 'tar'
+    comp = ['-I', 'zstd -d'] if gnu and path.endswith('.zst') else []
+    r = subprocess.run([tar, '-C', d, *_tar_xattrs(bool(gnu)), *comp, '-xf', path])   # restores the user.* annotations
     if r.returncode:
         log('tar could not restore the annotations (extended attributes); extracting without them')
         shutil.rmtree(d, ignore_errors=True)
         os.makedirs(d, exist_ok=True)
-        subprocess.run(['tar', '-C', d, *comp, '-xf', path], check=True)
+        subprocess.run([tar, '-C', d, *comp, '-xf', path], check=True)
     subs = [os.path.join(d, x) for x in os.listdir(d)]
     return subs[0] if len(subs) == 1 and os.path.isdir(subs[0]) and not os.path.exists(os.path.join(subs[0], 'source.ini')) else d
 
