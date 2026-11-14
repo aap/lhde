@@ -75,6 +75,8 @@ DATADIR        ?= $(PREFIX)/share/lhde
 # <their bindir>/../lib/lhde (liblhde: lhde_component_dir), so it stays $(PREFIX)/lib/lhde whatever LIBDIR is.
 PKGLIBDIR      ?= $(PREFIX)/lib/lhde
 APPDIR         ?= $(PREFIX)/share/applications
+# the X session entry a display manager lists (share/xsessions/lhde.desktop: lhde-session xsession)
+XSESSIONDIR    ?= $(PREFIX)/share/xsessions
 PKGCONFIGDIR   ?= $(LIBDIR)/pkgconfig
 # The file chooser portal backend: the .portal file goes where xdg-desktop-portal
 # looks (its own datadir: PORTALDIR=/usr/share/xdg-desktop-portal/portals for a
@@ -131,12 +133,14 @@ SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh ca
 TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py lhdeschemes.py lhdetree.py wim0108.py \
                 lhdebaml.py lhdeaurora.py lhdestyles.py lhdemime.py
 # share/applications/lhde-mimeapps.list into APPDIR: lhde's default programs, read when XDG_CURRENT_DESKTOP names lhde
-# (lhde-session sets it; docs/SETTINGS.md "Associations")
+# (lhde-session sets it; docs/SETTINGS.md "Associations"); share/xsessions/lhde.desktop.in into XSESSIONDIR with BINDIR filled in
 install-data:
 	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(BINDIR) \
 	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \
-	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools $(DESTDIR)$(APPDIR)
+	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools $(DESTDIR)$(APPDIR) $(DESTDIR)$(XSESSIONDIR)
 	install -m 644 share/applications/lhde-mimeapps.list $(DESTDIR)$(APPDIR)/
+	sed 's|@BINDIR@|$(BINDIR)|g' share/xsessions/lhde.desktop.in > $(DESTDIR)$(XSESSIONDIR)/lhde.desktop
+	chmod 644 $(DESTDIR)$(XSESSIONDIR)/lhde.desktop
 	install -m 644 share/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
 	install -m 644 share/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
 	install -m 644 share/icons/*.theme share/icons/apps.ini $(DESTDIR)$(DATADIR)/icons/
@@ -151,7 +155,7 @@ install-data:
 	cd tools && install -m 644 $(TOOL_FILES) $(DESTDIR)$(PKGLIBDIR)/tools/
 uninstall-data:
 	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(BINDIR)/lhde-pack $(DESTDIR)$(BINDIR)/lhde-schemes \
-	      $(DESTDIR)$(BINDIR)/lhde-mime $(DESTDIR)$(APPDIR)/lhde-mimeapps.list
+	      $(DESTDIR)$(BINDIR)/lhde-mime $(DESTDIR)$(APPDIR)/lhde-mimeapps.list $(DESTDIR)$(XSESSIONDIR)/lhde.desktop
 	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar \
 	       $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \
 	       $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools

@@ -30,7 +30,8 @@ frame regression against a local baseline; last the free baseline (`make check-f
 
 ## A running session
 
-`lhde-session start [THEME]` (a real X server on `:1`, `--nested` in Xephyr, `--attach` to a running server) runs, in this
+`lhde-session start [THEME]` (a real X server on `:1`, `--nested` in Xephyr, `--attach` to a running server; `lhde-session
+xsession` on a display manager's server, from `share/xsessions/lhde.desktop`) runs, in this
 order: the root wallpaper once, **luxwm** in a restart loop, **picom** when the
 theme's frames want a compositor, **luxshell** (or nothing, for `taskbar = classic`, where luxshell itself starts
 `flxp-taskbar`), **flxp-desktop**, and `flxp-startmenu` (flxp-taskbar's start panel without the bar) as the start-menu provider

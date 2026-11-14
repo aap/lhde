@@ -56,7 +56,11 @@ S.parse_ini = parse_ini   -- sections in file order: { _name = "sec", key = valu
 local function dirname(p) return p:match("^(.*)/[^/]*$") or "." end
 local function q(s) return "'" .. s:gsub("'", "'\\''") .. "'" end   -- shell quoting
 S.quote = q
-local function have(cmd) return os.execute("command -v " .. cmd .. " >/dev/null 2>&1") == true end
+-- a program on the PATH (io.popen: SIGCHLD is ignored in luxshell, so os.execute's status says nothing)
+local function have(cmd)
+  local f = io.popen("command -v " .. cmd .. " 2>/dev/null"); if not f then return false end
+  local r = f:read("l"); f:close(); return r ~= nil and r ~= ""
+end
 -- lhde: the session's scripts and files (picom-glass.conf, lhde-session): session/ of the tree or <prefix>/lib/lhde/session
 S.session_dir = lh.component_dir("session") or "."
 
@@ -303,11 +307,11 @@ function S.unset(sec, key) if not S.has(sec, key) then return false end return S
 ------------------------------------------------------------------ session commands (6.2)
 function S.default_command(name)
   if name == "logoff" then
-    -- an lhde-session has a state dir for its display; there "stop" ends the X session. Elsewhere luxwm exits cleanly
+    -- an lhde-session runs on this display (its state dir has loop.pid): "stop" ends the session. Elsewhere luxwm exits cleanly
     -- (properties deleted, clients left mapped) and whatever started it decides what follows.
     local st = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/lhde-session" .. (os.getenv("DISPLAY") or "")
     local function prog(n) local p = lh.bin_dir .. "/" .. n; if exists(p) then return q(p) end return n end
-    if os.execute("test -d " .. q(st)) == true then
+    if exists(st .. "/loop.pid") then
       local ls = S.session_dir .. "/lhde-session"; return (exists(ls) and q(ls) or prog("lhde-session")) .. " stop" end
     return prog("luxwmc") .. " quit"
   elseif name == "standby" then return have("zzz") and "zzz" or "loginctl suspend"

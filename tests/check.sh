@@ -7,7 +7,8 @@
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh and runas.sh setfattr
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick, menushadow.sh
 #                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick,
-#                thumbsmem.sh ImageMagick, nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed); displays :71-:73,
+#                thumbsmem.sh ImageMagick, nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed, xsession.sh xprop and
+#                dbus-daemon, picom when installed); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
 fails=0
@@ -158,6 +159,9 @@ else
     # a double click on a file with user.lux.run runs that command
     tests/headless/runas.sh "$1" > "$T/runas.log" 2>&1; rc=$?
     result "headless/runas.sh$(grep -m1 '^skip' "$T/runas.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/runas.log"
+    # lhde-session xsession as a display manager runs it: up, ended by luxshell's Log Off and by lhde-session stop, nothing left
+    tests/headless/xsession.sh "$2" > "$T/xsession.log" 2>&1; rc=$?
+    result "headless/xsession.sh$(grep -m1 '^skip' "$T/xsession.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/xsession.log"
 fi
 
 [ $fails = 0 ] && echo "check: all passed" || echo "check: $fails failed"

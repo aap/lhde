@@ -199,7 +199,8 @@ their 64 MB budget plus what is on screen, some evicted, skipped without ImageMa
 click and Enter on a file with Run as running its command: `tests/headless/runas.sh`, the window and program icons through
 liblhde's lookup, counted by colour in screenshots of a scratch icon set: the Open With list's and Properties' Opens with icon
 from a desktop file, luxshell's task buttons and the Alt+Tab switcher with an xterm (the class map's cmd) and Display Properties
-(its display key), none generic: `tests/headless/appicons.sh`) on displays :71-:73
+(its display key), none generic: `tests/headless/appicons.sh`, `lhde-session xsession` as a display manager runs it, ended by
+luxshell's Log Off and by `lhde-session stop` with nothing left: `tests/headless/xsession.sh`) on displays :71-:73
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).
@@ -290,6 +291,7 @@ fell back (`[windows]` the user's tree, `[system windows]` a system one); `lhde-
     lhde-session start [THEME]               a real X session (startx on :1, vt8; log in on that tty first)
     lhde-session start --nested [THEME]      in a Xephyr window
     lhde-session start --attach [THEME]      on an X server already running on $LHDE_DISPLAY
+    lhde-session xsession [THEME]            the session a display manager runs on its server (share/xsessions/lhde.desktop)
     lhde-session theme NAME | taskbar KIND | shell on|off | picom on|off | desktop on|off | stop
     LAB=:2 session/lab.sh start; session/lab.sh shell; session/lab.sh theme jade4074; session/lab.sh shot; session/lab.sh stop
 

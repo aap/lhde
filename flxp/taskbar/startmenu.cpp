@@ -21,6 +21,7 @@
 #include "shell/apps.h"
 #include "shell/config.h"
 #include "shell/lhtheme.h"
+#include "shell/util.h"
 #include "sys/sys.h"
 #include "taskbar.h"
 #include "wuxtheme/menu.h"
@@ -332,6 +333,16 @@ void log_off()
     if (MessageBoxW(g.wnd, L"Are you sure you want to log off?", L"Log Off", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return;
     std::string c = shell::store::get("commands", "logoff");   // settings.ini [commands] logoff, luxshell's too
     if (!c.empty()) { run_shell(c); return; }
+    // an lhde-session runs on this display (its state directory has loop.pid, as luxshell's default): `lhde-session stop`
+    const char* rt = getenv("XDG_RUNTIME_DIR");
+    const char* dpy = getenv("DISPLAY");
+    if (dpy && *dpy && shell::is_file(std::string(rt && *rt ? rt : "/tmp") + "/lhde-session" + dpy + "/loop.pid")) {
+        std::string dir = self_dir(), ls = dir + "/lhde-session";      // installed: beside us in bin/
+        if (!executable(ls)) ls = dir + "/../../session/lhde-session";  // a build tree: build/bin -> session/
+        if (!executable(ls)) ls = find_in_path("lhde-session");
+        std::string err;
+        if (!ls.empty() && shell::spawn({ ls, "stop" }, home(), &err)) return;
+    }
     // luxwm: `luxwmc quit` ends the window manager cleanly; that ends a session whose last program it is
     std::string wm = xwm::wm_name();
     if (wm.find("lhwm") != std::string::npos || wm.find("berry") != std::string::npos) {

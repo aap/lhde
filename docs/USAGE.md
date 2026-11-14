@@ -42,6 +42,7 @@ the DLL). Logs: a session's are in `$XDG_RUNTIME_DIR/lhde-session<DISPLAY>/` (be
 | headless | nowhere (Xvfb, `LAB=:2` by default), screenshots only: the test bench | no | `session/lab.sh start`, `session/lab.sh shell`, `session/lab.sh shot out.png` |
 | nested | a 1280x800 Xephyr window on your desktop | yes, click into it | `lhde-session start --nested [THEME]` (the first free display from `:2`), or `LAB=:3 session/lab.sh start xephyr` |
 | real | an X server of its own on `:1`, virtual terminal 8 | yes, full speed, GPU glass | log in on a console (Ctrl+Alt+F8) and run `lhde-session start [THEME]` |
+| display manager | the X server a display manager (LightDM) starts | yes, as real | choose the session "lhde" at the login screen: it runs `lhde-session xsession` (docs/BUILDING.md "A whole-system install and a display manager") |
 
 Each display belongs to one of them: the real session to `:1`, the lab and the scripted tests to `:2` (`LAB=:N` picks another),
 so neither restarts the other's window manager.
@@ -495,7 +496,12 @@ picom when the theme wants a compositor, a terminal, flxp-desktop and luxshell (
 Without a flag it is a real X server on `$LHDE_DISPLAY` (default `:1`) and `$LHDE_VT` (default vt8), started with startx from a
 console login; `--nested` a Xephyr window (`LHDE_GEOMETRY=WxH`, default 1280x800) on the current display, the session inside it on
 `$LHDE_DISPLAY` or the first free display from `:2`; `--attach` the session's programs on an X server that already runs on
-`$LHDE_DISPLAY` (else `$DISPLAY`). The control commands act on `$LHDE_DISPLAY`, else the one running session, else `$DISPLAY`:
+`$LHDE_DISPLAY` (else `$DISPLAY`). `lhde-session xsession [THEME]` is the session a display manager runs (the X session entry
+`$PREFIX/share/xsessions/lhde.desktop`): the same programs in the foreground on the display manager's `$DISPLAY`, with a session
+bus of its own when the login has none and no terminal unless `LHDE_TERMINAL` names one (in `~/.xprofile`, which LightDM's
+session wrapper reads); it returns when the session ends (Log Off, `lhde-session stop`), and the display manager ends the
+server and shows its greeter again. Every program of a session has `LHDE_DISPLAY` set to its display. The control commands act on
+`$LHDE_DISPLAY`, else the one running session, else `$DISPLAY`:
 
 ```
 lhde-session theme NAME                              switch the theme (root _LH_THEME; nothing restarts)
@@ -505,14 +511,14 @@ lhde-session picom on|off                            start / stop picom (glx; LH
 lhde-session desktop on|off                          start / stop flxp-desktop; restarts luxshell without / with its desktop layer
 lhde-session stop                                    end the session: luxshell, flxp-desktop, luxwm, picom, the session bus and
                                                      every process on it, and the X server of start and --nested; under
-                                                     --attach and --nested every process the session started (its
+                                                     --attach, --nested and xsession every process the session started (its
                                                      LHDE_SESSION_TAG), a terminal or an autolaunched sound server too
 ```
 Environment: `LHDE_PICOM=0|1` forces the compositor off / on for the session, luxshell included; `LHDE_SHELL=0` without luxshell;
 `LHDE_DESKTOP=0` without flxp-desktop (luxshell then shows its own desktop layer); `LHDE_WM=fvwm` an fvwm2 session (`lab.fvwm2rc`);
 `LHDE_TERMINAL=COMMAND` (default the terminal of settings.ini `[commands] terminal`; `none` for no terminal); `LHDE_WINDOWS` another Windows tree. State and logs:
 `$XDG_RUNTIME_DIR/lhde-session<DISPLAY>/` (`theme`, `shell`, `desktop`, `luxwm.log`, `luxshell.log`, `flxp-desktop.log`,
-`picom.log`, `session.log`). A real session without a D-Bus session bus gets one of its own, stopped with the session.
+`picom.log`, `session.log`). A real session or an xsession without a D-Bus session bus gets one of its own, stopped with the session.
 
 **flxp-desktop** shows the wallpaper and the icons in a `_NET_WM_WINDOW_TYPE_DESKTOP` window, started after luxwm and with
 luxshell, from the session shell (so it and the explorers it opens share DISPLAY, the session D-Bus and PATH). It takes the
@@ -535,7 +541,9 @@ lhde-session runs on the display, else `luxwmc quit` (luxwm exits cleanly: its r
 mapped; the lab's `restart-wm` brings it back); `standby` = `zzz` if installed, else `loginctl suspend`; `shutdown` = `loginctl
 poweroff`; `restart` = `loginctl reboot`; `lock` = `xlock` or `slock` if installed. From a terminal:
 `xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND logoff`. flxp's start panel asks first, then runs the same
-`[commands] logoff` (else it ends luxwm with `luxwmc quit`) and `[commands] shutdown` (default `loginctl poweroff`).
+`[commands] logoff` (else `lhde-session stop` when an lhde-session runs on the display, else it ends luxwm with `luxwmc quit`)
+and `[commands] shutdown` (default `loginctl poweroff`). Under a display manager Log Off is the end of the login: the session
+ends and the greeter comes back.
 
 ## Keys in the session
 

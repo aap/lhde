@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=lhde
+Comment=The Longhorn desktop environment: luxwm, luxshell and the flxp desktop
+Exec=@BINDIR@/lhde-session xsession
+TryExec=@BINDIR@/lhde-session
+DesktopNames=lhde

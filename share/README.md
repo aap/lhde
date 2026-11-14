@@ -12,5 +12,8 @@ relative name overrides the one here; the Windows tree's `index/` (`~/.local/sha
 - `frames/NAME/theme.ini`: luxwm's frame sets, the tuning keys; their pixels (or a cache) come from lhde-import.
 - `applications/lhde-mimeapps.list`: lhde's default programs, installed to `$PREFIX/share/applications` (not `share/lhde`; an
   uninstalled build does not read it: docs/SETTINGS.md "Associations").
+- `xsessions/lhde.desktop.in`: the X session entry a display manager lists (`lhde-session xsession`), installed with its
+  `@BINDIR@` filled in to `$PREFIX/share/xsessions/lhde.desktop` (docs/BUILDING.md "A whole-system install and a display
+  manager").
 - `packs/NAME/shell.lua`: luxshell's packs; their images are packs/<build>/... of the Windows tree
   (`generated/packs/<build>`).

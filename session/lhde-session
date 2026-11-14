@@ -15,6 +15,10 @@
 #         THEME     a theme (lhde-theme list: slate4051, slate4074, jade4074, aero4074, aerovision, basic5048, aero5048,
 #                   basic5112, aero5112, luna, luna-olive, luna-silver, the user's, bare styles; old names such as aero-patch
 #                   work as aliases); default: the last one (settings.ini [theme] name), else aero4074
+#   lhde-session xsession [THEME]      the session a display manager runs on the X server it started (share/xsessions/lhde.desktop):
+#                                      in the foreground on $DISPLAY, the same programs as start; it returns when the session
+#                                      ends (Log Off: luxshell's, the start panel's, lhde-session stop), and the display
+#                                      manager then ends the server. No terminal unless LHDE_TERMINAL names one (~/.xprofile)
 #   lhde-session theme NAME            switch the running session to NAME (root _LH_THEME; nothing restarts)
 #   lhde-session taskbar avalon|classic|classic+sidebar|none
 #                                      the bottom bar, live: luxshell's Avalon taskbar, flxp-taskbar (luxshell starts it; classic
@@ -23,15 +27,16 @@
 #   lhde-session shell on|off          start / stop luxshell
 #   lhde-session picom on|off          start / stop picom (glx backend; LHDE_PICOM_BACKEND=xrender for Xvfb)
 #   lhde-session desktop on|off        start / stop flxp-desktop; restarts luxshell without / with its own desktop layer
-#   lhde-session stop                  end the session (the X server of start and --nested ends with it; of --attach and
-#                                      --nested every process the session started, a terminal or an autolaunched D-Bus too)
+#   lhde-session stop                  end the session (the X server of start and --nested ends with it; of --attach, --nested
+#                                      and xsession every process the session started, a terminal or an autolaunched D-Bus too)
 # The control commands act on $LHDE_DISPLAY, else on the one running session, else on $DISPLAY.
 # Environment: LHDE_PICOM=0/1 forces the compositor off/on for the session (luxshell too); LHDE_SHELL=0 without luxshell;
 # LHDE_DESKTOP=0 without flxp-desktop (luxshell then shows its own desktop layer); LHDE_WM=fvwm for an fvwm2 session (lab.fvwm2rc);
 # LHDE_TERMINAL=command (default the terminal: settings.ini [commands] terminal, else the first of cmd, urxvt, xterm,
 # x-terminal-emulator; none for no terminal); LHDE_WINDOWS another Windows tree (as every lhde program);
 # Set for the session: XDG_CURRENT_DESKTOP=lhde and DESKTOP_SESSION=lhde (lhde-mimeapps.list, docs/SETTINGS.md "Associations");
-# LHDE_SESSION_TAG=<display>.<pid>, by which stop finds what an attached or nested session started.
+# LHDE_DISPLAY=<display>, the display the control commands of the session's programs act on (luxshell's Log Off);
+# LHDE_SESSION_TAG=<display>.<pid>, by which stop finds what an attached, nested or xsession session started.
 # Settings: ~/.config/lhde/settings.ini and themes/ (docs/SETTINGS.md).
 # State: $XDG_RUNTIME_DIR/lhde-session<DISPLAY>/ (theme, shell, desktop, logs; luxshell's Log Off runs `lhde-session stop` when it exists).
 SELF=$(readlink -f "$0")
@@ -121,11 +126,13 @@ startdesk() {
 session() {
 	D=$DISPLAY STATE=$(statedir "$DISPLAY"); mkdir -p "$STATE"
 	# no THEME given: the one saved last (settings.ini [theme] name, SETTINGS.md), else aero4074
-	[ -s "$STATE/theme" ] || echo "${LHDE_THEME:-$("$LHDE_THEME_TOOL" current 2>/dev/null)}" > "$STATE/theme"; [ -s "$STATE/theme" ] || echo aero4074 > "$STATE/theme"
+	if [ ! -s "$STATE/theme" ]; then
+		t=${LHDE_THEME:-$("$LHDE_THEME_TOOL" current 2>/dev/null)}; echo "${t:-aero4074}" > "$STATE/theme"
+	fi
 	[ -s "$STATE/shell" ] || echo "${LHDE_SHELL:-1}" > "$STATE/shell"
 	[ -s "$STATE/desktop" ] || echo "${LHDE_DESKTOP:-1}" > "$STATE/desktop"
 	rm -f "$STATE/quit"; echo $$ > "$STATE/loop.pid"
-	export LHDE_SESSION_TAG="$D.$$"; echo "$LHDE_MODE $LHDE_SESSION_TAG" > "$STATE/mode"
+	export LHDE_SESSION_TAG="$D.$$" LHDE_DISPLAY="$D"; echo "$LHDE_MODE $LHDE_SESSION_TAG" > "$STATE/mode"
 	trap session_end INT TERM HUP
 	# the desktop's name for every program the session starts: the MIME Applications spec reads lhde-mimeapps.list (lhde's
 	# default programs, installed in share/applications) only when XDG_CURRENT_DESKTOP names lhde; xdg-utils, which knows no
@@ -136,7 +143,7 @@ session() {
 	# a session bus for luxshell's notification server (toasts via notify-send); a tty login has none. Ours, ended with the session
 	# (bus_stop): dbus-launch leaves one dbus-daemon per start behind, and with it an at-spi bus and an xdg-desktop-portal; a hundred
 	# of them use up the user's inotify instances (fs.inotify.max_user_instances, 128)
-	if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && [ "$LHDE_MODE" = real ]; then bus_start; fi
+	if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && { [ "$LHDE_MODE" = real ] || [ "$LHDE_MODE" = xsession ]; }; then bus_start; fi
 	xset -b 2>/dev/null
 	# the root background once, from the settings luxshell and flxp-desktop read (lhwall.sh): the first frames already show the
 	# wallpaper the session keeps
@@ -188,6 +195,15 @@ session_end() {
 cmd=${1:-start}; [ $# -gt 0 ] && shift
 case $cmd in
 __session) LHDE_MODE=${LHDE_MODE:-real}; session ;;
+xsession)
+	# a display manager's session: its X server on $DISPLAY, this process the session (its end ends the login)
+	[ -n "$DISPLAY" ] && xdpyinfo >/dev/null 2>&1 || { echo "lhde-session: xsession: no X server on DISPLAY=$DISPLAY" >&2; exit 1; }
+	[ -x "$LUXWM" ] || { echo "lhde-session: no luxwm (make, or make install)" >&2; exit 1; }
+	n=; [ -z "$1" ] || { n=$(themename "$1"); [ -n "$n" ] || nosuch "$1"; }
+	STATE=$(statedir "$DISPLAY"); rm -rf "$STATE"; mkdir -p "$STATE"; [ -n "$n" ] && echo "$n" > "$STATE/theme"
+	export LHDE_THEME="$n"
+	: "${LHDE_TERMINAL:=none}"
+	LHDE_MODE=xsession; session ;;
 start)
 	how=real
 	case $1 in --nested) how=nested; shift ;; --attach) how=attach; shift ;; esac
@@ -250,6 +266,9 @@ picom)
 	D=$(target); STATE=$(statedir "$D"); mkdir -p "$STATE"
 	case $1 in off) killon picom ;; *) killon picom; picom_start ;; esac; echo "picom ${1:-on} on $D" ;;
 stop)
+	# run from inside the session (luxshell's Log Off): without the session's tag and bus address, so neither this stop's sweep
+	# nor the session's own end, which sweeps and stops the bus too once luxwm is gone, takes this process down halfway
+	[ -n "$LHDE_SESSION_TAG$DBUS_SESSION_BUS_ADDRESS" ] && exec env -u LHDE_SESSION_TAG -u DBUS_SESSION_BUS_ADDRESS "$SELF" stop "$@"
 	D=$(target); STATE=$(statedir "$D")
 	[ -d "$STATE" ] && touch "$STATE/quit"
 	killon luxshell; killon flxp-desktop; killon luxwm; killon picom; killon fvwm2
@@ -259,5 +278,5 @@ stop)
 	for p in $(pgrep -x Xephyr); do lhde_args $p | grep -qx -- "$D" && kill $p; done
 	echo "stopped $D" ;;
 -h|--help|help) sed -n '2,/^SELF=/p' "$SELF" | sed '$d; s/^# \{0,1\}//' ;;
-*) echo "usage: lhde-session start [--nested|--attach] [THEME] | theme NAME | taskbar KIND | shell on|off | picom on|off | desktop on|off | stop" >&2; exit 2 ;;
+*) echo "usage: lhde-session start [--nested|--attach] [THEME] | xsession [THEME] | theme NAME | taskbar KIND | shell on|off | picom on|off | desktop on|off | stop" >&2; exit 2 ;;
 esac
