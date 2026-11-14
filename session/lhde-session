@@ -29,6 +29,7 @@
 # LHDE_DESKTOP=0 without flxp-desktop (luxshell then shows its own desktop layer); LHDE_WM=fvwm for an fvwm2 session (lab.fvwm2rc);
 # LHDE_TERMINAL=command (default the terminal: settings.ini [commands] terminal, else the first of cmd, urxvt, xterm,
 # x-terminal-emulator; none for no terminal); LHDE_WINDOWS another Windows tree (as every lhde program);
+# Set for the session: XDG_CURRENT_DESKTOP=lhde and DESKTOP_SESSION=lhde (lhde-mimeapps.list, docs/SETTINGS.md "Associations").
 # Settings: ~/.config/lhde/settings.ini and themes/ (docs/SETTINGS.md).
 # State: $XDG_RUNTIME_DIR/lhde-session<DISPLAY>/ (theme, shell, desktop, logs; luxshell's Log Off runs `lhde-session stop` when it exists).
 SELF=$(readlink -f "$0")
@@ -105,6 +106,10 @@ session() {
 	[ -s "$STATE/desktop" ] || echo "${LHDE_DESKTOP:-1}" > "$STATE/desktop"
 	rm -f "$STATE/quit"; echo $$ > "$STATE/loop.pid"
 	trap session_end INT TERM HUP
+	# the desktop's name for every program the session starts: the MIME Applications spec reads lhde-mimeapps.list (lhde's
+	# default programs, installed in share/applications) only when XDG_CURRENT_DESKTOP names lhde; xdg-utils, which knows no
+	# lhde, takes its generic path, which reads the same files (docs/SETTINGS.md "Associations")
+	export XDG_CURRENT_DESKTOP=lhde DESKTOP_SESSION=lhde
 	[ "$LHDE_MODE" = real ] && [ -f "$HOME/.xinit_all" ] && . "$HOME/.xinit_all"   # the user's own X startup, real sessions only
 	[ -f "$HOME/.Xresources" ] && xrdb "$HOME/.Xresources" 2>/dev/null
 	# a session bus for luxshell's notification server (toasts via notify-send); a tty login has none. Ours, ended with the session

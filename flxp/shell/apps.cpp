@@ -118,6 +118,7 @@ bool in_path(const std::string& prog)
 
 struct Mimeapps {
     std::string path;
+    std::string layer;           // AppSource's layer names: "user", "lhde", "desktop", "system"
     std::map<std::string, std::vector<std::string>> defaults, added, removed;
 };
 
@@ -187,12 +188,14 @@ void scan_dir(const std::string& root, const std::string& sub, std::set<std::str
     }
 }
 
-void parse_mimeapps(const std::string& path, bool legacy)
+void parse_mimeapps(const std::string& path, const std::string& desktop, bool legacy)
 {
     KeyFile kf;
     if (!parse_keyfile(path, kf)) return;
     Mimeapps m;
     m.path = path;
+    auto under = [&](const std::string& dir) { return path.compare(0, dir.size() + 1, dir + "/") == 0; };
+    m.layer = under(config_home()) || under(data_home()) ? "user" : desktop == "lhde" ? "lhde" : !desktop.empty() ? "desktop" : "system";
     auto fill = [&](const char* group, std::map<std::string, std::vector<std::string>>& to) {
         if (const auto* g = kf.group(group))
             for (auto& kv : *g) {
@@ -221,12 +224,19 @@ void load()
         }
     std::stable_sort(db.apps.begin(), db.apps.end(), [](const App& x, const App& y) { return lower(x.name) < lower(y.name); });
     for (size_t i = 0; i < db.apps.size(); i++) db.by_id[db.apps[i].id] = i;
-    // mimeapps.list precedence (spec): config home, config dirs, data home, data dirs
-    parse_mimeapps(config_home() + "/mimeapps.list", false);
-    for (const std::string& d : config_dirs()) parse_mimeapps(d + "/mimeapps.list", false);
-    parse_mimeapps(data_home() + "/applications/mimeapps.list", false);
-    for (const std::string& d : data_dirs()) parse_mimeapps(d + "/applications/mimeapps.list", false);
-    for (const std::string& d : data_dirs()) parse_mimeapps(d + "/applications/defaults.list", true);   // the deprecated name, lowest
+    // mimeapps.list precedence (spec): config home, config dirs, data home, data dirs; in each the desktop-specific files
+    // ($desktop-mimeapps.list for each entry of XDG_CURRENT_DESKTOP, lower-cased) before mimeapps.list, and in a data
+    // directory the deprecated defaults.list after them (as GLib reads it)
+    std::vector<std::string> desks = current_desktops();
+    auto dir = [&](const std::string& d, bool data) {
+        for (const std::string& k : desks) parse_mimeapps(d + "/" + k + "-mimeapps.list", k, false);
+        parse_mimeapps(d + "/mimeapps.list", "", false);
+        if (data) parse_mimeapps(d + "/defaults.list", "", true);
+    };
+    dir(config_home(), false);
+    for (const std::string& d : config_dirs()) dir(d, false);
+    dir(data_home() + "/applications", true);
+    for (const std::string& d : data_dirs()) dir(d + "/applications", true);
 }
 
 bool removed_by(size_t upto, const std::string& type, const std::string& id)
@@ -257,14 +267,14 @@ std::vector<const App*> associations(const std::string& type)
     return out;
 }
 
-const App* default_for_exact(const std::string& type)
+const App* default_for_exact(const std::string& type, const Mimeapps** from = nullptr)
 {
     for (size_t i = 0; i < db.lists.size(); i++) {
         auto it = db.lists[i].defaults.find(type);
         if (it == db.lists[i].defaults.end()) continue;
         for (const std::string& id : it->second) {
             const App* a = find_app(id);
-            if (a && !removed_by(i, type, id)) return a;
+            if (a && !removed_by(i, type, id)) { if (from) *from = &db.lists[i]; return a; }
         }
     }
     return nullptr;
@@ -375,15 +385,45 @@ const App* find_app(const std::string& id)
     return it == db.by_id.end() ? nullptr : &db.apps[it->second];
 }
 
-const App* default_app(const std::string& mime)
+// GLib's order: the type's default, else its first association; else the same for its nearest ancestor, and so on (a
+// text/x-csrc file opens with a program that claims text/x-csrc before text/plain's default)
+AppSource default_source(const std::string& mime)
 {
     load();
+    AppSource s;
     for (const std::string& t : type_chain(mime)) {
-        if (const App* a = default_for_exact(t)) return a;
+        const Mimeapps* from = nullptr;
+        if (const App* a = default_for_exact(t, &from)) { s.app = a; s.type = t; s.file = from->path; s.layer = from->layer; return s; }
         auto as = associations(t);
-        if (!as.empty()) return as[0];
+        if (!as.empty()) { s.app = as[0]; s.type = t; s.file = as[0]->file; s.layer = "claimant"; return s; }
     }
-    return nullptr;
+    return s;
+}
+
+const App* default_app(const std::string& mime) { return default_source(mime).app; }
+
+std::vector<std::string> current_desktops()
+{
+    std::vector<std::string> out;
+    const char* e = getenv("XDG_CURRENT_DESKTOP");
+    std::string v = e ? e : "";
+    size_t i = 0;
+    while (i <= v.size()) {
+        size_t j = v.find(':', i);
+        if (j == std::string::npos) j = v.size();
+        std::string d = lower(trim(v.substr(i, j - i)));
+        if (!d.empty() && std::find(out.begin(), out.end(), d) == out.end()) out.push_back(d);
+        i = j + 1;
+    }
+    return out;
+}
+
+std::vector<std::string> mimeapps_files()
+{
+    load();
+    std::vector<std::string> out;
+    for (const Mimeapps& m : db.lists) out.push_back(m.path);
+    return out;
 }
 
 std::vector<const App*> apps_for(const std::string& mime)
@@ -401,10 +441,8 @@ std::vector<const App*> apps_for(const std::string& mime)
 
 std::string mimeapps_path() { return config_home() + "/mimeapps.list"; }
 
-bool set_default_app(const std::string& mime_in, const std::string& id, std::string* err)
+static Lines read_lines(const std::string& path)
 {
-    std::string mime = mime_canonical(mime_in);
-    std::string path = mimeapps_path();
     Lines L;
     std::string text;
     if (read_file(path, text)) {
@@ -416,6 +454,40 @@ bool set_default_app(const std::string& mime_in, const std::string& id, std::str
             i = j + 1;
         }
     }
+    return L;
+}
+
+static bool write_lines(const std::string& path, const Lines& L, std::string* err)
+{
+    std::string out;
+    for (const std::string& l : L.v) out += l + "\n";
+    if (!write_file_atomic(path, out)) { if (err) *err = "cannot write " + path + ": " + strerror(errno); return false; }
+    reload_apps();
+    return true;
+}
+
+bool reset_default_app(const std::string& mime_in, std::string* err)
+{
+    std::string mime = mime_canonical(mime_in), path = mimeapps_path();
+    Lines L = read_lines(path);
+    bool any = false;
+    for (const char* g : { "Default Applications", "Added Associations", "Removed Associations" }) {
+        int gi = L.group(g);
+        if (gi >= 0 && L.key(gi, mime) >= 0) { L.set(g, mime, {}, true); any = true; }
+    }
+    return !any || write_lines(path, L, err);
+}
+
+bool user_default_set(const std::string& mime)
+{
+    return !read_lines(mimeapps_path()).get("Default Applications", mime_canonical(mime)).empty();
+}
+
+bool set_default_app(const std::string& mime_in, const std::string& id, std::string* err)
+{
+    std::string mime = mime_canonical(mime_in);
+    std::string path = mimeapps_path();
+    Lines L = read_lines(path);
     L.set("Default Applications", mime, { id }, false);
     // as GLib does: the default also becomes the first added association, and is taken off the removed ones
     std::vector<std::string> added = L.get("Added Associations", mime);
@@ -427,11 +499,7 @@ bool set_default_app(const std::string& mime_in, const std::string& id, std::str
         removed.erase(std::remove(removed.begin(), removed.end(), id), removed.end());
         L.set("Removed Associations", mime, removed, true);
     }
-    std::string out;
-    for (const std::string& l : L.v) out += l + "\n";
-    if (!write_file_atomic(path, out)) { if (err) *err = "cannot write " + path + ": " + strerror(errno); return false; }
-    reload_apps();
-    return true;
+    return write_lines(path, L, err);
 }
 
 std::vector<std::vector<std::string>> exec_argvs(const App& app, const std::vector<std::string>& files)

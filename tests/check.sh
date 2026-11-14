@@ -61,6 +61,9 @@ result "aero-patches ($(tail -n 1 "$T/aero-patches.log"))" $? "$T/aero-patches.l
 # docs/KEYS.md against luxwm's default key table: every default listed, the Super keys it calls free unbound
 python3 -I tests/keys-doc.py > "$T/keys-doc.log" 2>&1
 result "keys-doc ($(tail -n 1 "$T/keys-doc.log"))" $? "$T/keys-doc.log"
+# which program opens a type: lhde-mime's verdicts, flxp's reader (assoctest), xdg-mime and gio on a scratch XDG tree; check
+python3 -I tests/mime.py > "$T/mime.log" 2>&1
+result "mime ($(tail -n 1 "$T/mime.log"))" $? "$T/mime.log"
 # libwuxtheme through its own API: every style the user imported
 styles=${LHDE_STYLES:-$(build/bin/lhde-theme find styles 2>/dev/null)}   # liblhde's lookup: the Windows tree's index/styles (docs/LAYOUT.md)
 n=0

@@ -34,8 +34,12 @@ $PREFIX/share/lhde/                  shipped data, our text only (DATADIR)
 $PREFIX/lib/lhde/                    code that is not a binary (PKGLIBDIR)
   luxshell/                            luxshell's Lua (runtime.lua, tiles/, ...)
   session/                             lhde-session's helpers: lhde-paths.sh, lhwall.sh, lab.sh, theme-*.sh, picom configs
-  tools/                               lhde-import's Python: lhdeimport.py, lhdetree.py, lhdeschemes.py, recipe builders
-$PREFIX/bin/                         luxwm luxshell luxshot luxattr luxpad flxp* lhde-theme lhde-session lhde-import lhde-pack lhde-schemes ut-dump
+  tools/                               lhde-import's Python: lhdeimport.py, lhdetree.py, lhdeschemes.py, recipe builders;
+                                       lhde-mime's lhdemime.py
+$PREFIX/share/applications/          flxp.desktop, luxpad.desktop, lhde-mimeapps.list (lhde's default programs, read when
+                                     XDG_CURRENT_DESKTOP names lhde: docs/SETTINGS.md "Associations"), mimeinfo.cache
+                                     (update-desktop-database, when installed)
+$PREFIX/bin/                         luxwm luxshell luxshot luxattr luxpad flxp* lhde-theme lhde-session lhde-import lhde-pack lhde-schemes lhde-mime ut-dump
 
 WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows
 ~/.local/share/lhde-windows/

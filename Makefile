@@ -125,11 +125,14 @@ check-bare: all
 SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh \
                 picom-glass.conf picom-glass-fvwm.conf lab.fvwm2rc
 TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py lhdeschemes.py lhdetree.py wim0108.py \
-                lhdebaml.py lhdeaurora.py lhdestyles.py
+                lhdebaml.py lhdeaurora.py lhdestyles.py lhdemime.py
+# share/applications/lhde-mimeapps.list into APPDIR: lhde's default programs, read when XDG_CURRENT_DESKTOP names lhde
+# (lhde-session sets it; docs/SETTINGS.md "Associations")
 install-data:
 	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(BINDIR) \
 	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \
-	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
+	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools $(DESTDIR)$(APPDIR)
+	install -m 644 share/applications/lhde-mimeapps.list $(DESTDIR)$(APPDIR)/
 	install -m 644 share/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
 	install -m 644 share/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
 	install -m 644 share/icons/*.theme share/icons/apps.ini $(DESTDIR)$(DATADIR)/icons/
@@ -137,13 +140,14 @@ install-data:
 	for d in share/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
 	for d in share/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done
 	install -m 755 session/lhde-session $(DESTDIR)$(BINDIR)/
-	install -m 755 tools/lhde-import tools/lhde-pack tools/lhde-schemes $(DESTDIR)$(BINDIR)/
+	install -m 755 tools/lhde-import tools/lhde-pack tools/lhde-schemes tools/lhde-mime $(DESTDIR)$(BINDIR)/
 	cd session && install -m 644 $(SESSION_FILES) $(DESTDIR)$(PKGLIBDIR)/session/
 	chmod 755 $(addprefix $(DESTDIR)$(PKGLIBDIR)/session/,lab.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh)
 	ln -sf $(BINDIR)/lhde-session $(DESTDIR)$(PKGLIBDIR)/session/lhde-session
 	cd tools && install -m 644 $(TOOL_FILES) $(DESTDIR)$(PKGLIBDIR)/tools/
 uninstall-data:
-	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(BINDIR)/lhde-pack $(DESTDIR)$(BINDIR)/lhde-schemes
+	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(BINDIR)/lhde-pack $(DESTDIR)$(BINDIR)/lhde-schemes \
+	      $(DESTDIR)$(BINDIR)/lhde-mime $(DESTDIR)$(APPDIR)/lhde-mimeapps.list
 	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar \
 	       $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \
 	       $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
@@ -251,7 +255,9 @@ install-resources-full:
 clean:
 	rm -rf build
 
+# the desktop files' claims into APPDIR's mimeinfo.cache, which GIO and xdg-open read instead of the files (not into a DESTDIR)
 install: install-libs install-liblhde install-flxp install-luxnav install-luxwm install-luxshell install-data
+	@[ -n "$(DESTDIR)" ] || ! command -v update-desktop-database >/dev/null || update-desktop-database -q $(APPDIR)
 uninstall: uninstall-luxshell uninstall-luxwm uninstall-luxnav uninstall-data uninstall-liblhde uninstall-libs uninstall-flxp
 
 .PHONY: all libs programs tests clean install uninstall check check-lux check-free check-bare install-data uninstall-data \

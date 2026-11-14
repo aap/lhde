@@ -489,7 +489,8 @@ no theme is known. A name that is not a theme is ignored (the current theme stay
 ## The session (lhde-session)
 
 `lhde-session start [--nested | --attach] [THEME]` starts, in this order: the root wallpaper once, luxwm in a restart loop,
-picom when the theme wants a compositor, a terminal, flxp-desktop and luxshell (docs/ARCHITECTURE.md "A running session").
+picom when the theme wants a compositor, a terminal, flxp-desktop and luxshell (docs/ARCHITECTURE.md "A running session"). The session's programs get
+`XDG_CURRENT_DESKTOP=lhde` and `DESKTOP_SESSION=lhde`, so lhde's default programs apply ("File types and programs").
 Without a flag it is a real X server on `$LHDE_DISPLAY` (default `:1`) and `$LHDE_VT` (default vt8), started with startx from a
 console login; `--nested` a Xephyr window (`LHDE_GEOMETRY=WxH`, default 1280x800) on the current display, the session inside it on
 `$LHDE_DISPLAY` or the first free display from `:2`; `--attach` the session's programs on an X server that already runs on
@@ -873,7 +874,7 @@ All, Time/Date F5: XP's "11:41 PM 11/12/2026"), Format (Word Wrap, Font...), Vie
 G, A; Shift+F3 finds upward; Ctrl+Shift+N a new window). A file that starts with `.LOG` gets the time and date appended when it
 opens. Closing with unsaved changes asks; a file dropped on the window (from the Explorer, any XDND source) opens.
 `luxpad.desktop` (installed) claims `text/plain`, so the Explorer's Open With lists it and a double click on a `.txt` opens it
-when no other default is set (`mimeapps.list`).
+when no other default is set; in an lhde session it is the default for `text/plain` ("File types and programs").
 
 Encodings, as Notepad's, with one difference: **ANSI means UTF-8 here** (the code page wux reads "ANSI" in), so "ANSI (UTF-8)"
 and "UTF-8" write the same bytes. A file opens as: Unicode (UTF-16 LE) or Unicode big endian or UTF-8 with BOM when it starts
@@ -894,6 +895,39 @@ Font... is comdlg32's Font dialog over every installed family. What luxpad keeps
 (`[window]` `x`, `y`, `width`, `height`, `maximized`; `[search]` `find`, `replace`, `match_case`, `whole_word`, `down`; what it
 remembers), both written when it exits (docs/SETTINGS.md). No printing, no Help Topics; About is a message box.
 `LUXPAD_TRACE=1` prints every status bar text on stdout (`status pos Ln 2, Col 3`), for scripts.
+
+## File types and programs (lhde-mime)
+
+Which program opens a file comes from the freedesktop files every program reads (docs/SETTINGS.md "Associations" has the
+order): your choices in `~/.config/mimeapps.list` beat lhde's defaults (`lhde-mimeapps.list`: folders open in flxp, text in
+luxpad), which beat the distribution's; a type nobody sets a default for opens with its first claimant, the first program
+whose desktop file names it (`MimeType=`). That last rule is how a music player ends up opening folders: deadbeef's desktop
+file claims `inode/directory`, update-desktop-database lists it first in `/usr/share/applications/mimeinfo.cache`, and without
+a default Firefox's "Open containing folder" (GIO) and xdg-open run it. In an lhde session (lhde-session sets
+`XDG_CURRENT_DESKTOP=lhde`) lhde's `inode/directory=flxp.desktop` is the default; outside one, or to override it, set your own.
+
+`lhde-mime` (tools/, installed to `$PREFIX/bin`) shows and sets all of it; it reads the same files with the environment's
+`XDG_*` variables, as the programs do:
+
+- `lhde-mime explain FILE|TYPE`: the type and how it was found (a glob and its weight, magic and its priority, a directory),
+  its parent types, every file that names it or a parent (with the line and the layer: your choice, lhde, the distribution),
+  the claimants with the directory that lists them, what Removed Associations took out, and what xdg-open, GIO (Firefox, GTK
+  programs) and flxp would run, and why: "xdg-open would run: deadbeef.desktop because /usr/share/applications/mimeinfo.cache
+  lists it first and nothing sets a default".
+- `lhde-mime list` (by type: the default, its layer and the claimants), `--programs` (each desktop file: the types it claims and
+  those it is the default of), `--defaults` (only the types something sets), `--user` (what your own files set, with the line).
+- `lhde-mime default TYPE APP` (`lhde-mime default inode/directory flxp.desktop`) writes your choice to `~/.config/mimeapps.list`
+  the way flxp's Open With does (the default, and the program first among the added associations); `lhde-mime reset TYPE` takes
+  your lines for the type out again, so lhde's or the distribution's default applies.
+- `lhde-mime check`: programs claiming types they are unlikely to handle (a player claiming folders, a non-browser claiming web
+  links, catch-all claims such as `application/octet-stream`), the verdicts that follow from them, defaults naming desktop files
+  that no longer exist, a key twice in one group, `mimeinfo.cache` files that miss or invent claims (GIO and xdg-open see only
+  the cache: a desktop file in `~/.local/share/applications` claims nothing for them until `update-desktop-database
+  ~/.local/share/applications`), legacy `defaults.list` files, and lhde's defaults not read (`XDG_CURRENT_DESKTOP` without lhde).
+
+flxp, GIO and xdg-open differ in two places, both shown by explain: flxp reads the claims from the desktop files themselves
+(GIO and xdg-open from `mimeinfo.cache`), and xdg-open looks up only the exact type (no parent types, no Removed
+Associations).
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell, docs/SHELL-DESIGN.md 6.4, 7.3, 13)
 

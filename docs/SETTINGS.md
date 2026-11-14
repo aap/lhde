@@ -38,7 +38,8 @@ Two directories, one rule each. liblhde gives every path (`lhde_config_file`, `l
 | `luxpad.ini` | luxpad's window (`[window]` x, y, width, height, maximized) and last search (`[search]` find, replace, match_case, whole_word, down) |
 
 lhde never puts Windows files in either: they are `~/.local/share/lhde-windows` (lhde-import), the shipped text is
-`$PREFIX/share/lhde` (make install).
+`$PREFIX/share/lhde` (make install). Which program opens a type is not kept here either but in the freedesktop files every
+program shares ("Associations" below).
 
 Environment, honoured by every lhde program and script: `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `LHDE_SETTINGS` (settings.ini
 alone), `LHDE_WINDOWS` (another Windows tree), `LHDE_DATA` (one flat data directory instead of the Windows tree: tests, scratch
@@ -147,3 +148,33 @@ file again and apply the keys whose value differs from what runs.
 
 Last writer wins per key; writers never drop keys they do not know. When settings.ini and the root disagree at startup, the
 root wins for the running session (it is what is live), and the first writer brings the file in line.
+
+## Associations
+
+Which program opens a file type is not an lhde setting: it lives in the freedesktop files every program reads (the MIME
+Applications Associations spec), so flxp, GIO programs (Firefox, GTK), xdg-open and lhde's own tools agree. The files, most
+important first (`$desktop` each entry of `XDG_CURRENT_DESKTOP`, lower-cased; lhde-session sets `XDG_CURRENT_DESKTOP=lhde` and
+`DESKTOP_SESSION=lhde`):
+
+| file | layer |
+| --- | --- |
+| `~/.config/$desktop-mimeapps.list`, `~/.config/mimeapps.list` | the user's choices; flxp (Open With, Folder Options' File Types, Properties' Change...), `lhde-mime default` and GLib write `mimeapps.list` |
+| `$XDG_CONFIG_DIRS/$desktop-mimeapps.list`, `.../mimeapps.list` | the administrator's |
+| `~/.local/share/applications/$desktop-mimeapps.list`, `mimeapps.list`, `defaults.list` | the user's too (the old place) |
+| `$XDG_DATA_DIRS/applications/$desktop-mimeapps.list`, `mimeapps.list`, `defaults.list` | in data-directory order: lhde's `lhde-mimeapps.list` (installed into `$PREFIX/share/applications`, from `share/applications/`), the distribution's |
+
+In each directory the desktop-specific files come before `mimeapps.list`, and `defaults.list` (the deprecated name) last. So the
+user's choice beats lhde's defaults, and lhde's beat the distribution's when lhde's data directory comes first in
+`XDG_DATA_DIRS` (`/usr/local/share` before `/usr/share`, the default) or is the data home (`PREFIX=~/.local`). Without
+`XDG_CURRENT_DESKTOP=lhde` (another session) lhde's file is not read.
+
+lhde's defaults: `inode/directory` = `flxp.desktop`, `text/plain` = `luxpad.desktop`; no Removed Associations.
+
+A type's program (GLib's order, which flxp's shell layer follows): the first installed, not removed `[Default Applications]`
+entry for the type in the files above; else its first claimant (`[Added Associations]` in the same order, then the desktop
+files that name the type in `MimeType=`, by data directory); else the same for its nearest parent type (`text/x-log` ->
+`text/plain` -> `application/octet-stream`). GIO and xdg-open read the claimants from each directory's `mimeinfo.cache`
+(update-desktop-database), not from the desktop files: a directory without one claims nothing for them (`make install` runs
+update-desktop-database on `$PREFIX/share/applications`). xdg-open knows no desktop called lhde and takes xdg-utils' generic
+path, which reads the same files in the same order but only for the exact type and without Removed Associations; it needs no
+hint. `lhde-mime explain TYPE` shows all three verdicts (docs/USAGE.md "File types and programs").

@@ -52,6 +52,10 @@
 * the thumbnail disk cache (~/.cache/thumbnails) is never cleaned: the freedesktop spec leaves it to a cleaner; flxp could
 	drop large/ and normal/ entries of files that are gone or not opened for months
 
+* flxp does not own org.freedesktop.FileManager1 (ShowFolders, ShowItems): Firefox's "Show in Folder" and Chromium's ask
+	that D-Bus name first and select the file in the window, and only without it open the folder through GIO
+	(inode/directory's default, lhde-mimeapps.list's flxp)
+
 ### details and task pane
 
 * 4074's (i) icon in the band's top right to flip between details and tasks (4051 is the target; undecided)
