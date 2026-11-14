@@ -142,7 +142,7 @@ Facts probe(const Item& it)
         thumbs::picture_size(it.path, &f.width, &f.height);
     }
     f.thumbnail = thumbs::can_thumbnail(it.path);
-    if (f.thumbnail && f.kind == Facts::Other) f.kind = Facts::Picture;   // by its bytes
+    if (f.thumbnail && f.kind == Facts::Other && thumbs::own_picture(it.path)) f.kind = Facts::Picture;   // a picture by another name
     return f;
 }
 

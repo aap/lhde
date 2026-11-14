@@ -1,0 +1,7 @@
+# lhde's thumbnailer for the documents MuPDF reads (the freedesktop thumbnailer spec): the first page of an XPS, OpenXPS,
+# EPUB or comic book archive, and of a PDF where pdftoppm (lhde-pdf.thumbnailer, tried first) is missing; mutool draw
+# fits it into %s x %s.
+[Thumbnailer Entry]
+TryExec=mutool
+Exec=mutool draw -q -F png -o %o -w %s -h %s %i 1
+MimeType=application/pdf;application/x-pdf;application/oxps;application/vnd.ms-xpsdocument;application/epub+zip;application/vnd.comicbook+zip;

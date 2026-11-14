@@ -49,6 +49,13 @@
 	160 MB cap), an interlaced PNG, BMP or ICO above 25 MP; a JPEG's embedded EXIF thumbnail (160 px) or a PNG's interlace
 	passes read row by row would give them one
 
+* thumbnailer entries (shell/thumbs): a thumbnailer child's memory is not bounded (no RLIMIT_AS: posix_spawn has no rlimit
+	action; a `prlimit` wrapper or fork+setrlimit would do it); the type is taken from the name only (a PDF without .pdf gets
+	none); lhde-postscript renders onto Ghostscript's default page when the file names no page size (an ImageMagick PS
+	without setpagedevice is cropped to letter); a timeout leaves the failure marker until the file changes, also when the
+	machine was only busy. ffmpegthumbnailer's own entry (videos) and gdk-pixbuf's (GIF, TIFF) work as they are: seen in
+	the lab with a generated MP4 and GIF
+
 * the thumbnail disk cache (~/.cache/thumbnails) is never cleaned: the freedesktop spec leaves it to a cleaner; flxp could
 	drop large/ and normal/ entries of files that are gone or not opened for months
 

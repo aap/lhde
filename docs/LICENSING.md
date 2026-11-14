@@ -28,7 +28,7 @@ them, but for the free pack's files (below).
 - **Microsoft's files** (visual styles, DLLs, fonts, wallpapers, from the user's ISOs, WIMs or a Windows directory through
   `lhde-pack` and `lhde-import`): under Microsoft's licence terms.
 - **ReactOS's files** (`make install-resources-free`, `lhde-import --iso` on ReactOS's boot CD): free, so lhde publishes them,
-  outside the repository, in the free pack `lhde-resources-free-2.zip`, which `make install-resources-free` downloads
+  outside the repository, in the free pack `lhde-resources-free-3.zip`, which `make install-resources-free` downloads
   (`make free-pack` makes it from the CD). ReactOS is under the GNU GPL version 2 or later, parts under the GNU LGPL 2.1 or
   later (the DLLs it shares with Wine) and a few under version 3; the corresponding source is ReactOS's tag 0.4.16. The fonts
   carry their own free licences (SIL OFL 1.1, Apache 2.0, the Bitstream Vera licence, the GUST Font License, GPL 3 with the

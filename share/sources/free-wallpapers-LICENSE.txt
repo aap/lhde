@@ -1,6 +1,6 @@
 The wallpapers of lhde's free themes (free/wallpapers/ in lhde's free resource pack)
 
-Photos from Pexels (https://www.pexels.com), chosen by aap for lhde's themes of ReactOS's visual styles. Each is under the
+Photos from Pexels (https://www.pexels.com), chosen by aap for lhde's themes of ReactOS's visual styles, for aerovision, and for Display Properties' wallpaper list. Each is under the
 Pexels licence: free to use, also commercially, and to modify; attribution is not required (https://www.pexels.com/license/).
 They are named here all the same. The files are as Pexels serves them, renamed to photographer-id.jpg:
 
@@ -16,3 +16,21 @@ They are named here all the same. The files are as Pexels serves them, renamed t
   diva-30887567.jpg            diva (https://www.pexels.com/@diva)
                                https://www.pexels.com/photo/30887567/
                                pale green and sand-coloured veils; the theme modern
+  karoldach-582486.jpg         Karol D (https://www.pexels.com/@karoldach)
+                               https://www.pexels.com/photo/582486/
+                               green grass blades up close; the theme aerovision
+  asumaani-18784763.jpg        asumaani (https://www.pexels.com/@asumaani)
+                               https://www.pexels.com/photo/18784763/
+                               a sunset over a calm lake with a mountain; offered in Display Properties
+  danieljschwarz-34362628.jpg  Daniel J. Schwarz (https://www.pexels.com/@danieljschwarz)
+                               https://www.pexels.com/photo/34362628/
+                               a forest road under fog, from above; offered in Display Properties
+  kratz-1363876.jpg            kratz (https://www.pexels.com/@kratz)
+                               https://www.pexels.com/photo/1363876/
+                               purple dusk over still water; offered in Display Properties
+  mikebird-9113226.jpg         Mike Bird (https://www.pexels.com/@mikebird)
+                               https://www.pexels.com/photo/9113226/
+                               a wheat field under a blue sky with clouds; offered in Display Properties
+  therato-3855632.jpg          therato (https://www.pexels.com/@therato)
+                               https://www.pexels.com/photo/3855632/
+                               northern lights over a bay at dusk; offered in Display Properties

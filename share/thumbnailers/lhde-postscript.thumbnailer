@@ -1,0 +1,7 @@
+# lhde's PostScript thumbnailer (the freedesktop thumbnailer spec): the first page by Ghostscript under -dSAFER, at the
+# resolution that makes an 11 in page %s pixels high (a letter or A4 page about %s; the reader fits it); an EPS is
+# cropped to its bounding box.
+[Thumbnailer Entry]
+TryExec=gs
+Exec=sh -c 'exec gs -q -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -dFirstPage=1 -dLastPage=1 -dEPSCrop -dTextAlphaBits=4 -dGraphicsAlphaBits=4 -r$(($3 / 11)) -sOutputFile="$2" -f "$1"' lhde-postscript %i %o %s
+MimeType=application/postscript;image/x-eps;

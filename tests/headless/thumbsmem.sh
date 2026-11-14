@@ -1,6 +1,7 @@
 #!/bin/sh
 # flxp's memory on a big folder of big pictures (docs/USAGE.md, thumbnails): 600 6000 x 4000 JPEGs (hard links of one
-# picture), 4 PNGs of 4000 x 4000 and a subfolder of 40, in the XP frame's Thumbnails view at 256 px with a cold thumbnail
+# picture), 4 PNGs of 4000 x 4000, 30 PDFs (copies of one page; made by lhde-pdf.thumbnailer's pdftoppm, or mutool, where
+# installed: all 30 are made) and a subfolder of 40, in the XP frame's Thumbnails view at 256 px with a cold thumbnail
 # cache; the list is paged through to the end and back, the subfolder opened and left. The peak RSS (sampled every
 # 0.2 s) stays under 400 MB, the view's images (FLXP_TRACE_THUMBS) within their 64 MB budget plus what is on screen, and
 # images were evicted on the way. A HOME and XDG directories of its own. Needs Xvfb, xdotool and ImageMagick; prints
@@ -19,6 +20,12 @@ $IM -size 6000x4000 gradient:navy-orange -quality 85 $T/big.jpg || { echo "FAIL 
 $IM -size 4000x4000 gradient:green-white $T/big.png || { echo "FAIL ImageMagick could not write the PNG"; exit 1; }
 n=0; while [ $n -lt 600 ]; do ln $T/big.jpg "$F/$(printf %03d $n).jpg"; n=$((n + 1)); done
 for n in 0 1 2 3; do ln $T/big.png "$F/png$n.png"; done
+pdfs=0
+if command -v pdftoppm >/dev/null 2>&1 || command -v mutool >/dev/null 2>&1; then
+    $IM -size 850x1100 gradient:white-steelblue $T/page.pdf || { echo "FAIL ImageMagick could not write the PDF"; exit 1; }
+    n=0; while [ $n -lt 30 ]; do cp $T/page.pdf "$F/pdf$(printf %02d $n).pdf"; n=$((n + 1)); done
+    pdfs=30
+fi
 n=0; while [ $n -lt 40 ]; do ln $T/big.jpg "$F/album/$(printf %02d $n).jpg"; n=$((n + 1)); done
 export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config XDG_DATA_HOME=$T/home/.local/share XDG_STATE_HOME=$T/home/.local/state \
        XDG_CACHE_HOME=$T/home/.cache DISPLAY=$D FLXP_TRACE_THUMBS=1 TMPDIR=$T
@@ -37,6 +44,7 @@ fails=0
   done ) & M=$!
 W=$(wait_window 30 --class Flxp)
 made() { grep -c '^thumbs: decode' $T/out; }
+documents() { grep -c '^thumbs: decode .* by .* at [1-9]' $T/out; }
 settle() {   # until no thumbnail was made for a second (or 60 s)
     _i=0; _m=-1
     while [ $_i -lt 60 ] && [ "$(made)" != "$_m" ]; do _m=$(made); sleep 1; _i=$((_i + 1)); done
@@ -68,6 +76,9 @@ if [ -n "$most" ] && [ $most -le 300 ]; then echo "ok   at most $most images hel
 else echo "FAIL images held: ${most:-none}"; fails=$((fails + 1)); fi
 if [ -n "$evicted" ] && [ $evicted -gt 0 ]; then echo "ok   $evicted evicted"; else echo "FAIL nothing evicted"; fails=$((fails + 1)); fi
 if [ $decoded -gt 100 ]; then echo "ok   $decoded decoded"; else echo "FAIL only $decoded decoded"; fails=$((fails + 1)); fi
+if [ $pdfs = 0 ]; then echo "skip the PDFs: no pdftoppm or mutool"
+elif [ "$(documents)" -ge $pdfs ]; then echo "ok   $(documents) PDF pages made by a thumbnailer"
+else echo "FAIL $(documents) of the $pdfs PDF pages made"; fails=$((fails + 1)); fi
 grep -m1 '^thumbs: decode .*6000x4000' $T/out | sed 's/^/     /'
 grep -m1 '^thumbs: decode .*4000x4000' $T/out | sed 's/^/     /'
 [ $fails = 0 ] && echo "PASS (peak $((peak / 1024)) MB)" || { echo FAIL; exit 1; }

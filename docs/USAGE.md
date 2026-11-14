@@ -138,7 +138,7 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    beside the ini); its medium is a directory holding the downloads (layout `tree`: `lhde-pack --medium free=DIR`,
    `lhde-import --dir DIR --source free`), of which only the four files the ini names are taken, into
    `lhde-windows/free/wallpapers/`. Nobody needs the ISO or the photos: these files are free, and lhde publishes both
-   sources as the free pack `lhde-resources-free-2.zip` (10 MB, with ReactOS's licence texts and a LICENSE note; `make
+   sources as the free pack `lhde-resources-free-3.zip` (10 MB, with ReactOS's licence texts and a LICENSE note; `make
    free-pack` builds it from the CD and the photos, reproducibly), which `make install-resources-free` downloads and imports
    (`lhde-import --pack` on it gives the same tree as `--iso` on the CD and `--dir` on the photos). Not taken: ReactOS's
    wallpapers (three of them are CC BY-NC; a tree imported from an earlier pack or the CD keeps its `reactos/wallpapers/`,
@@ -690,6 +690,24 @@ network filesystems) they are off unless `thumbnails_network = 1`, since every p
 thumbnails are cached in `~/.cache/thumbnails` (the freedesktop spec, shared with other programs: 128 px in `normal/`, 256 px in
 `large/`), so a picture is decoded once and its thumbnail read back after that.
 
+flxp decodes JPEG, PNG, WebP, BMP and ICO itself. Any other file gets a thumbnail when a **thumbnailer entry** takes its type (by
+its name; the nearest parent type's entry when its own has none): a PDF, PostScript or DjVu page, a video's frame, a GIF or TIFF.
+The entries are the freedesktop ones every file manager reads: `*.thumbnailer` files with `TryExec`, `Exec` (`%i` the file, `%o`
+the PNG to write, `%s` the size, `%u` the URI) and `MimeType`, in `~/.local/share/thumbnailers`, then each
+`$XDG_DATA_DIRS/thumbnailers` (`/usr/local/share`, `/usr/share`), then lhde's own; a name in an earlier directory hides the same
+name later, and in one directory they go by name. lhde ships four, installed to `$PREFIX/share/thumbnailers` (read from the
+source tree's `share/thumbnailers` when flxp runs uninstalled) and tried after every other entry, so a thumbnailer a
+distribution installs (evince's, ffmpegthumbnailer's) wins for its types: `lhde-pdf` (poppler's `pdftoppm`), `lhde-xps`
+(MuPDF's `mutool draw`: XPS, OpenXPS, EPUB, comic books, and PDF where pdftoppm is missing), `lhde-postscript` (Ghostscript under
+`-dSAFER`; PS and EPS) and `lhde-djvu` (djvulibre's `ddjvu`, through pdftoppm). An entry whose program is not installed is
+skipped (checked once). The program runs as a child of the thumbnail loader, one at a time per loader and counted among the two
+decodes at once, with stdin, stdout and stderr on `/dev/null` and only `PATH`, `HOME`, `LANG`, `LC_ALL` and `TMPDIR` of the
+environment, in a process group of its own that is killed after 10 seconds; its PNG goes to a temporary file in
+`~/.cache/thumbnails`, is not read above 16 MB, and is stored like any thumbnail (the page drawn like a picture, in the photo
+frame; the XP Details pane and the 4051 band show it as a picture's preview). A document that fails or times out gets the
+failure marker and is not tried again until it changes. None runs for a file on a network mount unless
+`thumbnails_network = 1`, and a folder's own picture is made from its pictures only.
+
 Memory is bounded whatever the folder holds. A picture is never decoded at full size for its thumbnail where the format allows it:
 a JPEG decodes at 1/2, 1/4 or 1/8 of its size (DCT scaling) straight from the file, a PNG is reduced row by row as it is read, a
 WebP rescaled by libwebp; what can only decode whole (an interlaced PNG, BMP, ICO) gets no thumbnail above 25 megapixels, nor a
@@ -698,7 +716,7 @@ pictures decode at once in a flxp process, whichever view or pane asks for them.
 screen's worth around them, drops what it asked for when you scroll away before it was made, and keeps at most 64 MB of thumbnails
 (256 at 256 px, about 1800 at 96 px) plus those on screen; the least recently seen go back to their icon and are read from the
 disk cache again when they come back. With `FLXP_TRACE_THUMBS=1` flxp prints each decode (the picture's size and the size it was
-decoded at) and, after each batch, the images the view holds, their bytes against the budget, how many were evicted and how many
+decoded at, or the thumbnailer entry that made it and why it failed, its stderr passed through) and, after each batch, the images the view holds, their bytes against the budget, how many were evicted and how many
 are pending.
 
 In the XP frame the Explorer keeps XP's views: Thumbnails (squares of `thumbnail_size`), Tiles, Icons, Small Icons, List,

@@ -3,10 +3,11 @@
 // file URI>.png, 128 or 256 px at most, with the tEXt chunks Thumb::URI and
 // Thumb::MTime that say which file version they show. Existing thumbnails
 // (from any application) are read when they are current; missing ones are
-// made from PNG/JPEG/BMP/ICO/CUR (gdi/image) and saved; files that cannot be
-// read get a failure marker in thumbnails/fail/flxp-1.0 so they are not tried
-// again until they change. No size limit, no clean-up (the spec leaves that
-// to the user or a cleaner).
+// made from PNG/JPEG/BMP/ICO/CUR/WebP (gdi/image), or by a thumbnailer entry's
+// program for any other type an entry names (a PDF, a PostScript file, a video),
+// and saved; files that cannot be read get a failure marker in
+// thumbnails/fail/flxp-1.0 so they are not tried again until they change. No
+// size limit, no clean-up (the spec leaves that to the user or a cleaner).
 //
 // Loader runs the work on background threads; results are picked up by the
 // UI thread after the notify callback (called on a worker thread) woke it.
@@ -24,8 +25,40 @@ std::string cache_dir();                                    // $XDG_CACHE_HOME/t
 int cache_size_for(int view_size);                          // 128 (normal) or 256 (large)
 std::string cache_path(const std::string& file, int cache_size);   // .../normal/<md5(uri)>.png
 std::string md5_hex(const std::string& data);
-// A file this can make a thumbnail of (by name or by its first bytes).
+// A file this can make a thumbnail of: a picture flxp decodes itself, or a file whose type (by its name) a thumbnailer
+// entry takes. UI thread (the MIME database is read without a lock).
 bool can_thumbnail(const std::string& path);
+// A picture flxp decodes itself (JPEG, PNG, BMP, ICO/CUR, WebP), by its name.
+bool own_picture(const std::string& path);
+
+// Thumbnailer entries (the freedesktop thumbnailer spec): [Thumbnailer Entry] files named *.thumbnailer with TryExec, Exec
+// and MimeType, read from $XDG_DATA_HOME/thumbnailers, each $XDG_DATA_DIRS/thumbnailers, then lhde's own
+// (<prefix>/share/thumbnailers; the source tree's share/thumbnailers uninstalled). A file name seen in an earlier directory
+// hides the later ones; lhde's own entries (lhde-*.thumbnailer) come after every other, so a distribution's thumbnailer
+// for a type wins over ours. Within a directory, by file name.
+struct Thumbnailer {
+    std::string file;                   // the entry's path
+    std::string name;                   // its file name
+    std::string exec, try_exec;
+    std::vector<std::string> types;     // MimeType, canonical
+};
+std::vector<std::string> thumbnailer_dirs();
+std::vector<const Thumbnailer*> thumbnailers();     // every entry, in the order they are tried
+// The entry for a file: the first whose program is there (TryExec, else the Exec's command, looked up once per entry)
+// listing the file's type, else its nearest parent type that has one (application/octet-stream never). Null: none, or
+// the file is one of flxp's own pictures. UI thread.
+const Thumbnailer* thumbnailer_for(const std::string& path);
+void reload_thumbnailers();                         // read the entries again (earlier pointers stay valid)
+// Exec's argument list for a file: %i the path, %o the output, %s the size, %u the URI, %% a percent sign, each a
+// whole argument; the line is split as a shell would ('...', "..." with backslash escapes, a backslash outside quotes),
+// with no expansion.
+std::vector<std::string> thumbnailer_argv(const Thumbnailer& t, const std::string& path, const std::string& out, int size);
+// A thumbnailer runs as a child process in its own process group, stdin and stdout on /dev/null, stderr too (flxp's
+// stderr with FLXP_TRACE_THUMBS), with only PATH, HOME, LANG, LC_ALL and TMPDIR of the environment; it writes into a
+// temporary file in the thumbnail directory. Its group is killed after timeout_ms (10 s) and when it ends, and its
+// output is not read above max_bytes (16 MB). Tests change them.
+void set_thumbnailer_limits(int timeout_ms, size_t max_bytes);
+int thumbnailer_runs();                             // children started so far
 
 // Whether the Longhorn views show thumbnails in a folder: flxp.ini thumbnails = 1 | 0
 // (default 1) and, on a network mount (reading every picture over the network is
@@ -38,8 +71,9 @@ bool on_network(const std::string& path);
 bool picture_size(const std::string& path, int* w, int* h);
 
 // The thumbnail at cache size: a current cached one, else a new one that is
-// also saved. Null when the file cannot be decoded. Thread-safe.
-gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size);
+// also saved, made by the thumbnailer when one is given (its child counts as one
+// of the decodes at once). Null when the file cannot be decoded. Thread-safe.
+gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size, const Thumbnailer* by = nullptr);
 // Thumbnails made from their pictures so far (decodes; not those read from the cache). FLXP_TRACE_THUMBS=1 prints a line
 // for each on stderr: the picture's size and the size it was decoded at.
 int decodes();
@@ -60,7 +94,9 @@ public:
     Loader(Notify notify, void* ctx, int threads = 0);   // 0: up to 4 by the CPU count
     ~Loader();
     // Queue a file; results come back in request order per thread. folder:
-    // the first pictures inside it (by name) instead, mini_size square each.
+    // the first pictures inside it (by name; flxp's own pictures only) instead, mini_size square each.
+    // A file that is not one of flxp's own pictures gets its thumbnailer here (UI thread), none on a
+    // network mount unless thumbnails_network = 1.
     void request(uint32_t gen, int id, const std::string& path, int64_t mtime, int view_size, bool folder = false, int mini_size = 0);
     uint32_t cancel();              // drops everything pending, returns the new generation
     uint32_t generation() const;

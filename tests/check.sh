@@ -7,7 +7,7 @@
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh and runas.sh setfattr
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick, startmenu.sh xprop and python3, menushadow.sh
 #                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick,
-#                thumbsmem.sh ImageMagick, nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed, xsession.sh xprop and
+#                thumbsmem.sh ImageMagick, thumbdocs.sh ImageMagick and pdftoppm or mutool (gs, ddjvu and c44 for its PS and DjVu), nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed, xsession.sh xprop and
 #                dbus-daemon, picom when installed); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
@@ -151,6 +151,9 @@ else
     # flxp's peak RSS on 600 6000 x 4000 JPEGs at 256 px, the view's images within their budget (needs ImageMagick)
     tests/headless/thumbsmem.sh "$1" > "$T/thumbsmem.log" 2>&1; rc=$?
     result "headless/thumbsmem.sh ($(tail -n 1 "$T/thumbsmem.log"))" $rc "$T/thumbsmem.log"
+    # a PDF, a PostScript and a DjVu file's thumbnails made by the thumbnailer entries (lhde's share/thumbnailers), in the cache, on screen
+    tests/headless/thumbdocs.sh "$2" > "$T/thumbdocs.log" 2>&1; rc=$?
+    result "headless/thumbdocs.sh ($(tail -n 1 "$T/thumbdocs.log"))" $rc "$T/thumbdocs.log"
     tests/headless/luxshot.sh "$1" > "$T/luxshot.log" 2>&1; rc=$?
     result "headless/luxshot.sh$(grep -m1 '^skip' "$T/luxshot.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxshot.log"
     tests/headless/luxattr.sh "$2" > "$T/luxattr.log" 2>&1; rc=$?

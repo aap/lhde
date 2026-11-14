@@ -190,7 +190,7 @@ setting and say "fallback: ..." in their why); `lhde-theme explain` shows `missi
 With only the free pack imported (the free baseline, a test configuration: `make check-free`; the sources reactos and
 free): `classic` and the four ReactOS themes (`lunar`, `modern`, `mizu`, `lautus`) resolve fully, their wallpapers the free
 source's Pexels photos (`free/timmossholder-9398211`, `free/diva-30887567`, `free/marek-piwnicki-12966762`,
-`free/ian-panelo-8669635`: aap's choice, taste); every other theme resolves to Windows Classic with
+`free/ian-panelo-8669635`, and aerovision's `free/karoldach-582486`: aap's choice, taste; the pack carries six more photos for Display Properties' list); every other theme resolves to Windows Classic with
 ReactOS's icons, fonts and resources. Microsoft-only by nature, with no free stand-in: the Luna, Longhorn and
 Vista visual styles and everything made from them (the frame sets, the glass, luxshell's packs and imageres
 art, the 4051/4074 navigation headers' art), XP's shellstyle.dll (the task pane's Luna bitmaps), the start

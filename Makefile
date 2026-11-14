@@ -77,6 +77,9 @@ PKGLIBDIR      ?= $(PREFIX)/lib/lhde
 APPDIR         ?= $(PREFIX)/share/applications
 # the X session entry a display manager lists (share/xsessions/lhde.desktop: lhde-session xsession)
 XSESSIONDIR    ?= $(PREFIX)/share/xsessions
+# share/thumbnailers/lhde-*.thumbnailer (PDF, XPS, PostScript, DjVu pages: docs/USAGE.md, thumbnails) where every program
+# using the freedesktop thumbnailer spec looks; flxp also reads the one beside DATADIR
+THUMBNAILERDIR ?= $(PREFIX)/share/thumbnailers
 PKGCONFIGDIR   ?= $(LIBDIR)/pkgconfig
 # The file chooser portal backend: the .portal file goes where xdg-desktop-portal
 # looks (its own datadir: PORTALDIR=/usr/share/xdg-desktop-portal/portals for a
@@ -132,17 +135,19 @@ SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh ca
                 picom-glass.conf picom-glass-fvwm.conf lab.fvwm2rc
 TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py lhdeschemes.py lhdetree.py wim0108.py \
                 lhdebaml.py lhdeaurora.py lhdestyles.py lhdemime.py
-# share/applications/lhde-mimeapps.list into APPDIR: lhde's default programs, read when XDG_CURRENT_DESKTOP names lhde
+# share/thumbnailers' entries into THUMBNAILERDIR; share/applications/lhde-mimeapps.list into APPDIR: lhde's default programs, read when XDG_CURRENT_DESKTOP names lhde
 # (lhde-session sets it; docs/SETTINGS.md "Associations"); share/applications/roles.ini, the default programs' roles, into
 # DATADIR/applications (a data file, read through liblhde's lookup; "Default programs"); share/xsessions/lhde.desktop.in into
 # XSESSIONDIR with BINDIR filled in
 install-data:
 	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(BINDIR) \
 	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \
-	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools $(DESTDIR)$(APPDIR) $(DESTDIR)$(XSESSIONDIR)
+	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools $(DESTDIR)$(APPDIR) $(DESTDIR)$(XSESSIONDIR) \
+	           $(DESTDIR)$(THUMBNAILERDIR)
 	install -m 644 share/applications/lhde-mimeapps.list $(DESTDIR)$(APPDIR)/
 	install -d $(DESTDIR)$(DATADIR)/applications
 	install -m 644 share/applications/roles.ini $(DESTDIR)$(DATADIR)/applications/
+	install -m 644 share/thumbnailers/lhde-*.thumbnailer $(DESTDIR)$(THUMBNAILERDIR)/
 	sed 's|@BINDIR@|$(BINDIR)|g' share/xsessions/lhde.desktop.in > $(DESTDIR)$(XSESSIONDIR)/lhde.desktop
 	chmod 644 $(DESTDIR)$(XSESSIONDIR)/lhde.desktop
 	install -m 644 share/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
@@ -159,7 +164,8 @@ install-data:
 	cd tools && install -m 644 $(TOOL_FILES) $(DESTDIR)$(PKGLIBDIR)/tools/
 uninstall-data:
 	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(BINDIR)/lhde-pack $(DESTDIR)$(BINDIR)/lhde-schemes \
-	      $(DESTDIR)$(BINDIR)/lhde-mime $(DESTDIR)$(APPDIR)/lhde-mimeapps.list $(DESTDIR)$(XSESSIONDIR)/lhde.desktop
+	      $(DESTDIR)$(BINDIR)/lhde-mime $(DESTDIR)$(APPDIR)/lhde-mimeapps.list $(DESTDIR)$(XSESSIONDIR)/lhde.desktop \
+	      $(addprefix $(DESTDIR)$(THUMBNAILERDIR)/,$(notdir $(wildcard share/thumbnailers/lhde-*.thumbnailer)))
 	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar \
 	       $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources $(DESTDIR)$(DATADIR)/applications \
 	       $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
@@ -177,7 +183,7 @@ uninstall-data:
 #                                  sha256 and the size
 #   make fetch-free-pack           the pack downloaded from FREE_PACK_URL into FREE_PACK_CACHE and checked against FREE_PACK_SHA256
 #                                  (kept there: make check-free and install-resources-free use it; a CI runs this first)
-# FREE_PACK_VERSION counts the free pack's contents (1: ReactOS 0.4.16 and the four photos; 2: also cmd.exe, desk.cpl and notepad.exe for the icon keys): a new ReactOS or other photos are
+# FREE_PACK_VERSION counts the free pack's contents (1: ReactOS 0.4.16 and the four photos; 2: also cmd.exe, desk.cpl and notepad.exe for the icon keys; 3: all ten Pexels photos, aerovision's among them): a new ReactOS or other photos are
 # a new version, so a new name and sha256.
 REACTOS_VERSION   = 0.4.16
 REACTOS_RELEASE   = https://sourceforge.net/projects/reactos/files/ReactOS/$(REACTOS_VERSION)/
@@ -185,12 +191,12 @@ REACTOS_ISO      ?= $(HOME)/lib/windows_isos/ReactOS-$(REACTOS_VERSION)-i386.iso
 REACTOS_SRC      ?= $(HOME)/lib/reactos-$(REACTOS_VERSION)
 # the directory holding the photos under Pexels's download names (share/sources/free.ini names the four it takes)
 FREE_WALLPAPERS  ?= $(HOME)/cfg/wallpaper
-FREE_PACK_VERSION = 2
+FREE_PACK_VERSION = 3
 FREE_PACK_NAME    = lhde-resources-free-$(FREE_PACK_VERSION)
 # FREE_PACK_URL is a placeholder until the pack is published (a release asset of the repository); FREE_PACK_SHA256 is the
 # sha256 of the pack make free-pack builds from the release's ISO and the photos
 FREE_PACK_URL    ?= https://github.com/aap/lhde/releases/download/resources/$(FREE_PACK_NAME).zip
-FREE_PACK_SHA256  = dfbcd03d90bffafb61557b40a02496ddb82c083a931bb2f030f67eea76696a7a
+FREE_PACK_SHA256  = 7d63a8910f99c543aceff4dec0b2516e362e31913a40bae000cb8fa2c758ad10
 FREE_PACK_CACHE  ?= $(or $(XDG_CACHE_HOME),$(HOME)/.cache)/lhde/$(FREE_PACK_NAME).zip
 FREE_FONT_DOCS    = Arial ArialBlack ComicSansMS CourierNew FranklinGothicMedium Georgia LucidaConsole MicrosoftSansSerif \
                     PalatinoLinotype Tahoma TimesNewRoman TrebuchetMS Verdana
