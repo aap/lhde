@@ -353,7 +353,8 @@ struct Engine {
         int rc = -1;
         for (int k = 1; k < 100 && rc != 0; k++) {
             part = part_name(dst, k);
-            rc = mknod(part.c_str(), (ss.st_mode & S_IFMT) | 0600, ss.st_rdev);
+            rc = S_ISFIFO(ss.st_mode) ? mkfifo(part.c_str(), 0600)   // FreeBSD's mknod makes no FIFO (EINVAL)
+                                      : mknod(part.c_str(), (ss.st_mode & S_IFMT) | 0600, ss.st_rdev);
             if (rc != 0 && errno != EEXIST) break;
         }
         if (rc != 0) { fail("Cannot create", dst, errno); return false; }
