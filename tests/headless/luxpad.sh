@@ -120,7 +120,7 @@ run '^u16.txt - luxpad$' $T/files/u16.txt
 if [ -z "$W" ]; then fail "no window for u16.txt"
 else
     check "reopened as Unicode" "Unicode" "$(status encoding)"
-    before=$(hex $T/files/u16.txt); touch -d '2001-01-01' $T/files/u16.txt
+    before=$(hex $T/files/u16.txt); touch -t 200101010000 $T/files/u16.txt
     xdotool key ctrl+s; wait_for 10 sh -c "[ \$(stat -c %Y $T/files/u16.txt 2>/dev/null || stat -f %m $T/files/u16.txt) -gt 978307200 ]"
     check "UTF-16 saved back byte for byte" "$before" "$(hex $T/files/u16.txt)"
     quit
@@ -134,7 +134,7 @@ if [ -z "$W" ]; then fail "no window for latin1.txt"
 else
     check "Latin-1 bytes open as ANSI" "ANSI (UTF-8)" "$(status encoding)"
     check "line ends Unix (LF)" "Unix (LF)" "$(status eoln)"
-    before=$(hex $L); touch -d '2001-01-01' $L
+    before=$(hex $L); touch -t 200101010000 $L
     xdotool key ctrl+s; wait_for 10 sh -c "[ \$(stat -c %Y $L 2>/dev/null || stat -f %m $L) -gt 978307200 ]"
     check "ANSI saved back byte for byte (LF kept)" "$before" "$(hex $L)"
     xdotool key ctrl+End; xdotool type x; sleep .3
