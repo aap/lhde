@@ -38,7 +38,7 @@ infotip) a comment shows its first line and "…" when more follow. One free-tex
 `notes` and `todo` stay plain names, listed and edited in the Properties sheet's Advanced view only. flxp writes as `x` does:
 values trimmed, without a trailing newline; tags split at commas (flxp also takes semicolons), trimmed, without duplicates, in
 their order; a colour of the palette as its lower-case name; an emptied value removes the attribute. It reads a value whatever
-its length (its size first), and takes only "not set" (`ENODATA`) or "no user attributes here" (`ENOTSUP`) as no value: on any
+its length (its size first), and takes only "not set" (`ENODATA`, FreeBSD's `ENOATTR`) or "no user attributes here" (`ENOTSUP`) as no value: on any
 other read error a change (a new tag merged in, an edited description) is refused, not written over the unseen value. `author`,
 `build`, `source`, `notes` and `todo` are this research's own and flxp's views do not show them.
 

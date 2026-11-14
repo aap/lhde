@@ -188,7 +188,7 @@ Read read_attr(const std::string& path, const std::string& xattr, std::string* v
         if (n < 0) {
             int e = errno;
             value->clear();
-            if (e == ENODATA || e == ENOTSUP || e == ENOENT) return Read::Missing;
+            if (e == LHDE_ENOATTR || e == ENOTSUP || e == ENOENT) return Read::Missing;
             if (error) *error = e;
             return Read::Failed;
         }
@@ -289,7 +289,7 @@ std::string join_list(const std::vector<std::string>& items)
 static bool put(const std::string& path, const std::string& xattr, const std::string& value, std::string* err)
 {
     int rc = value.empty() ? lhde_xattr_remove(path.c_str(), xattr.c_str()) : lhde_xattr_set(path.c_str(), xattr.c_str(), value.data(), value.size());
-    if (rc == 0 || (value.empty() && errno == ENODATA)) return true;
+    if (rc == 0 || (value.empty() && errno == LHDE_ENOATTR)) return true;
     if (!err) return false;
     std::string n = "'" + base_name(path) + "'";
     switch (errno) {

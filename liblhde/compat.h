@@ -9,7 +9,8 @@
  *   lhde_fxattr_* lhde_lxattr_*      namespace (extattr(2)), so `getextattr user lux.desc FILE` shows user.lux.desc;
  *                                    the f* forms take a descriptor, the l* forms do not follow a symlink. A list is in
  *                                    Linux's form ("user.a\0user.b\0"); FreeBSD lists the user namespace only. A value
- *                                    that is not there fails with ENODATA (FreeBSD's ENOATTR), a buffer too small with ERANGE.
+ *                                    that is not there fails with LHDE_ENOATTR (Linux's ENODATA, FreeBSD's ENOATTR; libc++
+ *                                    defines its own ENODATA there), a buffer too small with ERANGE.
  *   lhde_fs_is_remote(path)          the file system holding path is a network one (NFS, SMB, 9p, sshfs, ...)
  *   lhde_mount_each(fn, ctx)         every mount: device, mount point, file system type
  *   lhde_opath_chown, _chmod,        owner, mode and times of the file an O_PATH descriptor holds (which take neither
@@ -43,6 +44,7 @@
 #include <asm/prctl.h>
 #endif
 #define LHDE_COMM_MAX 15
+#define LHDE_ENOATTR ENODATA
 #ifndef __cplusplus
 extern char *program_invocation_short_name;   /* <errno.h> declares it only under _GNU_SOURCE */
 #endif
@@ -56,9 +58,7 @@ extern char *program_invocation_short_name;   /* <errno.h> declares it only unde
 #if defined(__x86_64__)
 #include <machine/sysarch.h>
 #endif
-#ifndef ENODATA
-#define ENODATA ENOATTR
-#endif
+#define LHDE_ENOATTR ENOATTR
 #define LHDE_COMM_MAX MAXCOMLEN
 #else
 #error "liblhde/compat.h: Linux or FreeBSD"

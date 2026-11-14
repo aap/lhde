@@ -84,7 +84,7 @@ int column_of(const std::string& id);
 using Stored = std::vector<std::pair<std::string, std::string>>;
 // One attribute, whatever its length (its size asked first, asked again when it
 // grew in between). Missing: not set, or no user attributes on that file system
-// (ENODATA, ENOTSUP, ENOENT); Failed: there may be a value that could not be
+// (LHDE_ENOATTR, ENOTSUP, ENOENT); Failed: there may be a value that could not be
 // read (EACCES, EIO, ...), *error the errno. A change that replaces or merges a
 // value must not go ahead on Failed: it would drop what it did not see.
 enum class Read { Value, Missing, Failed };
