@@ -88,6 +88,27 @@ int        flxp_swscanf(const flxp_wch*, const flxp_wch*, ...);
  * standard headers a file includes later are already in and only the file's own code can hit a poisoned
  * name. A renaming macro, as in C, would clash with those declarations. std::wstring is no better (its
  * char_traits call glibc's 32-bit wcslen) but cannot be poisoned without the standard headers. */
+#ifdef __FreeBSD__
+/* libc++ runs std::find over any 16-bit type, u16string::find and char_traits<wchar_t> through __builtin_wmemchr,
+ * __builtin_wmemcmp and __builtin_wcslen when sizeof(wchar_t) matches; outside a constant expression they call the
+ * libc's 32-bit functions. Here they are 16-bit loops, constexpr like the builtins. */
+namespace flxp_cx {
+constexpr size_t wcslen(const wchar_t* s) { size_t n = 0; while (s[n]) n++; return n; }
+constexpr int wmemcmp(const wchar_t* a, const wchar_t* b, size_t n)
+{
+    for (; n; --n, ++a, ++b) { if (*a < *b) return -1; if (*b < *a) return 1; }
+    return 0;
+}
+template <class T> constexpr T* wmemchr(T* s, wchar_t c, size_t n)
+{
+    for (; n; --n, ++s) if (*s == c) return s;
+    return nullptr;
+}
+}
+#define __builtin_wcslen(...) ::flxp_cx::wcslen(__VA_ARGS__)
+#define __builtin_wmemcmp(...) ::flxp_cx::wmemcmp(__VA_ARGS__)
+#define __builtin_wmemchr(...) ::flxp_cx::wmemchr(__VA_ARGS__)
+#endif
 #include <wchar.h>
 #include <wctype.h>
 #include <cwchar>
