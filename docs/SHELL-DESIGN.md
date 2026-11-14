@@ -1110,9 +1110,13 @@ map; any change of the property ends that guess.
 
 **flxp-startmenu's life.** Wanted whenever the bottom bar is not `classic` (then flxp-taskbar is the provider). Started with
 `FLXP_START_KEY=1` (as the provider it always opens the start panel), log `$XDG_RUNTIME_DIR/luxshell-startmenu<display>.log`, only after `_LH_STARTMENU_S<screen>`
-has no owner (one that finds it owned stays no provider; luxshell waits up to 3 s); adopted when one (or a `flxp-taskbar
---start-menu-only`) already runs on the display; restarted when it dies (checked every 3 s, at most 5 starts a minute, then
-none until the settings change); stopped by its pid (comm + DISPLAY checked) on the switch to the classic bar and on exit.
+has no owner (one that finds it owned stays no provider; luxshell waits up to 3 s, and while something else still holds the
+selection it starts none: the holder is the start menu); adopted when one (or a `flxp-taskbar --start-menu-only`) already runs
+on the display, found by the name it was started by (argv[0]: FreeBSD's command name for the `flxp-startmenu` symlink is
+`flxp-taskbar`) and its DISPLAY; never a second while the one it started runs (that one is its child: `waitpid` WNOHANG says
+whether it runs, so a reused pid is not taken for it); restarted when it dies (checked every 3 s, at most 5 starts a minute,
+then none until the settings change); stopped by its pid on the switch to the classic bar and on exit. The classic bar is
+tracked the same way.
 
 ## 14. Theme, settings, compositor, reload
 

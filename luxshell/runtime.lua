@@ -1286,12 +1286,18 @@ lh.on("surface-press", function(x, y, button, win)
 end)
 
 ------------------------------------------------------------------ the classic taskbar, tray and start-menu coordination
--- Processes of this display by name: the command name is NAME and the environment has our DISPLAY (nothing else is touched).
+-- Processes of this display by name: started as NAME (argv[0]) and the environment has our DISPLAY (nothing else is touched).
 local function display_pids(name) return lh.display_procs(name, os.getenv("DISPLAY") or "") end
 lh.display_pids = display_pids
-local function pid_is(pid, name)   -- pid still runs NAME on our display (pids are reused; SIGCHLD is ignored, so no wait)
+local function pid_is(pid, name)   -- pid still runs NAME on our display (pids are reused)
   for _, p in ipairs(display_pids(name)) do if p == pid then return true end end
   return false
+end
+-- a process we track: one we started (ours) runs while it is our child; one we adopted while its pid runs NAME on our display
+local function tracked_runs(t, name)
+  if not t.pid then return false end
+  if t.ours then return lh.child_alive(t.pid) end
+  return pid_is(t.pid, name)
 end
 -- The classic taskbar: [commands] taskbar (default flxp-taskbar; $LHSHELL_TASKBAR_CMD), run with our DISPLAY and session bus
 -- (inherited) and its log in $XDG_RUNTIME_DIR. It follows _LH_THEME by itself (flxp's WM_THEMECHANGED; no --theme). It may take
@@ -1329,42 +1335,44 @@ local function when_provider_free(fn)
 end
 local function classic_start()
   local name = classic_name()
-  if classic.pid and pid_is(classic.pid, classic.name or name) then return end
+  if tracked_runs(classic, classic.name or name) then return end
   local running = flxp_pids(false, name)
-  if #running > 0 then classic.pid, classic.name = running[1], name; io.stderr:write("luxshell: taskbar: " .. name .. " already runs (" .. running[1] .. ")\n") return end
+  if #running > 0 then classic.pid, classic.name, classic.ours = running[1], name, false; io.stderr:write("luxshell: taskbar: " .. name .. " already runs (" .. running[1] .. ")\n") return end
   -- hand the tray over before it starts (a takeover races: icons answering its MANAGER while we still hand them back are lost
   -- by flxp-taskbar's ReparentNotify handling); our tile stays hidden while it starts and claims again if nobody took the tray
   if lh.tray_yield then lh.tray_yield(10000) end
   local env = { FLXP_TRAY_TAKEOVER = "1", FLXP_START_KEY = "1" }
   local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/luxshell-taskbar" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
-  classic.pid = lh.spawn_pid(classic_command() .. " >" .. S.quote(log) .. " 2>&1 </dev/null", env); classic.name = name
+  classic.pid = lh.spawn_pid(classic_command() .. " >" .. S.quote(log) .. " 2>&1 </dev/null", env); classic.name, classic.ours = name, true
   io.stderr:write(string.format("luxshell: taskbar: started %s (pid %s, log %s)\n", classic_command(), tostring(classic.pid), log))
 end
 local function classic_stop()
-  local pid, name = classic.pid, classic.name or classic_name(); classic.pid = nil
+  local runs, pid, name = tracked_runs(classic, classic.name or classic_name()), classic.pid, classic.name or classic_name(); classic.pid = nil
   if lh.tray_unyield then lh.tray_unyield() end
-  if pid and pid_is(pid, name) then io.stderr:write("luxshell: taskbar: stopping " .. name .. " " .. pid .. "\n"); lh.kill(pid) end
+  if runs then io.stderr:write("luxshell: taskbar: stopping " .. name .. " " .. pid .. "\n"); lh.kill(pid) end
 end
 
 -- Without the classic bar (taskbar avalon or none) the start menu is flxp-startmenu (flxp-taskbar's start panel without the bar,
 -- tray or struts; it owns _LH_STARTMENU_S<screen>, we forward our Start button and Super to it with the button's rect). Started,
 -- adopted (one already running on this display, or a flxp-taskbar --start-menu-only run by hand), restarted when it dies (at
 -- most 5 times a minute, then nothing opens until the settings change), stopped on a switch to the classic bar (the provider
--- then) and on exit; only ever its own pid, checked by its name and DISPLAY.
+-- then) and on exit; only ever its own pid: the child we started while it runs, an adopted one by its name and DISPLAY. A
+-- second one is never started while the first runs, nor while anything else holds _LH_STARTMENU_S<screen> (it would find the
+-- selection owned and only idle): whoever holds it is the start menu then, and we look again every 3 s.
 local PROVIDER = "flxp-startmenu"
 local provider = { starts = {} }
 local function provider_wanted() return cfg.taskbar ~= "classic" end
-local function provider_running() return provider.pid and pid_is(provider.pid, provider.name or PROVIDER) end
+local function provider_running() return tracked_runs(provider, provider.name or PROVIDER) end
 local function provider_stop()
-  local pid, name = provider.pid, provider.name or PROVIDER; provider.pid = nil
-  if pid and pid_is(pid, name) then io.stderr:write("luxshell: start menu: stopping " .. name .. " " .. pid .. "\n"); lh.kill(pid) end
+  local runs, pid, name = provider_running(), provider.pid, provider.name or PROVIDER; provider.pid = nil
+  if runs then io.stderr:write("luxshell: start menu: stopping " .. name .. " " .. pid .. "\n"); lh.kill(pid) end
 end
 local function provider_start()
   if provider_running() or provider.pending then return end
   local name = PROVIDER
   local running = display_pids(PROVIDER)
   if #running == 0 then running = flxp_pids(true, classic_name()); if #running > 0 then name = classic_name() end end
-  if #running > 0 then provider.pid, provider.name = running[1], name; io.stderr:write("luxshell: start menu: " .. name .. " already runs (" .. running[1] .. ")\n") return end
+  if #running > 0 then provider.pid, provider.name, provider.ours = running[1], name, false; io.stderr:write("luxshell: start menu: " .. name .. " already runs (" .. running[1] .. ")\n") return end
   local now = lh.now(); local recent = {}
   for _, t in ipairs(provider.starts) do if now - t < 60000 then table.insert(recent, t) end end
   provider.starts = recent
@@ -1376,10 +1384,16 @@ local function provider_start()
   when_provider_free(function()
     provider.pending = false
     if not provider_wanted() or provider_running() then return end
+    local owner = lh.selection_owner(lh.startmenu_selection)
+    if owner then
+      if provider.held_by ~= owner then provider.held_by = owner; io.stderr:write(string.format("luxshell: start menu: %s is held by 0x%x (another start menu); not starting %s\n", lh.startmenu_selection, owner, PROVIDER)) end
+      return
+    end
+    provider.held_by = nil
     table.insert(provider.starts, lh.now())
     local log = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/luxshell-startmenu" .. (os.getenv("DISPLAY") or ""):gsub("[^%w]", "") .. ".log"
     provider.pid = lh.spawn_pid(lh.prog(PROVIDER) .. " >" .. S.quote(log) .. " 2>&1 </dev/null", { FLXP_START_KEY = "1" })
-    provider.name = PROVIDER
+    provider.name, provider.ours = PROVIDER, true
     io.stderr:write(string.format("luxshell: start menu: started %s (pid %s, log %s)\n", lh.prog(PROVIDER), tostring(provider.pid), log))
   end)
 end

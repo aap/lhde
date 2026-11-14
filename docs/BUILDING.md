@@ -188,7 +188,9 @@ mime database (typing jumps, Change... writes `mimeapps.list`, Restore, Edit Fil
 program's copy, New / Delete an extension): `tests/headless/filetypes.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron), Quick Launch and taskbar menu under luxwm
 (xprop, xwininfo; luxshell/tests/trayicon): `tests/headless/taskbar.sh`, every IDC_ cursor shown under the X cursor theme's name (XFixes): `tests/headless/cursors.sh`, Super+R
 opening the start menu's Run dialog (luxwm, luxshell, flxp-startmenu) and settings.ini `[commands] run` instead:
-`tests/headless/runkey.sh`, Super+H minimizing the sidebar into the taskbar and back at once (unmapped within 300 ms, two
+`tests/headless/runkey.sh`, luxshell keeping exactly one start-menu provider when the provider's command name is not
+`flxp-startmenu` (FreeBSD's for the symlink: one after 20 s, restarted once when killed, adopted by the next luxshell, stopped
+for the classic bar and on exit; xprop, python3): `tests/headless/startmenu.sh`, Super+H minimizing the sidebar into the taskbar and back at once (unmapped within 300 ms, two
 screenshots 50 ms apart the same), Super+S its stacking (`_NET_WM_STATE` ABOVE / BELOW), the minimized state and the mode it
 restores over a luxshell restart, `[sidebar] animate = 1` sliding both bars, a tile's hover band (with
 the pack's images): `tests/headless/sidebar.sh`, luxshell's menu shadow against luxwm's window menu's, alpha per pixel over the right and bottom
