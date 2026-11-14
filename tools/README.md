@@ -22,7 +22,8 @@
 
 - `lhde-mime` (`lhdemime.py`): which program opens a file type and why: the shared-mime-info database and the MIME
   Applications files read as GIO, xdg-open and flxp read them (`explain`, `list`, `default`, `reset`, `check`; docs/USAGE.md
-  "File types and programs"). Python rather than C on liblhde: the association code is flxp's C++ shell layer, which has no C
+  "File types and programs"); the default programs by role (`roles`, `role ROLE [APP|none|-]`, `roles apply`: roles.ini and
+  `settings.ini [programs]` into the role file; docs/SETTINGS.md "Default programs"; flxp's shell/roles.cpp is the same model). Python rather than C on liblhde: the association code is flxp's C++ shell layer, which has no C
   interface, and reading the same text files again is less than wrapping it; `tests/mime.py` keeps the two in agreement.
 
 ut-dump stays with wuxtheme/; lhde-theme (the resolver's command line) with liblhde/.

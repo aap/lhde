@@ -20,6 +20,7 @@
 #include "config.h"
 #include "util.h"
 #include "mime.h"
+#include "roles.h"
 #include <lhde/settings.h>
 
 namespace shell {
@@ -118,7 +119,7 @@ bool in_path(const std::string& prog)
 
 struct Mimeapps {
     std::string path;
-    std::string layer;           // AppSource's layer names: "user", "lhde", "desktop", "system"
+    std::string layer;           // AppSource's layer names: "user", "role", "lhde", "desktop", "system"
     std::map<std::string, std::vector<std::string>> defaults, added, removed;
 };
 
@@ -195,7 +196,8 @@ void parse_mimeapps(const std::string& path, const std::string& desktop, bool le
     Mimeapps m;
     m.path = path;
     auto under = [&](const std::string& dir) { return path.compare(0, dir.size() + 1, dir + "/") == 0; };
-    m.layer = under(config_home()) || under(data_home()) ? "user" : desktop == "lhde" ? "lhde" : !desktop.empty() ? "desktop" : "system";
+    m.layer = path == roles_file() ? "role" : under(config_home()) || under(data_home()) ? "user" : desktop == "lhde" ? "lhde" :
+              !desktop.empty() ? "desktop" : "system";
     auto fill = [&](const char* group, std::map<std::string, std::vector<std::string>>& to) {
         if (const auto* g = kf.group(group))
             for (auto& kv : *g) {

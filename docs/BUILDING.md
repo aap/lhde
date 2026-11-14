@@ -114,7 +114,7 @@ with GNU make (FreeBSD's make is not):
 
     gmake -j8
     PREFIX=~/.local gmake install
-    gmake install-resources-free FREE_PACK=lhde-resources-free-2.zip    # or with no FREE_PACK: downloaded
+    gmake install-resources-free FREE_PACK=lhde-resources-free-3.zip    # or with no FREE_PACK: downloaded
     LHDE_TEST_DISPLAYS=":71 :72 :73" gmake check
 
 `gmake check` there runs everything `make check` runs on Linux: the shim's and the toolkit's tests, the scripts, liblhde's
@@ -182,7 +182,8 @@ key table, and the Super keys it calls free are unbound), `build/tests/filetypes
 the extensions, where a default comes from, Change and Restore, the actions' copy, the user's extensions), `tests/mime.py` (which program opens a type on a scratch XDG tree
 with a distribution, lhde's `lhde-mimeapps.list` and a home: lhde-mime's verdicts against the spec's order, flxp's reader
 (`build/tests/assoctest default`), `xdg-mime query default` and `gio mime` against them when installed, `lhde-mime default` /
-`reset` and `check`'s findings), and the
+`reset` and `check`'s findings; the default programs by role: the roles' type sets, the role file's lines from lhde-mime and
+flxp alike, the user's file over the role file over lhde's, a role switched with one command), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
 incl. GTK, the file dialog in both looks, the modifier keys across a focus change, typed text into the Edit control as
 UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair: `tests/headless/typing.sh`), luxpad (`tests/headless/luxpad.sh`:
@@ -202,7 +203,9 @@ start under the last theme (icons, colours, bands, xwd and ImageMagick): `tests/
 window manager, luxwm started, killed and under fvwm2 (the Small header without the title row, the full one, the vision header's XP
 chrome; the log and the band's row in the pixels): `tests/headless/nowm.sh`, Folder Options' File Types page on a scratch home and
 mime database (typing jumps, Change... writes `mimeapps.list`, Restore, Edit File Type's New... writes and Restore removes the
-program's copy, New / Delete an extension): `tests/headless/filetypes.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron; its own items over the hardware layer's fake tree: Brightness with a backlight, the wheel setting it), Quick Launch and taskbar menu under luxwm
+program's copy, New / Delete an extension): `tests/headless/filetypes.sh`, Default Programs on a scratch home in an lhde session
+(a program picked for the editor role and applied: settings.ini `[programs]` and the role file; File Types' Set by names the
+role, Change... for one type wins over it): `tests/headless/defprogs.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron; its own items over the hardware layer's fake tree: Brightness with a backlight, the wheel setting it), Quick Launch and taskbar menu under luxwm
 (xprop, xwininfo; luxshell/tests/trayicon): `tests/headless/taskbar.sh`, every IDC_ cursor shown under the X cursor theme's name (XFixes): `tests/headless/cursors.sh`, Super+R
 opening the start menu's Run dialog (luxwm, luxshell, flxp-startmenu) and settings.ini `[commands] run` instead:
 `tests/headless/runkey.sh`, luxshell keeping exactly one start-menu provider when the provider's command name is not
@@ -283,7 +286,7 @@ pack directory works too). By hand:
 ReactOS's files (shell32, browseui, comctl32, themeui, explorer.exe, its four visual styles, 40 free fonts under the Windows
 file names; docs/USAGE.md "Getting the Windows resources") are free, and so are the wallpapers of the four ReactOS themes
 (photos from Pexels, the Pexels licence, chosen by aap: the source `free`, share/sources/free.ini), so lhde publishes them as
-one pack, outside the repository: `lhde-resources-free-2.zip` (10 MB), made once from ReactOS 0.4.16's boot CD and the
+one pack, outside the repository: `lhde-resources-free-3.zip` (10 MB), made once from ReactOS 0.4.16's boot CD and the
 photos. Its version (`FREE_PACK_VERSION`) counts its contents, a new ReactOS or other photos being the next. `make
 install-resources-free` takes, in this order, `FREE_PACK=FILE`, the ISO (`LHDE_REACTOS_ISO=FILE`, else the newest
 `~/lib/windows_isos/ReactOS-*.iso`, with the photos from `FREE_WALLPAPERS` when that directory is there), else the pack
@@ -359,7 +362,7 @@ compositors); LightDM needs the system D-Bus (ConsoleKit2 and AccountsService, w
 aap). From the Linux machine, the two packs (`lhde_winthemes.zip` already holds `reactos/` and `free/`; the free pack adds the
 whole ReactOS import):
 
-    scp /u/aap/src/lhde/lhde-resources-free-2.zip /u/aap/src/lhde/lhde_winthemes.zip soma:src/lhde-port/
+    scp /u/aap/src/lhde/lhde-resources-free-3.zip /u/aap/src/lhde/lhde_winthemes.zip soma:src/lhde-port/
 
 As aap on soma, the build for `/usr/local` (flxp has `DATADIR` compiled in, so a build for another `PREFIX` would be
 rebuilt by the install; built here, root only copies and no root-owned file lands in the build tree; the next `PREFIX=~/.local
@@ -373,12 +376,12 @@ As root (`su -`), in this order:
     cd /u/aap/src/lhde-port && PREFIX=/usr/local gmake install
     ls /usr/local/share/xsessions/lhde.desktop
     export LHDE_WINDOWS=/usr/local/share/lhde-windows
-    lhde-import --pack /u/aap/src/lhde-port/lhde-resources-free-2.zip
+    lhde-import --pack /u/aap/src/lhde-port/lhde-resources-free-3.zip
     lhde-import --pack /u/aap/src/lhde-port/lhde_winthemes.zip
     lhde-import --list
     unset LHDE_WINDOWS
 
-(`gmake install-resources-full FREE_PACK=lhde-resources-free-2.zip PACK=lhde_winthemes.zip LHDE_WINDOWS=/usr/local/share/lhde-windows`
+(`gmake install-resources-full FREE_PACK=lhde-resources-free-3.zip PACK=lhde_winthemes.zip LHDE_WINDOWS=/usr/local/share/lhde-windows`
 does the same import from the source tree's `tools/`, after deleting that tree, but leaves root-owned Python caches in the
 tree.) Then LightDM's configuration, in `/usr/local/etc/lightdm/lightdm.conf` under `[Seat:*]` (the package's file already has
 `session-wrapper=/usr/local/etc/lightdm/Xsession`, and `minimum-vt=9` under `[LightDM]`, so the greeter's server is on vt9,

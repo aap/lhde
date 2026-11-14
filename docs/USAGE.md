@@ -138,7 +138,7 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    beside the ini); its medium is a directory holding the downloads (layout `tree`: `lhde-pack --medium free=DIR`,
    `lhde-import --dir DIR --source free`), of which only the four files the ini names are taken, into
    `lhde-windows/free/wallpapers/`. Nobody needs the ISO or the photos: these files are free, and lhde publishes both
-   sources as the free pack `lhde-resources-free-2.zip` (10 MB, with ReactOS's licence texts and a LICENSE note; `make
+   sources as the free pack `lhde-resources-free-3.zip` (10 MB, with ReactOS's licence texts and a LICENSE note; `make
    free-pack` builds it from the CD and the photos, reproducibly), which `make install-resources-free` downloads and imports
    (`lhde-import --pack` on it gives the same tree as `--iso` on the CD and `--dir` on the photos). Not taken: ReactOS's
    wallpapers (three of them are CC BY-NC; a tree imported from an earlier pack or the CD keeps its `reactos/wallpapers/`,
@@ -935,7 +935,8 @@ remembers), both written when it exits (docs/SETTINGS.md). No printing, no Help 
 ## File types and programs (lhde-mime)
 
 Which program opens a file comes from the freedesktop files every program reads (docs/SETTINGS.md "Associations" has the
-order): your choices in `~/.config/mimeapps.list` beat lhde's defaults (`lhde-mimeapps.list`: folders open in flxp, text in
+order): your choices for one type in `~/.config/mimeapps.list` beat your default programs by role (the text editor, the image
+viewer, ...: "Default programs" below), which beat lhde's defaults (`lhde-mimeapps.list`: folders open in flxp, text in
 luxpad), which beat the distribution's; a type nobody sets a default for opens with its first claimant, the first program
 whose desktop file names it (`MimeType=`). That last rule is how a music player ends up opening folders: deadbeef's desktop
 file claims `inode/directory`, update-desktop-database lists it first in `/usr/share/applications/mimeinfo.cache`, and without
@@ -955,11 +956,17 @@ a default Firefox's "Open containing folder" (GIO) and xdg-open run it. In an lh
 - `lhde-mime default TYPE APP` (`lhde-mime default inode/directory flxp.desktop`) writes your choice to `~/.config/mimeapps.list`
   the way flxp's Open With does (the default, and the program first among the added associations); `lhde-mime reset TYPE` takes
   your lines for the type out again, so lhde's or the distribution's default applies.
+- `lhde-mime roles`: the default programs by role: each role's types (how many, the first), its program and why (your choice,
+  lhde's default, none installed), the installed programs it offers; the terminal. `lhde-mime role editor` prints one role's
+  choice, `lhde-mime role editor gedit` sets it (`settings.ini [programs] editor = gedit.desktop`) and applies the roles,
+  `lhde-mime role editor none` leaves the text types to your other files ("Use my current text editor"), `lhde-mime role editor
+  -` gives lhde's default back; `lhde-mime roles apply` writes the role file from the settings (lhde-session does at start).
 - `lhde-mime check`: programs claiming types they are unlikely to handle (a player claiming folders, a non-browser claiming web
   links, catch-all claims such as `application/octet-stream`), the verdicts that follow from them, defaults naming desktop files
   that no longer exist, a key twice in one group, `mimeinfo.cache` files that miss or invent claims (GIO and xdg-open see only
   the cache: a desktop file in `~/.local/share/applications` claims nothing for them until `update-desktop-database
-  ~/.local/share/applications`), legacy `defaults.list` files, and lhde's defaults not read (`XDG_CURRENT_DESKTOP` without lhde).
+  ~/.local/share/applications`), legacy `defaults.list` files, lhde's defaults not read (`XDG_CURRENT_DESKTOP` without lhde), a
+  role's program that is not installed, and a role file that does not say what the roles say.
 
 flxp, GIO and xdg-open differ in two places, both shown by explain: flxp reads the claims from the desktop files themselves
 (GIO and xdg-open from `mimeinfo.cache`), and xdg-open looks up only the exact type (no parent types, no Removed
@@ -977,7 +984,20 @@ Advanced: Edit File Type, the default program's actions (its command, bold, then
 Remove and Set Default change them in a copy of the program's desktop file in `~/.local/share/applications` (marked
 `X-Lhde-Override=true`; a desktop file of your own there is not touched). When you changed something for the type (a choice in
 `mimeapps.list`, such a copy) the button is Restore, which takes both back. Change Icon, XP's three check boxes, Browse... and
-Use DDE in New Action are shown greyed: the freedesktop files have nothing they would set.
+Use DDE in New Action are shown greyed: the freedesktop files have nothing they would set. A type a role sets says so in Set by
+("your editor role (luxpad)"); Change... still sets that one type, over the role. **Default Programs...** (left of New) opens
+Default Programs at the selected type's role.
+
+**Default programs.** One program per kind of file instead of one per type: the text editor opens every text type (`text/plain`
+and all the types shared-mime-info puts under it: C, Python, logs, XML, JSON, ...), the image viewer every picture but drawings,
+the document viewer PDF, PostScript and DjVu, and so on for the web browser, e-mail, music, video, archives and folders
+(docs/SETTINGS.md "Default programs" has the roles and their types). **Default Programs** (`flxp --default-programs`; All Programs'
+first item, XP's Set Program Access and Defaults; Folder Options' File Types, Default Programs...) is XP's page one activity at a
+time: the activities on the left; on the right the question ("Choose a default text editor:"), "Use my current text editor"
+(lhde leaves the text types alone) and the installed programs that open such files, lhde's default marked, and how many types
+the role opens. OK or Apply writes `settings.ini [programs]` and the role file at once; switching the editor is one click. A
+role without a choice takes lhde's (luxpad for text, flxp for folders, the first installed of a list of known viewers and
+players for the others; nothing while none is installed). From a terminal: `lhde-mime roles`, `lhde-mime role ROLE APP`.
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell, docs/SHELL-DESIGN.md 6.4, 7.3, 13)
 

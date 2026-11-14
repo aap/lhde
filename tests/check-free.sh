@@ -24,7 +24,7 @@ if [ -z "$iso" ]; then
 	for f in "$HOME"/lib/windows_isos/ReactOS-*.iso; do [ -f "$f" ] && iso=$f; done
 fi
 if [ -z "$iso" ]; then
-	f=${FREE_PACK_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/lhde/lhde-resources-free-2.zip}
+	f=${FREE_PACK_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/lhde/lhde-resources-free-3.zip}
 	[ -f "$f" ] && iso=$f
 fi
 if [ -z "$iso" ] || [ ! -f "$iso" ]; then

@@ -14,6 +14,8 @@ the programs that open files read them:
 The files, most important first (the spec's order; $desktop each entry of XDG_CURRENT_DESKTOP, lower-cased):
   $XDG_CONFIG_HOME/$desktop-mimeapps.list, $XDG_CONFIG_HOME/mimeapps.list, the same in each of $XDG_CONFIG_DIRS,
   $XDG_DATA_HOME/applications/{$desktop-mimeapps.list,mimeapps.list,defaults.list}, the same in each of $XDG_DATA_DIRS.
+$XDG_DATA_HOME/applications/lhde-mimeapps.list is the role file: the default programs by role (roles.ini, settings.ini
+[programs]), written by apply_roles below.
 The flxp C++ reader and this module implement the same order; tests/mime.py checks both against xdg-mime and gio.
 
 Python, not C on liblhde: the association code is flxp's C++ shell layer, which has no C interface; reading the same text
@@ -24,6 +26,8 @@ import struct
 import sys
 
 USER, LHDE, DESKTOP, SYSTEM = 'your choice', 'lhde', 'desktop', 'the distribution'
+ROLES = 'your roles'
+HERE = os.path.dirname(os.path.realpath(__file__))
 
 
 def _env_dirs(var, default):
@@ -45,6 +49,9 @@ class Env:
         self.desktops = [d.lower() for d in e.get('XDG_CURRENT_DESKTOP', '').split(':') if d]
         self.menu_prefix = e.get('XDG_MENU_PREFIX', '')
         self.path = e.get('PATH', '/usr/local/bin:/usr/bin:/bin')
+        self.lhde_config = os.path.join(self.config_home, 'lhde')
+        self.settings = e.get('LHDE_SETTINGS') or os.path.join(self.lhde_config, 'settings.ini')
+        self.roles_file = os.path.join(self.data_home, 'applications', 'lhde-mimeapps.list')
 
     def short(self, p):
         return '~' + p[len(self.home):] if self.home and self.home != '/' and p.startswith(self.home + '/') else p
@@ -208,6 +215,7 @@ class MimeDb:
         self.magic = []
         self.icons = {}
         self._comments = {}
+        self._all = None
         noglobs = set()
         for d in self.mime_dirs:
             blocked = set()
@@ -248,6 +256,21 @@ class MimeDb:
 
     def canonical(self, t):
         return self.aliases.get(t, t)
+
+    def all_types(self):
+        """every type the database knows (its types file, the globs, both sides of subclasses, the aliases' targets),
+        canonical, sorted"""
+        if self._all is None:
+            out = set()
+            for d in self.mime_dirs:
+                out.update(_lines(os.path.join(d, 'types')))
+            out.update(g.type for g in self.globs)
+            for a, ps in self.parents.items():
+                out.add(a)
+                out.update(ps)
+            out.update(self.aliases.values())
+            self._all = sorted({self.canonical(t.strip()) for t in out if '/' in t})
+        return self._all
 
     def direct_parents(self, t):
         t = self.canonical(t)
@@ -475,6 +498,8 @@ class Db:
 
     def _layer(self, path, desktop):
         e = self.env
+        if path == e.roles_file:
+            return ROLES
         if path.startswith(e.config_home + '/') or path.startswith(e.data_home + '/'):
             return USER
         if desktop == 'lhde':
@@ -503,6 +528,21 @@ class Db:
 
     def user_file(self):
         return os.path.join(self.env.config_home, 'mimeapps.list')
+
+    def roles(self):
+        """(roles, {role id: types}) of roles.ini over this database"""
+        if getattr(self, '_roles', None) is None:
+            rs = load_roles(self.env)
+            self._roles = (rs, role_types(self, rs))
+        return self._roles
+
+    def role_note(self, path, t):
+        """' (the editor role: settings.ini [programs] editor)' when path is the role file and t a type of a role"""
+        if path != self.env.roles_file:
+            return ''
+        rs, sets = self.roles()
+        r = next((r for r in rs if self.mime.canonical(t) in sets.get(r.id, [])), None)
+        return ' (the %s role: settings.ini [programs] %s)' % (r.id, r.id) if r else ' (a role\'s line)'
 
     def app(self, id_):
         a = self.apps.get(id_)
@@ -576,8 +616,9 @@ class Db:
         for c in chain:
             a, lf = self.default_exact(c)
             if a:
-                why = '%s sets it as the default%s' % (self.env.short(lf.path), '' if c == chain[0] else
-                                                       ' of the parent type ' + c + ' (nothing sets or claims ' + t + ')')
+                why = '%s sets it as the default%s%s' % (self.env.short(lf.path), self.role_note(lf.path, c),
+                                                         '' if c == chain[0] else
+                                                         ' of the parent type ' + c + ' (nothing sets or claims ' + t + ')')
                 return a, why, c, lf.layer
             for a, id_, how, layer in self.claimants(c, source):
                 if a:
@@ -598,7 +639,7 @@ class Db:
                     for id_ in lf.default[t]:
                         a = self.apps.get(id_)
                         if a and e.which(a.program()):
-                            return id_, '%s sets it as the default' % e.short(p)
+                            return id_, '%s sets it as the default%s' % (e.short(p), self.role_note(p, t))
         for d in e.app_dirs():
             for prefix in ([e.menu_prefix] if e.menu_prefix else []) + ['']:
                 for name in ('defaults.list', 'mimeinfo.cache'):
@@ -706,6 +747,235 @@ def reset(path, t):
     return bool(found)
 
 
+# ---- default programs by role (roles.ini, settings.ini [programs], the role file) ---------------------------------------
+# The same model as flxp's shell/roles.cpp: both write the same role file, byte for byte (tests/mime.py checks it).
+
+ROLE_HEADER = (
+    '# lhde\'s default programs by role, written by lhde-mime roles apply (lhde-session at start, Default Programs\' Apply)\n'
+    '# from settings.ini [programs] and roles.ini (docs/SETTINGS.md "Default programs"). Generated: rewritten whenever a\n'
+    '# role changes, so not edited by hand. A choice for one type (Open With\'s Always use, File Types\' Change...,\n'
+    '# lhde-mime default) goes into ~/.config/mimeapps.list, which is read before this file and wins.\n')
+
+
+def read_lhde_ini(path):
+    """lhde's ini (liblhde's lhde_ini): [(section, {key: value})] in file order, keys lower-cased, ; or # comments at the
+    start of a line or after whitespace, of a key given twice the last; and roles.ini's long lists: an indented line
+    without = continues the value before it. None when unreadable"""
+    try:
+        text = open(path, encoding='utf-8', errors='replace').read()
+    except OSError:
+        return None
+    out, cur, last = [], None, None
+    for raw in text.split('\n'):
+        line = raw.strip()
+        if not line or line[0] in ';#':
+            continue
+        if raw[0] in ' \t' and '=' not in line and cur is not None and last:
+            cur[last] = (cur[last] + ' ' + re.split(r'\s[;#]', line, 1)[0].strip()).strip()
+            continue
+        last = None
+        if line.startswith('['):
+            name = line[1:line.index(']')] if ']' in line else line[1:]
+            cur = next((d for n, d in out if n == name.strip().lower()), None)
+            if cur is None:
+                cur = {}
+                out.append((name.strip().lower(), cur))
+            continue
+        if '=' not in line or cur is None:
+            continue
+        k, v = line.split('=', 1)
+        v = re.split(r'\s[;#]', v, 1)[0]
+        last = k.strip().lower()
+        cur[last] = v.strip()
+    return out
+
+
+class Role:
+    def __init__(self, id_):
+        self.id = id_
+        self.label = self.question = self.current = ''
+        self.types, self.descendants, self.exclude, self.prefer, self.categories = [], [], [], [], []
+        self.files = []             # the roles.ini files it was read from
+
+
+def roles_ini_paths(env):
+    """the user's roles.ini (~/.config/lhde/applications/roles.ini) and the first shipped one: the source tree's share/,
+    an install's <prefix>/share/lhde, $XDG_DATA_DIRS/lhde, as liblhde's data lookup orders them (the user's first)"""
+    rel = os.path.join('applications', 'roles.ini')
+    user = os.path.join(env.lhde_config, rel)
+    shipped = [os.path.join(HERE, '..', '..', '..', 'share', 'lhde', rel)] + \
+        [os.path.join(d, 'lhde', rel) for d in env.data_dirs] + [os.path.join(HERE, '..', 'share', rel)]
+    first = next((os.path.realpath(p) for p in shipped if os.path.isfile(p)), None)
+    return [p for p in (user, first) if p and os.path.isfile(p)]
+
+
+def load_roles(env):
+    """the roles in the shipped file's order (roles only the user's file has after them); a key of the user's file wins"""
+    files = roles_ini_paths(env)
+    roles, by = [], {}
+    for path in reversed(files):           # the shipped file first, then the user's keys over it
+        for sec, kv in read_lhde_ini(path) or []:
+            r = by.get(sec)
+            if r is None:
+                r = by[sec] = Role(sec)
+                roles.append(r)
+            r.files.append(path)
+            for k, v in kv.items():
+                if k in ('label', 'question', 'current'):
+                    setattr(r, k, v)
+                elif k in ('types', 'descendants', 'exclude', 'prefer', 'categories'):
+                    setattr(r, k, v.split())
+    for r in roles:
+        r.label = r.label or r.id
+        r.question = r.question or 'Choose a default %s:' % r.label.lower()
+        r.current = r.current or 'Use my current %s' % r.label.lower()
+        r.prefer = [desktop_id(p) for p in r.prefer]
+    return roles
+
+
+def desktop_id(v):
+    v = v.strip()
+    return v if not v or v == 'none' or v.endswith('.desktop') else v + '.desktop'
+
+
+def _match(t, pats):
+    import fnmatch
+    return any(fnmatch.fnmatchcase(t, p) for p in pats)
+
+
+def role_types(db, roles):
+    """{role id: sorted types}: a type a role names in types= (a pattern matching the database's types, or a type of its
+    own such as x-scheme-handler/http) belongs to the first role that names it; a type no role names belongs to the first
+    role whose descendants= reach it through the database's parents; a role's exclude= takes its own types out"""
+    m = db.mime
+    known = m.all_types()
+    strong, weak = {}, {}
+    for r in roles:
+        for p in r.types:
+            hits = [x for x in known if _match(x, [p])] if any(c in p for c in '*?[') else [m.canonical(p)]
+            for t in hits:
+                if not _match(t, r.exclude):
+                    strong.setdefault(t, r.id)
+    for r in roles:
+        for base in r.descendants:
+            base = m.canonical(base)
+            for t in known:
+                if t != base and base in m.ancestors(t) and not _match(t, r.exclude):
+                    weak.setdefault(t, r.id)
+    out = {r.id: [] for r in roles}
+    for t, rid in strong.items():
+        out[rid].append(t)
+    for t, rid in weak.items():
+        if t not in strong:
+            out[rid].append(t)
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def read_programs(env):
+    """settings.ini [programs]: {role: value}"""
+    for sec, kv in read_lhde_ini(env.settings) or []:
+        if sec == 'programs':
+            return {k: desktop_id(v) for k, v in kv.items() if v.strip()}
+    return {}
+
+
+def role_default(db, r):
+    """lhde's choice for a role without a [programs] key: the first installed program of its prefer= list"""
+    return next((p for p in r.prefer if db.app(p)), '')
+
+
+def role_choice(db, r, programs):
+    """(desktop id or '', how): the program the role sets its types to, and a sentence for it"""
+    v = programs.get(r.id, '')
+    if v == 'none':
+        return '', 'none: your current programs (settings.ini [programs] %s = none)' % r.id
+    d = role_default(db, r)
+    if v:
+        if db.app(v):
+            return v, 'your choice (settings.ini [programs] %s)' % r.id
+        if d:
+            return d, '%s is not installed; lhde\'s default' % v
+        return '', '%s is not installed and lhde has no default installed' % v
+    if d:
+        return d, 'lhde\'s default'
+    return '', 'lhde\'s default: none of %s installed' % (' '.join(r.prefer) or 'no program')
+
+
+def role_candidates(db, r, types):
+    """the installed programs (not NoDisplay) that claim at least one of the role's types and have one of its
+    categories= (or are in its prefer= list): the prefer= list's order first, then by how many of the types they claim,
+    then by name"""
+    want = set(types)
+    out = []
+    for id_, a in db.apps.items():
+        if not a.usable(db.env) or (a.no_display and id_ not in r.prefer):
+            continue
+        if r.categories and id_ not in r.prefer and not set(a.categories) & set(r.categories):
+            continue
+        n = len({db.mime.canonical(x) for x in a.mime_types} & want)
+        if n:
+            out.append((r.prefer.index(id_) if id_ in r.prefer else len(r.prefer), -n, a.name.lower(), id_))
+    return [x[3] for x in sorted(out)]
+
+
+def roles_text(db, roles=None, programs=None):
+    """the role file's text"""
+    roles = load_roles(db.env) if roles is None else roles
+    programs = read_programs(db.env) if programs is None else programs
+    sets = role_types(db, roles)
+    out = [ROLE_HEADER, '[Default Applications]\n']
+    for r in roles:
+        id_, how = role_choice(db, r, programs)
+        types = sets.get(r.id, [])
+        if not id_ or not types:
+            out.append('# %s: nothing (%s)\n' % (r.id, how if not id_ else 'no types'))
+            continue
+        out.append('# %s: %s, %s, %d type%s\n' % (r.id, id_, how, len(types), '' if len(types) == 1 else 's'))
+        out.extend('%s=%s\n' % (t, id_) for t in types)
+    return ''.join(out)
+
+
+def apply_roles(db):
+    """writes the role file; True when it changed"""
+    text = roles_text(db)
+    path = db.env.roles_file
+    try:
+        if open(path, encoding='utf-8').read() == text:
+            return False
+    except OSError:
+        pass
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + '.tmp%d' % os.getpid()
+    with open(tmp, 'w', encoding='utf-8') as f:
+        f.write(text)
+    os.replace(tmp, path)
+    return True
+
+
+def role_of(db, t):
+    """the role whose type set holds t, or None"""
+    roles = load_roles(db.env)
+    sets = role_types(db, roles)
+    t = db.mime.canonical(t)
+    return next((r for r in roles if t in sets.get(r.id, [])), None)
+
+
+def set_role(env, role, value):
+    """settings.ini [programs] ROLE = VALUE through lhde-theme setting (liblhde's writer; '' removes the key)"""
+    import subprocess
+    tool = None
+    for d in (os.path.join(HERE, '..', 'build', 'bin'), os.path.join(HERE, '..', '..', '..', 'bin')):
+        if os.access(os.path.join(d, 'lhde-theme'), os.X_OK):
+            tool = os.path.join(d, 'lhde-theme')
+            break
+    tool = tool or env.which('lhde-theme')
+    if not tool:
+        raise OSError('lhde-theme not found: it writes settings.ini')
+    r = subprocess.run([tool, 'setting', 'programs', role, value or '-'], capture_output=True, text=True)
+    if r.returncode:
+        raise OSError(r.stderr.strip() or 'lhde-theme setting failed')
+
+
 # ---- the audit ---------------------------------------------------------------------------------------------------------
 
 # types a program should claim only when it is that kind of program (its Categories)
@@ -791,7 +1061,29 @@ def check(db):
     for id_, a in sorted(db.apps.items()):
         for s in a.shadowed:
             out.append(('shadowed', '%s: %s hides %s' % (id_, e.short(a.path), e.short(s))))
-    if not any(os.path.isfile(os.path.join(d, 'lhde-mimeapps.list')) for d in e.app_dirs() + [e.config_home] + e.config_dirs):
+    # 6. the roles: a chosen program that is not installed, a role file that does not say what the roles say
+    rs, sets = db.roles()
+    programs = read_programs(e)
+    for r in rs:
+        v = programs.get(r.id, '')
+        if v and v != 'none' and not db.app(v):
+            id_, how = role_choice(db, r, programs)
+            out.append(('role', 'settings.ini [programs] %s = %s: %s; the %s role sets %s' % (
+                r.id, v, 'no such desktop file' if v not in db.apps else 'hidden or its program is missing', r.id,
+                id_ or 'nothing')))
+    for k in programs:
+        if k not in sets:
+            out.append(('role', 'settings.ini [programs] %s: no such role in roles.ini (%s)' % (
+                k, ', '.join(e.short(p) for p in roles_ini_paths(e)) or 'none found')))
+    try:
+        have = open(e.roles_file, encoding='utf-8').read()
+    except OSError:
+        have = None
+    if rs and have != roles_text(db, rs, programs):
+        out.append(('role', '%s %s: run lhde-mime roles apply' % (
+            e.short(e.roles_file), 'does not exist' if have is None else 'is not what the roles say')))
+    if not any(os.path.isfile(os.path.join(d, 'lhde-mimeapps.list')) and os.path.join(d, 'lhde-mimeapps.list') != e.roles_file
+               for d in e.app_dirs() + [e.config_home] + e.config_dirs):
         out.append(('lhde', 'no lhde-mimeapps.list in the data directories: lhde\'s defaults are not installed (make install)'))
     elif 'lhde' not in e.desktops:
         out.append(('lhde', 'XDG_CURRENT_DESKTOP is %r: lhde-mimeapps.list is read only when it names lhde (lhde-session '

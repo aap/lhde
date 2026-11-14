@@ -1,6 +1,6 @@
 # flxp, the XP-style explorer and shell (included by the top-level Makefile).
 #   shell/      the shell model: namespace, icons, associations, settings, file ops (native); shell/ui/ its win32 part
-#               (the message box, shell icons as HICON, the Properties sheet), compiled on the shim
+#               (the message box, shell icons as HICON, the Properties sheet, Default Programs), compiled on the shim
 #   explorer/   the explorer (flxp) and the browsing widget the others share
 #   desktop/    flxp-desktop       taskbar/   flxp-taskbar (start menu, start panel, tray; as flxp-startmenu the panel alone)
 #   filedlg/    flxp-filedialog, flxp-portal (xdg-desktop-portal FileChooser backend)
@@ -20,7 +20,7 @@ SHELLOBJS = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/shell/*.cpp)) $(LHDE_OBJS)
 # liblhde (<lhde/data.h>, <lhde/theme.h>, <lhde/settings.h>): the data directories, the theme resolver and the settings
 # store; its objects are linked into every flxp program and test with the shell model
 $(O)/flxp/shell/lhdata.o $(O)/flxp/shell/lhtheme.o $(O)/flxp/shell/settings.o $(O)/flxp/settings/settings.o: CXXFLAGS += -Iliblhde
-$(O)/flxp/shell/icons.o $(O)/flxp/shell/apps.o: CXXFLAGS += -Iliblhde
+$(O)/flxp/shell/icons.o $(O)/flxp/shell/apps.o $(O)/flxp/shell/roles.o: CXXFLAGS += -Iliblhde
 # the tray's own controls: the hardware layer (<lhde/hw.h>)
 $(O)/flxp/taskbar/notify.o: CXXFLAGS += -Iliblhde
 # the shell layer's win32 part (shell/ui.h): linked with wux, so not into the native toolkit tests

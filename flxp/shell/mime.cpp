@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <algorithm>
 #include <map>
 #include <set>
 #include "config.h"
@@ -235,6 +236,39 @@ std::vector<std::string> mime_parents(const std::string& type_in)
     if (t.compare(0, 5, "text/") == 0 && seen.insert("text/plain").second) out.push_back("text/plain");
     if (t.compare(0, 6, "inode/") != 0 && seen.insert("application/octet-stream").second) out.push_back("application/octet-stream");
     return out;
+}
+
+std::vector<std::string> mime_direct_parents(const std::string& type_in)
+{
+    load();
+    std::string t = mime_canonical(type_in);
+    std::vector<std::string> out;
+    auto range = db.parents.equal_range(t);
+    for (auto it = range.first; it != range.second; ++it) {
+        std::string p = mime_canonical(it->second);
+        if (std::find(out.begin(), out.end(), p) == out.end()) out.push_back(p);
+    }
+    if (t.compare(0, 5, "text/") == 0 && t != "text/plain" && std::find(out.begin(), out.end(), "text/plain") == out.end())
+        out.push_back("text/plain");
+    if (out.empty() && t.compare(0, 6, "inode/") != 0 && t != "application/octet-stream") out.push_back("application/octet-stream");
+    return out;
+}
+
+std::vector<std::string> mime_all_types()
+{
+    load();
+    std::set<std::string> all;
+    auto add = [&](const std::string& t) { std::string x = trim(t); if (x.find('/') != std::string::npos) all.insert(mime_canonical(x)); };
+    for (const std::string& dir : db.mime_dirs) {
+        std::string text;
+        if (read_file(dir + "/types", text)) each_line(text, add);
+    }
+    for (auto& kv : db.literal) for (const Glob& g : kv.second) add(g.type);
+    for (auto& kv : db.ext) for (const Glob& g : kv.second) add(g.type);
+    for (const Glob& g : db.general) add(g.type);
+    for (auto& kv : db.parents) { add(kv.first); add(kv.second); }
+    for (auto& kv : db.aliases) add(kv.second);
+    return std::vector<std::string>(all.begin(), all.end());
 }
 
 bool mime_is_a(const std::string& type, const std::string& ancestor)

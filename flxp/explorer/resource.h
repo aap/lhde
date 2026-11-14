@@ -53,6 +53,7 @@
 #define IDC_FT_SETBY        1808
 #define IDC_FT_DESC         1809
 #define IDC_FT_ADVANCED     1810
+#define IDC_FT_DEFPROGS     1811
 #define IDC_NE_EXT          1821
 #define IDC_NE_TYPE         1822
 #define IDC_ET_ICON         1831

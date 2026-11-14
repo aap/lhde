@@ -6,6 +6,11 @@
 //   assoctest files                    the mimeapps.list files read, most important first
 //   assoctest setdefault <mime> <app.desktop>
 //   assoctest reset <mime>             the type out of the user's mimeapps.list
+//   assoctest roles                    each role: ID APP TYPES-COUNT then its candidates (shell/roles.h)
+//   assoctest roletext                 the role file's text as apply would write it
+//   assoctest rolesapply               write the role file
+//   assoctest setrole <role> <app|none|->   settings.ini [programs] ROLE, then apply
+//   assoctest roleof <type>...         the role of each type, "-" for none
 //   assoctest terminal <dir>
 //   assoctest trash <file>...
 //   assoctest bookmarks [add <path> [label]]
@@ -16,6 +21,7 @@
 #include "shell/config.h"
 #include "shell/fileops.h"
 #include "shell/mime.h"
+#include "shell/roles.h"
 
 int main(int argc, char** argv)
 {
@@ -41,6 +47,25 @@ int main(int argc, char** argv)
             printf("%s %s %s %s\n", shell::mime_canonical(t).c_str(), s.app ? s.app->id.c_str() : "-", s.layer.empty() ? "-" : s.layer.c_str(),
                    s.file.empty() ? "-" : s.file.c_str());
         }
+    } else if (cmd == "roles") {
+        std::vector<shell::Role> rs = shell::roles();
+        auto sets = shell::role_types(rs);
+        for (const shell::Role& r : rs) {
+            shell::RoleChoice c = shell::role_choice(r);
+            printf("%s %s %zu\n ", r.id.c_str(), c.app.empty() ? "-" : c.app.c_str(), sets[r.id].size());
+            for (const shell::App* a : shell::role_candidates(r, sets[r.id])) printf(" %s", a->id.c_str());
+            printf("\n");
+        }
+    } else if (cmd == "roletext") {
+        fputs(shell::roles_text().c_str(), stdout);
+    } else if (cmd == "rolesapply") {
+        if (!shell::apply_roles(&err)) { fprintf(stderr, "error: %s\n", err.c_str()); return 1; }
+        printf("%s\n", shell::roles_file().c_str());
+    } else if (cmd == "setrole" && argc == 4) {
+        if (!shell::set_role(argv[2], strcmp(argv[3], "-") ? argv[3] : "", &err)) { fprintf(stderr, "error: %s\n", err.c_str()); return 1; }
+        printf("%s\n", shell::roles_file().c_str());
+    } else if (cmd == "roleof") {
+        for (int i = 2; i < argc; i++) { const shell::Role* r = shell::role_of(argv[i]); printf("%s %s\n", argv[i], r ? r->id.c_str() : "-"); }
     } else if (cmd == "files") {
         for (const std::string& f : shell::mimeapps_files()) printf("%s\n", f.c_str());
     } else if (cmd == "reset" && argc == 3) {

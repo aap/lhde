@@ -65,8 +65,12 @@ try:
     os.makedirs(etc)
     os.makedirs(cfg)
     # the mime database: two text types (one an alias), a PNG signature in magic
-    write(usr + '/mime/globs2', '50:text/plain:*.txt\n50:text/x-csrc:*.c\n50:text/x-log:*.log\n50:image/png:*.png\n')
-    write(usr + '/mime/subclasses', 'text/x-csrc text/plain\ntext/x-log text/plain\n')
+    write(usr + '/mime/globs2', '50:text/plain:*.txt\n50:text/x-csrc:*.c\n50:text/x-log:*.log\n50:image/png:*.png\n'
+          '50:application/xml:*.xml\n50:image/svg+xml:*.svg\n50:application/x-shellscript:*.sh\n50:text/html:*.html\n'
+          '50:application/rtf:*.rtf\n')
+    # the roles' subclasses: a script and XML under text/plain, SVG under XML, RTF under text/plain (a word processor's)
+    write(usr + '/mime/subclasses', 'text/x-csrc text/plain\ntext/x-log text/plain\napplication/xml text/plain\n'
+          'image/svg+xml application/xml\napplication/x-shellscript text/plain\napplication/rtf text/plain\n')
     write(usr + '/mime/aliases', 'text/x-c text/x-csrc\n')
     write(usr + '/mime/text/x-csrc.xml', '<?xml version="1.0"?>\n<mime-type type="text/x-csrc"><comment>C source code</comment>'
           '</mime-type>\n')
@@ -210,6 +214,86 @@ try:
     check('explain a folder: the xdg-open verdict', True,
           'xdg-open would run: deadbeef.desktop because %s/applications/mimeinfo.cache lists it first and nothing sets a default'
           % usr in r.stdout)
+    # H. default programs by role (roles.ini as shipped, settings.ini [programs], the role file)
+    for f in (user, cfg + '/lhde-mimeapps.list'):
+        if os.path.exists(f):
+            os.remove(f)
+    e = env('lhde')
+    db = model(e)
+    rs, sets = db.roles()
+    check('roles: the shipped roles', ['editor', 'images', 'pdf', 'browser', 'mail', 'audio', 'video', 'archives', 'folders'],
+          [r.id for r in rs])
+    check('roles: the editor\'s types (text/plain, what reaches it; not SVG, HTML or RTF)',
+          ['application/x-shellscript', 'application/xml', 'text/plain', 'text/x-csrc', 'text/x-log'], sets['editor'])
+    check('roles: the images (not SVG)', ['image/png'], sets['images'])
+    check('roles: the browser\'s types, named ones the database does not know too',
+          ['application/xhtml+xml', 'text/html', 'x-scheme-handler/http', 'x-scheme-handler/https'], sets['browser'])
+    check('roles: an alias is its type', 'editor', M.role_of(db, 'text/x-c').id)
+    check('roles: the editor\'s candidates (TextEditor), lhde\'s default first', ['luxpad.desktop', 'gedit.desktop'],
+          M.role_candidates(db, rs[0], sets['editor']))
+    check('roles: lhde\'s defaults', [('editor', 'luxpad.desktop'), ('audio', 'deadbeef.desktop'), ('folders', 'flxp.desktop')],
+          [(r.id, M.role_choice(db, r, {})[0]) for r in rs if M.role_choice(db, r, {})[0]])
+    a = assoc(e, 'roleof', 'text/x-csrc', 'image/svg+xml', 'text/html')
+    if a is not None:
+        check('flxp: the roles of types', ['text/x-csrc', 'editor', 'image/svg+xml', '-', 'text/html', 'browser'], a)
+    # before the roles are applied a claimant of a text type opens it (gedit claims text/x-csrc)
+    agree('roles not applied, text/x-csrc', e, 'text/x-csrc', ('gedit.desktop',) * 3)
+    r = subprocess.run(tool + ['roles', 'apply'], env=e, capture_output=True, text=True)
+    rf = data + '/applications/lhde-mimeapps.list'
+    text = open(rf).read() if os.path.isfile(rf) else ''
+    check('roles apply: the role file, generated', True, text.startswith('# lhde\'s default programs by role'))
+    check('roles apply: a line per type of the editor role', True,
+          all('%s=luxpad.desktop\n' % t in text for t in sets['editor']))
+    check('roles apply: SVG is no role\'s', False, 'image/svg+xml=' in text)
+    if os.access(ASSOC, os.X_OK):
+        check('roles: flxp writes the same file', text, subprocess.run([ASSOC, 'roletext'], env=e, capture_output=True,
+                                                                        text=True).stdout)
+    agree('editor role, text/x-csrc', e, 'text/x-csrc', ('luxpad.desktop',) * 3)
+    agree('editor role, text/x-log (xdg-open finds the exact type now)', e, 'text/x-log', ('luxpad.desktop',) * 3)
+    r = subprocess.run(tool + ['explain', 'text/x-csrc'], env=e, capture_output=True, text=True)
+    check('explain: the verdict names the role', True, '(the editor role: settings.ini [programs] editor)' in r.stdout)
+    a = assoc(e, 'default', 'text/x-csrc')
+    if a is not None:
+        check('flxp: text/x-csrc set by the role file', ['role', rf], a[2:])
+    # precedence: the user's generic file beats the role file
+    subprocess.run(tool + ['default', 'text/x-csrc', 'gedit'], env=e, capture_output=True, text=True)
+    agree('the user\'s file over the role, text/x-csrc', e, 'text/x-csrc', ('gedit.desktop',) * 3)
+    subprocess.run(tool + ['reset', 'text/x-csrc'], env=e, capture_output=True, text=True)
+    agree('after reset, the role again', e, 'text/x-csrc', ('luxpad.desktop',) * 3)
+    # the role file beats lhde's data-dir file: the folders role to pcmanfm, then lhde's default again
+    r = subprocess.run(tool + ['role', 'folders', 'pcmanfm'], env=e, capture_output=True, text=True)
+    check('lhde-mime role folders pcmanfm: exit', 0, r.returncode)
+    settings = cfg + '/lhde/settings.ini'
+    check('settings.ini [programs] folders', True, 'folders = pcmanfm.desktop' in open(settings).read())
+    agree('folders role over lhde\'s file, inode/directory', e, 'inode/directory', ('pcmanfm.desktop',) * 3)
+    subprocess.run(tool + ['role', 'folders', '-'], env=e, capture_output=True, text=True)
+    agree('folders role back to lhde\'s default', e, 'inode/directory', ('flxp.desktop',) * 3)
+    # switching the editor: one key, every text type follows
+    subprocess.run(tool + ['role', 'editor', 'gedit'], env=e, capture_output=True, text=True)
+    for t in ('text/plain', 'text/x-log', 'application/xml'):
+        agree('editor role gedit, %s' % t, e, t, ('gedit.desktop',) * 3)
+    r = subprocess.run(tool + ['role', 'editor', 'nosuch'], env=e, capture_output=True, text=True)
+    check('lhde-mime role of a missing program: refused', 1, r.returncode)
+    if os.access(ASSOC, os.X_OK):
+        # flxp's writer: [programs] editor = none (Use my current text editor) takes the role's lines out
+        assoc(e, 'setrole', 'editor', 'none')
+        check('flxp setrole: settings.ini [programs] editor = none', True, 'editor = none' in open(settings).read())
+        text = open(rf).read()
+        check('editor none: no editor lines', False, 'text/x-log=' in text)
+        check('editor none: the file says so', True, '# editor: nothing (none: your current programs' in text)
+        agree('editor none, text/plain: lhde\'s data-dir file', e, 'text/plain', ('luxpad.desktop',) * 3)
+        agree('editor none, text/x-csrc: its claimant', e, 'text/x-csrc', ('gedit.desktop',) * 3)
+        r = subprocess.run(tool + ['roles', 'apply'], env=e, capture_output=True, text=True)
+        check('lhde-mime roles apply after flxp\'s: the same file', True, r.stdout.strip().endswith('unchanged'))
+        assoc(e, 'setrole', 'editor', '-')
+    # check: a role's program not installed, the role file out of date
+    write(settings, '[programs]\nimages = feh.desktop\n')
+    found = '\n'.join(t for k, t in M.check(model(e)) if k == 'role')
+    check('check: the role\'s program is not installed', True,
+          'settings.ini [programs] images = feh.desktop: no such desktop file' in found)
+    write(settings, '[programs]\neditor = gedit.desktop\n')
+    found = '\n'.join(t for k, t in M.check(model(e)) if k == 'role')
+    check('check: the role file out of date', True, 'is not what the roles say: run lhde-mime roles apply' in found)
 finally:
     shutil.rmtree(T, ignore_errors=True)
 

@@ -79,6 +79,8 @@ comments, the order and the keys it does not know: it reads the whole file, chan
               run = dmenu_run            ; Super+R runs this instead of the start menu's Run dialog (the default: unset)
               terminal = cmd             ; the terminal (below); default: the first of cmd, urxvt, xterm, x-terminal-emulator on PATH
               screenshot = luxshot --screen ; screenshot_window = luxshot --window ; screenshot_region = luxshot --region   ; luxwm's Super+Shift+F/W/S (luxshell; the defaults)
+[programs]    editor = luxpad.desktop    ; the default programs by role: editor images pdf browser mail audio video archives folders
+              images = none              ; a desktop file id; none: XP's "Use my current ..."; absent: lhde's ("Default programs" below)
 [fonts]       smoothing = standard       ; off | standard | cleartype (flxp, luxwm's menus; luxshell uses fontconfig's)
 [effects]     menu_shadows = 1           ; XP's drop shadow under menus (wux's popup menus, luxwm's window menu, luxshell's menus)
               keyboard_cues = 0          ; 0: mnemonics underlined only after Alt (XP's default); 1: always
@@ -115,6 +117,7 @@ selecting another theme removes it (`lhde_theme_select`), Save As turns it into 
 | Display Properties (flxp-settings: Themes, Desktop, Appearance, Effects) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[sidebar] mode with_classic stacking animate`, `[fonts]`, `[effects]`, theme files (Save As, Delete) |
 | luxshell (the settings flyout, its menus, drags, `_LHSHELL_COMMAND`) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[taskbar]`, `[sidebar]`, `[clock]`, theme files (Save As) |
 | flxp-desktop, the Explorer | Set as Desktop Background: the current layer's `Desktop.wallpaper` / `Desktop.mode` (and a `[desktop] wallpaper = none` cleared); outside lhde's files: the associations ("Associations" below) |
+| Default Programs (`flxp --default-programs`: Folder Options' File Types, All Programs' Set Program Access and Defaults) | `[programs]`, then the role file ("Default programs" below); `lhde-mime role` the same |
 | lhde-session | `_LH_THEME` only (`theme NAME`; luxshell then writes the file); without a luxshell, `taskbar KIND` through `lhde-theme set-key`, `set` and `setting` |
 | luxwm | nothing; it reads `[fonts] smoothing` and `[effects]` for its window menu, the theme through `_LH_THEME` |
 | flxp-taskbar, the start panel | `[taskbar] quicklaunch locked` (the taskbar menu); they read `[taskbar] start_menu hide_inactive`, `[quicklaunch] dir`, `[start] pinned`, `[commands] logoff shutdown terminal` |
@@ -160,11 +163,12 @@ important first (`$desktop` each entry of `XDG_CURRENT_DESKTOP`, lower-cased; lh
 | --- | --- |
 | `~/.config/$desktop-mimeapps.list`, `~/.config/mimeapps.list` | the user's choices; flxp (Open With, Folder Options' File Types, Properties' Change...), `lhde-mime default` and GLib write `mimeapps.list` |
 | `$XDG_CONFIG_DIRS/$desktop-mimeapps.list`, `.../mimeapps.list` | the administrator's |
+| `~/.local/share/applications/lhde-mimeapps.list` | the role file: the default programs by role, generated from `[programs]` ("Default programs" below) |
 | `~/.local/share/applications/$desktop-mimeapps.list`, `mimeapps.list`, `defaults.list` | the user's too (the old place) |
 | `$XDG_DATA_DIRS/applications/$desktop-mimeapps.list`, `mimeapps.list`, `defaults.list` | in data-directory order: lhde's `lhde-mimeapps.list` (installed into `$PREFIX/share/applications`, from `share/applications/`), the distribution's |
 
 In each directory the desktop-specific files come before `mimeapps.list`, and `defaults.list` (the deprecated name) last. So the
-user's choice beats lhde's defaults, and lhde's beat the distribution's when lhde's data directory comes first in
+user's choice for a type beats the role file, the role file beats lhde's defaults, and lhde's beat the distribution's when lhde's data directory comes first in
 `XDG_DATA_DIRS` (`/usr/local/share` before `/usr/share`, the default) or is the data home (`PREFIX=~/.local`). Without
 `XDG_CURRENT_DESKTOP=lhde` (another session) lhde's file is not read.
 
@@ -181,10 +185,61 @@ update-desktop-database on `$PREFIX/share/applications`). xdg-open knows no desk
 path, which reads the same files in the same order but only for the exact type and without Removed Associations; it needs no
 hint. `lhde-mime explain TYPE` shows all three verdicts (docs/USAGE.md "File types and programs").
 
-What lhde writes, all of it the user's: `~/.config/mimeapps.list` (flxp's Open With with "Always use", Properties' Change...,
+What lhde writes, all of it the user's: the role file (below); `~/.config/mimeapps.list` (flxp's Open With with "Always use", Properties' Change...,
 Folder Options' File Types Change... and Restore, `lhde-mime default` and `reset`: a type's `[Default Applications]` line, the
 program first in its `[Added Associations]`, off its `[Removed Associations]`; Restore and reset remove the type's lines from
 all three groups); copies of a program's desktop file in `~/.local/share/applications/ID` marked `X-Lhde-Override=true` and
 `X-Lhde-Original=PATH` (File Types' Edit File Type: the program's actions; Restore deletes the copy, and a desktop file there
 without the mark is never written); `~/.local/share/mime/packages/lhde-extensions.xml` and what update-mime-database compiles
 from it in `~/.local/share/mime` (File Types' New and Delete: the user's own extensions).
+
+## Default programs
+
+XP's Set Program Access and Defaults over the files above: one choice per kind of program, a **role**, instead of one per file
+type. A role is a set of types; the user's program for it is `settings.ini [programs] ROLE = ID.desktop`, and the role file,
+`~/.local/share/applications/lhde-mimeapps.list` (`$XDG_DATA_HOME/applications`), holds one `[Default Applications]` line
+`TYPE=ID.desktop` for every type of every role. The file starts with a comment saying it is generated; every apply writes it
+whole (`lhde-mime roles apply`: lhde-session at start, Default Programs' OK and Apply, `lhde-mime role`; flxp's
+`shell::apply_roles` and lhdemime.py's `apply_roles` write the same bytes). It is read only in an lhde session (a
+desktop-specific file: `XDG_CURRENT_DESKTOP=lhde`), after the user's `~/.config/mimeapps.list` (a choice for one type: Open
+With's Always use, File Types' Change..., `lhde-mime default`) and before lhde's and the distribution's files. Switching the
+text editor is one key and an apply; a text type that only one program claims still opens in the editor; one type set apart
+stays set apart in `mimeapps.list`.
+
+**The roles**, `applications/roles.ini` (shipped as `$PREFIX/share/lhde/applications/roles.ini`, from `share/applications/`;
+`~/.config/lhde/applications/roles.ini` is read over it key by key, and a section of its own adds a role). The keys: `label`,
+`question` (XP's "Choose a default Web browser:"), `current` (XP's "Use my current Web browser"), `types` (types, or patterns
+matched against the database's types; a type named here belongs to the first role that names it, types the database does not
+know, `x-scheme-handler/http`, included), `descendants` (every type whose parents reach one of these, through shared-mime-info's
+`subclasses` and `text/*` under `text/plain`, read at each apply: a text type installed later follows; a type another role names
+stays that role's), `exclude` (patterns out of the role), `prefer` (lhde's choice when `[programs]` sets none: the first of these
+that is installed; none installed: the role writes nothing), `categories` (the programs offered: the installed, not `NoDisplay`
+desktop files that claim one of the role's types and have one of these `Categories=`, or are in `prefer`). A long list goes on
+over indented lines without `=`.
+
+| role | label | types | lhde's default |
+| --- | --- | --- | --- |
+| `editor` | Text editor | `text/plain` and every type below it, but other media (`image/*`, `audio/*`, `video/*`, `model/*`, `chemical/*`, `message/*`), word processors' documents (RTF, AbiWord, LyX, the flat OpenDocument files), launchers and shortcuts (`.desktop`, `.url`, JNLP, Flatpak refs), other programs' project files, fonts, signatures, bookmarks, playlists | `luxpad.desktop`, then the usual editors |
+| `images` | Image viewer | `image/*` but drawings (SVG, WMF, EMF, CGM, CAD, Xfig, Skencil), the page formats (EPS, DjVu), the editors' own files (XCF, GIMP brushes, Photoshop, OpenRaster), 3D scenes, cursors | feh, nsxiv, sxiv, eog, Loupe, ristretto, ... |
+| `pdf` | Document viewer | PDF (and compressed), PostScript (and EPS), DjVu, XPS | mupdf, zathura, evince, ... |
+| `browser` | Web browser | `text/html`, `application/xhtml+xml`, `x-scheme-handler/http`, `https` | firefox, librewolf, chromium, ... |
+| `mail` | E-mail program | `x-scheme-handler/mailto`, `message/rfc822` | thunderbird, claws-mail, evolution, sylpheed |
+| `audio` | Music player | `audio/*` | audacious, deadbeef, qmmp, ... |
+| `video` | Video player | `video/*` | mpv, vlc, smplayer, ... |
+| `archives` | Archive manager | zip, tar and the compressed tars, 7z, rar, gzip, bzip2, xz, lzma, zstd, lzip, lha, arj, cpio, ace, cab (not the formats that are zip files inside) | xarchiver, file-roller, engrampa, ark, peazip |
+| `folders` | File manager | `inode/directory` | `flxp.desktop` |
+
+The `folders` role is lhde's, not XP's; it repeats lhde's `lhde-mimeapps.list`, so the role file says everything that file does
+(with `PREFIX=~/.local` the two are one path: make install's copy stands until the next apply). The terminal is no role: it is
+`[commands] terminal` (above).
+
+**`[programs] ROLE`**: a desktop file id (`luxpad.desktop`; `lhde-mime role` takes `luxpad` too); `none`, XP's "Use my current
+...": the role writes nothing and its types fall to the other files and the claimants; absent: lhde's default (`prefer`). A
+program that is not installed gives lhde's default, which `lhde-mime check` reports with the role file out of date.
+
+**Default Programs** (`flxp --default-programs[=ROLE]`; Folder Options' File Types, its Default Programs... button, at the
+selected type's role; All Programs' first item, XP's Set Program Access and Defaults) lists the roles; the selected one shows
+its question, "Use my current ..." and the programs offered as radio buttons (lhde's default marked), how many types it
+opens. OK and Apply write `[programs]` and apply at once. File Types' **Set by** names the role of a line from the role file:
+"your editor role (luxpad)" when `[programs]` chose it, "lhde's editor role (luxpad)" when it is lhde's default.
+

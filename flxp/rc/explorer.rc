@@ -146,6 +146,7 @@ FONT 8, "MS Shell Dlg"
 BEGIN
     LTEXT           "Registered file &types:", -1, 7, 7, 150, 8
     CONTROL         "", IDC_FT_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SHAREIMAGELISTS | LVS_OWNERDATA | WS_BORDER | WS_TABSTOP, 7, 17, 213, 90
+    PUSHBUTTON      "Default Pro&grams...", IDC_FT_DEFPROGS, 7, 111, 80, 14
     PUSHBUTTON      "N&ew", IDC_FT_NEW, 112, 111, 52, 14
     PUSHBUTTON      "&Delete", IDC_FT_DELETE, 168, 111, 52, 14
     GROUPBOX        "Details", IDC_FT_DETAILS, 7, 129, 213, 79

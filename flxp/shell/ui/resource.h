@@ -1,8 +1,10 @@
-/* The Properties sheet's resource ids (flxp/rc/shell.rc; shell::properties, properties.cpp) */
+/* The shell layer's dialogs' resource ids (flxp/rc/shell.rc): the Properties sheet (shell::properties, properties.cpp),
+   Default Programs (shell::default_programs, defprogs.cpp) */
 #pragma once
 #define IDD_GENERAL       100
 #define IDD_METADATA      101
 #define IDD_NEWATTR       102
+#define IDD_DEFPROGS      103
 
 /* General */
 #define IDC_GICON         110
@@ -55,3 +57,14 @@
 /* New Attribute */
 #define IDC_ATTRNAME      170
 #define IDC_ATTRVALUE     171
+
+/* Default Programs: the roles, the question, IDC_DP_RADIO0 "Use my current ..." and the programs IDC_DP_RADIO0 + 1 + i
+   (i < IDC_DP_SLOTS - 1) */
+#define IDC_DP_INTRO      300
+#define IDC_DP_ROLES      301
+#define IDC_DP_GROUP      302
+#define IDC_DP_QUESTION   303
+#define IDC_DP_INFO       304
+#define IDC_DP_APPLY      305
+#define IDC_DP_RADIO0     310
+#define IDC_DP_SLOTS      10
