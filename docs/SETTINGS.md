@@ -38,7 +38,8 @@ Two directories, one rule each. liblhde gives every path (`lhde_config_file`, `l
 | `luxpad.ini` | luxpad's window (`[window]` x, y, width, height, maximized) and last search (`[search]` find, replace, match_case, whole_word, down) |
 
 lhde never puts Windows files in either: they are `~/.local/share/lhde-windows` (lhde-import), the shipped text is
-`$PREFIX/share/lhde` (make install).
+`$PREFIX/share/lhde` (make install). Which program opens a type is not kept here either but in the freedesktop files every
+program shares ("Associations" below).
 
 Environment, honoured by every lhde program and script: `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `LHDE_SETTINGS` (settings.ini
 alone), `LHDE_WINDOWS` (another Windows tree), `LHDE_DATA` (one flat data directory instead of the Windows tree: tests, scratch
@@ -113,7 +114,7 @@ selecting another theme removes it (`lhde_theme_select`), Save As turns it into 
 | --- | --- |
 | Display Properties (flxp-settings: Themes, Desktop, Appearance, Effects) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[sidebar] mode with_classic stacking animate`, `[fonts]`, `[effects]`, theme files (Save As, Delete) |
 | luxshell (the settings flyout, its menus, drags, `_LHSHELL_COMMAND`) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[taskbar]`, `[sidebar]`, `[clock]`, theme files (Save As) |
-| flxp-desktop, the Explorer | Set as Desktop Background: the current layer's `Desktop.wallpaper` / `Desktop.mode` (and a `[desktop] wallpaper = none` cleared) |
+| flxp-desktop, the Explorer | Set as Desktop Background: the current layer's `Desktop.wallpaper` / `Desktop.mode` (and a `[desktop] wallpaper = none` cleared); outside lhde's files: the associations ("Associations" below) |
 | lhde-session | `_LH_THEME` only (`theme NAME`; luxshell then writes the file); without a luxshell, `taskbar KIND` through `lhde-theme set-key`, `set` and `setting` |
 | luxwm | nothing; it reads `[fonts] smoothing` and `[effects]` for its window menu, the theme through `_LH_THEME` |
 | flxp-taskbar, the start panel | `[taskbar] quicklaunch locked` (the taskbar menu); they read `[taskbar] start_menu hide_inactive`, `[quicklaunch] dir`, `[start] pinned`, `[commands] logoff shutdown terminal` |
@@ -147,3 +148,43 @@ file again and apply the keys whose value differs from what runs.
 
 Last writer wins per key; writers never drop keys they do not know. When settings.ini and the root disagree at startup, the
 root wins for the running session (it is what is live), and the first writer brings the file in line.
+
+## Associations
+
+Which program opens a file type is not an lhde setting: it lives in the freedesktop files every program reads (the MIME
+Applications Associations spec), so flxp, GIO programs (Firefox, GTK), xdg-open and lhde's own tools agree. The files, most
+important first (`$desktop` each entry of `XDG_CURRENT_DESKTOP`, lower-cased; lhde-session sets `XDG_CURRENT_DESKTOP=lhde` and
+`DESKTOP_SESSION=lhde`):
+
+| file | layer |
+| --- | --- |
+| `~/.config/$desktop-mimeapps.list`, `~/.config/mimeapps.list` | the user's choices; flxp (Open With, Folder Options' File Types, Properties' Change...), `lhde-mime default` and GLib write `mimeapps.list` |
+| `$XDG_CONFIG_DIRS/$desktop-mimeapps.list`, `.../mimeapps.list` | the administrator's |
+| `~/.local/share/applications/$desktop-mimeapps.list`, `mimeapps.list`, `defaults.list` | the user's too (the old place) |
+| `$XDG_DATA_DIRS/applications/$desktop-mimeapps.list`, `mimeapps.list`, `defaults.list` | in data-directory order: lhde's `lhde-mimeapps.list` (installed into `$PREFIX/share/applications`, from `share/applications/`), the distribution's |
+
+In each directory the desktop-specific files come before `mimeapps.list`, and `defaults.list` (the deprecated name) last. So the
+user's choice beats lhde's defaults, and lhde's beat the distribution's when lhde's data directory comes first in
+`XDG_DATA_DIRS` (`/usr/local/share` before `/usr/share`, the default) or is the data home (`PREFIX=~/.local`). Without
+`XDG_CURRENT_DESKTOP=lhde` (another session) lhde's file is not read.
+
+lhde's defaults: `inode/directory` = `flxp.desktop`, `text/plain` = `luxpad.desktop`. A desktop-specific file holds
+`[Default Applications]` only: its Added and Removed Associations are not read (the spec; GLib warns about them, `lhde-mime
+check` reports them), so taking a program off a type is done in `mimeapps.list`.
+
+A type's program (GLib's order, which flxp's shell layer follows): the first installed, not removed `[Default Applications]`
+entry for the type in the files above; else its first claimant (`[Added Associations]` in the same order, then the desktop
+files that name the type in `MimeType=`, by data directory); else the same for its nearest parent type (`text/x-log` ->
+`text/plain` -> `application/octet-stream`). GIO and xdg-open read the claimants from each directory's `mimeinfo.cache`
+(update-desktop-database), not from the desktop files: a directory without one claims nothing for them (`make install` runs
+update-desktop-database on `$PREFIX/share/applications`). xdg-open knows no desktop called lhde and takes xdg-utils' generic
+path, which reads the same files in the same order but only for the exact type and without Removed Associations; it needs no
+hint. `lhde-mime explain TYPE` shows all three verdicts (docs/USAGE.md "File types and programs").
+
+What lhde writes, all of it the user's: `~/.config/mimeapps.list` (flxp's Open With with "Always use", Properties' Change...,
+Folder Options' File Types Change... and Restore, `lhde-mime default` and `reset`: a type's `[Default Applications]` line, the
+program first in its `[Added Associations]`, off its `[Removed Associations]`; Restore and reset remove the type's lines from
+all three groups); copies of a program's desktop file in `~/.local/share/applications/ID` marked `X-Lhde-Override=true` and
+`X-Lhde-Original=PATH` (File Types' Edit File Type: the program's actions; Restore deletes the copy, and a desktop file there
+without the mark is never written); `~/.local/share/mime/packages/lhde-extensions.xml` and what update-mime-database compiles
+from it in `~/.local/share/mime` (File Types' New and Delete: the user's own extensions).

@@ -48,26 +48,43 @@ bool frame_auto()
     return fr != "xp" && fr != "longhorn";
 }
 
+static int g_wm = -1;   // lhwm_running's answer: -1 not asked yet
+
+bool lhwm_running(bool refresh)
+{
+    if (refresh || g_wm < 0) {
+        const char* forced = getenv("FLXP_LHWM");   // testing: 1 / 0 instead of asking the display
+        g_wm = forced && *forced ? atoi(forced) != 0 : shell::window_manager_name() == "lhwm";
+    }
+    return g_wm != 0;
+}
+
 bool want_longhorn(std::string* why)
 {
     // the session theme's Explorer.chrome (navbar none: xp)
     std::string fr = shell::theme_chrome();
+    const shell::SessionTheme& st = shell::session_theme();
+    bool lhwm = lhwm_running();
     if (fr == "xp" || fr == "longhorn") {
+        // the vision header's title and caption buttons live in luxwm's frame (CLIENT_CAPTION): under another window
+        // manager, or none, it has no frame to extend, so the XP chrome
+        bool vision_alone = fr == "longhorn" && !lhwm && st.value("Explorer.navbar") == "vision";
         if (why) {
-            const shell::SessionTheme& st = shell::session_theme();
             *why = "session theme " + st.name + ": Explorer.chrome=" + st.value("Explorer.chrome") +
-                   (st.value("Explorer.navbar") == "none" ? ", Explorer.navbar=none" : "");
+                   (st.value("Explorer.navbar") == "none" ? ", Explorer.navbar=none" : "") +
+                   (vision_alone ? ", but the vision header needs luxwm (window manager: " + wm_label() + ")" :
+                    fr == "longhorn" && !lhwm ? ", the header without its title row under " + wm_label() : "");
         }
-        return fr == "longhorn";
+        return fr == "longhorn" && !vision_alone;
     }
-    BOOL comp = FALSE;
-    DwmIsCompositionEnabled(&comp);
-    FLXP_DWM_FRAME_METRICS fm = {}; fm.cbSize = sizeof fm;
-    FlxpDwmGetFrameMetrics(&fm);
-    WCHAR th[8];
-    bool luxwm = comp || fm.bValid || FlxpDwmGetFrameThemePath(th, 8) == S_OK;
-    if (why) *why = luxwm ? "chrome auto, luxwm runs" : "chrome auto, no luxwm on this display";
-    return luxwm;
+    if (why) *why = lhwm ? "chrome auto, luxwm runs" : "chrome auto, no luxwm on this display (" + wm_label() + ")";
+    return lhwm;
+}
+
+std::string wm_label()
+{
+    std::string n = shell::window_manager_name();
+    return n.empty() ? "no window manager" : n == "?" ? "a window manager without a name" : n;
 }
 
 // The frame extends luxwm's glass by the header height and draws its own title.

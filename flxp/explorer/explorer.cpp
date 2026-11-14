@@ -82,6 +82,7 @@ struct Explorer : browser::Browser {
     bool focus_active = true;                        // WM_ACTIVATE: the window's own state
     UINT w_active = 0;                               // the root _NET_ACTIVE_WINDOW watch
     UINT w_settings = 0;                             // _LH_SETTINGS_CHANGED (per-theme icons, frame)
+    UINT w_wm = 0;                                   // _NET_SUPPORTING_WM_CHECK: luxwm started or stopped
 
     int icon(const std::string& key) override;
     HIMAGELIST icons_at(int px) override;
@@ -1910,7 +1911,7 @@ static void fo_applied(dialogs::FolderOptions& o)
     if (g.zoomable && o.thumbnails != shell::setting_flag("thumbnails", true)) on_command(ID_VIEW_THUMBNAILS);
 }
 
-static void folder_options()
+static void folder_options(int page = 0, HWND owner = g.frame)
 {
     dialogs::FolderOptions o;
     o.longhorn = g.zoomable;
@@ -1927,7 +1928,8 @@ static void folder_options()
     o.apply_all = fo_apply_all;
     o.reset_all = fo_reset_all;
     o.applied = fo_applied;
-    dialogs::folder_options(g.frame, o);
+    o.start_page = page;
+    dialogs::folder_options(owner, o);
 }
 
 static void on_command(int id)
@@ -2177,6 +2179,37 @@ static void set_frame_mode(bool lh)
     RedrawWindow(frame, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
 }
 
+// luxwm started or stopped (another window manager, or none): the Longhorn header belongs to its frame, so the
+// chrome follows (browser::want_longhorn), and a header that stays loses or gets back its title row
+enum { TIMER_WM = 78, TIMER_WM_GONE = 79 };
+static void CALLBACK wm_timer(HWND h, UINT, UINT_PTR, DWORD);
+static void log_wm();
+// a luxwm that is killed or crashes leaves _NET_SUPPORTING_WM_CHECK naming its window: asked every 2 s while it runs
+static void CALLBACK wm_gone_timer(HWND h, UINT, UINT_PTR, DWORD)
+{
+    if (browser::lhwm_running() && shell::window_manager_name() != "lhwm" && !getenv("FLXP_LHWM")) wm_timer(h, 0, 0, 0);
+}
+static void CALLBACK wm_timer(HWND h, UINT, UINT_PTR, DWORD)
+{
+    KillTimer(h, TIMER_WM);
+    bool lh = browser::lhwm_running(true);
+    bool refit = header::set_lhwm(lh);
+    set_frame_mode(want_longhorn());
+    if (g.header && refit) {
+        header_refit(h);
+        RedrawWindow(h, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+    }
+    log_wm();
+}
+
+// FLXP_WM_LOG=1: the window manager and what the frame made of it, at the start and on every change (for scripts)
+static void log_wm()
+{
+    if (!getenv("FLXP_WM_LOG")) return;
+    fprintf(stderr, "flxp: window manager %s: chrome %s, header %d rows%s\n", browser::wm_label().c_str(), g.longhorn ? "longhorn" : "xp",
+            g.header ? header::height() : 0, g.header && header::size() == header::SIZE_SMALL ? " (small)" : "");
+}
+
 // View > Toolbars: Standard Buttons, Address Bar, a separator, then what sizes
 // the frame's toolbar has, as that era named it, and nothing that does not
 // apply: XP's Icon Options (Large Icons / Small Icons, toolbar_icons) or the
@@ -2212,8 +2245,8 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         break;
     case WM_DWMCOMPOSITIONCHANGED:          // glass or the opaque header
     case WM_DWMCOLORIZATIONCOLORCHANGED:    // another luxwm theme: its caption height decides the header's
-        // luxwm started after us (Explorer.chrome auto): the header now; it
-        // is not taken away when luxwm goes (a restart deletes its properties)
+        // luxwm started after us (Explorer.chrome auto): the header now (its
+        // going away: _NET_SUPPORTING_WM_CHECK, wm_timer)
         if (!g.longhorn && frame_auto() && want_longhorn()) set_frame_mode(true);
         if (g.header) header_refit(h);
         sync_active();
@@ -2316,6 +2349,9 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             icons_changed();
             set_frame_mode(want_longhorn());
         }
+        // another window manager (or none, or luxwm again): decided once the property has settled (a luxwm restart
+        // deletes it and sets it again within a second)
+        if ((UINT)wp == g.w_wm) SetTimer(h, TIMER_WM, 700, wm_timer);
         return 0;
     case WM_SYSCOMMAND:
         if ((wp & 0xfff0) == SC_KEYMENU && menuband::key_menu((WCHAR)lp)) return 0;
@@ -2380,6 +2416,7 @@ static void usage(FILE* f)
         "  --geometry WxH+X+Y  window client size and position\n"
         "  --select FILE       open FILE's folder with FILE selected (Windows' explorer /select,FILE)\n"
         "  --info              print the settings, data directory, fonts and theme found, and exit\n"
+        "  --folder-options[=general|view|filetypes]   only the Folder Options sheet, at that page\n"
         "  --help              this text\n"
         "Options override %s for this run; every key there can also be set\n"
         "with the environment variable FLXP_<KEY>.\n", shell::settings_path().c_str());
@@ -2474,6 +2511,7 @@ int main(int argc, char** argv)
     std::string select;   // --select FILE
     bool info = false;
     int quit_ms = 0;
+    int fo_page = -1;     // --folder-options
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         auto value = [&](const char* opt) -> const char* {
@@ -2493,6 +2531,10 @@ int main(int argc, char** argv)
 
         else if (opt == "--geometry") setenv("FLXP_GEOMETRY", val("--geometry").c_str(), 1);
         else if (opt == "--info") info = true;
+        else if (opt == "--folder-options") {   // only the Folder Options sheet, at a page (XP's Options_RunDLL 0, 7, 2)
+            std::string p = eq != std::string::npos ? a.substr(eq + 1) : "general";
+            fo_page = p == "filetypes" || p == "2" ? 2 : p == "view" || p == "7" ? 1 : 0;
+        }
         else if (opt == "--select") select = val("--select");
         else if (opt == "--settings") {   // Display Properties: flxp --settings [--tab NAME]
             std::string prog = shell::store::settings_program();
@@ -2550,6 +2592,7 @@ int main(int argc, char** argv)
     {
         std::string ts = shell::setting("toolbar_icons");
         if (!ts.empty()) g.large_toolbar = ts != "small";
+        header::set_lhwm(browser::lhwm_running());
         g.longhorn = want_longhorn();
         sync_thumbs_mode();
         g.show_status = status_setting();
@@ -2577,6 +2620,10 @@ int main(int argc, char** argv)
     if (!select.empty()) { g.select_after_refresh = select; browser::fill_list(g); }   // after the view the folder chose
     g.w_active = FlxpWatchRootProperty("_NET_ACTIVE_WINDOW");   // luxwm's active frame (sync_active)
     g.w_settings = FlxpWatchRootProperty("_LH_SETTINGS_CHANGED");
+    g.w_wm = FlxpWatchRootProperty("_NET_SUPPORTING_WM_CHECK");
+    SetTimer(frame, TIMER_WM_GONE, 2000, wm_gone_timer);
+    log_wm();
+    if (fo_page >= 0) { folder_options(fo_page, nullptr); return 0; }   // the sheet alone; its General and View act on flxp.ini
     ShowWindow(frame, SW_SHOW);
     sync_active();
     SetFocus(g.list);

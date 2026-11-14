@@ -7,7 +7,7 @@
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh and runas.sh setfattr
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick, menushadow.sh
 #                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick,
-#                thumbsmem.sh ImageMagick); displays :71-:73,
+#                thumbsmem.sh ImageMagick, nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
 fails=0
@@ -61,6 +61,12 @@ result "aero-patches ($(tail -n 1 "$T/aero-patches.log"))" $? "$T/aero-patches.l
 # docs/KEYS.md against luxwm's default key table: every default listed, the Super keys it calls free unbound
 python3 -I tests/keys-doc.py > "$T/keys-doc.log" 2>&1
 result "keys-doc ($(tail -n 1 "$T/keys-doc.log"))" $? "$T/keys-doc.log"
+# Folder Options' File Types model: the extensions, where a default comes from, Change / Restore, the actions' copy, New / Delete
+build/tests/filetypestest > "$T/filetypes.log" 2>&1
+result "filetypestest ($(tail -n 1 "$T/filetypes.log"))" $? "$T/filetypes.log"
+# which program opens a type: lhde-mime's verdicts, flxp's reader (assoctest), xdg-mime and gio on a scratch XDG tree; check
+python3 -I tests/mime.py > "$T/mime.log" 2>&1
+result "mime ($(tail -n 1 "$T/mime.log"))" $? "$T/mime.log"
 # libwuxtheme through its own API: every style the user imported
 styles=${LHDE_STYLES:-$(build/bin/lhde-theme find styles 2>/dev/null)}   # liblhde's lookup: the Windows tree's index/styles (docs/LAYOUT.md)
 n=0
@@ -107,6 +113,12 @@ else
     # the size grip in luxpad's status bar and its scroll bars' corner: 4074's dots under jade4074, the double arrow, a drag sizes
     tests/headless/grip.sh "$3" > "$T/grip.log" 2>&1; rc=$?
     result "headless/grip.sh$(grep -m1 '^skip' "$T/grip.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/grip.log"
+    # Folder Options' File Types page: typing jumps, Change... writes mimeapps.list, Restore, Edit File Type's New..., New / Delete
+    tests/headless/filetypes.sh "$2" > "$T/filetypes-page.log" 2>&1; rc=$?
+    result "headless/filetypes.sh$(grep -m1 '^skip' "$T/filetypes-page.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/filetypes-page.log"
+    # flxp's chrome without luxwm, with luxwm, after it, under fvwm2 (the Small header, the full one; the vision header: XP)
+    tests/headless/nowm.sh "$1" > "$T/nowm.log" 2>&1; rc=$?
+    result "headless/nowm.sh$(grep -m1 '^skip' "$T/nowm.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/nowm.log"
     # Super+R: the start menu's Run dialog through luxwm, luxshell and flxp-startmenu; [commands] run instead when set
     tests/headless/runkey.sh "$1" > "$T/runkey.log" 2>&1; rc=$?
     result "headless/runkey.sh$(grep -m1 '^skip' "$T/runkey.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/runkey.log"

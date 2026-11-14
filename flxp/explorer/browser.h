@@ -38,11 +38,18 @@ using shell::Item;
 
 // The session theme's Explorer.chrome (xp | longhorn | auto; Explorer.navbar =
 // none: xp; shell::theme_chrome).
-// auto: longhorn whenever luxwm runs (it publishes _LHWM_COMPOSITED,
-// _LHWM_THEME or _LHWM_FRAME_METRICS), glass or not, else xp. `why` says what
-// decided.
+// auto: longhorn whenever luxwm runs, glass or not, else xp. longhorn under
+// another window manager or none: the 4051/4074 header without its title row
+// (header::set_lhwm: the Small size, the other caption has the title), the
+// vision header (its title and buttons are luxwm's frame) the XP chrome. `why`
+// says what decided.
 bool frame_auto();
 bool want_longhorn(std::string* why = nullptr);
+// luxwm runs: the root's _NET_SUPPORTING_WM_CHECK window is named "lhwm" (asked
+// once, again with refresh: on a change of that root property); FLXP_LHWM=1/0
+// answers instead (tests)
+bool lhwm_running(bool refresh = false);
+std::string wm_label();   // the window manager's name for messages ("no window manager")
 
 // luxwm's glass under the header: the extension by header::height(), the
 // NO_TITLE / NO_ICON (and on glass CLIENT_CAPTION) frame flags, the input hole

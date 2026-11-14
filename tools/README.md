@@ -20,6 +20,11 @@
   XAML); `lhdeaurora.py` flattens a scene into its layer list (lhde-import's `[aurora]` recipes, into
   `generated/aurora/<scene>-<source>.json`) and writes examples/aurorademo's C tables from those (`make examples`).
 
+- `lhde-mime` (`lhdemime.py`): which program opens a file type and why: the shared-mime-info database and the MIME
+  Applications files read as GIO, xdg-open and flxp read them (`explain`, `list`, `default`, `reset`, `check`; docs/USAGE.md
+  "File types and programs"). Python rather than C on liblhde: the association code is flxp's C++ shell layer, which has no C
+  interface, and reading the same text files again is less than wrapping it; `tests/mime.py` keeps the two in agreement.
+
 ut-dump stays with wuxtheme/; lhde-theme (the resolver's command line) with liblhde/.
 
 Both `lhde-pack` and `lhde-import` write file annotations (extended attributes, docs/ANNOTATIONS.md; `--no-annotate` to skip);

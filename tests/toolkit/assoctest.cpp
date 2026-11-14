@@ -2,7 +2,10 @@
 //   assoctest mime <file>...           type, description, default app, Open With list
 //   assoctest exec <app.desktop> <file>...   the argvs a launch would run
 //   assoctest open <file>...           open as a double click would
+//   assoctest default <type or file>...    the default, its layer and the file that set it
+//   assoctest files                    the mimeapps.list files read, most important first
 //   assoctest setdefault <mime> <app.desktop>
+//   assoctest reset <mime>             the type out of the user's mimeapps.list
 //   assoctest terminal <dir>
 //   assoctest trash <file>...
 //   assoctest bookmarks [add <path> [label]]
@@ -30,6 +33,20 @@ int main(int argc, char** argv)
             for (auto* a : shell::apps_for(t)) printf(" %s[%s]", a->id.c_str(), a->name.c_str());
             printf("\n");
         }
+    } else if (cmd == "default") {
+        // the default and where it comes from, one line per type or file: "TYPE APP LAYER FILE"
+        for (int i = 2; i < argc; i++) {
+            std::string t = strchr(argv[i], '/') && argv[i][0] != '/' && argv[i][0] != '.' ? std::string(argv[i]) : shell::mime_type(argv[i]);
+            shell::AppSource s = shell::default_source(t);
+            printf("%s %s %s %s\n", shell::mime_canonical(t).c_str(), s.app ? s.app->id.c_str() : "-", s.layer.empty() ? "-" : s.layer.c_str(),
+                   s.file.empty() ? "-" : s.file.c_str());
+        }
+    } else if (cmd == "files") {
+        for (const std::string& f : shell::mimeapps_files()) printf("%s\n", f.c_str());
+    } else if (cmd == "reset" && argc == 3) {
+        if (!shell::reset_default_app(argv[2], &err)) { fprintf(stderr, "error: %s\n", err.c_str()); return 1; }
+        const shell::App* d = shell::default_app(argv[2]);
+        printf("default for %s now %s\n", argv[2], d ? d->id.c_str() : "-");
     } else if (cmd == "exec" && argc >= 3) {
         const shell::App* a = shell::find_app(argv[2]);
         if (!a) { fprintf(stderr, "no app %s\n", argv[2]); return 1; }

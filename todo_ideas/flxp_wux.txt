@@ -52,6 +52,15 @@
 * the thumbnail disk cache (~/.cache/thumbnails) is never cleaned: the freedesktop spec leaves it to a cleaner; flxp could
 	drop large/ and normal/ entries of files that are gone or not opened for months
 
+* Folder Options' File Types: New Action's Browse... (a program through the file dialog) and Create New Extension's
+	"Advanced >>" (XP opens it collapsed, the type hidden) are not there; the page's rows show our icon set's file icons, not
+	the icon theme's per-type icons; a Restore leaves the empty [Default Applications] / [Added Associations] headers in
+	mimeapps.list (GLib does the same); the measurements are ReactOS's template fitted to our 227 x 215 pages, not XP's
+
+* flxp does not own org.freedesktop.FileManager1 (ShowFolders, ShowItems): Firefox's "Show in Folder" and Chromium's ask
+	that D-Bus name first and select the file in the window, and only without it open the folder through GIO
+	(inode/directory's default, lhde-mimeapps.list's flxp)
+
 ### details and task pane
 
 * 4074's (i) icon in the band's top right to flip between details and tasks (4051 is the target; undecided)

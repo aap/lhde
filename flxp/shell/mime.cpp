@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <map>
 #include <set>
@@ -297,6 +298,98 @@ std::string mime_icon_key(const std::string& type_in)
     if (icon == "audio-x-generic") return "audio";
     if (media == "text" || icon.compare(0, 5, "text-") == 0) return "text";
     return "";
+}
+
+void reload_mime() { db = Db(); }
+
+std::vector<Extension> mime_extensions()
+{
+    load();
+    std::vector<Extension> out;
+    for (const auto& kv : db.ext) {
+        const Glob* best = nullptr;
+        for (const Glob& g : kv.second) if (!best || g.weight > best->weight) best = &g;   // a tie: the earlier, more important directory
+        if (best) out.push_back({ kv.first, mime_canonical(best->type), best->weight });
+    }
+    return out;   // db.ext is ordered by its key
+}
+
+std::string user_extensions_file() { return data_home() + "/mime/packages/lhde-extensions.xml"; }
+
+std::vector<Extension> user_extensions()
+{
+    std::vector<Extension> out;
+    std::string text;
+    if (!read_file(user_extensions_file(), text)) return out;
+    // the lines this file's writer makes: <mime-type type="TYPE"><glob pattern="*.EXT"/></mime-type>
+    size_t i = 0;
+    while ((i = text.find("<mime-type type=\"", i)) != std::string::npos) {
+        size_t a = i + 17, b = text.find('"', a);
+        size_t p = text.find("<glob pattern=\"*.", b), q = p == std::string::npos ? p : text.find('"', p + 17);
+        if (b == std::string::npos || q == std::string::npos) break;
+        out.push_back({ text.substr(p + 17, q - p - 17), text.substr(a, b - a), 50 });
+        i = q;
+    }
+    return out;
+}
+
+namespace {
+bool write_user_extensions(const std::vector<Extension>& list, std::string* err)
+{
+    std::string x = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                    "<!-- the extensions added in flxp's Folder Options (File Types, New); flxp rewrites this file -->\n"
+                    "<mime-info xmlns=\"http://www.freedesktop.org/standards/shared-mime-info\">\n";
+    for (const Extension& e : list) x += "  <mime-type type=\"" + e.type + "\"><glob pattern=\"*." + e.ext + "\"/></mime-type>\n";
+    x += "</mime-info>\n";
+    std::string file = user_extensions_file();
+    if (!write_file_atomic(file, x)) { if (err) *err = "cannot write " + file; return false; }
+    // compile $XDG_DATA_HOME/mime (globs2 and the rest) from its packages
+    std::string dir = data_home() + "/mime";
+    pid_t pid = fork();
+    if (pid == 0) {
+        int dev = open("/dev/null", O_WRONLY);
+        if (dev >= 0) { dup2(dev, 1); dup2(dev, 2); }
+        execlp("update-mime-database", "update-mime-database", dir.c_str(), (char*)nullptr);
+        _exit(127);
+    }
+    int st = 0;
+    if (pid < 0 || waitpid(pid, &st, 0) < 0 || !WIFEXITED(st) || WEXITSTATUS(st) != 0) {
+        if (err) *err = WIFEXITED(st) && WEXITSTATUS(st) == 127 ? "update-mime-database (shared-mime-info) is not installed"
+                                                                 : "update-mime-database " + dir + " failed";
+        return false;
+    }
+    reload_mime();
+    return true;
+}
+bool valid_ext(const std::string& e)
+{
+    if (e.empty() || e.size() > 32 || e[0] == '.' || e.back() == '.') return false;
+    for (char c : e) if (!(isalnum((unsigned char)c) || c == '.' || c == '_' || c == '-' || c == '+' || c == '~')) return false;
+    return true;
+}
+}
+
+bool add_user_extension(const std::string& ext_in, const std::string& type, std::string* err)
+{
+    std::string ext = lower(trim(ext_in));
+    if (!ext.empty() && ext[0] == '.') ext.erase(0, 1);
+    if (!valid_ext(ext)) { if (err) *err = "\"" + ext_in + "\" is not a file name extension."; return false; }
+    if (type.find('/') == std::string::npos || type.find_first_of("<>\"& ") != std::string::npos) {
+        if (err) *err = "\"" + type + "\" is not a file type."; return false;
+    }
+    std::vector<Extension> list = user_extensions();
+    bool found = false;
+    for (Extension& e : list) if (e.ext == ext) { e.type = type; found = true; }
+    if (!found) list.push_back({ ext, type, 50 });
+    return write_user_extensions(list, err);
+}
+
+bool remove_user_extension(const std::string& ext, std::string* err)
+{
+    std::vector<Extension> list = user_extensions(), keep;
+    for (const Extension& e : list) if (e.ext != lower(ext)) keep.push_back(e);
+    if (keep.size() == list.size()) { if (err) *err = "." + ext + " is not one of your own extensions."; return false; }
+    return write_user_extensions(keep, err);
 }
 
 } // namespace shell

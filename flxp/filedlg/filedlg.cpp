@@ -1975,6 +1975,7 @@ static void lh_init(Dlg& d, HWND owner)
 
     // the header on luxwm's glass (or the navigation bar)
     header::Callbacks hcb = { lh_navigate, lh_filter, lh_done, lh_command, lh_history, lh_favorites, lh_tool };
+    header::set_lhwm(browser::lhwm_running());   // under another window manager: Small (browser::want_longhorn)
     header::configure("filedlg_", "small");      // compact (the portal's dialog): 4074's Small unless set
     d.header = header::create(dlg, hcb);
     header::set_title(title);

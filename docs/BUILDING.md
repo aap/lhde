@@ -84,11 +84,12 @@ tree). Per component: `make wux`, `make wuxtheme`, `make flxp`, `make tests`, `m
 `make luxshell`, `make examples`, `make apps`.
 
 `make install` installs program files only (docs/LAYOUT.md "The three trees"): `bin/` (the six flxp programs, ut-dump,
-luxwm, luxwmc, luxshell, luxshot, luxattr, luxpad, lhde-theme, lhde-session, lhde-import, lhde-pack, lhde-schemes), `lib/` (`libwuxtheme`, `libluxnav`, `liblhde` `.so.1` + `.so`, `liblhde.a`, `pkgconfig/`),
+luxwm, luxwmc, luxshell, luxshot, luxattr, luxpad, lhde-theme, lhde-session, lhde-import, lhde-pack, lhde-schemes, lhde-mime), `lib/` (`libwuxtheme`, `libluxnav`, `liblhde` `.so.1` + `.so`, `liblhde.a`, `pkgconfig/`),
 `lib/lhde/` (`PKGLIBDIR`: the code that is not a binary: `luxshell/` the Lua, `session/` lhde-session's helpers and lab.sh,
 `tools/` lhde-import's Python), `share/lhde/` (`DATADIR`: our shipped text, `themes/ navbar/ icons/ sources/ frames/*/theme.ini
 packs/*/shell.lua`, flxp's `res/icons`), `include/`,
-the man pages luxwm.1 and luxwmc.1 (`MANDIR`), `share/applications/flxp.desktop` and `luxpad.desktop`, the portal backend's `flxp.portal` (in
+the man pages luxwm.1 and luxwmc.1 (`MANDIR`), `share/applications/flxp.desktop`, `luxpad.desktop` and `lhde-mimeapps.list` (lhde's
+default programs, docs/SETTINGS.md "Associations"; without a `DESTDIR` update-desktop-database then indexes `APPDIR`), the portal backend's `flxp.portal` (in
 `PORTALDIR`, default `$PREFIX/share/xdg-desktop-portal/portals`; xdg-desktop-portal reads its own datadir, so set
 `PORTALDIR=/usr/share/xdg-desktop-portal/portals` for a system install) and its D-Bus service file (`DBUSSERVICEDIR`, default
 `$PREFIX/share/dbus-1/services`). Also settable: `BINDIR LIBDIR INCLUDEDIR DATADIR PKGLIBDIR APPDIR PKGCONFIGDIR`.
@@ -139,7 +140,11 @@ lists without a window: the backgrounds' order and selection, the icon sets; App
 appearance --pick STYLE`: classic, a bare style with and without a frame set, back to the theme's own, with the user's
 `jade4074.msstyles` copied under other names, skipped without it), `tests/aero-patches.py` (lhde-import's table of Aero
 patches and which styles get a frame set, on stand-in files), `tests/keys-doc.py` (docs/KEYS.md lists every default of luxwm's
-key table, and the Super keys it calls free are unbound), and the
+key table, and the Super keys it calls free are unbound), `build/tests/filetypestest` (the File Types page's model on a scratch tree:
+the extensions, where a default comes from, Change and Restore, the actions' copy, the user's extensions), `tests/mime.py` (which program opens a type on a scratch XDG tree
+with a distribution, lhde's `lhde-mimeapps.list` and a home: lhde-mime's verdicts against the spec's order, flxp's reader
+(`build/tests/assoctest default`), `xdg-mime query default` and `gio mime` against them when installed, `lhde-mime default` /
+`reset` and `check`'s findings), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
 incl. GTK, the file dialog in both looks, the modifier keys across a focus change, typed text into the Edit control as
 UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair: `tests/headless/typing.sh`), luxpad (`tests/headless/luxpad.sh`:
@@ -155,7 +160,11 @@ and Add Tag, the Explorer's Filter box under jade4074 over names and attributes,
 luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`, clicks outside open menus under luxwm:
 `tests/headless/menus.sh`, a Win32 menu bar's pixels (plain, hot, open, inactive) under jade4074, luna and classic with
 ImageMagick: `tests/headless/menubar.sh`, flxp switched luna -> jade4074 -> classic and classic -> jade4074 -> luna against a fresh
-start under the last theme (icons, colours, bands, xwd and ImageMagick): `tests/headless/themeswitch.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron), Quick Launch and taskbar menu under luxwm
+start under the last theme (icons, colours, bands, xwd and ImageMagick): `tests/headless/themeswitch.sh`, flxp's chrome with no
+window manager, luxwm started, killed and under fvwm2 (the Small header without the title row, the full one, the vision header's XP
+chrome; the log and the band's row in the pixels): `tests/headless/nowm.sh`, Folder Options' File Types page on a scratch home and
+mime database (typing jumps, Change... writes `mimeapps.list`, Restore, Edit File Type's New... writes and Restore removes the
+program's copy, New / Delete an extension): `tests/headless/filetypes.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron), Quick Launch and taskbar menu under luxwm
 (xprop, xwininfo; luxshell/tests/trayicon): `tests/headless/taskbar.sh`, every IDC_ cursor shown under the X cursor theme's name (XFixes): `tests/headless/cursors.sh`, Super+R
 opening the start menu's Run dialog (luxwm, luxshell, flxp-startmenu) and settings.ini `[commands] run` instead:
 `tests/headless/runkey.sh`, Super+H minimizing the sidebar into the taskbar and back at once (unmapped within 300 ms, two

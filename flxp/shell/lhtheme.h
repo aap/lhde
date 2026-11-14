@@ -78,4 +78,8 @@ std::string font_smoothing();
 // put there itself).
 bool follows_session_theme();
 
+// The running window manager's name: _NET_WM_NAME of the window the root's _NET_SUPPORTING_WM_CHECK names (EWMH), when
+// that window exists and names itself; "?" for one without a name, "" without a window manager. luxwm's is "lhwm".
+std::string window_manager_name();
+
 } // namespace shell

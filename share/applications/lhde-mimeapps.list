@@ -1,0 +1,11 @@
+# lhde's default programs (docs/SETTINGS.md "Associations"), installed as $PREFIX/share/applications/lhde-mimeapps.list.
+# Read by every program that follows the MIME Applications Associations spec (flxp, GIO, xdg-open) when XDG_CURRENT_DESKTOP
+# names lhde, as lhde-session sets it: after every file of the user (~/.config/mimeapps.list, ~/.config/lhde-mimeapps.list,
+# which win) and before the mimeapps.list and defaults.list of its own and later data directories (the distribution's), and
+# before any program that merely claims a type. Text types without a default of their own inherit text/plain's in flxp and
+# GIO (xdg-open asks for the exact type only). A desktop-specific file holds [Default Applications] only (the spec; GLib warns
+# about any other group).
+
+[Default Applications]
+inode/directory=flxp.desktop
+text/plain=luxpad.desktop
