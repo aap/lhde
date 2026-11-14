@@ -124,9 +124,17 @@ luxshot) through `getextattr` / `setextattr` (`tests/headless/xattrs.sh`: attr's
 What skips there and why: swatchtest without a `DISPLAY`; luxwm's frame regression and ut-dump without the frame sets'
 styles (a tree with the free pack only); fileops_test's moves between two file systems when its scratch directories share
 one (no `/dev/shm`: `build/tests/fileops_test DIR1 DIR2` names a second); a test that needs a style the free pack lacks
-(jade4074, luna). luxshell's Lua is parsed with lua54's `luac54`. With the free pack imported, `lhde-theme resolve`
-gives the same records as on Linux, and `lhde-session start --attach` on an Xvfb shows the session (luxwm, luxshell,
-flxp-desktop, flxp-taskbar). What differs, all behind `liblhde/compat.h` (one header, the only place that knows the system),
+(jade4074, luna); thumbdocs without `pdftoppm` or `mutool` (`pkg install poppler-utils` for PDF thumbnails); fontlink's East
+Asian characters when no installed face has them. luxshell's Lua is parsed with lua54's `luac54`. With the free pack
+imported, `lhde-theme resolve` gives the same records as on Linux, and `lhde-session start --attach` on an Xvfb shows the
+session (luxwm, luxshell, flxp-desktop, flxp-taskbar) and works there as on Linux: `lhde-mime check`, `explain` and `roles`,
+Default Programs and Folder Options' File Types, FileManager1's ShowItems through `gdbus` (glib) when the session has a bus,
+luxpad's text through font linking and fontconfig's faces (DejaVu has ж and 😀), luxview, Alt+Tab's switcher, a message
+box with Close alone, `lhde-hw`'s battery, backlight and volume. The headless scripts keep to what both systems' tools
+take: `xdotool search --name '.*'`, not `''` (FreeBSD's regcomp refuses an empty pattern); `touch -t`, not `touch -d DATE`;
+a process's peak RSS from `procstat -r` where there is no `/proc`; luxview.sh runs luxview with `MALLOC_CONF` set for
+FreeBSD's jemalloc (one arena, freed pages returned at once; glibc ignores it), whose default arenas hold back enough
+freed memory to pass its peak RSS limit. What differs, all behind `liblhde/compat.h` (one header, the only place that knows the system),
 `wux/w32/include/flxp_crt.h` for the win32 code and two shell helpers in `session/lhde-paths.sh`:
 
 - Extended attributes are extattr(2)'s: lhde's programs and tools name them as on Linux (`user.lux.desc`), stored in the user
