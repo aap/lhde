@@ -95,6 +95,7 @@ struct State {
     std::string sbmode, sbstack, sbclassic, sbanimate, smoothing;   // [sidebar] animate: "1" | "0"
     std::string shadows;          // [effects] menu_shadows: "1" | "0"
     std::string cues;             // [effects] keyboard_cues: "0" (hide the underlines until Alt) | "1"
+    std::string starticon;        // [taskbar] start_icon: "" = the theme's Shell.start_icon
 };
 State committed, cur;
 std::string stash_theme;          // the "(Modified)" state while another theme is picked (XP: pick it again to get it back)
@@ -146,6 +147,7 @@ State load_state()
     if (s.smoothing == "0") s.smoothing = "off";
     s.shadows = store::flag("effects", "menu_shadows", true) ? "1" : "0";
     s.cues = store::flag("effects", "keyboard_cues", false) ? "1" : "0";
+    s.starticon = store::get("taskbar", "start_icon");
     return s;
 }
 
@@ -887,6 +889,7 @@ void apply()
     if (cur.smoothing != committed.smoothing) edits.push_back(store::Edit{ "fonts", "smoothing", cur.smoothing });
     if (cur.shadows != committed.shadows) edits.push_back(store::Edit{ "effects", "menu_shadows", cur.shadows });
     if (cur.cues != committed.cues) edits.push_back(store::Edit{ "effects", "keyboard_cues", cur.cues });
+    if (cur.starticon != committed.starticon) edits.push_back(store::Edit{ "taskbar", "start_icon", cur.starticon });
     bool theme_changed = cur.theme != committed.theme;
     bool layer_changed = cur.layer != committed.layer;
     bool wall = cur.layer.count("Desktop.wallpaper") && (!committed.layer.count("Desktop.wallpaper") ||
@@ -1031,7 +1034,7 @@ void save_theme(HWND dlg)
     State keep = cur;
     cur = load_state();
     cur.sbmode = keep.sbmode; cur.sbstack = keep.sbstack; cur.sbclassic = keep.sbclassic; cur.sbanimate = keep.sbanimate; cur.smoothing = keep.smoothing;
-    cur.shadows = keep.shadows; cur.cues = keep.cues;
+    cur.shadows = keep.shadows; cur.cues = keep.cues; cur.starticon = keep.starticon;
     committed = cur;
     refresh_all();
 }
@@ -1049,7 +1052,7 @@ void delete_theme(HWND dlg)
         State keep = cur;
         cur = load_state();
         cur.sbmode = keep.sbmode; cur.sbstack = keep.sbstack; cur.sbclassic = keep.sbclassic; cur.sbanimate = keep.sbanimate; cur.smoothing = keep.smoothing;
-        cur.shadows = keep.shadows; cur.cues = keep.cues;
+        cur.shadows = keep.shadows; cur.cues = keep.cues; cur.starticon = keep.starticon;
         committed = cur;
     } else {
         cur.theme = base.empty() ? committed.theme : base;
@@ -1842,6 +1845,10 @@ std::map<int, std::vector<Item>> shell_items;
 const std::vector<Item> kSbModes = { { "Full", "full" }, { "Minimized", "minimized" }, { "Pinned", "pinned" }, { "None", "none" } };
 // SETTINGS.md [sidebar] stacking: luxshell's two labels
 const std::vector<Item> kSbStacks = { { "On top of windows", "top" }, { "Under windows (desktop)", "bottom" } };
+// THEME-FORMAT.md Shell.start_icon: the imported Windows flag, lhde's own drawings (share/icons/flags), by the system
+const std::vector<Item> kStartIcons = { { "Windows flag (imported)", "windows" }, { "lhde", "lhde" }, { "Linux penguin", "linux" },
+                                        { "FreeBSD daemon", "freebsd" }, { "Automatic (by the system)", "auto" } };
+std::vector<Item> start_icon_items;   // kStartIcons, and a value of the user's or the theme's not among them
 
 std::vector<Item> items_for(int id)
 {
@@ -1882,6 +1889,11 @@ void fill_shell(HWND dlg)
     set_text(dlg, IDC_AP_SBMODE_SRC, cur.sbmode != committed.sbmode ? "Changed: Apply keeps it for every theme"
                                      : cur.sbmode.empty() ? "The theme's (Shell.sidebar); yours once changed" : "Your setting, for every theme");
     fill_list(dlg, IDC_AP_SBSTACK, s, cur.sbstack);
+    start_icon_items = kStartIcons;
+    std::string icon = cur.starticon.empty() ? value("Shell.start_icon") : cur.starticon;
+    fill_list(dlg, IDC_AP_STARTICON, start_icon_items, icon.empty() ? "windows" : icon);
+    set_text(dlg, IDC_AP_STARTICON_SRC, cur.starticon != committed.starticon ? "Changed: Apply keeps it for every theme"
+                                        : cur.starticon.empty() ? "The theme's (Shell.start_icon); yours once changed" : "Your setting, for every theme");
     CheckDlgButton(dlg, IDC_AP_SBCLASSIC, cur.sbclassic == "1" ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(dlg, IDC_AP_SBANIMATE, cur.sbanimate == "1" ? BST_CHECKED : BST_UNCHECKED);
     filling = false;
@@ -1904,6 +1916,7 @@ INT_PTR CALLBACK shell_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
                 if (k.id == id) set_key(k.key, list_value(dlg, id, shell_items[id], value(k.key)));
             if (id == IDC_AP_SBMODE) cur.sbmode = list_value(dlg, id, kSbModes, cur.sbmode);
             if (id == IDC_AP_SBSTACK) cur.sbstack = list_value(dlg, id, kSbStacks, cur.sbstack);
+            if (id == IDC_AP_STARTICON) cur.starticon = list_value(dlg, id, start_icon_items, cur.starticon);
             if (id == IDC_AP_SBCLASSIC) cur.sbclassic = IsDlgButtonChecked(dlg, IDC_AP_SBCLASSIC) == BST_CHECKED ? "1" : "0";
             if (id == IDC_AP_SBANIMATE) cur.sbanimate = IsDlgButtonChecked(dlg, IDC_AP_SBANIMATE) == BST_CHECKED ? "1" : "0";
             refresh_all();

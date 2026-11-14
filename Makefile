@@ -28,7 +28,7 @@
 #   examples/examples.mk  extendframe, navdemo, aurorademo -> build/examples
 #   liblhde/liblhde.mk    liblhde (lhde/data.h, theme.h, settings.h, icon.h): the data directories, the theme resolver,
 #                         the settings store -> build/lib/liblhde.{a,so.1}, lhde.pc, build/bin/lhde-theme
-#   share/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme + apps.ini, sources/*.ini,
+#   share/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme + apps.ini + flags/*.png, sources/*.ini,
 #                         sources/free-wallpapers-LICENSE.txt, frames/*/*.ini, packs/*/shell.lua), PKGLIBDIR/session +
 #                         BINDIR/lhde-session, PKGLIBDIR/tools + BINDIR/lhde-import, lhde-pack, lhde-schemes
 #
@@ -129,9 +129,9 @@ check-free: build/bin/lhde-theme build/luxwm/tests/frametest
 check-bare: all
 	@tests/check-bare.sh
 
-# share/ (text only: the theme files, navbar layouts, icon recipes, import sources, the frame sets' theme.ini/nav.ini, the packs'
-# shell.lua) into DATADIR; session/ (lhde-session's helpers) and tools/ (lhde-import's Python) into PKGLIBDIR; the commands into
-# BINDIR.
+# share/ (the theme files, navbar layouts, icon recipes, import sources, the frame sets' theme.ini/nav.ini, the packs' shell.lua;
+# lhde's own Start button icons icons/flags/*.png, drawn by tools/start_icons.py) into DATADIR; session/ (lhde-session's helpers)
+# and tools/ (lhde-import's Python) into PKGLIBDIR; the commands into BINDIR.
 SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh \
                 picom-glass.conf picom-glass-fvwm.conf lab.fvwm2rc
 TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py lhdeschemes.py lhdetree.py wim0108.py \
@@ -155,6 +155,8 @@ install-data:
 	install -m 644 share/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
 	install -m 644 share/fonts/fontlink.ini $(DESTDIR)$(DATADIR)/fonts/
 	install -m 644 share/icons/*.theme share/icons/apps.ini $(DESTDIR)$(DATADIR)/icons/
+	install -d $(DESTDIR)$(DATADIR)/icons/flags
+	install -m 644 share/icons/flags/*.png $(DESTDIR)$(DATADIR)/icons/flags/
 	install -m 644 share/sources/*.ini share/sources/free-wallpapers-LICENSE.txt $(DESTDIR)$(DATADIR)/sources/
 	for d in share/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
 	for d in share/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done

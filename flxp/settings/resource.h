@@ -46,6 +46,10 @@
 #define IDC_AP_PRESET_SRC  1230
 #define IDC_AP_FRAMES_SRC  1231
 
+/* the Start button's picture: settings.ini [taskbar] start_icon (per user), else the theme's Shell.start_icon */
+#define IDC_AP_STARTICON     1213
+#define IDC_AP_STARTICON_SRC 1233
+
 /* the Sidebar group (luxshell's [sidebar], per user) */
 #define IDC_AP_SBMODE      1206
 #define IDC_AP_SBSTACK     1207

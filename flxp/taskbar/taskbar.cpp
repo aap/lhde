@@ -22,6 +22,8 @@
 #include "shell/config.h"
 #include "shell/icons.h"
 #include "shell/settings.h"
+#include "shell/starticon.h"
+#include "gdi/bitmap.h"
 #include "shell/lhtheme.h"
 #include "shell/runtime.h"
 #include "sys/sys.h"
@@ -61,6 +63,7 @@ const int CLASSIC_EDGE = 2;             // the raised edge of the classic bar (S
 HTHEME th_start, th_tray, th_clock;
 HIMAGELIST flag_list;                   // the start button's flag (explorer's IDB_START / IDB_STARTCLASSIC)
 SIZE flag_size;
+std::string flag_choice;                // the Shell.start_icon choice load_flag drew ("windows": the flag)
 bool start_hot, start_down;
 SIZE start_size;                        // the start button's ideal size
 int start_image_cy;                     // Start::Button's own image height (Luna, Slate: 33), 0 classic
@@ -157,12 +160,41 @@ HBITMAP drawn_flag(int w, int h)
     return bmp;
 }
 
+// Shell.start_icon's picture in the flag's cell (25x20 with a visual style, 16x16 classic): a square of the cell's height at
+// its left edge, where XP's flag is (start.bmp's flag fills the left 20 columns, the 5 after it are the gap to the text;
+// startclassic.bmp's the whole cell), straight alpha, bottom-up like the resource bitmaps. Null for windows or what cannot
+// be loaded.
+HBITMAP start_icon_bitmap(int w, int h)
+{
+    gdi::Bitmap* im = shell::start_icon_image(flag_choice, h);
+    if (!im) return nullptr;
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+    bi.bmiHeader.biWidth = w;
+    bi.bmiHeader.biHeight = h;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+    void* bits = nullptr;
+    HBITMAP bmp = CreateDIBSection(nullptr, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    if (bmp && bits) {
+        uint32_t* p = (uint32_t*)bits;
+        memset(p, 0, (size_t)w * h * 4);
+        for (int y = 0; y < im->height && y < h; y++)
+            for (int x = 0; x < im->width && x < w; x++) p[(size_t)(h - 1 - y) * w + x] = im->row(y)[x];
+    }
+    gdi::destroy_bitmap(im);
+    return bmp;
+}
+
 void load_flag()
 {
     if (flag_list) ImageList_Destroy(flag_list);
     flag_list = nullptr;
     flag_size = SIZE{ g.theme ? 25 : 16, g.theme ? 20 : 16 };
-    HBITMAP bmp = xp_explorer_bitmap(g.theme ? 143 : 176, LR_CREATEDIBSECTION);   // start.bmp / startclassic.bmp
+    flag_choice = shell::start_icon_choice(shell::start_icon_setting());
+    HBITMAP bmp = start_icon_bitmap(flag_size.cx, flag_size.cy);
+    if (!bmp) bmp = xp_explorer_bitmap(g.theme ? 143 : 176, LR_CREATEDIBSECTION);   // start.bmp / startclassic.bmp
     if (!bmp) bmp = drawn_flag(flag_size.cx, flag_size.cy);
     if (!bmp) return;
     BITMAP bm = {};
@@ -817,7 +849,7 @@ void notify_from_x()
     PostMessageW(g.wnd, WM_TB_XCHANGED, 0, 0);
 }
 
-// the settings flxp-taskbar follows live: [taskbar] quicklaunch, locked, hide_inactive
+// the settings flxp-taskbar follows live: [taskbar] quicklaunch, locked, hide_inactive, start_icon
 void read_bar_settings()
 {
     quicklaunch::read_setting();
@@ -900,7 +932,9 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             bool ql = quicklaunch::shown(), lk = locked;
             read_bar_settings();
             bool dm = tray_on && notify::demote();
-            if (ql != quicklaunch::shown() || lk != locked || dm || quicklaunch::refresh()) layout();
+            bool icon = shell::start_icon_choice(shell::start_icon_setting()) != flag_choice;   // [taskbar] start_icon
+            if (icon) { load_flag(); InvalidateRect(g.start, nullptr, TRUE); }
+            if (ql != quicklaunch::shown() || lk != locked || dm || icon || quicklaunch::refresh()) layout();
         }
         if ((UINT)wp == w_clock_visible) {
             bool was = clock_hidden;

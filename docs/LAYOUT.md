@@ -7,7 +7,10 @@ What lhde reads at run time, where it lives, and who is allowed to write it. The
 
 Nothing Microsoft-derived is in the repository: no `.msstyles`, DLLs, fonts, wallpapers, extracted or rendered bitmaps, no
 Microsoft concept art and no screenshots or reference renders of the real Windows builds. The repository holds code,
-configuration and recipes (numbers, presets, scripts that derive art), and screenshots of lhde itself in `screenshots/`. Windows
+configuration and recipes (numbers, presets, scripts that derive art), screenshots of lhde itself in `screenshots/`, and the
+few pictures that are lhde's own work: `share/icons/flags/*.png`, the Start button pictures `tools/start_icons.py` draws from
+circles and polygons in its source (`make check` draws them again and compares). No third-party logo or mascot is drawn there
+either; the Windows flag itself is only ever the user's imported one. Windows
 art is read at run time from the user's own files, imported once into the Windows tree below by `lhde-import` (from a resource
 pack made by `lhde-pack`, an ISO, a WIM or a Windows directory; docs/USAGE.md "Getting the Windows resources"). Data extracted
 from Windows files is derived there too, never committed: the aurora scenes' numbers come from the user's jade.msstyles and
@@ -23,11 +26,13 @@ thing that may change it:
 
 ```
 PROGRAM FILES                        make install; never edited by hand (a later make install overwrites them)
-$PREFIX/share/lhde/                  shipped data, our text only (DATADIR)
+$PREFIX/share/lhde/                  shipped data, our text and our own drawings (DATADIR)
   themes/NAME.theme                    the shipped themes
   navbar/NAME.ini                      navigation bar layouts (4051 4074 vision)
   fonts/fontlink.ini                   font linking's table (Windows' FontLink\SystemLink): the faces that draw what a font lacks
   icons/NAME.theme                     icon recipes (pe:shell32.dll#ID from resources/<build>, file:PACK/PATH from an icon pack)
+  icons/flags/NAME-SIZE.png            lhde's own Start button pictures (lhde linux freebsd at 16 20 24 32: Shell.start_icon),
+                                       drawn in code by tools/start_icons.py
   sources/ID.ini                       what lhde-pack takes from each Windows build, the recipes lhde-import runs
   frames/SET/theme.ini (+ nav.ini)     frame-set tuning; the pixels are generated, below
   packs/PACK/shell.lua                 luxshell's packs

@@ -6,7 +6,7 @@
 #                Windows tree's index/styles)
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, luxview.sh xprop, xwininfo and ImageMagick, filter.sh and runas.sh setfattr
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick, startmenu.sh xprop and python3, menushadow.sh
-#                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick,
+#                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick, starticon.sh xprop and ImageMagick (luna when imported),
 #                thumbsmem.sh ImageMagick, thumbdocs.sh ImageMagick and pdftoppm or mutool (gs, ddjvu and c44 for its PS and DjVu), nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed, xsession.sh xprop and
 #                dbus-daemon, picom when installed); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
@@ -42,6 +42,9 @@ result "lhdatatest ($(tail -n 1 "$T/lhdata.log"))" $? "$T/lhdata.log"
 # the icon keys' images (shell::key_icon: a program's window icon from a key) with nothing imported
 build/tests/keyicontest > "$T/keyicon.log" 2>&1
 result "keyicontest ($(tail -n 1 "$T/keyicon.log"))" $? "$T/keyicon.log"
+# Shell.start_icon's picture (shell/starticon.h): windows by default, the drawings at each size, auto by uname, a file, a key
+build/tests/starticontest > "$T/starticon-model.log" 2>&1
+result "starticontest ($(tail -n 1 "$T/starticon-model.log"))" $? "$T/starticon-model.log"
 # the Explorer's view model (shell/viewmodel.h): views, sizes, 4074's slider stops, memory
 build/tests/viewmodeltest > "$T/viewmodel.log" 2>&1
 result "viewmodeltest ($(tail -n 1 "$T/viewmodel.log"))" $? "$T/viewmodel.log"
@@ -74,6 +77,9 @@ result "aero-patches ($(tail -n 1 "$T/aero-patches.log"))" $? "$T/aero-patches.l
 # docs/KEYS.md against luxwm's default key table: every default listed, the Super keys it calls free unbound
 python3 -I tests/keys-doc.py > "$T/keys-doc.log" 2>&1
 result "keys-doc ($(tail -n 1 "$T/keys-doc.log"))" $? "$T/keys-doc.log"
+# share/icons/flags is what tools/start_icons.py draws, byte for byte (the drawings are made, not edited)
+mkdir -p "$T/flags" && python3 -I tools/start_icons.py "$T/flags" > /dev/null 2> "$T/flags.log" && diff -r "$T/flags" share/icons/flags >> "$T/flags.log" 2>&1
+result "start_icons.py (share/icons/flags redrawn identically)" $? "$T/flags.log"
 # Folder Options' File Types model: the extensions, where a default comes from, Change / Restore, the actions' copy, New / Delete
 build/tests/filetypestest > "$T/filetypes.log" 2>&1
 result "filetypestest ($(tail -n 1 "$T/filetypes.log"))" $? "$T/filetypes.log"
@@ -161,6 +167,9 @@ else
     # flxp-taskbar under luxwm: XEmbed icons in 18 px cells, their tooltip, the chevron, Quick Launch, the taskbar menu's Show the Desktop
     tests/headless/taskbar.sh "$3" > "$T/taskbar.log" 2>&1; rc=$?
     result "headless/taskbar.sh$(grep -m1 '^skip' "$T/taskbar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/taskbar.log"
+    # the Start button's picture (Shell.start_icon): windows is the flag as without the key, linux only inside the flag's cell, live
+    tests/headless/starticon.sh "$1" > "$T/starticon.log" 2>&1; rc=$?
+    result "headless/starticon.sh$(grep -m1 '^skip' "$T/starticon.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/starticon.log"
     # the task band's picture of a folder with two JPEGs is the Icons view's square (folderpictest)
     tests/headless/folderpic.sh "$2" > "$T/folderpic.log" 2>&1; result headless/folderpic.sh $? "$T/folderpic.log"
     # flxp's peak RSS on 600 6000 x 4000 JPEGs at 256 px, the view's images within their budget (needs ImageMagick)

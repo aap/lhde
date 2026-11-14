@@ -66,6 +66,8 @@ comments, the order and the keys it does not know: it reads the whole file, chan
               quicklaunch = 1            ; the classic bar's Quick Launch toolbar (its menu's Toolbars > Quick Launch) (flxp-taskbar)
               locked = 1                 ; the classic bar's Lock the Taskbar; 0: the bands' grippers show (flxp-taskbar)
               hide_inactive = 1          ; the classic bar's chevron hides the icons unchanged for an hour (XP's Hide inactive icons)
+              start_icon = linux         ; the picture in place of the Windows flag, for every theme (absent: the theme's Shell.start_icon;
+                                         ; windows | lhde | linux | freebsd | auto | file:PACK/PATH | a path | an icon key: THEME-FORMAT 2b)
 [sidebar]     mode = full                ; full | minimized | pinned (absent: the theme's Shell.sidebar; Super+H: minimized ⇄ back)
               width = 150                ; 100..600 (the sizer drag)
               stacking = top             ; top: above the windows, with its strut | bottom: under them, part of the desktop (Win+S)
@@ -115,13 +117,13 @@ selecting another theme removes it (`lhde_theme_select`), Save As turns it into 
 
 | writer | what |
 | --- | --- |
-| Display Properties (flxp-settings: Themes, Desktop, Appearance, Effects) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[sidebar] mode with_classic stacking animate`, `[fonts]`, `[effects]`, theme files (Save As, Delete) |
+| Display Properties (flxp-settings: Themes, Desktop, Appearance, Effects, Shell) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[sidebar] mode with_classic stacking animate`, `[taskbar] start_icon` (the Shell tab's Start icon row: the named pictures, the theme's until changed), `[fonts]`, `[effects]`, theme files (Save As, Delete) |
 | luxshell (the settings flyout, its menus, drags, `_LHSHELL_COMMAND`) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[taskbar]`, `[sidebar]`, `[clock]`, theme files (Save As) |
 | flxp-desktop, the Explorer | Set as Desktop Background: the current layer's `Desktop.wallpaper` / `Desktop.mode` (and a `[desktop] wallpaper = none` cleared); outside lhde's files: the associations ("Associations" below) |
 | Default Programs (`flxp --default-programs`: Folder Options' File Types, All Programs' Set Program Access and Defaults) | `[programs]`, then the role file ("Default programs" below); `lhde-mime role` the same |
 | lhde-session | `_LH_THEME` only (`theme NAME`; luxshell then writes the file); without a luxshell, `taskbar KIND` through `lhde-theme set-key`, `set` and `setting` |
 | luxwm | nothing; it reads `[fonts] smoothing` and `[effects]` for its window menu, the theme through `_LH_THEME` |
-| flxp-taskbar, the start panel | `[taskbar] quicklaunch locked` (the taskbar menu); they read `[taskbar] start_menu hide_inactive`, `[quicklaunch] dir`, `[start] pinned`, `[commands] logoff shutdown terminal` |
+| flxp-taskbar, the start panel | `[taskbar] quicklaunch locked` (the taskbar menu); they read `[taskbar] start_menu hide_inactive start_icon` (start_icon live, as the Explorer's brand band at its next theme change), `[quicklaunch] dir`, `[start] pinned`, `[commands] logoff shutdown terminal` |
 
 ## Change notification
 

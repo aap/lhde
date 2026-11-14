@@ -72,7 +72,7 @@ static const char *const KEYS[] = {
     "Theme.name", "Theme.base", "Theme.build",
     "VisualStyle.style", "VisualStyle.color", "VisualStyle.size", "VisualStyle.scheme", "VisualStyle.shellstyle",
     "Glass.frames", "Glass.frames_classic", "Glass.composition", "Glass.animations",
-    "Shell.taskbar", "Shell.pack", "Shell.sidebar",
+    "Shell.taskbar", "Shell.pack", "Shell.sidebar", "Shell.start_icon",
     "Explorer.chrome", "Explorer.navbar", "Explorer.navbar_preset", "Explorer.taskpane",
     "Desktop.wallpaper", "Desktop.mode", "Desktop.color", "Desktop.icons",
     "Fonts.fonts", "Fonts.smoothing", NULL };
@@ -395,6 +395,7 @@ static void apply_defaults(lhde_theme *t, const lhde_style_info *si, const char 
     { char w2[800]; snprintf(w2, sizeof w2, "%s%s", why, k == LHDE_STYLE_LONGHORN ? (avalon ? ": its pack exists" : ": no pack of its build and family") : "");
       dflt(t, "Shell.taskbar", avalon ? "avalon" : "classic", w2); }
     dflt(t, "Shell.sidebar", "full", "default");
+    dflt(t, "Shell.start_icon", "windows", "default: the imported Windows flag");
     if (build_wallpaper(build, v, sizeof v)) dflt(t, "Desktop.wallpaper", v, "default: the build's own wallpaper");
     else dflt(t, "Desktop.wallpaper", "none", "default: no wallpaper of the build imported");
     dflt(t, "Desktop.mode", "fill", "default");

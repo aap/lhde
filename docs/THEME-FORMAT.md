@@ -69,6 +69,8 @@ animations     = 4074plus       ; 4074plus | 4074 | 5048 | invented | none
 taskbar  = avalon               ; avalon (luxshell) | classic (flxp-taskbar) | none
 pack     = 4074-aero            ; packs/, for taskbar = avalon
 sidebar  = full                 ; full | minimized | pinned | none
+start_icon = windows            ; the picture in place of the Windows flag (section 2b): windows | lhde | linux | freebsd | auto
+                                ; | file:PACK/PATH | a path | an icon key
 
 [Explorer]
 chrome   = longhorn             ; auto | xp | longhorn: the Explorer's own look (without luxwm: CLIENT-PROTOCOL "Without luxwm")
@@ -124,6 +126,30 @@ what is still absent (source `scheme`); a scheme named but not imported falls ba
 Only the classic look reads them: a visual style brings its own `[SysMetrics]`. With the classic look `Colors.background` is
 the desktop colour (COLOR_BACKGROUND) under the wallpaper; `Desktop.color` when the scheme and the layer have none.
 
+## 2b. The Start button's picture: `Shell.start_icon`
+What flxp draws where Windows draws its flag: flxp-taskbar's Start button (explorer.exe's startclassic.bmp 176, 16x16, without
+a visual style; start.bmp 143, 25x20, its flag in the left 20 columns, with one) and the Explorer's brand band at the right of
+its toolbar row (shell32's IDB_BRAND_BITMAP_MICRO 240, frame 0: the flag in the 20x19 box at (1, 1) of the 22 px frame).
+The picture takes the flag's place at the flag's height (16 px classic, 20 px under a style, 20 px in the brand) at its
+left edge; the button's size and the text do not move. luxshell's Avalon Start buttons are their pack's bitmaps and do not
+change.
+
+| value | the picture |
+| --- | --- |
+| `windows` (default) | the imported flag, as without the key (XP's, else Windows 2000's; neither: flxp-taskbar's own waving flag, section 6) |
+| `lhde` | lhde's own mark: two overlapping application windows, `share/icons/flags/lhde-SIZE.png` |
+| `linux` | a penguin, `share/icons/flags/linux-SIZE.png` |
+| `freebsd` | a red daemon's face with horns, `share/icons/flags/freebsd-SIZE.png` |
+| `auto` | `linux` or `freebsd` by uname's system name, `lhde` on any other system |
+| `file:PACK/PATH` | `icons/PACK/PATH` of the data directories, as the icon set recipes take it (an imported icon pack, or the user's own under `~/.config/lhde/icons/`) |
+| a path (`/...`, `~/...`) | the user's own picture: PNG, ICO (its largest image), BMP, JPEG, WebP |
+| anything else | an icon key of the icon sets (section 9: `computer`, `notepad`, ...) |
+
+The three drawings are lhde's own, made in code by `tools/start_icons.py` at 16, 20, 24 and 32 px (docs/LAYOUT.md "Asset
+policy"); a size without a drawing, and every other source, is resampled from the source's 32 px (or largest) image with the
+thumbnail resampler (`gdi::resample`) and centred in the square. What cannot be loaded draws the flag. settings.ini
+`[taskbar] start_icon` (docs/SETTINGS.md) overrides the theme's value for every theme; Display Properties' Shell tab sets it.
+
 ## 3. Values and inheritance
 - **absent** = inherit from `base`, else the style-derived default (section 5); **`none`** = switched off.
 - `base` chains, at most 8 deep, a cycle is an error.
@@ -169,7 +195,7 @@ complete. The lists ask `lhde_theme_has_style(NAME)` (the files only, without th
 | v4 with CompositedWindow, 4074 | longhorn | 4074 | as above | `4074-slate` or `4074-aero` by family (slate -> slate, jade/aero -> aero) | the frame set named like the style (an Aero patch dropped in under its own name: the one lhde-import makes, docs/USAGE.md "The Aero patches for 4074"), else none | longhorn4074 |
 | v4 with DWMWindow/uDWM (5048, 5112) | longhorn | vision (aap: Vista falls back to luxnav with the patched aero resources) | classic | - | the frame set named like the style | longhorn4074 |
 | classic | xp | none | classic | - | none | xp |
-`composition` defaults to `auto`, `animations` to the build's own, fonts and resources
+`composition` defaults to `auto`, `animations` to the build's own, `start_icon` to `windows`, fonts and resources
 to the build. The build is the style's build-qualified name's (`jade4074`); a v4 style named without one that has
 CompositedWindow (`twiwmtb-aero`) is 4074's, the one build whose styles have that class.
 
@@ -198,7 +224,8 @@ panel's Log Off buttons (explorer.exe 7010/7011) and chess tile (logonui.exe 114
 strips, the classic Appearance schemes (ReactOS's hive has them only in Vista's form: the built-in Windows
 Standard stands in), and the builds' wallpapers. The start button's flag (explorer.exe's start.bmp 143 and startclassic.bmp
 176) is XP's or Windows 2000's; ReactOS's 143 is ReactOS's logo and is not taken: without XP's or 2000's explorer.exe
-flxp-taskbar draws a waving four-pane flag of its own (taste). ReactOS's own styles draw no flag at all (their Start::Button
+flxp-taskbar draws a waving four-pane flag of its own (taste), or the picture `Shell.start_icon` names (section 2b: lhde's
+own drawings are repository files, not imported art, so they are there in the free baseline too). ReactOS's own styles draw no flag at all (their Start::Button
 image carries their logo and hides the content; such a TRUESIZE button, Watercolor Lite's too, is at least its image's
 width, as their content margins give it on XP).
 

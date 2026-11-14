@@ -24,6 +24,8 @@
 #include "shell/runtime.h"
 #include "shell/lhdata.h"
 #include "shell/lhtheme.h"
+#include "shell/starticon.h"
+#include "gdi/bitmap.h"
 #include "shell/details.h"
 #include "shell/thumbs.h"
 #include "commands.h"
@@ -526,6 +528,44 @@ HBITMAP g_strip = nullptr;
 int g_size = 0;
 COLORREF g_bk = RGB(255, 255, 255);
 
+// Shell.start_icon (shell/starticon.h) in place of frame 0's flag: XP's micro brand has its flag in the 20 x 19 box at
+// (1, 1) of the 22 px frame; the picture is 20 px there, over the frame's background colour. Nothing for windows.
+static void replace_logo()
+{
+    if (g_size < 22) return;
+    gdi::Bitmap* im = shell::start_icon_image(shell::start_icon_choice(shell::start_icon_setting()), 20);
+    if (!im) return;
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize = sizeof bi.bmiHeader;
+    bi.bmiHeader.biWidth = g_size;
+    bi.bmiHeader.biHeight = -g_size;    // top-down
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+    void* bits = nullptr;
+    HBITMAP frame = CreateDIBSection(nullptr, &bi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    if (frame && bits) {
+        uint32_t* p = (uint32_t*)bits;
+        int br = GetRValue(g_bk), bg = GetGValue(g_bk), bb = GetBValue(g_bk);
+        for (int i = 0; i < g_size * g_size; i++) p[i] = 0xff000000u | (uint32_t)br << 16 | (uint32_t)bg << 8 | (uint32_t)bb;
+        for (int y = 0; y < im->height && y + 1 < g_size; y++)
+            for (int x = 0; x < im->width && x + 1 < g_size; x++) {
+                uint32_t c = im->row(y)[x], a = c >> 24;
+                int r = (int)(((c >> 16) & 255) * a + br * (255 - a)) / 255;
+                int gg = (int)(((c >> 8) & 255) * a + bg * (255 - a)) / 255;
+                int b = (int)((c & 255) * a + bb * (255 - a)) / 255;
+                p[(y + 1) * g_size + x + 1] = 0xff000000u | (uint32_t)r << 16 | (uint32_t)gg << 8 | (uint32_t)b;
+            }
+        HDC src = CreateCompatibleDC(nullptr), dst = CreateCompatibleDC(nullptr);
+        HGDIOBJ os = SelectObject(src, frame), od = SelectObject(dst, g_strip);
+        BitBlt(dst, 0, 0, g_size, g_size, src, 0, 0, SRCCOPY);
+        SelectObject(src, os); SelectObject(dst, od);
+        DeleteDC(src); DeleteDC(dst);
+    }
+    if (frame) DeleteObject(frame);
+    gdi::destroy_bitmap(im);
+}
+
 static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 {
     if (msg == WM_ERASEBKGND) return 1;
@@ -567,6 +607,7 @@ static void create(HWND rebar)
     g_bk = GetPixel(mem, 0, 0);
     SelectObject(mem, old);
     DeleteDC(mem);
+    replace_logo();
     WNDCLASSW wc = {};
     wc.lpfnWndProc = proc;
     wc.hCursor = LoadCursorW(nullptr, (LPCWSTR)IDC_ARROW);

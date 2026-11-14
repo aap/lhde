@@ -240,6 +240,8 @@ int main(void)
     EQ(G(t, "style.kind"), "xp"); EQ(G(t, "Explorer.chrome"), "xp"); EQ(G(t, "Explorer.navbar"), "none");
     EQ(G(t, "Shell.taskbar"), "classic"); EQ(G(t, "Desktop.icons"), "wine"); EQ(G(t, "Theme.build"), "xp");
     CHECK(lhde_theme_source(t, "Desktop.icons") == LHDE_FROM_FALLBACK);   /* icons xp: no resources/xp */
+    EQ(G(t, "Shell.start_icon"), "windows"); CHECK(lhde_theme_source(t, "Shell.start_icon") == LHDE_FROM_DEFAULT);   /* the flag */
+    CHECK(lhde_theme_is_key("Shell.start_icon") && lhde_theme_is_key("shell.START_ICON"));   /* a theme file's and the layer's */
     lhde_theme_free(t);
 
     /* the free baseline: only ReactOS imported; icons, resources and fonts fall back to it (section 6), then it goes again */
@@ -335,6 +337,11 @@ int main(void)
     EQ(sel, "aero-modified");
     CHECK(lhde_theme_set_key("aero-modified", "Glass.composition", "auto", sel, sizeof sel) == 1);  /* = the base's: removed */
     CHECK(!strstr(slurp("config/lhde/themes/aero-modified.theme"), "composition"));
+    CHECK(lhde_theme_set_key("aero-modified", "Shell.start_icon", "freebsd", sel, sizeof sel) == 1);   /* a theme file's picture */
+    t = R("aero-modified"); EQ(G(t, "Shell.start_icon"), "freebsd"); CHECK(lhde_theme_source(t, "Shell.start_icon") == LHDE_FROM_FILE);
+    lhde_theme_free(t);
+    CHECK(lhde_theme_set_key("aero-modified", "Shell.start_icon", NULL, sel, sizeof sel) == 1);
+    CHECK(!strstr(slurp("config/lhde/themes/aero-modified.theme"), "start_icon"));
     CHECK(lhde_theme_set_key("aero", "nodot", "x", sel, sizeof sel) == -1);
     CHECK(strstr(slurp("data/themes/aero.theme"), "icons") == NULL);   /* shipped files are never written */
 

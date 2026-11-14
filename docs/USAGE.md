@@ -370,6 +370,16 @@ gets them by importing those media again (files already there are kept): `lhde-i
 `lhde-import --pack` of a pack made again with `lhde-pack`. `lhde-theme icon urxvt` says what a window of a class gets and
 where it comes from.
 
+### The Start button's flag
+The classic taskbar's Start button and the Explorer's brand band show the imported Windows flag. Another picture takes its
+place with settings.ini `[taskbar] start_icon` (Display Properties > Shell > Start icon) or a theme's `Shell.start_icon`:
+`windows` (the flag, the default), `lhde` (lhde's own mark, two overlapping windows), `linux` (a penguin), `freebsd` (a red
+daemon's face), `auto` (the penguin on Linux, the daemon on FreeBSD, lhde's mark elsewhere), or a picture of your own as a
+path (`~/pictures/start.png`, an `.ico`), `file:PACK/PATH` (an imported icon pack) or an icon key (`computer`). It is drawn at
+the flag's size, 16 px on the classic button, 20 px under a visual style. The three drawings are lhde's own
+(`share/icons/flags`, made by `tools/start_icons.py`); the Avalon Start buttons of luxshell's packs are bitmaps and keep their
+flag. docs/THEME-FORMAT.md section 2b.
+
 The terminal every part of the desktop starts (Super+Return, Open Terminal Here, Quick Launch's Command Prompt, a
 `Terminal=true` program) is settings.ini `[commands] terminal` (docs/SETTINGS.md "The terminal"), by default the first of `cmd`,
 `urxvt`, `xterm`, `x-terminal-emulator` on PATH: a script `cmd` of your own that starts a terminal looking like cmd.exe is
