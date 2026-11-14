@@ -136,7 +136,7 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    beside the ini); its medium is a directory holding the downloads (layout `tree`: `lhde-pack --medium free=DIR`,
    `lhde-import --dir DIR --source free`), of which only the four files the ini names are taken, into
    `lhde-windows/free/wallpapers/`. Nobody needs the ISO or the photos: these files are free, and lhde publishes both
-   sources as the free pack `lhde-resources-free-1.zip` (10 MB, with ReactOS's licence texts and a LICENSE note; `make
+   sources as the free pack `lhde-resources-free-2.zip` (10 MB, with ReactOS's licence texts and a LICENSE note; `make
    free-pack` builds it from the CD and the photos, reproducibly), which `make install-resources-free` downloads and imports
    (`lhde-import --pack` on it gives the same tree as `--iso` on the CD and `--dir` on the photos). Not taken: ReactOS's
    wallpapers (three of them are CC BY-NC; a tree imported from an earlier pack or the CD keeps its `reactos/wallpapers/`,

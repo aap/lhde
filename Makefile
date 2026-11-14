@@ -169,7 +169,7 @@ uninstall-data:
 #                                  sha256 and the size
 #   make fetch-free-pack           the pack downloaded from FREE_PACK_URL into FREE_PACK_CACHE and checked against FREE_PACK_SHA256
 #                                  (kept there: make check-free and install-resources-free use it; a CI runs this first)
-# FREE_PACK_VERSION counts the free pack's contents (1: ReactOS 0.4.16 and the four photos): a new ReactOS or other photos are
+# FREE_PACK_VERSION counts the free pack's contents (1: ReactOS 0.4.16 and the four photos; 2: also cmd.exe, desk.cpl and notepad.exe for the icon keys): a new ReactOS or other photos are
 # a new version, so a new name and sha256.
 REACTOS_VERSION   = 0.4.16
 REACTOS_RELEASE   = https://sourceforge.net/projects/reactos/files/ReactOS/$(REACTOS_VERSION)/
@@ -177,12 +177,12 @@ REACTOS_ISO      ?= $(HOME)/lib/windows_isos/ReactOS-$(REACTOS_VERSION)-i386.iso
 REACTOS_SRC      ?= $(HOME)/lib/reactos-$(REACTOS_VERSION)
 # the directory holding the photos under Pexels's download names (share/sources/free.ini names the four it takes)
 FREE_WALLPAPERS  ?= $(HOME)/cfg/wallpaper
-FREE_PACK_VERSION = 1
+FREE_PACK_VERSION = 2
 FREE_PACK_NAME    = lhde-resources-free-$(FREE_PACK_VERSION)
 # FREE_PACK_URL is a placeholder until the pack is published (a release asset of the repository); FREE_PACK_SHA256 is the
 # sha256 of the pack make free-pack builds from the release's ISO and the photos
 FREE_PACK_URL    ?= https://github.com/aap/lhde/releases/download/resources/$(FREE_PACK_NAME).zip
-FREE_PACK_SHA256  = 30556f1ab8c590173e151b2d646cb5a40750044e5b0e647fc99e4de4feb5c724
+FREE_PACK_SHA256  = dfbcd03d90bffafb61557b40a02496ddb82c083a931bb2f030f67eea76696a7a
 FREE_PACK_CACHE  ?= $(or $(XDG_CACHE_HOME),$(HOME)/.cache)/lhde/$(FREE_PACK_NAME).zip
 FREE_FONT_DOCS    = Arial ArialBlack ComicSansMS CourierNew FranklinGothicMedium Georgia LucidaConsole MicrosoftSansSerif \
                     PalatinoLinotype Tahoma TimesNewRoman TrebuchetMS Verdana

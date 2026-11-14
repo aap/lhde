@@ -11,7 +11,6 @@
 	(grep the history too: the repo started fresh, so only the tree matters)
 * the free pack lhde-resources-free-1.zip lacks reactos/system32/cmd.exe, desk.cpl and notepad.exe, which the ISO recipe
 	imports (lhde-theme explain lunar: "does not exist" against the pack, found against an ISO import), so make check-free
-	FREE_PACK=lhde-resources-free-1.zip fails on the icon keys cmd, display and notepad (passes from the ISO): a pack 2
 * the agents' worktrees and .claude/ are untracked; .gitignore covers build/, packs and pycache; add .claude/
 
 ## FreeBSD (docs/BUILDING.md "FreeBSD")
