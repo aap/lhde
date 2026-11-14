@@ -34,7 +34,7 @@ fi
 W=$B/windows
 walls=
 case "$iso" in *.iso|*.ISO) [ -n "${FREE_WALLPAPERS:-}" ] && [ -d "$FREE_WALLPAPERS" ] && walls=$FREE_WALLPAPERS;; esac
-key="$iso $(stat -c %s.%Y "$iso") $walls"
+key="$iso $(stat -c %s.%Y "$iso" 2>/dev/null || stat -f %z.%m "$iso") $walls"   # GNU stat; BSD stat
 if [ ! -f "$W/reactos/source.ini" ] || [ "$(cat "$B/iso" 2>/dev/null)" != "$key" ] || [ share/sources/reactos.ini -nt "$W/reactos/source.ini" ] ||
    [ share/sources/free.ini -nt "$W/reactos/source.ini" ]; then
 	rm -rf "$W"; mkdir -p "$B"

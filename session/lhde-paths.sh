@@ -10,6 +10,9 @@
 #   LHDE_TOP             the source tree (when the script runs from one); LHDE_SHARE the install's share/lhde and LHDE_LIB its
 #                        lib/lhde (else empty); LHDE_USER_DATA the Windows tree's index (where lhde-import's files are found)
 #   LHDE_SESSION_DIR     session/ of the tree or lib/lhde/session of the install
+#   lhde_environ PID     a process's environment, lhde_args PID its arguments, one per line (/proc; FreeBSD's procstat,
+#                        whose list splits an entry with a space in it); lhde_alive PID: it runs
+#   lhde_setsid CMD...   CMD in a session of its own: setsid(1), else daemon(8) (FreeBSD: no setsid in the base system)
 # A script in session/ of the tree: LHDE_TOP=<tree>. Installed: lhde-session in <prefix>/bin, the rest in
 # <prefix>/lib/lhde/session (lhde-session sources <prefix>/lib/lhde/session/lhde-paths.sh).
 lhde_self() { # SCRIPT -> LHDE_SELF_DIR (its directory, symlinks resolved)
@@ -27,6 +30,16 @@ lhde_setup_paths() {
 	if [ -n "$LHDE_TOP" ]; then LHDE_SESSION_DIR=$LHDE_TOP/session; else LHDE_SESSION_DIR=$LHDE_LIB/session; fi
 	LHDE_USER_DATA=$(lhde_theme_tool dirs --user 2>/dev/null)
 }
+if [ -r /proc/self/environ ]; then
+	lhde_environ() { tr '\0' '\n' 2>/dev/null </proc/$1/environ; }
+	lhde_args() { tr '\0' '\n' 2>/dev/null </proc/$1/cmdline; }
+	lhde_alive() { [ -d "/proc/$1" ]; }
+else
+	lhde_environ() { procstat -h -e "$1" 2>/dev/null | sed 's/^ *[0-9]* *[^ ]* *//' | tr ' ' '\n'; }
+	lhde_args() { procstat -h -c "$1" 2>/dev/null | sed 's/^ *[0-9]* *[^ ]* *//' | tr ' ' '\n'; }
+	lhde_alive() { kill -0 "$1" 2>/dev/null; }
+fi
+if command -v setsid >/dev/null 2>&1; then lhde_setsid() { setsid "$@"; }; else lhde_setsid() { daemon "$@"; }; fi
 lhde_theme_tool() { "$(lhde_bin lhde-theme)" "$@"; }
 lhde_data_dirs() { lhde_theme_tool dirs --list 2>/dev/null; }
 lhde_find() { lhde_theme_tool find "$1" 2>/dev/null; }

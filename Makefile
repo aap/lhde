@@ -191,7 +191,7 @@ free-pack:
 	    --no-local --reproducible --no-tar --zip --notes build/free-pack-notes --name $(FREE_PACK_NAME) --out . --tmp build
 	rm -rf $(FREE_PACK_NAME) build/free-pack-notes
 	@h=$$(sha256sum < $(FREE_PACK_NAME).zip | cut -d' ' -f1); \
-	echo "$(FREE_PACK_NAME).zip: $$(stat -c %s $(FREE_PACK_NAME).zip) bytes, sha256 $$h"; \
+	echo "$(FREE_PACK_NAME).zip: $$(stat -c %s $(FREE_PACK_NAME).zip 2>/dev/null || stat -f %z $(FREE_PACK_NAME).zip) bytes, sha256 $$h"; \
 	if [ "$$h" = '$(FREE_PACK_SHA256)' ]; then echo "(the pack FREE_PACK_SHA256 names)"; \
 	else echo "(a new pack: FREE_PACK_SHA256 names $(FREE_PACK_SHA256); publish this one and set it)"; fi
 fetch_free = f='$(FREE_PACK_CACHE)'; sum() { sha256sum < "$$1" | cut -d' ' -f1; }; \

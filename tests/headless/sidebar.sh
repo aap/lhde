@@ -131,7 +131,7 @@ xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND "sidebar-mode full"
 full() { grep -q '^mode *= *full' $INI; }
 wait_for 2 full; sleep .6
 stop_shell
-sed -i 's/^animate *= *0/animate = 1/' $INI
+sed 's/^animate *= *0/animate = 1/' $INI > $INI.new && mv $INI.new $INI
 grep -q '^animate = 1' $INI || bad "settings.ini has no [sidebar] animate to set"
 shell
 t0=$(ms); xdotool key super+h

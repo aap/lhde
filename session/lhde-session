@@ -41,7 +41,7 @@ statedir() { echo "$RUN/lhde-session$1"; }
 # the display a control command acts on
 target() {
 	if [ -n "$LHDE_DISPLAY" ]; then echo "$LHDE_DISPLAY"; return; fi
-	n=0; for s in "$RUN"/lhde-session:*; do [ -f "$s/loop.pid" ] && [ -d "/proc/$(cat "$s/loop.pid")" ] && { n=$((n + 1)); one=${s##*/lhde-session}; }; done
+	n=0; for s in "$RUN"/lhde-session:*; do [ -f "$s/loop.pid" ] && lhde_alive "$(cat "$s/loop.pid")" && { n=$((n + 1)); one=${s##*/lhde-session}; }; done
 	if [ $n = 1 ]; then echo "$one"; else echo "${DISPLAY:-:1}"; fi
 }
 # a theme name (an alias, a bare style) through liblhde (lhde-theme resolve): prints the theme's name, nothing when unknown
@@ -63,37 +63,37 @@ bus_stop() {
 	addr=$(cat "$STATE/dbus.addr"); pid=$(cat "$STATE/dbus.pid" 2>/dev/null)
 	for p in $(pgrep -u "$(id -u)"); do   # our own processes only (another user's environ is not readable anyway)
 		[ "$p" = "$$" ] && continue
-		tr '\0' '\n' 2>/dev/null </proc/$p/environ | grep -qxF "DBUS_SESSION_BUS_ADDRESS=$addr" && kill $p 2>/dev/null
+		lhde_environ $p | grep -qxF "DBUS_SESSION_BUS_ADDRESS=$addr" && kill $p 2>/dev/null
 	done
-	[ -n "$pid" ] && [ -d "/proc/$pid" ] && kill $pid 2>/dev/null
+	[ -n "$pid" ] && lhde_alive "$pid" && kill $pid 2>/dev/null
 	rm -f "$STATE/dbus.addr" "$STATE/dbus.pid"
 }
 killon() { # kill processes named $1 whose DISPLAY is $D (never pkill -f: it matches this shell)
-	for p in $(pgrep -x "$1"); do tr '\0' '\n' </proc/$p/environ 2>/dev/null | grep -qx "DISPLAY=$D" && kill $p; done
+	for p in $(pgrep -x "$1"); do lhde_environ $p | grep -qx "DISPLAY=$D" && kill $p; done
 }
-running_on() { for p in $(pgrep -x "$1"); do tr '\0' '\n' </proc/$p/environ 2>/dev/null | grep -qx "DISPLAY=$D" && { echo $p; return 0; }; done; return 1; }
+running_on() { for p in $(pgrep -x "$1"); do lhde_environ $p | grep -qx "DISPLAY=$D" && { echo $p; return 0; }; done; return 1; }
 LUXWM=$(lhde_bin luxwm) LUXSHELL=$(lhde_bin luxshell) FLXPDESK=$(lhde_bin flxp-desktop)
 PCONF=$LHDE_SESSION_DIR/picom-glass.conf
 picom_start() { # picom with the session's config (glx on real hardware; LHDE_PICOM_BACKEND=xrender for Xvfb, with lab.sh's blur)
 	if [ "${LHDE_PICOM_BACKEND:-glx}" = xrender ]; then set -- --backend xrender --blur-method gaussian --blur-size 5 --blur-deviation 1.2
 	else set -- --backend glx; fi
-	(DISPLAY=$D setsid picom --config "$PCONF" "$@" >"$STATE/picom.log" 2>&1 </dev/null &)
+	(DISPLAY=$D lhde_setsid picom --config "$PCONF" "$@" >"$STATE/picom.log" 2>&1 </dev/null &)
 }
 # (re)start luxshell; without its desktop layer while flxp-desktop is on. Its pack follows the session theme (_LH_THEME).
 startshell() {
 	killon luxshell
 	lhdesk=1; [ "$(cat "$STATE/desktop" 2>/dev/null)" = 1 ] && [ -x "$FLXPDESK" ] && lhdesk=0
-	(cd "$HOME" && DISPLAY=$D LHSHELL_DESKTOP=$lhdesk setsid "$LUXSHELL" >"$STATE/luxshell.log" 2>&1 </dev/null &)
+	(cd "$HOME" && DISPLAY=$D LHSHELL_DESKTOP=$lhdesk lhde_setsid "$LUXSHELL" >"$STATE/luxshell.log" 2>&1 </dev/null &)
 }
 startdesk() {
 	# from a control command the session environment is not ours: DISPLAY and the D-Bus address of luxshell or luxwm on $D
 	bus=$DBUS_SESSION_BUS_ADDRESS
 	for p in $(pgrep -x luxshell) $(pgrep -x luxwm); do
-		tr '\0' '\n' </proc/$p/environ 2>/dev/null | grep -qx "DISPLAY=$D" || continue
-		b=$(tr '\0' '\n' </proc/$p/environ | sed -n 's/^DBUS_SESSION_BUS_ADDRESS=//p'); [ -n "$b" ] && bus=$b; break
+		lhde_environ $p | grep -qx "DISPLAY=$D" || continue
+		b=$(lhde_environ $p | sed -n 's/^DBUS_SESSION_BUS_ADDRESS=//p'); [ -n "$b" ] && bus=$b; break
 	done
 	# no FLXP_<KEY> here: an exported one beats flxp.ini, and every program the desktop starts inherits it
-	(cd "$HOME" && DISPLAY=$D DBUS_SESSION_BUS_ADDRESS=$bus setsid "$FLXPDESK" >"$STATE/flxp-desktop.log" 2>&1 </dev/null &)
+	(cd "$HOME" && DISPLAY=$D DBUS_SESSION_BUS_ADDRESS=$bus lhde_setsid "$FLXPDESK" >"$STATE/flxp-desktop.log" 2>&1 </dev/null &)
 }
 
 # ---- the session itself: runs on $D, in the X server's client process (startx) or in the background ----
@@ -127,8 +127,8 @@ session() {
 	echo "lhde-session: theme $(cat "$STATE/theme"), picom $lhpicom, Windows files $LHDE_USER_DATA" >&2
 	[ "$lhpicom" = yes ] && picom_start
 	term=${LHDE_TERMINAL:-}
-	if [ -z "$term" ]; then (cd "$HOME" && setsid "$LHDE_THEME_TOOL" terminal --run "$HOME" >/dev/null 2>&1 </dev/null &)
-	elif [ "$term" != none ]; then (cd "$HOME" && setsid $term >/dev/null 2>&1 </dev/null &); fi
+	if [ -z "$term" ]; then (cd "$HOME" && lhde_setsid "$LHDE_THEME_TOOL" terminal --run "$HOME" >/dev/null 2>&1 </dev/null &)
+	elif [ "$term" != none ]; then (cd "$HOME" && lhde_setsid $term >/dev/null 2>&1 </dev/null &); fi
 	[ -x "$FLXPDESK" ] || echo 0 > "$STATE/desktop"
 	if [ "$LHDE_WM" = fvwm ]; then exec fvwm2 -f "$LHDE_SESSION_DIR/lab.fvwm2rc"; fi
 	# luxwm in a loop: a restart (or a crash) brings it back without ending the session
@@ -174,11 +174,11 @@ start)
 	export LHDE_THEME="$n"
 	case $how in
 	real)   LHDE_MODE=real exec startx "$SELF" __session -- "$D" "${LHDE_VT:-vt8}" -keeptty ;;
-	nested) (setsid Xephyr "$D" -screen "${LHDE_GEOMETRY:-1280x800}" -title "lhde $D" +extension GLX -ac -br -noreset >"$STATE/x.log" 2>&1 </dev/null &)
+	nested) (lhde_setsid Xephyr "$D" -screen "${LHDE_GEOMETRY:-1280x800}" -title "lhde $D" +extension GLX -ac -br -noreset >"$STATE/x.log" 2>&1 </dev/null &)
 	        i=0; until DISPLAY=$D xdpyinfo >/dev/null 2>&1; do i=$((i + 1)); [ $i -gt 50 ] && { echo "lhde-session: Xephyr did not start on $D" >&2; exit 1; }; sleep 0.1; done
-	        (DISPLAY=$D LHDE_MODE=nested setsid "$SELF" __session >"$STATE/session.log" 2>&1 </dev/null &)
+	        (DISPLAY=$D LHDE_MODE=nested lhde_setsid "$SELF" __session >"$STATE/session.log" 2>&1 </dev/null &)
 	        echo "lhde-session: nested on $D (log $STATE)" ;;
-	attach) (DISPLAY=$D LHDE_MODE=attach setsid "$SELF" __session >"$STATE/session.log" 2>&1 </dev/null &)
+	attach) (DISPLAY=$D LHDE_MODE=attach lhde_setsid "$SELF" __session >"$STATE/session.log" 2>&1 </dev/null &)
 	        echo "lhde-session: on $D (log $STATE)" ;;
 	esac ;;
 theme)
@@ -227,7 +227,7 @@ stop)
 	killon luxshell; killon flxp-desktop; killon luxwm; killon picom; killon fvwm2
 	bus_stop
 	# the X server this script started for --nested (Xephyr whose command line names the display)
-	for p in $(pgrep -x Xephyr); do tr '\0' '\n' </proc/$p/cmdline | grep -qx -- "$D" && kill $p; done
+	for p in $(pgrep -x Xephyr); do lhde_args $p | grep -qx -- "$D" && kill $p; done
 	echo "stopped $D" ;;
 -h|--help|help) sed -n '2,/^SELF=/p' "$SELF" | sed '$d; s/^# \{0,1\}//' ;;
 *) echo "usage: lhde-session start [--nested|--attach] [THEME] | theme NAME | taskbar KIND | shell on|off | picom on|off | desktop on|off | stop" >&2; exit 2 ;;

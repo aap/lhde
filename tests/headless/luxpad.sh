@@ -115,7 +115,7 @@ if [ -z "$W" ]; then fail "no window for u16.txt"
 else
     check "reopened as Unicode" "Unicode" "$(status encoding)"
     before=$(hex $T/files/u16.txt); touch -d '2001-01-01' $T/files/u16.txt
-    xdotool key ctrl+s; wait_for 10 sh -c "[ \$(stat -c %Y $T/files/u16.txt) -gt 978307200 ]"
+    xdotool key ctrl+s; wait_for 10 sh -c "[ \$(stat -c %Y $T/files/u16.txt 2>/dev/null || stat -f %m $T/files/u16.txt) -gt 978307200 ]"
     check "UTF-16 saved back byte for byte" "$before" "$(hex $T/files/u16.txt)"
     quit
 fi
@@ -129,7 +129,7 @@ else
     check "Latin-1 bytes open as ANSI" "ANSI (UTF-8)" "$(status encoding)"
     check "line ends Unix (LF)" "Unix (LF)" "$(status eoln)"
     before=$(hex $L); touch -d '2001-01-01' $L
-    xdotool key ctrl+s; wait_for 10 sh -c "[ \$(stat -c %Y $L) -gt 978307200 ]"
+    xdotool key ctrl+s; wait_for 10 sh -c "[ \$(stat -c %Y $L 2>/dev/null || stat -f %m $L) -gt 978307200 ]"
     check "ANSI saved back byte for byte (LF kept)" "$before" "$(hex $L)"
     xdotool key ctrl+End; xdotool type x; sleep .3
     timeout 10 xdotool windowfocus --sync $W 2>/dev/null; xdotool key alt+F4

@@ -25,7 +25,7 @@ if command -v inotifywait >/dev/null 2>&1; then
   done
 else
   echo "theme-watch: no inotifywait, polling every second"
-  sig() { files | while IFS= read -r f; do stat -c '%n %Y %s' "$f" 2>/dev/null; done; }
+  sig() { files | while IFS= read -r f; do stat -c '%n %Y %s' "$f" 2>/dev/null || stat -f '%N %m %z' "$f" 2>/dev/null; done; }   # GNU stat; BSD stat
   old=$(sig)
   while sleep 1; do
     new=$(sig)
