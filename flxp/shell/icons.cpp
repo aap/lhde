@@ -390,7 +390,8 @@ std::vector<unsigned long> key_icon(const std::string& key, int px)
 {
     icon_theme();
     unsigned long n = 0;
-    return fit(lhde_icon_key_image(key.c_str(), px, &n, nullptr, 0), n, px);
+    unsigned long* im = lhde_icon_key_image(key.c_str(), px, &n, nullptr, 0);   // before fit reads n
+    return fit(im, n, px);
 }
 
 } // namespace shell

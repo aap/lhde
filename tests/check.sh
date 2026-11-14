@@ -39,6 +39,9 @@ result "fileopuitest ($(tail -n 1 "$T/fileopui.log"))" $? "$T/fileopui.log"
 # flxp's lookups in lhde's data directories (shell/lhdata.h) on a fake import
 build/tests/lhdatatest > "$T/lhdata.log" 2>&1
 result "lhdatatest ($(tail -n 1 "$T/lhdata.log"))" $? "$T/lhdata.log"
+# the icon keys' images (shell::key_icon: a program's window icon from a key) with nothing imported
+build/tests/keyicontest > "$T/keyicon.log" 2>&1
+result "keyicontest ($(tail -n 1 "$T/keyicon.log"))" $? "$T/keyicon.log"
 # the Explorer's view model (shell/viewmodel.h): views, sizes, 4074's slider stops, memory
 build/tests/viewmodeltest > "$T/viewmodel.log" 2>&1
 result "viewmodeltest ($(tail -n 1 "$T/viewmodel.log"))" $? "$T/viewmodel.log"
