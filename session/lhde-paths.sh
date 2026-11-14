@@ -12,7 +12,9 @@
 #   LHDE_SESSION_DIR     session/ of the tree or lib/lhde/session of the install
 #   lhde_environ PID     a process's environment, lhde_args PID its arguments, one per line (/proc; FreeBSD's procstat,
 #                        whose list splits an entry with a space in it); lhde_alive PID: it runs
-#   lhde_setsid CMD...   CMD in a session of its own: setsid(1), else daemon(8) (FreeBSD: no setsid in the base system)
+#   $LHDE_SETSID CMD...  CMD in a session of its own: setsid(1), else daemon(8) (FreeBSD: no setsid in the base system); a
+#                        command, not a function, so VAR=value before it reaches CMD (FreeBSD's sh exports no assignment
+#                        made before a function call)
 # A script in session/ of the tree: LHDE_TOP=<tree>. Installed: lhde-session in <prefix>/bin, the rest in
 # <prefix>/lib/lhde/session (lhde-session sources <prefix>/lib/lhde/session/lhde-paths.sh).
 lhde_self() { # SCRIPT -> LHDE_SELF_DIR (its directory, symlinks resolved)
@@ -39,7 +41,7 @@ else
 	lhde_args() { procstat -h -c "$1" 2>/dev/null | sed 's/^ *[0-9]* *[^ ]* *//' | tr ' ' '\n'; }
 	lhde_alive() { kill -0 "$1" 2>/dev/null; }
 fi
-if command -v setsid >/dev/null 2>&1; then lhde_setsid() { setsid "$@"; }; else lhde_setsid() { daemon "$@"; }; fi
+if command -v setsid >/dev/null 2>&1; then LHDE_SETSID=setsid; else LHDE_SETSID=daemon; fi
 lhde_theme_tool() { "$(lhde_bin lhde-theme)" "$@"; }
 lhde_data_dirs() { lhde_theme_tool dirs --list 2>/dev/null; }
 lhde_find() { lhde_theme_tool find "$1" 2>/dev/null; }

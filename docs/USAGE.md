@@ -503,7 +503,9 @@ lhde-session shell on|off                            start / stop luxshell (the 
 lhde-session picom on|off                            start / stop picom (glx; LHDE_PICOM_BACKEND=xrender for Xvfb)
 lhde-session desktop on|off                          start / stop flxp-desktop; restarts luxshell without / with its desktop layer
 lhde-session stop                                    end the session: luxshell, flxp-desktop, luxwm, picom, the session bus and
-                                                     every process on it, and the X server of start and --nested
+                                                     every process on it, and the X server of start and --nested; under
+                                                     --attach and --nested every process the session started (its
+                                                     LHDE_SESSION_TAG), a terminal or an autolaunched sound server too
 ```
 Environment: `LHDE_PICOM=0|1` forces the compositor off / on for the session, luxshell included; `LHDE_SHELL=0` without luxshell;
 `LHDE_DESKTOP=0` without flxp-desktop (luxshell then shows its own desktop layer); `LHDE_WM=fvwm` an fvwm2 session (`lab.fvwm2rc`);

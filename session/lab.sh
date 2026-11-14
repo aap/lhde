@@ -22,8 +22,8 @@ LUXWM=$(lhde_bin luxwm) LUXSHELL=$(lhde_bin luxshell)
 startpicom() {
   if [ "${LAB_PICOM:-1}" = 0 ]; then echo "LAB_PICOM=0: not starting picom on $LAB (DWM themes fall back to their frame_classic)"; return; fi
   PCONF="$LHDE_SESSION_DIR/picom-glass.conf"; [ "${LAB_WM:-luxwm}" = fvwm ] && PCONF="$LHDE_SESSION_DIR/picom-glass-fvwm.conf"
-  if [ "${LAB_BACKEND:-xrender}" = glx ]; then (DISPLAY=$LAB lhde_setsid picom --config "$PCONF" --backend glx >"$LOG/picom.log" 2>&1 < /dev/null &)
-  else (DISPLAY=$LAB lhde_setsid picom --config "$PCONF" --backend xrender --blur-method gaussian --blur-size 5 --blur-deviation 1.2 >"$LOG/picom.log" 2>&1 < /dev/null &); fi
+  if [ "${LAB_BACKEND:-xrender}" = glx ]; then (DISPLAY=$LAB $LHDE_SETSID picom --config "$PCONF" --backend glx >"$LOG/picom.log" 2>&1 < /dev/null &)
+  else (DISPLAY=$LAB $LHDE_SETSID picom --config "$PCONF" --backend xrender --blur-method gaussian --blur-size 5 --blur-deviation 1.2 >"$LOG/picom.log" 2>&1 < /dev/null &); fi
 }
 # a theme name (an alias, a bare style) through liblhde: prints the theme's name, nothing when unknown
 themename() { lhde_themename "$1"; }
@@ -33,12 +33,12 @@ wmtheme() { n=$(themename "${LAB_THEME:-aero4074}"); if [ -n "$n" ]; then echo "
 killlab() { for pid in $(pgrep -x "$1"); do lhde_environ $pid | grep -qx "DISPLAY=$LAB" && kill "$pid"; done; }
 startwm() {
   if [ "${LAB_WM:-luxwm}" = fvwm ]; then (DISPLAY=$LAB fvwm2 -f "$LHDE_SESSION_DIR/lab.fvwm2rc" >"$LOG/fvwm.log" 2>&1 &)
-  else (cd "$HOME" && DISPLAY=$LAB LHWM_THEME="$(wmtheme)" lhde_setsid "$LUXWM" ${LAB_WMARGS--d} >"$LOG/luxwm.log" 2>&1 < /dev/null &); fi
+  else (cd "$HOME" && DISPLAY=$LAB LHWM_THEME="$(wmtheme)" $LHDE_SETSID "$LUXWM" ${LAB_WMARGS--d} >"$LOG/luxwm.log" 2>&1 < /dev/null &); fi
 }
 case "$1" in
 start)
   if [ "$2" = xephyr ]; then (Xephyr $LAB -screen 1280x800 -title "lhde lab $LAB" +extension GLX -ac -br -noreset >"$LOG/x.log" 2>&1 &)
-  else lhde_setsid sh -c "trap '' TERM HUP INT; exec Xvfb $LAB -screen 0 1280x800x24 +extension GLX +render -noreset -nolisten tcp" >>"$LOG/x.log" 2>&1 < /dev/null & fi   # ignores TERM/HUP: only 'stop' (kill -9) ends it
+  else $LHDE_SETSID sh -c "trap '' TERM HUP INT; exec Xvfb $LAB -screen 0 1280x800x24 +extension GLX +render -noreset -nolisten tcp" >>"$LOG/x.log" 2>&1 < /dev/null & fi   # ignores TERM/HUP: only 'stop' (kill -9) ends it
   sleep 2; export DISPLAY=$LAB
   wp=$(lhde_find wallpapers/mock/longhorn.jpg); [ -n "$wp" ] && feh --no-fehbg --bg-fill "$wp" 2>/dev/null
   startwm; sleep 2
@@ -50,7 +50,7 @@ ensure) if ! DISPLAY=$LAB xdpyinfo >/dev/null 2>&1; then "$0" start; else echo "
 shell)
   killlab luxshell
   [ "$2" = off ] && { echo "luxshell stopped on $LAB"; exit 0; }
-  (cd "$HOME" && DISPLAY=$LAB LHSHELL_DESKTOP=${LAB_SHELL_DESKTOP:-1} lhde_setsid "$LUXSHELL" >"$LOG/luxshell.log" 2>&1 < /dev/null &)
+  (cd "$HOME" && DISPLAY=$LAB LHSHELL_DESKTOP=${LAB_SHELL_DESKTOP:-1} $LHDE_SETSID "$LUXSHELL" >"$LOG/luxshell.log" 2>&1 < /dev/null &)
   echo "luxshell on $LAB (log $LOG/luxshell.log)" ;;
 demo)
   export DISPLAY=$LAB; t=${LAB_TERM:-xterm}
