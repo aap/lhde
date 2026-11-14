@@ -9,3 +9,8 @@
 [Default Applications]
 inode/directory=flxp.desktop
 text/plain=luxpad.desktop
+image/png=luxview.desktop
+image/jpeg=luxview.desktop
+image/bmp=luxview.desktop
+image/webp=luxview.desktop
+image/vnd.microsoft.icon=luxview.desktop

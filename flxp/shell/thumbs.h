@@ -80,6 +80,14 @@ int decodes();
 // Pictures decoding at once in the process, whichever loader asks (the others wait their turn), and the most there were.
 enum { DECODES_AT_ONCE = 2 };
 int decodes_at_once_most();
+// One of those turns for a decode of the caller's own (an image viewer's whole picture): held while it lives, waiting
+// while DECODES_AT_ONCE others decode.
+struct DecodeTurn {
+    DecodeTurn();
+    ~DecodeTurn();
+    DecodeTurn(const DecodeTurn&) = delete;
+    DecodeTurn& operator=(const DecodeTurn&) = delete;
+};
 
 class Loader {
 public:

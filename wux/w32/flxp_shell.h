@@ -92,6 +92,12 @@ BOOL WINAPI FlxpClipboardOwned(void);
 BOOL WINAPI FlxpWritePng(HBITMAP bitmap, const char *path);
 HGLOBAL WINAPI FlxpEncodePng(HBITMAP bitmap);
 
+/* Full screen (a slide show): FlxpSetFullscreen asks the window manager for _NET_WM_STATE_FULLSCREEN on a managed toplevel
+   (TRUE) or to leave it (FALSE); the window gets WM_SIZE when the window manager has done it, nothing without one.
+   FlxpIsFullscreen: the window manager says it is. */
+BOOL WINAPI FlxpSetFullscreen(HWND hwnd, BOOL on);
+BOOL WINAPI FlxpIsFullscreen(HWND hwnd);
+
 #ifdef __cplusplus
 }
 #endif

@@ -117,6 +117,26 @@ and Esc in its address, search and Filter boxes stay theirs.
 
 The text keys are the Edit control's (below).
 
+## luxview (fixed, XP's picture viewer's)
+
+| Keys | Action |
+| --- | --- |
+| Left, Right; Up, Down | the previous / next picture; a picture larger than the window moves instead |
+| Page Up, Page Down; Backspace, Space; the wheel | the previous / next picture |
+| Home, End | the first / last picture |
+| Ctrl+B, Ctrl+A | Best Fit, Actual Size |
+| +, -; Ctrl+wheel | zoom in / out (about the pointer with the wheel) |
+| Ctrl+K, Ctrl+L | rotate clockwise / counterclockwise (in the view) |
+| F11 | the slide show (F11 or Esc ends it) |
+| Delete | to the Trash (asks) |
+| Ctrl+S | Copy To |
+| Ctrl+E | open for editing (the type's next program) and close |
+| Alt+Enter, Ctrl+Enter | Properties on General, on Metadata |
+| F1 | the keys |
+| Alt+F4 | close |
+
+A drag moves a picture larger than the window.
+
 ## Every program built on wux (fixed)
 
 **The Edit control** (luxpad's text, the address bar, the Filter and search boxes, every dialog field):

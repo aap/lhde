@@ -3,7 +3,8 @@
 // their full image in memory (the peak RSS, /proc/self/status VmHWM after resetting it through /proc/self/clear_refs,
 // grows by less than 16 MB), the PNG's reduction against the full decode, an interlaced PNG, the size ceilings; the
 // view's images bounded by bytes (thumbs::Slots: 300 inserts, the pinned ones kept, least recently used first); a
-// cancelled generation decodes nothing more, and three loaders decode at most two pictures at once (thumbs::Loader).
+// cancelled generation decodes nothing more, and three loaders decode at most two pictures at once (thumbs::Loader);
+// gdi::resample of a 6000 x 4000 bitmap without a buffer of every source row.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -399,6 +400,23 @@ int main()
     check("PNG thumbnail", th && th->width == 256 && th->height == 256);
     check("PNG thumbnail: peak RSS grows by less than 16 MB", g < 16 * 1024, kb(g));
     if (th) gdi::destroy_bitmap(th);
+
+    // resampling holds the horizontal pass of the rows one output row reads, not of every source row: a 6000 x 4000
+    // bitmap into 800 x 533 grows the peak by the result (1.6 MB) and a few rows, not by 4000 rows of 800 floats (51 MB);
+    // the result is the area average (a left half red and a right half blue stay so, the middle column between)
+    {
+        gdi::Bitmap* src = gdi::create_bitmap(6000, 4000);
+        for (int y = 0; y < 4000; y++)
+            for (int x = 0; x < 6000; x++) src->row(y)[x] = x < 3000 ? 0xffff0000u : 0xff0000ffu;
+        gdi::Bitmap* out = nullptr;
+        g = peak_growth([&] { out = gdi::resample(src, 800, 533); });
+        check("resample 6000 x 4000 to 800 x 533", out && out->width == 800 && out->height == 533);
+        check("resample: peak RSS grows by less than 8 MB", g < 8 * 1024, kb(g));
+        check("resample: the left half red", out && out->row(300)[100] == 0xffff0000u);
+        check("resample: the right half blue", out && out->row(532)[700] == 0xff0000ffu);
+        if (out) gdi::destroy_bitmap(out);
+        gdi::destroy_bitmap(src);
+    }
 
     // the reduction: 512 x 256 by 2 (both sides stay at least 100) to 256 x 128, the halves kept, the transparent
     // quarter transparent, its colour not bleeding into the blue (premultiplied)

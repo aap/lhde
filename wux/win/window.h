@@ -211,6 +211,8 @@ enum : intptr_t { MOVE_KEYBOARD = -100, SIZE_KEYBOARD = -101 };
 bool begin_move_resize(Window* w, intptr_t ht);
 bool is_maximized(Window* w);
 void set_maximized(Window* w, int action);      // 0 restore, 1 maximise, 2 toggle
+void set_fullscreen(Window* w, bool on);        // a managed toplevel: the window manager's full screen
+bool is_fullscreen(Window* w);
 
 // Shells: root window properties (CARDINAL arrays). A watched property's
 // changes are posted to every toplevel as WM_FLXP_ROOTPROPERTY (wp = the id).

@@ -38,13 +38,13 @@ $PREFIX/lib/lhde/                    code that is not a binary (PKGLIBDIR)
   session/                             lhde-session's helpers: lhde-paths.sh, lhwall.sh, lab.sh, theme-*.sh, picom configs
   tools/                               lhde-import's Python: lhdeimport.py, lhdetree.py, lhdeschemes.py, recipe builders;
                                        lhde-mime's lhdemime.py
-$PREFIX/share/applications/          flxp.desktop, luxpad.desktop, lhde-mimeapps.list (lhde's default programs, read when
+$PREFIX/share/applications/          flxp.desktop, luxpad.desktop, luxview.desktop, lhde-mimeapps.list (lhde's default programs, read when
                                      XDG_CURRENT_DESKTOP names lhde: docs/SETTINGS.md "Associations"), mimeinfo.cache
                                      (update-desktop-database, when installed)
 $PREFIX/share/thumbnailers/          lhde-pdf, lhde-xps, lhde-postscript, lhde-djvu .thumbnailer: freedesktop thumbnailer
                                      entries for document pages (THUMBNAILERDIR; any program reads them, flxp after the
                                      system's own: docs/USAGE.md, thumbnails)
-$PREFIX/bin/                         luxwm luxshell luxshot luxattr luxpad flxp* lhde-theme lhde-session lhde-import lhde-pack lhde-schemes lhde-mime ut-dump
+$PREFIX/bin/                         luxwm luxshell luxshot luxattr luxpad luxview flxp* lhde-theme lhde-session lhde-import lhde-pack lhde-schemes lhde-mime ut-dump
 
 WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows
 ~/.local/share/lhde-windows/

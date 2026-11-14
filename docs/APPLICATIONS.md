@@ -59,7 +59,7 @@ int main(int argc, char** argv)
 
 `wux/wux.h` is `<windows.h>`, `<commctrl.h>`, `<commdlg.h>`, `<uxtheme.h>` with `<vsstyle.h>`, `<shellapi.h>` and wux's own
 additions (`wux/w32/flxp_shell.h`: desktop and dock windows, root properties, file drag and drop, the X selections, typed
-clipboard data, `FlxpWritePng` / `FlxpEncodePng`), plus `WuxWide` / `WuxUtf8` / `WuxWindowText` for the UTF-8 the shell layer
+clipboard data, `FlxpWritePng` / `FlxpEncodePng`, `FlxpSetFullscreen`: the window manager's full screen), plus `WuxWide` / `WuxUtf8` / `WuxWindowText` for the UTF-8 the shell layer
 speaks. Strings to the API are UTF-16 (`L"..."` is 16-bit here; a character above U+FFFF is a surrogate pair, and typed it
 arrives as two `WM_CHAR`s, as on Windows); the A functions and the A text messages (`SendMessageA`'s `WM_SETTEXT`,
 `WM_GETTEXT`) read "ANSI" as UTF-8. Text in any script draws: GDI takes a character the font lacks from a linked face, and
@@ -96,7 +96,8 @@ and removed in one write), `known_tags` (the tags to offer in a tag box) and `re
 `list_attrs` (every `user.*` name on a file), `infotip`, the Properties formats (`size_and_bytes`: "1.29 KB (1,331 bytes)",
 `long_date` with seconds, `thousands`);
 `shell::store::get` / `set` (settings.ini, with the change notification); `shell::session_theme()` (the theme's record);
-`shell::mime_type`; `shell::trash`, the copy engine (`fileops_job.h`); `shell::thumbs`; the Explorer itself as a program:
+`shell::mime_type`; `shell::trash`, the copy engine (`fileops_job.h`); `shell::thumbs` (and `thumbs::DecodeTurn`, one of the
+process's two decodes at a time for a decoder of the program's own); the Explorer itself as a program:
 `flxp DIR`, `flxp --select FILE`, `flxp --properties ITEM...` (the Properties sheet alone, on General), or from
 another toolkit the session bus's `org.freedesktop.FileManager1` (docs/USAGE.md). The win32 part (`shell/ui.h`): `shell::message_box(owner, title, text, MB_OK |
 MB_ICONEXCLAMATION)` (MessageBoxW with UTF-8 strings), `shell::icon_for(path, 32)` and `icon_for_key(key, px)` (the icon the
@@ -139,7 +140,7 @@ for Linux; DIR/sysctl/NAME, DIR/dev/backlight/NAME, DIR/dev/mixerN for FreeBSD),
 ends everything the lab started. A headless test goes in `tests/headless/` (its own HOME and XDG directories, xdotool to drive
 the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
 
-## Three worked examples
+## Four worked examples
 
 - **luxshot** (`apps/luxshot`): a dialog program with an Xlib part (`capture_native.cpp`), the Open/Save dialog for Browse...,
   the annotations written with `shell::details::write`, PNG encoding and the clipboard (`FlxpWritePng`, `FlxpEncodePng`).
@@ -158,6 +159,17 @@ the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
   `WM_DROPFILES`, the window placement; what Windows had and lhde does not became POSIX (files through `open`/`mmap`/`write`
   for `CreateFile`/`CreateFileMapping`, the registry as two ini files through liblhde's `lhde_ini`, `errno` for
   `GetLastError`/`FormatMessage`). `tests/headless/luxpad.sh` drives it, the status bar read from `LUXPAD_TRACE=1`.
+- **luxview** (`apps/luxview`): a window that paints and takes input while its work is elsewhere. Its view model
+  (`model.h`, `model_native.cpp`: plain C++ with a thread, no win32 headers, driven by `tests/toolkit/luxviewtest.cpp` with a fake
+  decoder) owns the list, the zoom and a loader thread with generation ids; the window posts itself a message from the loader's
+  notify and takes the results on the UI thread. It draws into a DIB section of its own (`CreateDIBSection`, the picture's pixels
+  written into the bits, the chrome with GDI on top, one `BitBlt`), its toolbar is hand-drawn with the style's TOOLBAR part for the
+  hot and pressed buttons (`DrawThemeBackground`, `DrawEdge` under classic) and a tooltip control with `TTF_SUBCLASS` tools, the
+  glyphs a resource strip of an imported DLL (`shell::resource_file`, `shell::load_image("pe:...#105")`, `GetDIBits`,
+  `AlphaBlend`); full screen is `FlxpSetFullscreen`. From the shell layer: `shell::thumbs` (the cached thumbnail first, the
+  filmstrip's loader, `DecodeTurn`), `sort_items` (the Explorer's Name order), `trash`, `apps_for` and `launch`, `properties`,
+  the Save dialog for Copy To, `set_window_icon_key`, `theme_build` (which look). `tests/headless/luxview.sh` drives it, what it
+  shows read from `LUXVIEW_TRACE=1`.
 
 ## Not public yet: what an application cannot reach
 
@@ -176,4 +188,12 @@ What the first applications needed and the public surface lacks, the list of wha
 - **Shell images as `gdi::Bitmap`**: `shell/thumbs.h` (thumbnails) and `icons.h` (`load_art`: toolbar strips, Windows art by
   resource id) hand out `gdi::Bitmap`, wux's internal type; only icons have a win32 handle (`shell::icon_for`, `load_image`). The
   image lists of every icon at 16 and 32 px, one index per key, are still the Explorer's (`flxp/explorer/uiicons`).
+- **Decoding a picture**: there is no public decoder. luxview includes wux's `gdi/image.h` (`load_image` at a scale,
+  `resample`, `fit_size`) and `gdi/bitmap.h` for its view model, as the thumbnails do; a public one would hand out a DIB section
+  (or pixels and a size) decoded to fit a box, with the EXIF turn applied.
+- **The Open With dialog and the roles** are the Explorer's (`flxp/explorer/dialogs`, `shell/roles.h`, not in shell.h): luxview's
+  Edit takes the first program of `shell::apps_for` that is not luxview instead of the images role's second candidate or
+  asking.
+- **No `GdiFlush`**: wux draws at once, so a program that writes into a DIB section's bits after GDI calls (luxview) needs no
+  flush, but one written for Windows calls it and does not link.
 - **The X clipboard is not INCR**: typed data larger than the server's request size (16 MB with BIG-REQUESTS) is refused.

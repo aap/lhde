@@ -1066,6 +1066,13 @@ void set_maximized(Window* w, int action)
     if (is_window(w) && w->top && w->wm_decorated) sys::set_maximized(w->top->native, action);
 }
 
+void set_fullscreen(Window* w, bool on)
+{
+    if (is_window(w) && w->top && w->wm_decorated) sys::set_fullscreen(w->top->native, on);
+}
+
+bool is_fullscreen(Window* w) { return is_window(w) && w->top && sys::is_fullscreen(w->top->native); }
+
 // ---- input state ----------------------------------------------------------
 
 // A menu's capture (menu mode) also grabs the pointer, so that a click anywhere ends it (sys::grab_pointer, docs/

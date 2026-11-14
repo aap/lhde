@@ -968,6 +968,61 @@ Font... is comdlg32's Font dialog over every installed family. What luxpad keeps
 remembers), both written when it exits (docs/SETTINGS.md). No printing, no Help Topics; About is a message box.
 `LUXPAD_TRACE=1` prints every status bar text on stdout (`status pos Ln 2, Col 3`), for scripts.
 
+## luxview, the picture viewer
+
+`luxview FILE` opens the picture and walks its folder's pictures in the Explorer's Name order (natural: `img2` before `img10`,
+hidden files left out); `luxview FOLDER` starts at its first picture; several files make the list. It reads PNG, JPEG (turned
+as its EXIF orientation says), BMP, ICO and CUR, WebP when built with libwebp. Under XP's styles and classic it is XP's
+Windows Picture and Fax Viewer: the picture on the window colour with a grey 1 px frame, the toolbar of small buttons centred
+along the bottom (Previous, Next | Best Fit, Actual Size, Start Slide Show | Zoom In, Zoom Out | Rotate Clockwise, Rotate
+Counterclockwise | Delete, Print, Copy To, Edit | Help) with XP's tooltips, the name in the title ("Bliss.jpg - luxview"). Under
+a Longhorn build's theme (slate4051, jade4074, ...) it is 4051's Windows Picture Viewer, measured on lh4051-195511.png: black, the
+picture in a box 40 px in from the sides and the top (a 128 grey 1 px frame, 31 grey inside), the rotate and file buttons along
+the top with Slide Show, Properties and Help on the right, Best Fit, Actual Size, Zoom In, Zoom Out and the filmstrip button
+under the box with Previous and Next in the middle, the filmstrip of the folder's pictures below (the current one on 4051's
+brown rounded cell), the zoom in the title ("Blue hills.jpg (84%) - luxview"). 4051's editing buttons (crop, red eye,
+brightness, auto fix, undo) are not there; where the box goes without the filmstrip, and XP's toolbar band and margins, are
+unmeasured (no shot of XP's viewer). The look follows a theme switch at once.
+
+The glyphs are the viewer's own: shimgvw.dll's toolbar strips from the import (4051's under a Longhorn theme, XP's otherwise,
+ReactOS's single bitmaps from the free import), drawn by luxview when none is imported. shimgvw.dll is part of the xp, 4051
+and reactos imports; a Windows tree imported before it was gets it by importing those media again (files already there are
+kept).
+
+It opens at once: the window, the toolbar and the title are up before anything is decoded. The picture follows in two
+stages: the thumbnail from the shared thumbnail cache when there is one (drawn blown up to size at once), then the picture
+decoded at the size the window needs, on a thread of its own (a 6000 x 4000 JPEG in an 800 px window is decoded at a quarter
+by libjpeg and resampled, never held whole). A run of Next never shows an older picture over the one asked for, and closing
+the window while a picture decodes is safe. When the picture is complete, the next one in the direction you walk is decoded
+too, so Next shows it at once; the two stay within 64 MB at the fitted size. Zooming in past what was decoded decodes it
+larger (up to its own size, 32 megapixels at most; beyond that it is magnified); back at Best Fit a picture decoded larger
+than 64 MB is replaced by one of the window's size.
+
+- **Previous / Next**: Left / Right, Page Up / Page Down, the mouse wheel (as XP's), Backspace / Space; Home and End the first
+  and the last picture. The walk wraps around at the ends.
+- **Best Fit** (Ctrl+B) fits the picture into the window, never enlarging it; **Actual Size** (Ctrl+A) is 100%; **Zoom In / Out**
+  (+ and -, Ctrl+wheel about the pointer) go by 5, 10, 25, 50, 100, 200, 300, 500, 1000, 2000 and 4000%. A picture larger than
+  the window moves with a drag or with the arrow keys, which walk the folder only when it fits.
+- **Rotate Clockwise / Counterclockwise** (Ctrl+K, Ctrl+L) turn the picture in the view only; nothing is written to the file, and
+  the next picture comes up as it is.
+- **Start Slide Show** (F11, also 4051's Slide Show) shows the pictures full screen on black, a new one every 5 seconds; moving
+  the mouse shows XP's slide show buttons in the top right (Start, Pause, Previous, Next, Close) for 3 seconds; Escape or F11
+  ends it.
+- **Delete** (Delete) asks as the Explorer does ("Are you sure you want to send 'NAME' to the Trash?") and moves the file to the
+  Trash; the next picture comes up.
+- **Copy To** (Ctrl+S) is the Save dialog: the file copied under the name and folder given.
+- **Edit** (Ctrl+E, "Closes this program and opens the image for editing") opens the picture with the type's next program (the
+  Open With list without luxview: an image editor when one claims the type) and closes luxview.
+- **Properties** (Alt+Enter, 4051's Properties) is the Explorer's Properties sheet on General; Ctrl+Enter opens it on Metadata,
+  for the description and tags ("Metadata" above).
+- **Print** is greyed: lhde has no printing. **Help** (F1) lists the keys.
+
+What luxview remembers: `~/.local/state/lhde/luxview.ini` (`[window]` `x`, `y`, `width`, `height`, `maximized`; `[view]`
+`filmstrip`), written when it exits. `luxview.desktop` (installed) claims the types it reads, and luxview is the first choice of
+the images role ("File types and programs"), so a double click on a picture opens it unless another viewer is the default.
+`LUXVIEW_TRACE=1` prints what it shows and draws on stdout (`title ...`, `shown NAME picture 784x523 of 6000x4000 rss ...`,
+`drawn 733x550 zoom 46%`), for scripts.
+
 ## File types and programs (lhde-mime)
 
 Which program opens a file comes from the freedesktop files every program reads (docs/SETTINGS.md "Associations" has the

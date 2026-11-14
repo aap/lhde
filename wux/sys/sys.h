@@ -127,6 +127,8 @@ unsigned replayed_presses();                // those of them replayed to the oth
 void set_shell_grab(bool on);
 bool is_maximized(NativeWindow* w);         // _NET_WM_STATE has both MAXIMIZED atoms
 void set_maximized(NativeWindow* w, int action);   // 0 restore, 1 maximise, 2 toggle
+void set_fullscreen(NativeWindow* w, bool on);     // _NET_WM_STATE_FULLSCREEN, asked of the window manager
+bool is_fullscreen(NativeWindow* w);
 
 // A drop shadow under a popup (win32's CS_DROPSHADOW: the menus): size px right
 // of and below it, alpha(x, y, w, h) 0..255 black per pixel of the (w + size) x

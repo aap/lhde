@@ -107,6 +107,7 @@ include apps/skeleton/skeleton.mk
 include apps/luxshot/luxshot.mk
 include apps/luxattr/luxattr.mk
 include apps/luxpad/luxpad.mk
+include apps/luxview/luxview.mk
 
 all: libs programs tests liblhde luxwm luxshell examples
 libs: $(WUXA) $(UTA) $(UTSO) $(UTPC) $(LHDEA) $(LHDESO) $(LHDEPC) $(LUXNAVA) $(LUXNAVSO) $(LUXNAVPC)
