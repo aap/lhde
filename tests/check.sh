@@ -38,8 +38,10 @@ result "lhdatatest ($(tail -n 1 "$T/lhdata.log"))" $? "$T/lhdata.log"
 build/tests/viewmodeltest > "$T/viewmodel.log" 2>&1
 result "viewmodeltest ($(tail -n 1 "$T/viewmodel.log"))" $? "$T/viewmodel.log"
 # a colour swatch as an icon (the Details view's Color column) through an image list
-build/tests/w32/swatchtest > "$T/swatch.log" 2>&1
-result "swatchtest ($(tail -n 1 "$T/swatch.log"))" $? "$T/swatch.log"
+if [ -n "$DISPLAY" ]; then   # an image list needs the shim's screen
+    build/tests/w32/swatchtest > "$T/swatch.log" 2>&1
+    result "swatchtest ($(tail -n 1 "$T/swatch.log"))" $? "$T/swatch.log"
+else skip swatchtest "no DISPLAY"; fi
 # the details model (shell/details.h): XP's Details lines, 4051's band values
 build/tests/detailstest > "$T/details.log" 2>&1
 result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"

@@ -102,15 +102,17 @@ try:
         return r.stdout.split()
 
     def xdg(e, t):
-        if not shutil.which('xdg-mime'):
+        tool = shutil.which('xdg-mime')   # by its path: the scratch PATH has /usr/bin and /bin only, not /usr/local/bin
+        if not tool:
             return None
-        r = subprocess.run(['xdg-mime', 'query', 'default', t], env=e, capture_output=True, text=True)
+        r = subprocess.run([tool, 'query', 'default', t], env=e, capture_output=True, text=True)
         return r.stdout.strip() or None
 
     def gio(e, t):
-        if not shutil.which('gio'):
+        tool = shutil.which('gio')
+        if not tool:
             return None
-        r = subprocess.run(['gio', 'mime', t], env=e, capture_output=True, text=True)
+        r = subprocess.run([tool, 'mime', t], env=e, capture_output=True, text=True)
         line = r.stdout.split('\n')[0]
         return line.rsplit(': ', 1)[1].strip() if line.startswith('Default application') else None
 
