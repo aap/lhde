@@ -34,7 +34,7 @@ $(O)/wux/w32/image.o: wux/w32/stdres.res
 $(O)/wux/w32/msgbox_glue.o: wux/rc/user32.res
 # the message box's template and strings, cut from Wine's user32.rc (the .res is checked in; windres when the .rc changes)
 wux/rc/user32.res: wux/rc/user32.rc
-	$(WINDRES) -O res -o $@ $<
+	$(call run_windres)
 
 $(WUXA): $(filter-out $(UTOBJS),$(WUX_OBJS))
 	@mkdir -p $(dir $@)

@@ -56,6 +56,10 @@ W32FLAGS  = -fshort-wchar -D__WINESRC__ -DWINE_UNICODE_NATIVE -DDECLSPEC_IMPORT=
 CFLAGS    = -g -O1 -std=gnu11 -Wall -Wno-unused -Wno-missing-braces -Wno-incompatible-pointer-types -Werror=implicit-function-declaration -MMD -MP $(W32FLAGS)
 W32CXX    = $(CXX) $(CXXFLAGS) $(W32FLAGS) -Wno-missing-field-initializers
 WINDRES  ?= x86_64-w64-mingw32-windres
+# a recipe's windres -O res $(1) -o $@ $<; without windres (FreeBSD has no mingw binutils package) the checked-in .res is
+# kept and touched, with a warning, so a checkout whose .rc is newer than its .res still builds
+HAVE_WINDRES := $(shell command -v $(WINDRES) 2>/dev/null)
+run_windres = $(if $(HAVE_WINDRES),$(WINDRES) -O res $(1) -o $@ $<,@echo "warning: $(WINDRES) not found: $@ kept as checked in, not rebuilt from $<"; touch $@)
 
 O = build/obj
 P = build/pic

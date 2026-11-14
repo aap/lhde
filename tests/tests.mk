@@ -37,7 +37,7 @@ build/tests/w32/folderpictest: $(O)/tests/w32/folderpictest.o $(FILEDLGLIB) $(EX
 # kerneltest's resources beside it: test.res and comdlg32.res. tests/w32/test.res is checked in like every .res in the tree
 # (windres only when test.rc or pal.bmp changes)
 tests/w32/test.res: tests/w32/test.rc tests/w32/pal.bmp
-	$(WINDRES) -O res -I tests/w32 -o $@ $<
+	$(call run_windres,-I tests/w32)
 build/tests/w32/test.res: tests/w32/test.res
 	@mkdir -p $(dir $@)
 	cp $< $@

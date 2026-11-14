@@ -31,7 +31,7 @@ $(O)/apps/%_native.o: apps/%_native.cpp
 	$(CXX) $(CXXFLAGS) -Iliblhde -c $< -o $@
 # dialog templates, menus, strings: windres from the .rc, the .res checked in
 apps/%.res: apps/%.rc
-	$(WINDRES) -O res -I $(dir $<) -o $@ $<
+	$(call run_windres,-I $(dir $<))
 
 # link: wux and the shell facilities whole (their weak references and the style probe resolve as in flxp), then luxnav
 # when the application asked for it ($(LUXNAVA) among its prerequisites: the Longhorn navigation bar, -Iluxnav; it comes

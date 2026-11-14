@@ -59,11 +59,11 @@ $(O)/flxp/shell/config.o: CXXFLAGS += -DFLXP_DATADIR='"$(DATADIR)"'
 
 # dialog templates, embedded with .incbin
 flxp/rc/%.res: flxp/rc/%.rc flxp/%/resource.h
-	$(WINDRES) -O res -I flxp/$* -o $@ $<
+	$(call run_windres,-I flxp/$*)
 $(O)/flxp/explorer/dialogs.o: flxp/rc/explorer.res
 $(O)/flxp/shell/ui/properties.o: flxp/rc/shell.res
 flxp/rc/shell.res: flxp/rc/shell.rc flxp/shell/ui/resource.h
-	$(WINDRES) -O res -I flxp/shell/ui -o $@ $<
+	$(call run_windres,-I flxp/shell/ui)
 $(O)/flxp/filedlg/filedlg.o: flxp/rc/filedlg.res
 $(O)/flxp/settings/settings.o: flxp/rc/settings.res
 
