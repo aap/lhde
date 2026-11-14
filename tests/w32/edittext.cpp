@@ -4,13 +4,16 @@
 //   edittext --self        sends the WM_CHARs itself and checks WM_GETTEXT (prints ok/FAIL lines, exit 1 on a failure)
 //   edittext TITLE         a window with a multiline edit that prints its text as UTF-8 hex on every change, one line
 //                          ("text 61c3a9f09f9880"), flushed; tests/headless/typing.sh types into it with xdotool
-// --self also checks the A text messages (SendMessageA's WM_SETTEXT / WM_GETTEXT in UTF-8, SetDlgItemInt). Both need
+// --self also checks the A text messages (SendMessageA's WM_SETTEXT / WM_GETTEXT in UTF-8, SetDlgItemInt) and that U+1F600 in the
+// edit's Tahoma is drawn by a linked face, not the missing glyph (WM_PRINTCLIENT; skipped when no face has it). Both need
 // $DISPLAY.
 #include <stdio.h>
 #include <string.h>
 #include <string>
+#include <vector>
 #include "w32/w32.h"
 #include "w32/user.h"
+#include "gdi/font.h"
 
 static HWND g_edit;
 
@@ -51,6 +54,64 @@ static void check(bool ok, const char* what)
     if (!ok) fails++;
 }
 
+// the edit's client area drawn by WM_PRINTCLIENT into a white 32bpp DIB
+static std::vector<uint32_t> print_edit(HWND e, int w, int h)
+{
+    BITMAPINFO bmi = {};
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = w;
+    bmi.bmiHeader.biHeight = -h;
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    HDC dc = CreateCompatibleDC(nullptr);
+    void* bits = nullptr;
+    HBITMAP dib = CreateDIBSection(dc, &bmi, DIB_RGB_COLORS, &bits, nullptr, 0);
+    HGDIOBJ old = SelectObject(dc, dib);
+    RECT r = {0, 0, w, h};
+    FillRect(dc, &r, (HBRUSH)GetStockObject(WHITE_BRUSH));
+    SendMessageW(e, WM_PRINTCLIENT, (WPARAM)dc, PRF_CLIENT);
+    std::vector<uint32_t> px((uint32_t*)bits, (uint32_t*)bits + w * h);
+    SelectObject(dc, old);
+    DeleteObject(dib);
+    DeleteDC(dc);
+    return px;
+}
+
+// U+1F600 in the edit's font, which lacks it: drawn by a linked face (font linking), not the missing glyph. The missing
+// glyph is the same text in the same font made while linking is off.
+static void emoji_drawn(HWND parent)
+{
+    const int w = 120, h = 40;
+    HWND e = CreateWindowExW(0, L"Edit", L"", WS_CHILD | WS_VISIBLE | ES_MULTILINE, 0, 0, w, h, parent, nullptr, nullptr, nullptr);
+    LOGFONTW lf = {};
+    lf.lfHeight = -11;
+    memcpy(lf.lfFaceName, u"Tahoma", 7 * sizeof(WCHAR));
+    HFONT linked = CreateFontIndirectW(&lf);
+    gdi::set_font_fallback(false);
+    HFONT plain = CreateFontIndirectW(&lf);
+    gdi::set_font_fallback(true);
+    std::string fam = gdi::glyph_family(((w32::Font*)linked)->font, 0x1f600);
+    if (fam.empty()) {
+        printf("skip no installed face has U+1F600\n");
+    } else if (fam == gdi::glyph_family(((w32::Font*)linked)->font, 'a')) {
+        printf("skip the edit's face (%s) has U+1F600 itself\n", fam.c_str());
+    } else {
+        SendMessageA(e, WM_SETTEXT, 0, (LPARAM)"\xf0\x9f\x98\x80");
+        SendMessageW(e, WM_SETFONT, (WPARAM)linked, FALSE);
+        std::vector<uint32_t> drawn = print_edit(e, w, h);
+        gdi::set_font_fallback(false);
+        SendMessageW(e, WM_SETFONT, (WPARAM)plain, FALSE);
+        std::vector<uint32_t> box = print_edit(e, w, h);
+        gdi::set_font_fallback(true);
+        int inked = 0;
+        for (uint32_t p : drawn) inked += (p & 0xffffff) != 0xffffff;
+        check(inked > 0 && drawn != box, ("U+1F600 typed into the edit is drawn by " + fam + ", not the missing glyph").c_str());
+    }
+    DestroyWindow(e);
+    DeleteObject(linked);
+    DeleteObject(plain);
+}
+
 static int self_test(HWND parent)
 {
     HWND e = CreateWindowExW(0, L"Edit", L"", WS_CHILD | WS_VISIBLE | ES_MULTILINE, 0, 0, 200, 100, parent, nullptr, nullptr, nullptr);
@@ -79,6 +140,7 @@ static int self_test(HWND parent)
     BOOL ok = FALSE;
     check(edit_utf8(e) == "4096" && GetDlgItemInt(parent, 7, &ok, FALSE) == 4096 && ok, "SetDlgItemInt / GetDlgItemInt");
     DestroyWindow(e);
+    emoji_drawn(parent);
     printf("%d failure(s)\n", fails);
     return fails != 0;
 }

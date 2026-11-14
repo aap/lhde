@@ -110,6 +110,10 @@ int ut_draw_text(ut_theme *t, const char *cls, int part, int state,
                  uint32_t *pixels, int width, int height, int stride,
                  const char *text, unsigned flags, const ut_rect *rect);
 void ut_add_font_dir(const char *dir);
+/* Font linking's table (share/fonts/fontlink.ini, Windows' FontLink\SystemLink: "Family = Linked, ..." under [SystemLink]):
+ * the faces that draw a character the text's face lacks, before fontconfig's choice for it. Returns 0 when the file cannot
+ * be read (the table is then empty; fontconfig still chooses). */
+int ut_load_font_links(const char *path);
 
 /* GetThemeTextExtent: the rectangle DrawText would use (DT_CALCRECT,
  * advance-based, honours DT_SINGLELINE / DT_WORDBREAK / DT_END_ELLIPSIS /

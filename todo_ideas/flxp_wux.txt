@@ -92,8 +92,6 @@
 	its template under the Longhorn styles (the one dialog that does)
 * a dropped menu under Jade has a 1 px white line inside its outline where 4074's Notepad menu is the 245 grey of its body
 	(lh4074-083401.png: the Edit menu's outline at x=78, 245 from x=79); the window menu matched lh4074-195235.png
-* no font fallback in GDI: a character the font lacks is its missing glyph (an emoji in luxpad's Lucida Console is a box,
-	stored and saved right); Vista's Uniscribe and fontconfig would take a face that has it
 
 ## strings: UTF-8 as wux's only public API (survey 2026-11-12)
 * today: 127 W functions, 72 A functions (thin converters; GetACP() = CP_UTF8, so "ANSI" already means UTF-8), 425 neutral;

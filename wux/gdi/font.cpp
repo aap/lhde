@@ -44,6 +44,16 @@ struct Font {
     bool gasp_mono;         // gasp table exists and says no gray at this ppem
     uint8_t quality;        // FontDesc::quality
     std::unordered_map<uint64_t, Glyph> cache;  // key: codepoint | mode << 32 (0 grey, 1 mono, 2 ClearType)
+    // font linking: the faces that draw what this one lacks (created at this font's lfHeight, weight and style)
+    int32_t height, weight;                     // the LOGFONT's lfHeight (0 as 12) and weight
+    bool italic;
+    std::string file;                           // the face's file and index (a child is never its parent's face)
+    int index;
+    bool symbol;                                // a symbol font (the symbol cmap, or the OS/2 symbol code page): never linked
+    bool linked;                                // the link table's children were made
+    std::vector<Font*> links;                   // the link table's faces for this family, in its order
+    std::vector<Font*> picked;                  // faces fontconfig chose for earlier characters
+    std::unordered_map<uint32_t, Font*> fallback;   // code point -> the face that draws it (nullptr: none)
 };
 
 static FT_Library library;
@@ -52,6 +62,8 @@ static std::vector<std::string> font_dirs;
 static FcConfig* app_config;     // only the add_font_dir directories
 static FcConfig* fallback_config;  // only the add_font_dir(dir, true) ones, asked after app_config
 static FcConfig* theme_config;   // only the set_theme_font_dir directory
+
+static void sorted_faces_reset();
 
 static bool init_freetype()
 {
@@ -81,6 +93,7 @@ void add_font_dir(const char* dir, bool fallback)
     bool file = stat(dir, &st) == 0 && S_ISREG(st.st_mode);
     if (file ? FcConfigAppFontAddFile(cfg, (const FcChar8*)dir) : FcConfigAppFontAddDir(cfg, (const FcChar8*)dir))
         font_dirs.push_back(dir);
+    sorted_faces_reset();
 }
 
 // fontconfig breaks ties between same-family faces by font version, not by
@@ -89,6 +102,7 @@ void add_font_dir(const char* dir, bool fallback)
 // theme's directory is therefore a config of its own that is asked first.
 void set_theme_font_dir(const char* dir)
 {
+    sorted_faces_reset();
     if (theme_config) { FcConfigDestroy(theme_config); theme_config = nullptr; }
     if (!dir || !*dir) return;
     FcInit();
@@ -207,7 +221,7 @@ std::vector<FaceInfo> list_faces()
 // Returns true and fills file/index. The add_font_dir directories win over
 // the system for the same family, so a real XP tahoma.ttf beats whatever
 // Tahoma the system has; otherwise plain fontconfig matching (with fallback).
-static bool find_face(const char* family, int32_t weight, bool italic, std::string& file, int& index)
+static bool find_face(const char* family, int32_t weight, bool italic, std::string& file, int& index, bool exact = false)
 {
     FcPattern* pat = FcPatternCreate();
     FcPatternAddString(pat, FC_FAMILY, (const FcChar8*)family);
@@ -226,7 +240,7 @@ static bool find_face(const char* family, int32_t weight, bool italic, std::stri
         FcResult res;
         FcPattern* m = FcFontMatch(configs[c], p, &res);
         FcChar8* f;
-        if (m && (c == 3 || family_matches(m, family)) &&
+        if (m && ((c == 3 && !exact) || family_matches(m, family)) &&
             FcPatternGetString(m, FC_FILE, 0, &f) == FcResultMatch) {
             file = (const char*)f;
             if (FcPatternGetInteger(m, FC_INDEX, 0, &index) != FcResultMatch) index = 0;
@@ -397,15 +411,9 @@ static bool set_metrics(Font* f, int32_t vdmx_ymax, int32_t vdmx_ymin)
     return true;
 }
 
-Font* create_font(const FontDesc& d)
+static Font* open_font(const std::string& file, int index, const FontDesc& d)
 {
-    if (!init_freetype()) return nullptr;
-    const char* family = alias(d.family);
     int32_t weight = d.weight ? d.weight : 400;
-    std::string file;
-    int index = 0;
-    if (!find_face(family, weight, d.italic, file, index)) return nullptr;
-
     FT_Face face;
     if (FT_New_Face(library, file.c_str(), index, &face)) return nullptr;
     if (!FT_IS_SCALABLE(face)) { FT_Done_Face(face); return nullptr; }
@@ -417,9 +425,17 @@ Font* create_font(const FontDesc& d)
     f->underline = d.underline;
     f->strikeout = d.strikeout;
     f->quality = d.quality;
+    f->height = d.height ? d.height : 12;
+    f->weight = weight;
+    f->italic = d.italic;
+    f->file = file;
+    f->index = index;
+    f->linked = false;
 
     // font.c create_gdi_font: synthesize what the face lacks
     TT_OS2* os2 = (TT_OS2*)FT_Get_Sfnt_Table(face, FT_SFNT_OS2);
+    f->symbol = (face->charmap && face->charmap->encoding == FT_ENCODING_MS_SYMBOL) ||
+                (os2 && os2->version != 0xffff && (os2->ulCodePageRange1 & 0x80000000u));
     int32_t face_weight = os2 ? os2->usWeightClass : (face->style_flags & FT_STYLE_FLAG_BOLD ? 700 : 400);
     f->fake_bold = weight > 550 && !(face->style_flags & FT_STYLE_FLAG_BOLD) && face_weight < 550;
     f->fake_italic = d.italic && !(face->style_flags & FT_STYLE_FLAG_ITALIC);
@@ -455,6 +471,17 @@ Font* create_font(const FontDesc& d)
     return f;
 }
 
+Font* create_font(const FontDesc& d)
+{
+    if (!init_freetype()) return nullptr;
+    const char* family = alias(d.family);
+    int32_t weight = d.weight ? d.weight : 400;
+    std::string file;
+    int index = 0;
+    if (!find_face(family, weight, d.italic, file, index)) return nullptr;
+    return open_font(file, index, d);
+}
+
 Font* create_font(const char* family, int32_t height, int32_t weight, bool italic)
 {
     FontDesc d{family, height, weight, italic, false, false};
@@ -464,6 +491,8 @@ Font* create_font(const char* family, int32_t height, int32_t weight, bool itali
 void destroy_font(Font* f)
 {
     if (!f) return;
+    for (Font* c : f->links) destroy_font(c);
+    for (Font* c : f->picked) destroy_font(c);
     FT_Done_Face(f->face);
     delete f;
 }
@@ -479,7 +508,7 @@ static const FT_Matrix slant = { 1 << 16, (1 << 16) >> 2, 0, 1 << 16 };
 // other than the fake-italic slant. lcd: ClearType, the outline (hinted as for
 // grey, so the advances stay GDI's) rendered at three times the width and
 // filtered across the subpixels, one pixel wider on each side.
-static bool render_glyph(Font* f, FT_UInt index, bool mono, Glyph& g, bool lcd = false)
+static bool render_glyph(Font* f, FT_UInt index, bool mono, Glyph& g, bool lcd, const TextMetrics& clip)
 {
     FT_Face face = f->face;
     FT_Int32 load = FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH | (mono ? FT_LOAD_TARGET_MONO : FT_LOAD_TARGET_NORMAL);
@@ -505,10 +534,10 @@ static bool render_glyph(Font* f, FT_UInt index, bool mono, Glyph& g, bool lcd =
         if (!done && m.width) m.width += 1 << 6;
     }
 
-    // Clip the glyph box to the text metrics' ascent/descent.
-    FT_Pos top = m.horiBearingY < (FT_Pos)f->tm.ascent << 6 ? m.horiBearingY : (FT_Pos)f->tm.ascent << 6;
+    // Clip the glyph box to the text metrics' ascent/descent (a linked face's glyph to its base font's).
+    FT_Pos top = m.horiBearingY < (FT_Pos)clip.ascent << 6 ? m.horiBearingY : (FT_Pos)clip.ascent << 6;
     FT_Pos bot = m.horiBearingY - m.height;
-    if (bot < -((FT_Pos)f->tm.descent << 6)) bot = -((FT_Pos)f->tm.descent << 6);
+    if (bot < -((FT_Pos)clip.descent << 6)) bot = -((FT_Pos)clip.descent << 6);
     if (top < bot) { FT_Pos t = top; top = bot; bot = t; }
     m.horiBearingY = top;
     m.height = top - bot;
@@ -614,14 +643,17 @@ static bool render_glyph(Font* f, FT_UInt index, bool mono, Glyph& g, bool lcd =
             }
         }
     } else if (slot->format == FT_GLYPH_FORMAT_BITMAP) {
-        // embedded bitmap (mono load only)
+        // embedded bitmap (mono load only), placed by its own origin: the rows above the clipped top are left out
         const FT_Bitmap& src = slot->bitmap;
-        int32_t w = (int32_t)src.width < g.w ? (int32_t)src.width : g.w;
-        int32_t h = (int32_t)src.rows < g.h ? (int32_t)src.rows : g.h;
-        for (int32_t y = 0; y < h; y++) {
-            const uint8_t* s = src.buffer + y * src.pitch;
-            for (int32_t x = 0; x < w; x++) {
-                bool on = src.pixel_mode == FT_PIXEL_MODE_MONO ? (s[x / 8] & (0x80 >> (x % 8))) : s[x] >= 128;
+        int32_t ox = slot->bitmap_left - g.left, oy = g.top - slot->bitmap_top;   // the source's offset in the mask
+        for (int32_t sy = 0; sy < (int32_t)src.rows; sy++) {
+            int32_t y = sy + oy;
+            if (y < 0 || y >= g.h) continue;
+            const uint8_t* s = src.buffer + sy * src.pitch;
+            for (int32_t sx = 0; sx < (int32_t)src.width; sx++) {
+                int32_t x = sx + ox;
+                if (x < 0 || x >= g.w) continue;
+                bool on = src.pixel_mode == FT_PIXEL_MODE_MONO ? (s[sx / 8] & (0x80 >> (sx % 8))) : s[sx] >= 128;
                 if (on) {
                     g.mask[y * g.w + x] = 255;
                     if (f->fake_bold && x + 1 < g.w) g.mask[y * g.w + x + 1] = 255;
@@ -645,25 +677,203 @@ static FT_UInt glyph_index(FT_Face face, uint32_t cp)
     return FT_Get_Char_Index(face, cp);
 }
 
+// ---------------------------------------------------------------------------
+// Font linking: a character the face lacks is drawn by another face at the same lfHeight, weight and style, as GDI's
+// SystemLink and Uniscribe's fallback do: the link table's faces for the family in its order, then fontconfig's choice
+// for the character. The glyph keeps the base font's baseline and is clipped to its ascent and descent; its advance is
+// the linked face's, so measuring and drawing (both through get_glyph) agree.
+
+static bool fallback_on = true;
+void set_font_fallback(bool on) { fallback_on = on; }
+
+static std::unordered_map<std::string, std::vector<std::string>> link_table;   // lower-case family -> linked families
+static std::string lower(const char* s) { std::string o = s ? s : ""; for (char& c : o) c = (char)tolower((unsigned char)c); return o; }
+static std::string trim(const std::string& v)
+{
+    size_t a = v.find_first_not_of(" \t\r\n"), b = v.find_last_not_of(" \t\r\n");
+    return a == std::string::npos ? std::string() : v.substr(a, b - a + 1);
+}
+
+bool load_font_links(const char* path)
+{
+    link_table.clear();
+    FILE* fp = path && *path ? fopen(path, "r") : nullptr;
+    if (!fp) return false;
+    char line[2048];
+    bool in = false;
+    while (fgets(line, sizeof line, fp)) {
+        std::string l = trim(line);
+        if (l.empty() || l[0] == ';' || l[0] == '#') continue;
+        if (l[0] == '[') { in = !strcasecmp(l.c_str(), "[SystemLink]"); continue; }
+        size_t eq = l.find('=');
+        if (!in || eq == std::string::npos) continue;
+        std::vector<std::string>& to = link_table[lower(trim(l.substr(0, eq)).c_str())];
+        to.clear();
+        std::string v = l.substr(eq + 1);
+        for (size_t p = 0; p <= v.size();) {
+            size_t q = v.find(',', p);
+            if (q == std::string::npos) q = v.size();
+            std::string fam = trim(v.substr(p, q - p));
+            if (!fam.empty()) to.push_back(fam);
+            p = q + 1;
+        }
+    }
+    fclose(fp);
+    return true;
+}
+
+// a symbol font (Marlett, Wingdings: SYMBOL_CHARSET) is never linked; neither are the C0 and C1 controls
+static bool may_link(const Font* f, uint32_t cp)
+{
+    return fallback_on && !f->symbol && cp >= 0x20 && !(cp >= 0x7f && cp < 0xa0);
+}
+
+// Unicode's default-ignorable code points (joiners, direction marks, variation selectors, tags): one the face lacks
+// draws nothing and has no width, as Uniscribe shows them, instead of the missing glyph
+static bool ignorable(uint32_t cp)
+{
+    return cp == 0xad || cp == 0x34f || cp == 0x61c || (cp >= 0x115f && cp <= 0x1160) || (cp >= 0x17b4 && cp <= 0x17b5) ||
+           (cp >= 0x180b && cp <= 0x180f) || (cp >= 0x200b && cp <= 0x200f) || (cp >= 0x202a && cp <= 0x202e) ||
+           (cp >= 0x2060 && cp <= 0x206f) || cp == 0x3164 || (cp >= 0xfe00 && cp <= 0xfe0f) || cp == 0xfeff ||
+           cp == 0xffa0 || (cp >= 0xfff0 && cp <= 0xfff8) || (cp >= 0x1bca0 && cp <= 0x1bca3) ||
+           (cp >= 0x1d173 && cp <= 0x1d17a) || (cp >= 0xe0000 && cp <= 0xe0fff);
+}
+
+// fontconfig's faces for a family, best first (one FcFontSort per family, weight and slant, without a character): the
+// theme's directory, the imported fonts, the free ones, then the system's. Colour-only and bitmap faces are left out:
+// GDI draws text in one colour from outlines.
+struct SortedFace { std::string file; int index; FcCharSet* chars; };
+struct SortedSet { std::vector<FcFontSet*> sets; std::vector<SortedFace> faces; };
+static std::unordered_map<std::string, SortedSet> sorted_cache;
+
+static void sorted_faces_reset()
+{
+    for (auto& e : sorted_cache) for (FcFontSet* fs : e.second.sets) FcFontSetDestroy(fs);
+    sorted_cache.clear();
+}
+
+static const SortedSet& sorted_faces(const char* family, int32_t weight, bool italic)
+{
+    std::string key = lower(family) + "|" + std::to_string(weight) + (italic ? "|i" : "|r");
+    auto it = sorted_cache.find(key);
+    if (it != sorted_cache.end()) return it->second;
+    SortedSet& out = sorted_cache[key];
+    FcConfig* configs[4] = { theme_config, app_config, fallback_config, nullptr };
+    for (int c = 0; c < 4; c++) {
+        if (c < 3 && !configs[c]) continue;
+        FcConfig* cfg = c < 3 ? configs[c] : FcConfigGetCurrent();
+        FcPattern* p = FcPatternCreate();
+        FcPatternAddString(p, FC_FAMILY, (const FcChar8*)family);
+        FcPatternAddInteger(p, FC_WEIGHT, FcWeightFromOpenType(weight));
+        FcPatternAddInteger(p, FC_SLANT, italic ? FC_SLANT_ITALIC : FC_SLANT_ROMAN);
+        FcConfigSubstitute(cfg, p, FcMatchPattern);
+        FcDefaultSubstitute(p);
+        FcResult res;
+        FcFontSet* fs = FcFontSort(cfg, p, FcFalse, nullptr, &res);
+        FcPatternDestroy(p);
+        if (!fs) continue;
+        out.sets.push_back(fs);
+        for (int i = 0; i < fs->nfont; i++) {
+            FcPattern* m = fs->fonts[i];
+            FcBool b;
+            FcChar8* file;
+            FcCharSet* cs;
+            int index = 0;
+            if (FcPatternGetBool(m, FC_OUTLINE, 0, &b) == FcResultMatch && !b) continue;
+            if (FcPatternGetBool(m, FC_COLOR, 0, &b) == FcResultMatch && b) continue;
+            if (FcPatternGetString(m, FC_FILE, 0, &file) != FcResultMatch || FcPatternGetCharSet(m, FC_CHARSET, 0, &cs) != FcResultMatch)
+                continue;
+            FcPatternGetInteger(m, FC_INDEX, 0, &index);
+            out.faces.push_back(SortedFace{ (const char*)file, index, cs });
+        }
+    }
+    return out;
+}
+
+static FT_UInt glyph_index(FT_Face face, uint32_t cp);
+
+static Font* child_font(Font* f, const std::string& file, int index)
+{
+    if (file == f->file && index == f->index) return nullptr;
+    for (Font* c : f->links) if (c->file == file && c->index == index) return c;
+    for (Font* c : f->picked) if (c->file == file && c->index == index) return c;
+    FontDesc d{ nullptr, f->height, f->weight, f->italic, false, false, f->quality };
+    Font* c = open_font(file, index, d);
+    if (c) f->picked.push_back(c);
+    return c;
+}
+
+// the face that draws cp for f, which lacks it; nullptr when none has it
+static Font* linked_font(Font* f, uint32_t cp)
+{
+    auto it = f->fallback.find(cp);
+    if (it != f->fallback.end()) return it->second;
+    if (!f->linked) {
+        f->linked = true;
+        auto lt = link_table.find(lower(f->face->family_name));
+        if (lt != link_table.end())
+            for (const std::string& fam : lt->second) {
+                std::string file;
+                int index = 0;
+                if (!find_face(alias(fam.c_str()), f->weight, f->italic, file, index, true)) continue;
+                if (file == f->file && index == f->index) continue;
+                FontDesc d{ nullptr, f->height, f->weight, f->italic, false, false, f->quality };
+                if (Font* c = open_font(file, index, d)) f->links.push_back(c);
+            }
+    }
+    Font* found = nullptr;
+    for (Font* c : f->links) if (glyph_index(c->face, cp)) { found = c; break; }
+    // a face fontconfig gave an earlier character of this font, so a run of one script stays in one face
+    if (!found) for (Font* c : f->picked) if (glyph_index(c->face, cp)) { found = c; break; }
+    if (!found)
+        for (const SortedFace& sf : sorted_faces(f->face->family_name, f->weight, f->italic).faces) {
+            if (!FcCharSetHasChar(sf.chars, cp)) continue;
+            Font* c = child_font(f, sf.file, sf.index);
+            if (c && glyph_index(c->face, cp)) { found = c; break; }
+        }
+    f->fallback[cp] = found;
+    return found;
+}
+
+static inline bool mono_mode(const Font* f, bool cleartype)
+{
+    return f->quality == 2 ? true : f->quality == 1 || cleartype ? false : !smoothing || f->gasp_mono;
+}
+
 // opaque: the text goes onto an opaque surface (ClearType needs one; an alpha-tracking surface gets grey instead)
 static const Glyph* get_glyph(const Font* cf, uint32_t cp, bool opaque = false)
 {
     Font* f = (Font*)cf;   // the cache is not part of the font's logical state
     // ClearType (the system setting, or CLEARTYPE_QUALITY) ignores the gasp table's grey veto, as GDI's ClearType does
     bool cleartype = f->quality == 3 || (f->quality == 0 && smoothing == SMOOTH_CLEARTYPE);
-    bool mono = f->quality == 2 ? true : f->quality == 1 || cleartype ? false : !smoothing || f->gasp_mono;
+    bool mono = mono_mode(f, cleartype);
     bool lcd = cleartype && opaque;
     uint64_t key = (uint64_t)cp | (uint64_t)(lcd ? 2 : mono ? 1 : 0) << 32;
     auto it = f->cache.find(key);
     if (it != f->cache.end()) return &it->second;
 
     Glyph g{};
-    // cache_glyph_bitmap: the glyph, else .notdef, else space
-    FT_UInt indices[3] = { glyph_index(f->face, cp), 0, glyph_index(f->face, ' ') };
+    FT_UInt index = glyph_index(f->face, cp);
     bool ok = false;
-    for (int i = 0; i < 3 && !ok; i++) ok = render_glyph(f, indices[i], mono, g, lcd);
+    if (!index && may_link(f, cp)) {
+        if (ignorable(cp)) ok = true;
+        // a linked face's own gasp table decides grey or mono, as it would on its own
+        else if (Font* c = linked_font(f, cp)) ok = render_glyph(c, glyph_index(c->face, cp), mono_mode(c, cleartype), g, lcd, f->tm);
+    }
+    // cache_glyph_bitmap: the glyph, else .notdef, else space
+    FT_UInt indices[3] = { index, 0, glyph_index(f->face, ' ') };
+    for (int i = 0; i < 3 && !ok; i++) ok = render_glyph(f, indices[i], mono, g, lcd, f->tm);
     if (!ok) g = Glyph{};
     return &(f->cache[key] = std::move(g));
+}
+
+std::string glyph_family(const Font* cf, uint32_t cp)
+{
+    Font* f = (Font*)cf;
+    if (!f) return "";
+    if (glyph_index(f->face, cp)) return f->face->family_name ? f->face->family_name : "";
+    Font* c = may_link(f, cp) && !ignorable(cp) ? linked_font(f, cp) : nullptr;
+    return c && c->face->family_name ? c->face->family_name : "";
 }
 
 // UTF-8 decode; malformed bytes come out as U+FFFD.

@@ -169,7 +169,7 @@ header (the step-2 `LUXNAV_DIR` hook and build/compat are gone).
 
 `make check` first compiles a probe that calls glibc's wcslen in win32 C++ and fails if it compiles (`check-poison`:
 wchar_t is 16 bits there, `wux/w32/include/flxp_crt.h` poisons glibc's wide functions). `tests/check.sh` runs what needs no Microsoft files: kerneltest (the shim's
-kernel/CRT/registry/resource/usp10 parts), gditest, swatchtest (the Details Color column's square through an image list),
+kernel/CRT/registry/resource/usp10 parts), gditest, fontlink (font linking: the Latin of Tahoma and Lucida Console pixel for pixel as without linking in every smoothing and weight; ж, 日, 本, 한, 😀 drawn by a face that has them, as that face draws them on the baseline, with its advance; a variation selector without width; DrawText's wrap of a mixed line; skipped where no installed face has the character), swatchtest (the Details Color column's square through an image list),
 fileops_test, thumbstest (the thumbnails' memory bounds on pictures it writes: a 6000 x 4000 JPEG and a 4000 x 4000 PNG into 128 px thumbnails with the peak RSS growing by less than 16 MB, the PNG reduced row by row; the view's image budget over 300 inserts, the pinned ones kept; a cancelled loader generation
 decoding nothing more, three loaders decoding at most two pictures at once; thumbnailer entries with stand-in scripts: their order,
 a missing TryExec skipped, a parent type's entry, the Exec line's quoting and field codes, the page at the requested size, the
@@ -190,10 +190,10 @@ with a distribution, lhde's `lhde-mimeapps.list` and a home: lhde-mime's verdict
 flxp alike, the user's file over the role file over lhde's, a role switched with one command), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
 incl. GTK, the file dialog in both looks (a typed name taken as typed), the modifier keys across a focus change and the keys' characters (Delete has none), typed text into the Edit control as
-UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair: `tests/headless/typing.sh`), luxpad (`tests/headless/luxpad.sh`:
+UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair, and the emoji drawn in the edit by a linked face, not the missing glyph: `tests/headless/typing.sh`), luxpad (`tests/headless/luxpad.sh`:
 an emoji typed into a UTF-8 file with CR LF and saved byte for byte, Ln/Col, Find, Go To, Save As Unicode through the Encoding
 box and back, Alt+V dropping View from the Edit control, a Latin-1 file as ANSI saved back unchanged, the unsaved-changes question, the remembered placement, a file
-dropped from flxp, a run with nothing imported), luxview under luxwm (`tests/headless/luxview.sh`: a folder with a 6000 x 4000
+dropped from flxp, ж and 😀 typed and drawn by linked faces (a crop that differs from the missing glyph and from empty lines; ImageMagick), a run with nothing imported), luxview under luxwm (`tests/headless/luxview.sh`: a folder with a 6000 x 4000
 JPEG, the window up within 300 ms with the name in the title, the picture decoded at the window's size, the walk in Name order,
 three fast Rights, the zoom steps, Delete to the Trash, the slide show full screen and back, Alt+Enter's Properties, Actual Size
 decoding the picture whole and closing during a decode, the peak RSS under 80 MB at Best Fit and 200 MB after, the remembered

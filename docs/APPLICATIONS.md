@@ -62,7 +62,8 @@ additions (`wux/w32/flxp_shell.h`: desktop and dock windows, root properties, fi
 clipboard data, `FlxpWritePng` / `FlxpEncodePng`, `FlxpSetFullscreen`: the window manager's full screen), plus `WuxWide` / `WuxUtf8` / `WuxWindowText` for the UTF-8 the shell layer
 speaks. Strings to the API are UTF-16 (`L"..."` is 16-bit here; a character above U+FFFF is a surrogate pair, and typed it
 arrives as two `WM_CHAR`s, as on Windows); the A functions and the A text messages (`SendMessageA`'s `WM_SETTEXT`,
-`WM_GETTEXT`) read "ANSI" as UTF-8. `MessageBoxW` (and `MessageBoxA`, `MessageBoxIndirectW`) is
+`WM_GETTEXT`) read "ANSI" as UTF-8. Text in any script draws: GDI takes a character the font lacks from a linked face, and
+measures it so (docs/USAGE.md "Font linking"). `MessageBoxW` (and `MessageBoxA`, `MessageBoxIndirectW`) is
 Wine's message box (`wux/vendor/wine/user32/msgbox.c`) with XP's layout: the icon, the text and the buttons the flags ask for,
 measured in dialog units of MS Shell Dlg 8 (Tahoma 8: buttons 50 x 14 DLU = 75 x 23 px, 4 DLU apart, 7 DLU margins, 10 between
 the icon and the text and above the buttons; a button grows to its widest name), the text and the button names in the message
@@ -177,9 +178,6 @@ What the first applications needed and the public surface lacks, the list of wha
 - **The Open/Save dialog is built on the Explorer's browsing widget** (`flxp/filedlg/filedlg.cpp` uses `flxp/explorer/browser`,
   the headers, the task band), so `WUX_APP_FILEDIALOG` links all of `flxp/explorer` but its main, and luxnav. The dialog and the
   widget it needs belong with the shell facilities.
-- **No font fallback**: wux's GDI draws a character its font lacks as the font's missing glyph (Windows XP's GDI did too), so
-  an emoji in luxpad's Lucida Console is a box although it is stored, saved and reloaded right; Uniscribe's and fontconfig's
-  fallback to a face that has it is not there.
 - **No printing**: no `PrintDlgW`, `PageSetupDlgW` or printer DC; luxpad's printing was left out.
 - **wux depends on the shell layer**: the session theme (`flxp/shell/lhtheme`, `runtime`: fonts and the visual style) and the X
   clipboard (`flxp/shell/xclip`) are called from wux/w32, so libwux.a does not link without libflxpshell.a. Those three belong in

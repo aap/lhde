@@ -190,6 +190,8 @@ void setup_fonts()
     win::set_drop_shadows(store::flag("effects", "menu_shadows", true));
     // Effects' "Hide underlined letters for keyboard navigation until I press the Alt key" ([effects] keyboard_cues = 1: off)
     win::set_keyboard_cues(store::flag("effects", "keyboard_cues", false));
+    // font linking's table (share/fonts/fontlink.ini, a user's copy first): the faces that draw what a font lacks
+    gdi::load_font_links(lhde_find("fonts/fontlink.ini").c_str());
     // the imported Windows fonts (lhde's fonts/<build> with Tahoma)
     std::vector<std::string> fp = default_font_dirs();
     // ReactOS's free faces (fonts/reactos) in the fallback tier: a Windows build's Tahoma or Marlett wins a family both

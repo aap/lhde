@@ -173,6 +173,35 @@ else
     quit
 fi
 
+# 8b. font linking: ж and 😀 typed into the first line are drawn by faces that have them, not as the missing glyph (Lucida
+# Console lacks 😀): the first lines' pixels differ from the same lines holding ж and a character no face has (U+F0000:
+# the missing glyph) and from empty lines; the caret goes to line 4, out of the crop
+IM=convert; command -v magick >/dev/null 2>&1 && IM=magick
+if ! command -v import >/dev/null 2>&1 || ! command -v $IM >/dev/null 2>&1; then echo "skip the glyph crops: needs ImageMagick"
+elif [ -z "$(fc-list ':charset=1f600' file 2>/dev/null)" ] && [ ! -d "${LHDE_WINDOWS:-/nonexistent}/index/fonts/reactos" ]; then
+    echo "skip the glyph crops: no face has U+1F600"
+else
+    crop() {   # FILE COMMAND...: luxpad on FILE, the command run, the first lines' crop (rows 18-47, columns 0-199) in $T/NAME.ppm
+        f=$1; shift
+        run "^$(basename $f) - luxpad\$" $f
+        if [ -z "$W" ]; then fail "no luxpad window for $(basename $f)"; return; fi
+        "$@"; xdotool key ctrl+End; sleep .8
+        import -window $W $T/shot.png && $IM $T/shot.png -crop 200x30+0+18 +repage ppm:$T/$(basename $f).ppm
+        quit
+    }
+    printf '\320\266\363\260\200\200\n\n\n' > $T/files/missing.txt
+    printf '\n\n\n' > $T/files/blank.txt
+    : > $T/files/typed.txt
+    crop $T/files/missing.txt true
+    crop $T/files/blank.txt true
+    crop $T/files/typed.txt sh -c 'xdotool type --delay 80 "ж😀"; xdotool key Return Return Return ctrl+s; sleep .5'
+    if [ -s $T/typed.txt.ppm ] && [ -s $T/missing.txt.ppm ] && [ -s $T/blank.txt.ppm ]; then
+        cmp -s $T/typed.txt.ppm $T/missing.txt.ppm && fail "ж😀 drawn as the missing glyph" || ok "ж😀 not drawn as the missing glyph"
+        cmp -s $T/typed.txt.ppm $T/blank.txt.ppm && fail "ж😀 drew nothing" || ok "ж😀 drawn"
+        cmp -s $T/missing.txt.ppm $T/blank.txt.ppm && fail "the crop misses the first line" || ok "the crop holds the first line"
+    else fail "no crops"; fi
+fi
+
 # 9. nothing imported, an empty HOME, no XDG variables
 printf 'bare \342\234\223\n' > $T/bare/bare.txt
 env -i PATH="$PATH" DISPLAY=$D HOME=$T/bare LHDE_WINDOWS=/nonexistent LUXPAD_TRACE=1 $B $T/bare/bare.txt > $T/out.log 2>$T/err.log & P=$!

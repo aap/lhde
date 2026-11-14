@@ -576,6 +576,12 @@ void ut_add_font_dir(const char* dir)
     if (dir) gdi::add_font_dir(dir);
 }
 
+int ut_load_font_links(const char* path)
+{
+    Lock l;
+    return gdi::load_font_links(path) ? 1 : 0;
+}
+
 } // extern "C"
 
 namespace {

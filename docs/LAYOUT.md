@@ -26,6 +26,7 @@ PROGRAM FILES                        make install; never edited by hand (a later
 $PREFIX/share/lhde/                  shipped data, our text only (DATADIR)
   themes/NAME.theme                    the shipped themes
   navbar/NAME.ini                      navigation bar layouts (4051 4074 vision)
+  fonts/fontlink.ini                   font linking's table (Windows' FontLink\SystemLink): the faces that draw what a font lacks
   icons/NAME.theme                     icon recipes (pe:shell32.dll#ID from resources/<build>, file:PACK/PATH from an icon pack)
   sources/ID.ini                       what lhde-pack takes from each Windows build, the recipes lhde-import runs
   frames/SET/theme.ini (+ nav.ini)     frame-set tuning; the pixels are generated, below
