@@ -298,6 +298,100 @@ fell back (`[windows]` the user's tree, `[system windows]` a system one); `lhde-
 From a build tree they use `build/bin`; installed, `$PREFIX/bin`. docs/USAGE.md is the user guide (from
 the x11 lab).
 
+## A whole-system install and a display manager
+
+lhde for every user of a machine, chosen at a graphical login: the programs in `/usr/local`, the Windows files in a system
+Windows tree, and a display manager that lists the X session entry `make install` puts in `$PREFIX/share/xsessions/lhde.desktop`
+(`Exec=$BINDIR/lhde-session xsession`, `DesktopNames=lhde`).
+
+**The session.** `lhde-session xsession [THEME]` is what the display manager runs on the X server it started: the session of
+`lhde-session start` (the root wallpaper, luxwm in its loop, picom when the theme wants it, luxshell, flxp-desktop; no terminal
+unless `LHDE_TERMINAL` names one) in the foreground on its `$DISPLAY`, with `XDG_CURRENT_DESKTOP=lhde`, `DESKTOP_SESSION=lhde`,
+`LHDE_DISPLAY` and a D-Bus session bus of its own when the login brings none. Log Off (luxshell's, the start panel's) runs
+`lhde-session stop`, which ends every program the session started and its bus; `lhde-session xsession` then returns and the
+display manager ends the server and shows the greeter again. Ctrl+Alt+Backspace and the server itself are the display manager's.
+`tests/headless/xsession.sh` runs it on an Xvfb as a display manager would.
+
+**The system Windows tree.** After the user's own tree (`~/.local/share/lhde-windows`), every lhde program reads
+`$XDG_DATA_DIRS/lhde-windows` (default `/usr/local/share/lhde-windows`, then `/usr/share/lhde-windows`), by their `index/`: a
+file only the system tree has is found there, a user's copy of it wins, and generated pixels come from the first tree that has
+them. Root fills it, with lhde-import pointed at it by `LHDE_WINDOWS`; users only read it. A user's
+`lhde-import` (a `--style` of their own, another pack, `--regenerate`) writes and regenerates their own tree only. With
+`LHDE_WINDOWS` or `LHDE_DATA` set, that one tree is the only Windows tree (tests, root's import). `lhde-theme dirs` lists the
+system trees under "Windows files" and in the search order (`--system`: only them); `lhde-theme explain` marks a file of theirs
+`[system windows]`.
+
+**The display manager: LightDM with lightdm-gtk-greeter.** Of what FreeBSD 15's packages offer (`lightdm` with
+`lightdm-gtk-greeter`, `slick-greeter` or `lightdm-kde-greeter`; `sddm`, `ly`, `slim`, `xdm`; no greetd, gtkgreet, tuigreet or
+emptty), LightDM is the small one that reads `/usr/local/share/xsessions`, remembers each user's last session and has an rc.d
+script, and lightdm-gtk-greeter is its greeter: the package's default greeter (`/usr/local/share/xgreeters/default.desktop`) is
+a link to `lightdm-gtk-greeter.desktop`, it needs nothing but GTK 3, and its look is a centred login box over a colour or a
+picture with a small panel (the session chooser, the clock, power), all set in one file. slick-greeter looks finer but brings
+Python, PyGObject, the Ubuntu font and libcanberra, and its look is Linux Mint's; sddm needs Qt and a theme; ly is a text-mode
+login; slim is unmaintained; xdm has no session chooser. Neither LightDM nor Xorg needs seatd on FreeBSD (that is for Wayland
+compositors); LightDM needs the system D-Bus (ConsoleKit2 and AccountsService, which it depends on, are reached over it).
+
+**The recipe for soma** (FreeBSD 15.1; lightdm 1.33.1 installed, no greeter yet; the source tree `~/src/lhde-port`, built as
+aap). From the Linux machine, the two packs (`lhde_winthemes.zip` already holds `reactos/` and `free/`; the free pack adds the
+whole ReactOS import):
+
+    scp /u/aap/src/lhde/lhde-resources-free-2.zip /u/aap/src/lhde/lhde_winthemes.zip soma:src/lhde-port/
+
+As aap on soma, the build for `/usr/local` (flxp has `DATADIR` compiled in, so a build for another `PREFIX` would be
+rebuilt by the install; built here, root only copies and no root-owned file lands in the build tree; the next `PREFIX=~/.local
+gmake install` rebuilds those few files back):
+
+    cd ~/src/lhde-port && PATH=$HOME/src/lhde-port/bsd_bin:$PATH PREFIX=/usr/local gmake -j8
+
+As root (`su -`), in this order:
+
+    pkg install lightdm-gtk-greeter
+    cd /u/aap/src/lhde-port && PREFIX=/usr/local gmake install
+    ls /usr/local/share/xsessions/lhde.desktop
+    export LHDE_WINDOWS=/usr/local/share/lhde-windows
+    lhde-import --pack /u/aap/src/lhde-port/lhde-resources-free-2.zip
+    lhde-import --pack /u/aap/src/lhde-port/lhde_winthemes.zip
+    lhde-import --list
+    unset LHDE_WINDOWS
+
+(`gmake install-resources-full FREE_PACK=lhde-resources-free-2.zip PACK=lhde_winthemes.zip LHDE_WINDOWS=/usr/local/share/lhde-windows`
+does the same import from the source tree's `tools/`, after deleting that tree, but leaves root-owned Python caches in the
+tree.) Then LightDM's configuration, in `/usr/local/etc/lightdm/lightdm.conf` under `[Seat:*]` (the package's file already has
+`session-wrapper=/usr/local/etc/lightdm/Xsession`, and `minimum-vt=9` under `[LightDM]`, so the greeter's server is on vt9,
+clear of a startx session on vt8):
+
+    [Seat:*]
+    greeter-session=lightdm-gtk-greeter
+    user-session=lhde
+    session-wrapper=/usr/local/etc/lightdm/Xsession
+
+and the greeter's, `/usr/local/etc/lightdm/lightdm-gtk-greeter.conf` (made from its `.sample` by the package):
+
+    [greeter]
+    background=#3a6ea5
+    user-background=false
+    theme-name=Adwaita
+    icon-theme-name=Adwaita
+    font-name=Sans 11
+    hide-user-image=true
+    clock-format=%a %e %b  %H:%M
+    indicators=~host;~spacer;~clock;~spacer;~session;~power
+    position=50%,center 50%,center
+
+(`background=/usr/local/share/lhde-windows/5048/wallpapers/Longhorn.jpg` puts 5048's wallpaper behind the box instead of
+Windows Classic's desktop colour.) `lightdm --show-config`, as any user, prints the merged configuration and the files it came
+from, without starting anything. Then the services:
+
+    sysrc dbus_enable=YES lightdm_enable=YES
+    service dbus start
+    service lightdm start
+
+The greeter appears on vt9 (Ctrl+Alt+F9) with "lhde" chosen in its session menu; it is where Log Off returns. The console
+session started with `lhde-session start` stays on vt8 (Ctrl+Alt+F8), the text consoles on Ctrl+Alt+F1 and up. Back to the
+console only: `service lightdm stop` (from a text console or ssh; it ends the greeter's server and any session it runs) and
+`sysrc lightdm_enable=NO`, so it does not start at boot. A user who logs in for the first time gets the system tree's themes:
+`pw useradd -n guest -m -G video -s /bin/sh && passwd guest` makes one to try the out-of-the-box session with.
+
 ## Settings that point at your Windows files
 
 flxp needs none: it finds the imported art through the lookup above (`flxp/shell/lhdata.h` over

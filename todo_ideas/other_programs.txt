@@ -35,3 +35,6 @@
 * E's theming, as a concept: one theme skins WM, shell and every app; an app may add or override a few parts
 	(elm_theme_extension/overlay) and pick a per-widget style name. The entry point to copy: one macro (ELM_MAIN) and a
 	runnable one-file example per widget
+* an lhde greeter that is XP's Welcome screen (logonui.exe's art: the user tiles, the blue bands, the password box), written on
+	wux as a LightDM greeter (liblightdm-gobject, a .desktop in xgreeters/) or a greetd one, once the display manager path
+	(lightdm-gtk-greeter, docs/BUILDING.md "A whole-system install and a display manager") is in use
