@@ -860,10 +860,10 @@ void usage(FILE* f)
 static bool loop_keys(MSG& msg)
 {
     bool in_list = GetFocus() == g.list;
-    if (in_list && ((msg.message == WM_KEYDOWN && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
+    if (in_list && (((msg.message == WM_SYSKEYDOWN || msg.message == WM_KEYDOWN) && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
                     (msg.message == WM_KEYUP && msg.wParam == VK_APPS))) { context_menu(POINT{ -1, -1 }); return true; }
     if (in_list && msg.message == WM_KEYDOWN && msg.wParam == VK_APPS) return true;
-    if (in_list && msg.message == WM_KEYUP && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) return true;
+    if (in_list && (msg.message == WM_SYSKEYUP || msg.message == WM_KEYUP) && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) return true;
     if (msg.message == WM_KEYDOWN && msg.wParam == VK_F5) { fill(); return true; }
     if (in_list && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000)) {
         if (msg.wParam == 'A') {

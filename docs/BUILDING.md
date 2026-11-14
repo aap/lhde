@@ -175,10 +175,10 @@ with a distribution, lhde's `lhde-mimeapps.list` and a home: lhde-mime's verdict
 `reset` and `check`'s findings; the default programs by role: the roles' type sets, the role file's lines from lhde-mime and
 flxp alike, the user's file over the role file over lhde's, a role switched with one command), and the
 headless scripts under Xvfb (clipboard between two explorers, drag and drop
-incl. GTK, the file dialog in both looks, the modifier keys across a focus change, typed text into the Edit control as
+incl. GTK, the file dialog in both looks (a typed name taken as typed), the modifier keys across a focus change and the keys' characters (Delete has none), typed text into the Edit control as
 UTF-16 (é, a keysym outside Latin-1, an emoji as a surrogate pair: `tests/headless/typing.sh`), luxpad (`tests/headless/luxpad.sh`:
 an emoji typed into a UTF-8 file with CR LF and saved byte for byte, Ln/Col, Find, Go To, Save As Unicode through the Encoding
-box and back, a Latin-1 file as ANSI saved back unchanged, the unsaved-changes question, the remembered placement, a file
+box and back, Alt+V dropping View from the Edit control, a Latin-1 file as ANSI saved back unchanged, the unsaved-changes question, the remembered placement, a file
 dropped from flxp, a run with nothing imported), wux's MessageBoxW (its buttons per type,
 the default, Enter and Escape, XP's 75x23 buttons 6 px apart under classic, luna and jade4074 with the text in the message font:
 tests/w32/msgbox), luxshot, luxattr: the Properties sheet's Metadata
@@ -188,7 +188,8 @@ files in one sheet with a tag added to both, a read-only file's message box)
 and Add Tag, the Explorer's Filter box under jade4074 over names and attributes, skipped without that style or user xattrs,
 luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`, clicks outside open menus under luxwm:
 `tests/headless/menus.sh`, a Win32 menu bar's pixels (plain, hot, open, inactive) under jade4074, luna and classic with
-ImageMagick: `tests/headless/menubar.sh`, flxp switched luna -> jade4074 -> classic and classic -> jade4074 -> luna against a fresh
+ImageMagick: `tests/headless/menubar.sh`, the menu bar from the keyboard (Alt+letter drops its popup, F10 enters the bar without
+dropping, from the window and from an Edit control in it): `tests/headless/menukeys.sh`, flxp switched luna -> jade4074 -> classic and classic -> jade4074 -> luna against a fresh
 start under the last theme (icons, colours, bands, xwd and ImageMagick): `tests/headless/themeswitch.sh`, flxp's chrome with no
 window manager, luxwm started, killed and under fvwm2 (the Small header without the title row, the full one, the vision header's XP
 chrome; the log and the band's row in the pixels): `tests/headless/nowm.sh`, Folder Options' File Types page on a scratch home and

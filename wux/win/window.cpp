@@ -1598,7 +1598,10 @@ static void handle_event(const sys::Event& ev)
         if (vk == VK_MENU) g_keys[VK_LMENU] = down;
         Window* f = is_window(g_focus) ? g_focus : (is_window(g_active) ? g_active : t);
         bool alt = (ev.mods & sys::ModAlt) != 0 || (down && vk == VK_MENU);
-        uint32_t msg = down ? (alt ? WM_SYSKEYDOWN : WM_KEYDOWN) : (alt ? WM_SYSKEYUP : WM_KEYUP);
+        // F10 is a system key as Alt+key is (WM_SYSKEYDOWN without the context bit): DefWindowProc enters the menu bar with
+        // it, whatever control has the focus
+        bool sys = alt || vk == VK_F10;
+        uint32_t msg = down ? (sys ? WM_SYSKEYDOWN : WM_KEYDOWN) : (sys ? WM_SYSKEYUP : WM_KEYUP);
         bool ext = false;
         uint32_t scan = scan_from_vk(vk, &ext);
         LParam lp = 1 | (LParam)scan << 16 | (ext ? 0x01000000 : 0) | (down ? 0 : (LParam)0xC0000000) | (alt ? 0x20000000 : 0);

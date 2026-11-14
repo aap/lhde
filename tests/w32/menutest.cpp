@@ -1,5 +1,8 @@
 // Menus: a menu bar with submenus, checks, separators, disabled items, a
 // context menu on right click, and keyboard access (Alt, F10, accelerators).
+// stderr: "WM_COMMAND ID" for a chosen item, "WM_INITMENUPOPUP POS" for a
+// dropped menu-bar popup (POS its place in the bar); MENUTEST_EDIT=1 puts an
+// Edit control with the focus in the window (tests/headless/menukeys.sh).
 #include <stdio.h>
 #include <stdlib.h>
 #include "w32/w32.h"
@@ -57,6 +60,9 @@ static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             CheckMenuItem(v, LOWORD(wp), MF_BYCOMMAND | ((st & MF_CHECKED) ? MF_UNCHECKED : MF_CHECKED));
         }
         return 0;
+    case WM_INITMENUPOPUP:
+        if (!HIWORD(lp)) { fprintf(stderr, "WM_INITMENUPOPUP %d\n", LOWORD(lp)); fflush(stderr); }
+        return 0;
     case WM_CONTEXTMENU: {
         HMENU m = CreatePopupMenu();
         AppendMenuW(m, MF_STRING, 501, L"&Refresh");
@@ -86,6 +92,9 @@ int main(int argc, char** argv)
     RegisterClassW(&wc);
     HWND w = CreateWindowExW(0, L"flxpmenu", L"flxp menus", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 100, 100, 400, 300, nullptr, build_menu(), nullptr, nullptr);
     CreateWindowExW(0, L"Static", L"Click the menu bar, right-click here for a context menu, or press Alt.", WS_CHILD | WS_VISIBLE, 20, 20, 340, 40, w, nullptr, nullptr, nullptr);
+    if (getenv("MENUTEST_EDIT"))
+        SetFocus(CreateWindowExW(WS_EX_CLIENTEDGE, L"Edit", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 20, 80, 200, 22, w, nullptr,
+                                 nullptr, nullptr));
     if (argc > 1) SetTimer(w, 1, atoi(argv[1]), quit_timer);
     // MENUTEST_RECTS=1: the menu bar's items as "item N L T R B" in window coordinates (tests/headless/menubar.sh)
     if (getenv("MENUTEST_RECTS")) {

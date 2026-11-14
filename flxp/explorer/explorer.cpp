@@ -2473,13 +2473,13 @@ static bool loop_keys(MSG& msg)
     HWND focus = GetFocus();
     bool in_view = focus == g.list || focus == g.tree;
     if (msg.message == WM_KEYDOWN && msg.wParam == 'A' && (GetKeyState(VK_CONTROL) & 0x8000) && in_view) { on_command(ID_EDIT_SELECTALL); return true; }
-    if (in_view && ((msg.message == WM_KEYDOWN && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
+    if (in_view && (((msg.message == WM_SYSKEYDOWN || msg.message == WM_KEYDOWN) && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) ||
                     (msg.message == WM_KEYUP && msg.wParam == VK_APPS))) {
         context_menu(focus, POINT{ -1, -1 });
         return true;
     }
     if (in_view && msg.message == WM_KEYDOWN && msg.wParam == VK_APPS) return true;
-    if (in_view && msg.message == WM_KEYUP && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) return true;   // no menu-bar activation after Shift+F10
+    if (in_view && (msg.message == WM_SYSKEYUP || msg.message == WM_KEYUP) && msg.wParam == VK_F10 && (GetKeyState(VK_SHIFT) & 0x8000)) return true;   // no menu-bar activation after Shift+F10
     if (focus == g.list && msg.message == WM_SYSKEYDOWN && msg.wParam == VK_RETURN) {   // Alt+Enter: Properties
         g_ctx = Ctx(); g_ctx.items = selection(); verb(ID_PROPERTIES);
         return true;
