@@ -59,13 +59,19 @@ have_style() { [ -n "$styles" ] && [ -f "$styles/$1.msstyles" ]; }
 if have_style luna; then theme luna; else theme classic; fi
 sleep .5
 
+peak_kb() {   # peak_kb PID: the process's peak resident set in KB (Linux: VmHWM of /proc; FreeBSD: procstat's maximum RSS)
+    if [ -r /proc/$1/status ]; then sed -n 's/^VmHWM:[[:space:]]*\([0-9]*\) kB/\1/p' /proc/$1/status
+    else procstat -r $1 2>/dev/null | sed -n 's/.*maximum RSS[[:space:]]*\([0-9]*\) KB.*/\1/p'; fi
+}
 traced() { grep -q "$1" $T/out.log; }                         # a trace line matching
 last() { grep "^$1 " $T/out.log | tail -1 | sed "s/^$1 //"; }  # the last trace line of a kind
 title_is() { [ "$(last title)" = "$1" ]; }
 run() {   # run ARGS...: luxview, its window in $W, the time to the window in $MS
     : > $T/out.log
     t0=$(date +%s%N)
-    "$B" "$@" >> $T/out.log 2>$T/err.log & P=$!
+    # FreeBSD's jemalloc (MALLOC_CONF; glibc and musl do not read it): one arena and freed pages returned at once, so the
+    # peak RSS is the pictures' memory and not what four arenas per CPU hold back
+    MALLOC_CONF=narenas:1,dirty_decay_ms:0,muzzy_decay_ms:0 "$B" "$@" >> $T/out.log 2>$T/err.log & P=$!
     W=""
     n=0
     while [ $n -lt 3000 ]; do   # poll for the window without sleeping, to time it
@@ -150,7 +156,7 @@ else
     else bad "Alt+Enter: no Properties sheet"; fi
     # 7. Actual Size of the big one, closed during its decode
     timeout 10 xdotool windowactivate --sync $W 2>/dev/null
-    hwm_fit=$(sed -n 's/^VmHWM:[[:space:]]*\([0-9]*\) kB/\1/p' /proc/$P/status 2>/dev/null)
+    hwm_fit=$(peak_kb $P)
     if [ -n "$hwm_fit" ] && [ $((hwm_fit / 1024)) -lt $LIMIT_FIT_MB ]; then ok "peak RSS at Best Fit $((hwm_fit / 1024)) MB (under $LIMIT_FIT_MB)"
     else bad "peak RSS at Best Fit ${hwm_fit:-?} KB (limit $LIMIT_FIT_MB MB)"; fi
     key Home; wait_for 10 title_is "1_big.jpg - luxview"
@@ -159,7 +165,7 @@ else
     wait_for 20 traced "^shown 1_big.jpg picture 6000x4000"
     check "Actual Size: decoded whole" "6000x4000" "$(grep '^shown 1_big.jpg picture' $T/out.log | tail -1 | cut -d' ' -f4)"
     key ctrl+b; key End; sleep .2; key Home; sleep .05; key ctrl+a; sleep .05
-    hwm=$(sed -n 's/^VmHWM:[[:space:]]*\([0-9]*\) kB/\1/p' /proc/$P/status 2>/dev/null)
+    hwm=$(peak_kb $P)
     quit
     check "closed during a decode: exit 0" 0 "$RC"
     traced "^exit" && ok "closed during a decode: the loader joined, main returned" || bad "no exit line (crashed?)"
