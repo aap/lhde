@@ -27,6 +27,7 @@
 #include <math.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <fontconfig/fontconfig.h>
@@ -719,9 +720,13 @@ static int l_trim(lua_State *L) { size_t n; const char *s = luaL_checklstring(L,
     while (s < e && isspace((unsigned char)*s)) s++;
     while (e > s && isspace((unsigned char)e[-1])) e--;
     lua_pushlstring(L, s, (size_t)(e - s)); return 1; }
-/* lh.getpid(): this process's id; lh.display_procs(name, display): the processes whose command name is NAME (as far as the
-   system keeps it: LHDE_COMM_MAX bytes) and whose environment has DISPLAY=display, in the system's order;
-   lh.proc_args(pid): its arguments (an empty table when they cannot be read) */
+/* lh.getpid(): this process's id; lh.display_procs(name, display): the processes named NAME whose environment has
+   DISPLAY=display, in the system's order. A process's name is the last component of its argv[0], the name it was started
+   by (flxp-startmenu, a symlink to flxp-taskbar, is flxp-startmenu, though FreeBSD's command name for it is the symlink's
+   target), else, when its arguments cannot be read, its command name (as far as the system keeps it: LHDE_COMM_MAX bytes);
+   lh.proc_args(pid): its arguments (an empty table when they cannot be read);
+   lh.child_alive(pid): whether pid is a child of ours that still runs (waitpid WNOHANG: with SIGCHLD ignored an ended child
+   is gone at once, so a pid the system has given to another process since is not ours) */
 static int l_getpid(lua_State *L) { lua_pushinteger(L, (lua_Integer)getpid()); return 1; }
 static int l_display_procs(lua_State *L) {
     const char *name = luaL_checkstring(L, 1), *disp = luaL_checkstring(L, 2);
@@ -729,13 +734,22 @@ static int l_display_procs(lua_State *L) {
     static pid_t pids[32768]; int n = lhde_proc_pids(pids, (int)(sizeof pids / sizeof *pids)), k = 1;
     lua_newtable(L);
     for (int i = 0; i < n; i++) {
-        if (lhde_proc_comm(pids[i], comm, sizeof comm) != 0 || strcmp(comm, want) != 0) continue;
-        size_t len; char *env = lhde_proc_read(pids[i], LHDE_PROC_ENVIRON, &len); if (!env) continue;
+        size_t len; char *args = lhde_proc_read(pids[i], LHDE_PROC_ARGS, &len);
+        if (args && len && args[0]) {   /* argv[0]: up to the first NUL within len */
+            size_t l0 = strnlen(args, len), b = l0; while (b > 0 && args[b - 1] != '/') b--;
+            int same = l0 - b == strlen(name) && memcmp(args + b, name, l0 - b) == 0; free(args);
+            if (!same) continue;
+        } else {
+            free(args);
+            if (lhde_proc_comm(pids[i], comm, sizeof comm) != 0 || strcmp(comm, want) != 0) continue;
+        }
+        char *env = lhde_proc_read(pids[i], LHDE_PROC_ENVIRON, &len); if (!env) continue;
         for (size_t a = 0; a < len; a += strnlen(env + a, len - a) + 1)
             if (strnlen(env + a, len - a) == strlen(dv) && memcmp(env + a, dv, strlen(dv)) == 0) { lua_pushinteger(L, pids[i]); lua_rawseti(L, -2, k++); break; }
         free(env);
     }
     return 1; }
+static int l_child_alive(lua_State *L) { int st; lua_pushboolean(L, waitpid((pid_t)luaL_checkinteger(L, 1), &st, WNOHANG) == 0); return 1; }
 static int l_proc_args(lua_State *L) {
     size_t len; char *c = lhde_proc_read((pid_t)luaL_checkinteger(L, 1), LHDE_PROC_ARGS, &len); int k = 1;
     lua_newtable(L);
@@ -1055,7 +1069,7 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"app_icons", l_app_icons}, {"terminal", l_terminal}, {"app_icon", l_app_icon}, {"tray_start", l_tray_start}, {"tray_count", l_tray_count}, {"tray_manager", l_tray_manager}, {"tray_stop", l_tray_stop},
     {"selection_owner", l_selection_owner}, {"watch_selection", l_watch_selection}, {"own_selection", l_own_selection}, {"send_message", l_send_message}, {"send_root_message", l_send_root_message}, {"atom", l_atom},
     {"set_root_cardinal", l_set_root_cardinal}, {"struts", l_struts}, {"spawn_pid", l_spawn_pid}, {"notification_closed", l_notification_closed}, {"notification_action", l_notification_action},
-    {"spawn", l_spawn}, {"pipe", l_pipe}, {"pipe_close", l_pipe_close}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"getpid", l_getpid}, {"display_procs", l_display_procs}, {"proc_args", l_proc_args}, {"mtime", l_mtime}, {"exists", l_exists}, {"trim", l_trim},
+    {"spawn", l_spawn}, {"pipe", l_pipe}, {"pipe_close", l_pipe_close}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"getpid", l_getpid}, {"display_procs", l_display_procs}, {"proc_args", l_proc_args}, {"child_alive", l_child_alive}, {"mtime", l_mtime}, {"exists", l_exists}, {"trim", l_trim},
     {"data_find", l_data_find}, {"data_resolve", l_data_resolve}, {"data_resolve_dir", l_data_resolve_dir},
     {"component_dir", l_component_dir},
     {"theme_resolve", l_theme_resolve}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},
