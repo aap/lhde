@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <setjmp.h>
+#include <algorithm>
 #include <vector>
 #include <jpeglib.h>
 #include "image.h"
@@ -409,11 +410,19 @@ Bitmap* resample(const Bitmap* src, int dw, int dh)
     if (!out) return nullptr;
     int sw = src->width, sh = src->height;
     auto tx = taps(dw, sw), ty = taps(dh, sh);
-    // horizontal pass into premultiplied floats (sh rows of dw), then vertical
-    std::vector<float> mid((size_t)sh * dw * 4);
-    for (int y = 0; y < sh; y++) {
+    // horizontal pass into premultiplied floats (rows of dw), then vertical. The rows an output row reads are contiguous and
+    // move down with it, so only the widest such window of horizontal rows is kept (a ring), not one for every source row:
+    // a 6000 x 4000 picture into 800 px holds 7 rows of 800, not 4000.
+    size_t span = 1;
+    for (const auto& t : ty) if (!t.empty()) span = std::max(span, (size_t)(t.back().i - t.front().i + 1));
+    std::vector<float> ring(span * dw * 4);
+    std::vector<int> ring_row(span, -1);
+    auto mid_row = [&](int y) -> const float* {
+        size_t slot = (size_t)y % span;
+        float* m = &ring[slot * dw * 4];
+        if (ring_row[slot] == y) return m;
+        ring_row[slot] = y;
         const uint32_t* s = src->row(y);
-        float* m = &mid[(size_t)y * dw * 4];
         for (int x = 0; x < dw; x++) {
             float a = 0, r = 0, g = 0, b = 0;
             for (const Tap& t : tx[(size_t)x]) {
@@ -426,14 +435,20 @@ Bitmap* resample(const Bitmap* src, int dw, int dh)
             }
             m[x * 4] = a; m[x * 4 + 1] = r; m[x * 4 + 2] = g; m[x * 4 + 3] = b;
         }
-    }
+        return m;
+    };
+    std::vector<const float*> rows;
     for (int y = 0; y < dh; y++) {
         uint32_t* d = out->row(y);
+        const std::vector<Tap>& tv = ty[(size_t)y];
+        rows.clear();
+        for (const Tap& t : tv) rows.push_back(mid_row(t.i));
         for (int x = 0; x < dw; x++) {
             float a = 0, r = 0, g = 0, b = 0;
-            for (const Tap& t : ty[(size_t)y]) {
-                const float* m = &mid[((size_t)t.i * dw + x) * 4];
-                a += m[0] * t.w; r += m[1] * t.w; g += m[2] * t.w; b += m[3] * t.w;
+            for (size_t k = 0; k < tv.size(); k++) {
+                const float* m = rows[k] + (size_t)x * 4;
+                float w = tv[k].w;
+                a += m[0] * w; r += m[1] * w; g += m[2] * w; b += m[3] * w;
             }
             if (a <= 0.001f) { d[x] = 0; continue; }
             auto c8 = [](float v) -> uint32_t { int i = (int)(v + 0.5f); return (uint32_t)(i < 0 ? 0 : i > 255 ? 255 : i); };
