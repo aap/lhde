@@ -78,6 +78,8 @@
 
 ## misc
 
+* the Properties sheet's General page draws the "Opens with" program's icon over the start of its name ("[icon]pad" for luxpad,
+	seen in the lab under luna and jade4074 with luxattr --general)
 * flxp-filedialog: a right click right after the pointer arrives in the list opens the context menu and closes it at once (seen
 	under Xvfb with xdotool mousemove + click 3; tests/headless/filedlg.sh clicks again); a real mouse may never do this, check
 	(xdotool's click sends press and release in one burst; Xorg lets such a release past a synchronous grab's freeze,
