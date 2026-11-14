@@ -204,7 +204,8 @@ void parse_mimeapps(const std::string& path, const std::string& desktop, bool le
             }
     };
     fill("Default Applications", m.defaults);
-    if (!legacy) { fill("Added Associations", m.added); fill("Removed Associations", m.removed); }
+    // a desktop-specific file sets defaults only (the spec: its Added and Removed Associations are not read)
+    if (!legacy && desktop.empty()) { fill("Added Associations", m.added); fill("Removed Associations", m.removed); }
     db.lists.push_back(m);
 }
 

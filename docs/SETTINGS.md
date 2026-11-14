@@ -168,7 +168,9 @@ user's choice beats lhde's defaults, and lhde's beat the distribution's when lhd
 `XDG_DATA_DIRS` (`/usr/local/share` before `/usr/share`, the default) or is the data home (`PREFIX=~/.local`). Without
 `XDG_CURRENT_DESKTOP=lhde` (another session) lhde's file is not read.
 
-lhde's defaults: `inode/directory` = `flxp.desktop`, `text/plain` = `luxpad.desktop`; no Removed Associations.
+lhde's defaults: `inode/directory` = `flxp.desktop`, `text/plain` = `luxpad.desktop`. A desktop-specific file holds
+`[Default Applications]` only: its Added and Removed Associations are not read (the spec; GLib warns about them, `lhde-mime
+check` reports them), so taking a program off a type is done in `mimeapps.list`.
 
 A type's program (GLib's order, which flxp's shell layer follows): the first installed, not removed `[Default Applications]`
 entry for the type in the files above; else its first claimant (`[Added Associations]` in the same order, then the desktop

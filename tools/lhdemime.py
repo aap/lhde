@@ -418,10 +418,15 @@ class ListFile:
         self.default, self.added, self.removed = {}, {}, {}
         self.lines = {}             # (group, type) -> line number
         self.duplicates = []        # (group, type, line)
+        self.ignored = []           # groups a desktop-specific file may not have (the spec: defaults only)
         kf = read_keyfile(path) if self.exists else None
         for g, kv in kf or []:
             into = {'Default Applications': self.default, 'Added Associations': self.added,
                     'Removed Associations': self.removed}.get(g)
+            if into is not None and kind == 'desktop' and into is not self.default:
+                if kv:
+                    self.ignored.append(g)
+                continue
             if into is None or (kind == 'legacy' and into is not self.default):
                 continue
             for k, v, n in kv:
@@ -745,6 +750,9 @@ def check(db):
                         e.short(lf.path), lf.lines.get(('Default Applications', k), 0), k, id_, e.short(db.apps[id_].path))))
         for g, k, n in lf.duplicates:
             out.append(('duplicate', '%s:%d: %s twice in [%s]; the last line counts' % (e.short(lf.path), n, k, g)))
+        for g in lf.ignored:
+            out.append(('ignored', '%s: [%s] in a desktop-specific file is not read (only [Default Applications] is; put it in '
+                        'mimeapps.list)' % (e.short(lf.path), g)))
     # 4. caches that do not match their directory's desktop files
     for d in e.app_dirs():
         claims = {}

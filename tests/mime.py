@@ -187,6 +187,12 @@ try:
     check('check: lhde\'s list not read without XDG_CURRENT_DESKTOP', True, 'lhde' in kinds)
     check('check: in an lhde session no folder verdict', False,
           'inode/directory: no default' in '\n'.join(t for _, t in M.check(model(env('lhde')))))
+    # a desktop-specific file holds defaults only: its Removed Associations are not read (by GLib, xdg-mime, flxp, lhde-mime)
+    write(cfg + '/lhde-mimeapps.list', '[Removed Associations]\ninode/directory=flxp.desktop;\n')
+    agree('lhde, a desktop-specific Removed', env('lhde'), 'inode/directory', ('flxp.desktop',) * 3)
+    check('check: the desktop-specific Removed Associations', True,
+          any(k == 'ignored' and 'lhde-mimeapps.list: [Removed Associations]' in t for k, t in M.check(model(env('lhde')))))
+    os.remove(cfg + '/lhde-mimeapps.list')
     # G. explain's detection
     db = model(env())
     write(T + '/f/notes.txt', 'hello\n')
