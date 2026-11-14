@@ -1,6 +1,6 @@
 // A window that prints, for every WM_KEYDOWN / WM_SYSKEYDOWN, the key and what
 // GetKeyState says about Ctrl, Shift and Alt at that moment ("down 0x31 ctrl=1
-// shift=0 alt=0"), one line each, flushed. tests/headless/modkeys.sh drives two
+// shift=0 alt=0"), and every WM_CHAR ("char 0x08"), one line each, flushed. tests/headless/modkeys.sh drives two
 // of them with xdotool: a modifier pressed or released while the other had the
 // focus must be seen right in this one. Usage: keystate TITLE (on $DISPLAY).
 #include <stdio.h>
@@ -14,6 +14,10 @@ static LRESULT CALLBACK proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     case WM_SYSKEYDOWN:
         printf("down 0x%02x ctrl=%d shift=%d alt=%d\n", (unsigned)wp, (GetKeyState(VK_CONTROL) & 0x8000) != 0,
                (GetKeyState(VK_SHIFT) & 0x8000) != 0, (GetKeyState(VK_MENU) & 0x8000) != 0);
+        fflush(stdout);
+        return 0;
+    case WM_CHAR:
+        printf("char 0x%02x\n", (unsigned)wp);
         fflush(stdout);
         return 0;
     case WM_DESTROY:

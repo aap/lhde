@@ -2,7 +2,8 @@
 # The modifier state GetKeyState reports (wux's key table) when Ctrl changes while another window has the keyboard: two
 # tests/w32/keystate windows, xdotool moving the focus between them. Ctrl pressed in the other window, then 1 here: the
 # WM_KEYDOWN of 1 must see Ctrl down (else flxp's Ctrl+1..5 view keys do nothing); Ctrl pressed here, released in the
-# other window, then 2 here: Ctrl must be up (else plain keys look like Ctrl+key).
+# other window, then 2 here: Ctrl must be up (else plain keys look like Ctrl+key). The characters of keys: Backspace gives
+# WM_CHAR 0x08, Escape 0x1b, Delete none (X's DEL, 0x7f, is not a character on Windows).
 # Needs Xvfb and xdotool. Usage: tests/headless/modkeys.sh [:DISPLAY]
 D=${1:-:75}
 T=$(mktemp -d)
@@ -30,6 +31,10 @@ else
     check "Ctrl pressed elsewhere, then 1 here" "down 0x31 ctrl=1 shift=0 alt=0" "$(line 0x31)"
     focus $WP; xdotool keydown ctrl; line 0x11 > /dev/null; focus $WO; xdotool keyup ctrl; focus $WP; xdotool key 2
     check "Ctrl released elsewhere, then 2 here" "down 0x32 ctrl=0 shift=0 alt=0" "$(line 0x32)"
+    xdotool key BackSpace Delete KP_Delete Escape
+    wait_for 10 seen 0x1b
+    check "Backspace, Delete, keypad Delete, Escape: their characters" "char 0x08 char 0x1b" \
+          "$(sed -n '/^down 0x08/,$p' $T/probe.log | grep -a '^char' | tr '\n' ' ' | sed 's/ $//')"
 fi
 kill $P1 $P2; wait $P1 $P2 2>/dev/null; stop_xvfb
 rm -rf $T

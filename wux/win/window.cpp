@@ -1602,9 +1602,11 @@ static void handle_event(const sys::Event& ev)
         bool ext = false;
         uint32_t scan = scan_from_vk(vk, &ext);
         LParam lp = 1 | (LParam)scan << 16 | (ext ? 0x01000000 : 0) | (down ? 0 : (LParam)0xC0000000) | (alt ? 0x20000000 : 0);
-        // Alt+key keeps its text: translate_message turns it into WM_SYSCHAR (dialog and menu mnemonics)
-        post_full(f, msg, vk, lp, ev.time, ev.root, (down && !(ev.mods & sys::ModControl)) ? ev.text : nullptr);
-        if (down && (ev.mods & sys::ModControl) && !alt && ev.text[0]) {
+        // Alt+key keeps its text: translate_message turns it into WM_SYSCHAR (dialog and menu mnemonics). Delete has no
+        // character on Windows (X's keysym gives it DEL, 0x7f): no WM_CHAR, where Backspace's 0x08 and Escape's 0x1b are one
+        const char* text = vk == VK_DELETE ? "" : ev.text;
+        post_full(f, msg, vk, lp, ev.time, ev.root, (down && !(ev.mods & sys::ModControl)) ? text : nullptr);
+        if (down && (ev.mods & sys::ModControl) && !alt && text[0]) {
             // control characters still produce WM_CHAR (e.g. ^A, ^C) the way X reports them
             Message m; memset(&m, 0, sizeof m);
             m.w = f; m.msg = WM_KEYDOWN; m.wp = vk; m.time = ev.time; m.pt = ev.root;
