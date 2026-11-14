@@ -1062,8 +1062,8 @@ flxp-taskbar on the display runs as the start menu alone (no bar, no tray: it re
 it never takes the selection from it, `tray_takeover` or not); without luxshell flxp-taskbar claims the selection when it is
 free and waits for it otherwise (`flxp.ini tray_takeover = 1` takes it from another tray program).
 
-**XP's parts** (`taskbar.cpp` the layout and the menu, `quicklaunch.cpp`, `notify.cpp`, `xwm.cpp` the X side,
-`shell/traycontrol.cpp` the commands):
+**XP's parts** (`taskbar.cpp` the layout and the menu, `quicklaunch.cpp`, `notify.cpp`, `xwm.cpp` the X side; the tray's own
+controls through liblhde's hardware layer, `<lhde/hw.h>`, as luxshell's items):
 
 | Part | What it does |
 | --- | --- |
