@@ -38,3 +38,5 @@ page; docs/USAGE.md "Metadata"). Next phases (todo_ideas/XATTR-DESIGN_CLAUDE.md 
 	bare dots after the name need a layout per view. Keep the Details column for sorting and grouping. A hex field in the
 	Metadata tab beside the swatch row later
 
+* lhdetree annotates the ReactOS and free-wallpaper files with user.lux.author = microsoft (xput in import_source and the
+	wallpapers): the author of a source is the source's (reactos, the photographers)

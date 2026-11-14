@@ -9,16 +9,17 @@
 	(Aurora.c_rgColorMap, read from the assembly) are the last table of the aurora's kind (decide); wux/rc/*.res and
 	wux/w32/stdres.res are built from Wine's sources (fine); no .msstyles, .dll, fonts, wallpapers, bitmaps or screenshots
 	(grep the history too: the repo started fresh, so only the tree matters)
+* the free pack lhde-resources-free-1.zip lacks reactos/system32/cmd.exe, desk.cpl and notepad.exe, which the ISO recipe
+	imports (lhde-theme explain lunar: "does not exist" against the pack, found against an ISO import): a pack 2
 * the agents' worktrees and .claude/ are untracked; .gitignore covers build/, packs and pycache; add .claude/
 
 ## FreeBSD (docs/BUILDING.md "FreeBSD")
-* flxp/explorer/explorer.cpp's "open in a new window" spawns "/proc/self/exe", which FreeBSD (no procfs) does not have:
-	shell::self_exe() as places.cpp does (left out of the port while explorer.cpp was another session's)
 * the hardware tray items and tiles: brightness (backlight(8), /dev/backlight/*), battery (acpiconf -i 0 / hw.acpi.battery.*),
 	volume (mixer(8); wpctl/pactl when PipeWire/PulseAudio run), touchpad; flxp/shell/traycontrol.cpp and luxshell's
 	trayitems/brightness.lua, tiles/power.lua read /sys/class
 * check FreeBSD 15's inotify for IN_ATTRIB of a watched folder's entries (its sys/inotify.h lists only CLOSE_WRITE, DELETE,
 	MODIFY and MOVED_* as entry events): without it the attribute columns of a file changed elsewhere wait for F5; a
 	per-file watch or an mtime/ctime poll of the shown rows would do it
-* on soma: PREFIX=~/.local gmake install, gmake check (python3, Xvfb, xdotool from the pkg line), the free pack import and a
-	session under Xephyr or Xvfb are still to run; the build itself (gmake -j8) went through
+* the headless tests start luxshell, whose volume item's `pactl subscribe` autospawns pulseaudio where PulseAudio is installed
+	(soma): it writes ~/.config/pulse into the test's scratch HOME after the test removed it (an empty tmp.* directory in
+	/tmp per luxshell test) and lives on until it idles out; the tests could set PULSE_SERVER to nothing or kill it

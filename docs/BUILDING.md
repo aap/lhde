@@ -98,31 +98,52 @@ No Windows file and no user setting is ever installed: those are the two other t
 
 ### FreeBSD
 
-lhde builds and runs on FreeBSD 15 (amd64) with clang and GNU make; 15 is the first release with inotify(2) (the explorer
-following its folders), renameat2 and O_PATH, which flxp's file operations use. The packages:
+lhde builds and runs on FreeBSD 15 (amd64) with clang, libc++ and GNU make; 15 is the first release with inotify(2) (the
+explorer following its folders), renameat2 and O_PATH, which flxp's file operations use. The packages:
 
-    pkg install gmake pkgconf python3 py312-pillow p7zip cabextract libX11 libXext libXcursor libxkbcommon libXfixes \
+    pkg install gmake pkgconf python3 py312-pillow 7-zip cabextract libX11 libXext libXcursor libxkbcommon libXfixes \
         libXinerama libXft freetype2 fontconfig png jpeg-turbo webp dbus cairo pango lua54 \
         picom feh xprop xsetroot xinit xephyr xorg-vfbserver xdotool ImageMagick7 xclip gtar
 
-Then `gmake -j8`, `gmake check`, `PREFIX=~/.local gmake install` as above (FreeBSD's make is not GNU make). What differs,
-all behind `liblhde/compat.h` (one header, the only place that knows the system) and two shell helpers in
-`session/lhde-paths.sh`:
+(`python3` is the package that puts `python3` on the PATH; `7-zip` installs `7z` and `7zz`, there is no p7zip.) Then, as above
+with GNU make (FreeBSD's make is not):
+
+    gmake -j8
+    PREFIX=~/.local gmake install
+    gmake install-resources-free FREE_PACK=lhde-resources-free-1.zip    # or with no FREE_PACK: downloaded
+    LHDE_TEST_DISPLAYS=":71 :72 :73" gmake check FREE_PACK=lhde-resources-free-1.zip
+
+`gmake check` there runs everything `make check` runs on Linux: the shim's and the toolkit's tests, the scripts, liblhde's
+resolver, luxshell's Lua, and the headless scripts under Xvfb, the attribute ones (luxattr, properties, filter, runas,
+luxshot) through `getextattr` / `setextattr` (`tests/headless/xattrs.sh`: attr's getfattr and setfattr do not exist there).
+What skips there and why: swatchtest without a `DISPLAY`; luxwm's frame regression and ut-dump without the frame sets'
+styles (a tree with the free pack only); fileops_test's moves between two file systems when its scratch directories share
+one (no `/dev/shm`: `build/tests/fileops_test DIR1 DIR2` names a second); a test that needs a style the free pack lacks
+(jade4074, luna). luxshell's Lua is parsed with lua54's `luac54`. With the free pack imported, `lhde-theme resolve`
+gives the same records as on Linux, and `lhde-session start --attach` on an Xvfb shows the session (luxwm, luxshell,
+flxp-desktop, flxp-taskbar). What differs, all behind `liblhde/compat.h` (one header, the only place that knows the system),
+`wux/w32/include/flxp_crt.h` for the win32 code and two shell helpers in `session/lhde-paths.sh`:
 
 - Extended attributes are extattr(2)'s: lhde's programs and tools name them as on Linux (`user.lux.desc`), stored in the user
-  namespace without the prefix (`getextattr user lux.desc FILE`; `lsextattr user FILE` lists them). Only the user namespace is
-  listed and copied. The Python tools reach extattr through ctypes (Python has no `os.getxattr` there).
+  namespace without the prefix (`getextattr user lux.desc FILE`; `lsextattr user FILE` lists them), so lhde-import's
+  annotations, the Python tools (through ctypes: Python has no `os.getxattr` there) and the C programs read each other's.
+  Only the user namespace is listed and copied. ZFS keeps them (`xattr=sa`). A missing attribute is `ENOATTR`, which the C
+  code compares as `LHDE_ENOATTR` (libc++ defines an `ENODATA` of its own).
 - The running binary, another process's binary, its environment and arguments come from sysctl(3) (`kern.proc`), not
   `/proc`; the session scripts read them with procstat(1) (`lhde_environ`, `lhde_args`), and detach with daemon(8) where
-  there is no setsid(1).
+  there is no setsid(1) (`$LHDE_SETSID`: a command, since FreeBSD's sh does not export an assignment written before a
+  function call). A set-user-id program (FreeBSD's urxvt) does not show its environment.
 - The mounts (My Computer's drives, the Details pane's file system, which folders are on the network for thumbnails) come
   from getmntinfo(3) and statfs's `f_fstypename` (nfs, smbfs, p9fs and the network FUSE file systems are remote).
 - Pack archives: bsdtar unpacks a `.tar.zst` / `.tar.xz` pack with its annotations; making one (`lhde-pack` without `--zip`)
   needs GNU tar, `gtar`.
-- In C, FreeBSD's headers type `wchar_t` as `int` whatever `-fshort-wchar` says; `wux/w32/include/flxp_crt.h` types it as
-  the compiler's 16-bit one for the win32 code.
-- Not there yet (todo_ideas/repo.txt): the brightness, battery and volume tray items and tiles read Linux's `/sys/class` and
-  PipeWire/PulseAudio/ALSA and show nothing; the explorer's "open in a new window" runs `/proc/self/exe`.
+- In C, FreeBSD's headers type `wchar_t` as `int` whatever `-fshort-wchar` says; `flxp_crt.h` types it as the compiler's
+  16-bit one for the win32 code. In C++, libc++ runs `std::find` over 16-bit types, `u16string::find` and
+  `char_traits<wchar_t>` through the wide-string builtins, which would call the libc's 32-bit `wmemchr`, `wmemcmp` and
+  `wcslen`; `flxp_crt.h` makes them 16-bit loops.
+- No mingw windres package: a `.res` whose `.rc` looks newer (a checkout's times) is kept as checked in, with a warning.
+- Not there yet (todo_ideas/repo.txt): the brightness and battery tray items and tiles read Linux's `/sys/class` and show
+  nothing; the volume item works through pactl when PulseAudio is installed, not through mixer(8).
 
 ### luxnav (the explorer header's vision mode)
 
@@ -187,7 +208,7 @@ work against stub system commands (`luxshell/tests/tiles.sh`), every tile is in 
 (`luxshell/tests/parts.py`), and luxwm's frame
 regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a
 baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the first run); skipped
-without imported styles.
+without imported styles or when a frame set's style is missing (the free pack only: its classic renders are check-free's).
 Last the free baseline (`make check-free`, `tests/check-free.sh`): the free pack or ReactOS's boot CD (`FREE_PACK=FILE`,
 `LHDE_REACTOS_ISO=FILE`, `~/lib/windows_isos/ReactOS-*.iso`, or the pack `make fetch-free-pack` downloaded into
 `~/.cache/lhde`, the first there; skipped without any, so a CI runs `make fetch-free-pack` first; beside the ISO the free
