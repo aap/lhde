@@ -1,14 +1,16 @@
 // The notification area's parts besides the XEmbed icons (those are xwm.cpp's): XP's chevron, which hides the inactive
 // icons ([taskbar] hide_inactive, XP's "Hide inactive icons"), the tooltips of the docked icons, and our own three items,
 // as luxshell's tray tiles have them: Volume (XP's tray volume popup: a slider with Mute), Brightness (the same popup
-// without Mute) and Touchpad (a click turns it on or off), read and set through shell/traycontrol.h on a thread of their own.
+// without Mute) and Touchpad (a click turns it on or off), read and set through liblhde's hardware layer (lhde/hw.h) on a
+// thread of their own.
+#include <fcntl.h>
 #include <math.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <chrono>
-#include <condition_variable>
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -16,11 +18,11 @@
 #include "shell/apps.h"
 #include "shell/config.h"
 #include "shell/settings.h"
-#include "shell/traycontrol.h"
 #include "taskbar.h"
 extern "C" {
 #include "w32/flxp_shell.h"
 }
+#include "lhde/hw.h"
 
 namespace tb {
 namespace notify {
@@ -32,66 +34,106 @@ enum { TIMER_HOVER = 40, TIMER_DEMOTE = 41, TIMER_POPUP = 42 };
 const int SLOT = 18;                    // a 16 px icon and XP's 2 px (TB_SETPADDING 2, 2 on the tray's toolbar)
 
 struct State {
-    shell::tray::Volume vol;
-    shell::tray::Backlight bl;
-    shell::tray::Touchpad tp;
+    lhde_volume vol{};
+    lhde_backlight bl{};
+    lhde_touchpad tp{};
 };
 
 // ---- the controls' thread ------------------------------------------------------------
+// It waits up to a second for a command (the wake pipe), a volume event (the layer's descriptor: `pactl subscribe`, where
+// there is one) or the next read: the backlight every time, the volume every second without an event source, else after an
+// event or a command, the touchpad every 2 s.
 std::mutex lock;
-std::condition_variable cv;
 State state;                            // what the thread read last
 std::vector<std::function<void()>> todo;   // commands, run in order; a newer one of a kind replaces a waiting one
 std::vector<int> todo_kind;
 bool quit, have_state;
 std::thread worker;
+int wake[2] = { -1, -1 };
 
 void post_changed() { PostMessageW(g.wnd, WM_TB_TRAYCTL, 0, 0); }
+void wake_up() { if (wake[1] >= 0) { char c = 1; if (write(wake[1], &c, 1) < 0) {} } }
 
 void thread_main()
 {
     long tick = 0;
+    int vfd = lhde_hw_volume_fd();
+    bool first = true;
     for (;;) {
+        bool event = false;
+        if (!first) {
+            struct pollfd p[2] = { { wake[0], POLLIN, 0 }, { vfd, POLLIN, 0 } };
+            if (poll(p, 2, 1000) > 0) {
+                char buf[64];
+                if (p[0].revents) while (read(wake[0], buf, sizeof buf) > 0) {}
+                if (p[1].revents) {
+                    usleep(50000);              // a burst of events: one read after it
+                    int r = lhde_hw_volume_poll();
+                    if (r < 0) vfd = -1;
+                    event = r != 0;
+                }
+            }
+        }
         std::vector<std::function<void()>> run;
         {
-            std::unique_lock<std::mutex> l(lock);
-            cv.wait_for(l, std::chrono::milliseconds(1000), [] { return quit || !todo.empty(); });
-            if (quit) return;
+            std::lock_guard<std::mutex> l(lock);
+            if (quit) break;
             run.swap(todo);
             todo_kind.clear();
         }
         for (auto& f : run) f();
         State s;
-        s.vol = shell::tray::read_volume();
-        s.bl = shell::tray::read_backlight();
         {
             std::lock_guard<std::mutex> l(lock);
-            s.tp = (tick % 2 == 0 || !run.empty() || !have_state) ? shell::tray::read_touchpad() : state.tp;   // every 2 s
+            s = state;
         }
+        if (first || vfd < 0 || event || !run.empty()) lhde_hw_volume(&s.vol);
+        lhde_hw_backlight(&s.bl);
+        if (first || tick % 2 == 0 || !run.empty()) lhde_hw_touchpad(&s.tp);
         tick++;
+        first = false;
         bool changed;
         {
             std::lock_guard<std::mutex> l(lock);
-            changed = !have_state || s.vol.percent != state.vol.percent || s.vol.muted != state.vol.muted || s.vol.ok != state.vol.ok ||
-                      s.vol.error != state.vol.error || s.bl.present != state.bl.present || s.bl.percent != state.bl.percent ||
-                      s.tp.present != state.tp.present || s.tp.enabled != state.tp.enabled;
+            changed = !have_state || s.vol.percent != state.vol.percent || s.vol.muted != state.vol.muted ||
+                      s.vol.present != state.vol.present || strcmp(s.vol.error, state.vol.error) || s.bl.present != state.bl.present ||
+                      s.bl.percent != state.bl.percent || s.tp.present != state.tp.present || s.tp.enabled != state.tp.enabled;
             state = s;
             have_state = true;
         }
         if (changed) post_changed();
     }
+    lhde_hw_close();
 }
 
 void command(int kind, std::function<void()> f)
 {
     {
         std::lock_guard<std::mutex> l(lock);
-        for (size_t i = 0; i < todo_kind.size(); i++)
-            if (todo_kind[i] == kind) { todo[i] = f; cv.notify_one(); return; }
-        todo.push_back(f);
-        todo_kind.push_back(kind);
+        bool replaced = false;
+        for (size_t i = 0; i < todo_kind.size() && !replaced; i++)
+            if (todo_kind[i] == kind) { todo[i] = f; replaced = true; }
+        if (!replaced) {
+            todo.push_back(f);
+            todo_kind.push_back(kind);
+        }
     }
-    cv.notify_one();
+    wake_up();
+}
+
+// the tooltips, as luxshell's: "Volume: 40%", "Volume: 40% (muted)", "Brightness: 60%", "Touchpad: on (click to turn it off)"
+std::string volume_tip(const lhde_volume& v)
+{
+    if (!v.present) return std::string("Volume: ") + v.error;
+    return "Volume: " + std::to_string(v.percent) + "%" + (v.muted ? " (muted)" : "");
+}
+std::string backlight_tip(const lhde_backlight& b)
+{
+    return "Brightness: " + std::to_string(b.percent) + "%" + (b.error[0] ? std::string(" (") + b.error + ")" : "");
+}
+std::string touchpad_tip(const lhde_touchpad& t)
+{
+    return t.enabled ? "Touchpad: on (click to turn it off)" : "Touchpad: off (click to turn it on)";
 }
 
 State current()
@@ -264,14 +306,14 @@ void refresh_own(bool relayout)
         std::string key, tip;
         std::vector<Px> px;
         if (o.kind == OWN_VOLUME) {
-            key = std::to_string(s.vol.ok ? (s.vol.percent <= 0 ? 0 : s.vol.percent < 50 ? 1 : 2) : 0) + (s.vol.muted ? "m" : "");
-            tip = s.vol.ok || !s.vol.error.empty() ? shell::tray::volume_tip(s.vol) : "Volume";
-            if (key != o.key) px = speaker(s.vol.ok ? s.vol.percent : 0, s.vol.muted);
+            key = std::to_string(s.vol.present ? (s.vol.percent <= 0 ? 0 : s.vol.percent < 50 ? 1 : 2) : 0) + (s.vol.muted ? "m" : "");
+            tip = s.vol.present || s.vol.error[0] ? volume_tip(s.vol) : "Volume";
+            if (key != o.key) px = speaker(s.vol.present ? s.vol.percent : 0, s.vol.muted);
         } else if (o.kind == OWN_BRIGHTNESS) {
-            key = "sun"; tip = shell::tray::backlight_tip(s.bl);
+            key = "sun"; tip = backlight_tip(s.bl);
             if (key != o.key) px = sun();
         } else {
-            key = s.tp.enabled ? "on" : "off"; tip = shell::tray::touchpad_tip(s.tp);
+            key = s.tp.enabled ? "on" : "off"; tip = touchpad_tip(s.tp);
             if (key != o.key) px = pad(s.tp.enabled);
         }
         if (!px.empty()) {
@@ -307,14 +349,14 @@ LRESULT CALLBACK popup_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     switch (msg) {
     case WM_VSCROLL: {
         int v = 100 - (int)SendMessageW(GetDlgItem(h, IDC_SLIDER), TBM_GETPOS, 0, 0);
-        if (popup_kind == OWN_VOLUME) command(1, [v] { shell::tray::set_volume(v); });
-        else command(2, [v] { shell::tray::set_backlight(v); });
+        if (popup_kind == OWN_VOLUME) command(1, [v] { lhde_hw_volume_set(v); });
+        else command(2, [v] { lhde_hw_backlight_set(v); });
         return 0;
     }
     case WM_COMMAND:
         if (LOWORD(wp) == IDC_MUTE && HIWORD(wp) == BN_CLICKED) {
             bool on = SendMessageW((HWND)lp, BM_GETCHECK, 0, 0) == BST_CHECKED;
-            command(3, [on] { shell::tray::set_mute(on ? 1 : 0); });
+            command(3, [on] { lhde_hw_volume_mute(on ? 1 : 0); });
         }
         return 0;
     case WM_ACTIVATE:                   // XP's popup closes when it loses the focus
@@ -445,10 +487,10 @@ void own_click(Own& o, UINT msg)
     if (o.kind == OWN_TOUCHPAD) {
         State s = current();
         bool on = !s.tp.enabled;
-        command(4, [on] { shell::tray::set_touchpad(on); });
+        command(4, [on] { lhde_hw_touchpad_set(on); });
         return;
     }
-    if (msg == WM_MBUTTONUP && o.kind == OWN_VOLUME) { command(3, [] { shell::tray::set_mute(-1); }); return; }
+    if (msg == WM_MBUTTONUP && o.kind == OWN_VOLUME) { command(3, [] { lhde_hw_volume_mute(-1); }); return; }
     open_popup(o.kind, sr);
 }
 
@@ -491,7 +533,7 @@ void own_menu(Own& o, POINT pt)
                                     pt.x, pt.y, 0, g.wnd, nullptr);
     DestroyMenu(m);
     if (cmd == CMD_OPEN) startmenu::run_line(mixer());
-    else if (cmd == CMD_MUTE) command(3, [] { shell::tray::set_mute(-1); });
+    else if (cmd == CMD_MUTE) command(3, [] { lhde_hw_volume_mute(-1); });
     else if (cmd == CMD_SLIDER) own_click(o, WM_LBUTTONUP);
     else if (cmd == CMD_TOUCH) own_click(o, WM_LBUTTONUP);
 }
@@ -512,7 +554,10 @@ void start(bool tray_running)
     ti.uId = 1;
     ti.lpszText = (LPWSTR)L"";
     SendMessageW(hover_tip, TTM_ADDTOOLW, 0, (LPARAM)&ti);
-    if (enabled) worker = std::thread(thread_main);
+    if (enabled && pipe(wake) == 0) {
+        for (int fd : wake) fcntl(fd, F_SETFL, O_NONBLOCK), fcntl(fd, F_SETFD, FD_CLOEXEC);
+        worker = std::thread(thread_main);
+    }
     long every = idle_limit_ms() / 2;   // an icon becomes inactive while nothing happens: looked at twice per interval
     SetTimer(g.wnd, TIMER_DEMOTE, (UINT)(every < 30000 ? (every < 250 ? 250 : every) : 30000), nullptr);
     refresh_own(false);
@@ -524,7 +569,7 @@ void stop()
         std::lock_guard<std::mutex> l(lock);
         quit = true;
     }
-    cv.notify_one();
+    wake_up();
     if (worker.joinable()) worker.join();
     if (popup) DestroyWindow(popup);
 }
@@ -662,10 +707,10 @@ bool wheel(POINT screen, int delta)
         int steps = delta / WHEEL_DELTA;
         if (o.kind == OWN_VOLUME) {
             int v = s.vol.percent + 2 * steps;
-            command(1, [v] { shell::tray::set_volume(v); });
+            command(1, [v] { lhde_hw_volume_set(v); });
         } else if (o.kind == OWN_BRIGHTNESS) {
             int v = s.bl.percent + 5 * steps;
-            command(2, [v] { shell::tray::set_backlight(v); });
+            command(2, [v] { lhde_hw_backlight_set(v); });
         }
         return true;
     }

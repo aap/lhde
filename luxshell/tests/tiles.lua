@@ -1,7 +1,8 @@
--- The tray items (trayitems/volume.lua, brightness.lua, touchpad.lua) and the Classic Tray tile hosting them
--- (tiles/notifications.lua) against a stand-in `lh`: nodes are tables, timers and
--- lh.pipe run when the test says so (lh.pipe through io.popen, so the stub commands of tiles.sh on PATH answer), and the
--- commands the tiles run are logged by those stubs. Usage: lua5.4 tiles.lua LUXSHELL_DIR TEST (tiles.sh sets the scene).
+-- The tray items (trayitems/volume.lua, brightness.lua, touchpad.lua), the Classic Tray tile hosting them
+-- (tiles/notifications.lua) and the power tile against a stand-in `lh`: nodes are tables, timers and lh.pipe /
+-- lh.fork_call run when the test says so; lh.hw_* are liblhde's hardware layer itself, through build/bin/lhde-hw ($TR_LHDE_HW:
+-- -k WHAT for a read, its sets), over tiles.sh's fake tree (LHDE_HW_FAKE) and stub commands on PATH, which log what they are
+-- asked. Usage: lua5.4 tiles.lua LUXSHELL_DIR TEST (tiles.sh sets the scene).
 local dir, test = arg[1], arg[2]
 local fails, n = 0, 0
 local function check(what, ok, got) n = n + 1; if ok then print("ok    " .. what) else fails = fails + 1; print("FAIL  " .. what .. (got ~= nil and ("  (got " .. tostring(got) .. ")") or "")) end end
@@ -22,6 +23,47 @@ function lh.cancel(id) timers[id] = nil end
 function lh.now() return os.time() * 1000 end
 function lh.pipe(cmd, on_line, on_done) tid = tid + 1; pipes[tid] = { cmd = cmd, on_line = on_line, on_done = on_done }; return tid end
 function lh.pipe_close(id) pipes[id] = nil end
+function lh.fork_call(fn, on_line, on_done, ...) tid = tid + 1; pipes[tid] = { call = table.pack(fn, ...), on_line = on_line, on_done = on_done, cmd = "" }; return tid end
+-- the hardware layer: lhde-hw's records and sets
+local HW = os.getenv("TR_LHDE_HW")
+local function hwk(what)
+  local f = io.popen(HW .. " -k " .. what .. " 2>/dev/null"); local t = {}
+  for l in f:lines() do local k, v = l:match("^([^=]+)=(.*)$")
+    if k then if v == "true" then v = true elseif v == "false" then v = false elseif tonumber(v) then v = tonumber(v) end t[k] = v end end
+  f:close(); return t
+end
+local function hwset(args)
+  local f = io.popen(HW .. " " .. args .. " 2>&1 >/dev/null"); local out = f:read("a") or ""
+  if f:close() then return true end
+  return nil, out:match("^lhde%-hw: %a+: (.-)\n?$") or out
+end
+function lh.hw_battery() return hwk("battery") end
+function lh.hw_backlight() return hwk("backlight") end
+function lh.hw_volume() return hwk("volume") end
+function lh.hw_touchpad() return hwk("touchpad") end
+function lh.hw_backlight_set(p) return hwset("backlight " .. math.floor(p)) end
+function lh.hw_volume_set(p) return hwset("volume " .. math.floor(p)) end
+function lh.hw_volume_mute(on) return hwset("volume " .. (on == nil and "toggle" or on and "mute" or "unmute")) end
+function lh.hw_touchpad_set(on) return hwset("touchpad " .. (on and "on" or "off")) end
+-- event sources as a Linux system with pactl has them (the layer has none under LHDE_HW_FAKE): volume's when pactl is on
+-- PATH and not ruled out, never the battery's
+local watches, wid = {}, 0
+local function on_path(p) local f = io.popen("command -v " .. p); local o = f:read("l"); f:close(); return o ~= nil end
+function lh.hw_watch(what, fn)
+  if what ~= "volume" or os.getenv("LHDE_HW_SYSTEM") == "freebsd" or os.getenv("LHDE_HW_VOLUME") == "amixer" or not on_path("pactl") then return nil end
+  wid = wid + 1; watches[wid] = { what = what, fn = fn }; return wid
+end
+function lh.hw_unwatch(id) local had = watches[id] ~= nil; watches[id] = nil; return had end
+-- lh.fork_call's lines: what luxshell's child writes
+local function fc_lines(r)
+  local out = {}
+  local function one(k, v)
+    local ty = type(v) == "string" and "s" or type(v) == "number" and "n" or type(v) == "boolean" and "b"
+    if ty then table.insert(out, k .. "\t" .. ty .. "\t" .. tostring(v)) end
+  end
+  for i = 1, r.n do if type(r[i]) == "table" then for k, v in pairs(r[i]) do if type(k) == "string" then one(k, v) end end else one(tostring(i), r[i]) end end
+  return out
+end
 function lh.on(ev, f) handlers[ev] = handlers[ev] or {}; table.insert(handlers[ev], f) end
 function lh.off(ev, f) for i, g in ipairs(handlers[ev] or {}) do if g == f then table.remove(handlers[ev], i) end end end
 function lh._emit(ev, ...) for _, f in ipairs(handlers[ev] or {}) do f(...) end end
@@ -39,7 +81,11 @@ local function settle()
     local any = false
     local ids = {}; for id in pairs(pipes) do table.insert(ids, id) end table.sort(ids)
     for _, id in ipairs(ids) do local p = pipes[id]
-      if p and not p.cmd:find("subscribe") then
+      if p and p.call then
+        pipes[id] = nil; any = true
+        for _, l in ipairs(fc_lines(table.pack(p.call[1](table.unpack(p.call, 2, p.call.n))))) do p.on_line(l) end
+        if p.on_done then p.on_done() end
+      elseif p and not p.cmd:find("subscribe") then
         pipes[id] = nil; any = true
         local f = io.popen(p.cmd); for l in f:lines() do p.on_line(l) end f:close()
         if p.on_done then p.on_done() end
@@ -79,7 +125,7 @@ if test == "volume-wpctl" then
   local fg = t.foreground
   check("volume: wpctl answers, the tooltip is XP's", tip(fg) == "Volume: 40%", tip(fg))
   check("volume: under 50 % one wave", t.icon_node.name == "speaker-1", t.icon_node.name)
-  check("volume: pactl subscribe follows other programs", (function() for _, p in pairs(pipes) do if p.cmd:find("pactl subscribe") then return true end end end)())
+  check("volume: the layer's event source follows other programs", (function() for _, w in pairs(watches) do if w.what == "volume" then return true end end end)())
   clear_log(); fg.on_click(fg, 4); settle()
   check("volume: wheel up sets 42 %", log():find("wpctl set%-volume @DEFAULT_AUDIO_SINK@ 0.42") ~= nil, log())
   check("volume: and reads it back", tip(fg) == "Volume: 42%", tip(fg))
@@ -88,11 +134,11 @@ if test == "volume-wpctl" then
   clear_log(); fg.on_click(fg, 2); settle()
   check("volume: middle click toggles mute", log():find("wpctl set%-mute @DEFAULT_AUDIO_SINK@ 1") ~= nil, log())
   check("volume: muted icon and tooltip", t.icon_node.name == "speaker-muted" and tip(fg) == "Volume: 38% (muted)", t.icon_node.name .. " " .. tip(fg))
-  -- another program: the state file changes and pactl subscribe reports a sink event
+  -- another program: the state file changes and the layer's event source reports it
   write(os.getenv("TR_STATE"), "0.75\n"); write(os.getenv("TR_STATE") .. ".mute", "0\n")
-  for _, p in pairs(pipes) do if p.cmd:find("subscribe") then p.on_line("Event 'change' on sink #45") end end
+  for _, w in pairs(watches) do w.fn() end
   tick()
-  check("volume: an outside change shows (sink event)", tip(fg) == "Volume: 75%" and t.icon_node.name == "speaker-2", tip(fg))
+  check("volume: an outside change shows (an event)", tip(fg) == "Volume: 75%" and t.icon_node.name == "speaker-2", tip(fg))
   -- the popup
   fg.on_click(fg, 1)
   check("volume: a click opens the popup", lh.flyout_tile == t and t.fly[1] ~= nil)
@@ -107,7 +153,7 @@ if test == "volume-wpctl" then
   check("volume: the wheel on the trackbar", log():find("set%-volume @DEFAULT_AUDIO_SINK@ 0.77") ~= nil, log())
   lh.close_flyout()
   t:dispose()
-  check("volume: dispose ends pactl subscribe", next(pipes) == nil)
+  check("volume: dispose ends its watch and calls", next(pipes) == nil and next(watches) == nil)
   local tb, view = taskbar_tile("volume")
   check("volume: taskbar view, icon and tooltip (muted by the box)", tb.tb_icon.name == "speaker-muted" and tip(view) == "Volume: 77% (muted)", tip(view))
   tb:dispose()
@@ -124,23 +170,33 @@ elseif test == "volume-amixer" then
   clear_log(); t.foreground.on_click(t.foreground, 2); settle()
   check("volume: amixer toggles Master", log():find("amixer %-q set Master unmute") ~= nil, log())
   t:dispose()
+elseif test == "volume-oss" then
+  -- FreeBSD's back end over a recorded mixer (LHDE_HW_SYSTEM=freebsd): no event source, read every second
+  local mixer = os.getenv("LHDE_HW_FAKE") .. "/dev/mixer0"
+  local t = sidebar_tile("volume")
+  local fg = t.foreground
+  check("volume-oss: the OSS mixer's level", tip(fg) == "Volume: 66%" and t.backend == "oss", tip(fg))
+  check("volume-oss: polled, no event source", next(watches) == nil and next(timers) ~= nil)
+  fg.on_click(fg, 4); settle()
+  check("volume-oss: wheel up writes 68:68", read(mixer):find("vol 68:68", 1, true) ~= nil and tip(fg) == "Volume: 68%", read(mixer))
+  fg.on_click(fg, 2); settle()
+  check("volume-oss: middle click sets the mute mask", read(mixer):find("mute 1", 1, true) ~= nil and tip(fg) == "Volume: 68% (muted)", tip(fg))
+  write(mixer, "vol 20:20\nmute 0\n"); tick()
+  check("volume-oss: another mixer's change shows within a second", tip(fg) == "Volume: 20%", tip(fg))
+  t:dispose()
 elseif test == "volume-none" then
   local t = sidebar_tile("volume")
   check("volume: no tool, the tooltip says so", tip(t.foreground) == "Volume: no wpctl, pactl or amixer found", tip(t.foreground))
   t:dispose()
 elseif test == "brightness" then
-  local bl = os.getenv("LHSHELL_BACKLIGHT") .. "/acpi_video0/"
+  local bl = os.getenv("LHDE_HW_FAKE") .. "/sys/class/backlight/acpi_video0/"
   local t = sidebar_tile("brightness")
   local fg = t.foreground
   check("brightness: 600 of 1000 is 60 %", tip(fg) == "Brightness: 60%", tip(fg))
   check("brightness: shown with a device", not t.hidden)
   check("brightness: the sun", t.icon_node.name == "sun", t.icon_node.name)
   clear_log(); fg.on_click(fg, 4); settle()
-  if os.getenv("TR_BRIGHTNESSCTL") then
-    check("brightness: wheel up 5 % through brightnessctl", log():find("brightnessctl %-q %-d acpi_video0 set 650") ~= nil, log())
-  else
-    check("brightness: wheel up 5 % written to sysfs", read(bl .. "brightness"):match("%d+") == "650", read(bl .. "brightness"))
-  end
+  check("brightness: wheel up 5 % written to sysfs", read(bl .. "brightness"):match("%d+") == "650", read(bl .. "brightness"))
   write(bl .. "brightness", "200\n"); tick()
   check("brightness: an outside change shows", tip(fg) == "Brightness: 20%", tip(fg))
   fg.on_click(fg, 1)
@@ -149,7 +205,11 @@ elseif test == "brightness" then
 elseif test == "brightness-readonly" then
   local t = sidebar_tile("brightness")
   clear_log(); t.foreground.on_click(t.foreground, 4); settle()
-  check("brightness: not writable, the tooltip says so", tip(t.foreground):find("not writable") ~= nil, tip(t.foreground))
+  if os.getenv("TR_BRIGHTNESSCTL") then
+    check("brightness: not writable: wheel up 5 % through brightnessctl", log():find("brightnessctl %-q %-d acpi_video0 set 650") ~= nil, log())
+  else
+    check("brightness: not writable, the tooltip says so", tip(t.foreground):find("not writable") ~= nil, tip(t.foreground))
+  end
   t:dispose()
 elseif test == "brightness-none" then
   local t = sidebar_tile("brightness")
@@ -171,6 +231,31 @@ elseif test == "touchpad-none" then
   local t = sidebar_tile("touchpad")
   check("touchpad: none, hidden", t.hidden == true and t.node.visible == false)
   t:dispose()
+elseif test == "power" or test == "power-freebsd" then
+  local tile = dofile(dir .. "/tiles/power.lua")
+  tile.T = {}; tile.foreground = lh.node{ layout = "fill" }
+  tile:initialize()
+  local function label() return tile.g.text.text end
+  if test == "power" then
+    check("power: two batteries discharging, 30 of 44.19 Wh at 7.5 W", label() == "4h00 left: 68%", label())
+    check("power: no pulse on battery", tile.pulse == nil)
+    local fly = tile:flyout()
+    check("power: the flyout counts both", find_text(fly, "Power Status (2)") ~= nil)
+    check("power: the flyout's rate and capacity rows", find_text(fly, "7.5 W") ~= nil and find_text(fly, "30.0 / 44.2 Wh") ~= nil)
+    tile:flyout_closed()
+    write(os.getenv("LHDE_HW_FAKE") .. "/sys/class/power_supply/BAT0/status", "Charging\n")
+    write(os.getenv("LHDE_HW_FAKE") .. "/sys/class/power_supply/AC/online", "1\n")
+    tick()
+    check("power: charging on AC, read again on the timer", label() == "Charging: 68%" and tile.pulse ~= nil, label())
+  else
+    check("power-freebsd: soma on AC, not charging", label() == "On AC: 99%", label())
+    write(os.getenv("LHDE_HW_FAKE") .. "/sysctl/hw.acpi.battery.state", "1\n")
+    write(os.getenv("LHDE_HW_FAKE") .. "/sysctl/hw.acpi.battery.time", "263\n")
+    write(os.getenv("LHDE_HW_FAKE") .. "/sysctl/hw.acpi.acline", "0\n")
+    tick()
+    check("power-freebsd: discharging, the kernel's minutes", label() == "4h23 left: 99%", label())
+  end
+  tile:dispose()
 elseif test == "host" then
   -- the Classic Tray tile with its items after K docked XEmbed icons (5 slots a row at the stand-in's 133 px), no backlight
   local K, foreign = tonumber(os.getenv("TR_DOCKED") or "2"), false

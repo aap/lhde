@@ -106,6 +106,31 @@ flxp-settings' display), `shell::app_hicon(desktop_id, px)` (a program's icon: l
 `shell::one_line_edit` (an edit whose paste joins the clipboard's lines). The shell
 layer's warnings on stderr start with the program's name (`shell::program_name()`, argv[0]'s basename).
 
+## Hardware (lhde/hw.h)
+
+liblhde's hardware layer is public: `#include "lhde/hw.h"` (an application has `-Iliblhde` and links liblhde's objects; outside
+the tree, `pkg-config --cflags --libs lhde`). One interface, a back end per system, chosen at run time:
+
+| | read | set | Linux | FreeBSD |
+| --- | --- | --- | --- | --- |
+| battery | `lhde_hw_battery(&b)`: `count`, `percent`, `state` (charging, discharging, full, idle), `ac`, `minutes`, `now` / `full` / `rate` in Wh / W (or Ah / A), `model` | | `/sys/class/power_supply/*` of type Battery (a device's own battery, scope Device, left out), Mains / USB `online` | sysctl `hw.acpi.battery.{units,life,time,state,rate}`, `hw.acpi.acline` |
+| backlight | `lhde_hw_backlight(&b)`: `percent`, `raw` of `max`, `device`, `method`, `error` (why a set cannot work) | `lhde_hw_backlight_set(percent)` (1..100) | `/sys/class/backlight/*` (firmware, then platform, then raw), written when writable, else `brightnessctl` | `/dev/backlight/*` ioctls (`BACKLIGHTGETSTATUS`, `BACKLIGHTUPDATESTATUS`), `backlight(8)` when they fail |
+| volume | `lhde_hw_volume(&v)`: `percent`, `muted`, `backend`, `device`, `error` | `lhde_hw_volume_set(percent)`, `lhde_hw_volume_mute(1 / 0 / -1 toggle)` | the first that answers of `wpctl` (PipeWire), `pactl` (PulseAudio), `amixer` (ALSA Master) | the OSS mixer of `hw.snd.default_unit` (`SOUND_MIXER_READ_VOLUME` / `WRITE_VOLUME`, `SOUND_MIXER_MUTE`), `mixer(8)` when its ioctls fail, then the Linux commands (a PulseAudio without a mixer device) |
+| touchpad | `lhde_hw_touchpad(&t)`: `enabled`, `id`, `name`, `prop` | `lhde_hw_touchpad_set(on)` | `xinput`: the X server's device, the same on every system | |
+
+A read returns 1 when the thing is there and 0 when not (a desktop has no battery or backlight); a set returns 0, or -1 with
+`lhde_hw_error()`. Calls may run one of those programs and wait for it (two seconds at most), so a window program calls them
+from a thread of its own (flxp-taskbar's tray controls, `flxp/taskbar/notify.cpp`, are the example: one worker thread reads,
+runs the sets in order and posts a message when something changed); the layer keeps no lock, one thread per process uses it.
+Changes: `lhde_hw_volume_fd()` and `lhde_hw_battery_fd()` are descriptors to poll (`pactl subscribe`'s output, the kernel's
+uevents, devd's socket), `-1` where the system has none (FreeBSD's mixer: read every `LHDE_HW_VOLUME_POLL_MS`); after one is
+readable, `lhde_hw_volume_poll()` / `lhde_hw_battery_poll()` say whether it changed. `lhde_hw_describe(LHDE_HW_ALL, buf, n)`
+names the back end in use for each, for a tooltip or a bug report; `lhde_hw_fields` gives a record's fields as keys and values
+(luxshell's `lh.hw_*` tables are made from it). `lhde-hw` is the same from a shell: `lhde-hw`, `lhde-hw describe`, `lhde-hw
+volume 40`, `lhde-hw backlight +5`, `lhde-hw touchpad off`. Tests point it at recorded files: `LHDE_HW_FAKE=DIR` (DIR/sys/...
+for Linux; DIR/sysctl/NAME, DIR/dev/backlight/NAME, DIR/dev/mixerN for FreeBSD), `LHDE_HW_SYSTEM=linux|freebsd`,
+`LHDE_HW_VOLUME=wpctl|pactl|amixer|oss|mixer`.
+
 ## Trying it in the lab
 
 `LAB=:9 session/lab.sh start`, `session/lab.sh shell`, then `DISPLAY=:9 build/bin/NAME`; `session/lab.sh theme luna` and

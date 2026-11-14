@@ -611,7 +611,7 @@ overrides): `runtime.lua` (event bus, animation, packs, taskbar, sidebar and its
 bar and start-menu coordination, compositor, root commands), `session.lua` (the theme through liblhde, settings.ini, the state
 file, session commands), `settings.lua` (settings flyout, run box), `menu.lua`, `flyout.lua`, `toast.lua`, `notifylog.lua`,
 `tooltip.lua`, `apps.lua` (desktop entries, icon-theme lookup, launch counts), `traycontrol.lua` (the tray items' shared view,
-drawn icons, slider flyout and command queue, 8.6), `tiles/*.lua`.
+drawn icons, slider flyout and the queue of hardware calls, 8.6), `tiles/*.lua`.
 
 Events (`lh.on(name, fn)`, `lh._emit`): from C `windows`, `window(id)`, `desktop`, `maxmode`, `workarea`, `toplevel(win, map |
 unmap | destroy)`, `lh-theme`, `command`, `settings-changed(serial, hint)`, `start-key(l0..l4)`, `startmenu-open`,
@@ -907,14 +907,16 @@ apart, centred, the items after the tray's icons.
 
 ### 8.3 Power (`tiles/power.lua`)
 
-`/sys/class/power_supply/BAT0` (`status`, `capacity`, `energy_now/full` + `power_now` or `charge_*` + `current_now`),
-`AC/online`, every **30 s**; time left = now / rate (discharging), (full - now) / rate (charging). `LHSHELL_POWER_SUPPLY` /
-`LHSHELL_BATTERY` point it at a fake sysfs directory. `powergauge.xaml` uses no imageres ids, only vector brushes: the battery
+liblhde's hardware layer (`lh.hw_battery`, `<lhde/hw.h>`, docs/APPLICATIONS.md "Hardware"): every battery together, Linux's
+`/sys/class/power_supply` (energy or charge now / full and the rate; time left = now / rate discharging, (full - now) / rate
+charging), FreeBSD's `hw.acpi.battery` sysctls (the kernel's minutes); every **30 s** and on the layer's battery events
+(`lh.hw_watch("battery")`: the kernel's uevents, devd's socket). "On AC: N%" while on AC neither charging nor full (a
+ThinkPad's charge threshold). `LHDE_HW_FAKE` points the layer at a recorded tree. `powergauge.xaml` uses no imageres ids, only vector brushes: the battery
 (`battery_body` 35x19 ShinyWhite, `nub` 3x10, red plus/minus, `ACLogo` plug) rotated 270° and scaled 0.95, at x 7..24, y 7..41 of
 the tile as measured in `lh4074-181415.png`; the ACLogo pulses 0 → 1 → 0 over 2 s while charging. Gauge `#808080` 104x19 at x
 33, y 6, ShinyGreen (Yellow <= 25 %, Red <= 10 %) inset 2 px over a 40 % copy, GraySweep 15 %. Text Segoe UI 13 bold `#dddddd`
 centred under it: "Charging: N%", "XhMM left: N%", "Charged: N%". Tile 49 high. Flyout (`powerflyout.xaml`): white, 194 wide,
-"Power Status (1)" #808080 bold 14, the gauge, status / charge / time / rate / capacity rows, "Power Plans" with the selected
+"Power Status (N)" (the number of batteries) #808080 bold 14, the gauge, status / charge / time / rate / capacity rows, "Power Plans" with the selected
 one from `/sys/firmware/acpi/platform_profile` (read-only); brightness and "keep my screen on" are not shown.
 
 ### 8.4 Quick Launch (`tiles/quicklaunch.lua`)
@@ -950,7 +952,13 @@ minimized sidebar's taskbar view the same icons follow the tray's in 20 px slots
 backlight, no touchpad) takes no slot. While another client owns the tray (flxp-taskbar), the tile shows the items alone (in
 the first slots), and hides when none is shown. Left click: the slider flyout (the touchpad: toggles), left of the sidebar at
 the tile's top, or from the taskbar above the bar at the pointer; wheel: a step; middle click: the volume's mute. Tooltips are
-read when they show. Each item runs its commands while its tile is up (one instance per tile view).
+read when they show. Each item reads while its tile is up (one instance per tile view).
+
+The values come from liblhde's hardware layer (`<lhde/hw.h>`, docs/APPLICATIONS.md "Hardware"), the same calls flxp-taskbar's
+items make: `lh.hw_volume`, `lh.hw_backlight`, `lh.hw_touchpad` and their sets. The volume's and touchpad's may run a program
+and wait for it (wpctl, xinput), so the items make them in a child of luxshell (`traycontrol.lua` `C.hw` over `lh.fork_call`:
+the child calls the binding and writes the table back through a pipe the main loop reads); the backlight's are a file or an
+ioctl and run in place.
 
 Icons: none of the packs' images fits (4074's imageres and shell32 have no speaker, sun or touchpad; XP's tray speaker is in
 sndvol32 / stobject, which lhde-import does not take), so they are drawn: shapes sampled 4x4 per pixel into 1 px rect runs. A
@@ -963,21 +971,22 @@ popup is measured: 72 wide on white (the power flyout's background) inside the f
 from the top, a 100 px travel with 11 ticks (every 10 %, 3 px each side), a 21x11 thumb (radius 2, `#1C5180` frame, white to
 `#D6D2C2`) on a 4 px sunken channel, the check box row (13 px box, Marlett check) 4 px under the trackbar, 6 px bottom margin.
 A press on the trackbar jumps the thumb there and drags it (the value is sent at most every 60 ms while dragging and once on
-release), the wheel steps; an outside change moves the thumb unless the pointer holds it. Commands run one at a time in order
-(`traycontrol.lua` `C.queue`: a waiting command of the same kind is replaced by the newer, so wheel bursts collapse), then the
+release), the wheel steps; an outside change moves the thumb unless the pointer holds it. Sets run one at a time in order
+(`traycontrol.lua` `C.queue`: a waiting set of the same kind is replaced by the newer, so wheel bursts collapse), then the
 item reads the value back.
 
 | Item | Reads | Sets | Follows outside changes |
 | --- | --- | --- | --- |
-| Volume | the first that answers of `wpctl get-volume @DEFAULT_AUDIO_SINK@` ("Volume: 0.40 [MUTED]"), `pactl get-sink-volume` + `get-sink-mute @DEFAULT_SINK@`, `amixer get Master` ("[40%] ... [on]"); `LHSHELL_VOLUME` forces one | `wpctl set-volume / set-mute`, `pactl set-sink-volume N% / set-sink-mute`, `amixer -q set Master N% / mute / unmute`; wheel 2 %, up to 100 % (a level above stays) | `pactl subscribe` (sink and server events, 50 ms debounce) when pactl is installed, else a read every 1 s |
-| Brightness | `/sys/class/backlight/<dev>/brightness`, `max_brightness`; the device of `type` firmware, else platform, else raw (the kernel's ranking); `LHSHELL_BACKLIGHT` another directory | `brightnessctl -q -d DEV set RAW` when installed, else a write to `brightness` when writable, else the tooltip says neither works; wheel 5 %, never below 1 % | a read every 1 s |
-| Touchpad | `xinput list`: the first slave pointer named *touchpad* or *trackpad* (any case); `xinput list-props ID`: `libinput Device Enabled`, else `Device Enabled` | `xinput set-prop ID '<that property>' 0/1` | `list-props` every 2 s; without a touchpad `xinput list` every 10 s |
+| Volume | `lh.hw_volume`, in a child. Linux: the first that answers of `wpctl get-volume @DEFAULT_AUDIO_SINK@` ("Volume: 0.40 [MUTED]"), `pactl get-sink-volume` + `get-sink-mute @DEFAULT_SINK@`, `amixer get Master` ("[40%] ... [on]"). FreeBSD: the OSS mixer of `hw.snd.default_unit` (`vol`, else `pcm`; the mute mask), `mixer(8)` when its ioctls fail, then pactl. `LHDE_HW_VOLUME` forces one | `lh.hw_volume_set` / `lh.hw_volume_mute`: `wpctl set-volume / set-mute`, `pactl set-sink-volume N% / set-sink-mute`, `amixer -q set Master N% / mute / unmute`; the mixer's level and mute mask (without `SOUND_MIXER_MUTE`: 0, the level remembered in `~/.local/state/lhde/hw-volume-muted`); wheel 2 %, up to 100 % (a level above stays) | `lh.hw_watch("volume")`: `pactl subscribe` (sink and server events, 50 ms debounce) when pactl is installed (Linux), else a read every 1 s |
+| Brightness | `lh.hw_backlight`. Linux: `/sys/class/backlight/<dev>/brightness`, `max_brightness`; the device of `type` firmware, else platform, else raw (the kernel's ranking). FreeBSD: `/dev/backlight/backlight0` (`BACKLIGHTGETSTATUS`: 0..100) | `lh.hw_backlight_set`: a write to `brightness` when writable, else `brightnessctl -q -d DEV set RAW`; FreeBSD `BACKLIGHTUPDATESTATUS`, else `backlight(8)`; else the tooltip says who may write it; wheel 5 %, never below 1 % | a read every 1 s |
+| Touchpad | `lh.hw_touchpad`, in a child: `xinput list`, the first slave pointer named *touchpad* or *trackpad* (any case); `xinput list-props ID`: `libinput Device Enabled`, else `Device Enabled` | `lh.hw_touchpad_set`: `xinput set-prop ID '<that property>' 0/1` | every 2 s; without a touchpad every 10 s; never again without xinput |
 
-Tooltips: "Volume: 40%" (XP's), "Volume: 40% (muted)", on failure "Volume: no wpctl, pactl or amixer found" or "Volume:
-pactl: <its first line>"; "Brightness: 60%", "Brightness: 60% (not writable ...)"; "Touchpad: on (click to turn it off)". Tested
-by `luxshell/tests/tiles.sh` (stub commands on a PATH of their own, a fake backlight directory; `tiles.lua` drives the items
-and the Classic Tray tile hosting them through a stand-in `lh`: the slots after the docked icons, the wrap to a second row,
-the foreign tray, the taskbar view, the flyout placement), part of `make check`.
+Tooltips: "Volume: 40%" (XP's), "Volume: 40% (muted)", on failure the layer's reason ("Volume: no wpctl, pactl or amixer
+found", "Volume: pactl: <its first line>", "Volume: /dev/mixer0: Permission denied"); "Brightness: 60%", "Brightness: 60% (not
+writable ...)"; "Touchpad: on (click to turn it off)". Tested by `luxshell/tests/tiles.sh` (the layer itself through
+`build/bin/lhde-hw` over a fake tree, `LHDE_HW_FAKE`, Linux's and FreeBSD's, with stub commands on a PATH of their own;
+`tiles.lua` drives the items, the power tile and the Classic Tray tile hosting them through a stand-in `lh`: the slots after
+the docked icons, the wrap to a second row, the foreign tray, the taskbar view, the flyout placement), part of `make check`.
 
 ## 9. Toasts: `org.freedesktop.Notifications` (`notify.c`, `toast.lua`)
 
@@ -1062,8 +1071,8 @@ flxp-taskbar on the display runs as the start menu alone (no bar, no tray: it re
 it never takes the selection from it, `tray_takeover` or not); without luxshell flxp-taskbar claims the selection when it is
 free and waits for it otherwise (`flxp.ini tray_takeover = 1` takes it from another tray program).
 
-**XP's parts** (`taskbar.cpp` the layout and the menu, `quicklaunch.cpp`, `notify.cpp`, `xwm.cpp` the X side,
-`shell/traycontrol.cpp` the commands):
+**XP's parts** (`taskbar.cpp` the layout and the menu, `quicklaunch.cpp`, `notify.cpp`, `xwm.cpp` the X side; the tray's own
+controls through liblhde's hardware layer, `<lhde/hw.h>`, as luxshell's items):
 
 | Part | What it does |
 | --- | --- |

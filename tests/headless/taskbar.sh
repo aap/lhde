@@ -7,7 +7,9 @@
 #     button; a click on an entry runs it; [taskbar] quicklaunch = 0 hides the toolbar;
 #   the menus: a right click on the bar's empty part opens the taskbar menu, Show the Desktop (k) sets _NET_SHOWING_DESKTOP,
 #     Show Open Windows clears it (with an xterm to minimise; without xterm these two are skipped).
-# The tray's own controls run against stub commands (no wpctl, pactl, amixer, xinput; no backlight directory): Volume only.
+# The tray's own controls run over liblhde's hardware layer with a fake tree (LHDE_HW_FAKE) and a PATH without wpctl, pactl,
+# amixer and xinput: Volume only, until the tree gets a backlight: then Brightness beside it, and the wheel over it sets 5 %
+# more in the tree.
 # Needs Xvfb, xdotool, xprop and xwininfo. Usage: tests/headless/taskbar.sh [:DISPLAY]
 D=${1:-:79}
 R=$(cd "$(dirname "$0")/../.." && pwd)
@@ -15,10 +17,10 @@ for t in Xvfb xdotool xprop xwininfo; do command -v $t >/dev/null 2>&1 || { echo
 [ -x "$R/build/luxshell/tests/trayicon" ] || { echo "skip: build/luxshell/tests/trayicon not built"; exit 0; }
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
-mkdir -p $T/home/.config/lhde $T/ql $T/bin $T/bl
+mkdir -p $T/home/.config/lhde $T/ql $T/bin $T/hw
 export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config XDG_DATA_HOME=$T/home/.local/share XDG_STATE_HOME=$T/home/.local/state \
-       XDG_CACHE_HOME=$T/home/.cache DISPLAY=$D LHDE_WINDOWS=/nonexistent LHSHELL_BACKLIGHT=$T/bl FLXP_TASKBAR_LOG=1
-unset LHDE_DATA LHDE_SETTINGS
+       XDG_CACHE_HOME=$T/home/.cache DISPLAY=$D LHDE_WINDOWS=/nonexistent LHDE_HW_FAKE=$T/hw LHDE_HW_SYSTEM=linux FLXP_TASKBAR_LOG=1
+unset LHDE_DATA LHDE_SETTINGS LHDE_HW_VOLUME
 # a PATH without the mixers and xinput: our Volume item says it has none, Touchpad stays away
 for c in sh touch sleep cat xdg-open; do p=$(command -v $c) && ln -s "$p" $T/bin/$c; done
 printf '[Desktop Entry]\nType=Application\nName=Make a mark\nExec=touch %s/launched\n' "$T" > $T/ql/mark.desktop
@@ -69,6 +71,21 @@ has_tip() { grep -q 'tooltip trayicon' $T/tb.log; }
 wait_for 5 has_tip && ok "the icon's name as its tooltip" || bad "no tooltip for the icon"
 xdotool mousemove 500 300
 unicons; unbar
+
+# a backlight in the fake tree: Brightness beside Volume; the wheel over it
+BL=$T/hw/sys/class/backlight/acpi_video0
+mkdir -p $BL; echo 600 > $BL/brightness; echo 1000 > $BL/max_brightness; echo firmware > $BL/type
+bar "hide_inactive = 0"
+two_own() { [ "$(field own 3)" = 2 ]; }
+wait_for 5 two_own
+check "Brightness beside Volume with a backlight" 2 "$(field own 3)"
+ol=$(field own 1); by=$(last | sed 's/.*layout bar //' | cut -d' ' -f2); bb=$(last | sed 's/.*layout bar //' | cut -d' ' -f4)
+xdotool mousemove $((ol + 18 + 8)) $(( (by + bb) / 2 )) click 4
+raised() { [ "$(cat $BL/brightness)" = 650 ]; }
+wait_for 5 raised && ok "the wheel over Brightness: 60 % -> 65 % (650 of 1000)" || bad "the wheel over Brightness: $(cat $BL/brightness)"
+xdotool mousemove 500 300
+unbar
+rm -rf $T/hw/sys
 
 # hidden behind the chevron when inactive (tray_idle 1 s), shown again by it
 IDLE=1 bar "hide_inactive = 1"

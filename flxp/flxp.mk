@@ -21,6 +21,8 @@ SHELLOBJS = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/shell/*.cpp)) $(LHDE_OBJS)
 # store; its objects are linked into every flxp program and test with the shell model
 $(O)/flxp/shell/lhdata.o $(O)/flxp/shell/lhtheme.o $(O)/flxp/shell/settings.o $(O)/flxp/settings/settings.o: CXXFLAGS += -Iliblhde
 $(O)/flxp/shell/icons.o $(O)/flxp/shell/apps.o $(O)/flxp/shell/roles.o: CXXFLAGS += -Iliblhde
+# the tray's own controls: the hardware layer (<lhde/hw.h>)
+$(O)/flxp/taskbar/notify.o: CXXFLAGS += -Iliblhde
 # the shell layer's win32 part (shell/ui.h): linked with wux, so not into the native toolkit tests
 SHELLUIOBJS = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/shell/ui/*.cpp))
 EXPLOBJS  = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/explorer/*.cpp))

@@ -12,7 +12,7 @@ sessions are started. The repository, one build for the parts that were separate
 | `luxwm/`    | the window manager: Longhorn frames (DWM glass frame sets, classic frames from the style through wuxtheme), EWMH, animations; `luxwmc`; `tests/` (frametest, regress) | x11 `lhwm/` |
 | `luxnav/`   | libluxnav, the Longhorn navigation bar (the vision header; C API `lhnav_*`, `lhnav.h`), linked into flxp and navdemo | x11 `lhnav/` |
 | `luxshell/` | the Avalon bars, sidebar, tiles, toasts, start menu: C core + Lua (`*.lua`, `tiles/`) | x11 `lhshell/` (without `assets/`) |
-| `liblhde/`  | liblhde (`<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`): the three trees and every lookup in them, the theme resolver, the settings store; `lhde-theme` (with `explain` and `dirs`); `tests/resolve.c` | new (was `lhtheme/`) |
+| `liblhde/`  | liblhde (`<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`, `<lhde/hw.h>`): the three trees and every lookup in them, the theme resolver, the settings store, the hardware layer; `lhde-theme` (with `explain` and `dirs`), `lhde-hw`; `tests/resolve.c`, `tests/hw.c` | new (was `lhtheme/`) |
 | `session/`  | `lhde-session` (start, theme, taskbar, shell, picom, desktop, stop), `lab.sh` (the headless bench), `lhwall.sh`, theme-reload/-watch, picom configs | x11 `xinitrc.lab`, `second-display.sh`, `lab.sh`, ... |
 | `apps/`     | lhde's applications on the public entry point (`wux/wux.h`, `shell/shell.h`, the recipe `apps/app.mk`; docs/APPLICATIONS.md): `luxshot` (screenshots), `luxattr` (the attributes editor), `luxpad` (the notepad), `skeleton` (the one to copy) | new |
 | `examples/` | extendframe, navdemo, aurorademo (its tables made at build time from the Windows tree) | x11 `examples/` |
@@ -88,7 +88,7 @@ tree). Per component: `make wux`, `make wuxtheme`, `make flxp`, `make tests`, `m
 `make luxshell`, `make examples`, `make apps`.
 
 `make install` installs program files only (docs/LAYOUT.md "The three trees"): `bin/` (the six flxp programs, ut-dump,
-luxwm, luxwmc, luxshell, luxshot, luxattr, luxpad, lhde-theme, lhde-session, lhde-import, lhde-pack, lhde-schemes, lhde-mime), `lib/` (`libwuxtheme`, `libluxnav`, `liblhde` `.so.1` + `.so`, `liblhde.a`, `pkgconfig/`),
+luxwm, luxwmc, luxshell, luxshot, luxattr, luxpad, lhde-theme, lhde-hw, lhde-session, lhde-import, lhde-pack, lhde-schemes, lhde-mime), `lib/` (`libwuxtheme`, `libluxnav`, `liblhde` `.so.1` + `.so`, `liblhde.a`, `pkgconfig/`),
 `lib/lhde/` (`PKGLIBDIR`: the code that is not a binary: `luxshell/` the Lua, `session/` lhde-session's helpers and lab.sh,
 `tools/` lhde-import's Python), `share/lhde/` (`DATADIR`: our shipped text, `themes/ navbar/ icons/ sources/ frames/*/theme.ini
 packs/*/shell.lua`, flxp's `res/icons`), `include/`,
@@ -119,7 +119,7 @@ with GNU make (FreeBSD's make is not):
     LHDE_TEST_DISPLAYS=":71 :72 :73" gmake check
 
 `gmake check` there runs everything `make check` runs on Linux: the shim's and the toolkit's tests, the scripts, liblhde's
-resolver, luxshell's Lua, and the headless scripts under Xvfb, the attribute ones (luxattr, properties, filter, runas,
+resolver and hardware layer, luxshell's Lua, and the headless scripts under Xvfb, the attribute ones (luxattr, properties, filter, runas,
 luxshot) through `getextattr` / `setextattr` (`tests/headless/xattrs.sh`: attr's getfattr and setfattr do not exist there).
 What skips there and why: swatchtest without a `DISPLAY`; luxwm's frame regression and ut-dump without the frame sets'
 styles (a tree with the free pack only); fileops_test's moves between two file systems when its scratch directories share
@@ -147,8 +147,18 @@ flxp-desktop, flxp-taskbar). What differs, all behind `liblhde/compat.h` (one he
   `char_traits<wchar_t>` through the wide-string builtins, which would call the libc's 32-bit `wmemchr`, `wmemcmp` and
   `wcslen`; `flxp_crt.h` makes them 16-bit loops.
 - No mingw windres package: a `.res` whose `.rc` looks newer (a checkout's times) is kept as checked in, with a warning.
-- Not there yet (todo_ideas/repo.txt): the brightness and battery tray items and tiles read Linux's `/sys/class` and show
-  nothing; the volume item works through pactl when PulseAudio is installed, not through mixer(8).
+- The hardware (the power tile, the Volume, Brightness and Touchpad items of luxshell and flxp-taskbar, `lhde-hw`) is
+  liblhde's layer's FreeBSD back end (`liblhde/hw_freebsd.c`, docs/APPLICATIONS.md "Hardware"): the battery from the
+  `hw.acpi.battery` sysctls and `hw.acpi.acline` (every battery together; changes from devd's socket,
+  `/var/run/devd.seqpacket.pipe`), the backlight through `/dev/backlight/backlight0`'s ioctls (the i915 driver registers it
+  when `i915kms` is loaded; `backlight(8)` when they fail), the volume through the OSS mixer of `hw.snd.default_unit`
+  (`/dev/mixerN`: `vol`, its mute mask; `mixer(8)` when the ioctls fail, pactl when there is no mixer device; read every
+  second: the mixer has no change events). sndio is not a back end: on FreeBSD it sits on the same OSS mixer, which the layer
+  reads directly. The touchpad is the X server's (`xinput`, as on Linux): Xorg's libinput driver adds psm's evdev device
+  (`hw.psm.synaptics_support=1`, `kern.evdev.rcpt_mask=12`) as "SynPS/2 Synaptics TouchPad", which the item finds by its
+  name. Permissions: the mixer devices are 0666 and the sysctls and devd's socket readable by everyone; the backlight
+  device is root:video 0660, so a user who sets it is in the `video` group (as root: `pw groupmod video -m USER`, then log in
+  again); without it the item shows the level and its tooltip names the group. `lhde-hw describe` says what is used.
 
 ### luxnav (the explorer header's vision mode)
 
@@ -200,7 +210,7 @@ chrome; the log and the band's row in the pixels): `tests/headless/nowm.sh`, Fol
 mime database (typing jumps, Change... writes `mimeapps.list`, Restore, Edit File Type's New... writes and Restore removes the
 program's copy, New / Delete an extension): `tests/headless/filetypes.sh`, Default Programs on a scratch home in an lhde session
 (a program picked for the editor role and applied: settings.ini `[programs]` and the role file; File Types' Set by names the
-role, Change... for one type wins over it): `tests/headless/defprogs.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron), Quick Launch and taskbar menu under luxwm
+role, Change... for one type wins over it): `tests/headless/defprogs.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron; its own items over the hardware layer's fake tree: Brightness with a backlight, the wheel setting it), Quick Launch and taskbar menu under luxwm
 (xprop, xwininfo; luxshell/tests/trayicon): `tests/headless/taskbar.sh`, every IDC_ cursor shown under the X cursor theme's name (XFixes): `tests/headless/cursors.sh`, Super+R
 opening the start menu's Run dialog (luxwm, luxshell, flxp-startmenu) and settings.ini `[commands] run` instead:
 `tests/headless/runkey.sh`, luxshell keeping exactly one start-menu provider when the provider's command name is not
@@ -224,8 +234,10 @@ luxshell's Log Off and by `lhde-session stop` with nothing left: `tests/headless
 (`LHDE_TEST_DISPLAYS="A B C"` for others), each with a scratch HOME. Skipped when
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).
-Then the lux side (`make check-lux`): luxshell builds and its Lua parses (`luac -p`), its tray items and the Classic Tray tile hosting them
-work against stub system commands (`luxshell/tests/tiles.sh`), every tile is in the sidebar menu's parts list
+Then the lux side (`make check-lux`): liblhde's hardware layer over recorded trees for both systems and stub commands
+(`build/liblhde/tests/hw`: batteries, backlights, the volume back ends, the OSS mute, the touchpad), luxshell builds and its
+Lua parses (`luac -p`), its tray items, the power tile and the Classic Tray tile hosting them work over that layer with a
+fake tree and stub system commands (`luxshell/tests/tiles.sh`), every tile is in the sidebar menu's parts list
 (`luxshell/tests/parts.py`), and luxwm's frame
 regression (`luxwm/tests/regress.sh`): every frame set rendered offline and compared by SHA-256 with a
 baseline of this machine (`build/luxwm/regress/baseline.sha256`, written by the first run); skipped

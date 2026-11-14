@@ -110,7 +110,7 @@ include apps/luxpad/luxpad.mk
 
 all: libs programs tests liblhde luxwm luxshell examples
 libs: $(WUXA) $(UTA) $(UTSO) $(UTPC) $(LHDEA) $(LHDESO) $(LHDEPC) $(LUXNAVA) $(LUXNAVSO) $(LUXNAVPC)
-programs: $(PROGRAMS) $(LUXWM_PROGRAMS) build/bin/luxshell build/bin/lhde-theme
+programs: $(PROGRAMS) $(LUXWM_PROGRAMS) build/bin/luxshell build/bin/lhde-theme build/bin/lhde-hw
 
 # make check: tests/check.sh (tests/tests.mk), then the lux side's, then the free baseline (after luxwm's regression, whose
 # classic renders it compares with)

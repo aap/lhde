@@ -1048,13 +1048,15 @@ light blue) and open where you click, flipped to the left / upwards where they w
   tray: greyed, it has none), *Remove &lt;Name&gt; Tile* (not on pinned tiles, as in 4074; the sidebar menu brings it back).
 
 **Volume, brightness, touchpad** (docs/SHELL-DESIGN.md 8.6) are tray icons of luxshell's: in the Classic Tray tile after the
-programs' tray icons, and after them in the minimized sidebar's taskbar view. *Volume*: the default output's level through PipeWire (`wpctl`),
-PulseAudio (`pactl`) or ALSA (`amixer`), whichever is installed and answers (`LHSHELL_VOLUME=pactl` picks one); a click opens
-XP's small volume popup (the trackbar and *Mute*), the mouse wheel over the icon changes it in 2 % steps, a middle click
-mutes; the tooltip says "Volume: 40%", or which tool is missing or failing. *Brightness*: the backlight in
-`/sys/class/backlight`, set with `brightnessctl` when installed, else directly when the file is writable for you (the `video`
-group on many systems); the same popup, 5 % steps; not shown without a backlight. *Touchpad*: a click turns the touchpad off
-and on (`xinput`); not shown without one. They go and come with the Classic Tray tile. With the classic taskbar
+programs' tray icons, and after them in the minimized sidebar's taskbar view. They read and set the hardware through
+liblhde's layer, which `lhde-hw` shows from a shell (`lhde-hw describe` names what it uses). *Volume*: the default output's
+level, on Linux through PipeWire (`wpctl`), PulseAudio (`pactl`) or ALSA (`amixer`), whichever is installed and answers, on
+FreeBSD the OSS mixer of `hw.snd.default_unit` (`LHDE_HW_VOLUME=pactl` picks one); a click opens XP's small volume popup (the
+trackbar and *Mute*), the mouse wheel over the icon changes it in 2 % steps, a middle click mutes; the tooltip says "Volume:
+40%", or what is missing or failing. *Brightness*: the backlight in `/sys/class/backlight` (written directly when the file is
+writable for you, the `video` group on many systems, else with `brightnessctl`) or FreeBSD's `/dev/backlight` (the `video`
+group); the same popup, 5 % steps; not shown without a backlight. *Touchpad*: a click turns the touchpad off and on
+(`xinput`); not shown without one. They go and come with the Classic Tray tile. With the classic taskbar
 (flxp-taskbar holds the tray) they stay in the sidebar's Classic Tray tile, alone.
 - **Taskbar menu** (Avalon taskbar): right-click an empty part. 4074's items: *Minimize bar* / *Restore bar* (the sidebar),
   *Properties* (the settings flyout: theme list, Save as..., composition, taskbar kind and autohide, start menu, sidebar
@@ -1343,6 +1345,8 @@ name. On the first start luxshell creates the folder with copies of your browser
 or rename files there (the tile follows within seconds; *Open Quick Launch folder* in the tile menu opens it). Minimized, the
 icons sit in the taskbar.
 
-**Power tile** reads `/sys/class/power_supply/BAT0` and `AC/online` every 30 s; click it for the details flyout.
-`LHSHELL_POWER_SUPPLY=/some/dir` (with `BAT0/{status,capacity,...}` and `AC/online` files) fakes a battery for screenshots.
+**Power tile** reads the batteries through liblhde's hardware layer (`lhde-hw battery`: `/sys/class/power_supply` on Linux,
+`hw.acpi.battery` on FreeBSD) every 30 s and when the system reports a change; click it for the details flyout.
+`LHDE_HW_FAKE=/some/dir` (with `sys/class/power_supply/BAT0/{type,status,capacity,...}` and `AC/{type,online}` files) fakes a
+battery for screenshots.
 `LHSHELL_DEBUG=1` makes luxshell log events and paint times (CLOCK_MONOTONIC ms) to stderr.
