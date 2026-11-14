@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string>
+#include "liblhde/compat.h"
 #include "w32/w32.h"
 extern "C" {
 #include "winnls.h"
@@ -663,7 +664,7 @@ static void test_imm()
 static std::string beside_exe(const char* rel)
 {
     char exe[4096];
-    ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+    ssize_t n = lhde_self_exe(exe, sizeof exe);
     if (n <= 0) return rel;
     exe[n] = 0;
     std::string p = exe;

@@ -8,9 +8,9 @@
 #include <strings.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
-#include <sys/xattr.h>
 #include <time.h>
 #include <algorithm>
+#include "liblhde/compat.h"
 #include "config.h"
 #include "details.h"
 #include "thumbs.h"
@@ -124,14 +124,13 @@ Facts probe(const Item& it)
             f.total = (uint64_t)st.f_blocks * st.f_frsize;
             f.free = (uint64_t)st.f_bavail * st.f_frsize;
         }
-        // the file system: the last /proc/mounts line for the mount point
-        FILE* m = fopen("/proc/mounts", "r");
-        if (m) {
-            char line[1024], dev[256], mnt[512], fs[64];
-            while (fgets(line, sizeof line, m))
-                if (sscanf(line, "%255s %511s %63s", dev, mnt, fs) == 3 && it.path == mnt) f.fs = fs;
-            fclose(m);
-        }
+        // the file system: the last mount on the mount point
+        struct At { const std::string* path; std::string* fs; } at = { &it.path, &f.fs };
+        lhde_mount_each([](const char*, const char* mnt, const char* fs, void* c) {
+            At* a = (At*)c;
+            if (*a->path == mnt) *a->fs = fs;
+            return 0;
+        }, &at);
         return f;
     }
     f.xattrs = read_stored(it.path);
@@ -180,10 +179,10 @@ Read read_attr(const std::string& path, const std::string& xattr, std::string* v
     value->clear();
     if (error) *error = 0;
     for (int tries = 0; tries < 8; tries++) {
-        ssize_t n = getxattr(path.c_str(), xattr.c_str(), nullptr, 0);
+        ssize_t n = lhde_xattr_get(path.c_str(), xattr.c_str(), nullptr, 0);
         if (n > 0) {
             value->resize((size_t)n);
-            n = getxattr(path.c_str(), xattr.c_str(), &(*value)[0], value->size());
+            n = lhde_xattr_get(path.c_str(), xattr.c_str(), &(*value)[0], value->size());
             if (n < 0 && errno == ERANGE) continue;
         }
         if (n < 0) {
@@ -207,11 +206,11 @@ Read list_attrs(const std::string& path, std::vector<std::string>* names, int* e
     names->clear();
     if (error) *error = 0;
     for (int tries = 0; tries < 8; tries++) {
-        ssize_t n = listxattr(path.c_str(), nullptr, 0);
+        ssize_t n = lhde_xattr_list(path.c_str(), nullptr, 0);
         std::string buf;
         if (n > 0) {
             buf.resize((size_t)n);
-            n = listxattr(path.c_str(), &buf[0], buf.size());
+            n = lhde_xattr_list(path.c_str(), &buf[0], buf.size());
             if (n < 0 && errno == ERANGE) continue;   // grew in between
         }
         if (n < 0) {
@@ -289,7 +288,7 @@ std::string join_list(const std::vector<std::string>& items)
 // setxattr, or removexattr for an empty value (not being there is fine then)
 static bool put(const std::string& path, const std::string& xattr, const std::string& value, std::string* err)
 {
-    int rc = value.empty() ? removexattr(path.c_str(), xattr.c_str()) : setxattr(path.c_str(), xattr.c_str(), value.data(), value.size(), 0);
+    int rc = value.empty() ? lhde_xattr_remove(path.c_str(), xattr.c_str()) : lhde_xattr_set(path.c_str(), xattr.c_str(), value.data(), value.size());
     if (rc == 0 || (value.empty() && errno == ENODATA)) return true;
     if (!err) return false;
     std::string n = "'" + base_name(path) + "'";

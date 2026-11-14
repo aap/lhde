@@ -4,7 +4,7 @@
 #include "scene.h"
 #include <X11/Xlib.h>
 #include <cairo/cairo.h>
-#include <lua5.4/lua.h>
+#include <lua.h>
 
 struct surface { Window win; cairo_surface_t *xs; int x, y, w, h; struct node *root; bool dirty, mapped, grabbed; struct node *hot, *pressed; int press_x, press_y, radius, cursor; int geo_dx, geo_dy; int lua_ref; struct surface *next; };
 

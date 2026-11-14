@@ -15,7 +15,9 @@
 
 #define _DEFAULT_SOURCE 1
 #define _BSD_SOURCE 1
+#ifndef __FreeBSD__   /* there a _POSIX_C_SOURCE hides strdup, strtok_r, usleep, CLOCK_MONOTONIC: everything is visible without */
 #define _POSIX_C_SOURCE 2
+#endif
 
 /* CHANGE THIS TO USE A DIFFERENT FONT */
 #define DEFAULT_FONT "Monospace 10"

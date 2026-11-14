@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include "liblhde/compat.h"
 
 static char user_dir[PATH_MAX + 64], win_dir[PATH_MAX + 32], tree_dir[PATH_MAX], exe_dir[PATH_MAX];
 static struct root { char path[PATH_MAX]; int kind; } roots[LHDE_DATA_MAX];
@@ -29,7 +30,7 @@ static int is_tree(const char *p)
 static void find_exe_and_tree(void)
 {
     char p[PATH_MAX];
-    ssize_t k = readlink("/proc/self/exe", p, sizeof p - 1);
+    ssize_t k = lhde_self_exe(p, sizeof p);
     if (k <= 0) return;
     p[k] = 0;
     char *sl = strrchr(p, '/');

@@ -3,7 +3,7 @@
    SHELL-DESIGN 2.4.5) and reports back through lh.notification_closed / lh.notification_action. */
 #include "luxshell.h"
 #include <dbus/dbus.h>
-#include <lua5.4/lauxlib.h>
+#include <lauxlib.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

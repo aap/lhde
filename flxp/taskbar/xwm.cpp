@@ -17,6 +17,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
+#include "liblhde/compat.h"
 #include "xwm.h"
 #include "shell/icons.h"
 
@@ -944,9 +945,8 @@ std::string wm_executable()
         if (XGetWindowProperty(d, w, XInternAtom(d, "_NET_WM_PID", False), 0, 1, False, XA_CARDINAL, &t, &f, &n, &after,
                                &data) == Success && data) {
             if (n == 1) {
-                char link[64], buf[4096];
-                snprintf(link, sizeof link, "/proc/%lu/exe", ((unsigned long*)data)[0]);
-                ssize_t r = readlink(link, buf, sizeof buf - 1);
+                char buf[4096];
+                ssize_t r = lhde_pid_exe((pid_t)((unsigned long*)data)[0], buf, sizeof buf);
                 if (r > 0) s.assign(buf, (size_t)r);
             }
             XFree(data);

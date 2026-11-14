@@ -899,7 +899,7 @@ static void open_new_window(const std::string& p)
     if (p.empty()) return;
     if (p == trash_dir()) shell::make_dirs(p);
     std::string err;
-    shell::spawn({ "/proc/self/exe", p }, shell::home_dir(), &err);
+    shell::spawn({ shell::self_exe(), p }, shell::home_dir(), &err);
 }
 
 static bool same_uri(const shell::Bookmark& b, const Entry& e) { return b.uri == e.uri; }

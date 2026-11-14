@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string>
 #include <string.h>
+#include "liblhde/compat.h"
 #include "res/res.h"
 #include "w32/w32.h"
 #include "w32/user.h"
@@ -49,7 +50,7 @@ static INT_PTR CALLBACK dlg_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 static std::string beside_exe(const char* rel)
 {
     char exe[4096];
-    ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+    ssize_t n = lhde_self_exe(exe, sizeof exe);
     if (n <= 0) return rel;
     exe[n] = 0;
     std::string p = exe;

@@ -14,6 +14,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <string>
+#include "liblhde/compat.h"
 #include "w32/w32.h"
 #include "w32/user.h"
 extern "C" {
@@ -146,7 +147,7 @@ static HICON load_icon()
     if (const char* e = getenv("FLXP_GLASS_ICON")) path = e;
     else {
         char exe[4096];
-        ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+        ssize_t n = lhde_self_exe(exe, sizeof exe);
         if (n <= 0) return nullptr;
         exe[n] = 0;
         path = exe;

@@ -12,9 +12,9 @@
 #include <X11/extensions/Xfixes.h>
 #include <X11/cursorfont.h>
 #include <cairo/cairo-xlib.h>
-#include <lua5.4/lua.h>
-#include <lua5.4/lauxlib.h>
-#include <lua5.4/lualib.h>
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
 #include <poll.h>
 #include <ctype.h>
 #include <stdint.h>
@@ -27,10 +27,10 @@
 #include <math.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <sys/prctl.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <fontconfig/fontconfig.h>
+#include "liblhde/compat.h"
 
 Display *dpy; int screen; Window root; Visual *argb; static Colormap cmap; static int depth = 32;
 lua_State *L; static bool running = true; static int scr_w, scr_h;
@@ -557,7 +557,7 @@ static int l_pipe(lua_State *L) {
     pid_t parent = getpid(), pid = fork();
     if (pid < 0) { close(fds[0]); close(fds[1]); lua_pushnil(L); return 1; }
     if (pid == 0) {
-        setpgid(0, 0); prctl(PR_SET_PDEATHSIG, SIGTERM); if (getppid() != parent) _exit(1);
+        setpgid(0, 0); lhde_parent_death_signal(SIGTERM); if (getppid() != parent) _exit(1);
         signal(SIGCHLD, SIG_DFL); signal(SIGPIPE, SIG_DFL);
         int nul = open("/dev/null", O_RDONLY); if (nul >= 0) { dup2(nul, 0); close(nul); }
         dup2(fds[1], 1); close(fds[0]); close(fds[1]); close(ConnectionNumber(dpy));
@@ -719,6 +719,28 @@ static int l_trim(lua_State *L) { size_t n; const char *s = luaL_checklstring(L,
     while (s < e && isspace((unsigned char)*s)) s++;
     while (e > s && isspace((unsigned char)e[-1])) e--;
     lua_pushlstring(L, s, (size_t)(e - s)); return 1; }
+/* lh.getpid(): this process's id; lh.display_procs(name, display): the processes whose command name is NAME (as far as the
+   system keeps it: LHDE_COMM_MAX bytes) and whose environment has DISPLAY=display, in the system's order;
+   lh.proc_args(pid): its arguments (an empty table when they cannot be read) */
+static int l_getpid(lua_State *L) { lua_pushinteger(L, (lua_Integer)getpid()); return 1; }
+static int l_display_procs(lua_State *L) {
+    const char *name = luaL_checkstring(L, 1), *disp = luaL_checkstring(L, 2);
+    char want[LHDE_COMM_MAX + 1], comm[64], dv[512]; snprintf(want, sizeof want, "%s", name); snprintf(dv, sizeof dv, "DISPLAY=%s", disp);
+    static pid_t pids[32768]; int n = lhde_proc_pids(pids, (int)(sizeof pids / sizeof *pids)), k = 1;
+    lua_newtable(L);
+    for (int i = 0; i < n; i++) {
+        if (lhde_proc_comm(pids[i], comm, sizeof comm) != 0 || strcmp(comm, want) != 0) continue;
+        size_t len; char *env = lhde_proc_read(pids[i], LHDE_PROC_ENVIRON, &len); if (!env) continue;
+        for (size_t a = 0; a < len; a += strnlen(env + a, len - a) + 1)
+            if (strnlen(env + a, len - a) == strlen(dv) && memcmp(env + a, dv, strlen(dv)) == 0) { lua_pushinteger(L, pids[i]); lua_rawseti(L, -2, k++); break; }
+        free(env);
+    }
+    return 1; }
+static int l_proc_args(lua_State *L) {
+    size_t len; char *c = lhde_proc_read((pid_t)luaL_checkinteger(L, 1), LHDE_PROC_ARGS, &len); int k = 1;
+    lua_newtable(L);
+    for (size_t a = 0; c && a < len; a += strnlen(c + a, len - a) + 1) if (c[a]) { lua_pushlstring(L, c + a, strnlen(c + a, len - a)); lua_rawseti(L, -2, k++); }
+    free(c); return 1; }
 /* lh.cm_owner(): whether a compositing manager owns _NET_WM_CM_S<screen> (picom or any other) */
 static int l_cm_owner(lua_State *L) { char name[32]; snprintf(name, sizeof name, "_NET_WM_CM_S%d", screen); lua_pushboolean(L, XGetSelectionOwner(dpy, XInternAtom(dpy, name, False)) != None); return 1; }
 /* lh.kill(pid): SIGTERM to one process (the compositor rule in runtime.lua picks the pid: a `picom` with our DISPLAY) */
@@ -1033,7 +1055,7 @@ static const luaL_Reg lhlib[] = { {"node", l_node}, {"surface", l_surface}, {"ti
     {"app_icons", l_app_icons}, {"terminal", l_terminal}, {"app_icon", l_app_icon}, {"tray_start", l_tray_start}, {"tray_count", l_tray_count}, {"tray_manager", l_tray_manager}, {"tray_stop", l_tray_stop},
     {"selection_owner", l_selection_owner}, {"watch_selection", l_watch_selection}, {"own_selection", l_own_selection}, {"send_message", l_send_message}, {"send_root_message", l_send_root_message}, {"atom", l_atom},
     {"set_root_cardinal", l_set_root_cardinal}, {"struts", l_struts}, {"spawn_pid", l_spawn_pid}, {"notification_closed", l_notification_closed}, {"notification_action", l_notification_action},
-    {"spawn", l_spawn}, {"pipe", l_pipe}, {"pipe_close", l_pipe_close}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"mtime", l_mtime}, {"exists", l_exists}, {"trim", l_trim},
+    {"spawn", l_spawn}, {"pipe", l_pipe}, {"pipe_close", l_pipe_close}, {"screen", l_screen}, {"root_prop", l_root_prop}, {"set_root_prop", l_set_root_prop}, {"maxmode", l_maxmode}, {"desktop", l_desktop}, {"set_desktop", l_set_desktop}, {"now", l_now}, {"pointer", l_pointer}, {"list_dir", l_list_dir}, {"getpid", l_getpid}, {"display_procs", l_display_procs}, {"proc_args", l_proc_args}, {"mtime", l_mtime}, {"exists", l_exists}, {"trim", l_trim},
     {"data_find", l_data_find}, {"data_resolve", l_data_resolve}, {"data_resolve_dir", l_data_resolve_dir},
     {"component_dir", l_component_dir},
     {"theme_resolve", l_theme_resolve}, {"theme_list", l_theme_list}, {"theme_lookup", l_theme_lookup},
@@ -1055,7 +1077,7 @@ int main(int argc, char **argv) {
     char lua_dir[4200] = "", script_buf[4300], exe_dir[4200] = "";
     { const char *e = getenv("LUXSHELL_LUA"); if (e && *e) snprintf(lua_dir, sizeof lua_dir, "%s", e);
       else if (!lhde_component_dir("luxshell", lua_dir, sizeof lua_dir)) snprintf(lua_dir, sizeof lua_dir, "."); }
-    { ssize_t k = readlink("/proc/self/exe", exe_dir, sizeof exe_dir - 1); if (k > 0) { exe_dir[k] = 0; char *sl = strrchr(exe_dir, '/'); if (sl) *sl = 0; } else exe_dir[0] = 0; }
+    { ssize_t k = lhde_self_exe(exe_dir, sizeof exe_dir); if (k > 0) { exe_dir[k] = 0; char *sl = strrchr(exe_dir, '/'); if (sl) *sl = 0; } else exe_dir[0] = 0; }
     snprintf(script_buf, sizeof script_buf, "%s/runtime.lua", lua_dir);
     const char *script = argc > 1 ? argv[1] : script_buf; signal(SIGCHLD, SIG_IGN);
     struct sigaction sa = { .sa_handler = on_term }; sigaction(SIGTERM, &sa, NULL); sigaction(SIGINT, &sa, NULL);   /* no SA_RESTART: poll returns EINTR */

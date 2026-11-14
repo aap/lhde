@@ -213,7 +213,7 @@ local wp_applied        -- wallpaper|mode last put on the root (a settings reloa
 -- _NET_WM_WINDOW_TYPE_DESKTOP window of another client exists (flxp-desktop started by hand next to a luxshell with its own layer).
 local function desktop_elsewhere()
   if S.flag_value(os.getenv("LHSHELL_DESKTOP"), "LHSHELL_DESKTOP") == false then return true end
-  local me = ""; local f = io.open("/proc/self/stat"); if f then me = (f:read("*l") or ""):match("^(%d+)") or ""; f:close() end
+  local me = tostring(lh.getpid())
   local p = io.popen("for w in $(xprop -root _NET_CLIENT_LIST 2>/dev/null | sed 's/.*# //; s/,//g'); do "
     .. "xprop -id $w _NET_WM_WINDOW_TYPE _NET_WM_PID 2>/dev/null | tr '\\n' ' '; echo; done 2>/dev/null")
   local found = false
@@ -1286,20 +1286,8 @@ lh.on("surface-press", function(x, y, button, win)
 end)
 
 ------------------------------------------------------------------ the classic taskbar, tray and start-menu coordination
--- Processes of this display by name: /proc/PID/comm is NAME and its environment has our DISPLAY (nothing else is touched).
-local function display_pids(name)
-  local out, me = {}, os.getenv("DISPLAY") or ""
-  for _, d in ipairs(lh.list_dir("/proc") or {}) do
-    if d:match("^%d+$") then
-      local f = io.open("/proc/" .. d .. "/comm"); local comm = f and f:read("l"); if f then f:close() end
-      if comm == name:sub(1, 15) then
-        local e = io.open("/proc/" .. d .. "/environ"); local env = e and e:read("a") or ""; if e then e:close() end
-        for kv in env:gmatch("[^%z]+") do if kv == "DISPLAY=" .. me then table.insert(out, tonumber(d)) break end end
-      end
-    end
-  end
-  return out
-end
+-- Processes of this display by name: the command name is NAME and the environment has our DISPLAY (nothing else is touched).
+local function display_pids(name) return lh.display_procs(name, os.getenv("DISPLAY") or "") end
 lh.display_pids = display_pids
 local function pid_is(pid, name)   -- pid still runs NAME on our display (pids are reused; SIGCHLD is ignored, so no wait)
   for _, p in ipairs(display_pids(name)) do if p == pid then return true end end
@@ -1317,11 +1305,10 @@ local function classic_command()
 end
 local function classic_name() return (classic_command():gsub("'", ""):match("^%s*(%S+)") or "flxp-taskbar"):match("([^/]+)$") end
 
--- flxp-taskbar processes of this display: the bar, or one run by hand as the menu-only provider (/proc/PID/cmdline has
+-- flxp-taskbar processes of this display: the bar, or one run by hand as the menu-only provider (its arguments have
 -- --start-menu-only; the provider we start is flxp-startmenu, a name of its own)
 local function menu_only(pid)
-  local f = io.open("/proc/" .. pid .. "/cmdline"); local c = f and f:read("a") or ""; if f then f:close() end
-  for a in c:gmatch("[^%z]+") do if a == "--start-menu-only" then return true end end
+  for _, a in ipairs(lh.proc_args(pid)) do if a == "--start-menu-only" then return true end end
   return false
 end
 local function flxp_pids(want_menu_only, name)
@@ -1363,7 +1350,7 @@ end
 -- tray or struts; it owns _LH_STARTMENU_S<screen>, we forward our Start button and Super to it with the button's rect). Started,
 -- adopted (one already running on this display, or a flxp-taskbar --start-menu-only run by hand), restarted when it dies (at
 -- most 5 times a minute, then nothing opens until the settings change), stopped on a switch to the classic bar (the provider
--- then) and on exit; only ever its own pid, checked against /proc (name, DISPLAY).
+-- then) and on exit; only ever its own pid, checked by its name and DISPLAY.
 local PROVIDER = "flxp-startmenu"
 local provider = { starts = {} }
 local function provider_wanted() return cfg.taskbar ~= "classic" end
@@ -1532,19 +1519,7 @@ end
 -- auto (the theme's frames decide) | 1 | 0; it is applied at startup (1.5 s in: stops the picom the session may
 -- have started for a classic theme, starts one for a glass theme when none runs), on every theme change and when it changes.
 -- Command: settings.ini [commands] picom, else $LHSHELL_PICOM_CMD, else picom --config session/picom-glass.conf --backend glx.
-local function picom_pids()
-  local out, me = {}, os.getenv("DISPLAY") or ""
-  for _, d in ipairs(lh.list_dir("/proc") or {}) do
-    if d:match("^%d+$") then
-      local f = io.open("/proc/" .. d .. "/comm"); local comm = f and f:read("l"); if f then f:close() end
-      if comm == "picom" then
-        local e = io.open("/proc/" .. d .. "/environ"); local env = e and e:read("a") or ""; if e then e:close() end
-        for kv in env:gmatch("[^%z]+") do if kv == "DISPLAY=" .. me then table.insert(out, tonumber(d)) break end end
-      end
-    end
-  end
-  return out
-end
+local function picom_pids() return lh.display_procs("picom", os.getenv("DISPLAY") or "") end
 function lh.picom_command()
   local c = S.get("commands", "picom") or os.getenv("LHSHELL_PICOM_CMD")
   if c and c ~= "" then return c end

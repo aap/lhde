@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <sys/vfs.h>
 #include <limits.h>
 #include <algorithm>
 #include <atomic>
@@ -16,6 +15,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <thread>
+#include "liblhde/compat.h"
 #include "thumbs.h"
 #include "config.h"
 #include "gdi/image.h"
@@ -28,51 +28,7 @@ namespace thumbs {
 
 bool on_network(const std::string& path)
 {
-    struct statfs fs;
-    if (path.empty() || path[0] != '/' || statfs(path.c_str(), &fs) != 0) return false;
-    switch ((unsigned long)fs.f_type) {
-    case 0x6969:        // NFS
-    case 0x517b:        // SMB
-    case 0xff534d42:    // CIFS
-    case 0xfe534d42:    // SMB2
-    case 0x01021997:    // 9p
-    case 0x5346414f:    // AFS
-    case 0x00c36400:    // Ceph
-    case 0x73757245:    // Coda
-    case 0x564c:        // NCP
-        return true;
-    case 0x65735546:    // FUSE: what is behind it (fuseblk, ntfs-3g, is local)
-        break;
-    default:
-        return false;
-    }
-    char real[PATH_MAX];
-    std::string p = realpath(path.c_str(), real) ? real : path;
-    std::string data, best_type;
-    size_t best = 0;
-    if (!read_file("/proc/self/mountinfo", data)) return false;
-    size_t at = 0;
-    while (at < data.size()) {   // "id parent maj:min root mountpoint opts ... - fstype source superopts"
-        size_t nl = data.find('\n', at);
-        std::string line = data.substr(at, nl == std::string::npos ? std::string::npos : nl - at);
-        at = nl == std::string::npos ? data.size() : nl + 1;
-        size_t f = 0;
-        std::string mnt;
-        for (int i = 0; i < 5 && f != std::string::npos; i++) {
-            size_t sp = line.find(' ', f);
-            if (i == 4) mnt = line.substr(f, sp == std::string::npos ? std::string::npos : sp - f);
-            f = sp == std::string::npos ? sp : sp + 1;
-        }
-        size_t dash = line.find(" - ");
-        if (mnt.empty() || dash == std::string::npos) continue;
-        std::string type = line.substr(dash + 3, line.find(' ', dash + 3) - dash - 3);
-        bool under = p == mnt || (p.compare(0, mnt.size(), mnt) == 0 && (mnt == "/" || p[mnt.size()] == '/'));
-        if (under && mnt.size() >= best) { best = mnt.size(); best_type = type; }
-    }
-    static const char* remote[] = { "fuse.sshfs", "fuse.rclone", "fuse.curlftpfs", "fuse.gvfsd-fuse", "fuse.davfs",
-                                    "fuse.s3fs", "fuse.gcsfuse", "fuse.smbnetfs", "fuse.goofys", "fuse.httpdirfs" };
-    for (const char* r : remote) if (best_type == r) return true;
-    return false;
+    return lhde_fs_is_remote(path.c_str());
 }
 
 bool picture_size(const std::string& path, int* w, int* h)

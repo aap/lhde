@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
+#include "liblhde/compat.h"
 #include "shell/config.h"
 
 namespace {   // the program's own, up to main
@@ -264,7 +265,7 @@ static DBusHandlerResult request_handler(DBusConnection*, DBusMessage* m, void* 
 static std::string exe_dir()
 {
     char buf[PATH_MAX];
-    ssize_t n = readlink("/proc/self/exe", buf, sizeof buf - 1);
+    ssize_t n = lhde_self_exe(buf, sizeof buf);
     if (n <= 0) return "";
     buf[n] = 0;
     std::string s = buf;

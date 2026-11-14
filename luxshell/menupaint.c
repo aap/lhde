@@ -20,7 +20,7 @@
 #include <wuxtheme/ut.h>
 #include <lhde/theme.h>
 #include <lhde/settings.h>
-#include <lua5.4/lauxlib.h>
+#include <lauxlib.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

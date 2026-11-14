@@ -7,10 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/sysmacros.h>
-#include <sys/xattr.h>
 #include <unistd.h>
 #include <algorithm>
+#include "liblhde/compat.h"
 #include "config.h"
 #include "fileops.h"
 #include "fileops_job.h"
@@ -208,19 +207,19 @@ struct Engine {
 
     void copy_xattrs(int in, int out, const std::string& src, const std::string& dst, bool link, bool* ok)
     {
-        ssize_t n = in >= 0 ? flistxattr(in, nullptr, 0) : llistxattr(src.c_str(), nullptr, 0);
+        ssize_t n = in >= 0 ? lhde_fxattr_list(in, nullptr, 0) : lhde_lxattr_list(src.c_str(), nullptr, 0);
         if (n <= 0) return;
         std::vector<char> names((size_t)n + 1);
-        n = in >= 0 ? flistxattr(in, names.data(), names.size()) : llistxattr(src.c_str(), names.data(), names.size());
+        n = in >= 0 ? lhde_fxattr_list(in, names.data(), names.size()) : lhde_lxattr_list(src.c_str(), names.data(), names.size());
         if (n <= 0) return;
         std::vector<char> val;
         for (const char* nm = names.data(); nm < names.data() + n; nm += strlen(nm) + 1) {
-            ssize_t vn = in >= 0 ? fgetxattr(in, nm, nullptr, 0) : lgetxattr(src.c_str(), nm, nullptr, 0);
+            ssize_t vn = in >= 0 ? lhde_fxattr_get(in, nm, nullptr, 0) : lhde_lxattr_get(src.c_str(), nm, nullptr, 0);
             if (vn < 0) continue;
             val.resize((size_t)vn + 1);
-            vn = in >= 0 ? fgetxattr(in, nm, val.data(), val.size()) : lgetxattr(src.c_str(), nm, val.data(), val.size());
+            vn = in >= 0 ? lhde_fxattr_get(in, nm, val.data(), val.size()) : lhde_lxattr_get(src.c_str(), nm, val.data(), val.size());
             if (vn < 0) continue;
-            int rc = out >= 0 ? fsetxattr(out, nm, val.data(), (size_t)vn, 0) : lsetxattr(dst.c_str(), nm, val.data(), (size_t)vn, 0);
+            int rc = out >= 0 ? lhde_fxattr_set(out, nm, val.data(), (size_t)vn) : lhde_lxattr_set(dst.c_str(), nm, val.data(), (size_t)vn);
             if (rc == 0 || !user_xattr(nm)) continue;   // security./trusted./system.: best effort
             // user.* on a filesystem without them, or on a symlink (EPERM): skipped
             if (unsupported(errno) || (link && errno == EPERM)) continue;
@@ -257,7 +256,7 @@ struct Engine {
             size_t len = (size_t)std::min<off_t>(to - pos, Chunk);
             ssize_t n = -1;
             if (*use_cfr) {
-                loff_t ip = pos, op = pos;
+                off_t ip = pos, op = pos;
                 n = copy_file_range(in, &ip, out, &op, len, 0);
                 if (n < 0 && (errno == EXDEV || errno == EINVAL || unsupported(errno) || errno == EBADF || errno == EPERM)) { *use_cfr = false; continue; }
                 if (n < 0) { fail("Cannot copy", src, errno); return false; }
@@ -362,13 +361,11 @@ struct Engine {
         int fd = open(part.c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC);
         bool ok = fd >= 0;
         if (ok) {
-            // O_PATH descriptors take neither fchmod nor xattrs: go through /proc/self/fd
-            std::string pp = "/proc/self/fd/" + std::to_string(fd);
             uid_t uid = root ? ss.st_uid : (uid_t)-1;
-            if (chown(pp.c_str(), uid, ss.st_gid) != 0 && root) { if (chown(pp.c_str(), uid, (gid_t)-1)) {} }
-            if (chmod(pp.c_str(), ss.st_mode & 07777) != 0) { fail("Cannot set the permissions of", dst, errno); ok = false; }
+            if (lhde_opath_chown(fd, uid, ss.st_gid) != 0 && root) { if (lhde_opath_chown(fd, uid, (gid_t)-1)) {} }
+            if (lhde_opath_chmod(fd, ss.st_mode & 07777) != 0) { fail("Cannot set the permissions of", dst, errno); ok = false; }
             struct timespec ts[2] = { ss.st_atim, ss.st_mtim };
-            if (ok && utimensat(AT_FDCWD, pp.c_str(), ts, 0) != 0) { fail("Cannot set the times of", dst, errno); ok = false; }
+            if (ok && lhde_opath_utimens(fd, ts) != 0) { fail("Cannot set the times of", dst, errno); ok = false; }
             close(fd);
         }
         return ok && place(part, dst, replace);

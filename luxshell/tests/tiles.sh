@@ -3,7 +3,7 @@
 # (wpctl, pactl, amixer, brightnessctl, xinput: each logs its arguments to $TR_LOG and answers from $TR_STATE) and a fake
 # backlight directory; tiles.lua drives the tiles through a stand-in `lh`. No X display. Usage: tiles.sh [LUA]
 cd "$(dirname "$0")/../.." || exit 1
-LUA=${1:-lua5.4}
+LUA=${1:-$(command -v lua5.4 || command -v lua54 || echo lua5.4)}   # lua54: FreeBSD's name
 command -v "$LUA" >/dev/null 2>&1 || { echo "skip: no $LUA"; exit 0; }
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT

@@ -11,6 +11,7 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#include "liblhde/compat.h"
 #include "w32/w32.h"
 #include "w32/user.h"
 extern "C" {
@@ -35,7 +36,7 @@ static const char* icon_files[IC_COUNT] = { "folder", "folder_open", "document",
 static std::string icon_dir()
 {
     char exe[4096];
-    ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+    ssize_t n = lhde_self_exe(exe, sizeof exe);
     if (n <= 0) return "flxp/res/icons/";
     exe[n] = 0;
     std::string p = exe;

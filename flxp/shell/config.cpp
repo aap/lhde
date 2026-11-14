@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "liblhde/compat.h"
 #include "config.h"
 #include "util.h"
 
@@ -13,13 +14,13 @@ namespace shell {
 
 const char* program_name()
 {
-    const char* n = program_invocation_short_name;   // <errno.h>, glibc and musl: argv[0]'s basename
+    const char* n = lhde_progname();   // argv[0]'s basename
     if (n && strcmp(n, "exe") == 0) {
-        // started as /proc/self/exe (flxp opening another window): the binary's own name
+        // started as /proc/self/exe: the binary's own name
         static std::string self;
         if (self.empty()) {
             char buf[4096];
-            ssize_t k = readlink("/proc/self/exe", buf, sizeof buf - 1);
+            ssize_t k = lhde_self_exe(buf, sizeof buf);
             if (k > 0) { buf[k] = 0; self = base_of(buf); }
         }
         if (!self.empty()) return self.c_str();
@@ -178,10 +179,16 @@ bool write_setting(const std::string& key, const std::string& value)
     return write_file_atomic(path, text);
 }
 
+std::string self_exe()
+{
+    char exe[4096];
+    return lhde_self_exe(exe, sizeof exe) > 0 ? exe : "";
+}
+
 std::string exe_dir()
 {
     char exe[4096];
-    ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+    ssize_t n = lhde_self_exe(exe, sizeof exe);
     if (n <= 0) return "";
     exe[n] = 0;
     return dir_of(exe);

@@ -12,8 +12,8 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
-#include <sys/xattr.h>
 #include <unistd.h>
+#include "liblhde/compat.h"
 
 int lhde_explain(const char *name);
 int lhde_explain_files(const char *name);
@@ -111,11 +111,11 @@ static const char *style_about(const char *path, char *out, size_t n)
     char real[PATH_MAX], au[128];
     out[0] = 0;
     if (!path || !path[0] || !realpath(path, real)) return out;
-    ssize_t k = getxattr(real, "user.lux.author", au, sizeof au - 1);
+    ssize_t k = lhde_xattr_get(real, "user.lux.author", au, sizeof au - 1);
     if (k <= 0) return out;
     au[k] = 0;
     if (!strcmp(au, "microsoft")) return out;
-    k = getxattr(real, "user.lux.desc", out, n - 1);
+    k = lhde_xattr_get(real, "user.lux.desc", out, n - 1);
     out[k > 0 ? k : 0] = 0;
     return out;
 }

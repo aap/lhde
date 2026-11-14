@@ -19,6 +19,7 @@
 #include <X11/extensions/Xfixes.h>
 #include <X11/Xcursor/Xcursor.h>
 #include "sys.h"
+#include "liblhde/compat.h"
 
 namespace sys {
 
@@ -209,7 +210,7 @@ static void make_xwindow(NativeWindow* w)
     if (w->fixed) put_fixed_mwm(w);
     // WM_CLASS = <program>, "Flxp": lets picom/WM rules and xdotool --class find us
     XClassHint ch;
-    ch.res_name = program_invocation_short_name;
+    ch.res_name = (char*)lhde_progname();
     ch.res_class = (char*)"Flxp";
     XSetClassHint(dpy, w->xw, &ch);
     if (w->has_extend || w->frame_flags) put_frame_props(w);
@@ -732,7 +733,7 @@ static void drop_shadow_show(NativeWindow* w, const gdi::Rect& r, bool show)
     XShapeCombineRectangles(dpy, w->shadow_xw, ShapeInput, 0, 0, nullptr, 0, ShapeSet, Unsorted);   // clicks go through
     put_drop_shadow_mark(w->shadow_xw, 2);
     XClassHint ch;
-    ch.res_name = program_invocation_short_name;
+    ch.res_name = (char*)lhde_progname();
     ch.res_class = (char*)"Flxp";
     XSetClassHint(dpy, w->shadow_xw, &ch);
     XStoreName(dpy, w->shadow_xw, "drop shadow");

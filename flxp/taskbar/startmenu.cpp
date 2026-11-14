@@ -16,6 +16,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "liblhde/compat.h"
 #include "shell/settings.h"
 #include "shell/apps.h"
 #include "shell/config.h"
@@ -185,7 +186,7 @@ HMENU themes_menu()
 std::string self_dir()
 {
     char buf[4096];
-    ssize_t n = readlink("/proc/self/exe", buf, sizeof buf - 1);
+    ssize_t n = lhde_self_exe(buf, sizeof buf);
     if (n <= 0) return "";
     std::string p(buf, (size_t)n);
     return p.substr(0, p.rfind('/'));

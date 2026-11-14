@@ -1,11 +1,12 @@
 # luxshell, the Avalon bars, sidebar, tiles, toasts and start menu (docs/SHELL-DESIGN.md). Included by
 # the top-level Makefile. A C core (scene graph, X surfaces, tray, notifications, GDI text through libwuxtheme) running Lua
-# (runtime.lua and its modules, tiles/): system Lua 5.4 (pkg-config lua5.4) and libdbus.
+# (runtime.lua and its modules, tiles/): system Lua 5.4 (pkg-config lua5.4; FreeBSD's lua-5.4) and libdbus.
 #   build/bin/luxshell                    finds its Lua in luxshell/ (build tree) or $(PKGLIBDIR)/luxshell (installed)
 #   build/luxshell/tests/trayicon         an XEmbed tray icon for the notification area tile
 # The packs' text (share/packs/NAME/shell.lua) installs with share/; their images come from lhde-import (packs/<build>/...).
 
-LUXSHELL_PKGS   = x11 xext xfixes cairo cairo-xlib fontconfig freetype2 lua5.4 dbus-1 libpng
+LUA_PC         := $(firstword $(foreach p,lua5.4 lua-5.4,$(shell pkg-config --exists $(p) && echo $(p))) lua5.4)
+LUXSHELL_PKGS   = x11 xext xfixes cairo cairo-xlib fontconfig freetype2 $(LUA_PC) dbus-1 libpng
 LUXSHELL_CFLAGS = -std=gnu11 -O2 -g -Wall -Wextra -Wno-unused-parameter -Wno-misleading-indentation -MMD -MP -DHAVE_UXTHEME \
                   -Iluxshell -Iliblhde -idirafter . $(shell pkg-config --cflags $(LUXSHELL_PKGS))
 LUXSHELL_OBJS   = $(addprefix $(O)/luxshell/,luxshell.o scene.o text.o tray.o notify.o menupaint.o)

@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <algorithm>
 #include <map>
+#include "liblhde/compat.h"
 #include "namespace.h"
 #include "details.h"
 #include "mime.h"
@@ -233,19 +234,13 @@ static std::shared_ptr<Folder> make_my_computer()
     auto f = std::make_shared<VirtualFolder>("::computer", "My Computer", "computer");
     f->add("Local Disk (/)", "/", "drive", IsFolder | IsDrive);
     // mounted filesystems that look like user volumes
-    FILE* m = fopen("/proc/mounts", "r");
-    if (m) {
-        char line[1024];
-        while (fgets(line, sizeof line, m)) {
-            char dev[256], mnt[512], fs[64];
-            if (sscanf(line, "%255s %511s %63s", dev, mnt, fs) != 3) continue;
-            std::string mp = mnt;
-            if (mp == "/" || strncmp(dev, "/dev/", 5) != 0) continue;
-            if (mp.rfind("/boot", 0) == 0 || mp.rfind("/snap", 0) == 0) continue;
-            f->add(basename_of(mp) + " (" + mp + ")", mp, "drive", IsFolder | IsDrive);
-        }
-        fclose(m);
-    }
+    lhde_mount_each([](const char* dev, const char* mnt, const char*, void* c) {
+        std::string mp = mnt;
+        if (mp == "/" || strncmp(dev, "/dev/", 5) != 0) return 0;
+        if (mp.rfind("/boot", 0) == 0 || mp.rfind("/snap", 0) == 0) return 0;
+        ((VirtualFolder*)c)->add(basename_of(mp) + " (" + mp + ")", mp, "drive", IsFolder | IsDrive);
+        return 0;
+    }, f.get());
     return f;
 }
 

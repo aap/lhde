@@ -18,12 +18,8 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
-#include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
-#if defined(__x86_64__)
-#include <asm/prctl.h>
-#endif
 #include <map>
 #include "res/res.h"
 #include "w32/w32.h"
@@ -33,6 +29,7 @@ extern "C" {
 }
 #include "w32/kernel.h"
 #include "sys/sys.h"
+#include "liblhde/compat.h"
 
 using w32::utf8_of;
 using w32::utf16_of;
@@ -53,8 +50,8 @@ void install_teb(void** teb, void** peb, uintptr_t tid)
     teb[12] = peb;                                      // Peb
     peb[6] = &process_heap_dummy;                       // Peb->ProcessHeap
 #if defined(__x86_64__)
-    if (syscall(SYS_arch_prctl, ARCH_SET_GS, (unsigned long)teb) != 0)
-        perror("flxp: arch_prctl(ARCH_SET_GS)");
+    if (lhde_gsbase_set(teb) != 0)
+        perror("flxp: setting the GS base");
 #endif
 }
 
@@ -76,8 +73,7 @@ void ensure_teb()
     if (teb_checked) return;
     teb_checked = true;
 #if defined(__x86_64__)
-    unsigned long gs = 0;
-    if (syscall(SYS_arch_prctl, ARCH_GET_GS, &gs) == 0 && gs) return;
+    if (lhde_gsbase_get()) return;
     static uintptr_t next_tid = 2;
     void** teb = (void**)aligned_alloc(64, sizeof teb_block);
     memset(teb, 0, sizeof teb_block);
@@ -1102,7 +1098,7 @@ DWORD WINAPI GetModuleFileNameW(HMODULE h, LPWSTR buf, DWORD size)
     for (auto& l : libs) if ((HMODULE)l.m == h) path = l.path;
     if (path.empty()) {
         char tmp[PATH_MAX];
-        ssize_t n = readlink("/proc/self/exe", tmp, sizeof tmp - 1);
+        ssize_t n = lhde_self_exe(tmp, sizeof tmp);
         path = n > 0 ? std::string(tmp, n) : "flxp";
     }
     std::u16string w = utf16_of(path.c_str());

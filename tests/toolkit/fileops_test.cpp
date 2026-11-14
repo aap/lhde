@@ -9,14 +9,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/statfs.h>
-#include <sys/xattr.h>
 #include <unistd.h>
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
 #include <string>
 #include <vector>
+#include "liblhde/compat.h"
 #include "shell/fileops.h"
 #include "shell/fileops_job.h"
 
@@ -126,8 +125,8 @@ static void test_cross_fs_move()
     mk(t + "/tree"); mk(t + "/tree/sub"); put(t + "/tree/a", "aaa"); put(t + "/tree/sub/b", std::string(3 << 20, 'b'));
     symlink("a", (t + "/tree/la").c_str());
     // the Explorer's tags and description (shell/details.h) travel with the move
-    bool xa = setxattr((t + "/tree/a").c_str(), "user.xdg.tags", "reference,4051", 14, 0) == 0 &&
-              setxattr((t + "/tree/sub").c_str(), "user.lux.desc", "Sub", 3, 0) == 0;
+    bool xa = lhde_xattr_set((t + "/tree/a").c_str(), "user.xdg.tags", "reference,4051", 14) == 0 &&
+              lhde_xattr_set((t + "/tree/sub").c_str(), "user.lux.desc", "Sub", 3) == 0;
     fileops::Result r = fileops::run(Op::Move, { t + "/tree" }, u);
     CHECK(r.ok);
     CHECK(!exists(t + "/tree"));
@@ -135,8 +134,8 @@ static void test_cross_fs_move()
     CHECK(!has_parts(u));
     if (xa) {
         char v[32] = {};
-        CHECK(getxattr((u + "/tree/a").c_str(), "user.xdg.tags", v, sizeof v) == 14 && !memcmp(v, "reference,4051", 14));
-        CHECK(getxattr((u + "/tree/sub").c_str(), "user.lux.desc", v, sizeof v) == 3 && !memcmp(v, "Sub", 3));
+        CHECK(lhde_xattr_get((u + "/tree/a").c_str(), "user.xdg.tags", v, sizeof v) == 14 && !memcmp(v, "reference,4051", 14));
+        CHECK(lhde_xattr_get((u + "/tree/sub").c_str(), "user.lux.desc", v, sizeof v) == 3 && !memcmp(v, "Sub", 3));
     } else fprintf(stderr, "note: no user xattrs on %s: the moved tags are not checked\n", t.c_str());
 
     // a source that cannot be removed: its parent is read-only
@@ -276,9 +275,9 @@ static void test_metadata()
     put(t + "/m/ro", "r", 0400);
     mk(t + "/m/sticky"); chmod((t + "/m/sticky").c_str(), 01777);
     mk(t + "/m/rodir"); put(t + "/m/rodir/in", "in"); chmod((t + "/m/rodir").c_str(), 0555);
-    bool xa = setxattr((t + "/m/suid").c_str(), "user.flxp.test", "value", 5, 0) == 0 &&
-              setxattr((t + "/m").c_str(), "user.flxp.dir", "dv", 2, 0) == 0 &&
-              setxattr((t + "/m/sgid").c_str(), "user.xdg.tags", "a,b", 3, 0) == 0;
+    bool xa = lhde_xattr_set((t + "/m/suid").c_str(), "user.flxp.test", "value", 5) == 0 &&
+              lhde_xattr_set((t + "/m").c_str(), "user.flxp.dir", "dv", 2) == 0 &&
+              lhde_xattr_set((t + "/m/sgid").c_str(), "user.xdg.tags", "a,b", 3) == 0;
     if (!xa) fprintf(stderr, "note: no user xattrs on %s (%s): xattr checks skipped\n", t.c_str(), strerror(errno));
     struct timespec ft[2] = { { 1000000000, 123456789 }, { 1200000000, 987654321 } };
     utimensat(AT_FDCWD, (t + "/m/suid").c_str(), ft, 0);
@@ -309,9 +308,9 @@ static void test_metadata()
         lstat((c + "/link").c_str(), &s2); CHECK(S_ISLNK(s2.st_mode) && ts_eq(s2.st_mtim, lt[1]));
         if (xa) {
             char v[16] = {};
-            CHECK(getxattr((c + "/suid").c_str(), "user.flxp.test", v, sizeof v) == 5 && !memcmp(v, "value", 5));
-            CHECK(getxattr(c.c_str(), "user.flxp.dir", v, sizeof v) == 2 && !memcmp(v, "dv", 2));
-            CHECK(getxattr((c + "/sgid").c_str(), "user.xdg.tags", v, sizeof v) == 3 && !memcmp(v, "a,b", 3));   // the Explorer's tags
+            CHECK(lhde_xattr_get((c + "/suid").c_str(), "user.flxp.test", v, sizeof v) == 5 && !memcmp(v, "value", 5));
+            CHECK(lhde_xattr_get(c.c_str(), "user.flxp.dir", v, sizeof v) == 2 && !memcmp(v, "dv", 2));
+            CHECK(lhde_xattr_get((c + "/sgid").c_str(), "user.xdg.tags", v, sizeof v) == 3 && !memcmp(v, "a,b", 3));   // the Explorer's tags
         }
         CHECK(!has_parts(dest));
         nuke(dest);
@@ -588,12 +587,10 @@ static void test_job()
 int main(int argc, char** argv)
 {
     const char* tmp = getenv("TMPDIR");
-    std::string base1 = argc > 1 ? argv[1] : tmp ? tmp : "/tmp", base2 = argc > 2 ? argv[2] : "/dev/shm";
+    std::string base1 = argc > 1 ? argv[1] : tmp ? tmp : "/tmp", base2 = argc > 2 ? argv[2] : access("/dev/shm", W_OK) == 0 ? "/dev/shm" : base1;   // FreeBSD: no /dev/shm
     std::string t1 = base1 + "/fileops_test.XXXXXX", t2 = base2 + "/fileops_test.XXXXXX";
     if (!mkdtemp(&t1[0]) || !mkdtemp(&t2[0])) { perror("mkdtemp"); return 2; }
     A = t1; B = t2;
-    struct statfs f1, f2;
-    statfs(A.c_str(), &f1); statfs(B.c_str(), &f2);
     struct stat s1, s2;
     stat(A.c_str(), &s1); stat(B.c_str(), &s2);
     if (s1.st_dev == s2.st_dev) fprintf(stderr, "warning: %s and %s are on the same filesystem: the cross-filesystem cases test renames\n", A.c_str(), B.c_str());

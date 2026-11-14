@@ -8,6 +8,12 @@
  * calls the flxp_ names, or better w32::utf8_of / utf16_of and std::u16string). */
 #ifndef FLXP_CRT_H
 #define FLXP_CRT_H
+#if defined(__FreeBSD__) && !defined(__cplusplus)
+/* FreeBSD's headers type wchar_t in C as int whatever -fshort-wchar says; L"..." is then
+ * unsigned short[], and WCHAR (wchar_t under WINE_UNICODE_NATIVE) must be the same type */
+typedef __WCHAR_TYPE__ wchar_t;
+#define _WCHAR_T_DECLARED
+#endif
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdlib.h>

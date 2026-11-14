@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <algorithm>
+#include "liblhde/compat.h"
 #include "luxpad.h"
 #include "shell/shell.h"
 
@@ -427,7 +428,7 @@ VOID DIALOG_FileNewWindow(VOID)
     WaitCursor(TRUE);
 
     char self[4096];
-    ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
+    ssize_t n = lhde_self_exe(self, sizeof self);
     if (n > 0)
     {
         self[n] = 0;

@@ -46,7 +46,8 @@ bool write_setting(const std::string& key, const std::string& value);
 // (styles, resources, wallpapers, themes) comes through liblhde (lhdata.h).
 std::string data_path(const std::string& rel);
 std::vector<std::string> data_search_dirs();
-std::string exe_dir();                        // dirname(/proc/self/exe)
+std::string self_exe();                       // the running binary's path ("" when unknown)
+std::string exe_dir();                        // dirname(self_exe())
 
 std::string uri_from_path(const std::string& path);    // "file:///a%20b"
 std::string path_from_uri(const std::string& uri);     // "" if not a file: URI

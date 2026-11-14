@@ -8,10 +8,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/xattr.h>
 #include <unistd.h>
 #include <time.h>
 #include <string>
+#include "liblhde/compat.h"
 #include "shell/details.h"
 
 using namespace shell;
@@ -410,7 +410,7 @@ int main(int, char** argv)
             {
                 std::string other = dir + "/other.txt", state = dir + "/state";
                 FILE* op = fopen(other.c_str(), "w"); if (op) fclose(op);
-                setxattr(other.c_str(), "user.xdg.tags", "folder1,shared", 14, 0);
+                lhde_xattr_set(other.c_str(), "user.xdg.tags", "folder1,shared", 14);
                 write(f, *tags, "own,shared", &err);
                 const char* old_state = getenv("XDG_STATE_HOME");
                 std::string keep = old_state ? old_state : "";
@@ -427,14 +427,14 @@ int main(int, char** argv)
                 write(f, *tags, "", &err);
             }
             // a NUL and a newline someone else wrote are not part of the value
-            setxattr(f.c_str(), "user.xdg.comment", "echoed\n", 7, 0);
+            lhde_xattr_set(f.c_str(), "user.xdg.comment", "echoed\n", 7);
             check("newline dropped", "echoed", value("user.xdg.comment"));
             check("missing file", 0, write(dir + "/gone", *desc, "x", &err));
             check("missing file says so", 1, err.find("not there") != std::string::npos);
             // a value longer than any fixed buffer (5000 bytes of tags): read whole, and Add Tag keeps every old tag
             std::string many;
             for (int i = 0; i < 625; i++) many += (i ? "," : "") + std::string("tag") + std::to_string(1000 + i);   // 4999 bytes
-            if (setxattr(f.c_str(), "user.xdg.tags", many.data(), many.size(), 0) != 0) {
+            if (lhde_xattr_set(f.c_str(), "user.xdg.tags", many.data(), many.size()) != 0) {
                 printf("note: %s keeps no %zu-byte attribute (%s; ext4 keeps one block): the long-value checks are skipped\n",
                        dir.c_str(), many.size(), strerror(errno));
             } else {
