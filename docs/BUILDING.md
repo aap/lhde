@@ -114,7 +114,7 @@ with GNU make (FreeBSD's make is not):
 
     gmake -j8
     PREFIX=~/.local gmake install
-    gmake install-resources-free FREE_PACK=lhde-resources-free-2.zip    # or with no FREE_PACK: downloaded
+    gmake install-resources-free FREE_PACK=lhde-resources-free-3.zip    # or with no FREE_PACK: downloaded
     LHDE_TEST_DISPLAYS=":71 :72 :73" gmake check
 
 `gmake check` there runs everything `make check` runs on Linux: the shim's and the toolkit's tests, the scripts, liblhde's
@@ -271,7 +271,7 @@ pack directory works too). By hand:
 ReactOS's files (shell32, browseui, comctl32, themeui, explorer.exe, its four visual styles, 40 free fonts under the Windows
 file names; docs/USAGE.md "Getting the Windows resources") are free, and so are the wallpapers of the four ReactOS themes
 (photos from Pexels, the Pexels licence, chosen by aap: the source `free`, share/sources/free.ini), so lhde publishes them as
-one pack, outside the repository: `lhde-resources-free-2.zip` (10 MB), made once from ReactOS 0.4.16's boot CD and the
+one pack, outside the repository: `lhde-resources-free-3.zip` (10 MB), made once from ReactOS 0.4.16's boot CD and the
 photos. Its version (`FREE_PACK_VERSION`) counts its contents, a new ReactOS or other photos being the next. `make
 install-resources-free` takes, in this order, `FREE_PACK=FILE`, the ISO (`LHDE_REACTOS_ISO=FILE`, else the newest
 `~/lib/windows_isos/ReactOS-*.iso`, with the photos from `FREE_WALLPAPERS` when that directory is there), else the pack
@@ -347,7 +347,7 @@ compositors); LightDM needs the system D-Bus (ConsoleKit2 and AccountsService, w
 aap). From the Linux machine, the two packs (`lhde_winthemes.zip` already holds `reactos/` and `free/`; the free pack adds the
 whole ReactOS import):
 
-    scp /u/aap/src/lhde/lhde-resources-free-2.zip /u/aap/src/lhde/lhde_winthemes.zip soma:src/lhde-port/
+    scp /u/aap/src/lhde/lhde-resources-free-3.zip /u/aap/src/lhde/lhde_winthemes.zip soma:src/lhde-port/
 
 As aap on soma, the build for `/usr/local` (flxp has `DATADIR` compiled in, so a build for another `PREFIX` would be
 rebuilt by the install; built here, root only copies and no root-owned file lands in the build tree; the next `PREFIX=~/.local
@@ -361,12 +361,12 @@ As root (`su -`), in this order:
     cd /u/aap/src/lhde-port && PREFIX=/usr/local gmake install
     ls /usr/local/share/xsessions/lhde.desktop
     export LHDE_WINDOWS=/usr/local/share/lhde-windows
-    lhde-import --pack /u/aap/src/lhde-port/lhde-resources-free-2.zip
+    lhde-import --pack /u/aap/src/lhde-port/lhde-resources-free-3.zip
     lhde-import --pack /u/aap/src/lhde-port/lhde_winthemes.zip
     lhde-import --list
     unset LHDE_WINDOWS
 
-(`gmake install-resources-full FREE_PACK=lhde-resources-free-2.zip PACK=lhde_winthemes.zip LHDE_WINDOWS=/usr/local/share/lhde-windows`
+(`gmake install-resources-full FREE_PACK=lhde-resources-free-3.zip PACK=lhde_winthemes.zip LHDE_WINDOWS=/usr/local/share/lhde-windows`
 does the same import from the source tree's `tools/`, after deleting that tree, but leaves root-owned Python caches in the
 tree.) Then LightDM's configuration, in `/usr/local/etc/lightdm/lightdm.conf` under `[Seat:*]` (the package's file already has
 `session-wrapper=/usr/local/etc/lightdm/Xsession`, and `minimum-vt=9` under `[LightDM]`, so the greeter's server is on vt9,

@@ -24,7 +24,7 @@ navbar   = vision            ; small | big (share/navbar/vision.ini)
 navbar_preset = auto
 
 [Desktop]
-wallpaper = demos/exec_briefing_chadDesktop.dir_18_1   ; the chadDesktop demo (lhde-import --from-workspace; else 4074's Bliss)
+wallpaper = free/karoldach-582486   ; a Pexels photo chosen by aap (taste; the free pack's wallpapers/); the chadDesktop demo picture was the earlier choice
 mode      = fill
 icons     = longhorn4074
 
