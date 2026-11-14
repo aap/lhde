@@ -95,6 +95,34 @@ the man pages luxwm.1 and luxwmc.1 (`MANDIR`), `share/applications/flxp.desktop`
 `DATADIR` is compiled into flxp (its `res/icons`; everything else it finds through liblhde).
 No Windows file and no user setting is ever installed: those are the two other trees below.
 
+### FreeBSD
+
+lhde builds and runs on FreeBSD 15 (amd64) with clang and GNU make; 15 is the first release with inotify(2) (the explorer
+following its folders), renameat2 and O_PATH, which flxp's file operations use. The packages:
+
+    pkg install gmake pkgconf python3 py312-pillow p7zip cabextract libX11 libXext libXcursor libxkbcommon libXfixes \
+        libXinerama libXft freetype2 fontconfig png jpeg-turbo webp dbus cairo pango lua54 \
+        picom feh xprop xsetroot xinit xephyr xorg-vfbserver xdotool ImageMagick7 xclip gtar
+
+Then `gmake -j8`, `gmake check`, `PREFIX=~/.local gmake install` as above (FreeBSD's make is not GNU make). What differs,
+all behind `liblhde/compat.h` (one header, the only place that knows the system) and two shell helpers in
+`session/lhde-paths.sh`:
+
+- Extended attributes are extattr(2)'s: lhde's programs and tools name them as on Linux (`user.lux.desc`), stored in the user
+  namespace without the prefix (`getextattr user lux.desc FILE`; `lsextattr user FILE` lists them). Only the user namespace is
+  listed and copied. The Python tools reach extattr through ctypes (Python has no `os.getxattr` there).
+- The running binary, another process's binary, its environment and arguments come from sysctl(3) (`kern.proc`), not
+  `/proc`; the session scripts read them with procstat(1) (`lhde_environ`, `lhde_args`), and detach with daemon(8) where
+  there is no setsid(1).
+- The mounts (My Computer's drives, the Details pane's file system, which folders are on the network for thumbnails) come
+  from getmntinfo(3) and statfs's `f_fstypename` (nfs, smbfs, p9fs and the network FUSE file systems are remote).
+- Pack archives: bsdtar unpacks a `.tar.zst` / `.tar.xz` pack with its annotations; making one (`lhde-pack` without `--zip`)
+  needs GNU tar, `gtar`.
+- In C, FreeBSD's headers type `wchar_t` as `int` whatever `-fshort-wchar` says; `wux/w32/include/flxp_crt.h` types it as
+  the compiler's 16-bit one for the win32 code.
+- Not there yet (todo_ideas/repo.txt): the brightness, battery and volume tray items and tiles read Linux's `/sys/class` and
+  PipeWire/PulseAudio/ALSA and show nothing; the explorer's "open in a new window" runs `/proc/self/exe`.
+
 ### luxnav (the explorer header's vision mode)
 
 luxnav is in the tree (luxnav/, `make luxnav`); flxp links `build/lib/libluxnav.a` and always has the vision

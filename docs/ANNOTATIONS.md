@@ -17,6 +17,9 @@ user xattrs is fine, nothing depends on them.
 | `run` | `user.lux.run` | the command the file opens with instead of its type's program: a `/bin/sh` command line, `%f` the file | `python3 %f`, `wine %f` |
 | `notes`, `todo` | `user.lux.notes`, `.todo` | free text, as luxfs defines them | |
 
+On FreeBSD the same attributes are extattr(2)'s, in the user namespace without the `user.` prefix (`getextattr user lux.desc
+FILE`, `setextattr user xdg.tags a,b FILE`); lhde's programs and tools take the names above on both systems.
+
 The colours (flxp's palette, `shell::details::palette`): `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`,
 `brown`, `gray`; VGA's values where VGA has the colour, a choice that reads on white and on the task band's blue. A value
 outside it is kept and shown as written. Where a colour shows is a first, provisional choice (todo_ideas/xattribs.txt).
