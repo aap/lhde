@@ -642,6 +642,14 @@ whose `Explorer.chrome` is auto, the 4051 or 4074 header at its Small size (the 
 says longhorn, and the XP chrome for the vision header; it follows luxwm starting, stopping or crashing within a few seconds
 (docs/CLIENT-PROTOCOL.md "Without luxwm").
 
+## The Open and Save dialog (flxp-filedialog)
+
+lhde's programs and, through the xdg-desktop-portal backend `flxp-portal`, other programs' file choosers show XP's Open and
+Save dialog (or the Longhorn one under a Longhorn theme). The File name box takes what is typed as it is: it does not complete
+the name inline (XP's AutoComplete only suggests unless "Use inline AutoComplete" is on, and it is off by default), so
+`python3` and Enter in a folder that also holds `python3-config` opens `python3`. A name with `*` or `?` filters the list,
+a folder's name (or a path ending in `/`) goes there, quoted names choose several files.
+
 ## The Explorer's views (flxp)
 
 In the Longhorn frame (and the Longhorn file dialog) the Explorer's list has build 4074's three views, each at an image size:

@@ -15,7 +15,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <dirent.h>
 #include <algorithm>
 #include <map>
 #include <memory>
@@ -1088,49 +1087,12 @@ static void on_ok(Dlg& d)
     if (!out.empty()) finish(d, out);
 }
 
-// ---- File name completion (XP SHAutoComplete with ACO_AUTOAPPEND) ----
-
-static void autocomplete(Dlg& d)
-{
-    std::string text = text_of(d.name_edit);
-    DWORD s = 0, e = 0;
-    SendMessageW(d.name_edit, EM_GETSEL, (WPARAM)&s, (LPARAM)&e);
-    std::u16string t16 = W(text);
-    if (text.empty() || s != e || s != t16.size() || text.find('"') != std::string::npos || has_wildcard(text)) return;
-    size_t slash = text.find_last_of('/');
-    std::string dir_part = slash == std::string::npos ? "" : text.substr(0, slash + 1);
-    std::string prefix = slash == std::string::npos ? text : text.substr(slash + 1);
-    if (prefix.empty()) return;
-    std::string dir = dir_part.empty() ? cur_dir(d) : resolve_name(d, dir_part);
-    if (dir.empty()) return;
-    DIR* dp = opendir(dir.c_str());
-    if (!dp) return;
-    std::vector<std::pair<std::string, bool>> cands;
-    while (struct dirent* de = readdir(dp)) {
-        std::string n = de->d_name;
-        if (n == "." || n == "..") continue;
-        if (n[0] == '.' && prefix[0] != '.') continue;
-        if (n.size() <= prefix.size() || n.compare(0, prefix.size(), prefix) != 0) continue;
-        bool folder = is_dir(dir + "/" + n);
-        if (!folder && d.o->mode == Mode::Folder) continue;
-        cands.push_back({ n, folder });
-    }
-    closedir(dp);
-    if (cands.empty()) return;
-    std::sort(cands.begin(), cands.end());
-    std::string full = dir_part + cands[0].first + (cands[0].second ? "/" : "");
-    std::u16string f16 = W(full);
-    SetWindowTextW(d.name_edit, (LPCWSTR)f16.c_str());
-    SendMessageW(d.name_edit, EM_SETSEL, (WPARAM)t16.size(), (LPARAM)f16.size());
-}
-
 static RECT lh_band_rect(Dlg& d);
 
 static LRESULT CALLBACK edit_subclass(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 {
     Dlg* d = (Dlg*)GetPropW(h, L"flxp_filedlg");
     LRESULT r = CallWindowProcW(d->edit_proc, h, msg, wp, lp);
-    if (msg == WM_CHAR && wp >= 0x20 && wp != 0x7f) autocomplete(*d);
     if (d->lh && d->o->mode == Mode::Save && (msg == WM_CHAR || msg == WM_SETTEXT || msg == WM_KEYDOWN || msg == WM_CUT || msg == WM_PASTE || msg == WM_CLEAR)) {
         RECT rc; GetClientRect(d->dlg, &rc);   // the details band's icon follows the name's type
         RECT band = lh_band_rect(*d);

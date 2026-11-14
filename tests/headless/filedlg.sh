@@ -1,6 +1,6 @@
 #!/bin/sh
 # flxp-filedialog in both looks (XP template, Longhorn): open, multi-select,
-# save with the overwrite prompt (No, then Yes), folder mode, a typed
+# a typed name taken as typed (no inline completion), save with the overwrite prompt (No, then Yes), folder mode, a typed
 # wildcard, a typed folder, cancel; Longhorn only: Hide Explorer (remembered
 # across runs), Show in Groups from the list's menu (remembered), the
 # view keys (Ctrl+0..5) remembered with the view and its size.
@@ -9,7 +9,7 @@ D=${1:-:73}
 T=$(mktemp -d)
 B=$(cd "$(dirname "$0")/../.." && pwd)/build/bin/flxp-filedialog
 mkdir -p $T/home/.config/lhde $T/dir/Projects $T/dir/Photos
-for f in notes.txt todo.txt Budget.xls Accounts.xls readme.md; do echo x > "$T/dir/$f"; done
+for f in notes.txt todo.txt Budget.xls Accounts.xls readme.md python3 python3-config; do echo x > "$T/dir/$f"; done
 export HOME=$T/home XDG_CONFIG_HOME=$T/home/.config XDG_DATA_HOME=$T/home/.local/share XDG_STATE_HOME=$T/home/.local/state \
        XDG_CACHE_HOME=$T/home/.cache DISPLAY=$D   # the scratch home only: nothing exported from outside leaks in
 . "$(dirname "$0")/wait.sh"
@@ -66,6 +66,8 @@ $1"; shift; done
 for look in xp longhorn; do
     echo "-- $look"
     check "$look open" "0 $T/dir/notes.txt|" "$(run $look type:notes.txt Return -- --open)"
+    # the File name box does not complete inline (XP's AutoComplete only suggests): Enter takes the name as typed
+    check "$look typed name, not its completion" "0 $T/dir/python3|" "$(run $look type:python3 Return -- --open)"
     check "$look multi" "0 $T/dir/notes.txt|$T/dir/todo.txt|" "$(run $look 'type:"notes.txt" "todo.txt"' Return -- --open --multiple)"
     check "$look save new" "0 $T/dir/new.txt|" "$(run $look ctrl+a type:new.txt Return -- --save --filename x.txt)"
     # the overwrite question: No keeps the dialog (Escape cancels it then), Yes replaces

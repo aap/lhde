@@ -112,5 +112,3 @@
 	files first: filedlg/main, portal, wallpaper, xwm, preview)
 * Ctrl+digit posts WM_CHAR of the digit (keystate: Ctrl+1 gives char 0x31); Windows gives none for Ctrl+1..9 (only the ASCII
 	control characters: Ctrl+A..Z, Ctrl+[, Ctrl+], Ctrl+Backspace's 0x7f)
-* the file dialog's File name box completes inline: typing "python3" and Enter in /usr/bin chose python3-config (XP's
-	AutoComplete only suggests in its drop-down unless "Use inline AutoComplete" is on, which it is not by default)
