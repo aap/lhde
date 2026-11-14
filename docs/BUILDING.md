@@ -111,7 +111,7 @@ with GNU make (FreeBSD's make is not):
     gmake -j8
     PREFIX=~/.local gmake install
     gmake install-resources-free FREE_PACK=lhde-resources-free-1.zip    # or with no FREE_PACK: downloaded
-    LHDE_TEST_DISPLAYS=":71 :72 :73" gmake check FREE_PACK=lhde-resources-free-1.zip
+    LHDE_TEST_DISPLAYS=":71 :72 :73" gmake check
 
 `gmake check` there runs everything `make check` runs on Linux: the shim's and the toolkit's tests, the scripts, liblhde's
 resolver, luxshell's Lua, and the headless scripts under Xvfb, the attribute ones (luxattr, properties, filter, runas,
