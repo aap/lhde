@@ -1,4 +1,5 @@
-/* The shell layer's Properties sheet (shell::properties, flxp/shell/ui/properties.cpp: flxp's Properties, luxattr), in dialog
+/* The shell layer's dialogs. Default Programs (shell::default_programs, flxp/shell/ui/defprogs.cpp) is at the end.
+ * The Properties sheet (shell::properties, flxp/shell/ui/properties.cpp: flxp's Properties, luxattr), in dialog
  * units for "MS Shell Dlg" 8 (Tahoma 8 under every style). The pages are 227 x 215, XP's file Properties pages (shell32's
  * General page, docprop's Summary page). General: the icon, the name, the type, Opens with and its Change... button (shown
  * when the caller can change the program: the Explorer), location, size, contains, the dates, permissions, a link's target.
@@ -98,4 +99,34 @@ BEGIN
     EDITTEXT        IDC_ATTRVALUE, 50, 25, 163, 14, ES_AUTOHSCROLL
     DEFPUSHBUTTON   "OK", IDOK, 109, 49, 50, 14
     PUSHBUTTON      "Cancel", IDCANCEL, 163, 49, 50, 14
+END
+
+/* Default Programs (shell::default_programs): XP's Set Program Access and Defaults as one dialog, its Custom
+ * configuration's groups ("Choose a default Web browser:", the installed programs as radio buttons, "Use my current Web
+ * browser") one role at a time: the roles in a list on the left, the selected role's question and programs on the right.
+ * The radio buttons are slots the code fills (IDC_DP_RADIO0 is "Use my current ..."), the unused ones hidden. */
+IDD_DEFPROGS DIALOGEX 0, 0, 320, 236
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Default Programs"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "A default program opens every file of its kind. Choose one for each activity; a program chosen for one file type (Open With, Folder Options' File Types) is kept.", IDC_DP_INTRO, 7, 7, 306, 18
+    LTEXT           "Ac&tivities:", -1, 7, 30, 100, 8
+    LISTBOX         IDC_DP_ROLES, 7, 40, 100, 168, LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_BORDER | WS_TABSTOP
+    GROUPBOX        "", IDC_DP_GROUP, 114, 36, 199, 152
+    LTEXT           "", IDC_DP_QUESTION, 121, 48, 186, 8, SS_NOPREFIX
+    CONTROL         "", IDC_DP_RADIO0, "Button", BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP, 128, 62, 178, 10
+    CONTROL         "", 311, "Button", BS_AUTORADIOBUTTON, 128, 74, 178, 10
+    CONTROL         "", 312, "Button", BS_AUTORADIOBUTTON, 128, 86, 178, 10
+    CONTROL         "", 313, "Button", BS_AUTORADIOBUTTON, 128, 98, 178, 10
+    CONTROL         "", 314, "Button", BS_AUTORADIOBUTTON, 128, 110, 178, 10
+    CONTROL         "", 315, "Button", BS_AUTORADIOBUTTON, 128, 122, 178, 10
+    CONTROL         "", 316, "Button", BS_AUTORADIOBUTTON, 128, 134, 178, 10
+    CONTROL         "", 317, "Button", BS_AUTORADIOBUTTON, 128, 146, 178, 10
+    CONTROL         "", 318, "Button", BS_AUTORADIOBUTTON, 128, 158, 178, 10
+    CONTROL         "", 319, "Button", BS_AUTORADIOBUTTON, 128, 170, 178, 10
+    LTEXT           "", IDC_DP_INFO, 114, 192, 199, 16, SS_NOPREFIX
+    DEFPUSHBUTTON   "OK", IDOK, 155, 215, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 209, 215, 50, 14
+    PUSHBUTTON      "&Apply", IDC_DP_APPLY, 263, 215, 50, 14
 END

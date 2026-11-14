@@ -918,7 +918,7 @@ remembers), both written when it exits (docs/SETTINGS.md). No printing, no Help 
 
 Which program opens a file comes from the freedesktop files every program reads (docs/SETTINGS.md "Associations" has the
 order): your choices for one type in `~/.config/mimeapps.list` beat your default programs by role (the text editor, the image
-viewer, ...: docs/SETTINGS.md "Default programs"), which beat lhde's defaults (`lhde-mimeapps.list`: folders open in flxp, text in
+viewer, ...: "Default programs" below), which beat lhde's defaults (`lhde-mimeapps.list`: folders open in flxp, text in
 luxpad), which beat the distribution's; a type nobody sets a default for opens with its first claimant, the first program
 whose desktop file names it (`MimeType=`). That last rule is how a music player ends up opening folders: deadbeef's desktop
 file claims `inode/directory`, update-desktop-database lists it first in `/usr/share/applications/mimeinfo.cache`, and without
@@ -966,7 +966,20 @@ Advanced: Edit File Type, the default program's actions (its command, bold, then
 Remove and Set Default change them in a copy of the program's desktop file in `~/.local/share/applications` (marked
 `X-Lhde-Override=true`; a desktop file of your own there is not touched). When you changed something for the type (a choice in
 `mimeapps.list`, such a copy) the button is Restore, which takes both back. Change Icon, XP's three check boxes, Browse... and
-Use DDE in New Action are shown greyed: the freedesktop files have nothing they would set.
+Use DDE in New Action are shown greyed: the freedesktop files have nothing they would set. A type a role sets says so in Set by
+("your editor role (luxpad)"); Change... still sets that one type, over the role. **Default Programs...** (left of New) opens
+Default Programs at the selected type's role.
+
+**Default programs.** One program per kind of file instead of one per type: the text editor opens every text type (`text/plain`
+and all the types shared-mime-info puts under it: C, Python, logs, XML, JSON, ...), the image viewer every picture but drawings,
+the document viewer PDF, PostScript and DjVu, and so on for the web browser, e-mail, music, video, archives and folders
+(docs/SETTINGS.md "Default programs" has the roles and their types). **Default Programs** (`flxp --default-programs`; All Programs'
+first item, XP's Set Program Access and Defaults; Folder Options' File Types, Default Programs...) is XP's page one activity at a
+time: the activities on the left; on the right the question ("Choose a default text editor:"), "Use my current text editor"
+(lhde leaves the text types alone) and the installed programs that open such files, lhde's default marked, and how many types
+the role opens. OK or Apply writes `settings.ini [programs]` and the role file at once; switching the editor is one click. A
+role without a choice takes lhde's (luxpad for text, flxp for folders, the first installed of a list of known viewers and
+players for the others; nothing while none is installed). From a terminal: `lhde-mime roles`, `lhde-mime role ROLE APP`.
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell, docs/SHELL-DESIGN.md 6.4, 7.3, 13)
 

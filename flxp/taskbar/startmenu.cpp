@@ -32,7 +32,7 @@ namespace startmenu {
 namespace {
 
 enum : UINT {
-    CMD_DOCUMENTS = 1, CMD_COMPUTER, CMD_DISPLAY, CMD_RUN, CMD_LOGOFF, CMD_SHUTDOWN,
+    CMD_DOCUMENTS = 1, CMD_COMPUTER, CMD_DISPLAY, CMD_RUN, CMD_LOGOFF, CMD_SHUTDOWN, CMD_DEFPROGS,
     CMD_THEME = 100,            // + index into the theme list (liblhde)
     CMD_APP = 1000,             // + index into the application list
 };
@@ -149,6 +149,10 @@ HMENU programs_menu()
     for (BandItem& b : band_items) if (b.icon) DeleteObject(b.icon);    // the previous Programs menu is destroyed by now
     band_items.clear();
     HMENU m = band_menu();
+    // XP's All Programs starts with Set Program Access and Defaults above a separator: here Default Programs
+    // (flxp --default-programs)
+    append_band(m, CMD_DEFPROGS, "Set Program Access and Defaults", startpanel::menu_bitmap("", "settings"), false);
+    AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     for (int gi = 0; gi < n; gi++) {
         if (by[gi].empty()) continue;
         std::sort(by[gi].begin(), by[gi].end(), [](const shell::App* a, const shell::App* b) {
@@ -161,7 +165,7 @@ HMENU programs_menu()
         }
         append_band(m, (UINT_PTR)sub, groups[gi].title, startpanel::menu_bitmap("", "folder"), true);
     }
-    if (app_cmds.empty()) append(m, 0, "(Empty)", MF_GRAYED);
+    if (app_cmds.empty()) append(m, 0, "(Empty)", MF_GRAYED);   // no program besides Set Program Access and Defaults
     return m;
 }
 
@@ -363,6 +367,18 @@ void shut_down()
     std::u16string t = W("Turn off the computer?\n\n(" + c + ")");
     if (MessageBoxW(g.wnd, (LPCWSTR)t.c_str(), L"Shut Down", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return;
     run_shell(c);
+}
+
+// flxp with arguments (beside this program, else on PATH)
+void run_flxp(const std::vector<std::string>& args, const std::string& what)
+{
+    std::string bin = self_dir() + "/flxp";
+    if (!executable(bin)) bin = find_in_path("flxp");
+    if (bin.empty()) { report("Cannot open " + what, "flxp (the explorer) was not found"); return; }
+    std::vector<std::string> argv = { bin };
+    argv.insert(argv.end(), args.begin(), args.end());
+    std::string err;
+    if (!shell::spawn(argv, home(), &err)) report("Cannot open " + what, err);
 }
 
 void open_folder(const std::string& path)
@@ -576,6 +592,7 @@ bool command(UINT cmd)
         if (!shell::store::launch_settings()) report("Cannot start Display Properties", shell::store::settings_program());
         break;
     case CMD_RUN: run_dialog(); break;
+    case CMD_DEFPROGS: run_flxp({ "--default-programs" }, "Default Programs"); break;
     case CMD_LOGOFF: log_off(); break;
     case CMD_SHUTDOWN: shut_down(); break;
     default: return false;

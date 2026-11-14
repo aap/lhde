@@ -44,16 +44,19 @@ extern "C" const unsigned char flxp_shell_res_start[], flxp_shell_res_end[];
 
 namespace shell {
 
-namespace {
-
-namespace details = shell::details;
-
-HINSTANCE module()
+// flxp/rc/shell.res as a module, for every dialog of the shell layer (defprogs.cpp too)
+HINSTANCE ui_module()
 {
     static res::Module* m;
     if (!m) m = res::load_memory(flxp_shell_res_start, (size_t)(flxp_shell_res_end - flxp_shell_res_start));
     return (HINSTANCE)m;
 }
+
+namespace {
+
+namespace details = shell::details;
+
+HINSTANCE module() { return ui_module(); }
 
 // ---- the model -------------------------------------------------------------------------
 

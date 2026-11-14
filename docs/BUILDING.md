@@ -186,7 +186,9 @@ start under the last theme (icons, colours, bands, xwd and ImageMagick): `tests/
 window manager, luxwm started, killed and under fvwm2 (the Small header without the title row, the full one, the vision header's XP
 chrome; the log and the band's row in the pixels): `tests/headless/nowm.sh`, Folder Options' File Types page on a scratch home and
 mime database (typing jumps, Change... writes `mimeapps.list`, Restore, Edit File Type's New... writes and Restore removes the
-program's copy, New / Delete an extension): `tests/headless/filetypes.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron), Quick Launch and taskbar menu under luxwm
+program's copy, New / Delete an extension): `tests/headless/filetypes.sh`, Default Programs on a scratch home in an lhde session
+(a program picked for the editor role and applied: settings.ini `[programs]` and the role file; File Types' Set by names the
+role, Change... for one type wins over it): `tests/headless/defprogs.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron), Quick Launch and taskbar menu under luxwm
 (xprop, xwininfo; luxshell/tests/trayicon): `tests/headless/taskbar.sh`, every IDC_ cursor shown under the X cursor theme's name (XFixes): `tests/headless/cursors.sh`, Super+R
 opening the start menu's Run dialog (luxwm, luxshell, flxp-startmenu) and settings.ini `[commands] run` instead:
 `tests/headless/runkey.sh`, luxshell keeping exactly one start-menu provider when the provider's command name is not

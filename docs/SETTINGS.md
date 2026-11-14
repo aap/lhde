@@ -117,7 +117,7 @@ selecting another theme removes it (`lhde_theme_select`), Save As turns it into 
 | Display Properties (flxp-settings: Themes, Desktop, Appearance, Effects) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[sidebar] mode with_classic stacking animate`, `[fonts]`, `[effects]`, theme files (Save As, Delete) |
 | luxshell (the settings flyout, its menus, drags, `_LHSHELL_COMMAND`) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[taskbar]`, `[sidebar]`, `[clock]`, theme files (Save As) |
 | flxp-desktop, the Explorer | Set as Desktop Background: the current layer's `Desktop.wallpaper` / `Desktop.mode` (and a `[desktop] wallpaper = none` cleared); outside lhde's files: the associations ("Associations" below) |
-| `lhde-mime role` | `[programs]`, then the role file ("Default programs" below) |
+| Default Programs (`flxp --default-programs`: Folder Options' File Types, All Programs' Set Program Access and Defaults) | `[programs]`, then the role file ("Default programs" below); `lhde-mime role` the same |
 | lhde-session | `_LH_THEME` only (`theme NAME`; luxshell then writes the file); without a luxshell, `taskbar KIND` through `lhde-theme set-key`, `set` and `setting` |
 | luxwm | nothing; it reads `[fonts] smoothing` and `[effects]` for its window menu, the theme through `_LH_THEME` |
 | flxp-taskbar, the start panel | `[taskbar] quicklaunch locked` (the taskbar menu); they read `[taskbar] start_menu hide_inactive`, `[quicklaunch] dir`, `[start] pinned`, `[commands] logoff shutdown terminal` |
@@ -199,7 +199,7 @@ XP's Set Program Access and Defaults over the files above: one choice per kind o
 type. A role is a set of types; the user's program for it is `settings.ini [programs] ROLE = ID.desktop`, and the role file,
 `~/.local/share/applications/lhde-mimeapps.list` (`$XDG_DATA_HOME/applications`), holds one `[Default Applications]` line
 `TYPE=ID.desktop` for every type of every role. The file starts with a comment saying it is generated; every apply writes it
-whole (`lhde-mime roles apply`: lhde-session at start, `lhde-mime role`; flxp's
+whole (`lhde-mime roles apply`: lhde-session at start, Default Programs' OK and Apply, `lhde-mime role`; flxp's
 `shell::apply_roles` and lhdemime.py's `apply_roles` write the same bytes). It is read only in an lhde session (a
 desktop-specific file: `XDG_CURRENT_DESKTOP=lhde`), after the user's `~/.config/mimeapps.list` (a choice for one type: Open
 With's Always use, File Types' Change..., `lhde-mime default`) and before lhde's and the distribution's files. Switching the
@@ -236,3 +236,10 @@ The `folders` role is lhde's, not XP's; it repeats lhde's `lhde-mimeapps.list`, 
 **`[programs] ROLE`**: a desktop file id (`luxpad.desktop`; `lhde-mime role` takes `luxpad` too); `none`, XP's "Use my current
 ...": the role writes nothing and its types fall to the other files and the claimants; absent: lhde's default (`prefer`). A
 program that is not installed gives lhde's default, which `lhde-mime check` reports with the role file out of date.
+
+**Default Programs** (`flxp --default-programs[=ROLE]`; Folder Options' File Types, its Default Programs... button, at the
+selected type's role; All Programs' first item, XP's Set Program Access and Defaults) lists the roles; the selected one shows
+its question, "Use my current ..." and the programs offered as radio buttons (lhde's default marked), how many types it
+opens. OK and Apply write `[programs]` and apply at once. File Types' **Set by** names the role of a line from the role file:
+"your editor role (luxpad)" when `[programs]` chose it, "lhde's editor role (luxpad)" when it is lhde's default.
+

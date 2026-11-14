@@ -1,6 +1,6 @@
 # flxp, the XP-style explorer and shell (included by the top-level Makefile).
 #   shell/      the shell model: namespace, icons, associations, settings, file ops (native); shell/ui/ its win32 part
-#               (the message box, shell icons as HICON, the Properties sheet), compiled on the shim
+#               (the message box, shell icons as HICON, the Properties sheet, Default Programs), compiled on the shim
 #   explorer/   the explorer (flxp) and the browsing widget the others share
 #   desktop/    flxp-desktop       taskbar/   flxp-taskbar (start menu, start panel, tray; as flxp-startmenu the panel alone)
 #   filedlg/    flxp-filedialog, flxp-portal (xdg-desktop-portal FileChooser backend)

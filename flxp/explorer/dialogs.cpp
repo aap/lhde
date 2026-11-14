@@ -13,6 +13,7 @@
 #include "shell/fileops.h"
 #include "shell/mime.h"
 #include "shell/namespace.h"
+#include "shell/roles.h"
 #include "shell/ui.h"
 #include "commands.h"
 #include "uiicons.h"
@@ -543,7 +544,13 @@ static void details()
     std::string file = s.file;
     std::string home = shell::home_dir();
     if (!home.empty() && file.compare(0, home.size() + 1, home + "/") == 0) file = "~" + file.substr(home.size());
-    if (s.layer == "user") by = "your choice (" + file + ")";
+    const shell::Role* role = s.layer == "role" ? shell::role_of(s.type) : nullptr;
+    if (s.layer == "role") {
+        std::string name = s.app ? s.app->name : "";
+        if (role) by = (shell::role_choice(*role).user ? "your " : "lhde's ") + role->id + " role (" + name + ")";
+        else by = "a role (" + file + ")";
+    }
+    else if (s.layer == "user") by = "your choice (" + file + ")";
     else if (s.layer == "lhde") by = "lhde (" + file + ")";
     else if (s.layer == "desktop") by = "another desktop's defaults (" + file + ")";
     else if (s.layer == "system") by = "the distribution (" + file + ")";
@@ -558,8 +565,8 @@ static void details()
     set_text(page, IDC_FT_DESC, desc);
     set_text(page, IDC_FT_ADVANCED, restore_mode ? "&Restore" : "Ad&vanced");
     if (getenv("FLXP_TRACE_FILETYPES"))
-        printf("filetypes: %s %s %s %s%s\n", EXT.c_str(), r.type.c_str(), s.app ? s.app->id.c_str() : "-", s.layer.empty() ? "-" : s.layer.c_str(),
-               restore_mode ? " restore" : ""), fflush(stdout);
+        printf("filetypes: %s %s %s %s%s%s\n", EXT.c_str(), r.type.c_str(), s.app ? s.app->id.c_str() : "-", s.layer.empty() ? "-" : s.layer.c_str(),
+               restore_mode ? " restore" : "", role ? (" [" + by + "]").c_str() : ""), fflush(stdout);
 }
 
 // ---- New Action / Edit Action ----
@@ -849,6 +856,14 @@ static INT_PTR CALLBACK proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         switch (LOWORD(wp)) {
         case IDC_FT_CHANGE: change(); return TRUE;
         case IDC_FT_ADVANCED: advanced(); return TRUE;
+        case IDC_FT_DEFPROGS: {
+            // Default Programs at the role of the selected type
+            int i = current();
+            const shell::Role* r = i >= 0 ? shell::role_of(rows[(size_t)i].type) : nullptr;
+            shell::default_programs(dlg, r ? r->id : "");
+            details();
+            return TRUE;
+        }
         case IDC_FT_NEW: {
             int i = current();
             new_type = i >= 0 ? rows[(size_t)i].type : "";

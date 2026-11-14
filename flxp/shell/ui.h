@@ -1,6 +1,6 @@
 // ui.h: the shell layer's win32 part (flxp/shell/ui/, compiled on wux and linked with it: libflxpshell.a, flxp's
 // programs; not the native toolkit tests). What a program shows of the shell: the message box, a shell icon as an HICON,
-// the Properties sheet. Include it after the win32 headers (wux/wux.h, or w32/w32.h inside flxp); shell/shell.h does.
+// the Properties sheet, Default Programs. Include it after the win32 headers (wux/wux.h, or w32/w32.h inside flxp); shell/shell.h does.
 #pragma once
 #pragma push_macro("min")
 #pragma push_macro("max")
@@ -64,6 +64,12 @@ struct PropertiesOptions {
     std::function<bool(HWND page, const std::string& path, const std::string& mime)> change_program;
 };
 bool properties(HWND owner, const std::vector<std::string>& paths, const PropertiesOptions& o = PropertiesOptions());
+// Default Programs (shell/roles.h; XP's Set Program Access and Defaults): the roles in a list, the selected one's question
+// with "Use my current ..." and its installed programs as radio buttons. OK and Apply write settings.ini [programs] and
+// apply the roles (the role file) at once; Cancel drops what was not applied. role: the role selected first (its id;
+// "" the first). Modal to owner (null: a window of its own). True when something was applied.
+bool default_programs(HWND owner, const std::string& role = "");
+
 // A one-line edit's paste keeps every line of the clipboard, joined by spaces (the edit control alone keeps the first)
 void one_line_edit(HWND edit);
 

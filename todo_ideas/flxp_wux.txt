@@ -57,6 +57,13 @@
 	the icon theme's per-type icons; a Restore leaves the empty [Default Applications] / [Added Associations] headers in
 	mimeapps.list (GLib does the same); the measurements are ReactOS's template fitted to our 227 x 215 pages, not XP's
 
+* Default Programs (flxp --default-programs): ten radio slots, so a role with more than nine programs offered shows the first
+	nine (prefer= order, then by claims); the terminal ([commands] terminal) is no role there yet (candidates from
+	Categories=TerminalEmulator, its Exec as the command); XP's "Enable access to this program" check boxes and its
+	Computer Manufacturer / Microsoft Windows / Non-Microsoft configurations are not there; the layout is ours (XP's page lives
+	in Add or Remove Programs as one scrolled list of groups); with PREFIX=~/.local the role file and make install's
+	lhde-mimeapps.list are one path (the role file covers both of its lines, the folders and editor roles)
+
 * flxp does not own org.freedesktop.FileManager1 (ShowFolders, ShowItems): Firefox's "Show in Folder" and Chromium's ask
 	that D-Bus name first and select the file in the window, and only without it open the folder through GIO
 	(inode/directory's default, lhde-mimeapps.list's flxp)

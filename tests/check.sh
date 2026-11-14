@@ -119,6 +119,9 @@ else
     # Folder Options' File Types page: typing jumps, Change... writes mimeapps.list, Restore, Edit File Type's New..., New / Delete
     tests/headless/filetypes.sh "$2" > "$T/filetypes-page.log" 2>&1; rc=$?
     result "headless/filetypes.sh$(grep -m1 '^skip' "$T/filetypes-page.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/filetypes-page.log"
+    # Default Programs: a role's program picked and applied (settings.ini, the role file), File Types' "Set by" the role
+    tests/headless/defprogs.sh "$3" > "$T/defprogs.log" 2>&1; rc=$?
+    result "headless/defprogs.sh$(grep -m1 '^skip' "$T/defprogs.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/defprogs.log"
     # flxp's chrome without luxwm, with luxwm, after it, under fvwm2 (the Small header, the full one; the vision header: XP)
     tests/headless/nowm.sh "$1" > "$T/nowm.log" 2>&1; rc=$?
     result "headless/nowm.sh$(grep -m1 '^skip' "$T/nowm.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/nowm.log"
