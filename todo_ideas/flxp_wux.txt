@@ -71,9 +71,6 @@
 	in Add or Remove Programs as one scrolled list of groups); with PREFIX=~/.local the role file and make install's
 	lhde-mimeapps.list are one path (the role file covers both of its lines, the folders and editor roles)
 
-* flxp does not own org.freedesktop.FileManager1 (ShowFolders, ShowItems): Firefox's "Show in Folder" and Chromium's ask
-	that D-Bus name first and select the file in the window, and only without it open the folder through GIO
-	(inode/directory's default, lhde-mimeapps.list's flxp)
 
 ### details and task pane
 

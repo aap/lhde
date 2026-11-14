@@ -776,12 +776,16 @@ int unfiltered_count(const Browser& b)
     return n;
 }
 
-// testing (tests/headless/filter.sh): the list's item count after every change, "list: N of M"
+// testing (tests/headless/filter.sh, filemanager1.sh): the list's item count after every change, "list: N of M", then
+// "selected: PATH" for each selected item
 static void trace_count(const Browser& b)
 {
     static bool on = getenv("FLXP_TRACE_LIST") != nullptr;
     if (!on || !b.list) return;
     fprintf(stderr, "list: %d of %d\n", (int)SendMessageW(b.list, LVM_GETITEMCOUNT, 0, 0), unfiltered_count(b));
+    int i = -1;
+    while ((i = (int)SendMessageW(b.list, LVM_GETNEXTITEM, (WPARAM)i, LVNI_SELECTED)) >= 0)
+        if ((size_t)i < b.items.size()) fprintf(stderr, "selected: %s\n", b.items[(size_t)i].path.c_str());
     fflush(stderr);
 }
 

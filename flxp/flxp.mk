@@ -51,6 +51,9 @@ $(O)/flxp/desktop/wallpaper.o: flxp/desktop/wallpaper.cpp
 $(O)/flxp/filedlg/portal.o: flxp/filedlg/portal.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(shell pkg-config --cflags dbus-1) -c $< -o $@
+$(O)/flxp/desktop/filemanager1.o: flxp/desktop/filemanager1.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(shell pkg-config --cflags dbus-1) -c $< -o $@
 
 # the data directory, compiled into config.o (rebuilt when it changes)
 $(shell mkdir -p $(O)/flxp/shell; [ "`cat $(O)/flxp/shell/datadir 2>/dev/null`" = '$(DATADIR)' ] || echo '$(DATADIR)' > $(O)/flxp/shell/datadir)
@@ -79,7 +82,7 @@ build/bin/flxp: $(EXPLOBJS) $(FILEDLGLIB) $(W32DEPS)
 	$(CXX) -o $@ $(EXPLOBJS) $(FILEDLGLIB) $(W32LINK) $(LDLIBS) -no-pie
 build/bin/flxp-desktop: $(DESKOBJS) $(EXPLSHARED) $(FILEDLGLIB) $(W32DEPS)
 	@mkdir -p $(dir $@)
-	$(CXX) -o $@ $(DESKOBJS) $(EXPLSHARED) $(FILEDLGLIB) $(W32LINK) $(LDLIBS) $(shell pkg-config --libs libpng libjpeg) -no-pie
+	$(CXX) -o $@ $(DESKOBJS) $(EXPLSHARED) $(FILEDLGLIB) $(W32LINK) $(LDLIBS) $(shell pkg-config --libs libpng libjpeg dbus-1) -no-pie
 # the Longhorn look is built on the explorer's browsing widget (browser, header, places, ...)
 build/bin/flxp-filedialog: $(O)/flxp/filedlg/main.o $(FILEDLGLIB) $(EXPLSHARED) $(W32DEPS)
 	@mkdir -p $(dir $@)
@@ -114,9 +117,11 @@ install-flxp: flxp
 	sed 's|@BINDIR@|$(BINDIR)|g; s|@DATADIR@|$(DATADIR)|g' flxp/res/flxp.desktop.in > $(DESTDIR)$(APPDIR)/flxp.desktop
 	install -m 644 flxp/res/portal/flxp.portal $(DESTDIR)$(PORTALDIR)/flxp.portal
 	sed 's|@BINDIR@|$(BINDIR)|g' flxp/res/portal/org.freedesktop.impl.portal.desktop.flxp.service.in > $(DESTDIR)$(DBUSSERVICEDIR)/org.freedesktop.impl.portal.desktop.flxp.service
+	sed 's|@BINDIR@|$(BINDIR)|g' flxp/res/org.freedesktop.FileManager1.service.in > $(DESTDIR)$(DBUSSERVICEDIR)/org.freedesktop.FileManager1.service
 uninstall-flxp:
 	rm -f $(addprefix $(DESTDIR)$(BINDIR)/,$(FLXP_PROGRAMS)) $(DESTDIR)$(BINDIR)/flxp-startmenu $(DESTDIR)$(APPDIR)/flxp.desktop
 	rm -f $(DESTDIR)$(PORTALDIR)/flxp.portal $(DESTDIR)$(DBUSSERVICEDIR)/org.freedesktop.impl.portal.desktop.flxp.service
+	rm -f $(DESTDIR)$(DBUSSERVICEDIR)/org.freedesktop.FileManager1.service
 	rm -rf $(DESTDIR)$(DATADIR)/res
 	-rmdir $(DESTDIR)$(DATADIR)
 

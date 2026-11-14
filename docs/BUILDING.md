@@ -33,7 +33,7 @@ the user's own files (settings below).
 
 Needs a C and C++17 compiler, GNU make, Python 3 (the standard library: every `make` runs
 `tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, xext, xcursor, xfixes, xkbcommon, freetype2,
-fontconfig, libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, luxshell);
+fontconfig, libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, flxp-desktop's FileManager1, luxshell);
 for the lux side also xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4).
 Every `.res` is checked in (`wux/rc/`, `wux/w32/stdres.res`, `flxp/rc/`, `tests/w32/test.res`):
 the mingw-w64 cross toolchain (`x86_64-w64-mingw32-windres`, which preprocesses with its gcc) is needed
@@ -96,7 +96,8 @@ the man pages luxwm.1 and luxwmc.1 (`MANDIR`), `share/applications/flxp.desktop`
 default programs, docs/SETTINGS.md "Associations"; without a `DESTDIR` update-desktop-database then indexes `APPDIR`), the portal backend's `flxp.portal` (in
 `PORTALDIR`, default `$PREFIX/share/xdg-desktop-portal/portals`; xdg-desktop-portal reads its own datadir, so set
 `PORTALDIR=/usr/share/xdg-desktop-portal/portals` for a system install) and its D-Bus service file (`DBUSSERVICEDIR`, default
-`$PREFIX/share/dbus-1/services`). Also settable: `BINDIR LIBDIR INCLUDEDIR DATADIR PKGLIBDIR APPDIR PKGCONFIGDIR`.
+`$PREFIX/share/dbus-1/services`), and there too `org.freedesktop.FileManager1.service` (`flxp-desktop --filemanager1`, docs/USAGE.md
+"Show in Folder"). Also settable: `BINDIR LIBDIR INCLUDEDIR DATADIR PKGLIBDIR APPDIR PKGCONFIGDIR`.
 `DATADIR` is compiled into flxp (its `res/icons`; everything else it finds through liblhde).
 No Windows file and no user setting is ever installed: those are the two other trees below.
 
@@ -190,7 +191,9 @@ luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`, clicks o
 `tests/headless/menus.sh`, a Win32 menu bar's pixels (plain, hot, open, inactive) under jade4074, luna and classic with
 ImageMagick: `tests/headless/menubar.sh`, the menu bar from the keyboard (Alt+letter drops its popup, F10 enters the bar without
 dropping, from the window and from an Edit control in it): `tests/headless/menukeys.sh`, the caption buttons luxwm gives a message box,
-a property sheet and luxpad's Find (Close alone) and an overlapped window (all three) under classic: `tests/headless/capbuttons.sh`, flxp switched luna -> jade4074 -> classic and classic -> jade4074 -> luna against a fresh
+a property sheet and luxpad's Find (Close alone) and an overlapped window (all three) under classic: `tests/headless/capbuttons.sh`,
+org.freedesktop.FileManager1 on a private session bus (flxp-desktop's, then the activated service's: ShowItems selects the item,
+ShowFolders, ShowItemProperties): `tests/headless/filemanager1.sh`, flxp switched luna -> jade4074 -> classic and classic -> jade4074 -> luna against a fresh
 start under the last theme (icons, colours, bands, xwd and ImageMagick): `tests/headless/themeswitch.sh`, flxp's chrome with no
 window manager, luxwm started, killed and under fvwm2 (the Small header without the title row, the full one, the vision header's XP
 chrome; the log and the band's row in the pixels): `tests/headless/nowm.sh`, Folder Options' File Types page on a scratch home and

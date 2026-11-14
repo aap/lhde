@@ -105,6 +105,8 @@ else
     tests/headless/menukeys.sh "$2" > "$T/menukeys.log" 2>&1; result headless/menukeys.sh $? "$T/menukeys.log"
     tests/headless/capbuttons.sh "$3" > "$T/capbuttons.log" 2>&1; rc=$?
     result "headless/capbuttons.sh$(grep -m1 '^skip' "$T/capbuttons.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/capbuttons.log"
+    tests/headless/filemanager1.sh "$1" > "$T/filemanager1.log" 2>&1; rc=$?
+    result "headless/filemanager1.sh$(grep -m1 '^skip' "$T/filemanager1.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/filemanager1.log"
     tests/headless/typing.sh "$3" > "$T/typing.log" 2>&1; result headless/typing.sh $? "$T/typing.log"
     tests/headless/msgbox.sh "$3" > "$T/msgbox.log" 2>&1; result headless/msgbox.sh $? "$T/msgbox.log"
     tests/headless/filedlg.sh "$3" > "$T/filedlg.log" 2>&1; result headless/filedlg.sh $? "$T/filedlg.log"

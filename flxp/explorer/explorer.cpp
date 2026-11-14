@@ -2416,6 +2416,7 @@ static void usage(FILE* f)
         "  --taskpane          Longhorn: the task band under the command bar (taskpane=1)\n"
         "  --geometry WxH+X+Y  window client size and position\n"
         "  --select FILE       open FILE's folder with FILE selected (Windows' explorer /select,FILE)\n"
+        "  --properties ITEM...  only the Properties sheet of the items (files or folders), on General\n"
         "  --info              print the settings, data directory, fonts and theme found, and exit\n"
         "  --folder-options[=general|view|filetypes]   only the Folder Options sheet, at that page\n"
         "  --default-programs[=ROLE]   only Default Programs (Set Program Access and Defaults), at\n"
@@ -2517,6 +2518,7 @@ int main(int argc, char** argv)
     int fo_page = -1;     // --folder-options
     bool defprogs = false;    // --default-programs
     std::string defprogs_role;
+    bool props = false;       // --properties
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         auto value = [&](const char* opt) -> const char* {
@@ -2542,6 +2544,7 @@ int main(int argc, char** argv)
         }
         else if (opt == "--default-programs") { defprogs = true; if (eq != std::string::npos) defprogs_role = a.substr(eq + 1); }
         else if (opt == "--select") select = val("--select");
+        else if (opt == "--properties") props = true;
         else if (opt == "--settings") {   // Display Properties: flxp --settings [--tab NAME]
             std::string prog = shell::store::settings_program();
             std::vector<char*> av = { (char*)prog.c_str() };
@@ -2559,6 +2562,21 @@ int main(int argc, char** argv)
     if (shell::write_settings_template() && !info)
         fprintf(stderr, "flxp: wrote %s (every setting, empty = automatic)\n", shell::settings_path().c_str());
 
+    if (props) {   // only the Properties sheet of the items, on General (org.freedesktop.FileManager1's ShowItemProperties)
+        std::vector<std::string> paths;
+        for (const std::string& a : args) {
+            std::string p = shell::path_from_uri(a);
+            char abs[PATH_MAX];
+            if (!realpath((p.empty() ? a : p).c_str(), abs)) { fprintf(stderr, "flxp: %s: no such file or folder\n", a.c_str()); continue; }
+            if (std::find(paths.begin(), paths.end(), abs) == paths.end()) paths.push_back(abs);
+        }
+        if (paths.empty()) return 1;
+        shell::setup_fonts();
+        shell::setup_theme();
+        w32::init();
+        shell::properties(nullptr, paths);
+        return 0;
+    }
     // Split the arguments: folders get windows, files are opened.
     std::vector<std::string> dirs, files;
     for (std::string a : args) {
