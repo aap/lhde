@@ -44,6 +44,7 @@ geom() { xwininfo -id "$1" | awk '/Absolute upper-left X/ {x=$NF} /Absolute uppe
 menu_win() { xdotool search --onlyvisible --classname "^$1\$" 2>/dev/null | head -1; }
 shown_win() { W=$(menu_win $1); [ -n "$W" ]; }
 gone_win() { [ -z "$(menu_win $1)" ]; }
+painted() { [ "$(xwd -id $W -silent 2>/dev/null | magick xwd:- -crop 1x1+10+10 -format '%[hex:p{0,0}]' info: 2>/dev/null)" != 000000 ]; }
 # open_menu NAME TAG: the background, the menu (luxshell's script; luxwm's Alt+Space on the xterm), its geometry, the shot
 PS=
 open_menu() {
@@ -52,6 +53,7 @@ open_menu() {
     if [ "$1" = luxshell-menu ]; then "$R/build/bin/luxshell" $T/menu.lua > $T/luxshell.log 2>&1 & PS=$!
     else xdotool key alt+space; fi
     wait_for 5 shown_win $1 || { bad "$2: no menu window ($1)"; [ -n "$PS" ] && kill $PS; PS=; return 1; }
+    wait_for 10 painted || echo "note: $1 still black inside after 10 s"   # mapped is not drawn yet (a slow machine)
     sleep .4
     geom $W > $T/$2.geom
     xwd -id $W -silent > $T/$2.xwd
