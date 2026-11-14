@@ -12,6 +12,9 @@ relative name overrides the one here; the Windows tree's `index/` (`~/.local/sha
 - `frames/NAME/theme.ini`: luxwm's frame sets, the tuning keys; their pixels (or a cache) come from lhde-import.
 - `applications/lhde-mimeapps.list`: lhde's default programs, installed to `$PREFIX/share/applications` (not `share/lhde`; an
   uninstalled build does not read it: docs/SETTINGS.md "Associations").
+- `thumbnailers/lhde-*.thumbnailer`: freedesktop thumbnailer entries for document pages (PDF, XPS, PostScript, DjVu), installed
+  to `$PREFIX/share/thumbnailers` (not `share/lhde`); flxp reads them after every other entry, uninstalled from here too
+  (docs/USAGE.md, thumbnails).
 - `xsessions/lhde.desktop.in`: the X session entry a display manager lists (`lhde-session xsession`), installed with its
   `@BINDIR@` filled in to `$PREFIX/share/xsessions/lhde.desktop` (docs/BUILDING.md "A whole-system install and a display
   manager").

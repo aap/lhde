@@ -77,6 +77,9 @@ PKGLIBDIR      ?= $(PREFIX)/lib/lhde
 APPDIR         ?= $(PREFIX)/share/applications
 # the X session entry a display manager lists (share/xsessions/lhde.desktop: lhde-session xsession)
 XSESSIONDIR    ?= $(PREFIX)/share/xsessions
+# share/thumbnailers/lhde-*.thumbnailer (PDF, XPS, PostScript, DjVu pages: docs/USAGE.md, thumbnails) where every program
+# using the freedesktop thumbnailer spec looks; flxp also reads the one beside DATADIR
+THUMBNAILERDIR ?= $(PREFIX)/share/thumbnailers
 PKGCONFIGDIR   ?= $(LIBDIR)/pkgconfig
 # The file chooser portal backend: the .portal file goes where xdg-desktop-portal
 # looks (its own datadir: PORTALDIR=/usr/share/xdg-desktop-portal/portals for a
@@ -132,13 +135,15 @@ SESSION_FILES = lab.sh lhwall.sh lhde-paths.sh theme-reload.sh theme-watch.sh ca
                 picom-glass.conf picom-glass-fvwm.conf lab.fvwm2rc
 TOOL_FILES    = msstyles2theme.py build_aerovision.py build_aero5112.py lhdeimport.py lhdeschemes.py lhdetree.py wim0108.py \
                 lhdebaml.py lhdeaurora.py lhdestyles.py lhdemime.py
-# share/applications/lhde-mimeapps.list into APPDIR: lhde's default programs, read when XDG_CURRENT_DESKTOP names lhde
+# share/thumbnailers' entries into THUMBNAILERDIR; share/applications/lhde-mimeapps.list into APPDIR: lhde's default programs, read when XDG_CURRENT_DESKTOP names lhde
 # (lhde-session sets it; docs/SETTINGS.md "Associations"); share/xsessions/lhde.desktop.in into XSESSIONDIR with BINDIR filled in
 install-data:
 	install -d $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(BINDIR) \
 	           $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \
-	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools $(DESTDIR)$(APPDIR) $(DESTDIR)$(XSESSIONDIR)
+	           $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools $(DESTDIR)$(APPDIR) $(DESTDIR)$(XSESSIONDIR) \
+	           $(DESTDIR)$(THUMBNAILERDIR)
 	install -m 644 share/applications/lhde-mimeapps.list $(DESTDIR)$(APPDIR)/
+	install -m 644 share/thumbnailers/lhde-*.thumbnailer $(DESTDIR)$(THUMBNAILERDIR)/
 	sed 's|@BINDIR@|$(BINDIR)|g' share/xsessions/lhde.desktop.in > $(DESTDIR)$(XSESSIONDIR)/lhde.desktop
 	chmod 644 $(DESTDIR)$(XSESSIONDIR)/lhde.desktop
 	install -m 644 share/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
@@ -155,7 +160,8 @@ install-data:
 	cd tools && install -m 644 $(TOOL_FILES) $(DESTDIR)$(PKGLIBDIR)/tools/
 uninstall-data:
 	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(BINDIR)/lhde-pack $(DESTDIR)$(BINDIR)/lhde-schemes \
-	      $(DESTDIR)$(BINDIR)/lhde-mime $(DESTDIR)$(APPDIR)/lhde-mimeapps.list $(DESTDIR)$(XSESSIONDIR)/lhde.desktop
+	      $(DESTDIR)$(BINDIR)/lhde-mime $(DESTDIR)$(APPDIR)/lhde-mimeapps.list $(DESTDIR)$(XSESSIONDIR)/lhde.desktop \
+	      $(addprefix $(DESTDIR)$(THUMBNAILERDIR)/,$(notdir $(wildcard share/thumbnailers/lhde-*.thumbnailer)))
 	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar \
 	       $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources \
 	       $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools

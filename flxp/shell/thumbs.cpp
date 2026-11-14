@@ -6,7 +6,13 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <limits.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <spawn.h>
+#include <time.h>
+#include <sys/wait.h>
 #include <algorithm>
+#include <map>
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -18,6 +24,7 @@
 #include "liblhde/compat.h"
 #include "thumbs.h"
 #include "config.h"
+#include "mime.h"
 #include "gdi/image.h"
 #include "gdi/png.h"
 
@@ -141,7 +148,7 @@ std::string cache_path(const std::string& file, int cache_size)
     return cache_dir() + "/" + size_dir(cache_size) + "/" + md5_hex(uri_from_path(file)) + ".png";
 }
 
-bool can_thumbnail(const std::string& path)
+bool own_picture(const std::string& path)
 {
     size_t dot = path.rfind('.');
     if (dot == std::string::npos || path.find('/', dot) != std::string::npos) return false;
@@ -226,7 +233,321 @@ static bool trace()
     return on > 0;
 }
 
-gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size)
+// ---- thumbnailer entries ----------------------------------------------------------------
+
+namespace {
+struct Entries {
+    std::vector<Thumbnailer*> list;                       // the order they are tried
+    std::map<const Thumbnailer*, bool> present;           // its program is there (looked up once)
+    std::map<std::string, const Thumbnailer*> by_type;    // canonical type -> the entry, null: none
+    bool loaded = false;
+};
+Entries g_entries;
+std::mutex g_entries_lock;
+std::atomic<int> g_timeout_ms{10000};
+std::atomic<size_t> g_max_output{16u << 20};
+std::atomic<int> g_runs{0};
+std::atomic<unsigned> g_out_serial{0};
+}
+
+std::vector<std::string> thumbnailer_dirs()
+{
+    std::vector<std::string> out = { data_home() + "/thumbnailers" };
+    for (const std::string& d : data_dirs()) out.push_back(d + "/thumbnailers");
+    // lhde's: beside its data directory (<prefix>/share/lhde) or the source tree's share/ (flxp/ found from build/)
+    for (const std::string& d : data_search_dirs()) {
+        std::string base = base_of(d), up = dir_of(d);
+        if (base == "lhde") out.push_back(up + "/thumbnailers");
+        else if (base == "flxp") out.push_back(up + "/share/thumbnailers");
+    }
+    std::vector<std::string> unique;
+    std::set<std::string> seen;
+    for (const std::string& d : out) {
+        char real[PATH_MAX];
+        std::string r = realpath(d.c_str(), real) ? std::string(real) : d;
+        if (seen.insert(r).second) unique.push_back(d);
+    }
+    return unique;
+}
+
+// a key file value's escapes: \s \n \t \r \\ (the desktop entry spec)
+static std::string unescape_value(const std::string& v)
+{
+    std::string out;
+    for (size_t i = 0; i < v.size(); i++) {
+        if (v[i] != '\\' || i + 1 == v.size()) { out += v[i]; continue; }
+        char c = v[++i];
+        out += c == 's' ? ' ' : c == 'n' ? '\n' : c == 't' ? '\t' : c == 'r' ? '\r' : c;
+    }
+    return out;
+}
+
+static Thumbnailer* read_entry(const std::string& file)
+{
+    std::string text;
+    if (!read_file(file, text)) return nullptr;
+    Thumbnailer t;
+    t.file = file;
+    t.name = base_of(file);
+    bool in = false;
+    size_t i = 0;
+    while (i < text.size()) {
+        size_t j = text.find('\n', i);
+        if (j == std::string::npos) j = text.size();
+        std::string line = trim(text.substr(i, j - i));
+        i = j + 1;
+        if (line.empty() || line[0] == '#') continue;
+        if (line[0] == '[') { in = line == "[Thumbnailer Entry]"; continue; }
+        size_t eq = line.find('=');
+        if (!in || eq == std::string::npos) continue;
+        std::string key = trim(line.substr(0, eq)), value = unescape_value(trim(line.substr(eq + 1)));
+        if (key == "Exec") t.exec = value;
+        else if (key == "TryExec") t.try_exec = value;
+        else if (key == "MimeType") {
+            size_t a = 0;
+            while (a < value.size()) {
+                size_t b = value.find(';', a);
+                if (b == std::string::npos) b = value.size();
+                std::string type = trim(value.substr(a, b - a));
+                if (!type.empty()) t.types.push_back(mime_canonical(type));
+                a = b + 1;
+            }
+        }
+    }
+    if (t.exec.empty() || t.types.empty()) return nullptr;
+    return new Thumbnailer(t);
+}
+
+static void load_entries()
+{
+    if (g_entries.loaded) return;
+    g_entries.loaded = true;
+    std::set<std::string> names;
+    std::vector<Thumbnailer*> others, ours;
+    for (const std::string& dir : thumbnailer_dirs()) {
+        std::vector<std::string> files;
+        if (DIR* d = opendir(dir.c_str())) {
+            while (struct dirent* e = readdir(d)) {
+                std::string n = e->d_name;
+                if (n.size() > 12 && n.compare(n.size() - 12, 12, ".thumbnailer") == 0) files.push_back(n);
+            }
+            closedir(d);
+        }
+        std::sort(files.begin(), files.end());
+        for (const std::string& n : files) {
+            if (!names.insert(n).second) continue;   // hidden by the same name in an earlier directory
+            Thumbnailer* t = read_entry(dir + "/" + n);
+            if (!t) continue;
+            (n.compare(0, 5, "lhde-") == 0 ? ours : others).push_back(t);
+        }
+    }
+    g_entries.list = others;
+    g_entries.list.insert(g_entries.list.end(), ours.begin(), ours.end());
+}
+
+std::vector<const Thumbnailer*> thumbnailers()
+{
+    std::lock_guard<std::mutex> l(g_entries_lock);
+    load_entries();
+    return std::vector<const Thumbnailer*>(g_entries.list.begin(), g_entries.list.end());
+}
+
+void reload_thumbnailers()
+{
+    std::lock_guard<std::mutex> l(g_entries_lock);
+    g_entries.list.clear();   // the entries themselves stay: a loader may hold one
+    g_entries.present.clear();
+    g_entries.by_type.clear();
+    g_entries.loaded = false;
+}
+
+// the line split as a shell splits it, without expansion
+static std::vector<std::string> split_shell(const std::string& s)
+{
+    std::vector<std::string> out;
+    std::string cur;
+    bool have = false;
+    for (size_t i = 0; i < s.size(); i++) {
+        char c = s[i];
+        if (c == ' ' || c == '\t' || c == '\n') {
+            if (have) out.push_back(cur);
+            cur.clear(); have = false;
+        } else if (c == '\'') {
+            have = true;
+            while (++i < s.size() && s[i] != '\'') cur += s[i];
+        } else if (c == '"') {
+            have = true;
+            while (++i < s.size() && s[i] != '"') {
+                if (s[i] == '\\' && i + 1 < s.size() && strchr("$`\"\\\n", s[i + 1])) {
+                    if (s[++i] != '\n') cur += s[i];
+                } else cur += s[i];
+            }
+        } else if (c == '\\' && i + 1 < s.size()) {
+            have = true;
+            if (s[++i] != '\n') cur += s[i];
+        } else { cur += c; have = true; }
+    }
+    if (have) out.push_back(cur);
+    return out;
+}
+
+std::vector<std::string> thumbnailer_argv(const Thumbnailer& t, const std::string& path, const std::string& out, int size)
+{
+    std::string line;
+    for (size_t i = 0; i < t.exec.size(); i++) {
+        if (t.exec[i] != '%' || i + 1 == t.exec.size()) { line += t.exec[i]; continue; }
+        switch (t.exec[++i]) {
+        case 'i': line += shell_quote(path); break;
+        case 'o': line += shell_quote(out); break;
+        case 'u': line += shell_quote(uri_from_path(path)); break;
+        case 's': line += std::to_string(size); break;
+        case '%': line += '%'; break;
+        default: break;   // an unknown field code is dropped
+        }
+    }
+    return split_shell(line);
+}
+
+static bool runnable(const std::string& cmd)
+{
+    if (cmd.empty()) return false;
+    if (cmd.find('/') != std::string::npos) return access(cmd.c_str(), X_OK) == 0;
+    const char* p = getenv("PATH");
+    std::string path = p ? p : "/usr/local/bin:/usr/bin:/bin";
+    size_t a = 0;
+    while (a <= path.size()) {
+        size_t b = path.find(':', a);
+        if (b == std::string::npos) b = path.size();
+        std::string dir = b > a ? path.substr(a, b - a) : ".";
+        std::string f = dir + "/" + cmd;
+        struct stat st;
+        if (stat(f.c_str(), &st) == 0 && S_ISREG(st.st_mode) && access(f.c_str(), X_OK) == 0) return true;
+        a = b + 1;
+    }
+    return false;
+}
+
+static bool present(const Thumbnailer* t)
+{
+    auto it = g_entries.present.find(t);
+    if (it != g_entries.present.end()) return it->second;
+    std::string cmd = t->try_exec;
+    if (cmd.empty()) {
+        std::vector<std::string> argv = split_shell(t->exec);
+        if (!argv.empty()) cmd = argv[0];
+    }
+    bool ok = runnable(cmd);
+    g_entries.present[t] = ok;
+    return ok;
+}
+
+const Thumbnailer* thumbnailer_for(const std::string& path)
+{
+    if (own_picture(path)) return nullptr;
+    std::string type = mime_type_for_name(base_of(path));
+    if (type.empty()) return nullptr;
+    type = mime_canonical(type);
+    std::lock_guard<std::mutex> l(g_entries_lock);
+    load_entries();
+    auto cached = g_entries.by_type.find(type);
+    if (cached != g_entries.by_type.end()) return cached->second;
+    std::vector<std::string> types = { type };
+    for (const std::string& p : mime_parents(type)) if (p != "application/octet-stream") types.push_back(p);
+    const Thumbnailer* found = nullptr;
+    for (size_t k = 0; k < types.size() && !found; k++)
+        for (const Thumbnailer* t : g_entries.list)
+            if (std::find(t->types.begin(), t->types.end(), types[k]) != t->types.end() && present(t)) { found = t; break; }
+    g_entries.by_type[type] = found;
+    return found;
+}
+
+bool can_thumbnail(const std::string& path)
+{
+    return own_picture(path) || thumbnailer_for(path) != nullptr;
+}
+
+void set_thumbnailer_limits(int timeout_ms, size_t max_bytes)
+{
+    g_timeout_ms = timeout_ms;
+    g_max_output = max_bytes;
+}
+
+int thumbnailer_runs() { return g_runs; }
+
+// a loader asks its running thumbnailer to stop when it is destroyed
+static thread_local const std::atomic<bool>* t_stop;
+
+// The entry's program on path, its PNG into out; "" when it wrote one, else why not.
+static std::string run_thumbnailer(const Thumbnailer& t, const std::string& path, const std::string& out, int size)
+{
+    std::vector<std::string> args = thumbnailer_argv(t, path, out, size);
+    if (args.empty()) return "an empty Exec";
+    std::vector<char*> argv;
+    for (std::string& a : args) argv.push_back(&a[0]);
+    argv.push_back(nullptr);
+    std::vector<std::string> env;
+    for (const char* k : { "PATH", "HOME", "LANG", "LC_ALL", "TMPDIR" })
+        if (const char* v = getenv(k)) env.push_back(std::string(k) + "=" + v);
+    if (!getenv("PATH")) env.push_back("PATH=/usr/local/bin:/usr/bin:/bin");
+    std::vector<char*> envp;
+    for (std::string& e : env) envp.push_back(&e[0]);
+    envp.push_back(nullptr);
+
+    posix_spawn_file_actions_t fa;
+    posix_spawn_file_actions_init(&fa);
+    posix_spawn_file_actions_addopen(&fa, 0, "/dev/null", O_RDONLY, 0);
+    posix_spawn_file_actions_addopen(&fa, 1, "/dev/null", O_WRONLY, 0);
+    if (!trace()) posix_spawn_file_actions_addopen(&fa, 2, "/dev/null", O_WRONLY, 0);
+#if defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 34))
+    posix_spawn_file_actions_addclosefrom_np(&fa, 3);   // not the X connection or any other descriptor of flxp's
+#endif
+    posix_spawnattr_t attr;
+    posix_spawnattr_init(&attr);
+    sigset_t none, all;
+    sigemptyset(&none);
+    sigfillset(&all);
+    posix_spawnattr_setsigmask(&attr, &none);
+    posix_spawnattr_setsigdefault(&attr, &all);
+    posix_spawnattr_setpgroup(&attr, 0);
+    posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF);
+    pid_t pid = -1;
+    int err = posix_spawnp(&pid, argv[0], &fa, &attr, argv.data(), envp.data());
+    posix_spawn_file_actions_destroy(&fa);
+    posix_spawnattr_destroy(&attr);
+    if (err != 0) return std::string("cannot run ") + args[0] + ": " + strerror(err);
+    g_runs++;
+    struct timespec start, now;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    int status = 0;
+    std::string why;
+    for (int wait_ms = 5;;) {
+        pid_t r = waitpid(pid, &status, WNOHANG);
+        if (r == pid || (r < 0 && errno != EINTR)) break;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        long ms = (now.tv_sec - start.tv_sec) * 1000 + (now.tv_nsec - start.tv_nsec) / 1000000;
+        bool stop = t_stop && t_stop->load();
+        if (ms >= g_timeout_ms || stop) {
+            kill(-pid, SIGKILL);
+            kill(pid, SIGKILL);
+            while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+            why = stop ? "stopped" : "timed out after " + std::to_string(ms) + " ms";
+            break;
+        }
+        struct timespec nap = { 0, wait_ms * 1000000L };
+        nanosleep(&nap, nullptr);
+        if (wait_ms < 50) wait_ms += 5;
+    }
+    kill(-pid, SIGKILL);   // what it left running in its group
+    if (!why.empty()) return why;
+    if (!WIFEXITED(status)) return "killed by signal " + std::to_string(WTERMSIG(status));
+    if (WEXITSTATUS(status) != 0) return "exit " + std::to_string(WEXITSTATUS(status));
+    struct stat st;
+    if (stat(out.c_str(), &st) != 0 || !S_ISREG(st.st_mode) || st.st_size == 0) return "no output";
+    if ((size_t)st.st_size > g_max_output) return "output of " + std::to_string((long long)st.st_size) + " bytes";
+    return "";
+}
+
+gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size, const Thumbnailer* by)
 {
     struct stat st;
     if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) return nullptr;
@@ -254,12 +575,32 @@ gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size)
     snprintf(sz, sizeof sz, "%lld", (long long)st.st_size);
     int ow = 0, oh = 0;
     g_decodes++;
-    gdi::Bitmap* img;
-    {
+    gdi::Bitmap* img = nullptr;
+    std::string why;
+    if (by) {
+        // the entry's program writes a PNG into the thumbnail directory, read like any other
+        if (!mkdir_private(dir)) return nullptr;
+        char tmp[96];
+        snprintf(tmp, sizeof tmp, "/.flxp-%d-%u.png", (int)getpid(), g_out_serial++);
+        std::string out = dir + tmp;
+        {
+            DecodeTurn turn;
+            why = run_thumbnailer(*by, path, out, cache_size);
+            if (why.empty()) {
+                img = gdi::load_image(out, cache_size);
+                if (!img) why = "not a picture";
+            }
+        }
+        unlink(out.c_str());
+        if (why == "stopped") { if (img) gdi::destroy_bitmap(img); return nullptr; }   // not a failure of the file
+    } else {
         DecodeTurn turn;
         img = gdi::load_image(path, cache_size, &ow, &oh);
     }
-    if (trace())
+    if (trace() && by)
+        fprintf(stderr, "thumbs: decode %s by %s at %dx%d%s%s\n", path.c_str(), by->name.c_str(), img ? img->width : 0,
+                img ? img->height : 0, why.empty() ? "" : ": ", why.c_str());
+    else if (trace())
         fprintf(stderr, "thumbs: decode %s %dx%d at %dx%d\n", path.c_str(), ow, oh, img ? img->width : 0, img ? img->height : 0);
     if (!img) {
         if (!in_cache) {
@@ -281,11 +622,13 @@ gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size)
         if (!img) return nullptr;
     }
     if (!in_cache) {
-        char iw[16], ih[16];
-        snprintf(iw, sizeof iw, "%d", ow);
-        snprintf(ih, sizeof ih, "%d", oh);
-        save(img, file, { { "Thumb::URI", uri }, { "Thumb::MTime", mt }, { "Thumb::Size", sz },
-                          { "Thumb::Image::Width", iw }, { "Thumb::Image::Height", ih }, { "Software", "flxp" } });
+        gdi::PngText text = { { "Thumb::URI", uri }, { "Thumb::MTime", mt }, { "Thumb::Size", sz } };
+        if (ow > 0 && oh > 0) {   // a picture's own size (a thumbnailer's page has none to give)
+            text.push_back({ "Thumb::Image::Width", std::to_string(ow) });
+            text.push_back({ "Thumb::Image::Height", std::to_string(oh) });
+        }
+        text.push_back({ "Software", "flxp" });
+        save(img, file, text);
     }
     return img;
 }
@@ -319,7 +662,7 @@ static std::vector<gdi::Bitmap*> folder_minis(const std::string& dir, int mini)
     if (DIR* d = opendir(dir.c_str())) {
         while (struct dirent* e = readdir(d)) {
             if (e->d_name[0] == '.') continue;
-            if (can_thumbnail(e->d_name)) names.push_back(e->d_name);
+            if (own_picture(e->d_name)) names.push_back(e->d_name);
         }
         closedir(d);
     }
@@ -339,7 +682,8 @@ static std::vector<gdi::Bitmap*> folder_minis(const std::string& dir, int mini)
 }
 
 struct Loader::Impl {
-    struct Job { uint32_t gen; int id; std::string path; int64_t mtime; int size; bool folder; int mini; };
+    struct Job { uint32_t gen; int id; std::string path; int64_t mtime; int size; bool folder; int mini;
+                 bool picture; const Thumbnailer* by; };   // by: the thumbnailer of a file that is not a picture
     Notify notify;
     void* ctx;
     std::mutex lock;
@@ -350,6 +694,7 @@ struct Loader::Impl {
     std::atomic<uint32_t> gen{1};
     int working = 0;                // jobs taken by a thread and not done (under lock)
     bool quit = false;
+    std::atomic<bool> stop{false};  // the destructor: a running thumbnailer is killed
     void run();
 };
 
@@ -371,6 +716,7 @@ Loader::~Loader()
         impl_->quit = true;
         impl_->jobs.clear();
     }
+    impl_->stop = true;
     impl_->cv.notify_all();
     for (std::thread& t : impl_->threads) t.join();
     for (Result& r : impl_->done) free_result(r);
@@ -387,9 +733,12 @@ bool Loader::busy() const
 
 void Loader::request(uint32_t gen, int id, const std::string& path, int64_t mtime, int view_size, bool folder, int mini_size)
 {
+    bool picture = folder || own_picture(path);
+    const Thumbnailer* by = nullptr;
+    if (!picture && (setting_flag("thumbnails_network", false) || !on_network(path))) by = thumbnailer_for(path);
     {
         std::lock_guard<std::mutex> l(impl_->lock);
-        impl_->jobs.push_back(Impl::Job{ gen, id, path, mtime, view_size, folder, mini_size });
+        impl_->jobs.push_back(Impl::Job{ gen, id, path, mtime, view_size, folder, mini_size, picture, by });
     }
     impl_->cv.notify_one();
 }
@@ -417,6 +766,7 @@ bool Loader::take(Result& out)
 
 void Loader::Impl::run()
 {
+    t_stop = &stop;
     for (;;) {
         Job job;
         {
@@ -431,7 +781,7 @@ void Loader::Impl::run()
         Result r;
         r.gen = job.gen; r.id = job.id; r.path = job.path;
         if (job.folder) r.minis = folder_minis(job.path, job.mini);
-        else r.bmp = fitted(get(job.path, job.mtime, cache_size_for(job.size)), job.size);
+        else if (job.picture || job.by) r.bmp = fitted(get(job.path, job.mtime, cache_size_for(job.size), job.by), job.size);
         bool wake;
         {
             std::lock_guard<std::mutex> l(lock);

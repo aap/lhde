@@ -1,0 +1,7 @@
+# lhde's PDF thumbnailer (the freedesktop thumbnailer spec): the first page by poppler's pdftoppm, %s pixels on its long
+# side. pdftoppm names its output ROOT.png, so it writes beside %o and the file is moved there. Tried after every other
+# entry for these types (docs/USAGE.md, thumbnails).
+[Thumbnailer Entry]
+TryExec=pdftoppm
+Exec=sh -c 'pdftoppm -f 1 -l 1 -singlefile -scale-to "$3" -png -- "$1" "$2.p" && mv -f "$2.p.png" "$2"; r=$?; rm -f "$2.p.png"; exit $r' lhde-pdf %i %o %s
+MimeType=application/pdf;application/x-pdf;

@@ -1,0 +1,6 @@
+# lhde's DjVu thumbnailer (the freedesktop thumbnailer spec): the first page by djvulibre's ddjvu at %s x %s, its aspect
+# kept. ddjvu writes no PNG, so the page goes through a one-page PDF to pdftoppm (poppler-utils, needed as well).
+[Thumbnailer Entry]
+TryExec=ddjvu
+Exec=sh -c 'ddjvu -format=pdf -page=1 -size=${3}x${3} "$1" "$2.pdf" && pdftoppm -singlefile -scale-to "$3" -png "$2.pdf" "$2.p" && mv -f "$2.p.png" "$2"; r=$?; rm -f "$2.pdf" "$2.p.png"; exit $r' lhde-djvu %i %o %s
+MimeType=image/vnd.djvu;image/vnd.djvu+multipage;
