@@ -19,4 +19,16 @@ bool mime_is_a(const std::string& type, const std::string& ancestor);
 std::string mime_comment(const std::string& type);               // "PNG image"; "" if unknown
 std::string mime_icon_key(const std::string& type);              // our icon key ("image", "text", ...); "" if no mapping
 
+// The registered extensions (Folder Options' File Types): every "*.EXT" glob whose EXT has no wildcard ("txt", "tar.gz"),
+// lower-cased, with the type its best glob names (highest weight, then the most important directory), sorted by EXT
+struct Extension { std::string ext, type; int weight; };
+std::vector<Extension> mime_extensions();
+void reload_mime();                                              // forget the database (after update-mime-database)
+// The user's own extensions (Folder Options' New): $XDG_DATA_HOME/mime/packages/lhde-extensions.xml, one
+// <mime-type><glob pattern="*.EXT"/></mime-type> per extension, compiled into $XDG_DATA_HOME/mime by update-mime-database
+std::string user_extensions_file();
+std::vector<Extension> user_extensions();
+bool add_user_extension(const std::string& ext, const std::string& type, std::string* err = nullptr);
+bool remove_user_extension(const std::string& ext, std::string* err = nullptr);
+
 } // namespace shell

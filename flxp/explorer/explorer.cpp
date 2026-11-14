@@ -1911,7 +1911,7 @@ static void fo_applied(dialogs::FolderOptions& o)
     if (g.zoomable && o.thumbnails != shell::setting_flag("thumbnails", true)) on_command(ID_VIEW_THUMBNAILS);
 }
 
-static void folder_options()
+static void folder_options(int page = 0, HWND owner = g.frame)
 {
     dialogs::FolderOptions o;
     o.longhorn = g.zoomable;
@@ -1928,7 +1928,8 @@ static void folder_options()
     o.apply_all = fo_apply_all;
     o.reset_all = fo_reset_all;
     o.applied = fo_applied;
-    dialogs::folder_options(g.frame, o);
+    o.start_page = page;
+    dialogs::folder_options(owner, o);
 }
 
 static void on_command(int id)
@@ -2415,6 +2416,7 @@ static void usage(FILE* f)
         "  --geometry WxH+X+Y  window client size and position\n"
         "  --select FILE       open FILE's folder with FILE selected (Windows' explorer /select,FILE)\n"
         "  --info              print the settings, data directory, fonts and theme found, and exit\n"
+        "  --folder-options[=general|view|filetypes]   only the Folder Options sheet, at that page\n"
         "  --help              this text\n"
         "Options override %s for this run; every key there can also be set\n"
         "with the environment variable FLXP_<KEY>.\n", shell::settings_path().c_str());
@@ -2509,6 +2511,7 @@ int main(int argc, char** argv)
     std::string select;   // --select FILE
     bool info = false;
     int quit_ms = 0;
+    int fo_page = -1;     // --folder-options
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         auto value = [&](const char* opt) -> const char* {
@@ -2528,6 +2531,10 @@ int main(int argc, char** argv)
 
         else if (opt == "--geometry") setenv("FLXP_GEOMETRY", val("--geometry").c_str(), 1);
         else if (opt == "--info") info = true;
+        else if (opt == "--folder-options") {   // only the Folder Options sheet, at a page (XP's Options_RunDLL 0, 7, 2)
+            std::string p = eq != std::string::npos ? a.substr(eq + 1) : "general";
+            fo_page = p == "filetypes" || p == "2" ? 2 : p == "view" || p == "7" ? 1 : 0;
+        }
         else if (opt == "--select") select = val("--select");
         else if (opt == "--settings") {   // Display Properties: flxp --settings [--tab NAME]
             std::string prog = shell::store::settings_program();
@@ -2616,6 +2623,7 @@ int main(int argc, char** argv)
     g.w_wm = FlxpWatchRootProperty("_NET_SUPPORTING_WM_CHECK");
     SetTimer(frame, TIMER_WM_GONE, 2000, wm_gone_timer);
     log_wm();
+    if (fo_page >= 0) { folder_options(fo_page, nullptr); return 0; }   // the sheet alone; its General and View act on flxp.ini
     ShowWindow(frame, SW_SHOW);
     sync_active();
     SetFocus(g.list);

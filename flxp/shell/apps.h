@@ -46,6 +46,18 @@ bool set_default_app(const std::string& mime, const std::string& app_id, std::st
 bool reset_default_app(const std::string& mime, std::string* err = nullptr);
 bool user_default_set(const std::string& mime);         // the user's file names a default for exactly this type
 std::string mimeapps_path();                            // the file set_default_app writes
+
+// A program's actions (Folder Options' Edit File Type): the first is its Exec= (id "", XP's default action, "open"),
+// then each Actions= entry with its [Desktop Action ID] Name= and Exec=.
+struct AppAction { std::string id, name, exec; };
+std::vector<AppAction> app_actions(const App& a);
+// Changed actions go into a copy of the program's desktop file in $XDG_DATA_HOME/applications under its id (which then
+// hides the system's), marked X-Lhde-Override=true; actions[0]'s Exec is the program's Exec. A file of the user's own
+// there (no mark) is refused: it is edited by hand. remove_app_override deletes our copy (Restore); app_overridden: the
+// program's file is our copy.
+bool write_app_override(const App& a, const std::vector<AppAction>& actions, std::string* err = nullptr);
+bool remove_app_override(const App& a, std::string* err = nullptr);
+bool app_overridden(const App& a);
 std::vector<std::string> mimeapps_files();              // the files read that exist, most important first
 std::vector<std::string> current_desktops();            // XDG_CURRENT_DESKTOP's entries, lower-cased
 

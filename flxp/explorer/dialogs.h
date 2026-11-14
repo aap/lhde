@@ -25,7 +25,8 @@ void message(HWND owner, const std::string& title, const std::string& text, bool
 // Organize Bookmarks: rename, remove, reorder; saves the GTK bookmarks file on OK.
 bool organize_bookmarks(HWND owner, HIMAGELIST small, int folder_image);
 
-// Folder Options (Tools menu): XP's General and View pages reduced to flxp's settings.
+// Folder Options (Tools menu): XP's General and View pages reduced to flxp's settings, and its File Types page over the
+// freedesktop associations (shell/apps.h, shell/mime.h).
 // View codes as browser::view_code (LVS_*, VIEW_THUMBNAILS; the Longhorn frame's
 // LVS_REPORT, VIEW_TILES, LVS_ICON with the size above ZOOM_SHIFT). The buttons act at
 // once through the callbacks (as XP's do, after a question); OK and Apply call
@@ -42,6 +43,7 @@ struct FolderOptions {
     void (*apply_all)(FolderOptions&) = nullptr;   // the current view is the default, every folder's own forgotten
     void (*reset_all)(FolderOptions&) = nullptr;   // the built-in default again, every folder's own forgotten
     void (*applied)(FolderOptions&) = nullptr;     // OK / Apply
+    int start_page = 0;                // 0 General, 1 View, 2 File Types (which acts at once: the freedesktop files)
 };
 void folder_options(HWND owner, FolderOptions& o);
 

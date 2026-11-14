@@ -15,6 +15,7 @@
 #include "shell/namespace.h"
 #include "shell/ui.h"
 #include "commands.h"
+#include "uiicons.h"
 extern "C" {
 #include "prsht.h"
 }
@@ -480,13 +481,420 @@ static INT_PTR CALLBACK view_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
     return FALSE;
 }
 
+// ---- File Types ----------------------------------------------------------------------
+// XP's page over the freedesktop files: one row per registered extension (shared-mime-info's "*.EXT" globs), its type's
+// description as the Details view names it; the details of the selected one: the program that opens it (Change... is the
+// Open With dialog, written to the user's mimeapps.list at once, as XP's), where that comes from, XP's sentence, and
+// Advanced (Edit File Type: the program's actions) or Restore when the user changed something (the user's lines for the
+// type, flxp's copy of the program's desktop file). New and Delete: the user's own extensions.
+
+namespace filetypes {
+
+struct Row { std::string ext, type; };
+std::vector<Row> rows;
+HWND page;
+std::u16string text_buf;            // LVN_GETDISPINFO's text lives until the next call
+bool restore_mode;
+
+static int current() { return (int)SendDlgItemMessageW(page, IDC_FT_LIST, LVM_GETNEXTITEM, (WPARAM)-1, LVNI_SELECTED); }
+static std::string upper(std::string s) { for (char& c : s) c = (char)toupper((unsigned char)c); return s; }
+static std::string type_label(const Row& r) { return shell::type_name("x." + r.ext, false); }
+
+static void fill(const std::string& select_ext)
+{
+    rows.clear();
+    for (const shell::Extension& e : shell::mime_extensions()) rows.push_back({ e.ext, e.type });
+    HWND lv = GetDlgItem(page, IDC_FT_LIST);
+    SendMessageW(lv, LVM_SETITEMCOUNT, rows.size(), 0);
+    int sel = -1;
+    for (size_t i = 0; i < rows.size(); i++) if (rows[i].ext == select_ext) sel = (int)i;
+    if (sel < 0 && !rows.empty()) sel = 0;
+    if (sel >= 0) {
+        LVITEMW it = {}; it.stateMask = LVIS_SELECTED | LVIS_FOCUSED; it.state = it.stateMask;
+        SendMessageW(lv, LVM_SETITEMSTATE, (WPARAM)sel, (LPARAM)&it);
+        SendMessageW(lv, LVM_ENSUREVISIBLE, (WPARAM)sel, FALSE);
+    }
+    InvalidateRect(lv, nullptr, TRUE);
+}
+
+static void details()
+{
+    int i = current();
+    bool have = i >= 0 && (size_t)i < rows.size();
+    for (int id : { IDC_FT_CHANGE, IDC_FT_ADVANCED }) EnableWindow(GetDlgItem(page, id), have);
+    bool own = false;
+    if (have) for (const shell::Extension& e : shell::user_extensions()) if (e.ext == rows[(size_t)i].ext) own = true;
+    EnableWindow(GetDlgItem(page, IDC_FT_DELETE), own);
+    if (!have) {
+        set_text(page, IDC_FT_DETAILS, "Details");
+        for (int id : { IDC_FT_APPNAME, IDC_FT_SETBY, IDC_FT_DESC }) set_text(page, id, "");
+        return;
+    }
+    const Row& r = rows[(size_t)i];
+    std::string EXT = upper(r.ext), label = type_label(r);
+    set_text(page, IDC_FT_DETAILS, "Details for '" + EXT + "' extension");
+    shell::AppSource s = shell::default_source(r.type);
+    set_text(page, IDC_FT_APPNAME, s.app ? s.app->name : "Unknown application");
+    HICON hi = s.app ? shell::app_hicon(s.app->id, 16) : nullptr;
+    if (s.app && !hi) hi = ImageList_GetIcon(uiicons::small(), uiicons::index("exe"), ILD_NORMAL);   // a program without an icon
+    HICON old = (HICON)SendDlgItemMessageW(page, IDC_FT_APPICON, STM_SETICON, (WPARAM)hi, 0);
+    if (old) DestroyIcon(old);
+    std::string by;
+    std::string file = s.file;
+    std::string home = shell::home_dir();
+    if (!home.empty() && file.compare(0, home.size() + 1, home + "/") == 0) file = "~" + file.substr(home.size());
+    if (s.layer == "user") by = "your choice (" + file + ")";
+    else if (s.layer == "lhde") by = "lhde (" + file + ")";
+    else if (s.layer == "desktop") by = "another desktop's defaults (" + file + ")";
+    else if (s.layer == "system") by = "the distribution (" + file + ")";
+    else if (s.layer == "claimant") by = "nothing, the first claimant of " + s.type + " (" + file + ")";
+    else by = "nothing; no program claims " + r.type;
+    if (s.app && s.type != shell::mime_canonical(r.type) && s.layer != "claimant") by += ", for " + s.type;
+    set_text(page, IDC_FT_SETBY, "Set by: " + by);
+    restore_mode = shell::user_default_set(r.type) || (s.app && shell::app_overridden(*s.app));
+    std::string desc = "Files with extension '" + EXT + "' are of type '" + label + "' (" + r.type + "). ";
+    if (restore_mode) desc += "You have changed how they open. To go back to the defaults, click Restore.";
+    else desc += "To change settings that affect all '" + label + "' files, click Advanced.";
+    set_text(page, IDC_FT_DESC, desc);
+    set_text(page, IDC_FT_ADVANCED, restore_mode ? "&Restore" : "Ad&vanced");
+    if (getenv("FLXP_TRACE_FILETYPES"))
+        printf("filetypes: %s %s %s %s%s\n", EXT.c_str(), r.type.c_str(), s.app ? s.app->id.c_str() : "-", s.layer.empty() ? "-" : s.layer.c_str(),
+               restore_mode ? " restore" : ""), fflush(stdout);
+}
+
+// ---- New Action / Edit Action ----
+struct ActionAsk { std::string title, name, exec; };
+ActionAsk* ask_action;
+
+static INT_PTR CALLBACK action_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM)
+{
+    switch (msg) {
+    case WM_INITDIALOG:
+        SetWindowTextW(dlg, WS(ask_action->title));
+        set_text(dlg, IDC_AC_ACTION, ask_action->name);
+        set_text(dlg, IDC_AC_APP, ask_action->exec);
+        return TRUE;
+    case WM_COMMAND:
+        if (LOWORD(wp) == IDOK) {
+            std::string n = shell::trim(get_text(GetDlgItem(dlg, IDC_AC_ACTION))), e = shell::trim(get_text(GetDlgItem(dlg, IDC_AC_APP)));
+            if (n.empty() || e.empty()) { MessageBeep(0); return TRUE; }
+            ask_action->name = n; ask_action->exec = e;
+            EndDialog(dlg, IDOK);
+        } else if (LOWORD(wp) == IDCANCEL) EndDialog(dlg, IDCANCEL);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static bool edit_action(HWND owner, ActionAsk& a)
+{
+    ask_action = &a;
+    bool ok = DialogBoxParamW(module(), MAKEINTRESOURCEW(IDD_FT_ACTION), owner, action_proc, 0) == IDOK;
+    ask_action = nullptr;
+    return ok;
+}
+
+// ---- Edit File Type: the default program's actions ----
+struct EditType { Row row; const shell::App* app; std::vector<shell::AppAction> acts; bool changed; HFONT bold; };
+EditType* et;
+
+static std::string plain(const std::string& s) { std::string r; for (char c : s) if (c != '&') r += c; return r; }
+
+static void et_fill(HWND dlg, int sel)
+{
+    HWND lb = GetDlgItem(dlg, IDC_ET_ACTIONS);
+    SendMessageW(lb, LB_RESETCONTENT, 0, 0);
+    for (const shell::AppAction& a : et->acts) SendMessageW(lb, LB_ADDSTRING, 0, (LPARAM)WS(plain(a.name)));
+    SendMessageW(lb, LB_SETCURSEL, (WPARAM)sel, 0);
+    bool app = et->app != nullptr;
+    EnableWindow(GetDlgItem(dlg, IDC_ET_NEW), app);
+    EnableWindow(GetDlgItem(dlg, IDC_ET_EDIT), app && sel >= 0);
+    EnableWindow(GetDlgItem(dlg, IDC_ET_REMOVE), app && sel > 0);     // the program's own command stays
+    EnableWindow(GetDlgItem(dlg, IDC_ET_DEFAULT), app && sel > 0);
+}
+
+static std::string action_id(const std::string& name)
+{
+    std::string id;
+    for (char c : plain(name)) id += isalnum((unsigned char)c) ? (char)tolower((unsigned char)c) : '-';
+    if (id.empty()) id = "action";
+    std::string base = id;
+    for (int n = 2;; n++) {
+        bool taken = false;
+        for (const shell::AppAction& a : et->acts) if (a.id == id) taken = true;
+        if (!taken) return id;
+        id = base + "-" + std::to_string(n);
+    }
+}
+
+static INT_PTR CALLBACK edittype_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
+{
+    switch (msg) {
+    case WM_INITDIALOG: {
+        int img = uiicons::index(shell::icon_key("x." + et->row.ext, false));
+        HICON ic = img >= 0 ? uiicons::large_icon(shell::icon_key("x." + et->row.ext, false)) : nullptr;
+        if (ic) SendDlgItemMessageW(dlg, IDC_ET_ICON, STM_SETICON, (WPARAM)ic, 0);
+        set_text(dlg, IDC_ET_TEXT, type_label(et->row));
+        set_text(dlg, IDC_ET_PROGRAM, et->app ? "(" + et->app->name + ", " + et->app->id + ")" : "(no program opens this type)");
+        HFONT f = (HFONT)SendMessageW(dlg, WM_GETFONT, 0, 0);
+        LOGFONTW lf = {};
+        if (f && GetObjectW(f, sizeof lf, &lf)) { lf.lfWeight = FW_BOLD; et->bold = CreateFontIndirectW(&lf); }
+        et_fill(dlg, 0);
+        return TRUE;
+    }
+    case WM_MEASUREITEM: ((MEASUREITEMSTRUCT*)lp)->itemHeight = 16; return TRUE;
+    case WM_DRAWITEM: {
+        // XP draws the default action bold
+        DRAWITEMSTRUCT* d = (DRAWITEMSTRUCT*)lp;
+        if (d->itemID == (UINT)-1) return TRUE;
+        bool sel = (d->itemState & ODS_SELECTED) != 0;
+        FillRect(d->hDC, &d->rcItem, GetSysColorBrush(sel ? COLOR_HIGHLIGHT : COLOR_WINDOW));
+        SetTextColor(d->hDC, GetSysColor(sel ? COLOR_HIGHLIGHTTEXT : COLOR_WINDOWTEXT));
+        SetBkMode(d->hDC, TRANSPARENT);
+        HGDIOBJ of = SelectObject(d->hDC, d->itemID == 0 && et->bold ? (HGDIOBJ)et->bold : (HGDIOBJ)SendMessageW(d->hwndItem, WM_GETFONT, 0, 0));
+        RECT r = d->rcItem; r.left += 2;
+        if (d->itemID < et->acts.size()) DrawTextW(d->hDC, WS(plain(et->acts[d->itemID].name)), -1, &r, DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+        SelectObject(d->hDC, of);
+        if (d->itemState & ODS_FOCUS) DrawFocusRect(d->hDC, &d->rcItem);
+        return TRUE;
+    }
+    case WM_COMMAND: {
+        int sel = (int)SendDlgItemMessageW(dlg, IDC_ET_ACTIONS, LB_GETCURSEL, 0, 0);
+        switch (LOWORD(wp)) {
+        case IDC_ET_ACTIONS:
+            if (HIWORD(wp) == LBN_SELCHANGE) et_fill(dlg, sel);
+            if (HIWORD(wp) == LBN_DBLCLK) SendMessageW(dlg, WM_COMMAND, IDC_ET_EDIT, 0);
+            return TRUE;
+        case IDC_ET_NEW: {
+            ActionAsk a = { "New Action", "", "" };
+            if (!edit_action(dlg, a)) return TRUE;
+            et->acts.push_back({ action_id(a.name), a.name, a.exec });
+            et->changed = true;
+            et_fill(dlg, (int)et->acts.size() - 1);
+            return TRUE;
+        }
+        case IDC_ET_EDIT: {
+            if (sel < 0 || (size_t)sel >= et->acts.size()) return TRUE;
+            ActionAsk a = { "Editing action for type: " + type_label(et->row), plain(et->acts[(size_t)sel].name), et->acts[(size_t)sel].exec };
+            if (!edit_action(dlg, a)) return TRUE;
+            if (sel > 0) et->acts[(size_t)sel].name = a.name;
+            et->acts[(size_t)sel].exec = a.exec;
+            et->changed = true;
+            et_fill(dlg, sel);
+            return TRUE;
+        }
+        case IDC_ET_REMOVE:
+            if (sel <= 0) return TRUE;
+            if (MessageBoxW(dlg, L"Are you sure you want to remove this action?", L"Edit File Type", MB_YESNO | MB_ICONQUESTION) != IDYES) return TRUE;
+            et->acts.erase(et->acts.begin() + sel);
+            et->changed = true;
+            et_fill(dlg, sel - 1);
+            return TRUE;
+        case IDC_ET_DEFAULT: {
+            // the program's command becomes the chosen action's; the old one stays as an action
+            if (sel <= 0) return TRUE;
+            shell::AppAction was = et->acts[0], chosen = et->acts[(size_t)sel];
+            et->acts[0] = { "", chosen.name, chosen.exec };
+            et->acts[(size_t)sel] = { action_id(was.name), plain(was.name), was.exec };
+            et->changed = true;
+            et_fill(dlg, 0);
+            return TRUE;
+        }
+        case IDOK:
+            if (et->changed && et->app) {
+                std::string err;
+                if (!shell::write_app_override(*et->app, et->acts, &err)) { message(dlg, "Edit File Type", err); return TRUE; }
+            }
+            EndDialog(dlg, IDOK);
+            return TRUE;
+        case IDCANCEL: EndDialog(dlg, IDCANCEL); return TRUE;
+        }
+        return FALSE;
+    }
+    case WM_DESTROY: {
+        HICON ic = (HICON)SendDlgItemMessageW(dlg, IDC_ET_ICON, STM_GETICON, 0, 0);
+        if (ic) DestroyIcon(ic);
+        if (et->bold) DeleteObject(et->bold);
+        return FALSE;
+    }
+    }
+    return FALSE;
+}
+
+// ---- Create New Extension ----
+std::string new_ext, new_type;
+
+static INT_PTR CALLBACK newext_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM)
+{
+    switch (msg) {
+    case WM_INITDIALOG: {
+        HWND cb = GetDlgItem(dlg, IDC_NE_TYPE);
+        std::vector<std::string> types;
+        for (const Row& r : rows) types.push_back(r.type);
+        std::sort(types.begin(), types.end());
+        types.erase(std::unique(types.begin(), types.end()), types.end());
+        for (const std::string& t : types) SendMessageW(cb, CB_ADDSTRING, 0, (LPARAM)WS(t));
+        set_text(dlg, IDC_NE_TYPE, new_type);
+        return TRUE;
+    }
+    case WM_COMMAND:
+        if (LOWORD(wp) == IDOK) {
+            new_ext = shell::trim(get_text(GetDlgItem(dlg, IDC_NE_EXT)));
+            new_type = shell::trim(get_text(GetDlgItem(dlg, IDC_NE_TYPE)));
+            if (new_ext.empty() || new_type.empty()) { MessageBeep(0); return TRUE; }
+            std::string err;
+            if (!shell::add_user_extension(new_ext, new_type, &err)) { message(dlg, "Create New Extension", err); return TRUE; }
+            EndDialog(dlg, IDOK);
+        } else if (LOWORD(wp) == IDCANCEL) EndDialog(dlg, IDCANCEL);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static void change()
+{
+    int i = current();
+    if (i < 0) return;
+    Row r = rows[(size_t)i];
+    OpenWith ow;
+    HICON icon = uiicons::large_icon(shell::icon_key("x." + r.ext, false));
+    bool ok = choose_program(page, "." + r.ext, r.type, icon, uiicons::small(), uiicons::index("exe"), true, &ow);
+    if (icon) DestroyIcon(icon);
+    if (!ok) return;
+    std::string err;
+    if (!shell::set_default_app(r.type, ow.app_id, &err)) message(page, "File Types", err);
+    details();
+}
+
+static void advanced()
+{
+    int i = current();
+    if (i < 0) return;
+    Row r = rows[(size_t)i];
+    if (restore_mode) {
+        // Restore: the user's lines for the type and flxp's copy of the program's desktop file
+        std::string err;
+        shell::AppSource s = shell::default_source(r.type);
+        if (s.app && shell::app_overridden(*s.app) && !shell::remove_app_override(*s.app, &err)) message(page, "File Types", err);
+        if (!shell::reset_default_app(r.type, &err)) message(page, "File Types", err);
+        details();
+        return;
+    }
+    EditType e = { r, shell::default_app(r.type), {}, false, nullptr };
+    if (e.app) e.acts = shell::app_actions(*e.app);
+    et = &e;
+    DialogBoxParamW(module(), MAKEINTRESOURCEW(IDD_FT_EDITTYPE), page, edittype_proc, 0);
+    et = nullptr;
+    details();
+}
+
+static INT_PTR CALLBACK proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
+{
+    switch (msg) {
+    case WM_INITDIALOG: {
+        page = dlg;
+        HWND lv = GetDlgItem(dlg, IDC_FT_LIST);
+        SendMessageW(lv, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT);
+        SendMessageW(lv, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)uiicons::small());
+        RECT rc; GetClientRect(lv, &rc);
+        int w0 = MulDiv(80, rc.right, 330);
+        LVCOLUMNW c = {}; c.mask = LVCF_TEXT | LVCF_WIDTH;
+        c.pszText = (LPWSTR)L"Extensions"; c.cx = w0;
+        SendMessageW(lv, LVM_INSERTCOLUMNW, 0, (LPARAM)&c);
+        c.pszText = (LPWSTR)L"File Types"; c.cx = rc.right - w0 - GetSystemMetrics(SM_CXVSCROLL);
+        SendMessageW(lv, LVM_INSERTCOLUMNW, 1, (LPARAM)&c);
+        fill("txt");
+        details();
+        return TRUE;
+    }
+    case WM_NOTIFY: {
+        NMHDR* n = (NMHDR*)lp;
+        if (n->idFrom == IDC_FT_LIST) {
+            if (n->code == LVN_GETDISPINFOW) {
+                NMLVDISPINFOW* d = (NMLVDISPINFOW*)lp;
+                if (d->item.iItem < 0 || (size_t)d->item.iItem >= rows.size()) return TRUE;
+                const Row& r = rows[(size_t)d->item.iItem];
+                if (d->item.mask & LVIF_TEXT) {
+                    text_buf = W(d->item.iSubItem == 0 ? upper(r.ext) : type_label(r));
+                    lstrcpynW(d->item.pszText, (LPCWSTR)text_buf.c_str(), d->item.cchTextMax);
+                }
+                if ((d->item.mask & LVIF_IMAGE) && d->item.iSubItem == 0) d->item.iImage = uiicons::index(shell::icon_key("x." + r.ext, false));
+                return TRUE;
+            }
+            if (n->code == LVN_ODFINDITEMW) {
+                // typing in the list: the next extension that starts with what was typed
+                NMLVFINDITEMW* f = (NMLVFINDITEMW*)lp;
+                if (!(f->lvfi.flags & (LVFI_STRING | LVFI_PARTIAL)) || !f->lvfi.psz) { SetWindowLongPtrW(dlg, DWLP_MSGRESULT, -1); return TRUE; }
+                std::string want = shell::lower(w32::utf8_of((const WCHAR*)f->lvfi.psz));
+                size_t n0 = rows.size();
+                for (size_t k = 0; k < n0; k++) {
+                    size_t i = ((size_t)(f->iStart < 0 ? 0 : f->iStart) + k) % n0;
+                    if (rows[i].ext.compare(0, want.size(), want) == 0) { SetWindowLongPtrW(dlg, DWLP_MSGRESULT, (LONG_PTR)i); return TRUE; }
+                }
+                SetWindowLongPtrW(dlg, DWLP_MSGRESULT, -1);
+                return TRUE;
+            }
+            if (n->code == LVN_ITEMCHANGED) {
+                NMLISTVIEW* nl = (NMLISTVIEW*)lp;
+                if ((nl->uChanged & LVIF_STATE) && (nl->uNewState & LVIS_SELECTED)) details();
+                return TRUE;
+            }
+            if (n->code == NM_DBLCLK) { advanced(); return TRUE; }
+        }
+        if (n->code == PSN_SETACTIVE) SetFocus(GetDlgItem(dlg, IDC_FT_LIST));
+        if (n->code == PSN_APPLY) SetWindowLongPtrW(dlg, DWLP_MSGRESULT, PSNRET_NOERROR);
+        return TRUE;
+    }
+    case WM_COMMAND:
+        switch (LOWORD(wp)) {
+        case IDC_FT_CHANGE: change(); return TRUE;
+        case IDC_FT_ADVANCED: advanced(); return TRUE;
+        case IDC_FT_NEW: {
+            int i = current();
+            new_type = i >= 0 ? rows[(size_t)i].type : "";
+            if (DialogBoxParamW(module(), MAKEINTRESOURCEW(IDD_FT_NEWEXT), dlg, newext_proc, 0) == IDOK) {
+                std::string e = shell::lower(new_ext);
+                if (!e.empty() && e[0] == '.') e.erase(0, 1);
+                fill(e);
+                details();
+            }
+            return TRUE;
+        }
+        case IDC_FT_DELETE: {
+            int i = current();
+            if (i < 0) return TRUE;
+            // XP's question
+            if (MessageBoxW(dlg, L"If you remove a registered file name extension, you will not be able to open files with this extension by "
+                                 L"double-clicking their icons.\n\nAre you sure you want to remove this extension?",
+                            L"File Types", MB_YESNO | MB_ICONWARNING) != IDYES) return TRUE;
+            std::string err;
+            if (!shell::remove_user_extension(rows[(size_t)i].ext, &err)) message(dlg, "File Types", err);
+            fill(i + 1 < (int)rows.size() ? rows[(size_t)i + 1].ext : "");
+            details();
+            return TRUE;
+        }
+        }
+        return FALSE;
+    case WM_DESTROY: {
+        HICON ic = (HICON)SendDlgItemMessageW(dlg, IDC_FT_APPICON, STM_GETICON, 0, 0);
+        if (ic) DestroyIcon(ic);
+        page = nullptr;
+        rows.clear();
+        return FALSE;
+    }
+    }
+    return FALSE;
+}
+
+} // namespace filetypes
+
 } // namespace folderopts
 
 void folder_options(HWND owner, FolderOptions& o)
 {
     folderopts::o = &o;
-    PROPSHEETPAGEW pages[2] = {};
-    for (int i = 0; i < 2; i++) {
+    PROPSHEETPAGEW pages[3] = {};
+    for (int i = 0; i < 3; i++) {
         pages[i].dwSize = sizeof pages[i];
         pages[i].dwFlags = PSP_DEFAULT;
         pages[i].hInstance = module();
@@ -495,13 +903,16 @@ void folder_options(HWND owner, FolderOptions& o)
     pages[0].pfnDlgProc = folderopts::general_proc;
     pages[1].pszTemplate = MAKEINTRESOURCEW(IDD_FO_VIEW);
     pages[1].pfnDlgProc = folderopts::view_proc;
+    pages[2].pszTemplate = MAKEINTRESOURCEW(IDD_FO_FILETYPES);
+    pages[2].pfnDlgProc = folderopts::filetypes::proc;
     PROPSHEETHEADERW psh = {};
     psh.dwSize = sizeof psh;
     psh.dwFlags = PSH_PROPSHEETPAGE;
     psh.hwndParent = owner;
     psh.hInstance = module();
     psh.pszCaption = L"Folder Options";
-    psh.nPages = 2;
+    psh.nPages = 3;
+    psh.nStartPage = (UINT)(o.start_page >= 0 && o.start_page < 3 ? o.start_page : 0);
     psh.ppsp = pages;
     PropertySheetW(&psh);
     folderopts::o = nullptr;

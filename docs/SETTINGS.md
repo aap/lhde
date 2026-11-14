@@ -114,7 +114,7 @@ selecting another theme removes it (`lhde_theme_select`), Save As turns it into 
 | --- | --- |
 | Display Properties (flxp-settings: Themes, Desktop, Appearance, Effects) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[sidebar] mode with_classic stacking animate`, `[fonts]`, `[effects]`, theme files (Save As, Delete) |
 | luxshell (the settings flyout, its menus, drags, `_LHSHELL_COMMAND`) | `[theme] name`, the current layer, `[desktop] wallpaper`, `[taskbar]`, `[sidebar]`, `[clock]`, theme files (Save As) |
-| flxp-desktop, the Explorer | Set as Desktop Background: the current layer's `Desktop.wallpaper` / `Desktop.mode` (and a `[desktop] wallpaper = none` cleared) |
+| flxp-desktop, the Explorer | Set as Desktop Background: the current layer's `Desktop.wallpaper` / `Desktop.mode` (and a `[desktop] wallpaper = none` cleared); outside lhde's files: the associations ("Associations" below) |
 | lhde-session | `_LH_THEME` only (`theme NAME`; luxshell then writes the file); without a luxshell, `taskbar KIND` through `lhde-theme set-key`, `set` and `setting` |
 | luxwm | nothing; it reads `[fonts] smoothing` and `[effects]` for its window menu, the theme through `_LH_THEME` |
 | flxp-taskbar, the start panel | `[taskbar] quicklaunch locked` (the taskbar menu); they read `[taskbar] start_menu hide_inactive`, `[quicklaunch] dir`, `[start] pinned`, `[commands] logoff shutdown terminal` |
@@ -178,3 +178,11 @@ files that name the type in `MimeType=`, by data directory); else the same for i
 update-desktop-database on `$PREFIX/share/applications`). xdg-open knows no desktop called lhde and takes xdg-utils' generic
 path, which reads the same files in the same order but only for the exact type and without Removed Associations; it needs no
 hint. `lhde-mime explain TYPE` shows all three verdicts (docs/USAGE.md "File types and programs").
+
+What lhde writes, all of it the user's: `~/.config/mimeapps.list` (flxp's Open With with "Always use", Properties' Change...,
+Folder Options' File Types Change... and Restore, `lhde-mime default` and `reset`: a type's `[Default Applications]` line, the
+program first in its `[Added Associations]`, off its `[Removed Associations]`; Restore and reset remove the type's lines from
+all three groups); copies of a program's desktop file in `~/.local/share/applications/ID` marked `X-Lhde-Override=true` and
+`X-Lhde-Original=PATH` (File Types' Edit File Type: the program's actions; Restore deletes the copy, and a desktop file there
+without the mark is never written); `~/.local/share/mime/packages/lhde-extensions.xml` and what update-mime-database compiles
+from it in `~/.local/share/mime` (File Types' New and Delete: the user's own extensions).

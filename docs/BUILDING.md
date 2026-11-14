@@ -112,7 +112,8 @@ lists without a window: the backgrounds' order and selection, the icon sets; App
 appearance --pick STYLE`: classic, a bare style with and without a frame set, back to the theme's own, with the user's
 `jade4074.msstyles` copied under other names, skipped without it), `tests/aero-patches.py` (lhde-import's table of Aero
 patches and which styles get a frame set, on stand-in files), `tests/keys-doc.py` (docs/KEYS.md lists every default of luxwm's
-key table, and the Super keys it calls free are unbound), `tests/mime.py` (which program opens a type on a scratch XDG tree
+key table, and the Super keys it calls free are unbound), `build/tests/filetypestest` (the File Types page's model on a scratch tree:
+the extensions, where a default comes from, Change and Restore, the actions' copy, the user's extensions), `tests/mime.py` (which program opens a type on a scratch XDG tree
 with a distribution, lhde's `lhde-mimeapps.list` and a home: lhde-mime's verdicts against the spec's order, flxp's reader
 (`build/tests/assoctest default`), `xdg-mime query default` and `gio mime` against them when installed, `lhde-mime default` /
 `reset` and `check`'s findings), and the
@@ -133,7 +134,9 @@ luxwm's Alt+Tab switcher with test windows: `tests/headless/alttab.sh`, clicks o
 ImageMagick: `tests/headless/menubar.sh`, flxp switched luna -> jade4074 -> classic and classic -> jade4074 -> luna against a fresh
 start under the last theme (icons, colours, bands, xwd and ImageMagick): `tests/headless/themeswitch.sh`, flxp's chrome with no
 window manager, luxwm started, killed and under fvwm2 (the Small header without the title row, the full one, the vision header's XP
-chrome; the log and the band's row in the pixels): `tests/headless/nowm.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron), Quick Launch and taskbar menu under luxwm
+chrome; the log and the band's row in the pixels): `tests/headless/nowm.sh`, Folder Options' File Types page on a scratch home and
+mime database (typing jumps, Change... writes `mimeapps.list`, Restore, Edit File Type's New... writes and Restore removes the
+program's copy, New / Delete an extension): `tests/headless/filetypes.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron), Quick Launch and taskbar menu under luxwm
 (xprop, xwininfo; luxshell/tests/trayicon): `tests/headless/taskbar.sh`, every IDC_ cursor shown under the X cursor theme's name (XFixes): `tests/headless/cursors.sh`, Super+R
 opening the start menu's Run dialog (luxwm, luxshell, flxp-startmenu) and settings.ini `[commands] run` instead:
 `tests/headless/runkey.sh`, Super+H minimizing the sidebar into the taskbar and back at once (unmapped within 300 ms, two

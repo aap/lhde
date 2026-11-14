@@ -672,6 +672,100 @@ bool open_files(const std::vector<std::string>& paths, std::string* err)
     return ok;
 }
 
+std::vector<AppAction> app_actions(const App& a)
+{
+    std::vector<AppAction> out = { { "", "&Open", a.exec } };
+    KeyFile kf;
+    if (!parse_keyfile(a.file, kf)) return out;
+    const auto* g = kf.group("Desktop Entry");
+    std::vector<std::string> ids;
+    if (g) for (auto& kv : *g) if (kv.first == "Actions") ids = split_list(kv.second);
+    for (const std::string& id : ids) {
+        const auto* ag = kf.group("Desktop Action " + id);
+        if (!ag) continue;
+        AppAction act = { id, id, "" };
+        for (auto& kv : *ag) {
+            if (kv.first == "Name") act.name = unescape(kv.second, false);
+            else if (kv.first == "Exec") act.exec = unescape(kv.second, true);
+        }
+        out.push_back(act);
+    }
+    return out;
+}
+
+static bool marked_override(const std::string& path)
+{
+    KeyFile kf;
+    if (!parse_keyfile(path, kf)) return false;
+    const auto* g = kf.group("Desktop Entry");
+    if (g) for (auto& kv : *g) if (kv.first == "X-Lhde-Override") return truthy(kv.second);
+    return false;
+}
+
+bool app_overridden(const App& a) { return a.file == data_home() + "/applications/" + a.id && marked_override(a.file); }
+
+bool write_app_override(const App& a, const std::vector<AppAction>& actions, std::string* err)
+{
+    std::string target = data_home() + "/applications/" + a.id;
+    if (exists(target) && !marked_override(target)) {
+        if (err) *err = target + " is your own desktop file; change its actions there.";
+        return false;
+    }
+    if (actions.empty() || trim(actions[0].exec).empty()) { if (err) *err = "The program needs a command."; return false; }
+    std::string text;
+    if (!read_file(a.file, text)) { if (err) *err = "cannot read " + a.file; return false; }
+    // the original's lines: [Desktop Entry] without Exec, Actions and our keys, other groups but its actions
+    std::string out, group;
+    bool keep = true, entry_done = false;
+    std::string original = a.file;
+    auto escape = [](const std::string& v) { std::string r; for (char c : v) { if (c == '\n') r += "\\n"; else r += c; } return r; };
+    auto entry_keys = [&]() {
+        std::string ids;
+        for (size_t i = 1; i < actions.size(); i++) ids += actions[i].id + ";";
+        std::string s = "Exec=" + escape(actions[0].exec) + "\n";
+        if (!ids.empty()) s += "Actions=" + ids + "\n";
+        return s + "X-Lhde-Override=true\nX-Lhde-Original=" + original + "\n";
+    };
+    size_t i = 0;
+    while (i < text.size()) {
+        size_t j = text.find('\n', i);
+        if (j == std::string::npos) j = text.size();
+        std::string line = text.substr(i, j - i), t = trim(line);
+        i = j + 1;
+        if (!t.empty() && t[0] == '[') {
+            if (group == "Desktop Entry" && !entry_done) { out += entry_keys(); entry_done = true; }
+            group = t.substr(1, t.find(']') == std::string::npos ? std::string::npos : t.find(']') - 1);
+            keep = group.compare(0, 15, "Desktop Action ") != 0;
+            if (keep) out += line + "\n";
+            continue;
+        }
+        if (!keep) continue;
+        if (group == "Desktop Entry") {
+            size_t eq = t.find('=');
+            std::string k = eq == std::string::npos ? "" : trim(t.substr(0, eq));
+            if (k == "X-Lhde-Original") { original = trim(t.substr(eq + 1)); continue; }
+            if (k == "Exec" || k == "Actions" || k == "X-Lhde-Override" || k == "TryExec") continue;
+        }
+        out += line + "\n";
+    }
+    if (group == "Desktop Entry" && !entry_done) out += entry_keys();
+    for (size_t k = 1; k < actions.size(); k++)
+        out += "\n[Desktop Action " + actions[k].id + "]\nName=" + escape(actions[k].name) + "\nExec=" + escape(actions[k].exec) + "\n";
+    if (!write_file_atomic(target, out)) { if (err) *err = "cannot write " + target + ": " + strerror(errno); return false; }
+    reload_apps();
+    return true;
+}
+
+bool remove_app_override(const App& a, std::string* err)
+{
+    std::string target = data_home() + "/applications/" + a.id;
+    if (!exists(target)) return true;
+    if (!marked_override(target)) { if (err) *err = target + " is your own desktop file, not a copy flxp made."; return false; }
+    if (unlink(target.c_str()) != 0) { if (err) *err = "cannot remove " + target + ": " + strerror(errno); return false; }
+    reload_apps();
+    return true;
+}
+
 // a .desktop file anywhere (the Quick Launch folder): its id the file name
 bool read_desktop_file(const std::string& path, App& out)
 {

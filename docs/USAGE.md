@@ -936,6 +936,20 @@ flxp, GIO and xdg-open differ in two places, both shown by explain: flxp reads t
 (GIO and xdg-open from `mimeinfo.cache`), and xdg-open looks up only the exact type (no parent types, no Removed
 Associations).
 
+The same in the Explorer: **Tools > Folder Options > File Types** (or `flxp --folder-options=filetypes`, XP's
+`Options_RunDLL 2`) is XP's page: "Registered file types", one row per extension with its type's name and icon (every
+`*.EXT` glob of shared-mime-info; a few thousand, in a virtual list: type the first letters to jump); New makes an extension
+of your own (Create New Extension: the extension and its type, written to
+`~/.local/share/mime/packages/lhde-extensions.xml` and compiled by update-mime-database) and Delete removes one of yours (the
+distribution's cannot be). "Details for 'TXT' extension": Opens with the program and its icon, Change... (the Open With
+dialog: your choice goes to `~/.config/mimeapps.list` at once, as XP's did), a line XP did not have, **Set by**: your choice,
+lhde, another desktop's defaults, the distribution, or nothing (the first claimant), with the file; then XP's sentence and
+Advanced: Edit File Type, the default program's actions (its command, bold, then its desktop file's `Actions=`); New..., Edit...,
+Remove and Set Default change them in a copy of the program's desktop file in `~/.local/share/applications` (marked
+`X-Lhde-Override=true`; a desktop file of your own there is not touched). When you changed something for the type (a choice in
+`mimeapps.list`, such a copy) the button is Restore, which takes both back. Change Icon, XP's three check boxes, Browse... and
+Use DDE in New Action are shown greyed: the freedesktop files have nothing they would set.
+
 ## Start menu, taskbar autohide, sidebar modes (luxshell, docs/SHELL-DESIGN.md 6.4, 7.3, 13)
 
 **Start menu.** The Start button and the Super key (luxwm sends the root client message `_LHSHELL_START` when Super is pressed

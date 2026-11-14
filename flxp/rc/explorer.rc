@@ -135,6 +135,79 @@ BEGIN
     AUTOCHECKBOX    "Display the full &path in the address bar", IDC_FO_FULLPATH, 16, 126, 194, 10
 END
 
+/* Folder Options' File Types page and its dialogs (dialogs.cpp folderopts): XP's shell32 layout (the list of extensions and
+ * file types, New and Delete, "Details for 'TXT' extension" with Opens with, Change..., the sentence and Advanced, which
+ * becomes Restore), fitted to the sheet's 227 x 215 pages, with a "Set by" line XP did not have. Create New Extension, Edit
+ * File Type and New Action in XP's layout. */
+IDD_FO_FILETYPES DIALOGEX 0, 0, 227, 215
+STYLE DS_SHELLFONT | WS_CHILD | WS_DISABLED | WS_CAPTION
+CAPTION "File Types"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "Registered file &types:", -1, 7, 7, 150, 8
+    CONTROL         "", IDC_FT_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SHAREIMAGELISTS | LVS_OWNERDATA | WS_BORDER | WS_TABSTOP, 7, 17, 213, 90
+    PUSHBUTTON      "N&ew", IDC_FT_NEW, 112, 111, 52, 14
+    PUSHBUTTON      "&Delete", IDC_FT_DELETE, 168, 111, 52, 14
+    GROUPBOX        "Details", IDC_FT_DETAILS, 7, 129, 213, 79
+    LTEXT           "Opens with:", -1, 14, 143, 42, 8
+    ICON            "", IDC_FT_APPICON, 58, 141, 10, 10, SS_REALSIZEIMAGE
+    LTEXT           "", IDC_FT_APPNAME, 72, 143, 88, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    PUSHBUTTON      "&Change...", IDC_FT_CHANGE, 164, 140, 50, 14
+    LTEXT           "", IDC_FT_SETBY, 14, 157, 200, 8, SS_NOPREFIX | SS_PATHELLIPSIS
+    LTEXT           "", IDC_FT_DESC, 14, 170, 146, 34, SS_NOPREFIX
+    PUSHBUTTON      "Ad&vanced", IDC_FT_ADVANCED, 164, 188, 50, 14
+END
+
+IDD_FT_NEWEXT DIALOGEX 0, 0, 260, 75
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Create New Extension"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "&File Extension:", -1, 10, 10, 85, 8
+    EDITTEXT        IDC_NE_EXT, 105, 8, 60, 14, ES_AUTOHSCROLL
+    LTEXT           "&Associated File Type:", -1, 10, 34, 85, 8
+    COMBOBOX        IDC_NE_TYPE, 105, 32, 145, 140, CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    DEFPUSHBUTTON   "OK", IDOK, 125, 55, 60, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 190, 55, 60, 14
+END
+
+IDD_FT_EDITTYPE DIALOGEX 0, 0, 225, 190
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Edit File Type"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    ICON            "", IDC_ET_ICON, 5, 8, 20, 20
+    EDITTEXT        IDC_ET_TEXT, 30, 10, 115, 14, ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON      "Change &Icon...", IDC_ET_CHANGEICON, 150, 10, 70, 14, WS_DISABLED
+    LTEXT           "&Actions:", -1, 5, 37, 30, 8
+    LTEXT           "", IDC_ET_PROGRAM, 36, 37, 184, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    LISTBOX         IDC_ET_ACTIONS, 5, 50, 140, 60, LBS_NOINTEGRALHEIGHT | LBS_HASSTRINGS | LBS_OWNERDRAWFIXED | LBS_NOTIFY | WS_VSCROLL | WS_TABSTOP | WS_BORDER
+    PUSHBUTTON      "&New...", IDC_ET_NEW, 150, 50, 70, 14
+    PUSHBUTTON      "&Edit...", IDC_ET_EDIT, 150, 65, 70, 14
+    PUSHBUTTON      "&Remove", IDC_ET_REMOVE, 150, 80, 70, 14
+    PUSHBUTTON      "&Set Default", IDC_ET_DEFAULT, 150, 95, 70, 14
+    AUTOCHECKBOX    "Confirm &open after download", IDC_ET_CONFIRM, 5, 115, 150, 14, WS_DISABLED
+    AUTOCHECKBOX    "Al&ways show extension", IDC_ET_SHOWEXT, 5, 130, 150, 14, WS_DISABLED
+    AUTOCHECKBOX    "&Browse in same window", IDC_ET_SAMEWIN, 5, 145, 150, 14, WS_DISABLED
+    DEFPUSHBUTTON   "OK", IDOK, 95, 170, 60, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 160, 170, 60, 14
+END
+
+IDD_FT_ACTION DIALOGEX 0, 0, 225, 95
+STYLE DS_MODALFRAME | DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "New Action"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT           "&Action:", -1, 5, 7, 150, 8
+    EDITTEXT        IDC_AC_ACTION, 5, 20, 150, 14, ES_AUTOHSCROLL
+    LTEXT           "App&lication used to perform action:", -1, 5, 42, 150, 8
+    EDITTEXT        IDC_AC_APP, 5, 55, 150, 14, ES_AUTOHSCROLL
+    PUSHBUTTON      "B&rowse...", IDC_AC_BROWSE, 160, 55, 60, 14, WS_DISABLED
+    AUTOCHECKBOX    "&Use DDE", IDC_AC_DDE, 10, 75, 103, 14, WS_DISABLED
+    DEFPUSHBUTTON   "OK", IDOK, 160, 20, 60, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 160, 40, 60, 14
+END
+
 /* File operations (fileopui.cpp), XP's shell32 dialogs in their layout:
  * Confirm File Replace (DLG_REPLACE_FILE), Confirm Folder Replace
  * (DLG_REPLACE_FOLDER), Confirm File Move (DLG_MOVE_FILE), the progress

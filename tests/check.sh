@@ -61,6 +61,9 @@ result "aero-patches ($(tail -n 1 "$T/aero-patches.log"))" $? "$T/aero-patches.l
 # docs/KEYS.md against luxwm's default key table: every default listed, the Super keys it calls free unbound
 python3 -I tests/keys-doc.py > "$T/keys-doc.log" 2>&1
 result "keys-doc ($(tail -n 1 "$T/keys-doc.log"))" $? "$T/keys-doc.log"
+# Folder Options' File Types model: the extensions, where a default comes from, Change / Restore, the actions' copy, New / Delete
+build/tests/filetypestest > "$T/filetypes.log" 2>&1
+result "filetypestest ($(tail -n 1 "$T/filetypes.log"))" $? "$T/filetypes.log"
 # which program opens a type: lhde-mime's verdicts, flxp's reader (assoctest), xdg-mime and gio on a scratch XDG tree; check
 python3 -I tests/mime.py > "$T/mime.log" 2>&1
 result "mime ($(tail -n 1 "$T/mime.log"))" $? "$T/mime.log"
@@ -110,6 +113,9 @@ else
     # the size grip in luxpad's status bar and its scroll bars' corner: 4074's dots under jade4074, the double arrow, a drag sizes
     tests/headless/grip.sh "$3" > "$T/grip.log" 2>&1; rc=$?
     result "headless/grip.sh$(grep -m1 '^skip' "$T/grip.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/grip.log"
+    # Folder Options' File Types page: typing jumps, Change... writes mimeapps.list, Restore, Edit File Type's New..., New / Delete
+    tests/headless/filetypes.sh "$2" > "$T/filetypes-page.log" 2>&1; rc=$?
+    result "headless/filetypes.sh$(grep -m1 '^skip' "$T/filetypes-page.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/filetypes-page.log"
     # flxp's chrome without luxwm, with luxwm, after it, under fvwm2 (the Small header, the full one; the vision header: XP)
     tests/headless/nowm.sh "$1" > "$T/nowm.log" 2>&1; rc=$?
     result "headless/nowm.sh$(grep -m1 '^skip' "$T/nowm.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/nowm.log"
