@@ -18,7 +18,7 @@ fails=0
 check() {   # NAME EXPECTED ACTUAL
     if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected [$2] got [$3]"; fails=$((fails + 1)); fi
 }
-wins() { xdotool search --onlyvisible --name '' 2>/dev/null | wc -l | tr -d ' '; }
+wins() { xdotool search --onlyvisible --name '.*' 2>/dev/null | wc -l | tr -d ' '; }
 more() { [ "$(wins)" -gt "$N0" ]; }
 back() { [ "$(wins)" -eq "$N0" ]; }
 logged() { grep -q "^$1\$" $T/err; }

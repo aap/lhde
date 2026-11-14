@@ -58,9 +58,9 @@ else
     sleep .5
     check "no status bar at first" "" "$(status encoding)"
     # Alt+V from the Edit control drops View at once (a menu window shows), S chooses Status Bar
-    n0=$(xdotool search --onlyvisible --name '' 2>/dev/null | wc -l)
+    n0=$(xdotool search --onlyvisible --name '.*' 2>/dev/null | wc -l)
     xdotool key alt+v
-    dropped() { [ "$(xdotool search --onlyvisible --name '' 2>/dev/null | wc -l)" -gt $n0 ]; }
+    dropped() { [ "$(xdotool search --onlyvisible --name '.*' 2>/dev/null | wc -l)" -gt $n0 ]; }
     wait_for 5 dropped
     check "Alt+V drops View" "yes" "$(dropped && echo yes)"
     xdotool key s
