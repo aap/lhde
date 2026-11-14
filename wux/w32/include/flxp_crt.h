@@ -48,11 +48,22 @@ int        flxp_iswalnum(flxp_wch);
 int        flxp_swprintf(flxp_wch*, size_t, const flxp_wch*, ...);
 int        flxp_vswprintf(flxp_wch*, size_t, const flxp_wch*, va_list);
 int        flxp_swscanf(const flxp_wch*, const flxp_wch*, ...);
+/* qsort and bsearch with the comparator Wine's C passes: __cdecl, which is ms_abi on x86-64, while the libc calls a
+ * comparator with the System V convention */
+#if defined(__x86_64__)
+typedef int (__attribute__((ms_abi)) *flxp_cmp_fn)(const void*, const void*);
+#else
+typedef int (*flxp_cmp_fn)(const void*, const void*);
+#endif
+void       flxp_qsort(void*, size_t, size_t, flxp_cmp_fn);
+void*      flxp_bsearch(const void*, const void*, size_t, size_t, flxp_cmp_fn);
 #ifdef __cplusplus
 }
 #endif
 
 #ifndef __cplusplus
+#define qsort      flxp_qsort
+#define bsearch    flxp_bsearch
 #define wcslen     flxp_wcslen
 #define wcscpy     flxp_wcscpy
 #define wcsncpy    flxp_wcsncpy

@@ -195,6 +195,32 @@ int flxp_iswalpha(wch c)
 
 int flxp_iswalnum(wch c) { return flxp_iswdigit(c) || flxp_iswalpha(c); }
 
+// the libc's qsort calls a System V comparator: the ms_abi one goes through a thunk (kept per thread, restored after,
+// so a comparator that sorts again works)
+static thread_local flxp_cmp_fn qsort_cmp;
+static int qsort_thunk(const void* a, const void* b) { return qsort_cmp(a, b); }
+
+void flxp_qsort(void* base, size_t n, size_t size, flxp_cmp_fn cmp)
+{
+    flxp_cmp_fn outer = qsort_cmp;
+    qsort_cmp = cmp;
+    qsort(base, n, size, qsort_thunk);
+    qsort_cmp = outer;
+}
+
+void* flxp_bsearch(const void* key, const void* base, size_t n, size_t size, flxp_cmp_fn cmp)
+{
+    const char* lo = (const char*)base;
+    while (n > 0) {
+        const char* mid = lo + (n / 2) * size;
+        int c = cmp(key, mid);
+        if (c == 0) return (void*)mid;
+        if (c > 0) { lo = mid + size; n -= n / 2 + 1; }
+        else n /= 2;
+    }
+    return nullptr;
+}
+
 } // extern "C"
 
 namespace {
