@@ -32,6 +32,9 @@ expect() {   # WHAT LINE: wait until the details show LINE
     if wait_for 10 shows "$2"; then ok "$1: $2"; else bad "$1: expected [$2] got [$(tail -n 1 $T/out)]"; fi
 }
 has() { grep -q "$2" "$1" 2>/dev/null; }
+# a key for the sheet only once the dialog before it has closed and the sheet has the focus again (a slow machine takes longer)
+focused() { [ "$(xdotool getwindowfocus 2>/dev/null)" = "$W" ]; }
+back() { wait_for 10 focused || echo "note: the Folder Options window did not get the focus back"; sleep .3; }
 "$R/build/bin/flxp" --folder-options=filetypes > $T/out 2>&1 & P=$!
 W=$(wait_window 30 --name '^Folder Options$')
 if [ -z "$W" ]; then
@@ -50,12 +53,12 @@ else
     expect "Change: the user's choice" "TXT text/plain zztest.desktop user restore"
     has $T/home/.config/mimeapps.list '^text/plain=zztest.desktop$' && ok "Change: ~/.config/mimeapps.list has text/plain=zztest.desktop" ||
         bad "Change: ~/.config/mimeapps.list: $(cat $T/home/.config/mimeapps.list 2>&1)"
-    xdotool key alt+r
+    back; xdotool key alt+r
     expect "Restore" "TXT text/plain zztest.desktop claimant"
     has $T/home/.config/mimeapps.list 'text/plain' && bad "Restore: still in mimeapps.list: $(cat $T/home/.config/mimeapps.list)" ||
         ok "Restore: text/plain is out of ~/.config/mimeapps.list"
     # Advanced: Edit File Type, New... an action
-    xdotool key alt+v
+    back; xdotool key alt+v
     ET=$(wait_window 10 --name '^Edit File Type$')
     if [ -n "$ET" ]; then
         ok "Advanced opens Edit File Type"
@@ -68,7 +71,7 @@ else
         C=$T/home/.local/share/applications/zztest.desktop
         has $C '^X-Lhde-Override=true$' && has $C '^Actions=print;$' && has $C '^Exec=/bin/true --print %f$' &&
             ok "the copy in the data home has the action" || bad "the copy: $(cat $C 2>&1)"
-        xdotool key alt+r
+        back; xdotool key alt+r
         expect "Restore: the distribution's file again" "TXT text/plain zztest.desktop claimant"
         [ -f $C ] && bad "Restore left $C" || ok "Restore removed the copy"
     else
@@ -76,14 +79,14 @@ else
     fi
     # New / Delete: the user's own extension
     if command -v update-mime-database >/dev/null 2>&1; then
-        xdotool key alt+e
+        back; xdotool key alt+e
         NE=$(wait_window 10 --name '^Create New Extension$')
         if [ -n "$NE" ]; then
             sleep .5; xdotool type --delay 30 zzq; xdotool key Tab; xdotool key ctrl+a; xdotool type --delay 30 text/plain; xdotool key Return
             expect "New .zzq" "ZZQ text/plain zztest.desktop claimant"
             has $T/home/.local/share/mime/packages/lhde-extensions.xml 'glob pattern="\*.zzq"' && ok "New: lhde-extensions.xml has *.zzq" ||
                 bad "New: lhde-extensions.xml: $(cat $T/home/.local/share/mime/packages/lhde-extensions.xml 2>&1)"
-            xdotool key alt+d
+            back; xdotool key alt+d
             MB=$(wait_window 10 --name '^File Types$')
             sleep .5; xdotool key Return
             wait_for 10 sh -c "! grep -q zzq $T/home/.local/share/mime/packages/lhde-extensions.xml"
@@ -94,7 +97,7 @@ else
     else
         echo "skip New / Delete: no update-mime-database"
     fi
-    xdotool key Escape
+    back; xdotool key Escape
     wait_for 10 sh -c "! kill -0 $P 2>/dev/null" && ok "Escape closes the sheet, flxp exits" || bad "flxp still runs after Escape"
 fi
 kill $P 2>/dev/null; wait $P 2>/dev/null

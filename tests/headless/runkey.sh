@@ -1,7 +1,7 @@
 #!/bin/sh
 # Super+R opens the start menu's Run dialog (Start > Run...): luxwm's default "Mod4+r shell run" is _LHSHELL_COMMAND run,
 # luxshell forwards it to the start-menu provider (flxp-startmenu, which it starts) as _LHSHELL_START with l[0] bit 1, and the
-# provider shows its Run dialog ("Run", WM_CLASS flxp-startmenu); Escape closes it. Then settings.ini [commands] run, when set,
+# provider shows its Run dialog ("Run", WM_CLASS flxp-startmenu, or flxp-taskbar under a classic taskbar); Escape closes it. Then settings.ini [commands] run, when set,
 # runs instead. luxwm, luxshell and the provider on Xvfb with a scratch HOME. Needs Xvfb, xdotool and xprop.
 # Usage: tests/headless/runkey.sh [:DISPLAY]
 D=${1:-:80}
@@ -28,14 +28,18 @@ RUN="--onlyvisible --name ^Run$"   # the dialog by its title (its win32 class Fl
 run_up() { xdotool search $RUN >/dev/null 2>&1; }
 # Super+R until the dialog shows (the provider takes a moment to start and claim the start menu)
 # (before it does, luxshell opens its own run box, which Escape closes)
-started() { grep -q 'start menu: started' $T/luxshell.log; }
+# the provider is flxp-startmenu, or the classic taskbar itself when luxshell runs one (a theme without the Avalon taskbar's
+# images, as with nothing imported)
+started() { grep -q 'start menu: started\|taskbar: started' $T/luxshell.log; }
 wait_for 20 started; sleep 2
+PROV=flxp-startmenu
+grep -q 'taskbar classic' $T/luxshell.log && PROV=flxp-taskbar
 try() { xdotool key super+r; wait_for 2 run_up || { xdotool key Escape; sleep 1; false; }; }
 n=0; until try || [ $n -ge 10 ]; do n=$((n + 1)); done
 if run_up; then
     RW=$(xdotool search $RUN | head -1)
-    if xprop -id $RW WM_CLASS | grep -q '"flxp-startmenu"'; then ok "Super+R: the Run dialog (flxp-startmenu's \"Run\")"
-    else bad "Super+R: a \"Run\" window that is not flxp-startmenu's ($(xprop -id $RW WM_CLASS))"; fi
+    if xprop -id $RW WM_CLASS | grep -q "\"$PROV\""; then ok "Super+R: the Run dialog ($PROV's \"Run\")"
+    else bad "Super+R: a \"Run\" window that is not $PROV's ($(xprop -id $RW WM_CLASS))"; fi
     xdotool windowactivate --sync $RW 2>/dev/null; sleep .3
     xdotool key Escape
     run_gone() { ! run_up; }
