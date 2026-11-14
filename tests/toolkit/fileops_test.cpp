@@ -25,6 +25,7 @@ using fileops::Answer;
 
 static int g_fail = 0, g_pass = 0;
 static std::string A, B;   // scratch dir (fs 1), other filesystem dir (fs 2)
+static bool CROSS;         // A and B are on two filesystems (a move between them copies, then removes)
 
 #define CHECK(c) do { if (c) g_pass++; else { g_fail++; fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); } } while (0)
 
@@ -138,6 +139,7 @@ static void test_cross_fs_move()
         CHECK(lhde_xattr_get((u + "/tree/sub").c_str(), "user.lux.desc", v, sizeof v) == 3 && !memcmp(v, "Sub", 3));
     } else fprintf(stderr, "note: no user xattrs on %s: the moved tags are not checked\n", t.c_str());
 
+    if (!CROSS) { nuke(t); nuke(u); return; }   // the cases below need the copy a move between two filesystems makes
     // a source that cannot be removed: its parent is read-only
     mk(t + "/ro"); put(t + "/ro/f", "fff"); mk(t + "/ro/d"); put(t + "/ro/d/x", "xx");
     chmod((t + "/ro").c_str(), 0555);
@@ -261,7 +263,7 @@ static void test_failed_copy_cleanup()
     // and a cancelled cross-fs move leaves the source alone
     cancel = false;
     r = fileops::run(Op::Move, { t + "/u" }, v, oc);
-    CHECK(r.cancelled && entries(v) == 0 && get(t + "/u/big").size() == (5u << 20) && get(t + "/u/b/c") == "c");
+    if (CROSS) CHECK(r.cancelled && entries(v) == 0 && get(t + "/u/big").size() == (5u << 20) && get(t + "/u/b/c") == "c");
     nuke(t); nuke(u); nuke(v);
 }
 
@@ -593,7 +595,10 @@ int main(int argc, char** argv)
     A = t1; B = t2;
     struct stat s1, s2;
     stat(A.c_str(), &s1); stat(B.c_str(), &s2);
-    if (s1.st_dev == s2.st_dev) fprintf(stderr, "warning: %s and %s are on the same filesystem: the cross-filesystem cases test renames\n", A.c_str(), B.c_str());
+    CROSS = s1.st_dev != s2.st_dev;
+    if (!CROSS) fprintf(stderr, "warning: %s and %s are on the same filesystem: the cross-filesystem cases test renames, the unremovable"
+                                " and unreadable sources and the cancelled move are skipped (a second filesystem: fileops_test DIR1 DIR2)\n",
+                        A.c_str(), B.c_str());
     umask(022);
     test_same_fs_move();
     test_cross_fs_move();
