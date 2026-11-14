@@ -2581,7 +2581,7 @@ int main(int argc, char** argv)
     }
     for (size_t i = 1; i < dirs.size(); i++) {   // one window per process
         std::string err;
-        shell::spawn({ "/proc/self/exe", dirs[i] }, shell::home_dir(), &err);
+        shell::spawn({ shell::self_exe(), dirs[i] }, shell::home_dir(), &err);
     }
 
     shell::setup_fonts();
