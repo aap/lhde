@@ -26,6 +26,7 @@ the shell pack (+ the imageres it was cut from), the start menu, the navigation 
 | --- | --- | --- | --- |
 | `[shipped]` | `$PREFIX/share/lhde` (code: `$PREFIX/lib/lhde`) | our text: theme files, navbar layouts, icon recipes, frame-set `theme.ini`, pack `shell.lua` | no: `make install` overwrites it; copy the file into `~/.config/lhde/<same path>` and edit that |
 | `[windows]` | `~/.local/share/lhde-windows` | the Windows files of each build (`<build>/system32, themes, fonts, wallpapers`), `local/` (dropped in), `generated/` (frame and pack PNGs) | no: `lhde-import` fills it; `generated/` may be deleted (`lhde-import --regenerate`) |
+| `[system windows]` | `$XDG_DATA_DIRS/lhde-windows` (`/usr/local/share/lhde-windows`) | the same for every user of a whole-system install, read after yours (docs/BUILDING.md "A whole-system install and a display manager") | no: root imports into it (`LHDE_WINDOWS=/usr/local/share/lhde-windows lhde-import ...`); your own imports go to yours, which wins file by file |
 | `[user]` | `~/.config/lhde` | `settings.ini`, your `themes/`, and any shipped file you override under its own name | yes |
 | `[source tree]` | `<tree>/share` | the shipped text when running from a build tree | yes (it is the repository) |
 

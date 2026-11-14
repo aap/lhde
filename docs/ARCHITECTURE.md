@@ -38,7 +38,7 @@ when the Avalon taskbar is up. `session/lab.sh` does the same on an Xvfb display
 screenshots and scripted tests (`lab.sh start; lab.sh shell; lab.sh theme NAME; lab.sh shot FILE`).
 
 Everything a program needs is looked up by a relative name through liblhde (docs/LAYOUT.md "The three trees"):
-`~/.config/lhde` first, then the Windows tree's `index/`, then the install's `share/lhde` (the source tree's `share/` when run
+`~/.config/lhde` first, then the Windows tree's `index/` (the user's, then a system one in `$XDG_DATA_DIRS/lhde-windows`), then the install's `share/lhde` (the source tree's `share/` when run
 from a build tree). `lhde-theme explain [THEME]` prints every visible component of a theme, the file behind it, its tree and
 whether it fell back; this is the first thing to run when something looks wrong.
 

@@ -16,6 +16,8 @@
    wallpapers/4074/Bliss.jpg; lhde_data_kind_rel) searched in these directories, first match wins (lhde_data_dirs):
      1. user        ~/.config/lhde
      2. windows     $LHDE_WINDOWS/index; with $LHDE_DATA set (tests, scratch): that one flat directory instead
+      system windows  with neither set: the system Windows trees' index/ after the user's, $XDG_DATA_DIRS/lhde-windows
+                  (root imports into them: LHDE_WINDOWS=/usr/local/share/lhde-windows lhde-import)
      3. shipped     <exe>/../share/lhde (the program's own prefix), then $XDG_DATA_DIRS/lhde (default /usr/local/share:/usr/share)
      4. source tree <top>/share when the program runs from a build tree (<top>/build/...; LHDE_TREE=0 leaves it out: tests)
    A frame set or pack is split: its text (theme.ini, shell.lua) is shipped, its pixels are generated; lhde_data_find_in finds a
@@ -36,17 +38,19 @@ extern "C" {
 int lhde_data_dirs(const char **dirs, int max);
 /* the trees */
 enum lhde_tree_kind { LHDE_TREE_USER, LHDE_TREE_WINDOWS, LHDE_TREE_FLAT, LHDE_TREE_SHIPPED, LHDE_TREE_SOURCE,
-                      LHDE_TREE_CODE };
+                      LHDE_TREE_CODE, LHDE_TREE_SYSWINDOWS };
 /* the tree of lhde_data_dirs' i-th directory (-1 past the end), and a kind's name: user, windows, data, shipped,
-   source tree, program ($PREFIX/lib/lhde), "elsewhere" for -1 */
+   source tree, program ($PREFIX/lib/lhde), system windows, "elsewhere" for -1 */
 int lhde_data_dir_kind(int i);
 const char *lhde_tree_name(int kind);
 /* the Windows files' lookup directory (2. above: $LHDE_WINDOWS/index, or $LHDE_DATA; it need not exist yet) */
 const char *lhde_data_user(void);
 /* the Windows tree itself: $LHDE_WINDOWS (default ${XDG_DATA_HOME:-~/.local/share}/lhde-windows), or $LHDE_DATA */
 const char *lhde_windows_dir(void);
+/* the system Windows trees searched after the user's (their tops, <share>/lhde-windows, real paths), in order; how many */
+int lhde_system_windows_dirs(const char **dirs, int max);
 /* which tree PATH really lies in (symlinks resolved; enum lhde_tree_kind, -1 elsewhere); rel = the path below that tree's
-   top (for the Windows tree: below $LHDE_WINDOWS, e.g. 4074/system32/imageres.dll), else the resolved path */
+   top (for a Windows tree: below its top, $LHDE_WINDOWS or a system tree, e.g. 4074/system32/imageres.dll), else the resolved path */
 int lhde_data_origin(const char *path, char *rel, size_t n);
 /* lookup by kind: theme, style, scheme, frames, pack, navbar, icons, wallpaper, fonts, resources, source -> the relative name
    (style jade4074 -> styles/jade4074.msstyles); NULL for an unknown kind. lhde_data_kind_name(i): the kinds, NULL past the end */

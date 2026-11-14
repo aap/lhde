@@ -15,6 +15,9 @@
 static char user_dir[PATH_MAX + 64], win_dir[PATH_MAX + 32], tree_dir[PATH_MAX], exe_dir[PATH_MAX];
 static struct root { char path[PATH_MAX]; int kind; } roots[LHDE_DATA_MAX];
 static int ndirs = -1;
+/* the system Windows trees in search order (their tops, real paths; the index/ of each is in roots) */
+static char sys_tops[LHDE_DATA_MAX][PATH_MAX];
+static int nsys;
 
 static int is_dir(const char *p) { struct stat st; return p && p[0] && stat(p, &st) == 0 && S_ISDIR(st.st_mode); }
 static int exists(const char *p) { struct stat st; return p && p[0] && stat(p, &st) == 0; }
@@ -46,19 +49,29 @@ static void find_exe_and_tree(void)
     }
 }
 
-static void add_dir(const char *d, int kind)
+static int add_dir(const char *d, int kind)
 {
     char r[PATH_MAX];
-    if (ndirs >= LHDE_DATA_MAX || !is_dir(d) || !realpath(d, r)) return;
-    for (int i = 0; i < ndirs; i++) if (!strcmp(roots[i].path, r)) return;   /* the first kind wins */
+    if (ndirs >= LHDE_DATA_MAX || !is_dir(d) || !realpath(d, r)) return 0;
+    for (int i = 0; i < ndirs; i++) if (!strcmp(roots[i].path, r)) return 0;   /* the first kind wins */
     snprintf(roots[ndirs].path, PATH_MAX, "%s", r);
     roots[ndirs++].kind = kind;
+    return 1;
+}
+
+/* a system Windows tree TOP (<share>/lhde-windows): its index/ joins the search, its top is kept for lhde_data_origin */
+static void add_system_tree(const char *top)
+{
+    char p[PATH_MAX + 16], r[PATH_MAX];
+    snprintf(p, sizeof p, "%s/index", top);
+    if (nsys >= LHDE_DATA_MAX || !add_dir(p, LHDE_TREE_SYSWINDOWS) || !realpath(top, r)) return;
+    snprintf(sys_tops[nsys++], PATH_MAX, "%s", r);
 }
 
 static void init(void)
 {
     if (ndirs >= 0) return;
-    ndirs = 0;
+    ndirs = nsys = 0;
     const char *e = getenv("LHDE_DATA"), *w = getenv("LHDE_WINDOWS"), *x = getenv("XDG_DATA_HOME"), *h = getenv("HOME");
     char share[PATH_MAX - 64];
     if (x && *x) snprintf(share, sizeof share, "%s", x); else snprintf(share, sizeof share, "%s/.local/share", h ? h : "");
@@ -80,10 +93,20 @@ static void init(void)
         snprintf(user_dir, sizeof user_dir, "%s/index", win_dir);
         add_dir(user_dir, LHDE_TREE_WINDOWS);
     }
+    /* 2b. the system Windows trees, read-only for users (root imports into them): $XDG_DATA_DIRS/lhde-windows, each by its
+       index/. Only behind the default tree: an explicit $LHDE_WINDOWS or $LHDE_DATA
+       is the one Windows tree (tests, root's import into a system tree) */
+    const char *xd = getenv("XDG_DATA_DIRS");
+    char list[4096];
+    if (!(e && *e) && !(w && *w)) {
+        snprintf(list, sizeof list, "%s", xd && *xd ? xd : "/usr/local/share:/usr/share");
+        for (char *save = NULL, *t = strtok_r(list, ":", &save); t; t = strtok_r(NULL, ":", &save)) {
+            char p[PATH_MAX + 16]; snprintf(p, sizeof p, "%s/lhde-windows", t); add_system_tree(p);
+        }
+    }
     /* 3. the shipped data: <exe>/../share/lhde (the program's own prefix), then $XDG_DATA_DIRS/lhde */
     if (exe_dir[0] && !tree_dir[0]) { char p[PATH_MAX + 32]; snprintf(p, sizeof p, "%s/../share/lhde", exe_dir); add_dir(p, LHDE_TREE_SHIPPED); }
-    const char *xd = getenv("XDG_DATA_DIRS");
-    char list[4096]; snprintf(list, sizeof list, "%s", xd && *xd ? xd : "/usr/local/share:/usr/share");
+    snprintf(list, sizeof list, "%s", xd && *xd ? xd : "/usr/local/share:/usr/share");
     for (char *save = NULL, *t = strtok_r(list, ":", &save); t; t = strtok_r(NULL, ":", &save)) {
         char p[PATH_MAX + 16]; snprintf(p, sizeof p, "%s/lhde", t); add_dir(p, LHDE_TREE_SHIPPED);
     }
@@ -113,12 +136,21 @@ const char *lhde_tree_name(int kind)
     case LHDE_TREE_SHIPPED: return "shipped";
     case LHDE_TREE_SOURCE: return "source tree";
     case LHDE_TREE_CODE: return "program";
+    case LHDE_TREE_SYSWINDOWS: return "system windows";
     }
     return "elsewhere";
 }
 
 const char *lhde_data_user(void) { init(); return user_dir; }
 const char *lhde_windows_dir(void) { init(); return win_dir; }
+
+int lhde_system_windows_dirs(const char **dirs, int max)
+{
+    init();
+    int n = 0;
+    for (int i = 0; i < nsys && n < max; i++) dirs[n++] = sys_tops[i];
+    return n;
+}
 const char *lhde_tree(void) { init(); return tree_dir[0] ? tree_dir : NULL; }
 
 /* DIR/REL, else DIR/<REL's directory>/cache/<REL's last component> (the caches of a $LHDE_DATA) */
@@ -250,12 +282,13 @@ int lhde_data_origin(const char *path, char *rel, size_t n)
     char rp[PATH_MAX];
     if (!path || !path[0] || !realpath(path, rp)) return -1;
     /* the trees by their real tops: a file found through the Windows index lies in the Windows tree, not in index/ */
-    static char tops[LHDE_DATA_MAX + 3][PATH_MAX];
-    int kinds[LHDE_DATA_MAX + 3], nt = 0;
+    static char tops[2 * LHDE_DATA_MAX + 3][PATH_MAX];
+    int kinds[2 * LHDE_DATA_MAX + 3], nt = 0;
     char t[PATH_MAX];
     const char *e = getenv("LHDE_DATA");
     if (realpath(win_dir, t)) { snprintf(tops[nt], PATH_MAX, "%s", t); kinds[nt++] = e && *e ? LHDE_TREE_FLAT : LHDE_TREE_WINDOWS; }
-    for (int i = 0; i < ndirs; i++) if (roots[i].kind != LHDE_TREE_WINDOWS && roots[i].kind != LHDE_TREE_FLAT) { snprintf(tops[nt], PATH_MAX, "%.*s", PATH_MAX - 1, roots[i].path); kinds[nt++] = roots[i].kind; }
+    for (int i = 0; i < nsys; i++) { snprintf(tops[nt], PATH_MAX, "%s", sys_tops[i]); kinds[nt++] = LHDE_TREE_SYSWINDOWS; }
+    for (int i = 0; i < ndirs; i++) if (roots[i].kind != LHDE_TREE_WINDOWS && roots[i].kind != LHDE_TREE_FLAT && roots[i].kind != LHDE_TREE_SYSWINDOWS) { snprintf(tops[nt], PATH_MAX, "%.*s", PATH_MAX - 1, roots[i].path); kinds[nt++] = roots[i].kind; }
     if (tree_dir[0]) { snprintf(tops[nt], PATH_MAX, "%s", tree_dir); kinds[nt++] = LHDE_TREE_SOURCE; }
     else if (installed_code("", t, sizeof t)) { snprintf(tops[nt], PATH_MAX, "%s", t); kinds[nt++] = LHDE_TREE_CODE; }
     int best = -1; size_t bl = 0;   /* the longest top that holds it */

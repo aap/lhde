@@ -528,6 +528,58 @@ int main(void)
         unsetenv("LHDE_WINDOWS"); setenv("LHDE_DATA", flat, 1); setenv("XDG_DATA_DIRS", "/nonexistent", 1); lhde_data_reset();
     }
 
+    /* ---- a system Windows tree ($XDG_DATA_DIRS/lhde-windows) behind the user's: a file only there is found, the user's copy
+       wins, lhde_data_origin names the tree; an explicit $LHDE_WINDOWS is the only Windows tree; lhde-theme dirs lists both ---- */
+    {
+        char U[PATH_MAX + 32], S[PATH_MAX + 32], q[PATH_MAX * 2], o[PATH_MAX], rel[PATH_MAX], flat[PATH_MAX];
+        snprintf(flat, sizeof flat, "%s", getenv("LHDE_DATA"));
+        snprintf(U, sizeof U, "%s/sysu/lhde-windows", T); snprintf(S, sizeof S, "%s/syss/lhde-windows", T);
+        put("sysu/lhde-windows/local/themes/both.msstyles", "user");
+        put("syss/lhde-windows/local/themes/both.msstyles", "system");
+        put("syss/lhde-windows/4074/themes/Jade/jade.msstyles", "system");
+        put("syss/lhde-windows/generated/frames/sysonly/close.png", "x");
+        snprintf(q, sizeof q, "%s/index/styles", U); mkdirs(q);
+        snprintf(q, sizeof q, "%s/index/styles", S); mkdirs(q);
+        snprintf(q, sizeof q, "%s/index/styles/both.msstyles", U); CHECK(symlink("../../local/themes/both.msstyles", q) == 0);
+        snprintf(q, sizeof q, "%s/index/styles/both.msstyles", S); CHECK(symlink("../../local/themes/both.msstyles", q) == 0);
+        snprintf(q, sizeof q, "%s/index/styles/sysjade.msstyles", S); CHECK(symlink("../../4074/themes/Jade/jade.msstyles", q) == 0);
+        snprintf(q, sizeof q, "%s/index/frames", S); CHECK(symlink("../generated/frames", q) == 0);
+        unsetenv("LHDE_DATA"); unsetenv("LHDE_WINDOWS");
+        snprintf(q, sizeof q, "%s/sysu", T); setenv("XDG_DATA_HOME", q, 1);
+        snprintf(q, sizeof q, "/nonexistent:%s/syss", T); setenv("XDG_DATA_DIRS", q, 1);
+        lhde_data_reset();
+        const char *d[LHDE_DATA_MAX]; int nd = lhde_data_dirs(d, LHDE_DATA_MAX), iw = -1, is = -1;
+        for (int i = 0; i < nd; i++) { if (lhde_data_dir_kind(i) == LHDE_TREE_WINDOWS) iw = i; if (lhde_data_dir_kind(i) == LHDE_TREE_SYSWINDOWS) is = i; }
+        CHECK(iw >= 0 && is == iw + 1);                                             /* the system tree right after the user's */
+        snprintf(q, sizeof q, "%s/index", S); if (is >= 0) EQ(d[is], q);
+        const char *sd[LHDE_DATA_MAX]; CHECK(lhde_system_windows_dirs(sd, LHDE_DATA_MAX) == 1); EQ(sd[0], S);
+        EQ(lhde_windows_dir(), U);                                                  /* lhde-import's tree stays the user's */
+        EQ(lhde_tree_name(LHDE_TREE_SYSWINDOWS), "system windows");
+        CHECK(lhde_data_find_kind("style", "sysjade", o, sizeof o) != NULL);       /* only in the system tree */
+        CHECK(lhde_data_origin(o, rel, sizeof rel) == LHDE_TREE_SYSWINDOWS); EQ(rel, "4074/themes/Jade/jade.msstyles");
+        CHECK(lhde_data_find("frames/sysonly/close.png", o, sizeof o) != NULL);    /* generated/ of the first tree that has it */
+        CHECK(lhde_data_origin(o, rel, sizeof rel) == LHDE_TREE_SYSWINDOWS); EQ(rel, "generated/frames/sysonly/close.png");
+        CHECK(lhde_data_find_kind("style", "both", o, sizeof o) != NULL);          /* the user's copy wins */
+        CHECK(lhde_data_origin(o, rel, sizeof rel) == LHDE_TREE_WINDOWS); EQ(rel, "local/themes/both.msstyles");
+        /* lhde-theme dirs (the program of this build) lists both trees and both index/ in the search order */
+        if (access("build/bin/lhde-theme", X_OK) == 0) {
+            FILE *f = popen("build/bin/lhde-theme dirs 2>&1; build/bin/lhde-theme dirs --system", "r");
+            char out[16384] = ""; size_t k = f ? fread(out, 1, sizeof out - 1, f) : 0; out[k] = 0; if (f) pclose(f);
+            char line[PATH_MAX * 2];
+            HAS(out, "windows      ~/sysu/lhde-windows ");                          /* HOME is T: printed as ~ */
+            HAS(out, "system       ~/syss/lhde-windows ");
+            HAS(out, "system windows ~/syss/lhde-windows/index\n");
+            snprintf(line, sizeof line, "\n%s\n", S); HAS(out, line);
+        }
+        /* an explicit $LHDE_WINDOWS: that tree alone */
+        setenv("LHDE_WINDOWS", U, 1); lhde_data_reset();
+        nd = lhde_data_dirs(d, LHDE_DATA_MAX);
+        int nsys = 0; for (int i = 0; i < nd; i++) nsys += lhde_data_dir_kind(i) == LHDE_TREE_SYSWINDOWS;
+        CHECK(nsys == 0 && lhde_system_windows_dirs(sd, LHDE_DATA_MAX) == 0);
+        CHECK(lhde_data_find_kind("style", "sysjade", o, sizeof o) == NULL);
+        unsetenv("LHDE_WINDOWS"); setenv("LHDE_DATA", flat, 1); setenv("XDG_DATA_DIRS", "/nonexistent", 1); lhde_data_reset();
+    }
+
     /* lhde_app_icon (lhde/icon.h): a flat data directory with its own icon set zz (a .ico, a PE with a named group, a key
        whose file is missing), the class map, a desktop file and an XDG icon theme of its own */
     {

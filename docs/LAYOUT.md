@@ -66,6 +66,9 @@ WINDOWS FILES                        lhde-import; $LHDE_WINDOWS, default ${XDG_D
     icons/PACK                             -> ../../local/icons/PACK
     frames -> ../generated/frames,  packs -> ../generated/packs,  aurora -> ../generated/aurora
   import.log
+$XDG_DATA_DIRS/lhde-windows/         a system Windows tree (/usr/local/share/lhde-windows): the same layout, made by root with
+                                     LHDE_WINDOWS=<it> lhde-import (or make install-resources-* LHDE_WINDOWS=<it>); read-only for
+                                     users, read after the user's own tree
 
 A RESOURCE PACK                      lhde-pack; lhde-import --pack makes the Windows tree from it (docs/USAGE.md)
 lhde-resources-<date>[-essentials]/
@@ -94,10 +97,13 @@ USER FILES                           yours; lhde writes only what you change in 
 **Lookup.** A program asks for a file by kind and name, i.e. by its relative name (`styles/jade4074.msstyles`,
 `frames/jade4074/close.png`, `resources/4074`, `wallpapers/4074/Bliss.jpg`), and liblhde (`liblhde/data.c`, `<lhde/data.h>`)
 answers from the first of: 1. `~/.config/lhde`; 2. `~/.local/share/lhde-windows/index` (or `$LHDE_DATA`, a flat directory:
-tests, scratch imports); 3. `$PREFIX/share/lhde` of the running program, then `$XDG_DATA_DIRS/lhde`; 4. the source tree's
+tests, scratch imports), then the system Windows trees' `index/` (`$XDG_DATA_DIRS/lhde-windows`;
+only when neither `$LHDE_WINDOWS` nor `$LHDE_DATA` names the one tree), so the user's copy of a file wins and a file only the
+system tree has is found there, a frame set's or pack's generated pixels in the first tree that has them; 3. `$PREFIX/share/lhde` of the running program, then `$XDG_DATA_DIRS/lhde`; 4. the source tree's
 `share/` when the program runs from a build tree. Code is found by `lhde_component_dir`: `<tree>/luxshell` or `<prefix>/lib/lhde/luxshell`. Scripts use the
 same lookup through `lhde-theme find REL` / `find KIND NAME` / `dirs --list` (session/lhde-paths.sh); lhde-import is the only
-writer of the Windows tree and the only code that knows its inside (`tools/lhdetree.py`). A frame set or pack is split by
+writer of the Windows trees (of the user's as the user, of a system tree as root with `LHDE_WINDOWS`; `--regenerate`
+remakes the one tree it writes) and the only code that knows their inside (`tools/lhdetree.py`). A frame set or pack is split by
 design: its text is shipped, its pixels are generated; `lhde_data_find_in` joins them.
 
 **Where does this pixel come from.** `lhde-theme explain [THEME]` prints one row per visible component (visual style and

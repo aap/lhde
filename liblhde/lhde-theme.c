@@ -22,10 +22,11 @@
      lhde-theme explain --files THEME      the Windows-tree files THEME reads, one real path each (lhde-pack --profile essentials)
      lhde-theme explain [THEME]            where every visible part of THEME (default: the selected one, with its current layer)
                                            comes from: one row per component, its file and tree, ok / off / missing -> fallback
-     lhde-theme dirs [--list | --windows | --user]
+     lhde-theme dirs [--list | --windows | --user | --system]
                                            the three trees (program files, Windows files, user files) with sizes and the search
                                            order; --list: only the search order, one directory per line (scripts); --windows:
-                                           the Windows tree's top ($LHDE_WINDOWS); --user: its lookup directory (index/)
+                                           the Windows tree's top ($LHDE_WINDOWS); --user: its lookup directory (index/);
+                                           --system: the system Windows trees searched after it ($XDG_DATA_DIRS/lhde-windows)
      lhde-theme find REL | KIND NAME       a data file by its relative name (styles/jade4074.msstyles) or by kind (style jade4074;
                                            kinds: theme style scheme frames pack navbar icons wallpaper fonts resources source):
                                            the path, exit 1 when no tree has it
@@ -58,7 +59,7 @@ static void usage(void)
     fprintf(stderr, "usage: lhde-theme list | resolve NAME [--files] [--why | --get KEY | --shell] | current | set NAME |\n"
                     "                  layer | layer-set KEY VALUE | layer-clear | save-as FILE [TITLE] | delete NAME | styles | schemes |\n"
                     "                  set-key NAME KEY VALUE | setting SEC KEY [VALUE] | style NAME |\n"
-                    "                  explain [THEME | --files THEME] | dirs [--list | --windows | --user] | find REL | find KIND NAME | path VALUE |\n"
+                    "                  explain [THEME | --files THEME] | dirs [--list | --windows | --user | --system] | find REL | find KIND NAME | path VALUE |\n"
                     "                  icon CLASS [INSTANCE] [--desktop ID] [--key KEY] [--size N] [--set ICONS] | terminal [--run [DIR]]\n");
     exit(2);
 }
@@ -96,6 +97,11 @@ int main(int argc, char **argv)
         }
         if (argc > 2 && !strcmp(argv[2], "--windows")) { printf("%s\n", lhde_windows_dir()); return 0; }
         if (argc > 2 && !strcmp(argv[2], "--user")) { printf("%s\n", lhde_data_user()); return 0; }
+        if (argc > 2 && !strcmp(argv[2], "--system")) {
+            const char *d[LHDE_DATA_MAX]; int n = lhde_system_windows_dirs(d, LHDE_DATA_MAX);
+            for (int i = 0; i < n; i++) printf("%s\n", d[i]);
+            return 0;
+        }
         return lhde_dirs_report();
     }
     if (!strcmp(cmd, "explain")) {

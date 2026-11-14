@@ -357,8 +357,11 @@ int lhde_explain(const char *name)
     }
 #undef G
     print_rows();
-    printf("\nTrees: user = %s, windows = %s, shipped = the install's share/lhde (lhde-theme dirs). A key's source: lhde-theme resolve %s --why.\n",
-           tilde(lhde_config_dir(buf, sizeof buf), w, sizeof w), tilde(lhde_windows_dir(), err, sizeof err), lhde_theme_get(t, "theme"));
+    const char *sys[LHDE_DATA_MAX]; int nsys = lhde_system_windows_dirs(sys, LHDE_DATA_MAX);
+    char sw[PATH_MAX + 32] = "";
+    if (nsys) snprintf(sw, sizeof sw, ", system windows = %s%s", sys[0], nsys > 1 ? " ..." : "");
+    printf("\nTrees: user = %s, windows = %s%s, shipped = the install's share/lhde (lhde-theme dirs). A key's source: lhde-theme resolve %s --why.\n",
+           tilde(lhde_config_dir(buf, sizeof buf), w, sizeof w), tilde(lhde_windows_dir(), err, sizeof err), sw, lhde_theme_get(t, "theme"));
     lhde_theme_free(t);
     return 0;
 }
@@ -551,6 +554,11 @@ int lhde_dirs_report(void)
     const char *wd = lhde_windows_dir();
     tree_line(getenv("LHDE_DATA") && *getenv("LHDE_DATA") ? "LHDE_DATA" : "windows", wd, NULL);
     if (isdir(wd)) entries(wd, "    ");
+    const char *sys[LHDE_DATA_MAX]; int ns = lhde_system_windows_dirs(sys, LHDE_DATA_MAX);
+    for (int i = 0; i < ns; i++) {
+        tree_line("system", sys[i], "read-only for users, after the user's; root imports into it (LHDE_WINDOWS=DIR lhde-import)");
+        entries(sys[i], "    ");
+    }
     printf("User files (docs/SETTINGS.md \"Files\"):\n");
     tree_line("config", lhde_config_dir(buf, sizeof buf), "what you chose: settings.ini, themes/, flxp.ini, keys, overridden shipped files");
     if (isdir(buf)) entries(buf, "    ");

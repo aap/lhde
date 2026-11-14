@@ -280,10 +280,10 @@ give the same sha256 as the published pack; a new pack is published under `FREE_
 
 Every program looks a file up by its relative name (`styles/jade4074.msstyles`, `frames/jade4074/close.png`,
 `resources/4074`) in this order: `~/.config/lhde`, the Windows tree's `index/` (`$LHDE_DATA`, a flat directory, instead:
-tests), the install's `share/lhde`, `$XDG_DATA_DIRS/lhde`, the
+tests), the system Windows trees' `index/` (`$XDG_DATA_DIRS/lhde-windows`, below), the install's `share/lhde`, `$XDG_DATA_DIRS/lhde`, the
 source tree's `share/` (liblhde/data.c, lhde/data.h; scripts through `lhde-theme find`). **When something looks wrong:**
 `lhde-theme explain [THEME]` prints every visible component of the theme, the file it comes from, its tree and whether it
-fell back; `lhde-theme dirs` shows the trees with their sizes.
+fell back (`[windows]` the user's tree, `[system windows]` a system one); `lhde-theme dirs` shows the trees with their sizes.
 
 ## Running
 
