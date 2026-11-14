@@ -28,7 +28,7 @@ luxshell: build/bin/luxshell build/luxshell/tests/trayicon
 # luxshell/tests/tiles.sh (stub system commands, no display; the Classic Tray tile hosting them), and every tile is in the
 # sidebar menu's parts list (luxshell/tests/parts.py)
 check-luxshell: build/bin/luxshell
-	@if command -v luac5.4 >/dev/null 2>&1; then L=luac5.4; elif command -v luac >/dev/null 2>&1; then L=luac; else L=; fi; \
+	@if command -v luac5.4 >/dev/null 2>&1; then L=luac5.4; elif command -v luac54 >/dev/null 2>&1; then L=luac54; elif command -v luac >/dev/null 2>&1; then L=luac; else L=; fi; \
 	if [ -n "$$L" ]; then $$L -p $(LUXSHELL_LUA) share/packs/*/shell.lua && echo "ok    luxshell (built, Lua parses: $$L -p)"; \
 	else echo "ok    luxshell (built; no luac to check the Lua)"; fi
 	@luxshell/tests/tiles.sh > build/luxshell-tiles.log 2>&1 && echo "ok    luxshell tray items ($$(tail -n 1 build/luxshell-tiles.log))" || \

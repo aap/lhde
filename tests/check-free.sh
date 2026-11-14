@@ -66,8 +66,8 @@ done
 [ $fails -eq 0 ] || { echo "FAIL  free baseline: $fails of $n themes"; exit 1; }
 echo "ok    free baseline: $n themes resolve with only the free pack imported ($W, from $(basename "$iso")${walls:+ and $walls})"
 [ -z "$nowall" ] || echo "      (without the free themes' photos: no FREE_WALLPAPERS directory beside the ISO, their wallpaper is missing)"
-keys=$(sed -n '/^\[icons\]/,/^\[/{s/^\([a-z_0-9]*\) *=.*/\1/p}' share/icons/*.theme | sort -u)
-mapped=$(sed -n '/^\[classes\]/,/^\[/{s/^[^;[][^=]*= *\([a-z_0-9]*\) *$/\1/p}' share/icons/apps.ini | sort -u)
+keys=$(sed -n '/^\[icons\]/,/^\[/{s/^\([a-z_0-9]*\) *=.*/\1/p;}' share/icons/*.theme | sort -u)
+mapped=$(sed -n '/^\[classes\]/,/^\[/{s/^[^;[][^=]*= *\([a-z_0-9]*\) *$/\1/p;}' share/icons/apps.ini | sort -u)
 nk=0 bad=
 for k in $keys $mapped; do
 	nk=$((nk + 1))

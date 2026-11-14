@@ -78,7 +78,7 @@ renders, for every frame set in `share/frames`, the strip, `normal`, `unfocused`
 and `classic/`, `classic.xl/` (Extra Large metrics 24/24, Tahoma -19 bold), `classic.hc/` (High Contrast Black colours, borderwidth
 6, 31/31, Tahoma -24 bold) for Windows Classic. It compares their SHA-256 with a baseline made on this machine
 (`build/luxwm/regress/baseline.sha256`, written by the first run, `LUXWM_BASELINE=` another file; `--rebaseline` after an intended
-change; `--source dir|lib`). No reference images are in the repository; it skips without the user's imported styles.
+change; `--source dir|lib`). No reference images are in the repository; it skips without the user's imported styles, or when one frame set's style is not imported.
 `build/luxwm/tests/shapetest` (run first by `make check-luxwm`) checks the msstyles window shape against synthetic captions with
 rounded alpha-0 corners (SIZINGMARGINS top 0, a top margin covering the corner, one shallower than it, transparent top rows): no
 style file, so it runs everywhere.

@@ -37,7 +37,7 @@ check() {   # NAME EXPECTED ACTUAL
     if [ "$2" = "$3" ]; then echo "ok   $1: $3"; else echo "FAIL $1: expected [$2] got [$3]"; fails=$((fails + 1)); fi
 }
 attr() { getfattr --only-values -n "$1" "$2" 2>/dev/null; }
-nwin() { xdotool search --onlyvisible --name "$1" 2>/dev/null | wc -l; }
+nwin() { xdotool search --onlyvisible --name "$1" 2>/dev/null | wc -l | tr -d " "; }
 gone() { [ "$(nwin "$1")" = 0 ]; }
 two() { [ "$(nwin "$1")" -ge 2 ]; }
 focus() { timeout 10 xdotool windowfocus --sync "$1" 2>/dev/null; sleep .3; }

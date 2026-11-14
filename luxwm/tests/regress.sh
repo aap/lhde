@@ -9,7 +9,7 @@
 #   luxwm/tests/regress.sh --classic-only [OUTDIR]         only the Windows Classic renders (classic/ classic.xl/ classic.hc/), which
 #                                                          need no visual style: the free baseline (tests/check-free.sh)
 # The baseline is build/luxwm/regress/baseline.sha256 (LUXWM_BASELINE= another file). Skips (exit 0) when the data directory
-# has no styles/ (nothing imported: tools/lhde-import). Sources (docs/LUXWM.md "libuxtheme source"): lib = the visual style named
+# has no styles/ (nothing imported: tools/lhde-import) or lacks a frame set's style (only the free sources imported). Sources (docs/LUXWM.md "libuxtheme source"): lib = the visual style named
 # in theme.ini read live through libwuxtheme (default), dir = the frame set's PNG cache.
 # Renders per frame set (640x480, title "Frame test window"):
 #   strip.png      the 4-state strip (focused, hover close, pressed max, inactive)
@@ -54,6 +54,16 @@ if [ -z "$classic_only" ] && { [ -z "$styles" ] || [ -z "$(ls "$styles" 2>/dev/n
 	echo "skip  luxwm regress: no visual styles in $LHDE_USER_DATA/styles (tools/lhde-import)"; exit 0
 fi
 [ -x "$ft" ] || { echo "regress: build $ft first (make)" >&2; exit 2; }
+ini() { sed -n "s/^$2 *= *//p" "$1" | head -1; }
+# every frame set's visual style must be there (a tree with the free sources only has none of them)
+if [ -z "$classic_only" ] && [ "$source" = lib ]; then
+	absent=
+	for td in "$top"/share/frames/*/; do
+		st=$(ini "$td/theme.ini" msstyles); [ -n "$st" ] || continue
+		f=$(lhde_resolve "$st"); [ -f "$f" ] || case " $absent " in *" ${st#styles/} "*) ;; *) absent="$absent ${st#styles/}" ;; esac
+	done
+	[ -z "$absent" ] || { echo "skip  luxwm regress: the frame sets' styles are not imported:$absent (the classic renders: make check-free)"; exit 0; }
+fi
 # the session's fonts (a theme's path.fonts): the 4074 Fonts directory, so "Segoe UI 9" is Segoe UI 0.7 as in luxwm
 export FRAMETEST_FONTS=${FRAMETEST_FONTS-$(lhde_find fonts/4074)}
 rm -rf "$out"; mkdir -p "$out"
@@ -83,7 +93,6 @@ classic_own() {
 		[ -n "$st" ] && "$top/build/bin/lhde-theme" style "$st" 2>/dev/null | grep -qx 'kind=dwm' && basename "$td"
 	done | sort -u
 }
-ini() { sed -n "s/^$2 *= *//p" "$1" | head -1; }
 
 export FRAMETEST_SOURCE=$source
 n=0
@@ -116,7 +125,7 @@ done
 checksums "$out" > "$out.sha256"
 if [ $mode = rebaseline ] || [ ! -f "$base" ]; then
 	cp "$out.sha256" "$base"
-	echo "ok    luxwm regress: baseline written, $(wc -l < "$base") renders of $n frame sets (source $source, data $LHDE_USER_DATA) -> $base"
+	echo "ok    luxwm regress: baseline written, $(wc -l < "$base" | tr -d " ") renders of $n frame sets (source $source, data $LHDE_USER_DATA) -> $base"
 	exit 0
 fi
 same=0 diff=0 miss=0 new=0
