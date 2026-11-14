@@ -12,7 +12,7 @@ the design journals of the merge and before are in `history/` (kept unchanged, n
 | `SETTINGS.md` | the settings store (`~/.config/lhde/settings.ini`), change notification, who writes what |
 | `CLIENT-PROTOCOL.md` | luxwm's client protocol: extended glass frames, the `_LHWM_*` properties, the vision header |
 | `USAGE.md` | the user guide: where a pixel comes from, importing the Windows resources, themes, the shell, the lab |
-| `KEYS.md` | every keyboard shortcut by owner (luxwm's configurable ones, luxshell, the start menu, the Explorer, the file dialog, luxpad, every wux program's controls), the free Super combinations |
+| `KEYS.md` | every keyboard shortcut by owner (luxwm's configurable ones, luxshell, the start menu, the Explorer, the file dialog, luxpad, luxview, every wux program's controls), the free Super combinations |
 | `LUXWM.md` | the window manager: frames (glass, msstyles, Windows Classic), EWMH, animations, the regression |
 | `NAVBAR.md` | luxnav, the Longhorn navigation bar: geometry, presets, art, the flxp integration |
 | `SHELL-DESIGN.md` | luxshell: the three shells reproduced, fact sheets, the architecture, the milestone designs |

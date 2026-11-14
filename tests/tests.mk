@@ -17,6 +17,7 @@ $(O)/tests/toolkit/%.o: tests/toolkit/%.cpp
 build/tests/%: $(O)/tests/toolkit/%.o $(NATIVE_OBJS)
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $^ $(LDLIBS)
+build/tests/luxviewtest: $(O)/apps/luxview/model_native.o   # luxview's view model, no win32
 
 $(O)/tests/w32/%.o: tests/w32/%.cpp
 	@mkdir -p $(dir $@)

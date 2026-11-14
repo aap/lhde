@@ -93,6 +93,16 @@ BOOL WINAPI FlxpSetSelectionText(BOOL primary, const WCHAR* text, INT len)
 
 BOOL WINAPI FlxpClipboardOwned(void) { return shell::xclip::owned(); }
 
+BOOL WINAPI FlxpSetFullscreen(HWND hwnd, BOOL on)
+{
+    win::Window* w = w32::window_of(hwnd);
+    if (!win::is_window(w) || !w->top) return FALSE;
+    win::set_fullscreen(w, on != FALSE);
+    return TRUE;
+}
+
+BOOL WINAPI FlxpIsFullscreen(HWND hwnd) { return win::is_fullscreen(w32::window_of(hwnd)); }
+
 BOOL WINAPI FlxpWritePng(HBITMAP bitmap, const char* path)
 {
     w32::Bitmap* b = w32::as<w32::Bitmap>((HANDLE)bitmap, w32::T_BITMAP);

@@ -211,19 +211,18 @@ int decodes() { return g_decodes; }
 static std::mutex g_turn_lock;
 static std::condition_variable g_turn_cv;
 static int g_decoding, g_decoding_most;
-struct DecodeTurn {
-    DecodeTurn()
-    {
-        std::unique_lock<std::mutex> l(g_turn_lock);
-        g_turn_cv.wait(l, [] { return g_decoding < DECODES_AT_ONCE; });
-        if (++g_decoding > g_decoding_most) g_decoding_most = g_decoding;
-    }
-    ~DecodeTurn()
-    {
-        { std::lock_guard<std::mutex> l(g_turn_lock); g_decoding--; }
-        g_turn_cv.notify_one();
-    }
-};
+DecodeTurn::DecodeTurn()
+{
+    std::unique_lock<std::mutex> l(g_turn_lock);
+    g_turn_cv.wait(l, [] { return g_decoding < DECODES_AT_ONCE; });
+    if (++g_decoding > g_decoding_most) g_decoding_most = g_decoding;
+}
+
+DecodeTurn::~DecodeTurn()
+{
+    { std::lock_guard<std::mutex> l(g_turn_lock); g_decoding--; }
+    g_turn_cv.notify_one();
+}
 int decodes_at_once_most() { std::lock_guard<std::mutex> l(g_turn_lock); return g_decoding_most; }
 
 static bool trace()

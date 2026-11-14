@@ -575,6 +575,24 @@ void set_maximized(NativeWindow* w, int action)
     root_message(w, a_state, action, (long)a_max_v, (long)a_max_h, 1, 0);
 }
 
+void set_fullscreen(NativeWindow* w, bool on)
+{
+    static Atom fs = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
+    root_message(w, a_state, on ? 1 : 0, (long)fs, 0, 1, 0);
+}
+
+bool is_fullscreen(NativeWindow* w)
+{
+    Atom fs = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
+    Atom type; int format; unsigned long count, after; unsigned char* data = nullptr;
+    bool on = false;
+    if (XGetWindowProperty(dpy, w->xw, a_state, 0, 64, False, XA_ATOM, &type, &format, &count, &after, &data) == Success && data) {
+        for (unsigned long i = 0; i < count; i++) if ((Atom)((long*)data)[i] == fs) on = true;
+        XFree(data);
+    }
+    return on;
+}
+
 void* window_user(NativeWindow* w) { return w->user; }
 
 // The Win32 cursors as the X cursor theme has them: the theme's named cursors (Xcursor: the freedesktop names, then the

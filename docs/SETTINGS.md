@@ -36,6 +36,7 @@ Two directories, one rule each. liblhde gives every path (`lhde_config_file`, `l
 | `flxp-desktop-positions` | the desktop's icon positions |
 | `flxp-mfu`, `flxp-run-history` | the start panel's launch counts, the Run box's history |
 | `luxpad.ini` | luxpad's window (`[window]` x, y, width, height, maximized) and last search (`[search]` find, replace, match_case, whole_word, down) |
+| `luxview.ini` | luxview's window (`[window]` x, y, width, height, maximized) and whether 4051's filmstrip shows (`[view]` filmstrip; docs/USAGE.md "luxview") |
 
 lhde never puts Windows files in either: they are `~/.local/share/lhde-windows` (lhde-import), the shipped text is
 `$PREFIX/share/lhde` (make install). Which program opens a type is not kept here either but in the freedesktop files every
@@ -220,7 +221,7 @@ over indented lines without `=`.
 | role | label | types | lhde's default |
 | --- | --- | --- | --- |
 | `editor` | Text editor | `text/plain` and every type below it, but other media (`image/*`, `audio/*`, `video/*`, `model/*`, `chemical/*`, `message/*`), word processors' documents (RTF, AbiWord, LyX, the flat OpenDocument files), launchers and shortcuts (`.desktop`, `.url`, JNLP, Flatpak refs), other programs' project files, fonts, signatures, bookmarks, playlists | `luxpad.desktop`, then the usual editors |
-| `images` | Image viewer | `image/*` but drawings (SVG, WMF, EMF, CGM, CAD, Xfig, Skencil), the page formats (EPS, DjVu), the editors' own files (XCF, GIMP brushes, Photoshop, OpenRaster), 3D scenes, cursors | feh, nsxiv, sxiv, eog, Loupe, ristretto, ... |
+| `images` | Image viewer | `image/*` but drawings (SVG, WMF, EMF, CGM, CAD, Xfig, Skencil), the page formats (EPS, DjVu), the editors' own files (XCF, GIMP brushes, Photoshop, OpenRaster), 3D scenes, cursors | `luxview.desktop`, then feh, nsxiv, sxiv, eog, Loupe, ristretto, ... |
 | `pdf` | Document viewer | PDF (and compressed), PostScript (and EPS), DjVu, XPS | mupdf, zathura, evince, ... |
 | `browser` | Web browser | `text/html`, `application/xhtml+xml`, `x-scheme-handler/http`, `https` | firefox, librewolf, chromium, ... |
 | `mail` | E-mail program | `x-scheme-handler/mailto`, `message/rfc822` | thunderbird, claws-mail, evolution, sylpheed |

@@ -4,7 +4,7 @@
 # failures. Tests that need assets skip when these are absent:
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
-#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, filter.sh and runas.sh setfattr
+#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, luxview.sh xprop, xwininfo and ImageMagick, filter.sh and runas.sh setfattr
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick, startmenu.sh xprop and python3, menushadow.sh
 #                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick,
 #                thumbsmem.sh ImageMagick, thumbdocs.sh ImageMagick and pdftoppm or mutool (gs, ddjvu and c44 for its PS and DjVu), nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed, xsession.sh xprop and
@@ -52,6 +52,9 @@ result "columnstest ($(tail -n 1 "$T/columns.log"))" $? "$T/columns.log"
 # the thumbnails' memory bounds (shell/thumbs.h, gdi/image.h): big pictures into small thumbnails without their full image
 build/tests/thumbstest > "$T/thumbs.log" 2>&1
 result "thumbstest ($(tail -n 1 "$T/thumbs.log"))" $? "$T/thumbs.log"
+# luxview's view model (apps/luxview/model.h): the list's order, generations, the prefetch, the budget, closing during a decode
+build/tests/luxviewtest > "$T/luxview-model.log" 2>&1
+result "luxviewtest ($(tail -n 1 "$T/luxview-model.log"))" $? "$T/luxview-model.log"
 # lhde-import's overwrite policy (kept without --force, written with it) on a scratch tree and a stand-in file
 tests/import-policy.sh > "$T/import.log" 2>&1
 result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"
@@ -165,6 +168,9 @@ else
     result "headless/luxattr.sh$(grep -m1 '^skip' "$T/luxattr.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxattr.log"
     tests/headless/luxpad.sh "$3" > "$T/luxpad.log" 2>&1; rc=$?
     result "headless/luxpad.sh$(grep -m1 '^skip' "$T/luxpad.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxpad.log"
+    # luxview: a folder with a 6000 x 4000 JPEG, the window at once, the walk, zoom, Delete, the slide show, Properties, RSS, the looks
+    tests/headless/luxview.sh "$1" > "$T/luxview.log" 2>&1; rc=$?
+    result "headless/luxview.sh$(grep -m1 '^skip' "$T/luxview.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxview.log"
     tests/headless/properties.sh "$3" > "$T/properties.log" 2>&1; rc=$?
     result "headless/properties.sh$(grep -m1 '^skip' "$T/properties.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/properties.log"
     # the window and program icons (lhde_app_icon): Open With, Properties' Opens with, luxshell's task buttons, Alt+Tab

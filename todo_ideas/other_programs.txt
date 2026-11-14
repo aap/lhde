@@ -9,11 +9,6 @@
 	drawing path at volume (owner-drawn text, caret, timers, popup list, DIB sections, alpha) that flxp's stock controls are not
 * not Notepad++: GPL-3 (incompatible with lhde's GPL-2) and 159k lines of raw Win32 (docking, subclassing, COM, plugins)
 
-## image viewer
-
-* roughly XP/longhorn-like (see lh4051-195511.png)
-* open and respond *immediately*, show images when ready
-
 ## pdf viewer
 
 * mupdf base with simple GUI for TOC and bookmarks
