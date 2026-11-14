@@ -124,7 +124,7 @@ writes `NAME.zip` beside the tarball; the tarball or the pack directory works th
    first path, the MANIFEST (one line per path) is the authority, and lhde-import annotates each imported file by its own
    path. Sources: 4015 (pre-release WIM 1.8.1), 4042 (Lab06), 4042main, 4051, 4053, 4066 (I386 layout, `*.XX_` expanded), 4074,
    4074r2 (not default), 4093, 5048, 5112, xp (Windows Server 2003 R2 x64 CD1: XP's Luna with its three schemes' shellstyle.dll,
-   shell32, explorer, fonts with the East Asian faces of font linking from `LANG/`, wallpapers), 2k (Windows 2000), reactos and free (neither default; below). Adding a file or a
+   shell32, explorer, fonts, wallpapers), 2k (Windows 2000), reactos and free (neither default; below). Adding a file or a
    build is editing or adding an ini.
    **reactos** is the free source (ReactOS 0.4.16's boot CD, `ReactOS-0.4.16-i386.iso`, GPL/LGPL): its shell32, browseui,
    comctl32, themeui and explorer.exe keep Windows' resource ids, so the xp and 2k icon recipes and flxp's art by id have a
@@ -454,10 +454,10 @@ to the family (`[SystemLink]`, `Tahoma = MS UI Gothic, Gulim, SimSun, PMingLiU`,
 `~/.config/lhde/fonts/fontlink.ini` is read instead), then fontconfig's faces for the family that have the character (the
 theme's fonts, the imported ones, ReactOS's, the system's: Noto, DejaVu, Unifont, an emoji font). The linked face is taken at
 the font's height, weight and style and drawn on its baseline, clipped to its ascent and descent, so a line keeps its height;
-the face's own glyphs do not change. The missing glyph (a box) remains only when no installed face has the character. The XP
-source imports XP's East Asian faces (msgothic.ttc, gulim.ttc, simsun.ttc, mingliu.ttc from the CD's LANG directory, 41 MB) so
-Japanese, Korean and Chinese look as on an XP with East Asian support (their hand-tuned bitmaps at 8 and 9 pt); without them
-fontconfig's CJK face (or Unifont) draws them. Emoji are monochrome, in the text colour, as GDI draws them: colour-only faces
+the face's own glyphs do not change. The missing glyph (a box) remains only when no installed face has the character. With XP's
+East Asian faces among the fonts (msgothic.ttc, gulim.ttc, simsun.ttc, mingliu.ttc) Japanese, Korean and Chinese look as on
+an XP with East Asian support (their hand-tuned bitmaps at 8 and 9 pt); without them fontconfig's CJK face (or Unifont) draws
+them. Emoji are monochrome, in the text colour, as GDI draws them: colour-only faces
 (Noto Color Emoji's bitmaps) are passed over for an outline face (Noto Emoji, DejaVu Sans, Symbola, ReactOS's Verdana). Symbol
 fonts (Marlett, Wingdings) are never linked; a default-ignorable character the face lacks (a variation selector, a zero-width
 joiner) draws nothing. luxshell's and luxnav's text (wuxtheme's GDI) takes fontconfig's faces, and the link table when the

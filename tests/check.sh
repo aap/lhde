@@ -62,9 +62,6 @@ result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"
 # Display Properties' Desktop lists (flxp-settings --list desktop, no window) on a scratch home and Windows tree
 tests/settings-lists.sh > "$T/settings-lists.log" 2>&1
 result "settings-lists ($(tail -n 1 "$T/settings-lists.log"))" $? "$T/settings-lists.log"
-# the sources' [files] rules over a medium's names: the XP source's fonts with its East Asian faces of font linking
-python3 -I tests/source-rules.py > "$T/source-rules.log" 2>&1
-result "source-rules ($(tail -n 1 "$T/source-rules.log"))" $? "$T/source-rules.log"
 # lhde-import's Aero patches (by sha256, the unknown one by its bytes) and which dropped-in styles get a frame set, stand-in files
 python3 -I tests/aero-patches.py > "$T/aero-patches.log" 2>&1
 result "aero-patches ($(tail -n 1 "$T/aero-patches.log"))" $? "$T/aero-patches.log"
