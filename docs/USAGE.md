@@ -509,7 +509,8 @@ no theme is known. A name that is not a theme is ignored (the current theme stay
 picom when the theme wants a compositor, a terminal, flxp-desktop and luxshell (docs/ARCHITECTURE.md "A running session"). The session's programs get
 `XDG_CURRENT_DESKTOP=lhde` and `DESKTOP_SESSION=lhde`, so lhde's default programs apply ("File types and programs").
 Without a flag it is a real X server on `$LHDE_DISPLAY` (default `:1`) and `$LHDE_VT` (default vt8), started with startx from a
-console login; `--nested` a Xephyr window (`LHDE_GEOMETRY=WxH`, default 1280x800) on the current display, the session inside it on
+console login, with `~/.xprofile` (the user's X setup: keyboard map, pointer devices) sourced first, as a display manager does
+before its sessions; `--nested` a Xephyr window (`LHDE_GEOMETRY=WxH`, default 1280x800) on the current display, the session inside it on
 `$LHDE_DISPLAY` or the first free display from `:2`; `--attach` the session's programs on an X server that already runs on
 `$LHDE_DISPLAY` (else `$DISPLAY`). `lhde-session xsession [THEME]` is the session a display manager runs (the X session entry
 `$PREFIX/share/xsessions/lhde.desktop`): the same programs in the foreground on the display manager's `$DISPLAY`, with a session

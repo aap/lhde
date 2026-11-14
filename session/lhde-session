@@ -8,6 +8,7 @@
 #         (default) a real X server on $LHDE_DISPLAY (default :1) and virtual terminal $LHDE_VT (default vt8), started with
 #                   startx from a console login (Xorg not setuid: log in on that tty first); Ctrl+Alt+F1 goes back,
 #                   Ctrl+C there ends the session and everything it started (the bus too)
+#                   ~/.xprofile is sourced first, as a display manager does before its sessions
 #         --nested  a Xephyr window on the current $DISPLAY (1280x800, LHDE_GEOMETRY=WxH), the session inside it on
 #                   $LHDE_DISPLAY (default: the first free display from :2)
 #         --attach  the session on an X server that already runs on $LHDE_DISPLAY (an Xvfb, a bare Xorg); nothing is started
@@ -142,7 +143,9 @@ session() {
 	# the default programs by role (settings.ini [programs], roles.ini) into the role file, so a text type installed since the
 	# last session follows its role (lhde-mime roles apply; docs/SETTINGS.md "Default programs")
 	m=$(lhde_bin lhde-mime) && [ -n "$m" ] && "$m" roles apply >/dev/null 2>&1
-	[ "$LHDE_MODE" = real ] && [ -f "$HOME/.xinit_all" ] && . "$HOME/.xinit_all"   # the user's own X startup, real sessions only
+	# the user's own X setup (keyboard map, pointer devices): ~/.xprofile, the file display managers source before a session.
+	# A real session comes from startx, which does not, so it is sourced here; an xsession's display manager already has
+	[ "$LHDE_MODE" = real ] && [ -f "$HOME/.xprofile" ] && . "$HOME/.xprofile"
 	[ -f "$HOME/.Xresources" ] && xrdb "$HOME/.Xresources" 2>/dev/null
 	# a session bus for luxshell's notification server (toasts via notify-send); a tty login has none. Ours, ended with the session
 	# (bus_stop): dbus-launch leaves one dbus-daemon per start behind, and with it an at-spi bus and an xdg-desktop-portal; a hundred
