@@ -109,6 +109,13 @@ static std::string decoded_list()
     for (const std::string& d : fake.decoded) s += (s.empty() ? "" : " ") + d;
     return s;
 }
+static int decodes_of(const char* name)
+{
+    std::lock_guard<std::mutex> l(fake.lock);
+    int n = 0;
+    for (const std::string& d : fake.decoded) n += d == name;
+    return n;
+}
 static void reset() { std::lock_guard<std::mutex> l(fake.lock); fake.decoded.clear(); fake.previews.clear(); }
 
 static void touch(const std::string& p) { FILE* f = fopen(p.c_str(), "w"); if (f) fclose(f); }
@@ -186,15 +193,17 @@ int main()
 
         // the neighbour is prefetched; Next shows it at once, decoded at the fitted size
         check("d prefetched", pump_until(v, 2000, [&] { return v.prefetched(T + "/d.jpg"); }));
-        int n0 = v.loader().decodes();
+        int d0 = decodes_of("d.jpg");
         v.next();
         check("Next: d at once", (long long)id_of("d.jpg"), (long long)shown_id(v));
         check("d is not a preview", !v.is_preview());
-        check("d needed no decode of its own", n0, v.loader().decodes());
         check("the budget: the shown and the prefetched picture", v.bytes() <= Viewer::BUDGET);
 
         // a zoom past what was decoded asks for a larger decode; the shown bitmap stays until it is in
         pump_until(v, 2000, [&] { return v.prefetched(T + "/e.jpg"); });
+        // counted once e's prefetch is in (a decode of d would have been queued before it); not the loader's count, which
+        // e's prefetch raises as soon as the loader thread takes it up, before or after next() returns
+        check("d needed no decode of its own", d0, decodes_of("d.jpg"));
         v.set_zoom(1.0);
         check("Actual Size: loading a larger decode", v.loading());
         check("the smaller one stays meanwhile", (long long)id_of("d.jpg"), (long long)shown_id(v));
