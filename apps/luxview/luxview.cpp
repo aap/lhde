@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <algorithm>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 #include "wux/wux.h"
@@ -758,27 +759,50 @@ void draw_picture(HDC dc)
 
 void thumbs_notify(void*) { PostMessageW(g.wnd, WM_THUMBS, 0, 0); }
 
-void drop_thumbs()
-{
-    for (auto& kv : g.thumb) if (kv.second) gdi::destroy_bitmap(kv.second);
-    g.thumb.clear();
-    g.thumb_asked.clear();
-    if (g.thumbs) g.thumbs_gen = g.thumbs->cancel();
-}
-
 int strip_cells() { return std::max(1, (g.cx - LH_CELL_X) / LH_CELL_W); }
 
+// the strip scrolled so that the current picture's cell shows
+void strip_follow()
+{
+    size_t n = (size_t)strip_cells(), cur = g.view->index();
+    if (cur < g.strip_first) g.strip_first = cur;
+    if (cur >= g.strip_first + n) g.strip_first = cur - n + 1;
+}
+
+// Every cell on screen gets its thumbnail: asked for once per picture (a cell whose thumbnail was dropped asks again), the
+// cells as they will be drawn. The strip asks only for what it shows, so a network folder's pictures are read whole past
+// thumbnails_network_budget (shell/thumbs.h unbudgeted): the budget would leave every cell after the first few empty.
 void ask_thumbs()
 {
     if (!g.longhorn || !g.filmstrip || g.slideshow || g.view->count() == 0) return;
     if (g.view->loading()) return;   // the picture first
-    if (!g.thumbs) { g.thumbs = new shell::thumbs::Loader(thumbs_notify, nullptr, 1); g.thumbs_gen = g.thumbs->generation(); }
+    if (!g.thumbs) {
+        g.thumbs = new shell::thumbs::Loader(thumbs_notify, nullptr, 1);
+        g.thumbs->unbudgeted();
+        g.thumbs_gen = g.thumbs->generation();
+    }
+    strip_follow();
     size_t n = (size_t)strip_cells();
     for (size_t i = g.strip_first; i < g.view->count() && i < g.strip_first + n; i++) {
         const std::string& p = g.view->files()[i];
         if (g.thumb_asked.count(p)) continue;
         g.thumb_asked[p] = true;
         g.thumbs->request(g.thumbs_gen, (int)i, p, 0, 46);
+    }
+}
+
+// past 400 thumbnails kept, those of the cells off screen go (asked for again when their cells show)
+void trim_thumbs()
+{
+    if (g.thumb.size() <= 400) return;
+    std::set<std::string> shown;
+    size_t n = (size_t)strip_cells();
+    for (size_t i = g.strip_first; i < g.view->count() && i < g.strip_first + n; i++) shown.insert(g.view->files()[i]);
+    for (auto it = g.thumb.begin(); it != g.thumb.end();) {
+        if (shown.count(it->first)) { ++it; continue; }
+        if (it->second) gdi::destroy_bitmap(it->second);
+        g.thumb_asked.erase(it->first);
+        it = g.thumb.erase(it);
     }
 }
 
@@ -829,8 +853,7 @@ void draw_filmstrip(HDC dc)
     if (!g.longhorn || !g.filmstrip || g.slideshow) return;
     int n = strip_cells();
     size_t cur = g.view->index();
-    if (cur < g.strip_first) g.strip_first = cur;
-    if (cur >= g.strip_first + (size_t)n) g.strip_first = cur - (size_t)n + 1;
+    strip_follow();
     int top = g.cy - LH_STRIP;
     for (int k = 0; k < n && g.strip_first + (size_t)k < g.view->count(); k++) {
         size_t i = g.strip_first + (size_t)k;
@@ -1226,13 +1249,14 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         bool any = false;
         while (g.thumbs && g.thumbs->take(r)) {
             auto it = g.thumb.find(r.path);
+            if (it != g.thumb.end() && it->second && !r.bmp) { shell::thumbs::free_result(r); continue; }   // the EXIF thumbnail stays
             if (it != g.thumb.end() && it->second) gdi::destroy_bitmap(it->second);
             g.thumb[r.path] = r.bmp;
             r.bmp = nullptr;
             shell::thumbs::free_result(r);
             any = true;
         }
-        if (g.thumb.size() > 400) drop_thumbs();
+        trim_thumbs();
         if (any) InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
     }

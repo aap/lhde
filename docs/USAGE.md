@@ -1053,7 +1053,9 @@ by libjpeg and resampled, never held whole). A run of Next never shows an older 
 the window while a picture decodes is safe. When the picture is complete, the next one in the direction you walk is decoded
 too, so Next shows it at once; the two stay within 64 MB at the fitted size. Zooming in past what was decoded decodes it
 larger (up to its own size, 32 megapixels at most; beyond that it is magnified); back at Best Fit a picture decoded larger
-than 64 MB is replaced by one of the window's size.
+than 64 MB is replaced by one of the window's size. The filmstrip's thumbnails are the Explorer's (the shared cache, else
+made and saved), asked for the cells on screen as they show; on a network mount those are read whole even past
+`thumbnails_network_budget`, which bounds what a folder view of thousands reads, not a strip of a dozen cells.
 
 - **Previous / Next**: Left / Right, Page Up / Page Down, the mouse wheel (as XP's), Backspace / Space; Home and End the first
   and the last picture. The walk wraps around at the ends.

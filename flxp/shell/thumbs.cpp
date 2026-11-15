@@ -808,6 +808,7 @@ struct Loader::Impl {
     std::atomic<bool> stop{false};  // the destructor: a running thumbnailer is killed
     std::string budget_dir;         // the folder the budget is being spent on
     uint64_t budget = 64u << 20, spent = 0;
+    bool bounded = true;            // unbudgeted(): false
     void run();
     bool charge(uint64_t bytes);    // within the budget: spent (true), else false
     void finish(const Job& job, Result& r);
@@ -816,7 +817,7 @@ struct Loader::Impl {
 bool Loader::Impl::charge(uint64_t bytes)
 {
     std::lock_guard<std::mutex> l(lock);
-    if (spent + bytes > budget) return false;
+    if (bounded && spent + bytes > budget) return false;
     spent += bytes;
     return true;
 }
@@ -831,6 +832,12 @@ void Loader::Impl::finish(const Job& job, Result& r)
         done.push_back(r);
     }
     if (wake && notify) notify(ctx);   // one wake-up per batch: the UI takes everything there is
+}
+
+void Loader::unbudgeted()
+{
+    std::lock_guard<std::mutex> l(impl_->lock);
+    impl_->bounded = false;
 }
 
 uint64_t Loader::spent() const

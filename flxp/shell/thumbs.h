@@ -131,6 +131,9 @@ public:
     bool busy() const;              // jobs queued or being made
     bool take(Result& out);         // UI thread: next finished result (free_result it)
     uint64_t spent() const;         // bytes of network files read whole for the current folder
+    // No budget: every network file's full decode is made (still after every request's cache and EXIF stage), for a
+    // caller that asks only for what it shows (luxview's filmstrip), where a cell past the budget would stay empty
+    void unbudgeted();
     struct Impl;                    // the threads (kept out of here: <thread> and win32's min/max)
 private:
     Impl* impl_;
