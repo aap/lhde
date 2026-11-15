@@ -222,7 +222,9 @@ struct lhcat__walk {
     void *ctx;
     int64_t scan, started;              /* the scan and its start (ms) */
     int64_t last_commit, last_progress;
-    dev_t dev;
+    struct lhcat__scope scope;          /* the root's device, the mount points below it, the excludes */
+    int64_t deadline;                   /* ms: the time limit's end (0 none) */
+    sqlite3_stmt *mark, *mark_under;
     char *cursor;                       /* resuming: the last entry the scan committed */
     char last[PATH_MAX];                /* the last entry done (with what is under it) */
     const char *sub;
@@ -235,8 +237,8 @@ struct lhcat__walk {
     int kill;
 };
 
-static volatile sig_atomic_t g_stop;
-void lhcat_interrupt(void) { g_stop = 1; }
+volatile sig_atomic_t lhcat__stop;
+void lhcat_interrupt(void) { lhcat__stop = 1; }
 
 static int walk_init(lhcat *c, struct lhcat__walk *w, const struct lhcat_index_opts *o)
 {
@@ -272,10 +274,51 @@ static int walk_init(lhcat *c, struct lhcat__walk *w, const struct lhcat_index_o
     w->dups = lhcat__prepare(c, "SELECT object_id FROM hashes WHERE full = ?1 AND object_id != ?2 LIMIT 16");
     /* the writes a replaced file's old object was waiting for: the user decides */
     w->orphan = lhcat__prepare(c, "UPDATE attrs SET pending = 'conflict' WHERE object_id = ?1 AND pending = 'write'");
+    /* an entry not walked: excluded, or a mount point not entered */
+    w->mark = lhcat__prepare(c, "UPDATE locations SET kind = ?2, state = ?3, observed_at = ?4, coverage = 0 WHERE id = ?1");
+    /* what was under a directory that is not walked any more */
+    w->mark_under = lhcat__prepare(c, "WITH RECURSIVE under(id) AS (SELECT id FROM locations WHERE parent = ?1 UNION ALL"
+                                      " SELECT x.id FROM under u JOIN locations x ON x.parent = u.id)"
+                                      " UPDATE locations SET state = 'excluded' WHERE id IN (SELECT id FROM under) AND state = 'present'");
     if (!w->sel || !w->seen || !w->facts || !w->newobj || !w->relate || !w->moves || !w->pic || !w->nopic || !w->thumb ||
-        !w->nothumb || !w->hash || !w->dups || !w->orphan)
+        !w->nothumb || !w->hash || !w->dups || !w->orphan || !w->mark || !w->mark_under)
         return -1;
     return lhcat__exec(c, "CREATE TEMP TABLE IF NOT EXISTS lhcat_gone(id INTEGER PRIMARY KEY)");
+}
+
+/* the entry name under parent recorded as not walked: kind 'm' (a mount point) or state 'excluded'; what a location
+   there had under it is excluded too */
+static int mark(lhcat *c, struct lhcat__walk *w, int64_t parent, const char *name, char kind, const char *state)
+{
+    int64_t id = 0;
+    int had_children = 0;
+    sqlite3_reset(w->sel);
+    sqlite3_bind_int64(w->sel, 1, parent);
+    sqlite3_bind_text(w->sel, 2, name, -1, SQLITE_STATIC);
+    if (sqlite3_step(w->sel) == SQLITE_ROW) {
+        id = sqlite3_column_int64(w->sel, 0);
+        const char *k = (const char *)sqlite3_column_text(w->sel, 7);
+        const char *s = (const char *)sqlite3_column_text(w->sel, 9);
+        had_children = k && k[0] == 'd' && s && !strcmp(s, "present");
+    }
+    sqlite3_reset(w->sel);
+    if (!id && !lhcat__new_location(c, parent, name, strlen(name), kind, &id)) return -1;
+    char ks[2] = { kind, 0 };
+    sqlite3_reset(w->mark);
+    sqlite3_bind_int64(w->mark, 1, id);
+    sqlite3_bind_text(w->mark, 2, ks, 1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(w->mark, 3, state, -1, SQLITE_STATIC);
+    sqlite3_bind_int64(w->mark, 4, lhcat__now_ms() > w->started ? lhcat__now_ms() : w->started);
+    int ok = sqlite3_step(w->mark) == SQLITE_DONE;
+    sqlite3_reset(w->mark);
+    if (ok && had_children) {
+        sqlite3_reset(w->mark_under);
+        sqlite3_bind_int64(w->mark_under, 1, id);
+        ok = sqlite3_step(w->mark_under) == SQLITE_DONE;
+        sqlite3_reset(w->mark_under);
+    }
+    lhcat__forget(c, id);
+    return ok ? 0 : lhcat__dbfail(c, name);
 }
 
 static void helper_stop(struct lhcat__walk *w)
@@ -290,10 +333,11 @@ static void helper_stop(struct lhcat__walk *w)
 static void walk_done(struct lhcat__walk *w)
 {
     sqlite3_stmt *all[] = { w->sel, w->seen, w->facts, w->newobj, w->relate, w->moves, w->pic, w->nopic, w->thumb,
-                            w->nothumb, w->hash, w->dups, w->orphan };
+                            w->nothumb, w->hash, w->dups, w->orphan, w->mark, w->mark_under };
     for (size_t i = 0; i < sizeof all / sizeof all[0]; i++) sqlite3_finalize(all[i]);
     helper_stop(w);
     free(w->cursor);
+    lhcat__scope_free(&w->scope);
 }
 
 /* ---- the thumbnail helper (flxp-thumb, a coprocess: a path a line in, "made|cached PATH" or "fail" a line out) ----- */
@@ -652,7 +696,6 @@ static int is_ancestor(const char *dir, const char *path)
     return !n || (!strncmp(dir, path, n) && path[n] == '/');
 }
 
-static int name_cmp(const void *a, const void *b) { return strcmp(*(char *const *)a, *(char *const *)b); }
 
 static int scan_update(lhcat *c, struct lhcat__walk *w, const char *status, const char *cursor)
 {
@@ -697,44 +740,37 @@ static void join(char *out, size_t n, const char *a, const char *b)
 /* 1 stopped (interrupted), 0 done, -1 an error */
 static int walk_dir(lhcat *c, struct lhcat__walk *w, int64_t dir, const char *rel, const char *abs)
 {
-    DIR *d = opendir(abs);
-    if (!d) { w->p.unreadable++; return 0; }   /* not listed: nothing under it is taken as gone */
-    char **names = NULL;
-    size_t n = 0, cap = 0;
-    struct dirent *e;
-    int whole = 1;
-    errno = 0;
-    while ((e = readdir(d))) {
-        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
-        if (n == cap) {
-            cap = cap ? cap * 2 : 64;
-            char **m = realloc(names, cap * sizeof *m);
-            if (!m) { whole = 0; break; }
-            names = m;
-        }
-        if ((names[n] = strdup(e->d_name))) n++; else whole = 0;
-    }
-    if (errno) whole = 0;
-    closedir(d);
-    if (n) qsort(names, n, sizeof *names, name_cmp);
+    struct dent_list l;
+    if (lhcat__list_dir(abs, &l) != 0) { w->p.unreadable++; return 0; }   /* not listed: nothing under it is taken as gone */
+    int whole = l.whole;
     int rc = 0;
-    for (size_t i = 0; i < n && rc == 0; i++) {
-        if (g_stop) { rc = 1; w->p.interrupted = 1; break; }
+    for (size_t i = 0; i < l.n && rc == 0; i++) {
+        if (lhcat__stop) { rc = 1; w->p.interrupted = 1; break; }
+        if (w->deadline && lhcat__now_ms() >= w->deadline) { rc = 1; w->p.interrupted = w->p.out_of_time = 1; break; }
+        const char *name = l.v[i].name;
         char crel[PATH_MAX], cabs[PATH_MAX];
-        join(crel, sizeof crel, rel, names[i]);
-        snprintf(cabs, sizeof cabs, "%s/%s", abs, names[i]);
+        join(crel, sizeof crel, rel, name);
+        snprintf(cabs, sizeof cabs, "%s/%s", abs, name);
         if (w->cursor) {
             if (is_ancestor(crel, w->cursor)) ;                           /* on the way back to where it stopped */
             else if (walk_cmp(crel, w->cursor) <= 0) continue;            /* done before the interruption */
             else { free(w->cursor); w->cursor = NULL; }                   /* from here on as a fresh walk */
         }
         struct stat st;
-        if (lstat(cabs, &st) != 0) { whole = 0; continue; }
+        int have = 0;
+        char kind, glob[8];
+        int what = lhcat__classify(&w->scope, crel, cabs, l.v[i].type, 1, &st, &have, &kind, glob, sizeof glob);
+        if (what < 0) { whole = 0; continue; }
         int64_t id = 0;
         w->p.files++;
-        if (lhcat__entry(c, w, dir, names[i], crel, cabs, &st, 0, &id)) { rc = -1; break; }
-        progress(w, crel, 0);
-        if (S_ISDIR(st.st_mode) && st.st_dev == w->dev) rc = walk_dir(c, w, id, crel, cabs);
+        if (what != LHCAT__WALK) {   /* recorded, not walked */
+            if (what == LHCAT__EXCLUDED) w->p.excluded++; else w->p.mounts++;
+            if (mark(c, w, dir, name, what == LHCAT__MOUNT ? 'm' : kind, what == LHCAT__MOUNT ? "present" : "excluded")) { rc = -1; break; }
+        } else {
+            if (lhcat__entry(c, w, dir, name, crel, cabs, &st, 0, &id)) { rc = -1; break; }
+            progress(w, crel, 0);
+            if (S_ISDIR(st.st_mode)) rc = walk_dir(c, w, id, crel, cabs);
+        }
         if (rc == 0) snprintf(w->last, sizeof w->last, "%s", crel);
         if (rc == 0 && maybe_commit(c, w, crel)) rc = -1;
         if (rc == 0 && w->stop_after && w->p.files >= w->stop_after) {
@@ -742,8 +778,7 @@ static int walk_dir(lhcat *c, struct lhcat__walk *w, int64_t dir, const char *re
             lhcat_interrupt();
         }
     }
-    for (size_t i = 0; i < n; i++) free(names[i]);
-    free(names);
+    lhcat__free_dents(&l);
     if (rc == 0 && whole) {   /* this directory was listed whole in this scan: what it lacks may be gone at the end */
         sqlite3_stmt *st = lhcat__prepare(c, "UPDATE locations SET listed_in = ?2 WHERE id = ?1");
         if (!st) return -1;
@@ -811,10 +846,9 @@ int lhcat_index(lhcat *c, const char *subpath, const struct lhcat_index_opts *o,
     snprintf(sub, sizeof sub, "%s", subpath ? subpath : "");
     while (strlen(sub) && sub[strlen(sub) - 1] == '/') sub[strlen(sub) - 1] = 0;
     w.sub = sub;
-    struct stat rs;
-    if (stat(c->root, &rs) != 0) { walk_done(&w); return lhcat__fail(c, "%s: %s", c->root, strerror(errno)); }
-    w.dev = rs.st_dev;
-    g_stop = 0;
+    if (lhcat__scope_init(c, &w.scope, o)) { walk_done(&w); return -1; }
+    if (o && o->time_limit_ms > 0) w.deadline = lhcat__now_ms() + o->time_limit_ms;
+    lhcat__stop = 0;
     int rc = -1;
     if (lhcat__exec(c, "BEGIN IMMEDIATE")) { walk_done(&w); return -1; }
     /* an unfinished scan of the same subpath goes on where it stopped, with its start time */

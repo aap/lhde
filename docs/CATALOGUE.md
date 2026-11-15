@@ -22,8 +22,9 @@ holds the thumbnails of an index run with `--self-contained`. The databases use 
 - **Objects** (`objects`) are the catalogue's own identities. Everything the file system says is evidence about them, never
   their identity.
 - **Locations** (`locations`) are paths under the root, each the location of one object, with the facts last observed
-  there: kind (`f`, `d`, `l`, `o`), `size` (the length, from stat), `usage_kib` (the disk usage, from a du listing), mtime,
-  ctime (nanoseconds), dev, ino, `type` (MIME), `observed_at`, `state` (`present` or `gone`) and `coverage`. The path is the
+  there: kind (`f`, `d`, `l`, `o`; `m` a mount point the walk did not enter), `size` (the length, from stat), `usage_kib`
+  (the disk usage, from a du listing), mtime, ctime (nanoseconds), dev, ino, `type` (MIME), `observed_at`, `state`
+  (`present`, `gone`, or `excluded`: not walked, see "What a walk enters") and `coverage`. The path is the
   chain of parent locations' names (`parent`, `name`; the root's own location has parent 0 and the name ""), which keeps a
   7-million-row listing to about 180 bytes a row.
 - **Coverage** is a bit mask of what a location's facts are based on: 1 listed (a du listing), 2 statted, 4 typed, 8 its
@@ -121,21 +122,53 @@ All three are incremental and can run again at any time.
    directory's location and never summed; the root's (the `.` line) is the root's total. A location an index has stat'ed
    keeps its facts; a listed-only location the listing no longer has is marked gone. Paths are kept as the bytes they are.
    It commits every 10,000 lines, so `find` works on what is in while it runs.
-2. **`lhde-cat index NAME [SUBPATH]`** walks the root, one entry at a time, on its own file system (it does not cross into
-   other mounts): an entry whose size, mtime, ctime and inode are the location's is not read again (only its observed time;
+2. **`lhde-cat index NAME [SUBPATH]`** walks the root, one entry at a time, on its own file system and outside the excluded
+   paths (see "What a walk enters"): an entry whose size, mtime, ctime and inode are the location's is not read again (only its observed time;
    the ctime is what changes when an attribute changes). A new or changed entry gets its type, its attributes observed and,
    for a picture, its facts; `--hash` and `--thumbs` add those. `--budget MB` bounds the bytes of file contents read (EXIF,
-   sniffing, hashes, thumbnails; stat and attributes are free): what the budget leaves out is done by a later run. A
-   progress line on a terminal; Ctrl+C stops at the next entry, and the next index resumes.
+   sniffing, hashes, thumbnails; stat and attributes are free): what the budget leaves out is done by a later run.
+   `--time MIN` stops after MIN minutes of wall clock (exit status 124) and the next index resumes. A progress line on a
+   terminal; Ctrl+C stops at the next entry (exit status 130), and the next index resumes.
 3. **`lhde-cat touch PATH...`** observes the given files again whatever their stat says (what a program calls after its own
    writes; flxp does it through the library), and marks a path that is not there any more gone.
+
+### What a walk enters
+
+A root may be a home directory, with other machines' file systems mounted in it and caches nobody wants catalogued, so an
+index decides for each entry before it looks at it:
+
+- **One file system** (`--one-fs`, the default): a mount point below the root is not entered. The mount points are read
+  from the system's mount table (`/proc/self/mountinfo`, FreeBSD's `getmntinfo`) before the walk, so one is recognised by
+  its path and never stat'ed (a stat of an NFS mount's root already asks the server); a directory whose device is not the
+  root's is one too. A mount point is recorded as a location of kind `m`, coverage 0 (not entered), and nothing under it.
+  `--cross-fs` walks into them as into any directory.
+- **Excludes**: globs matched against the path relative to the root, the root's list (`roots.excludes`) and the run's
+  (`index --exclude GLOB`, repeatable). Like `.gitignore` but always anchored at the root: `n/` is the directory `n` at the
+  top only; `*` and `?` stay within a name, `[...]` is a set, `**/` any number of whole names (`**/node_modules/` at any
+  depth, `src/**` all under src), a trailing `/` only directories, a line starting with `#` a comment. An excluded entry
+  is recorded as a location with state `excluded` (kind from the directory listing, no stat, no attributes) and not
+  walked; what an earlier walk had found under it becomes `excluded` too. An excluded location is never marked gone, and
+  `find` leaves it out like a gone one; when its glob is dropped the next index walks it again, as present, with the same
+  objects.
+- A new root over the user's home directory (`$HOME` or the password entry's) gets the default list: `.cache/`,
+  `.local/share/Trash/`, `.thumbnails/`, `**/node_modules/`. Others get none. `lhde-cat excludes NAME` prints the list,
+  `lhde-cat excludes NAME +GLOB -GLOB` adds and removes, `add-root ... --exclude GLOB` adds when the root is made.
+- **`index NAME --dry-run`** writes nothing: it lists each entry directly under the root (or SUBPATH) with what the walk
+  would do with it (excluded by which glob, a mount point not entered, or the counts of entries and directories it would
+  walk under it with the excluded ones and mount points there), names and kinds from the directory listings, a directory
+  stat'ed only to compare its device. The way to look at a first run on a home before making it.
+- `stats` lists what was not walked (the mount points, the top of each excluded subtree), the root's excludes, and every
+  mount point of the system's table below the root with what the catalogue knows of it: `not entered`, `under an
+  excluded directory, not entered`, `excluded, not entered`, `entered (--cross-fs)` or `not reached yet`.
 
 An **offline** root (`add-root NAME PATH --offline`) is one whose PATH is not reachable from here, such as a listing made on
 another machine: it is filled by import-du only; `add-root NAME REALPATH` later gives it its real path.
 
 ## Using it
 
-    lhde-cat add-root NAME PATH [--authority filesystem|catalogue] [--offline]
+    lhde-cat add-root NAME PATH [--authority filesystem|catalogue] [--offline] [--exclude GLOB]...
+    lhde-cat excludes NAME [+GLOB|-GLOB]...
+    lhde-cat index NAME [SUBPATH] [--exclude GLOB]... [--cross-fs] [--time MIN] [--dry-run] [--budget MB] [--thumbs 128|256] ...
     lhde-cat roots
     lhde-cat find NAME [--tag T] [--no-tag T [--include-unknown]] [--desc TEXT] [--text WORDS] [--type image/*]
                        [--since DATE] [--until DATE] [--color C] [--in SUBPATH] [--files|--dirs] [--limit N] [--json]
@@ -171,7 +204,8 @@ file observed again), so the catalogue follows flxp's edits. Nothing else in flx
 ## Schema and versions
 
 `migrations(version, applied_at, what)` records the schema versions applied; a database is migrated on open and a newer
-one than the program knows is refused. The tables: `roots` (name, path, host, authority, offline, added_at, listed_at,
+one than the program knows is refused (version 2 widened the state check of `locations` in place, no rows rewritten).
+The tables: `roots` (name, path, host, authority, offline, excludes, added_at, listed_at,
 indexed_at), `objects`, `locations`, `relations`, `hashes`, `attrs`, `tags`, `picture`, `thumbs`, `journal`, `scans`, the
 FTS5 table `text`. Indices: locations by (parent, name) (unique), name, type, object and inode; attrs by (name, desired)
 and pending; tags by (tag, object) and object; picture by taken_at; hashes by full hash; journal by object and time.
@@ -179,7 +213,7 @@ and pending; tags by (tag, object) and object; picture by taken_at; hashes by fu
 Measured on this machine: a generated 2,000,000-line listing imports at about 230,000 lines a second (9 s); `find --tag`
 over it answers in 5 ms with the paths; aap's 7.1-million-line stash listing (650 MB) imports in 35 s (200,000 lines a second; again over
 the same rows in 19 s) into a 1.26 GB database, whose root total is the listing's `.` line, 4.86 TiB. `LHCAT_COMMIT_MS` changes the time between an index's commits
-and `LHCAT_TEST_STOP=N` (or `kill:N`) stops (or kills) an index after N entries, for the tests. `make check-liblhcat` (`tests/catalogue.sh`, `liblhcat/tests/cat.c`) checks all of the above on a scratch root.
+and `LHCAT_TEST_STOP=N` (or `kill:N`) stops (or kills) an index after N entries, `LHCAT_TEST_NO_MOUNTTAB` leaves the mount table out (the device comparison alone), for the tests. `make check-liblhcat` (`tests/catalogue.sh`, `liblhcat/tests/cat.c`) checks all of the above on a scratch root.
 
 ## Not there yet
 

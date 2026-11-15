@@ -26,7 +26,8 @@ command -v setfattr > /dev/null && command -v getfattr > /dev/null || { echo "sk
 R=$T/root
 mkdir -p "$R/docs/sub" "$R/pics/2019" "$R/pics/2021"
 touch "$T/x" && setfattr -n user.t -v 1 "$T/x" 2> /dev/null || { echo "skip: no user attributes on $T"; exit 0; }
-db() { python3 -c 'import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); print("\n".join("|".join("" if v is None else str(v) for v in r) for r in c.execute(sys.argv[2])))' "$T/state/lhde/catalogue/t.db" "$1"; }
+db_of() { python3 -c 'import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); print("\n".join("|".join("" if v is None else str(v) for v in r) for r in c.execute(sys.argv[2])))' "$T/state/lhde/catalogue/$1.db" "$2"; }
+db() { db_of t "$1"; }
 
 # ---- the scratch root ------------------------------------------------------------------------------------------------
 i=0
@@ -227,6 +228,71 @@ $B add-root off /nonexistent/tree --offline > /dev/null || no "offline add-root"
 $B import-du off "$T/off.txt" --quiet > /dev/null || no "offline import-du"
 eq "offline find" "a/b.jpg" "$($B find off --type image/jpeg --quiet)"
 $B index off --quiet > /dev/null 2>&1 && no "an offline root is not indexed" || ok
+
+# ---- a home directory: excludes, mount points, the dry run, the time limit -------------------------------------------
+H2=$T/home
+mkdir -p "$H2/.cache/fonts" "$H2/.local/share/Trash/files" "$H2/n/indra" "$H2/n/stash" "$H2/src/app/node_modules/left-pad" \
+         "$H2/src/app/build" "$H2/src/lib/build" "$H2/docs" "$H2/mnt"
+for f in .cache/fonts/a .local/share/Trash/files/old src/app/node_modules/left-pad/index.js src/app/build/app.o \
+         src/lib/build/lib.o src/app/main.c src/lib/lib.c docs/one.txt docs/two.txt n/readme; do echo x > "$H2/$f"; done
+out=$(HOME=$H2 $B add-root home "$H2")
+has "a home root gets the default excludes" ".cache/  .local/share/Trash/  .thumbnails/  **/node_modules/" "$out"
+eq "excludes NAME +GLOB" "$(printf '.cache/\n.local/share/Trash/\n.thumbnails/\n**/node_modules/\nn/')" "$($B excludes home +n/)"
+eq "excludes NAME -GLOB" "$(printf '.cache/\n.local/share/Trash/\n**/node_modules/\nn/')" "$($B excludes home -.thumbnails/)"
+$B add-root plain "$R/docs" > /dev/null
+eq "another root: no excludes" "" "$($B excludes plain)"
+plan=$($B index home --dry-run --exclude '**/build/' | tr -s ' ')
+has "dry run: an excluded top-level directory" " .cache excluded (.cache/)" "$plan"
+has "dry run: counts under a walked one" " src 5 entries 3 dirs, 3 excluded" "$plan"
+has "dry run: the total" "11 entries would be walked (7 directories), 6 excluded" "$plan"
+eq "dry run writes nothing" "1" "$(db_of home "SELECT count(*) FROM locations")"
+out=$($B index home --exclude '**/build/' --quiet)
+has "index: what was not walked" "not walked: 6 excluded, 0 mount points" "$out"
+eq "excluded directories recorded, not walked" ".cache|d Trash|d build|d build|d n|d node_modules|d" "$(db_of home "SELECT name || '|' || kind FROM locations WHERE state = 'excluded' ORDER BY name" | tr '\n' ' ' | sed 's/ $//')"
+eq "nothing under an excluded directory" "0" "$(db_of home "SELECT count(*) FROM locations WHERE name IN ('a', 'old', 'index.js', 'app.o', 'lib.o', 'readme')")"
+eq "find leaves them out" "" "$($B find home --in src --quiet | grep -e build -e node_modules)"
+has "stats: not walked" " src/app/build excluded" "$($B stats home | tr -s ' ')"
+$B index home --quiet > /dev/null
+eq "a glob dropped: walked again" "present|present" "$(db_of home "SELECT group_concat(state, '|') FROM locations WHERE name = 'app.o' OR (name = 'build' AND parent = (SELECT id FROM locations WHERE name = 'app'))")"
+eq "the object kept" "1" "$(db_of home "SELECT count(*) FROM locations WHERE name = 'app.o' AND state = 'present'")"
+$B index home --exclude 'src/' --quiet > /dev/null
+eq "newly excluded: what was under it too" "excluded|excluded" "$(db_of home "SELECT group_concat(DISTINCT state) FROM locations WHERE name IN ('src', 'main.c')")|$(db_of home "SELECT state FROM locations WHERE name = 'lib.c'")"
+$B index home --quiet > /dev/null
+eq "and back" "present" "$(db_of home "SELECT state FROM locations WHERE name = 'lib.c'")"
+eq "no gone ones on the way" "0" "$(db_of home "SELECT count(*) FROM locations WHERE state = 'gone'")"
+# the time limit: stops after the first entry, the next index resumes and finishes
+mkdir "$H2/docs/many" && (cd "$H2/docs/many" && touch $(seq -f f%g.txt 2000))
+$B index home --time 0.00001 --quiet > "$T/tl"; st=$?
+eq "--time: stopped (exit 124)" "124" "$st"
+has "--time: said" "stopped at the time limit" "$(cat "$T/tl")"
+out=$($B index home --quiet); st=$?
+has "--time: resumed" "(resumed)" "$out"
+eq "--time: finished" "0|complete" "$st|$(db_of home "SELECT status FROM scans ORDER BY id DESC LIMIT 1")"
+# mount points (in a user namespace with a tmpfs over n/indra): recorded, not entered; --cross-fs enters
+$B excludes home -n/ > /dev/null
+if unshare -rm true 2> /dev/null; then
+    cat > "$T/ns.sh" <<'EOF'
+q() { python3 -c 'import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); print(c.execute(sys.argv[2]).fetchone()[0])' "$DB" "$1"; }
+mount -t tmpfs none "$H2/n/indra" || exit 3
+echo remote > "$H2/n/indra/remote.txt"
+echo "plan: $($B index home --dry-run | grep '^  n ' | tr -s ' ')"
+echo "index: $($B index home --quiet | grep 'not walked')"
+echo "kind=$(q "SELECT kind || state || coverage FROM locations WHERE name = 'indra'")"
+echo "under=$(q "SELECT count(*) FROM locations WHERE name = 'remote.txt'")"
+echo "stats: $($B stats home | grep '^  n/indra ' | tr -s ' ')"
+echo "by device: $(LHCAT_TEST_NO_MOUNTTAB=1 $B index home --quiet | grep 'not walked')"
+$B index home --cross-fs --quiet > /dev/null
+echo "cross=$(q "SELECT count(*) FROM locations WHERE name = 'remote.txt' AND state = 'present'")"
+EOF
+    ns=$(B=$B H2=$H2 DB=$T/state/lhde/catalogue/home.db unshare -rm sh "$T/ns.sh" 2>&1)
+    has "a mount point in the dry run" " n 3 entries 2 dirs, 1 mounts not entered" "$ns"
+    has "a mount point not entered" "index: not walked: 3 excluded, 1 mount points not entered" "$ns"
+    has "recorded as kind m, coverage 0" "kind=mpresent0" "$ns"
+    has "nothing under it" "under=0" "$ns"
+    has "stats: the mount table" " n/indra tmpfs not entered" "$ns"
+    has "by its device when the table does not say" "by device: not walked: 3 excluded, 1 mount points not entered" "$ns"
+    has "--cross-fs enters it" "cross=1" "$ns"
+else echo "note: no user namespaces: the mount point checks are skipped"; fi
 
 # ---- liblhcat's own -------------------------------------------------------------------------------------------------
 mkdir -p "$T/perf"

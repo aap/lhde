@@ -14,12 +14,20 @@
 
 static const char *USAGE =
     "usage: lhde-cat COMMAND ...\n"
-    "  add-root NAME PATH [--authority filesystem|catalogue] [--offline]   a root over a directory (or a mount);\n"
-    "                                            --offline: PATH is not reachable here (a listing of another machine's)\n"
+    "  add-root NAME PATH [--authority filesystem|catalogue] [--offline] [--exclude GLOB]...\n"
+    "                                            a root over a directory (or a mount); --offline: PATH is not reachable\n"
+    "                                            here (a listing of another machine's); a home directory gets the default\n"
+    "                                            excludes (" ".cache/ .local/share/Trash/ .thumbnails/ **/node_modules/)\n"
     "  roots                                     the roots and their paths\n"
+    "  excludes NAME [+GLOB|-GLOB]...            the root's exclude globs (relative to the root, a trailing / for\n"
+    "                                            directories, ** any depth), with some added or removed\n"
     "  import-du NAME FILE [--block BYTES]       a du -a listing (FILE - for stdin) as listed-only locations\n"
     "  index NAME [SUBPATH] [--thumbs 128|256] [--self-contained] [--sniff] [--hash] [--budget MB] [--restart] [--quiet]\n"
-    "                                            scan the root (or SUBPATH); an unfinished scan resumes\n"
+    "           [--exclude GLOB]... [--cross-fs|--one-fs] [--time MIN] [--dry-run]\n"
+    "                                            scan the root (or SUBPATH); an unfinished scan resumes. It stays on the\n"
+    "                                            root's file system (--one-fs) unless --cross-fs; --time stops after MIN\n"
+    "                                            minutes (the next index resumes); --dry-run counts what would be walked\n"
+    "                                            under each top-level entry and writes nothing\n"
     "  touch PATH...                             observe these files again (after a write)\n"
     "  hash PATH...                              hash these files now\n"
     "  find NAME [--tag T] [--no-tag T [--include-unknown]] [--desc TEXT] [--text WORDS] [--type image/*]\n"
@@ -110,6 +118,14 @@ static void print_root(void *ctx, const char *name, const char *path)
 static double g_t0;
 static int g_quiet;
 
+/* a list of one item a line on one line, after title */
+static void print_list(const char *title, const char *list)
+{
+    fputs(title, stdout);
+    for (const char *p = list; *p; p++) fputs(*p == '\n' ? "  " : (char[2]){ *p, 0 }, stdout);
+    putchar('\n');
+}
+
 static void du_progress(void *ctx, const struct lhcat_progress *p)
 {
     (void)ctx;
@@ -155,11 +171,35 @@ static void index_progress(void *ctx, const struct lhcat_progress *p)
             p->bytes_read / 1e6, p->current ? p->current : "");
 }
 
+struct plan_ctx { uint64_t entries, dirs, excluded, mounts, unreadable; };
+
+static void print_plan(void *ctx, const struct lhcat_plan *e)
+{
+    struct plan_ctx *pc = ctx;
+    if (e->what == 1) printf("  %-40s excluded (%s)\n", e->name, e->glob ? e->glob : "");
+    else if (e->what == 2) printf("  %-40s a mount point, not entered\n", e->name);
+    else if (e->kind != 'd') printf("  %-40s %c\n", e->name, e->kind);
+    else {
+        printf("  %-40s %10llu entries %9llu dirs", e->name, (unsigned long long)e->entries, (unsigned long long)e->dirs);
+        if (e->excluded) printf(", %llu excluded", (unsigned long long)e->excluded);
+        if (e->mounts) printf(", %llu mounts not entered", (unsigned long long)e->mounts);
+        if (e->unreadable) printf(", %llu unreadable", (unsigned long long)e->unreadable);
+        putchar('\n');
+    }
+    pc->entries += e->entries;
+    pc->dirs += e->dirs;
+    pc->excluded += e->excluded + (e->what == 1);
+    pc->mounts += e->mounts + (e->what == 2);
+    pc->unreadable += e->unreadable;
+}
+
 static int cmd_index(int argc, char **argv)
 {
     if (argc < 1) return usage();
     struct lhcat_index_opts o = { 0 };
     const char *sub = "";
+    char excl[8192] = "";
+    int dry = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--thumbs") && i + 1 < argc) o.thumbs = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--self-contained")) o.self_contained = 1;
@@ -169,15 +209,39 @@ static int cmd_index(int argc, char **argv)
         else if (!strcmp(argv[i], "--restart")) o.restart = 1;
         else if (!strcmp(argv[i], "--quiet")) g_quiet = 1;
         else if (!strcmp(argv[i], "--thumb-helper") && i + 1 < argc) o.thumb_helper = argv[++i];
+        else if (!strcmp(argv[i], "--exclude") && i + 1 < argc) {
+            size_t k = strlen(excl), m = strlen(argv[++i]);
+            if (k + m + 2 > sizeof excl) return fail("too many --exclude globs", NULL, NULL);
+            snprintf(excl + k, sizeof excl - k, "%s%s", k ? "\n" : "", argv[i]);
+        }
+        else if (!strcmp(argv[i], "--cross-fs")) o.cross_fs = 1;
+        else if (!strcmp(argv[i], "--one-fs")) o.cross_fs = 0;
+        else if (!strcmp(argv[i], "--time") && i + 1 < argc) { double ms = atof(argv[++i]) * 60000; o.time_limit_ms = ms > 0 && ms < 1 ? 1 : (int64_t)ms; }
+        else if (!strcmp(argv[i], "--dry-run")) dry = 1;
         else if (argv[i][0] != '-') sub = argv[i];
         else return usage();
     }
     if (o.thumbs && o.thumbs != 128 && o.thumbs != 256) return fail("--thumbs %s: 128 or 256", argv[0], NULL);
+    o.exclude = excl;
     lhcat *c = open_name(argv[0]);
     if (!c) return 1;
     if (lhcat_offline(c)) { fprintf(stderr, "lhde-cat: %s is offline (%s is not reachable here): import-du only\n", argv[0], lhcat_root_path(c)); lhcat_close(c); return 1; }
     signal(SIGINT, on_signal);
     signal(SIGTERM, on_signal);
+    if (dry) {
+        struct plan_ctx pc = { 0 };
+        printf("%s: %s%s%s, %s\n", argv[0], lhcat_root_path(c), *sub ? "/" : "", sub, o.cross_fs ? "crossing into other file systems" : "on its own file system");
+        if (*lhcat_root_excludes(c)) print_list("excludes (root): ", lhcat_root_excludes(c));
+        if (*excl) print_list("excludes (this run): ", excl);
+        double t0 = now_s();
+        int rc = lhcat_index_plan(c, sub, &o, print_plan, &pc);
+        if (rc) fprintf(stderr, "lhde-cat: %s\n", lhcat_error(c));
+        printf("%llu entries would be walked (%llu directories), %llu excluded, %llu mount points not entered, %llu unreadable;"
+               " %.1f s\n", (unsigned long long)pc.entries, (unsigned long long)pc.dirs, (unsigned long long)pc.excluded,
+               (unsigned long long)pc.mounts, (unsigned long long)pc.unreadable, now_s() - t0);
+        lhcat_close(c);
+        return rc ? 1 : 0;
+    }
     struct lhcat_progress p;
     double t0 = now_s();
     int rc = lhcat_index(c, sub, &o, index_progress, NULL, &p);
@@ -192,10 +256,12 @@ static int cmd_index(int argc, char **argv)
                p.bytes_read / 1e6, now_s() - t0);
         if (p.skipped_budget) printf("the budget left %llu entries' contents for the next run\n", (unsigned long long)p.skipped_budget);
         if (p.unreadable) printf("%llu directories could not be listed (nothing under them is taken as gone)\n", (unsigned long long)p.unreadable);
-        if (p.interrupted) printf("interrupted: the next index resumes\n");
+        if (p.excluded || p.mounts) printf("not walked: %llu excluded, %llu mount points not entered\n", (unsigned long long)p.excluded, (unsigned long long)p.mounts);
+        if (p.out_of_time) printf("stopped at the time limit: the next index resumes\n");
+        else if (p.interrupted) printf("interrupted: the next index resumes\n");
     }
     lhcat_close(c);
-    return rc ? 1 : p.interrupted ? 130 : 0;
+    return rc ? 1 : p.out_of_time ? 124 : p.interrupted ? 130 : 0;
 }
 
 static int cmd_each_path(int argc, char **argv, int hash)
@@ -306,6 +372,37 @@ static void size_line(const char *what, int64_t kib)
     printf("%-26s %lld KiB (%.2f GiB, %.2f TiB)\n", what, (long long)kib, kib / 1048576.0, kib / 1073741824.0);
 }
 
+/* a mount point of the system's table below the root, with what the catalogue knows of it */
+struct mount_ctx { lhcat *c; int n; };
+
+static void print_mount(void *ctx, const char *path, const char *fstype)
+{
+    struct mount_ctx *m = ctx;
+    const char *root = lhcat_root_path(m->c);
+    const char *rel = path + (strcmp(root, "/") ? strlen(root) : 0);
+    while (*rel == '/') rel++;
+    if (!m->n++) printf("mount points below the root (the system's mount table)\n");
+    sqlite3 *db = lhcat_db(m->c);
+    const char *what = "not reached yet";
+    char prefix[PATH_MAX];
+    snprintf(prefix, sizeof prefix, "%s", rel);
+    for (int depth = 0;; depth++) {   /* the location itself, else its nearest ancestor the catalogue has */
+        int64_t id = lhcat_id(m->c, prefix);
+        if (id) {
+            char sql[128];
+            snprintf(sql, sizeof sql, "SELECT (kind = 'm') + 2 * (state = 'excluded') FROM locations WHERE id = %lld", (long long)id);
+            int64_t v = one(db, sql);
+            if (depth == 0) what = v & 2 ? "excluded, not entered" : v & 1 ? "not entered" : "entered (--cross-fs)";
+            else if (v & 2) what = "under an excluded directory, not entered";
+            break;
+        }
+        char *slash = strrchr(prefix, '/');
+        if (!slash) break;
+        *slash = 0;
+    }
+    printf("  %-40s %-10s %s\n", rel, fstype, what);
+}
+
 static int cmd_stats(int argc, char **argv)
 {
     if (argc != 1) return usage();
@@ -333,6 +430,36 @@ static int cmd_stats(int argc, char **argv)
     printf("%-26s %lld\n", "conflicts", (long long)one(db, "SELECT count(*) FROM attrs WHERE pending = 'conflict'"));
     printf("%-26s %lld\n", "journal operations", (long long)one(db, "SELECT count(*) FROM journal"));
     printf("%-26s %lld\n", "relations to confirm", (long long)one(db, "SELECT count(*) FROM relations WHERE confirmed IS NULL"));
+    printf("%-26s %lld\n", "excluded", (long long)one(db, "SELECT count(*) FROM locations WHERE state = 'excluded'"));
+    printf("%-26s %lld\n", "mount points not entered", (long long)one(db, "SELECT count(*) FROM locations WHERE kind = 'm' AND state = 'present'"));
+    if (*lhcat_root_excludes(c)) {
+        printf("excludes\n");
+        for (const char *p = lhcat_root_excludes(c); *p;) {
+            const char *e = strchr(p, '\n');
+            int len = e ? (int)(e - p) : (int)strlen(p);
+            printf("  %.*s\n", len, p);
+            p += len + (e ? 1 : 0);
+        }
+    }
+    {   /* the walk's frontier: what it recorded and did not enter, the top of each excluded subtree */
+        sqlite3_stmt *st;
+        if (sqlite3_prepare_v2(db, "SELECT l.id, l.kind, l.state FROM locations l WHERE (l.kind = 'm' AND l.state = 'present')"
+                                   " OR (l.state = 'excluded' AND NOT EXISTS (SELECT 1 FROM locations p WHERE p.id = l.parent"
+                                   " AND p.state = 'excluded')) ORDER BY l.id LIMIT 200", -1, &st, NULL) == SQLITE_OK) {
+            int any = 0;
+            while (sqlite3_step(st) == SQLITE_ROW) {
+                if (!any++) printf("not walked\n");
+                const char *p = lhcat_path(c, sqlite3_column_int64(st, 0));
+                const char *k = (const char *)sqlite3_column_text(st, 1);
+                printf("  %-40s %s\n", p ? p : "?", k && k[0] == 'm' ? "mount point, not entered" : "excluded");
+            }
+            sqlite3_finalize(st);
+        }
+    }
+    if (!lhcat_offline(c)) {
+        struct mount_ctx mc = { c, 0 };
+        lhcat_mounts_below(lhcat_root_path(c), print_mount, &mc);
+    }
     size_line("disk usage (the root's)", one(db, "SELECT usage_kib FROM locations WHERE parent = 0"));
     size_line("disk usage (files summed)", one(db, "SELECT sum(usage_kib) FROM locations WHERE state = 'present' AND kind = 'f'"));
     int64_t bytes = one(db, "SELECT sum(size) FROM locations WHERE state = 'present' AND kind = 'f'");
@@ -604,6 +731,56 @@ static int cmd_resolve(int argc, char **argv)
     return rc ? 1 : 0;
 }
 
+/* globs added (add: each "+G" or "G") or removed ("-G") from the root's list; -1 on an error */
+static int edit_excludes(lhcat *c, const char *const *globs, int n, int plain_adds)
+{
+    const char *cur = lhcat_root_excludes(c);
+    size_t cap = strlen(cur) + 2;
+    for (int i = 0; i < n; i++) cap += strlen(globs[i]) + 1;
+    char *list = malloc(cap);
+    if (!list) return -1;
+    snprintf(list, cap, "%s", cur);
+    for (int i = 0; i < n; i++) {
+        const char *g = globs[i];
+        int add = g[0] == '+' || (plain_adds && g[0] != '-');
+        if (g[0] == '+' || g[0] == '-') g++;
+        if (!*g) continue;
+        /* the list without g (whole lines) */
+        char *o = list;
+        for (char *p = list; *p;) {
+            char *e = strchr(p, '\n');
+            size_t len = e ? (size_t)(e - p) : strlen(p);
+            if (!(len == strlen(g) && !memcmp(p, g, len))) {
+                if (o != list) *o++ = '\n';
+                memmove(o, p, len);
+                o += len;
+            }
+            p += len + (e ? 1 : 0);
+        }
+        *o = 0;
+        if (add) { if (o != list) *o++ = '\n'; strcpy(o, g); }
+    }
+    int rc = lhcat_set_excludes(c, list);
+    if (rc) fprintf(stderr, "lhde-cat: %s\n", lhcat_error(c));
+    free(list);
+    return rc;
+}
+
+static int cmd_excludes(int argc, char **argv)
+{
+    if (argc < 1) return usage();
+    for (int i = 1; i < argc; i++) if (argv[i][0] != '+' && argv[i][0] != '-') return usage();
+    lhcat *c = open_name(argv[0]);
+    if (!c) return 1;
+    int rc = argc > 1 ? edit_excludes(c, (const char *const *)argv + 1, argc - 1, 0) : 0;
+    if (!rc) {
+        const char *l = lhcat_root_excludes(c);
+        if (*l) printf("%s\n", l);
+    }
+    lhcat_close(c);
+    return rc ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 2) return usage();
@@ -614,20 +791,29 @@ int main(int argc, char **argv)
         if (n < 2) return usage();
         const char *authority = NULL;
         int offline = 0;
+        const char *excl[64];
+        int nexcl = 0;
         for (int i = 2; i < n; i++)
             if (!strcmp(a[i], "--authority") && i + 1 < n) authority = a[++i];
             else if (!strcmp(a[i], "--offline")) offline = 1;
+            else if (!strcmp(a[i], "--exclude") && i + 1 < n && nexcl < 64) excl[nexcl++] = a[++i];
             else return usage();
         char err[1024];
+        lhcat *before = lhcat_open(a[0], err, sizeof err);
+        int existed = before != NULL;
+        lhcat_close(before);
         if (lhcat_add_root(a[0], a[1], authority, offline, err, sizeof err)) return fail("%s", err, NULL);
         lhcat *c = open_name(a[0]);
         if (!c) return 1;
-        int r = lhcat_offline(c) ? 0 : lhcat_touch(c, "");   /* the root's own facts */
+        if (nexcl && edit_excludes(c, excl, nexcl, 1)) { lhcat_close(c); return 1; }
+        int r = lhcat_offline(c) || existed ? 0 : lhcat_touch(c, "");   /* a new root's own facts */
+        if (*lhcat_root_excludes(c)) print_list("excludes: ", lhcat_root_excludes(c));
         printf("%s\t%s\t(authority: %s%s)\n", a[0], lhcat_root_path(c), lhcat_catalogue_authority(c) ? "catalogue" : "filesystem", lhcat_offline(c) ? ", offline" : "");
         lhcat_close(c);
         return r < 0;
     }
     if (!strcmp(cmd, "roots")) return lhcat_roots(print_root, NULL) < 0;
+    if (!strcmp(cmd, "excludes")) return cmd_excludes(n, a);
     if (!strcmp(cmd, "import-du")) return cmd_import_du(n, a);
     if (!strcmp(cmd, "index")) return cmd_index(n, a);
     if (!strcmp(cmd, "touch")) return cmd_each_path(n, a, 0);

@@ -7,7 +7,7 @@
 #                                        drives it with the generated pictures and the performance checks)
 SQLITE_CFLAGS := $(shell pkg-config --cflags sqlite3)
 SQLITE_LIBS   := $(shell pkg-config --libs sqlite3)
-LHCAT_SRCS    = $(addprefix liblhcat/,cat.c attrs.c fill.c find.c exif.c)
+LHCAT_SRCS    = $(addprefix liblhcat/,cat.c attrs.c fill.c find.c exif.c scope.c)
 LHCAT_OBJS    = $(patsubst %.c,$(O)/%.o,$(LHCAT_SRCS))
 LHCATA        = build/lib/liblhcat.a
 LHCAT_CFLAGS  = -std=gnu11 -O2 -g -fPIC -Wall -Wextra -Wno-format-truncation -MMD -MP -Iliblhcat -Iliblhde -idirafter . $(SQLITE_CFLAGS)

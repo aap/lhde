@@ -4,6 +4,7 @@
 #include "liblhde/compat.h"
 #include "lhde/settings.h"
 #include <ctype.h>
+#include <pwd.h>
 #include <dirent.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -16,8 +17,11 @@
 #include <unistd.h>
 
 /* ---- the schema ----------------------------------------------------------------------------------------------------- */
-/* Each migration takes a database from the version before it to its own; a new database runs them all. */
-static const struct { int version; const char *what; const char *sql; } MIGRATIONS[] = {
+static int widen_state(lhcat *c);
+
+/* Each migration takes a database from the version before it to its own; a new database runs them all. fn (when set)
+   runs after the SQL, in the same transaction. */
+static const struct { int version; const char *what; const char *sql; int (*fn)(lhcat *); } MIGRATIONS[] = {
     { 1, "roots, objects, locations, relations, hashes, attrs, tags, picture, thumbs, journal, scans",
       "CREATE TABLE roots(name TEXT PRIMARY KEY, path TEXT NOT NULL, host TEXT,"
       "  authority TEXT NOT NULL DEFAULT 'filesystem' CHECK(authority IN ('filesystem', 'catalogue')),"
@@ -67,9 +71,36 @@ static const struct { int version; const char *what; const char *sql; } MIGRATIO
       "CREATE INDEX journal_object ON journal(object_id, attr);"
       "CREATE INDEX journal_at ON journal(at);"
       "CREATE TABLE scans(id INTEGER PRIMARY KEY, subpath TEXT NOT NULL, started INTEGER NOT NULL, finished INTEGER,"
-      "  status TEXT NOT NULL, cursor TEXT, entries INTEGER);" },
+      "  status TEXT NOT NULL, cursor TEXT, entries INTEGER);", NULL },
+    /* a location's state 'excluded': not walked, by the root's or the run's exclude list (and what was under it); kind
+       'm': a mount point the walk did not enter. excludes: the root's exclude globs, one a line */
+    { 2, "excluded locations, mount points, the root's exclude list",
+      "ALTER TABLE roots ADD COLUMN excludes TEXT;", widen_state },
 };
 #define NMIGRATIONS (int)(sizeof MIGRATIONS / sizeof MIGRATIONS[0])
+
+/* The state CHECK of locations as migration 1 made it, widened by 'excluded': sqlite_schema's text is changed in place
+   (every row satisfies the wider check, so nothing is rebuilt) and the schema version moved on so that every connection
+   reads it again. The new value is an OR beside the two-value IN list: SQLite evaluates that per row as cheaply as the
+   original, a three-value IN list in a CHECK costs a third more per insert. */
+static int widen_state(lhcat *c)
+{
+    sqlite3_db_config(c->db, SQLITE_DBCONFIG_DEFENSIVE, 0, (int *)NULL);
+    sqlite3_stmt *st = lhcat__prepare(c, "PRAGMA schema_version");
+    if (!st) return -1;
+    int v = sqlite3_step(st) == SQLITE_ROW ? sqlite3_column_int(st, 0) : 0;
+    sqlite3_finalize(st);
+    char sql[512];
+    snprintf(sql, sizeof sql, "PRAGMA writable_schema = ON;"
+             "UPDATE sqlite_schema SET sql = replace(sql, 'CHECK(state IN (''present'', ''gone''))',"
+             " 'CHECK(state IN (''present'', ''gone'') OR state = ''excluded'')') WHERE type = 'table' AND name = 'locations';"
+             "PRAGMA schema_version = %d; PRAGMA writable_schema = OFF", v + 1);
+    if (lhcat__exec(c, sql)) return -1;
+    st = lhcat__prepare(c, "SELECT instr(sql, '''excluded''') FROM sqlite_schema WHERE type = 'table' AND name = 'locations'");
+    int ok = st && sqlite3_step(st) == SQLITE_ROW && sqlite3_column_int(st, 0) > 0;
+    sqlite3_finalize(st);
+    return ok ? 0 : lhcat__fail(c, "the locations table's state check could not be widened");
+}
 
 /* the text index over a row's description, comment and tags (rowid = files.id): FTS5 when SQLite has it */
 static const char *FTS_SQL = "CREATE VIRTUAL TABLE IF NOT EXISTS text USING fts5(desc, comment, tags, tokenize = 'unicode61')";
@@ -213,10 +244,13 @@ static int migrate(lhcat *c)
     for (int i = 0; i < NMIGRATIONS; i++) {
         if (MIGRATIONS[i].version <= have) continue;
         if (lhcat__exec(c, "BEGIN IMMEDIATE")) return -1;
-        char rec[256];
-        snprintf(rec, sizeof rec, "INSERT INTO migrations VALUES(%d, %lld, '%s')", MIGRATIONS[i].version,
+        char rec[512];
+        sqlite3_snprintf(sizeof rec, rec, "INSERT INTO migrations VALUES(%d, %lld, %Q)", MIGRATIONS[i].version,
                  (long long)(lhcat__now_ms() / 1000), MIGRATIONS[i].what);
-        if (lhcat__exec(c, MIGRATIONS[i].sql) || lhcat__exec(c, rec)) { sqlite3_exec(c->db, "ROLLBACK", 0, 0, 0); return -1; }
+        if (lhcat__exec(c, MIGRATIONS[i].sql) || (MIGRATIONS[i].fn && MIGRATIONS[i].fn(c)) || lhcat__exec(c, rec)) {
+            sqlite3_exec(c->db, "ROLLBACK", 0, 0, 0);
+            return -1;
+        }
         if (lhcat__exec(c, "COMMIT")) return -1;
     }
     return lhcat__exec(c, FTS_SQL);
@@ -252,13 +286,14 @@ static lhcat *open_db(const char *name, int create, char *err, size_t errn)
     c->st_child = lhcat__prepare(c, "SELECT id FROM locations WHERE parent = ?1 AND name = ?2");
     c->st_node = lhcat__prepare(c, "SELECT parent, name FROM locations WHERE id = ?1");
     if (!c->st_child || !c->st_node) { snprintf(err, errn, "%s", c->err); lhcat_close(c); return NULL; }
-    sqlite3_stmt *q = lhcat__prepare(c, "SELECT path, authority, offline FROM roots WHERE name = ?1");
+    sqlite3_stmt *q = lhcat__prepare(c, "SELECT path, authority, offline, excludes FROM roots WHERE name = ?1");
     if (q) {
         sqlite3_bind_text(q, 1, name, -1, SQLITE_STATIC);
         if (sqlite3_step(q) == SQLITE_ROW) {
             snprintf(c->root, sizeof c->root, "%s", (const char *)sqlite3_column_text(q, 0));
             c->catalogue_authority = sqlite3_column_text(q, 1) && !strcmp((const char *)sqlite3_column_text(q, 1), "catalogue");
             c->offline = sqlite3_column_int(q, 2);
+            if (sqlite3_column_text(q, 3) && *sqlite3_column_text(q, 3)) c->excludes = strdup((const char *)sqlite3_column_text(q, 3));
         }
         sqlite3_finalize(q);
     }
@@ -286,11 +321,60 @@ void lhcat_close(lhcat *c)
     sqlite3_finalize(c->st_node);
     lhcat__forget_all(c);
     free(c->pathbuf);
+    free(c->excludes);
     if (c->db) sqlite3_close_v2(c->db);
     free(c);
 }
 
 static int g_roots_serial;
+
+/* the path (resolved) is the user's home directory ($HOME or the password entry's) */
+static int is_home(const char *real)
+{
+    const char *cand[2] = { getenv("HOME"), NULL };
+    struct passwd *pw = getpwuid(getuid());
+    if (pw) cand[1] = pw->pw_dir;
+    for (int i = 0; i < 2; i++) {
+        char r[PATH_MAX];
+        if (cand[i] && *cand[i] && realpath(cand[i], r) && !strcmp(r, real)) return 1;
+    }
+    return 0;
+}
+
+const char *lhcat_root_excludes(lhcat *c) { return c->excludes ? c->excludes : ""; }
+
+int lhcat_set_excludes(lhcat *c, const char *list)
+{
+    /* one glob a line, blank lines and surrounding blanks dropped */
+    size_t n = list ? strlen(list) : 0;
+    char *norm = malloc(n + 2), *o = norm;
+    if (!norm) return lhcat__fail(c, "out of memory");
+    for (const char *p = list ? list : ""; *p;) {
+        const char *e = strchr(p, '\n');
+        size_t len = e ? (size_t)(e - p) : strlen(p);
+        const char *a = p, *b = p + len;
+        while (a < b && isspace((unsigned char)*a)) a++;
+        while (b > a && isspace((unsigned char)b[-1])) b--;
+        if (b > a) { memcpy(o, a, (size_t)(b - a)); o += b - a; *o++ = '\n'; }
+        p += len + (e ? 1 : 0);
+    }
+    if (o > norm) o--;   /* no newline after the last */
+    *o = 0;
+    sqlite3_stmt *st = lhcat__prepare(c, "UPDATE roots SET excludes = ?2 WHERE name = ?1");
+    int ok = st != NULL;
+    if (ok) {
+        sqlite3_bind_text(st, 1, c->name, -1, SQLITE_STATIC);
+        if (*norm) sqlite3_bind_text(st, 2, norm, -1, SQLITE_STATIC); else sqlite3_bind_null(st, 2);
+        ok = sqlite3_step(st) == SQLITE_DONE;
+        if (!ok) lhcat__dbfail(c, "excludes");
+    }
+    sqlite3_finalize(st);
+    if (!ok) { free(norm); return -1; }
+    free(c->excludes);
+    c->excludes = *norm ? norm : NULL;
+    if (!*norm) free(norm);
+    return 0;
+}
 
 int lhcat_add_root(const char *name, const char *path, const char *authority, int offline, char *err, size_t errn)
 {
@@ -300,7 +384,17 @@ int lhcat_add_root(const char *name, const char *path, const char *authority, in
     }
     char real[PATH_MAX];
     struct stat st;
-    if (offline) {
+    char given[PATH_MAX];
+    snprintf(given, sizeof given, "%s", path);
+    while (strlen(given) > 1 && given[strlen(given) - 1] == '/') given[strlen(given) - 1] = 0;
+    char known[PATH_MAX] = "";
+    if (valid_name(name)) {   /* a root's own path as stored is taken as it is: nothing on it is looked at again */
+        lhcat *k = lhcat_open(name, NULL, 0);
+        if (k) snprintf(known, sizeof known, "%s", k->root);
+        lhcat_close(k);
+    }
+    if (known[0] && !strcmp(known, given)) snprintf(real, sizeof real, "%s", known);
+    else if (offline) {
         if (path[0] != '/') { snprintf(err, errn, "%s: an offline root's path is absolute", path); return -1; }
         snprintf(real, sizeof real, "%s", path);
         while (strlen(real) > 1 && real[strlen(real) - 1] == '/') real[strlen(real) - 1] = 0;
@@ -316,7 +410,8 @@ int lhcat_add_root(const char *name, const char *path, const char *authority, in
         rc = -1;
     } else {
         if (lhcat__exec(c, "BEGIN IMMEDIATE")) rc = -1;
-        sqlite3_stmt *q = lhcat__prepare(c, "INSERT INTO roots(name, path, host, authority, added_at, offline) VALUES(?1, ?2, ?3, ?4, ?5, ?6)"
+        sqlite3_stmt *q = lhcat__prepare(c, "INSERT INTO roots(name, path, host, authority, added_at, offline, excludes)"
+                                            " VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)"
                                             " ON CONFLICT(name) DO UPDATE SET authority = excluded.authority,"
                                             " path = CASE WHEN roots.offline THEN excluded.path ELSE roots.path END,"
                                             " offline = CASE WHEN roots.offline THEN excluded.offline ELSE roots.offline END");
@@ -327,6 +422,8 @@ int lhcat_add_root(const char *name, const char *path, const char *authority, in
             sqlite3_bind_text(q, 4, authority ? authority : c->root[0] ? (c->catalogue_authority ? "catalogue" : "filesystem") : "filesystem", -1, SQLITE_STATIC);
             sqlite3_bind_int64(q, 5, lhcat__now_ms() / 1000);
             sqlite3_bind_int(q, 6, offline);
+            if (!offline && is_home(real)) sqlite3_bind_text(q, 7, LHCAT_HOME_EXCLUDES, -1, SQLITE_STATIC);
+            else sqlite3_bind_null(q, 7);
             if (sqlite3_step(q) != SQLITE_DONE) rc = lhcat__dbfail(c, "add-root");
         } else rc = -1;
         sqlite3_finalize(q);

@@ -5,6 +5,7 @@
 #include "lhcat.h"
 #include <limits.h>
 #include <sqlite3.h>
+#include <signal.h>
 #include <sys/stat.h>
 
 #define LHCAT_PATH_CACHE 4096
@@ -17,6 +18,7 @@ struct lhcat {
     size_t rootlen;
     int catalogue_authority;
     int offline;                        /* the root's path is not reachable from here (a listing only) */
+    char *excludes;                     /* the root's exclude globs, one a line (NULL: none) */
     int64_t root_id;                    /* the row of the root directory itself (parent 0, name "") */
     char err[1024];
     char program[64];
@@ -60,6 +62,30 @@ int lhcat__observe(lhcat *c, int64_t object, const char *rel, char **nv, int n);
 int lhcat__derived(lhcat *c, int64_t object);
 /* the locations in the temporary table lhcat_gone marked gone */
 int lhcat__mark_gone(lhcat *c, uint64_t *count);
+
+/* what a walk enters (scope.c): the root's device, the mount points below the root (sorted, absolute), the exclude lists */
+struct lhcat__scope {
+    dev_t dev;
+    int one_fs;
+    char **mounts;
+    size_t nmounts;
+    const char *root_list, *run_list;
+};
+enum { LHCAT__WALK, LHCAT__EXCLUDED, LHCAT__MOUNT };
+int lhcat__scope_init(lhcat *c, struct lhcat__scope *s, const struct lhcat_index_opts *o);
+void lhcat__scope_free(struct lhcat__scope *s);
+/* What the walk does with the entry rel (abs its absolute path, d_type readdir's): LHCAT__WALK, __EXCLUDED (the glob into
+   glob) or __MOUNT (not entered); -1 it could not be stat'ed. A mount point of the table is never stat'ed, an excluded
+   entry only when readdir gave no type; *kind its kind, st its lstat when *have_st (always for a walked entry with
+   stat_all, else for directories) */
+int lhcat__classify(const struct lhcat__scope *s, const char *rel, const char *abs, unsigned char d_type, int stat_all,
+                    struct stat *st, int *have_st, char *kind, char *glob, size_t globn);
+/* a directory's entries (not . and ..) sorted bytewise; whole: none was lost to an error. -1 it cannot be opened */
+struct dent { char *name; unsigned char type; };
+struct dent_list { struct dent *v; size_t n; int whole; };
+int lhcat__list_dir(const char *abs, struct dent_list *out);
+void lhcat__free_dents(struct dent_list *l);
+extern volatile sig_atomic_t lhcat__stop;   /* lhcat_interrupt's flag */
 
 /* the shared part of index and touch: the entry name under parent (rel its path, abs its absolute path, st its lstat)
    written or refreshed; *id its row. force: read it again even when unchanged */

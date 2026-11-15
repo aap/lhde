@@ -203,9 +203,40 @@ static void performance(long lines)
     unlink(listing);
 }
 
+/* exclude globs: anchored at the root, '*' within a name, "**" whole names, a trailing '/' directories only */
+static void excludes(void)
+{
+    char g[256];
+#define M(list, rel, dir) (lhcat_exclude_match((list), (rel), (dir), g, sizeof g) != NULL)
+    CHECK(M("n/", "n", 1));
+    CHECK(!M("n/", "n", 0));                     /* a file called n */
+    CHECK(!M("n/", "src/n", 1));                 /* anchored */
+    CHECK(!M("n/", "nn", 1));
+    CHECK(M(".cache/", ".cache", 1));
+    CHECK(M(".local/share/Trash/", ".local/share/Trash", 1));
+    CHECK(!M(".local/share/Trash/", ".local/share", 1));
+    CHECK(M("**/node_modules/", "node_modules", 1));
+    CHECK(M("**/node_modules/", "a/b/c/node_modules", 1));
+    CHECK(!M("**/node_modules/", "a/node_modules2", 1));
+    CHECK(M("*.iso", "x.iso", 0));
+    CHECK(!M("*.iso", "dir/x.iso", 0));           /* '*' stays within a name */
+    CHECK(M("**/*.iso", "dir/x.iso", 0));
+    CHECK(M("src/**", "src/a/b", 0));
+    CHECK(M("a/**/b", "a/b", 1) && M("a/**/b", "a/x/y/b", 1) && !M("a/**/b", "a/x/yb", 1));
+    CHECK(M("img?.jpg", "img1.jpg", 0) && !M("img?.jpg", "img10.jpg", 0));
+    CHECK(M("[ab]*", "about", 0) && !M("[!ab]*", "about", 0) && M("[a-c]x", "bx", 0));
+    CHECK(M("/build/", "build", 1));             /* a leading / changes nothing */
+    CHECK(M("# a comment\n\n  docs/  \n", "docs", 1));
+    CHECK(!M("# docs/", "docs", 1));
+    lhcat_exclude_match("one/\n**/two/", "x/two", 1, g, sizeof g);
+    EQ(g, "**/two/");
+#undef M
+}
+
 int main(int argc, char **argv)
 {
     normalize();
+    excludes();
     pictures();
     sha();
     performance(argc > 1 ? atol(argv[1]) : 2000000);

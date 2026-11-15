@@ -25,7 +25,7 @@ extern "C" {
 typedef struct lhcat lhcat;
 typedef struct sqlite3 sqlite3;
 
-#define LHCAT_SCHEMA 1          /* the schema version a new database gets; older ones are migrated on open */
+#define LHCAT_SCHEMA 2          /* the schema version a new database gets; older ones are migrated on open */
 #define LHCAT_NAME_MAX 64       /* a root's name: letters, digits, '-', '_', '.', not starting with '.' */
 
 /* what a location's facts cover (locations.coverage) */
@@ -47,6 +47,20 @@ const char *lhcat_dir(char *out, size_t n);     /* the databases' directory (cre
    only import-du fills the catalogue, and an offline root can be given another path later. */
 int lhcat_add_root(const char *name, const char *path, const char *authority, int offline, char *err, size_t errn);
 int lhcat_offline(lhcat *c);                   /* the root was added offline */
+
+/* Exclude globs, one a line, matched against a path relative to the root (gitignore-like, but always anchored at the
+   root): '*' and '?' within one name, "[...]" a set, "**" any number of whole names ("**" + "/node_modules/" at any
+   depth), a trailing '/' only directories; what one matches is not walked (an excluded location). A new root over the
+   user's home directory gets LHCAT_HOME_EXCLUDES. */
+#define LHCAT_HOME_EXCLUDES ".cache/\n.local/share/Trash/\n.thumbnails/\n**/node_modules/"
+const char *lhcat_root_excludes(lhcat *c);             /* the root's list ("" none) */
+int lhcat_set_excludes(lhcat *c, const char *list);    /* replace it (blank lines dropped) */
+/* the first glob of list that matches rel (is_dir: rel is a directory), NULL none; the glob is a copy in out */
+const char *lhcat_exclude_match(const char *list, const char *rel, int is_dir, char *out, size_t n);
+/* the mount points strictly below the absolute directory dir, from the system's mount table (nothing under them is
+   looked at): the count, -1 when the table cannot be read */
+typedef void (*lhcat_mount_fn)(void *ctx, const char *path, const char *fstype);
+int lhcat_mounts_below(const char *dir, lhcat_mount_fn fn, void *ctx);
 /* every root: its name and path, by name; the count, -1 on an error */
 typedef void (*lhcat_root_fn)(void *ctx, const char *name, const char *path);
 int lhcat_roots(lhcat_root_fn fn, void *ctx);
@@ -76,6 +90,9 @@ struct lhcat_progress {
     uint64_t bytes_read;                /* index: bytes read from file contents (EXIF, sniffing, hashes, thumbnails) */
     uint64_t skipped_budget;            /* index: entries whose content reading the budget left for a later run */
     uint64_t unreadable;                /* index: directories that could not be listed (nothing under them is gone) */
+    uint64_t excluded;                  /* index: entries an exclude glob kept out (not walked) */
+    uint64_t mounts;                    /* index: mount points not entered (another file system) */
+    int out_of_time;                    /* index: stopped by its time limit (it resumes) */
     int64_t scan;                       /* index: the scan's id */
     int resumed, interrupted;           /* index: went on from an interrupted scan / stopped early (it resumes) */
     const char *current;                /* the path being looked at (during the callback) */
@@ -96,6 +113,11 @@ struct lhcat_index_opts {
     uint64_t budget;                    /* bytes of file contents to read at most (0: no limit); stat and attributes are free */
     int restart;                        /* start a new scan instead of resuming an unfinished one */
     const char *thumb_helper;           /* the flxp-thumb program (NULL: beside this program, else on PATH) */
+    int cross_fs;                       /* enter other file systems' mount points (by default one is recorded as a
+                                           location of kind 'm', not entered: from the mount table before it is
+                                           stat'ed, else by its device) */
+    const char *exclude;                /* more exclude globs for this run (one a line), besides the root's */
+    int64_t time_limit_ms;              /* stop after this long (0: no limit); the next index resumes */
 };
 /* Scan SUBPATH ("" the whole root), one entry at a time, recording observations: an entry whose size, mtime, ctime and
    inode are the location's is not read again; a new or changed one gets its type, its attributes observed (see
@@ -106,6 +128,19 @@ struct lhcat_index_opts {
 int lhcat_index(lhcat *c, const char *subpath, const struct lhcat_index_opts *o, lhcat_progress_fn fn, void *ctx,
                 struct lhcat_progress *out);
 void lhcat_interrupt(void);             /* stop a running lhcat_index at the next entry (async-signal-safe) */
+/* What an index of SUBPATH with these options would walk, without writing anything: each entry directly under SUBPATH
+   with the counts under it (the same excludes and mount rules; names and kinds from the directory listings, a directory
+   stat'ed only to compare its device). In name order. */
+struct lhcat_plan {
+    const char *name;
+    int kind;                           /* 'f', 'd', 'l', 'o' */
+    int what;                           /* 0 walked, 1 excluded (by glob), 2 a mount point not entered */
+    const char *glob;
+    uint64_t entries, dirs;             /* under it, itself included */
+    uint64_t excluded, mounts, unreadable;
+};
+typedef void (*lhcat_plan_fn)(void *ctx, const struct lhcat_plan *e);
+int lhcat_index_plan(lhcat *c, const char *subpath, const struct lhcat_index_opts *o, lhcat_plan_fn fn, void *ctx);
 /* The entry rel observed again whatever its stat says (what a program calls after writing to it); its parents get
    locations when they have none; a path that is not there any more is marked gone (and what is under it). 1 gone,
    0 observed, -1 an error. */
