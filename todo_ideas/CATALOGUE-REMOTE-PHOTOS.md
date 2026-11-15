@@ -55,3 +55,28 @@ common not to do well; a web gallery per directory (today a crude static page); 
 (a) lhde-cat locally with flxp's Filter and the band reading it; (b) lhde-remote with LIST/THUMB/SET and the flxp provider,
 tested between this machine, indra and soma; (c) the photo query views and bulk tagging; (d) lhde-gallery; (e) offline sync.
 Each step is useful on its own; (a) and (b) are the foundation the rest stands on.
+
+## Refinements (aap, 2026-11-15): authority may flip, sync is the hard part, responsiveness first
+* Design the catalogue so the flip costs no format change: every record carries the file's identity beyond its path (dev,
+  inode, size, mtime, and a lazily computed content hash for pictures and documents, so a moved or renamed photo keeps its
+  record and its history), and every attribute write goes through one function that also appends to a per-root journal
+  (what, old value, new value, when, by which host/program). Sync is then a merge of journals (last writer wins per
+  attribute; one user, conflicts are rare and shown), the catalogue can become the truth later by declaring the journal
+  authoritative and the xattrs a cache written back, and an archive keeps attributes even on a file system without them.
+* Responsiveness is the first deliverable, before any index: flxp's folder enumeration is synchronous today (readdir + stat
+  + attributes before the list shows), which is what makes a remote mount feel dead. Step 1 is: readdir first and the list
+  shown at once, stats and attributes filled in from a worker, nothing on the UI thread ever waits on a remote path;
+  thumbnails on a remote mount from the cache first (instant), then from the JPEG's own EXIF preview (160x120 in the first
+  few KB of most camera files: read 64 KB, not 5 MB), the full decode last and only within a byte budget per folder; luxview
+  the same three stages. Measured with a slow-path test harness (an LD_PRELOAD that delays stat/open/read under a prefix),
+  so "2000 photos on a 50 ms mount: the list in under half a second, thumbnails appearing progressively" is a test, not a hope.
+* indra runs FreeBSD 13.1 (no inotify, old packages): the remote side must be one Python 3 script with Pillow optional
+  (`lhde-remote`), not a build of lhde; it answers LIST (stat + attributes in one go), THUMB (EXIF preview or Pillow),
+  SET/REMOVE, and later QUERY over a catalogue built there by the same script. It must run unchanged on 13.1, 15 and Linux.
+* GUI or external: the index starts external (`lhde-cat` CLI: index, find, journal), is used by flxp's existing Filter box
+  when a root has one (instant, and across the whole tree not just the folder), and gets its own small window for the
+  fun part (`luxfind`: XP's Search Companion / 4051's query views; a query box, the results in the shared list view, double
+  click opens luxview, drag to tag). flxp's core stays unaware beyond the provider and the filter hook.
+* Steps, each a satisfying end in itself: (1) async enumeration + EXIF thumbnails + the slow-path harness; (2) lhde-cat
+  locally + the Filter box over it + luxfind; (3) lhde-remote over ssh with the flxp provider, tested against indra (13.1)
+  and soma; (4) the journal and sync; (5) photo query views and the gallery.
