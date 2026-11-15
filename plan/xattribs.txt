@@ -12,7 +12,7 @@ Future: synchronize local metadata catalog with local and remote filesystems
 For existing xattr tooling see ~/src/luxfs [note: perhaps move into lhde? or separate repo...]
 
 Phase 1 is in (columns, the 4051 band's editable rows with invitations, the infotip, Add Tag, the Properties sheet's Metadata
-page; docs/USAGE.md "Metadata"). Next phases (todo_ideas/XATTR-DESIGN_CLAUDE.md sections 3-4):
+page; docs/USAGE.md "Metadata"). Next phases (plan/XATTR-DESIGN_CLAUDE.md sections 3-4):
 * the invitation colour in the 4051 band and the Choose Details dialog's layout are unmeasured choices
 * where a colour (user.lux.color) shows is open: the Details column's 12 px square with the name, the band's square after
 	the item's name and XP's "Color: Red" line are a first, provisional choice (a square in a column is "a bit ugly"); an

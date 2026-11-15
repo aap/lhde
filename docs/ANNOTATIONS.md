@@ -22,7 +22,7 @@ FILE`, `setextattr user xdg.tags a,b FILE`); lhde's programs and tools take the 
 
 The colours (flxp's palette, `shell::details::palette`): `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`,
 `brown`, `gray`; VGA's values where VGA has the colour, a choice that reads on white and on the task band's blue. A value
-outside it is kept and shown as written. Where a colour shows is a first, provisional choice (todo_ideas/xattribs.txt).
+outside it is kept and shown as written. Where a colour shows is a first, provisional choice (plan/xattribs.txt).
 
 Tags in use (extend freely): `reference` (real Windows screenshots and originals to compare against),
 `concept-art`, `research` (notes and findings), `generated` (rebuildable output), `aerovision`,

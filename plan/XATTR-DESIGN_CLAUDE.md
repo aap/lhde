@@ -1,7 +1,7 @@
 # From Longhorn 4051's preview/task pane to xattrs in flxp (thinking notes, 2026-10-31)
 
-Context: `~/src/lhde/todo_ideas/xattribs.txt` (xattrs for tagging, descriptions, annotations; luxfs tooling) and
-`todo_ideas/flxp_wux.txt` ("details and task pane"). Longhorn facts from `taskpane/README.md` (data.md, native.md,
+Context: `~/src/lhde/plan/xattribs.txt` (xattrs for tagging, descriptions, annotations; luxfs tooling) and
+`plan/flxp_wux.txt` ("details and task pane"). Longhorn facts from `taskpane/README.md` (data.md, native.md,
 managed.md) and `explorer-views/icon-views.md`; screenshots lh4051-1528xx / 1523xx / 1524xx.
 
 ## 1. What 4051 actually did (the parts that matter here)

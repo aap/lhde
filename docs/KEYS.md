@@ -156,7 +156,7 @@ A drag moves a picture larger than the window.
 | Ctrl+V, Shift+Insert | paste |
 
 **Menus** (a menu bar, a context menu): Alt alone or F10 the menu bar, Alt+letter a menu (a click or F10 in luxpad: Alt+letter
-does not yet drop it, todo_ideas/flxp_wux), the arrows move, Enter chooses, Esc closes, a mnemonic chooses; Shift+F10 or the
+does not yet drop it, plan/flxp_wux), the arrows move, Enter chooses, Esc closes, a mnemonic chooses; Shift+F10 or the
 Menu key a context menu; Alt+Space the window menu (luxwm's).
 
 **Dialogs and property sheets**: Tab / Shift+Tab the next / previous control, the arrows within a group of radio buttons, Space

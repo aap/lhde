@@ -4,7 +4,7 @@ A catalogue is a SQLite database of one tree of files, a **root**: every path un
 (the stat, the type, the user.* attributes, a picture's EXIF facts, the freedesktop thumbnail), and the journal of every
 attribute edit made through it. It is built quickly (a `du` listing gives millions of rows in a minute), queried at once
 (`lhde-cat find`, flxp's Filter box), and it is where quick local edits can be made and later written back to the files
-(the authority setting). The plan it comes from is `todo_ideas/CATALOGUE-REMOTE-PHOTOS.md`.
+(the authority setting). The plan it comes from is `plan/CATALOGUE-REMOTE-PHOTOS.md`.
 
 `liblhcat/` is a C library next to liblhde (`lhcat.h`, `lhcat_*`; it uses liblhde for the state directory, compat.h for the
 attribute calls), linked into flxp's shell layer and into `lhde-cat`, the command line. Python tools read the same schema
