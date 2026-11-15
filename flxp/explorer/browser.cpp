@@ -427,14 +427,11 @@ bool wants_stored(const Browser& b)
 }
 
 // the stored properties of the items, when a column needs them (else none: what is not
-// shown is not read)
+// shown is not read); from the folder's catalogue when it has one
 static void read_stored(const Browser& b, std::vector<Item>& items)
 {
-    bool want = wants_stored(b);
-    for (Item& it : items) {
-        if (want && b.folder && b.folder->is_filesystem()) shell::details::read_stored(it);
-        else it.xattrs.clear();
-    }
+    if (wants_stored(b) && b.folder && b.folder->is_filesystem()) { shell::details::read_stored(items, b.folder->path()); return; }
+    for (Item& it : items) it.xattrs.clear();
 }
 
 // The user's widths and header order into b.column_layout: the list's column i shows

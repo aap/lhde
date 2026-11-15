@@ -97,6 +97,9 @@ Stored read_stored(const std::string& path);                         // the regi
 // Missing: none, no user attributes on that file system (ENOTSUP) or no such file; Failed: *error the errno.
 Read list_attrs(const std::string& path, std::vector<std::string>* names, int* error = nullptr);
 void read_stored(Item& it);                                          // into it.xattrs (a file-system item)
+// The same for the items of a folder: from the catalogue when a root's catalogue holds the folder (docs/CATALOGUE.md),
+// for each item whose size, mtime and ctime are those the catalogue observed, its desired values; the others from the file
+void read_stored(std::vector<Item>& items, const std::string& folder);
 std::vector<std::string> split_list(const std::string& text);        // "a, b;c\n" -> a, b, c (commas, semicolons, newlines)
 std::string join_list(const std::vector<std::string>& items);        // -> "a,b,c", as stored
 // The value the user typed for p on path: a list is split and joined again; a
@@ -104,6 +107,8 @@ std::string join_list(const std::vector<std::string>& items);        // -> "a,b,
 // a colour of the palette its lower-case name; every value trimmed. False with *err a sentence for a message box (the file system keeps no user
 // attributes, the file is not the user's or read-only, its current value could
 // not be read, ...). add_tags and remove_tag refuse the same way.
+// A write that succeeded is recorded in the catalogue holding the file, if one does (lhcat_record_write: an operation in
+// its journal, the file observed again); so are change_tags' writes.
 bool write(const std::string& path, const Property& p, const std::string& text, std::string* err);
 bool add_tags(const std::string& path, const std::vector<std::string>& tags, std::string* err);   // keeping the others
 bool remove_tag(const std::string& path, const std::string& tag, std::string* err);

@@ -56,6 +56,9 @@ else skip swatchtest "no DISPLAY"; fi
 # the details model (shell/details.h): XP's Details lines, 4051's band values
 build/tests/detailstest > "$T/details.log" 2>&1
 result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"
+# the shell layer and the catalogue (liblhcat): details::write into the journal, read_stored from a catalogued folder
+build/tests/cattest > "$T/cat.log" 2>&1
+result "cattest ($(tail -n 1 "$T/cat.log"))" $? "$T/cat.log"
 # the Details columns' layout (shell/columns.h) and the per-folder records of flxp-views, on a scratch state directory
 build/tests/columnstest > "$T/columns.log" 2>&1
 result "columnstest ($(tail -n 1 "$T/columns.log"))" $? "$T/columns.log"

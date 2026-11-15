@@ -267,7 +267,8 @@ tag / unset with the journal, deferred writes and commit, a file changed before 
 operation ids, offline edits against one revision, both authorities, a move and a duplicate as relations, an interrupted and a
 killed scan, an unreadable directory, thumbnails through flxp-thumb, an offline root; then `build/liblhcat/tests/cat`: the
 values as flxp stores them, the picture headers, sha256, a 2,000,000-line listing imported in under 30 s and a tag query on it
-in under 50 ms), luxshell builds and its
+in under 50 ms; `build/tests/cattest` in tests/check.sh: flxp's writes in the journal, a catalogued folder's attributes
+read from the catalogue), luxshell builds and its
 Lua parses (`luac -p`), its tray items, the power tile and the Classic Tray tile hosting them work over that layer with a
 fake tree and stub system commands (`luxshell/tests/tiles.sh`), every tile is in the sidebar menu's parts list
 (`luxshell/tests/parts.py`), and luxwm's frame

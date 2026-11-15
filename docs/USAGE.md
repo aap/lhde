@@ -922,7 +922,9 @@ the field alone (`tag:`) keeps the items where it is set. Double quotes make one
 other `word:` is a plain word. While a filter is on the status bar says "N of M items". Escape in the box empties it and the
 whole folder shows again; Enter goes back to the list keeping the filter; another folder starts unfiltered. The filter belongs to
 the window and is not remembered. The attributes are read once per folder when a word needs them (or a column shows them) and
-follow changes on disk.
+follow changes on disk. In a folder under a root with a catalogue (`lhde-cat`, below) they come from the catalogue, one query
+for the folder, for every item the catalogue observed as it is now (its size, mtime and ctime), which on a network mount is
+one stat per item instead of an attribute call per property; flxp's own edits go into that catalogue's journal.
 
 **The catalogue (lhde-cat).** A catalogue keeps a whole tree's files and attributes in a database for quick queries and edits
 (docs/CATALOGUE.md): `lhde-cat add-root photos ~/Pictures`, then `lhde-cat index photos` (or `import-du photos LISTING` for a

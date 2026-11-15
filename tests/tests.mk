@@ -11,6 +11,7 @@ W32_TESTS     = $(patsubst tests/w32/%.cpp,build/tests/w32/%,$(wildcard tests/w3
 NATIVE_OBJS   = $(patsubst %.cpp,$(O)/%.o,$(WUX_NATIVE) wux/w32/utf.cpp) $(SHELLOBJS)
 
 $(O)/tests/toolkit/lhdatatest.o $(O)/tests/toolkit/keyicontest.o $(O)/tests/toolkit/starticontest.o: CXXFLAGS += -Iliblhde
+$(O)/tests/toolkit/cattest.o: CXXFLAGS += -Iliblhcat $(SQLITE_CFLAGS)
 $(O)/tests/toolkit/%.o: tests/toolkit/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@

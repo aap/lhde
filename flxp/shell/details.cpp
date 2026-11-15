@@ -10,7 +10,10 @@
 #include <sys/statvfs.h>
 #include <time.h>
 #include <algorithm>
+#include <map>
+#include <mutex>
 #include "liblhde/compat.h"
+#include "lhcat.h"
 #include "config.h"
 #include "details.h"
 #include "thumbs.h"
@@ -173,6 +176,32 @@ Item location_item(const Folder& folder)
 
 static std::string base_name(const std::string& path) { return path.substr(path.find_last_of('/') + 1); }
 
+// ---- the catalogue (liblhcat, docs/CATALOGUE.md) -------------------------------------------------------------------------
+// A path under a root with a catalogue: the catalogue's handle (opened once per process) and the path relative to its root
+static std::mutex g_cat_lock;
+static lhcat* catalogue_for(const std::string& path, std::string* rel)
+{
+    char real[PATH_MAX], name[LHCAT_NAME_MAX + 1];
+    const char* r = nullptr;
+    if (path.empty() || path[0] != '/' || !realpath(path.c_str(), real)) return nullptr;
+    if (lhcat_root_for(real, name, sizeof name, &r) != 0) return nullptr;
+    static std::map<std::string, lhcat*> open;
+    auto it = open.find(name);
+    lhcat* c = it != open.end() ? it->second : (open[name] = lhcat_open(name, nullptr, 0));
+    if (c && rel) *rel = r;
+    return c;
+}
+
+// what put() wrote, into the catalogue that holds the file (an operation in its journal, the file observed again)
+static void follow(const std::string& path, const std::string& xattr, const std::string& old, const std::string& value)
+{
+    std::lock_guard<std::mutex> hold(g_cat_lock);
+    std::string rel;
+    lhcat* c = catalogue_for(path, &rel);
+    if (c && lhcat_record_write(c, rel.c_str(), xattr.c_str(), old.c_str(), value.c_str()) != 0)
+        fprintf(stderr, "%s: the catalogue %s did not follow: %s\n", lhde_progname(), lhcat_name(c), lhcat_error(c));
+}
+
 // the size first, then a buffer of that size; ERANGE: it grew in between, ask again
 Read read_attr(const std::string& path, const std::string& xattr, std::string* value, int* error)
 {
@@ -261,6 +290,43 @@ void read_stored(Item& it)
     it.xattrs = read_stored(it.path);
 }
 
+namespace {
+struct CatRow { int64_t size, mtime, ctime_ns; int kind, coverage; Stored attrs; };
+void cat_row(void* ctx, const struct lhcat_entry* e)
+{
+    CatRow r { e->size, e->mtime, e->ctime_ns, e->kind, e->coverage, {} };
+    for (int i = 0; i < e->nattrs; i++) r.attrs.push_back({ e->attrs[2 * i], e->attrs[2 * i + 1] });
+    (*static_cast<std::map<std::string, CatRow>*>(ctx))[e->name] = std::move(r);
+}
+}
+
+void read_stored(std::vector<Item>& items, const std::string& folder)
+{
+    std::map<std::string, CatRow> rows;
+    {
+        std::lock_guard<std::mutex> hold(g_cat_lock);
+        std::string rel;
+        lhcat* c = catalogue_for(folder, &rel);
+        if (c && lhcat_list_dir(c, rel.c_str(), cat_row, &rows) != 0) rows.clear();
+    }
+    for (Item& it : items) {
+        if (it.flags & (IsVirtual | IsDrive)) { it.xattrs.clear(); continue; }
+        auto r = rows.find(base_name(it.path));
+        struct stat st;
+        // the catalogue's values while the file is as it observed it (an attribute changed elsewhere changes the ctime)
+        if (r != rows.end() && (r->second.coverage & LHCAT_ATTRS) && lstat(it.path.c_str(), &st) == 0 &&
+            r->second.mtime == (int64_t)st.st_mtime &&
+            r->second.ctime_ns == (int64_t)st.st_ctim.tv_sec * 1000000000 + st.st_ctim.tv_nsec &&
+            (S_ISDIR(st.st_mode) || r->second.size == (int64_t)st.st_size)) {
+            it.xattrs.clear();
+            for (const Property& p : registry()) {
+                if (p.xattr.empty()) continue;
+                for (const auto& kv : r->second.attrs) if (kv.first == p.xattr && !kv.second.empty()) it.xattrs.push_back(kv);
+            }
+        } else read_stored(it);
+    }
+}
+
 std::vector<std::string> split_list(const std::string& v)
 {
     std::vector<std::string> out;
@@ -326,7 +392,9 @@ bool write(const std::string& path, const Property& p, const std::string& text, 
         if (const Color* c = color(v)) v = c->name;
     std::string old;
     if (!read_current(path, p, &old, err)) return false;   // the value it replaces was not seen
-    return put(path, p.xattr, v, err);
+    if (!put(path, p.xattr, v, err)) return false;
+    follow(path, p.xattr, old, v);
+    return true;
 }
 
 bool change_tags(const std::string& path, const std::vector<std::string>& add, const std::vector<std::string>& remove,
@@ -343,7 +411,9 @@ bool change_tags(const std::string& path, const std::vector<std::string>& add, c
         have.erase(std::remove(have.begin(), have.end(), t), have.end());
     std::string v = join_list(have);
     if (v == join_list(split_list(old))) return true;
-    return put(path, p->xattr, v, err);
+    if (!put(path, p->xattr, v, err)) return false;
+    follow(path, p->xattr, old, v);
+    return true;
 }
 
 bool add_tags(const std::string& path, const std::vector<std::string>& tags, std::string* err)
