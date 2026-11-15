@@ -206,7 +206,9 @@ itself for its menus. luxwm selects `FocusChangeMask` on the clients and the roo
 focused client (or a window inside it) the frame is active; on a window luxwm does not manage, the root, `PointerRoot` or None,
 `focus_set_active(false)`: the frame is repainted inactive, `_NET_ACTIVE_WINDOW` becomes None and `_NET_WM_STATE_FOCUSED` goes, while
 `f_client` stays the last focused window (`f_active` false; `client_active(c)` is what painting and `FOCUSED` use). Focus inside an
-override-redirect top-level (menus, tooltips) or on another managed client changes nothing; luxwm then selects `FocusChangeMask` on
+override-redirect top-level (menus, tooltips) or on another managed client changes nothing, and so does such a window going
+away: only when the focus went with an unmanaged window (None, `PointerRoot` or the root after it) on a desktop without clients
+does luxwm give it to `nofocus`; luxwm then selects `FocusChangeMask` on
 that override-redirect window too, so that the focus leaving it is followed (the start menu's focus window, the desktop clicked
 through the start menu). A click on a client or its frame (`FOCUS_ON_CLICK`; the left, middle or right button, as Windows activates
 on each, and `focus_button` besides) focuses it whenever it does not really hold the focus; a press another client replays when its

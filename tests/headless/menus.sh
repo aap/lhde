@@ -4,7 +4,8 @@
 # outside an open menu ends it and goes on to the window under the pointer, which is activated and acts on it: a right
 # click on another program's window opens that window's menu, one on the same window or another window of the same
 # program likewise; Escape ends a menu; luxwm's window menu (Alt+Space) the same way. luxshell's menus when luxshell
-# comes up (skipped otherwise).
+# comes up (skipped otherwise). First flxp-desktop's context menu on a desktop without windows: from its submenu's item down
+# onto the next item, the submenu closes and the menu stays.
 # Needs Xvfb and xdotool. Usage: tests/headless/menus.sh [:DISPLAY]
 D=${1:-:76}
 T=$(mktemp -d)
@@ -18,12 +19,39 @@ start_xvfb $D -screen 0 1024x768x24 -nolisten tcp || { echo "FAIL Xvfb $D did no
 "$R/build/bin/luxwm" > $T/luxwm.log 2>&1 & PW=$!
 wm_up() { xprop -root _NET_SUPPORTING_WM_CHECK 2>/dev/null | grep -q 'window id'; }
 wait_for 20 wm_up || echo "note: luxwm did not announce itself"
-"$B" A 40 60 A2 400 60 > $T/a.log 2>$T/a.err & PA=$!
-"$B" B 40 400 > $T/b.log 2>$T/b.err & PB=$!
-WA=$(wait_window 30 --name '^A$'); WA2=$(wait_window 30 --name '^A2$'); WB=$(wait_window 30 --name '^B$')
 fails=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fails=$((fails + 1)); }
+# flxp-desktop's context menu on a desktop without windows: the pointer on Arrange Icons By opens its submenu, then down
+# onto Refresh: the submenu closes, the menu stays (luxwm leaves the focus on the desktop when the submenu's window goes)
+mkdir -p $HOME/Desktop
+"$R/build/bin/flxp-desktop" > $T/desktop.log 2>&1 & PD=$!
+if wait_window 20 --classname '^flxp-desktop$' > /dev/null; then
+    sleep .5
+    nwin() { xdotool search --onlyvisible --classname '^flxp-desktop$' 2>/dev/null | wc -l; }
+    n0=$(nwin)
+    click_root() { xdotool mousemove "$1" "$2" sleep .1 mousedown "$3" sleep .1 mouseup "$3"; }
+    click_root 500 300 3
+    more() { [ "$(nwin)" -gt "$1" ]; }
+    if wait_for 5 more $n0; then
+        n1=$(nwin)
+        xdotool mousemove 530 312
+        if wait_for 5 more $n1; then
+            n2=$(nwin)
+            xdotool mousemove 530 331
+            back() { [ "$(nwin)" = "$n1" ]; }
+            if wait_for 5 back && sleep 1 && back; then ok "desktop menu: off the submenu's item onto Refresh, the submenu closes and the menu stays"
+            else bad "desktop menu: off the submenu's item onto Refresh: $(nwin) windows, the menu up was $n1, with its submenu $n2"; fi
+        else bad "desktop menu: no submenu on Arrange Icons By"; fi
+        xdotool key Escape; sleep .3; xdotool key Escape
+        gone() { [ "$(nwin)" = "$n0" ]; }
+        wait_for 5 gone || bad "desktop menu: still up after Escape"
+    else bad "desktop menu: no menu on a right click"; fi
+else bad "flxp-desktop did not show"; cat $T/desktop.log; fi
+kill $PD 2>/dev/null; wait $PD 2>/dev/null
+"$B" A 40 60 A2 400 60 > $T/a.log 2>$T/a.err & PA=$!
+"$B" B 40 400 > $T/b.log 2>$T/b.err & PB=$!
+WA=$(wait_window 30 --name '^A$'); WA2=$(wait_window 30 --name '^A2$'); WB=$(wait_window 30 --name '^B$')
 # lines of a log after a mark: mark LOG; since LOG
 mark() { eval "m_$1=\$(wc -l < $T/$1.log)"; }
 since() { eval "_m=\$m_$1"; tail -n +$((_m + 1)) $T/$1.log; }

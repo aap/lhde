@@ -1585,8 +1585,13 @@ handle_unmap_notify(XEvent *e)
         /* Some applications *ahem* Spotify *ahem*, don't seem to place nicely with being deleted.
          * They close slowing, causing focusing issues with unmap requests. Check to see if the current
          * workspace is empty and, if so, focus the root client so that we can pick up new key presses..
+         * Only when the focus went with the window (X reverted it to None, PointerRoot or the root): an override-redirect
+         * window going (a submenu, a tooltip) leaves the focus where it is, on flxp-desktop under its context menu, whose
+         * FocusOut would end the menu (LUXWM.md "Focus and the desktop").
          */
-        if (f_list[curr_ws] == NULL) {
+        Window fw; int rev;
+        XGetInputFocus(display, &fw, &rev);
+        if (f_list[curr_ws] == NULL && (fw == None || fw == PointerRoot || fw == root)) {
             LOGN("Client not found while deleting and ws is empty, focusing root window");
             client_manage_focus(NULL);
 
