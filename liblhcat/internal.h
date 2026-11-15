@@ -19,6 +19,7 @@ struct lhcat {
     int catalogue_authority;
     int offline;                        /* the root's path is not reachable from here (a listing only) */
     char *excludes;                     /* the root's exclude globs, one a line (NULL: none) */
+    char machine[LHCAT_NAME_MAX + 1];   /* the machine the root is on ("" not said) */
     int64_t root_id;                    /* the row of the root directory itself (parent 0, name "") */
     char err[1024];
     char program[64];

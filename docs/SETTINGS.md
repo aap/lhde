@@ -19,6 +19,7 @@ Two directories, one rule each. liblhde gives every path (`lhde_config_file`, `l
 | `keys` | luxwm's key bindings, one per line (`Mod4+Return exec urxvt`; LUXWM.md "Running and testing") |
 | `quicklaunch/` | the Quick Launch `.desktop` files: luxshell's tile, flxp-taskbar's toolbar (`[quicklaunch] dir` names another folder) |
 | `luxpad.ini` | luxpad's choices: `[luxpad]` font, font_size, font_weight, font_italic, wrap, statusbar (docs/USAGE.md "luxpad") |
+| `machines.ini` | the user's machines, one section each (`[NAME]` host, os, note; "machines.ini" below): the catalogue's roots are bound to them (docs/CATALOGUE.md "Machines") |
 | anything else | a shipped file overridden under its own relative name (`navbar/4074.ini`, `frames/jade4074/theme.ini`, `packs/4074-aero/shell.lua`): this directory is the first tree of every data lookup (docs/LAYOUT.md "The three trees") |
 
 **What a program remembers on its own**: `${XDG_STATE_HOME:-~/.local/state}/lhde/`. Losing it costs nothing but convenience.
@@ -114,6 +115,19 @@ theme resolver applies (below the current layer; source `settings` in `lhde-them
 the theme's. The current layer is written by Display Properties, Set as Desktop Background, luxshell's flyout and
 `_LHSHELL_COMMAND taskbar` (liblhde `lhde_current_set` / `lhde_current_set_key`; a key the theme gives anyway is dropped);
 selecting another theme removes it (`lhde_theme_select`), Save As turns it into a theme file (docs/THEME-FORMAT.md section 3).
+
+## machines.ini
+
+The user's machines, written by hand (nothing writes it), read by liblhcat (`lhcat_machines`) for `lhde-cat machines` and
+the machine a catalogue root is bound to (`add-root ... --machine NAME`). One section a machine; NAME as a root's name
+(letters, digits, `-`, `_`, `.`):
+
+    [indra]
+    host = indra              ; how ssh reaches it (a Host of ~/.ssh/config, user@host); none: this machine
+    os = freebsd              ; freebsd or linux
+    note = FreeBSD 13.1, ZFS  ; anything, shown as it is
+
+Keys it does not know are kept for later readers and ignored.
 
 ## Who writes what
 

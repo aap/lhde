@@ -25,7 +25,7 @@ extern "C" {
 typedef struct lhcat lhcat;
 typedef struct sqlite3 sqlite3;
 
-#define LHCAT_SCHEMA 3          /* the schema version a new database gets; older ones are migrated on open */
+#define LHCAT_SCHEMA 4          /* the schema version a new database gets; older ones are migrated on open */
 #define LHCAT_NAME_MAX 64       /* a root's name: letters, digits, '-', '_', '.', not starting with '.' */
 
 /* what a location's facts cover (locations.coverage) */
@@ -54,6 +54,8 @@ int lhcat_offline(lhcat *c);                   /* the root was added offline */
    user's home directory gets LHCAT_HOME_EXCLUDES. */
 #define LHCAT_HOME_EXCLUDES ".cache/\n.local/share/Trash/\n.thumbnails/\n**/node_modules/"
 const char *lhcat_root_excludes(lhcat *c);             /* the root's list ("" none) */
+const char *lhcat_root_machine(lhcat *c);              /* the machine the root is on ("" not said) */
+int lhcat_set_machine(lhcat *c, const char *machine);  /* NULL or "": not said */
 int lhcat_set_excludes(lhcat *c, const char *list);    /* replace it (blank lines dropped) */
 /* the first glob of list that matches rel (is_dir: rel is a directory), NULL none; the glob is a copy in out */
 const char *lhcat_exclude_match(const char *list, const char *rel, int is_dir, char *out, size_t n);
@@ -61,8 +63,8 @@ const char *lhcat_exclude_match(const char *list, const char *rel, int is_dir, c
    looked at): the count, -1 when the table cannot be read */
 typedef void (*lhcat_mount_fn)(void *ctx, const char *path, const char *fstype);
 int lhcat_mounts_below(const char *dir, lhcat_mount_fn fn, void *ctx);
-/* every root: its name and path, by name; the count, -1 on an error */
-typedef void (*lhcat_root_fn)(void *ctx, const char *name, const char *path);
+/* every root: its name, path and machine ("" not said), by name; the count, -1 on an error */
+typedef void (*lhcat_root_fn)(void *ctx, const char *name, const char *path, const char *machine);
 int lhcat_roots(lhcat_root_fn fn, void *ctx);
 /* the root whose path holds the absolute path PATH (the longest such): its name; *rel (when not null) points into PATH
    after the root's path. 0 when found, -1 none. The roots are read again when the directory changed. */
@@ -70,6 +72,15 @@ int lhcat_root_for(const char *path, char *name, size_t n, const char **rel);
 /* The root OLD named NEW: its row, its database file (checkpointed whole into it first) and its thumbnails' directory
    with the paths recorded to it. Refused when NEW exists or another program has the catalogue open. */
 int lhcat_rename_root(const char *old, const char *new_name, char *err, size_t errn);
+
+/* ---- machines ---------------------------------------------------------------------------------------------------------- */
+/* The user's machines: ${XDG_CONFIG_HOME:-~/.config}/lhde/machines.ini, a section each (docs/SETTINGS.md "machines.ini"):
+   host (how ssh reaches it; NULL: this machine), os (freebsd, linux), note. Each machine in file order to fn; the count
+   (0 without the file), -1 when it cannot be read. A root may be bound to one by its section's name. */
+struct lhcat_machine { const char *name, *host, *os, *note; };
+typedef void (*lhcat_machine_fn)(void *ctx, const struct lhcat_machine *m);
+int lhcat_machines(lhcat_machine_fn fn, void *ctx);
+const char *lhcat_machines_file(char *out, size_t n);
 
 /* ---- a catalogue ----------------------------------------------------------------------------------------------------- */
 lhcat *lhcat_open(const char *name, char *err, size_t errn);

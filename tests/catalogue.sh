@@ -12,7 +12,7 @@ cd "$(dirname "$0")/.." || exit 1
 B=$PWD/build/bin/lhde-cat
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
-export XDG_STATE_HOME="$T/state" XDG_CACHE_HOME="$T/cache"
+export XDG_STATE_HOME="$T/state" XDG_CACHE_HOME="$T/cache" XDG_CONFIG_HOME="$T/config"
 fails=0 checks=0
 ok() { checks=$((checks + 1)); }
 no() { checks=$((checks + 1)); fails=$((fails + 1)); echo "FAIL $*"; }
@@ -328,10 +328,10 @@ eq "a file became a directory: --in it" "docs/note2.txt/inner.txt" "$($B find t 
 eq "dirs after kind changes" "0" "$(dirs_bad t)"
 eq "the group index in catalogue order" "$($B find t --type 'image/*' --quiet | head -n 3)" "$($B find t --type 'image/*' --limit 3 --quiet)"
 # the migration fills dirs from the locations of an older database
-python3 -c 'import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); c.executescript("DROP TABLE dirs; DROP INDEX locations_group; DELETE FROM migrations WHERE version >= 3")' "$T/state/lhde/catalogue/t.db"
+python3 -c 'import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); c.executescript("DROP TABLE dirs; DROP INDEX locations_group; ALTER TABLE roots DROP COLUMN machine; DELETE FROM migrations WHERE version >= 3")' "$T/state/lhde/catalogue/t.db"
 $B stats t > /dev/null
 eq "migrated: dirs filled" "0" "$(dirs_bad t)"
-eq "migrated: version" "3" "$(db "SELECT max(version) FROM migrations")"
+eq "migrated: version" "4" "$(db "SELECT max(version) FROM migrations")"
 eq "migrated: the group index" "1" "$(db "SELECT count(*) FROM sqlite_schema WHERE name = 'locations_group'")"
 # rename-root: the row, the file, the thumbnails' directory and their recorded paths
 work=$($B find t --tag work --quiet | wc -l | tr -d ' ')
@@ -354,6 +354,53 @@ kill $reader 2> /dev/null; wait $reader 2> /dev/null
 has "refused while open" "in use" "$(cat "$T/busy")"
 eq "and left as it was" "t2" "$(db_of t2 "SELECT name FROM roots")"
 $B rename-root t2 t > /dev/null || no "rename-root back"
+
+# ---- machines: machines.ini, roots bound to them, the probe (a stand-in ssh: up answers, slow never does) ----------
+mkdir -p "$T/config/lhde" "$T/bin"
+cat > "$T/config/lhde/machines.ini" <<'EOF'
+[here]
+os = linux
+note = this machine
+
+[up]
+host = up.example    ; reached
+os = freebsd
+note = FreeBSD 13.1, ZFS
+
+[down]
+host = down.example
+os = freebsd
+
+[slow]
+host = slow.example
+os = linux
+EOF
+cat > "$T/bin/ssh" <<'EOF'
+#!/bin/sh
+for a; do host=$a; [ "$a" = true ] && break; prev=$a; done
+case "$prev" in up.example) exit 0 ;; slow.example) exec sleep 23.5 ;; *) exit 255 ;; esac
+EOF
+chmod +x "$T/bin/ssh"
+$B add-root plain "$R/docs" --machine nowhere > /dev/null 2> "$T/err" && no "an unknown machine refused" || ok
+has "an unknown machine named" "no machine 'nowhere'" "$(cat "$T/err")"
+has "add-root --machine" "machine here" "$($B add-root plain "$R/docs" --machine here)"
+$B add-root home "$H2" --machine up > /dev/null
+$B add-root t "$R" --machine up > /dev/null || no "add-root t --machine"
+has "roots: the machine" "plain	$R/docs	here" "$($B roots)"
+eq "machines: their roots" "here	(this machine)	linux	plain	this machine|up	up.example	freebsd	home, t	FreeBSD 13.1, ZFS|down	down.example	freebsd	-|slow	slow.example	linux	-" \
+   "$($B machines | tr '\n' '|' | sed 's/|$//')"
+start=$(date +%s)
+out=$(PATH="$T/bin:$PATH" $B machines --probe)
+took=$(($(date +%s) - start))
+has "probe: here" "plain	here	this machine" "$out"
+has "probe: reachable" "home, t	reachable" "$out"
+has "probe: not reachable" "down.example	freebsd	-	not reachable" "$out"
+has "probe: no answer" "slow.example	linux	-	no answer in 3 s" "$out"
+[ $took -le 5 ] && ok || no "probe: 3 s at most ($took s)"
+eq "probe: nothing left running" "" "$(pgrep -f '[s]leep 23.5' | head -n 1)"
+$B add-root plain "$R/docs" --machine - > /dev/null
+eq "unbound" "plain	$R/docs" "$($B roots | grep '^plain')"
+XDG_CONFIG_HOME=$T/none $B machines | grep -q "no machines" && ok || no "machines without the file"
 
 # ---- liblhcat's own -------------------------------------------------------------------------------------------------
 mkdir -p "$T/perf"

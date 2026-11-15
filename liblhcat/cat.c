@@ -87,6 +87,8 @@ static const struct { int version; const char *what; const char *sql; int (*fn)(
       " INSERT INTO dirs(id, path) SELECT id, path FROM t;"
       "CREATE INDEX dirs_path ON dirs(path);"
       "CREATE INDEX locations_group ON locations(substr(type, 1, instr(type, '/')));", NULL },
+    /* machine: the section of machines.ini the root's files are on (NULL: not said) */
+    { 4, "the machine of a root", "ALTER TABLE roots ADD COLUMN machine TEXT;", NULL },
 };
 #define NMIGRATIONS (int)(sizeof MIGRATIONS / sizeof MIGRATIONS[0])
 
@@ -322,7 +324,7 @@ static lhcat *open_db(const char *name, int create, char *err, size_t errn)
     c->st_child = lhcat__prepare(c, "SELECT id FROM locations WHERE parent = ?1 AND name = ?2");
     c->st_node = lhcat__prepare(c, "SELECT l.parent, l.name, d.path FROM locations l LEFT JOIN dirs d ON d.id = l.parent WHERE l.id = ?1");
     if (!c->st_child || !c->st_node) { snprintf(err, errn, "%s", c->err); lhcat_close(c); return NULL; }
-    sqlite3_stmt *q = lhcat__prepare(c, "SELECT path, authority, offline, excludes FROM roots WHERE name = ?1");
+    sqlite3_stmt *q = lhcat__prepare(c, "SELECT path, authority, offline, excludes, machine FROM roots WHERE name = ?1");
     if (q) {
         sqlite3_bind_text(q, 1, name, -1, SQLITE_STATIC);
         if (sqlite3_step(q) == SQLITE_ROW) {
@@ -330,6 +332,7 @@ static lhcat *open_db(const char *name, int create, char *err, size_t errn)
             c->catalogue_authority = sqlite3_column_text(q, 1) && !strcmp((const char *)sqlite3_column_text(q, 1), "catalogue");
             c->offline = sqlite3_column_int(q, 2);
             if (sqlite3_column_text(q, 3) && *sqlite3_column_text(q, 3)) c->excludes = strdup((const char *)sqlite3_column_text(q, 3));
+            if (sqlite3_column_text(q, 4)) snprintf(c->machine, sizeof c->machine, "%s", (const char *)sqlite3_column_text(q, 4));
         }
         sqlite3_finalize(q);
     }
@@ -380,6 +383,53 @@ static int is_home(const char *real)
 }
 
 const char *lhcat_root_excludes(lhcat *c) { return c->excludes ? c->excludes : ""; }
+
+const char *lhcat_root_machine(lhcat *c) { return c->machine; }
+
+int lhcat_set_machine(lhcat *c, const char *machine)
+{
+    if (machine && *machine && !valid_name(machine)) return lhcat__fail(c, "'%s' is not a machine's name", machine);
+    sqlite3_stmt *st = lhcat__prepare(c, "UPDATE roots SET machine = ?2 WHERE name = ?1");
+    if (!st) return -1;
+    sqlite3_bind_text(st, 1, c->name, -1, SQLITE_STATIC);
+    if (machine && *machine) sqlite3_bind_text(st, 2, machine, -1, SQLITE_STATIC); else sqlite3_bind_null(st, 2);
+    int ok = sqlite3_step(st) == SQLITE_DONE;
+    sqlite3_finalize(st);
+    if (!ok) return lhcat__dbfail(c, "machine");
+    snprintf(c->machine, sizeof c->machine, "%s", machine ? machine : "");
+    g_roots_serial++;
+    return 0;
+}
+
+const char *lhcat_machines_file(char *out, size_t n) { return lhde_config_file("machines.ini", out, n); }
+
+struct machines_ctx { lhde_ini *ini; lhcat_machine_fn fn; void *ctx; int n; };
+
+static void each_machine(const char *sec, void *ud)
+{
+    struct machines_ctx *m = ud;
+    if (!valid_name(sec)) return;
+    char host[256], os[64], note[512];
+    struct lhcat_machine mc = { sec, lhde_ini_get(m->ini, sec, "host", host, sizeof host),
+                                lhde_ini_get(m->ini, sec, "os", os, sizeof os), lhde_ini_get(m->ini, sec, "note", note, sizeof note) };
+    if (mc.host && !*mc.host) mc.host = NULL;
+    m->n++;
+    if (m->fn) m->fn(m->ctx, &mc);
+}
+
+int lhcat_machines(lhcat_machine_fn fn, void *ctx)
+{
+    char path[PATH_MAX];
+    lhcat_machines_file(path, sizeof path);
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    lhde_ini *ini = lhde_ini_load(path);
+    if (!ini) return -1;
+    struct machines_ctx m = { ini, fn, ctx, 0 };
+    lhde_ini_sections(ini, each_machine, &m);
+    lhde_ini_free(ini);
+    return m.n;
+}
 
 int lhcat_set_excludes(lhcat *c, const char *list)
 {
@@ -534,7 +584,7 @@ int lhcat_rename_root(const char *old, const char *new_name, char *err, size_t e
     return 0;
 }
 
-struct root { char name[LHCAT_NAME_MAX + 1]; char *path; };
+struct root { char name[LHCAT_NAME_MAX + 1]; char *path; char machine[LHCAT_NAME_MAX + 1]; };
 static struct root *g_roots;
 static int g_nroots = -1, g_loaded_serial = -1;
 static struct timespec g_dir_mtime;
@@ -572,7 +622,9 @@ static void load_roots(void)
         if (sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK) {
             sqlite3_busy_timeout(db, 2000);
             sqlite3_stmt *q = NULL;
-            if (sqlite3_prepare_v2(db, "SELECT path FROM roots WHERE name = ?1", -1, &q, NULL) == SQLITE_OK) {
+            /* a database older than the machine column: its roots without one */
+            if (sqlite3_prepare_v2(db, "SELECT path, machine FROM roots WHERE name = ?1", -1, &q, NULL) == SQLITE_OK ||
+                sqlite3_prepare_v2(db, "SELECT path, NULL FROM roots WHERE name = ?1", -1, &q, NULL) == SQLITE_OK) {
                 sqlite3_bind_text(q, 1, name, -1, SQLITE_STATIC);
                 if (sqlite3_step(q) == SQLITE_ROW && sqlite3_column_text(q, 0)) {
                     if (g_nroots == cap) {
@@ -583,6 +635,8 @@ static void load_roots(void)
                     }
                     snprintf(g_roots[g_nroots].name, sizeof g_roots[g_nroots].name, "%s", name);
                     g_roots[g_nroots].path = strdup((const char *)sqlite3_column_text(q, 0));
+                    snprintf(g_roots[g_nroots].machine, sizeof g_roots[g_nroots].machine, "%s",
+                             sqlite3_column_text(q, 1) ? (const char *)sqlite3_column_text(q, 1) : "");
                     if (g_roots[g_nroots].path) g_nroots++;
                 }
                 sqlite3_finalize(q);
@@ -597,7 +651,7 @@ static void load_roots(void)
 int lhcat_roots(lhcat_root_fn fn, void *ctx)
 {
     load_roots();
-    for (int i = 0; i < g_nroots; i++) if (fn) fn(ctx, g_roots[i].name, g_roots[i].path);
+    for (int i = 0; i < g_nroots; i++) if (fn) fn(ctx, g_roots[i].name, g_roots[i].path, g_roots[i].machine);
     return g_nroots;
 }
 

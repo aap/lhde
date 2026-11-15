@@ -3,6 +3,9 @@
 #include "lhcat.h"
 #include <sqlite3.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <strings.h>
+#include <sys/wait.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdio.h>
@@ -14,11 +17,13 @@
 
 static const char *USAGE =
     "usage: lhde-cat COMMAND ...\n"
-    "  add-root NAME PATH [--authority filesystem|catalogue] [--offline] [--exclude GLOB]...\n"
+    "  add-root NAME PATH [--authority filesystem|catalogue] [--offline] [--exclude GLOB]... [--machine NAME|-]\n"
     "                                            a root over a directory (or a mount); --offline: PATH is not reachable\n"
     "                                            here (a listing of another machine's); a home directory gets the default\n"
     "                                            excludes (" ".cache/ .local/share/Trash/ .thumbnails/ **/node_modules/)\n"
-    "  roots                                     the roots and their paths\n"
+    "  roots                                     the roots, their paths and machines\n"
+    "  machines [--probe]                        the machines of machines.ini with their roots; --probe: whether ssh\n"
+    "                                            reaches each (BatchMode, 3 s)\n"
     "  rename-root OLD NEW                       the root and its database renamed (not while another program has it open)\n"
     "  excludes NAME [+GLOB|-GLOB]...            the root's exclude globs (relative to the root, a trailing / for\n"
     "                                            directories, ** any depth), with some added or removed\n"
@@ -108,11 +113,6 @@ static void on_signal(int s) { g_sig = s; lhcat_interrupt(); }
 
 /* ---- add-root, roots --------------------------------------------------------------------------------------------- */
 
-static void print_root(void *ctx, const char *name, const char *path)
-{
-    (void)ctx;
-    printf("%s\t%s\n", name, path);
-}
 
 /* ---- import-du ---------------------------------------------------------------------------------------------------- */
 
@@ -767,6 +767,132 @@ static int edit_excludes(lhcat *c, const char *const *globs, int n, int plain_ad
     return rc;
 }
 
+/* ---- roots, machines ---------------------------------------------------------------------------------------------- */
+
+static void print_root(void *ctx, const char *name, const char *path, const char *machine)
+{
+    (void)ctx;
+    if (*machine) printf("%s\t%s\t%s\n", name, path, machine);
+    else printf("%s\t%s\n", name, path);
+}
+
+struct find_machine { const char *name; int found; };
+
+static void match_machine(void *ctx, const struct lhcat_machine *m)
+{
+    struct find_machine *f = ctx;
+    if (!strcasecmp(m->name, f->name)) f->found = 1;
+}
+
+/* the root bound to a machine of machines.ini ("-": to none) */
+static int set_machine(lhcat *c, const char *machine)
+{
+    if (!strcmp(machine, "-")) machine = NULL;
+    else {
+        struct find_machine f = { machine, 0 };
+        char file[PATH_MAX];
+        if (lhcat_machines(match_machine, &f) < 0 || !f.found) {
+            fprintf(stderr, "lhde-cat: no machine '%s' in %s\n", machine, lhcat_machines_file(file, sizeof file));
+            return -1;
+        }
+    }
+    if (lhcat_set_machine(c, machine)) { fprintf(stderr, "lhde-cat: %s\n", lhcat_error(c)); return -1; }
+    return 0;
+}
+
+struct machine_row { char name[LHCAT_NAME_MAX + 1], host[256], os[64], note[512], roots[1024]; pid_t probe; int reached; };
+struct machine_list { struct machine_row v[64]; int n; };
+
+static void add_machine(void *ctx, const struct lhcat_machine *m)
+{
+    struct machine_list *l = ctx;
+    if (l->n == 64) return;
+    struct machine_row *r = &l->v[l->n++];
+    memset(r, 0, sizeof *r);
+    snprintf(r->name, sizeof r->name, "%s", m->name);
+    snprintf(r->host, sizeof r->host, "%s", m->host ? m->host : "");
+    snprintf(r->os, sizeof r->os, "%s", m->os ? m->os : "");
+    snprintf(r->note, sizeof r->note, "%s", m->note ? m->note : "");
+    r->probe = -1;
+}
+
+static void add_machine_root(void *ctx, const char *name, const char *path, const char *machine)
+{
+    (void)path;
+    struct machine_list *l = ctx;
+    for (int i = 0; i < l->n; i++)
+        if (*machine && !strcasecmp(l->v[i].name, machine)) {
+            size_t k = strlen(l->v[i].roots);
+            snprintf(l->v[i].roots + k, sizeof l->v[i].roots - k, "%s%s", k ? ", " : "", name);
+        }
+}
+
+/* ssh HOST true without asking for anything, given up after 3 s; every machine at once */
+static void probe(struct machine_list *l)
+{
+    for (int i = 0; i < l->n; i++) {
+        if (!l->v[i].host[0]) continue;
+        pid_t p = fork();
+        if (p == 0) {
+            int nul = open("/dev/null", O_RDWR);
+            if (nul >= 0) { dup2(nul, 0); dup2(nul, 1); dup2(nul, 2); }
+            execlp("ssh", "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=yes",
+                   l->v[i].host, "true", (char *)NULL);
+            _exit(127);
+        }
+        l->v[i].probe = p;
+    }
+    double end = now_s() + 3.0;
+    for (;;) {
+        int left = 0;
+        for (int i = 0; i < l->n; i++) {
+            if (l->v[i].probe <= 0) continue;
+            int st;
+            pid_t r = waitpid(l->v[i].probe, &st, WNOHANG);
+            if (r == l->v[i].probe) { l->v[i].reached = WIFEXITED(st) && WEXITSTATUS(st) == 0 ? 1 : -1; l->v[i].probe = 0; }
+            else left++;
+        }
+        if (!left) break;
+        if (now_s() >= end) {   /* not answered in time: stopped */
+            for (int i = 0; i < l->n; i++)
+                if (l->v[i].probe > 0) {
+                    kill(l->v[i].probe, SIGKILL);
+                    waitpid(l->v[i].probe, NULL, 0);
+                    l->v[i].probe = 0;
+                    l->v[i].reached = -2;
+                }
+            break;
+        }
+        struct timespec ts = { 0, 50 * 1000000L };
+        nanosleep(&ts, NULL);
+    }
+}
+
+static int cmd_machines(int argc, char **argv)
+{
+    int do_probe = 0;
+    for (int i = 0; i < argc; i++)
+        if (!strcmp(argv[i], "--probe")) do_probe = 1;
+        else return usage();
+    static struct machine_list l;
+    char file[PATH_MAX];
+    lhcat_machines_file(file, sizeof file);
+    int n = lhcat_machines(add_machine, &l);
+    if (n < 0) return fail("%s: cannot be read", file, NULL);
+    if (n == 0) { printf("no machines (%s)\n", file); return 0; }
+    lhcat_roots(add_machine_root, &l);
+    if (do_probe) probe(&l);
+    for (int i = 0; i < l.n; i++) {
+        struct machine_row *r = &l.v[i];
+        printf("%s\t%s\t%s\t%s", r->name, r->host[0] ? r->host : "(this machine)", r->os[0] ? r->os : "-", r->roots[0] ? r->roots : "-");
+        if (do_probe)
+            printf("\t%s", !r->host[0] ? "here" : r->reached == 1 ? "reachable" : r->reached == -2 ? "no answer in 3 s" : "not reachable");
+        if (r->note[0]) printf("\t%s", r->note);
+        putchar('\n');
+    }
+    return 0;
+}
+
 static int cmd_excludes(int argc, char **argv)
 {
     if (argc < 1) return usage();
@@ -793,11 +919,13 @@ int main(int argc, char **argv)
         const char *authority = NULL;
         int offline = 0;
         const char *excl[64];
+        const char *machine = NULL;
         int nexcl = 0;
         for (int i = 2; i < n; i++)
             if (!strcmp(a[i], "--authority") && i + 1 < n) authority = a[++i];
             else if (!strcmp(a[i], "--offline")) offline = 1;
             else if (!strcmp(a[i], "--exclude") && i + 1 < n && nexcl < 64) excl[nexcl++] = a[++i];
+            else if (!strcmp(a[i], "--machine") && i + 1 < n) machine = a[++i];
             else return usage();
         char err[1024];
         lhcat *before = lhcat_open(a[0], err, sizeof err);
@@ -807,13 +935,16 @@ int main(int argc, char **argv)
         lhcat *c = open_name(a[0]);
         if (!c) return 1;
         if (nexcl && edit_excludes(c, excl, nexcl, 1)) { lhcat_close(c); return 1; }
+        if (machine && set_machine(c, machine)) { lhcat_close(c); return 1; }
         int r = lhcat_offline(c) || existed ? 0 : lhcat_touch(c, "");   /* a new root's own facts */
         if (*lhcat_root_excludes(c)) print_list("excludes: ", lhcat_root_excludes(c));
-        printf("%s\t%s\t(authority: %s%s)\n", a[0], lhcat_root_path(c), lhcat_catalogue_authority(c) ? "catalogue" : "filesystem", lhcat_offline(c) ? ", offline" : "");
+        printf("%s\t%s\t(authority: %s%s%s%s)\n", a[0], lhcat_root_path(c), lhcat_catalogue_authority(c) ? "catalogue" : "filesystem",
+               lhcat_offline(c) ? ", offline" : "", *lhcat_root_machine(c) ? ", machine " : "", lhcat_root_machine(c));
         lhcat_close(c);
         return r < 0;
     }
     if (!strcmp(cmd, "roots")) return lhcat_roots(print_root, NULL) < 0;
+    if (!strcmp(cmd, "machines")) return cmd_machines(n, a);
     if (!strcmp(cmd, "excludes")) return cmd_excludes(n, a);
     if (!strcmp(cmd, "rename-root")) {
         if (n != 2) return usage();

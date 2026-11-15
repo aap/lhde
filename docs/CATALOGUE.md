@@ -169,10 +169,10 @@ another machine: it is filled by import-du only; `add-root NAME REALPATH` later 
 
 ## Using it
 
-    lhde-cat add-root NAME PATH [--authority filesystem|catalogue] [--offline] [--exclude GLOB]...
+    lhde-cat add-root NAME PATH [--authority filesystem|catalogue] [--offline] [--exclude GLOB]... [--machine NAME|-]
     lhde-cat excludes NAME [+GLOB|-GLOB]...
     lhde-cat index NAME [SUBPATH] [--exclude GLOB]... [--cross-fs] [--time MIN] [--dry-run] [--budget MB] [--thumbs 128|256] ...
-    lhde-cat roots | rename-root OLD NEW
+    lhde-cat roots | rename-root OLD NEW | machines [--probe]
     lhde-cat find NAME [--tag T] [--no-tag T [--include-unknown]] [--desc TEXT] [--text WORDS] [--type image/*]
                        [--since DATE] [--until DATE] [--color C] [--in SUBPATH] [--files|--dirs] [--limit N] [--json]
     lhde-cat stats NAME
@@ -196,6 +196,16 @@ in the whole of June). ATTR is a short name (`desc`, `tags`, `comment`, `color`,
 `todo`) or a `user.*` name. `set`, `unset` and `tag` write at once on a root whose authority is the file system and defer to
 `commit` on one whose authority is the catalogue; `--write` and `--defer` choose. Exit status 3 means a conflict.
 
+## Machines
+
+`~/.config/lhde/machines.ini` lists the user's machines, a section each with `host` (how ssh reaches it; none: this
+machine), `os` (`freebsd`, `linux`) and `note` (docs/SETTINGS.md "machines.ini"). A root is bound to one with
+`add-root NAME PATH --machine MACHINE` (`--machine -` unbinds; the machine must be in the file), kept in `roots.machine`;
+`lhde-cat roots` prints it after the path. `lhde-cat machines` lists each machine with its host, OS, the roots bound to it
+and its note; with `--probe` also whether `ssh -o BatchMode=yes -o ConnectTimeout=3 HOST true` succeeds (`reachable`,
+`not reachable`, `no answer in 3 s`; all machines at once, each stopped after 3 s; `here` for this machine). Nothing goes
+over the connection yet: it is where the remote side will start.
+
 ## What flxp uses
 
 When the folder shown lies under a root with a catalogue, the Explorer's attribute reads for the folder (the Filter box's
@@ -211,8 +221,8 @@ file observed again), so the catalogue follows flxp's edits. Nothing else in flx
 
 `migrations(version, applied_at, what)` records the schema versions applied; a database is migrated on open and a newer
 one than the program knows is refused (version 2 widened the state check of `locations` in place, no rows rewritten;
-version 3 fills `dirs` from the locations, about 9 s on the 7.1 M-row stash). The tables: `roots` (name, path, host,
-authority, offline, excludes, added_at, listed_at, indexed_at), `objects`, `locations`, `dirs`, `relations`, `hashes`,
+version 3 fills `dirs` from the locations, about 9 s on the 7.1 M-row stash; version 4 adds `roots.machine`). The tables: `roots` (name, path, host,
+authority, offline, excludes, machine, added_at, listed_at, indexed_at), `objects`, `locations`, `dirs`, `relations`, `hashes`,
 `attrs`, `tags`, `picture`, `thumbs`, `journal`, `scans`, the FTS5 table `text`. Indices: locations by (parent, name)
 (unique), name, type, the type's group (`substr(type, 1, instr(type, '/'))`), object and inode; dirs by path; attrs by
 (name, desired) and pending; tags by (tag, object) and object; picture by taken_at; hashes by full hash; journal by object
