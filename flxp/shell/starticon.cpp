@@ -135,10 +135,25 @@ gdi::Bitmap* to_square(gdi::Bitmap* src, int size)
     return out;
 }
 
-// A build whose explorer.exe has no IDB_START but whose own visual style has the flag its Start button shows: 4074's classic
-// Start button carries a white four-pane flag, drawn as Jade's CompositedWindow.DEFAULTICON (20 x 17, a PNG with alpha; Jade
-// is 4074's default look). The other Longhorn styles' Start::Button images are flagless pills and their
-// Sidebar.STARTBUTTON is the Sidebar's own button, so no other build is here.
+// Where a build keeps its Start button's flag: XP's and 2000's explorer.exe (IDB_START 143, IDB_STARTCLASSIC 176); the
+// Longhorn builds' shell branding DLL, shellbrd.dll (Windows/Branding/shellbrd; 4051's and 4074's: 1040 the 25 x 20 flag of a
+// styled button, 1041 the classic 16 x 16, both 32-bit with straight alpha, the white four-pane flag with a dark blue edge).
+struct FlagFile { const char* file; int start, classic; };
+const FlagFile kFlagFiles[] = { { "explorer.exe", 143, 176 }, { "shellbrd.dll", 1040, 1041 } };
+
+// the first file of kFlagFiles that BUILD has with its Start bitmap; null when none (ReactOS never: its 143 is ReactOS's logo)
+const FlagFile* flag_file(const std::string& build)
+{
+    if (build.empty() || build == "reactos") return nullptr;
+    for (const FlagFile& f : kFlagFiles)
+        if (has_bitmap(build, f.file, f.start)) return &f;
+    return nullptr;
+}
+
+// A build without such a file whose own visual style has a stand-in for its flag: 4074's white four-pane flag in the design
+// of Jade's CompositedWindow.DEFAULTICON (20 x 17, a PNG with alpha, the glass frame's default window icon; Jade is 4074's
+// default look), its panes shaded where shellbrd's are white. The other Longhorn styles' Start::Button images are flagless
+// pills and their Sidebar.STARTBUTTON is the Sidebar's own button, so no other build is here.
 const struct { const char* build; const char* style; } kStyleFlags[] = { { "4074", "jade4074" } };
 
 // the file of the style that has BUILD's flag, when it is imported ("" otherwise)
@@ -202,7 +217,7 @@ std::string start_flag_build(const std::string& choice) { return flag_build_of(c
 bool start_flag_available(const std::string& build)
 {
     if (build.empty() || build == "reactos") return false;
-    return has_bitmap(build, "explorer.exe", 143) || has_style_flag(build);
+    return flag_file(build) || has_style_flag(build);
 }
 
 std::vector<std::string> start_flag_builds()
@@ -230,7 +245,8 @@ std::string start_flag_label(const std::string& build)
 gdi::Bitmap* start_flag_image(const std::string& build, bool styled)
 {
     if (!start_flag_available(build)) return nullptr;
-    gdi::Bitmap* start = build_bitmap(build, "explorer.exe", 143);
+    const FlagFile* ff = flag_file(build);
+    gdi::Bitmap* start = ff ? build_bitmap(build, ff->file, ff->start) : nullptr;
     if (!start)   // the style's flag: in the left 20 x 20 of the styled cell, where XP's flag is; the classic cell whole
         return styled ? in_cell(style_flag(build), 25, 20, 0, 0, 20, 20) : in_cell(style_flag(build), 16, 16, 0, 0, 16, 16);
     key_alpha(start);
@@ -245,7 +261,7 @@ gdi::Bitmap* start_flag_image(const std::string& build, bool styled)
         gdi::destroy_bitmap(start);
         return cell;
     }
-    if (gdi::Bitmap* classic = build_bitmap(build, "explorer.exe", 176)) {
+    if (gdi::Bitmap* classic = build_bitmap(build, ff->file, ff->classic)) {
         gdi::destroy_bitmap(start);
         key_alpha(classic);
         return to_square(classic, 16);
@@ -311,9 +327,10 @@ std::string start_icon_source(const std::string& choice, int size)
     std::string build = flag_build_of(choice);
     if (!build.empty()) {
         if (!start_flag_available(build)) return "";
-        if (!has_bitmap(build, "explorer.exe", 143)) return "style:" + flag_style_path(build) + "#CompositedWindow.DEFAULTICON";
-        int id = size <= 16 && has_bitmap(build, "explorer.exe", 176) ? 176 : 143;
-        return "pe:" + resource_file(build, "explorer.exe") + "#" + std::to_string(id);
+        const FlagFile* ff = flag_file(build);
+        if (!ff) return "style:" + flag_style_path(build) + "#CompositedWindow.DEFAULTICON";
+        int id = size <= 16 && has_bitmap(build, ff->file, ff->classic) ? ff->classic : ff->start;
+        return "pe:" + resource_file(build, ff->file) + "#" + std::to_string(id);
     }
     if (named(choice)) {
         std::string f = lhde_find("icons/flags/" + choice + "-" + std::to_string(size) + ".png");

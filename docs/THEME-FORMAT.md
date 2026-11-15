@@ -137,7 +137,7 @@ change.
 | value | the picture |
 | --- | --- |
 | `windows` (default) | the imported flag, as without the key (XP's, else Windows 2000's; neither: flxp-taskbar's own waving flag, section 6) |
-| `windows:BUILD` | that build's own flag, whatever the theme: `resources/BUILD/explorer.exe`'s IDB_START 143 on a styled button, IDB_STARTCLASSIC 176 on the classic one (without 176: 143 at 16 px), and frame 0 of its micro brand in the brand band (see below); `windows:4074` 4074's white flag from Jade (see below). A build not imported, or without a flag of its own, is `windows` |
+| `windows:BUILD` | that build's own flag, whatever the theme: `resources/BUILD/explorer.exe`'s IDB_START 143 on a styled button, IDB_STARTCLASSIC 176 on the classic one (without 176: 143 at 16 px), and frame 0 of its micro brand in the brand band (see below); a Longhorn build's from `resources/BUILD/shellbrd.dll` (see below). A build not imported, or without a flag of its own, is `windows` |
 | `lhde` | lhde's own mark: two overlapping application windows, `share/icons/flags/lhde-SIZE.png` |
 | `linux` | a penguin, `share/icons/flags/linux-SIZE.png` |
 | `freebsd` | a red daemon's face with horns, `share/icons/flags/freebsd-SIZE.png` |
@@ -156,17 +156,22 @@ Start bitmap. `windows:2k` is 2000's one IDB_START, 16x16 at 4 bits on the butto
 magenta are transparent), on the classic button as it is and centred in the left 20x20 of the styled button's 25x20 cell;
 its brand is browseui's 306 (22 px frames). `windows:xp` is XP's 32-bit start.bmp (25x20) and startclassic.bmp (16x16) with
 their alpha, and shell32's IDB_BRAND_BITMAP_MICRO 240. The Longhorn builds' explorer.exe (4042, 4051, 4074, 5048, 5112) has
-neither 143 nor 176, and their shell32 no 240. 4074's classic taskbar shows a white four-pane flag on its Start button,
-drawn as Jade's `CompositedWindow.DEFAULTICON` (a 20x17 PNG stream with alpha, the glass frame's default window icon; Jade is
-4074's default look), the button's panes a little whiter than the icon's. `windows:4074` takes it from `styles/jade4074.msstyles`: as it is, centred in the left 20x20 of the
-styled cell, and shrunk to 16x14 in the classic 16x16 cell, alpha kept; the brand band shows it at 20 px (4074 has no micro
-brand); without jade4074 imported it is `windows`. No other Longhorn style has that part, and none carries a flag on its
-Start button: the 4042-4074 styles' `Start::Button` images (99x87 Plex and Jade, 99x99 Slate and Luna; three states) are
-flagless pills, their `Sidebar.STARTBUTTON` (28x22, Jade's 29x22 silver-white; Slate 4074's a 63x23 dark pill with the
-colour flag) is the sidebar's own button, and the Avalon Start button is imageres' StartButton images (1156, 74x23 in 4051
-and 4074; 1179, 78x28 in 4074) with the four-colour flag drawn into the dark pill; 5048 has no flag bitmap at all and 5112's
-explorer.exe only a 48 px icon (7103). So 4042, 4051, 5048 and 5112 are not offered and are `windows`; `lhde-theme explain`
-says why. ReactOS's 143 is ReactOS's logo and is never taken.
+neither 143 nor 176, and their shell32 no 240: their Start bitmaps are in the shell branding DLL,
+`Windows/Branding/shellbrd/shellbrd.dll`, imported as `resources/BUILD/shellbrd.dll` for 4051 and 4074. Its RT_BITMAP 1040
+(25x20) and 1041 (16x16), both 32-bit with straight (not premultiplied) alpha, are the white four-pane flag with a dark blue
+edge at its bottom and right that 4074's classic taskbar shows on its Start button; they take 143's and 176's places: 1040
+as it is on a styled button, 1041 on the classic one, and the brand band shows the flag alone at 20 px (no micro brand).
+The two bitmaps are the same in every Longhorn build's shellbrd.dll from 4042 to 5112 (4042, 4051, 4053, 4074, 5048, 5112);
+only 4051's and 4074's recipes import it, so the other builds are not offered and are `windows`; `lhde-theme explain` says why.
+A 4074 tree without shellbrd.dll (imported before it was in the recipe) has the flag's design from Jade:
+`CompositedWindow.DEFAULTICON` (a 20x17 PNG stream with alpha, the glass frame's default window icon; Jade is 4074's default
+look), its panes shaded where shellbrd's are white, from `styles/jade4074.msstyles`: centred in the left 20x20 of the styled
+cell and shrunk to 16x14 in the classic 16x16 cell, alpha kept; with neither imported `windows:4074` is `windows`. No
+Longhorn style carries a flag on its Start button: the 4042-4074 styles' `Start::Button` images (99x87 Plex and Jade, 99x99
+Slate and Luna; three states) are flagless pills, their `Sidebar.STARTBUTTON` (28x22, Jade's 29x22 silver-white; Slate
+4074's a 63x23 dark pill with the colour flag) is the sidebar's own button, and the Avalon Start button is imageres'
+StartButton images (1156, 74x23 in 4051 and 4074; 1179, 78x28 in 4074) with the four-colour flag drawn into the dark pill.
+ReactOS's 143 is ReactOS's logo and is never taken.
 
 ## 3. Values and inheritance
 - **absent** = inherit from `base`, else the style-derived default (section 5); **`none`** = switched off.
