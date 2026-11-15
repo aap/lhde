@@ -197,9 +197,12 @@ static void thumbnailer_checks()
 {
     using namespace shell::thumbs;
     struct stat st;
-    if (stat("/usr/share/mime/globs2", &st) != 0) { printf("note: no /usr/share/mime: the thumbnailer entries are not checked\n"); return; }
+    const char* mime = nullptr;   // the system's MIME database: /usr/local/share/mime on FreeBSD
+    for (const char* m : { "/usr/share/mime", "/usr/local/share/mime" })
+        if (stat((std::string(m) + "/globs2").c_str(), &st) == 0) { mime = m; break; }
+    if (!mime) { printf("note: no shared-mime-info database: the thumbnailer entries are not checked\n"); return; }
     std::string data = dir + "/data/thumbnailers", sys = dir + "/sys";
-    std::string cmd = "mkdir -p '" + data + "' '" + sys + "' && ln -s /usr/share/mime '" + sys + "/mime'";
+    std::string cmd = "mkdir -p '" + data + "' '" + sys + "' && ln -s " + mime + " '" + sys + "/mime'";
     if (system(cmd.c_str()) != 0) { check("scratch data directories", false); return; }
     setenv("DISPLAY", ":thumbstest", 1);   // not passed on
 

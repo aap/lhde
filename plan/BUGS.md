@@ -116,10 +116,8 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
 ## FreeBSD
 - 2026-11-14 The battery is the sysctls' sum: no model, capacity or per-battery rows in the power flyout (ACPIIO_BATT_GET_BIX /
   GET_BST on /dev/acpi, group operator, would give them).
-- 2026-11-14 The touchpad item is unverified on a real X server (Xorg's log on soma shows the "SynPS/2 Synaptics TouchPad").
 - 2026-11-14 FreeBSD 15's inotify may give no IN_ATTRIB for a watched folder's entries, so changed attribute columns wait for F5;
   a per-file watch or a ctime poll of the shown rows (check).
-- 2026-11-15 tests/headless/slowfs.c (the slow-path shim) is unbuilt and untested on FreeBSD (extattr_*, statfs's f_fstypename).
 
 ## Tests
 - 2026-11-14 The headless tests' luxshell runs `pactl subscribe`, which autospawns pulseaudio where it is installed but not running:
