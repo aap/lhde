@@ -250,7 +250,13 @@ JPEGs in the Thumbnails view at 256 px, paged through and into a subfolder: the 
 their 64 MB budget plus what is on screen, some evicted, and 30 PDFs among them each made by a thumbnailer (where pdftoppm or
 mutool is installed), skipped without ImageMagick: `tests/headless/thumbsmem.sh`, a PDF's, a PostScript file's and a DjVu
 file's thumbnails made by lhde's thumbnailer entries, in the cache and on screen (the PS and DjVu where gs and ddjvu are
-installed; skipped without pdftoppm or mutool): `tests/headless/thumbdocs.sh`, a double
+installed; skipped without pdftoppm or mutool): `tests/headless/thumbdocs.sh`, flxp on a network folder of 2000 JPEGs made as
+slow as an NFS mount at 50 ms a round trip by `build/tests/slowfs.so` (an LD_PRELOAD shim, `tests/headless/slowfs.c`: stat,
+open, read, readdir and the xattr calls under `$LHDE_SLOW_PREFIX` wait `$LHDE_SLOW_MS`, `LHDE_SLOW_REMOTE=1` makes statfs say
+NFS there, `$LHDE_SLOW_LOG` logs every call and the bytes read per open; usable by hand on any program): the list painted
+from readdir at most 2 s later than the same folder local, every stat in within 60 s, EXIF thumbnails before the first full
+decode, the full reads within `thumbnails_network_budget`, the local folder listed and decoded as before (skipped without
+python3's PIL): `tests/headless/slowpath.sh`, a double
 click and Enter on a file with Run as running its command: `tests/headless/runas.sh`, the window and program icons through
 liblhde's lookup, counted by colour in screenshots of a scratch icon set: the Open With list's and Properties' Opens with icon
 from a desktop file, luxshell's task buttons and the Alt+Tab switcher with an xterm (the class map's cmd) and Display Properties

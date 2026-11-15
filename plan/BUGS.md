@@ -18,6 +18,16 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   rollout / 4051 band of the selection (setfattr in a terminal: old value until the selection changes).
 - 2026-11-01 The 4051 band's invitation colour and the Choose Details dialog's layout are unmeasured choices.
 - 2026-11-01 The property registry's defaults are not in a shipped data file with user overrides (the shape is there, no loading).
+- 2026-11-15 Network folder: readdir, folder_for's stat and the tree's listing of the parent still run on the UI thread (0.8 s for
+  2000 entries in slowpath.sh at 50 ms per 128-entry reply); a hung server still hangs the window. A worker readdir in batches would not.
+- 2026-11-15 Network folder: Tiles and the details leave out a picture's Dimensions, the infotip shows only the stored properties a
+  column read; the lister could read the header (and the xattrs) for the items on screen.
+- 2026-11-15 Network folder: what the user asks for still reads synchronously (Add Tag's selection_tags reads every selected
+  file's xattrs, Open's mime_type stats and sniffs, Properties); 500 selected files = 500 round trips before the dialog.
+- 2026-11-15 Network folder: the task band shows "Add a description" for the moment (0.1-0.3 s) before the lister has read the
+  selection's stored properties; an edit begun then starts empty.
+- 2026-11-15 The network thumbnail budget is per Loader: thumbview's and the two panes' loaders (preview.cpp) each have one, so a
+  folder may read up to three budgets whole.
 - 2026-11-14 Properties sheet, General page: the "Opens with" program's icon is drawn over the start of its name ("[icon]pad" for
   luxpad; lab, luna and jade4074, luxattr --general).
 - 2026-11-13 Properties sheet: a binary value shows escaped (\xNN) in the Advanced list, but an edit of it is written back as text.
@@ -107,10 +117,13 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
 - 2026-11-14 The touchpad item is unverified on a real X server (Xorg's log on soma shows the "SynPS/2 Synaptics TouchPad").
 - 2026-11-14 FreeBSD 15's inotify may give no IN_ATTRIB for a watched folder's entries, so changed attribute columns wait for F5;
   a per-file watch or a ctime poll of the shown rows (check).
+- 2026-11-15 tests/headless/slowfs.c (the slow-path shim) is unbuilt and untested on FreeBSD (extattr_*, statfs's f_fstypename).
 
 ## Tests
 - 2026-11-14 The headless tests' luxshell runs `pactl subscribe`, which autospawns pulseaudio where it is installed but not running:
   it writes ~/.config/pulse into the scratch HOME and lingers; set PULSE_SERVER to nothing or stop it.
+- 2026-11-15 slowpath.sh covers the Icons view sorted by Name only: the once-only re-sort of a size or date sort and the Details
+  columns filling in on a network folder have no test.
 
 ## Repository
 - 2026-11-14 Publish the free pack: a GitHub release tagged `resources` with lhde-resources-free-3.zip (FREE_PACK_URL's default,

@@ -50,7 +50,13 @@ build/tests/w32/comdlg32.res: wux/rc/comdlg32.res
 	cp $< $@
 TEST_DATA = build/tests/w32/test.res build/tests/w32/comdlg32.res
 
-tests: $(TOOLKIT_TESTS) $(W32_TESTS) $(TEST_DATA)
+# slowfs.so: the LD_PRELOAD shim that makes a tree as slow as a network mount (tests/headless/slowfs.c, slowpath.sh)
+SLOWFS = build/tests/slowfs.so
+$(SLOWFS): tests/headless/slowfs.c
+	@mkdir -p $(dir $@)
+	$(CC) -g -O1 -Wall -Wno-nonnull-compare -fPIC -shared -o $@ $< -pthread $(if $(filter Linux,$(shell uname -s)),-ldl)
+
+tests: $(TOOLKIT_TESTS) $(W32_TESTS) $(TEST_DATA) $(SLOWFS)
 w32test: $(W32_TESTS) $(TEST_DATA)
 check: all check-poison
 	tests/check.sh

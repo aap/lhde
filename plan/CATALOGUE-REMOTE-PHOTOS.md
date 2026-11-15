@@ -81,7 +81,9 @@ Each step is useful on its own; (a) and (b) are the foundation the rest stands o
   when a root has one (instant, and across the whole tree not just the folder), and gets its own small window for the
   fun part (`luxfind`: XP's Search Companion / 4051's query views; a query box, the results in the shared list view, double
   click opens luxview, drag to tag). flxp's core stays unaware beyond the provider and the filter hook.
-* Steps, each a satisfying end in itself: (1) async enumeration + EXIF thumbnails + the slow-path harness; (2) lhde-cat
+* Steps, each a satisfying end in itself: (1) async enumeration + EXIF thumbnails + the slow-path harness
+  (in: shell/lister.h and Folder::enumerate_names, the three thumbnail stages with thumbnails_network_budget, luxview's EXIF
+  first look, tests/headless/slowfs.c and slowpath.sh; open: readdir itself off the UI thread, plan/BUGS.md); (2) lhde-cat
   locally + the Filter box over it + luxfind (in: lhde-cat with import-du, index, touch, find, the observed/desired/pending
   attributes, the operation journal and the authority setting, flxp's Filter box and details::write on it; docs/CATALOGUE.md.
   Open: luxfind, queries across the whole root in flxp); (3) lhde-remote over ssh with the flxp provider, tested against indra (13.1)
