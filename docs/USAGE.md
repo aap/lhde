@@ -707,7 +707,8 @@ while the data comes in and is sorted once when the last of it is in, so it move
 the entries at once and adds up their sizes as they come. Nothing the Explorer does on its own reads an entry of such a folder
 on its window's thread: the infotip shows what the list has read, the Tiles view and the details leave out a picture's
 Dimensions, the status bar and Open With take a file's type from its name, the folder tree and the breadcrumb's drop-downs know
-folders from the directory entries; F5 and a change seen on disk read the names again and the stats behind them. What you ask
+folders from the directory entries; F5 reads the names and every stat again, a change
+seen on disk (inotify: what this machine changed) reads the names again and stats the new entries. What you ask
 for yourself (opening a file, Properties, Add Tag, copying) still reads the files it needs while you wait.
 
 ## The Explorer's views (flxp)

@@ -925,7 +925,8 @@ void unfollow(Browser& b)
 static void merge(Browser& b, std::vector<Item> all, bool keep_order);
 
 // A slow folder (b.slow) is listed again from readdir alone: the entries it had keep what
-// was known of them while the lister reads their stats again (the new ones are pending).
+// was known of them, the new ones (pending) get their stat and, when wanted, their stored properties
+// from the lister (F5, refresh(), reads every stat again)
 void update(Browser& b)
 {
     if (!b.folder || !b.list) return;
@@ -940,7 +941,8 @@ void update(Browser& b)
         }
         std::vector<Item> order = all;
         shell::sort_items(order, b.sort, b.ascending);
-        lister_of(b).add(order, true, wants_stored(b));
+        lister_of(b).add(order, true, false);   // (the pending ones)
+        read_stored(b, order);                  // (those not read yet, when a column wants them)
     } else {
         if (!b.folder->enumerate(all, b.show_hidden) && all.empty()) return;
         read_stored(b, all);
