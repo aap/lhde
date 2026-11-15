@@ -86,3 +86,27 @@ Each step is useful on its own; (a) and (b) are the foundation the rest stands o
 * lhde-cat: a path-prefix query (`--in backup`) over 7 M rows takes 1.9 s and `--type image/* --limit` 255 ms on 2 M: the
 	parent+name storage needs a subtree index (a directory id range or a materialised path prefix) and the type filter an index
 	ordered by id; confirm relations from the CLI; resolve applies every conflicting op, not the winner only
+
+## "My machines" (aap, 2026-11-15) and what ZFS offers
+aap: a list of the machines I have and how to reach them, with a synchronised catalogue of their file systems; something
+between KDE Connect and a directory service. indra and soma are FreeBSD on ZFS; vishnu (here) is not.
+* **The machine list is the catalogue's address book**: `~/.config/lhde/machines.ini` (name, ssh host, OS, notes, what it
+  serves: catalogue roots, zfs pools, a tray of its hardware through lhde-hw later) and every root bound to a machine. The
+  same file drives the remote helper (`ssh HOST lhde-remote`), luxshell's future "machines" tile (reachability, battery of a
+  laptop through the helper = the KDE Connect-ish part), and a wux "My Network Places" window in XP's idiom (each machine a
+  computer icon; open it: its roots as folders through the provider; Properties: OS, pools, last sync). A directory service
+  in the small: names to addresses and capabilities, kept in a text file the user owns, no daemon.
+* **ZFS makes two hard problems easy on indra and soma**:
+  - `zfs diff SNAP1 SNAP2` lists exactly the files changed, created, deleted or renamed between two snapshots: a change
+    feed without a watcher. A catalogue root on a ZFS dataset records the snapshot it last observed; the next index asks
+    `zfs diff` instead of walking, so a 7 M-file tree re-indexes in seconds and "scans are observations only" stops being a
+    limitation there. Snapshots also give a consistent catalogue version: "as of @2026-11-15".
+  - `zfs send | zfs receive` moves a dataset incrementally and exactly: a catalogue plus its self-contained thumbnails on a
+    small dataset replicates to another machine as a stream, no sync protocol of our own needed for that part.
+  - User properties on datasets (`lhde:root = stash`, `lhde:catalogue = ...`) let the machine itself say which trees are
+    catalogued; `zfs list -o` from the helper fills the machine's Properties.
+  - vishnu without ZFS keeps the walk and the inotify watcher; the catalogue API is the same.
+* **ZFS admin in wux** (later, aap's idea): pools, datasets, snapshots, scrub status and used/avail in XP's Disk Management
+  / Computer Management idiom, local or through the helper over ssh; destructive actions behind XP-style confirmations. More
+  wux front ends for OS-level work (mounts, services, users) are the same pattern: a small Python helper on the host, a
+  wux window here.
