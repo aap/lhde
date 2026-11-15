@@ -351,6 +351,13 @@ static unsigned long *key_image(const char *key, int size, unsigned long *n, cha
     return NULL;
 }
 
+int lhde_pe_has_resource(const char *path, unsigned type, unsigned id)
+{
+    size_t len;
+    const struct pe *pe = path && path[0] ? pe_open(path) : NULL;
+    return pe && pe_resource(pe, type, id, NULL, &len) != NULL;
+}
+
 unsigned long *lhde_icon_key_image(const char *key, int size, unsigned long *n, char *why, size_t nwhy)
 {
     if (!key || !key[0]) return NULL;

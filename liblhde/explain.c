@@ -2,8 +2,10 @@
    (docs/USAGE.md "When something looks wrong", docs/LAYOUT.md). Part of the lhde-theme program, not of the library. */
 #define _GNU_SOURCE
 #include "lhde/data.h"
+#include "lhde/icon.h"
 #include "lhde/theme.h"
 #include "lhde/settings.h"
+#include <ctype.h>
 #include <dirent.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -89,6 +91,48 @@ static int status(struct row *r, const lhde_theme *t, const char *key)
         return 1;
     }
     return 0;
+}
+
+/* resources/BUILD/explorer.exe when it has IDB_START 143 (the Start button's flag), else NULL */
+static const char *flag_exe(const char *build, char *out, size_t n)
+{
+    char rel[96];
+    if (!build[0] || !strcasecmp(build, "reactos")) return NULL;
+    snprintf(rel, sizeof rel, "resources/%s/explorer.exe", build);
+    return lhde_data_find(rel, out, n) && lhde_pe_has_resource(out, 2, 143) ? out : NULL;
+}
+
+/* the Start button's picture (docs/THEME-FORMAT.md section 2b): settings.ini [taskbar] start_icon over Shell.start_icon */
+static void start_flag_row(const lhde_theme *t)
+{
+    char v[256] = "", exe[PATH_MAX];
+    lhde_settings_get("taskbar", "start_icon", v, sizeof v);
+    const char *mine = v[0] ? "settings.ini [taskbar] start_icon" : "Shell.start_icon";
+    if (!v[0]) snprintf(v, sizeof v, "%s", nz(lhde_theme_get(t, "Shell.start_icon")));
+    if (!v[0]) snprintf(v, sizeof v, "windows");
+    struct row *r = row("start flag", v);
+    more(r, "from %s", mine);
+    char build[64] = "";
+    if (!strncasecmp(v, "windows:", 8)) {
+        size_t i = 0;
+        for (const char *p = v + 8; *p && i < sizeof build - 1; p++) build[i++] = (char)tolower((unsigned char)*p);
+        build[i] = 0;
+        if (flag_exe(build, exe, sizeof exe)) {
+            file(r, exe);
+            if (lhde_pe_has_resource(exe, 2, 176)) more(r, "build %s's own flag: explorer.exe's IDB_START 143 (a visual style), IDB_STARTCLASSIC 176 (classic)", build);
+            else more(r, "build %s's own flag: explorer.exe's IDB_START 143, on the classic button too (it has no IDB_STARTCLASSIC)", build);
+            return;
+        }
+        char rel[96]; snprintf(rel, sizeof rel, "resources/%s/explorer.exe", build);
+        snprintf(r->status, sizeof r->status, "missing -> fallback windows");
+        more(r, lhde_data_find(rel, exe, sizeof exe) ? "resources/%s/explorer.exe has no Start bitmap (IDB_START 143): the theme's flag"
+                                                     : "resources/%s is not imported: the theme's flag", build);
+    } else if (strcasecmp(v, "windows")) {
+        more(r, "flxp-taskbar's Start button and the Explorer's brand show this picture in place of the flag");
+        return;
+    }
+    if (flag_exe("xp", exe, sizeof exe) || flag_exe("2k", exe, sizeof exe)) file(r, exe);
+    else more(r, "no XP or 2000 explorer.exe imported: flxp-taskbar's own drawn flag");
 }
 
 /* a manifest's recipe and inputs ("composited jade4074 <- styles/jade4074.msstyles = 4074/themes/Jade/jade.msstyles") */
@@ -289,6 +333,7 @@ int lhde_explain(const char *name)
     r = row("start menu", "flxp");
     snprintf(r->status, sizeof r->status, "ok");
     more(r, "flxp's start panel, drawn from the visual style's StartPanel parts%s", classic ? " (classic: the 2000-style menu)" : "");
+    start_flag_row(t);
     /* the navigation bar */
     char ns[200]; snprintf(ns, sizeof ns, "%s%s%s", G("Explorer.navbar"), strcmp(G("Explorer.navbar_preset"), "auto") ? " " : "", strcmp(G("Explorer.navbar_preset"), "auto") ? G("Explorer.navbar_preset") : "");
     r = row("navbar", ns);

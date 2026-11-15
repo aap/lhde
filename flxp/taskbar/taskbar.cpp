@@ -163,10 +163,11 @@ HBITMAP drawn_flag(int w, int h)
 // Shell.start_icon's picture in the flag's cell (25x20 with a visual style, 16x16 classic): a square of the cell's height at
 // its left edge, where XP's flag is (start.bmp's flag fills the left 20 columns, the 5 after it are the gap to the text;
 // startclassic.bmp's the whole cell), straight alpha, bottom-up like the resource bitmaps. Null for windows or what cannot
-// be loaded.
+// be loaded. windows:BUILD: that build's flag in the cell as its explorer.exe has it (shell::start_flag_image).
 HBITMAP start_icon_bitmap(int w, int h)
 {
-    gdi::Bitmap* im = shell::start_icon_image(flag_choice, h);
+    std::string build = shell::start_flag_build(flag_choice);
+    gdi::Bitmap* im = build.empty() ? shell::start_icon_image(flag_choice, h) : shell::start_flag_image(build, g.theme != nullptr);
     if (!im) return nullptr;
     BITMAPINFO bi = {};
     bi.bmiHeader.biSize = sizeof bi.bmiHeader;

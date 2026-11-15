@@ -19,13 +19,12 @@
 	clicks: an icon used only by clicking hides after an hour); the tray offers the default 24-bit visual, so an ARGB icon
 	that paints its surround transparent on 32 bits (luxshell/tests/trayicon) shows it black there (luxshell's tray is 32-bit)
 
-* Shell.start_icon: a choice of Windows flag by version (`windows-2000`, `windows-xp`, `windows-4074`, or the theme's build):
-	`windows` takes XP's explorer.exe 143/176, else 2000's, whatever the theme's build. Easy for the 32-bit alpha bitmaps
-	(XP's start.bmp, a Longhorn explorer.exe's 143 if it has one: a `pe:resources/BUILD/explorer.exe#143` source through
-	shell::load_art); 2000's startclassic.bmp is to be checked (a bitmap without alpha needs its background keyed out; the
-	regression tree's 2k source has no explorer.exe to look at). The Explorer's brand band
-	changes only at its next theme change, not live as the taskbar does. The Avalon packs' Start buttons keep their flag
-	(bitmaps; a pack key for a separate flag image, as 4042's start_compose, would let them follow)
+* Shell.start_icon: the Explorer's brand band changes only at its next theme change, not live as the taskbar does. The
+	Avalon packs' Start buttons keep their flag (bitmaps; a pack key for a separate flag image, as 4042's start_compose,
+	would let them follow). A Longhorn flag for windows:4074 could only be cut from imageres' Avalon StartButton (1156,
+	1179: the flag drawn into the dark pill, no alpha of its own), or taken from a style: the 4042-4074 styles' Sidebar.STARTBUTTON
+	is a glass flag tile (28x22 blue in Plex and Luna, 29x22 silver-white in Jade: aap's "white Longhorn flag"), not square;
+	explorer.exe of 4042-5112 has no Start bitmap
 
 * the classic theme's icon set (2k) has no Go glyph, so a classic Explorer has no Go button, while XP's classic Explorer has
 	it (WinXP-193211.png)

@@ -613,6 +613,9 @@ int main(void)
         unsigned long *im = lhde_app_icon("ZzTerm", "zzterm", NULL, 16, NULL, 0, 0, &n, &step, why, sizeof why);
         CHECK(im && n == 2 + 16 * 16 && step == LHDE_APPICON_CLASS); HAS(why, "class map: ZzTerm = cmd");
         CHECK(first_px(im, &w) == 0xff00ff00u && w == 16);                                    /* the PE's named group */
+        snprintf(q, sizeof q, "%s/icdata/icons/zz/zz.dll", T);                                  /* lhde_pe_has_resource: RT_ICON 1, no bitmap */
+        CHECK(lhde_pe_has_resource(q, 3, 1) && !lhde_pe_has_resource(q, 3, 2) && !lhde_pe_has_resource(q, 2, 143));
+        snprintf(q, sizeof q, "%s/icdata/icons/zz/generic.ico", T); CHECK(!lhde_pe_has_resource(q, 3, 1));   /* not a PE */
         CHECK(first_px(lhde_app_icon(NULL, "zzterm-256color", NULL, 16, NULL, 0, 0, &n, &step, NULL, 0), NULL) == 0xff00ff00u && step == LHDE_APPICON_CLASS);   /* a glob, the instance, no case */
         CHECK(first_px(lhde_app_icon("zzpad", NULL, NULL, 16, NULL, 0, 0, &n, NULL, NULL, 0), &w) == 0xffff0000u && w == 16);   /* the .ico's 16 */
         CHECK(first_px(lhde_app_icon("zzpad", NULL, NULL, 24, NULL, 0, 0, &n, NULL, NULL, 0), &w) == 0xff800000u && w == 32);   /* at or above */

@@ -69,8 +69,8 @@ animations     = 4074plus       ; 4074plus | 4074 | 5048 | invented | none
 taskbar  = avalon               ; avalon (luxshell) | classic (flxp-taskbar) | none
 pack     = 4074-aero            ; packs/, for taskbar = avalon
 sidebar  = full                 ; full | minimized | pinned | none
-start_icon = windows            ; the picture in place of the Windows flag (section 2b): windows | lhde | linux | freebsd | auto
-                                ; | file:PACK/PATH | a path | an icon key
+start_icon = windows            ; the picture in place of the Windows flag (section 2b): windows | windows:BUILD (2k, xp) | lhde
+                                ; | linux | freebsd | auto | file:PACK/PATH | a path | an icon key
 
 [Explorer]
 chrome   = longhorn             ; auto | xp | longhorn: the Explorer's own look (without luxwm: CLIENT-PROTOCOL "Without luxwm")
@@ -137,6 +137,7 @@ change.
 | value | the picture |
 | --- | --- |
 | `windows` (default) | the imported flag, as without the key (XP's, else Windows 2000's; neither: flxp-taskbar's own waving flag, section 6) |
+| `windows:BUILD` | that build's own flag, whatever the theme: `resources/BUILD/explorer.exe`'s IDB_START 143 on a styled button, IDB_STARTCLASSIC 176 on the classic one (without 176: 143 at 16 px), and frame 0 of its micro brand in the brand band (see below). A build not imported, or whose explorer.exe has no IDB_START, is `windows` |
 | `lhde` | lhde's own mark: two overlapping application windows, `share/icons/flags/lhde-SIZE.png` |
 | `linux` | a penguin, `share/icons/flags/linux-SIZE.png` |
 | `freebsd` | a red daemon's face with horns, `share/icons/flags/freebsd-SIZE.png` |
@@ -149,6 +150,18 @@ The three drawings are lhde's own, made in code by `tools/start_icons.py` at 16,
 policy"); a size without a drawing, and every other source, is resampled from the source's 32 px (or largest) image with the
 thumbnail resampler (`gdi::resample`) and centred in the square. What cannot be loaded draws the flag. settings.ini
 `[taskbar] start_icon` (docs/SETTINGS.md) overrides the theme's value for every theme; Display Properties' Shell tab sets it.
+
+The builds' flags (`windows:BUILD`, BUILD a source id of `share/sources`): only Windows 2000's and XP's explorer.exe have a
+Start bitmap. `windows:2k` is 2000's one IDB_START, 16x16 at 4 bits on the button face's 192 192 192 (keyed: that grey and
+magenta are transparent), on the classic button as it is and centred in the left 20x20 of the styled button's 25x20 cell;
+its brand is browseui's 306 (22 px frames). `windows:xp` is XP's 32-bit start.bmp (25x20) and startclassic.bmp (16x16) with
+their alpha, and shell32's IDB_BRAND_BITMAP_MICRO 240. The Longhorn builds' explorer.exe (4042, 4051, 4074, 5048, 5112) has
+neither 143 nor 176, and their shell32 no 240: the Start button is the Avalon one, imageres' StartButton images (1156,
+74x23 in 4051 and 4074; 1179, 78x28 in 4074) with the four-colour flag drawn into the dark pill; the 4042-4074 styles'
+`Sidebar.STARTBUTTON` (28x22, Jade's 29x22) is a glass flag tile (blue, Jade's silver-white) of the sidebar, not a flag of
+the button's size; 5048 has no flag bitmap at all and 5112's explorer.exe only a 48 px icon (7103). So those builds are not
+offered, and `windows:4074` and the like are `windows`; `lhde-theme explain` says why. ReactOS's 143 is ReactOS's logo and
+is never taken.
 
 ## 3. Values and inheritance
 - **absent** = inherit from `base`, else the style-derived default (section 5); **`none`** = switched off.

@@ -2,13 +2,17 @@
 // explicit "windows" give no picture (the flag is drawn as before), the settings.ini key wins over the theme's, each of
 // lhde, linux and freebsd loads at 16, 20, 24 and 32 px from share/icons/flags (and at 22 resampled from the 32), auto
 // follows uname's system name ($LHDE_UNAME), a file path, a file:PACK/PATH of the data directories and an icon key work,
-// and what cannot be loaded gives no picture.
+// and what cannot be loaded gives no picture. windows:BUILD over stand-in explorer.exe, shell32.dll and browseui.dll files
+// (32-bit .res files): the builds with a Start bitmap and the Shell tab's list, XP's 143 / 176 with their alpha, 2000's one
+// 16 px 8-bit flag keyed and centred in the styled cell, a styled flag only cut to 16 px, the brands' frame 0, and the builds
+// without one (Longhorn's explorer.exe, ReactOS's logo, not imported) falling back to the theme's flag.
 // Usage: build/tests/starticontest
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/utsname.h>
 #include <string>
+#include <vector>
 #include "gdi/bitmap.h"
 #include "gdi/image.h"
 #include "gdi/png.h"
@@ -62,6 +66,132 @@ static void theme_says(const std::string& v)
     t.name = "zztest";
     if (!v.empty()) t.keys["Shell.start_icon"] = v;
     set_session_theme(t);
+}
+
+// ---- windows:BUILD over stand-in explorer.exe files: 32-bit .res files (res::load reads them as it reads a PE) ----
+static void le(std::string& s, uint32_t v, int n) { for (int i = 0; i < n; i++) s += (char)(v >> (8 * i)); }
+// a bottom-up DIB of w x h: 32-bit (pixel(x, y) as 0xAARRGGBB) or, paletted, 8-bit with a palette of
+// { 192 192 192, the colour } and the colour where pixel(x, y) is opaque (2000's kind of bitmap, no alpha)
+template <class F> static std::string dib(int w, int h, F pixel, bool paletted = false)
+{
+    std::string d;
+    le(d, 40, 4); le(d, (uint32_t)w, 4); le(d, (uint32_t)h, 4); le(d, 1, 2); le(d, paletted ? 8 : 32, 2);
+    le(d, 0, 4); le(d, 0, 4); le(d, 0, 4); le(d, 0, 4); le(d, paletted ? 2 : 0, 4); le(d, 0, 4);
+    if (paletted) { le(d, 0xc0c0c0, 4); le(d, pixel(-1, -1) & 0xffffff, 4); }
+    for (int y = h - 1; y >= 0; y--) {
+        size_t row = d.size();
+        for (int x = 0; x < w; x++) {
+            uint32_t c = pixel(x, y);
+            if (paletted) d += (char)((c >> 24) ? 1 : 0); else le(d, c, 4);
+        }
+        while ((d.size() - row) % 4) d += '\0';
+    }
+    return d;
+}
+// a .res of RT_BITMAP entries { id, DIB } at REL in the user's data directory
+static void put_res(const std::string& rel, const std::vector<std::pair<int, std::string>>& bitmaps)
+{
+    std::string r;
+    le(r, 0, 4); le(r, 32, 4); le(r, 0xffff, 2); le(r, 0, 2); le(r, 0xffff, 2); le(r, 0, 2); r.append(16, '\0');   // the empty first entry
+    for (const auto& b : bitmaps) {
+        le(r, (uint32_t)b.second.size(), 4); le(r, 32, 4);
+        le(r, 0xffff, 2); le(r, 2, 2); le(r, 0xffff, 2); le(r, (uint32_t)b.first, 2);
+        le(r, 0, 4); le(r, 0x30, 2); le(r, 1033, 2); le(r, 0, 4); le(r, 0, 4);
+        r += b.second;
+        while (r.size() % 4) r += '\0';
+    }
+    std::string p = T + "/lhde/" + rel;
+    make_dirs(dir_of(p));
+    FILE* f = fopen(p.c_str(), "wb");
+    if (!f) { perror(p.c_str()); exit(2); }
+    fwrite(r.data(), 1, r.size(), f);
+    fclose(f);
+}
+
+static void builds()
+{
+    const uint32_t XP = 0xff1060e0, XPC = 0xff20c020, HALF = 0x80ff8000, K2 = 0xffe02010, Z = 0xff8040c0;
+    // xp: start.bmp 25 x 20 (the flag in the left 20 columns, a half-transparent pixel at (3, 3)), startclassic.bmp 16 x 16,
+    // shell32's micro brand of three 22 px frames (frame 0 white with a blue pixel at (5, 5))
+    put_res("resources/xp/explorer.exe", {
+        { 143, dib(25, 20, [&](int x, int y) { return x == 3 && y == 3 ? HALF : x < 20 && y >= 1 ? XP : 0u; }) },
+        { 176, dib(16, 16, [&](int, int y) { return y < 15 ? XPC : 0u; }) },
+        { 145, dib(4, 4, [](int, int) { return 0xff000000u; }) } });
+    put_res("resources/xp/shell32.dll", { { 240, dib(22, 66, [](int x, int y) { return y < 22 ? (x == 5 && y == 5 ? 0xff0000ffu : 0xffffffffu) : 0xff00ff00u; }) } });
+    // 2k: one 16 px 8-bit flag on the 192 grey of the button face, no IDB_STARTCLASSIC; browseui's brand 306 of two frames
+    put_res("resources/2k/explorer.exe", { { 143, dib(16, 16, [&](int x, int y) { return x < 0 || (x >= 2 && x < 14 && y >= 2 && y < 14) ? K2 : 0u; }, true) } });
+    put_res("resources/2k/browseui.dll", { { 306, dib(22, 44, [](int, int y) { return y < 22 ? 0xff102030u : 0xff405060u; }) } });
+    // a build whose explorer.exe has no Start bitmap (Longhorn's: the Avalon Start button is not explorer's), ReactOS (its 143 is
+    // ReactOS's logo), a build without explorer.exe, and one with a styled flag only (no 176)
+    put_res("resources/4074/explorer.exe", { { 145, dib(4, 4, [](int, int) { return 0xff000000u; }) } });
+    put_res("resources/reactos/explorer.exe", { { 143, dib(25, 20, [](int, int) { return 0xff000000u; }) } });
+    put_res("resources/5112/shell32.dll", { { 240, dib(22, 22, [](int, int) { return 0xff000000u; }) } });
+    put_res("resources/zz25/explorer.exe", { { 143, dib(25, 20, [&](int x, int) { return x < 20 ? Z : 0u; }) } });
+    lhde_data_reset();
+
+    std::vector<std::string> b = start_flag_builds();
+    std::string all;
+    for (const std::string& s : b) all += s + " ";
+    CHECK_EQ(all, "2k xp zz25 ");
+    std::string items;
+    for (const auto& it : start_icon_items()) items += it.second + "=" + it.first + "; ";
+    CHECK_EQ(items, "windows=Windows flag (the theme's); windows:2k=Windows 2000 flag; windows:xp=Windows XP flag; "
+                    "windows:zz25=Windows zz25 flag; lhde=lhde; linux=Linux penguin; freebsd=FreeBSD daemon; auto=Automatic (by the system); ");
+    CHECK_EQ(start_flag_label("4074"), "Longhorn 4074 flag");
+    CHECK_EQ(start_flag_label("4042main"), "Longhorn 4042 flag");
+    CHECK_EQ(start_flag_label("5112"), "Longhorn 5112 flag");
+
+    // the choice: a build with a flag stays, the rest is the theme's flag (windows)
+    CHECK_EQ(start_icon_choice("windows:2k"), "windows:2k");
+    CHECK_EQ(start_icon_choice(" Windows:XP "), "windows:xp");
+    for (const char* v : { "windows:4074", "windows:reactos", "windows:5112", "windows:9999", "windows:", "windows:../xp" })
+        CHECK_EQ(start_icon_choice(v), "windows");
+    CHECK_EQ(start_flag_build("windows:xp"), "xp");
+    CHECK_EQ(start_flag_build("linux"), "");
+    settings("[theme]\nname = zztest\n[taskbar]\nstart_icon = windows:4074\n");
+    CHECK_EQ(start_icon_choice(start_icon_setting()), "windows");
+    settings("[theme]\nname = zztest\n[taskbar]\nstart_icon = windows:2k\n");
+    CHECK_EQ(start_icon_choice(start_icon_setting()), "windows:2k");
+    CHECK(start_icon_source("windows:xp", 16).find("/resources/xp/explorer.exe#176") != std::string::npos);
+    CHECK(start_icon_source("windows:xp", 20).find("/resources/xp/explorer.exe#143") != std::string::npos);
+    CHECK(start_icon_source("windows:2k", 16).find("/resources/2k/explorer.exe#143") != std::string::npos);
+    CHECK_EQ(start_icon_source("windows:4074", 16), "");
+
+    // xp: 143 as it is under a style (alpha kept), 176 classic
+    gdi::Bitmap* f = start_flag_image("xp", true);
+    CHECK(f && f->width == 25 && f->height == 20);
+    if (f) { CHECK(f->row(0)[0] == 0 && f->row(1)[0] == XP && f->row(3)[3] == HALF && f->row(10)[22] == 0); gdi::destroy_bitmap(f); }
+    f = start_flag_image("xp", false);
+    CHECK(f && f->width == 16 && f->height == 16);
+    if (f) { CHECK(f->row(0)[0] == XPC && f->row(15)[0] == 0); gdi::destroy_bitmap(f); }
+    // 2k: keyed (the grey is clear, the flag opaque); under a style centred in the left 20 x 20 of the 25 x 20 cell
+    f = start_flag_image("2k", false);
+    CHECK(f && f->width == 16 && f->height == 16);
+    if (f) { CHECK(f->row(0)[0] == 0 && f->row(2)[2] == K2 && f->row(13)[13] == K2 && f->row(14)[14] == 0); gdi::destroy_bitmap(f); }
+    f = start_flag_image("2k", true);
+    CHECK(f && f->width == 25 && f->height == 20);
+    if (f) { CHECK(f->row(3)[3] == 0 && f->row(4)[4] == K2 && f->row(15)[15] == K2 && f->row(16)[16] == 0 && f->row(10)[22] == 0); gdi::destroy_bitmap(f); }
+    // a styled flag only: classic gets its left 20 columns at 16
+    f = start_flag_image("zz25", false);
+    CHECK(f && f->width == 16 && f->height == 16);
+    if (f) { CHECK(f->row(8)[8] == Z && f->row(8)[15] == Z); gdi::destroy_bitmap(f); }
+    CHECK_EQ(shape(start_flag_image("4074", true)), "none");
+    CHECK_EQ(shape(start_flag_image("reactos", true)), "none");
+    // the flag alone at a size (the Explorer's brand without a micro brand of the build's)
+    CHECK_EQ(shape(start_icon_image("windows:xp", 20)), "20x20 opaque clear");
+    CHECK_EQ(shape(start_icon_image("windows:2k", 16)), "16x16 opaque clear");
+    CHECK_EQ(shape(start_icon_image("windows:4074", 16)), "none");
+
+    // the brand: frame 0 of xp's shell32 240, 2k's browseui 306, resampled to another size; none for a build without one
+    f = start_flag_brand("xp", 22);
+    CHECK(f && f->width == 22 && f->height == 22);
+    if (f) { CHECK(f->row(5)[5] == 0xff0000ffu && f->row(21)[0] == 0xffffffffu); gdi::destroy_bitmap(f); }
+    f = start_flag_brand("2k", 22);
+    CHECK(f && f->row(21)[21] == 0xff102030u);
+    if (f) gdi::destroy_bitmap(f);
+    CHECK_EQ(shape(start_flag_brand("2k", 26)), "26x26 opaque");
+    CHECK_EQ(shape(start_flag_brand("zz25", 22)), "none");
+    CHECK_EQ(shape(start_flag_brand("5112", 22)), "none");
 }
 
 int main()
@@ -154,6 +284,8 @@ int main()
     CHECK_EQ(shape(start_icon_image(T + "/missing.png", 16)), "none");
     CHECK_EQ(shape(start_icon_image("no-such-key-anywhere", 16)), "none");
     CHECK_EQ(shape(start_icon_image("file:mine/none.png", 16)), "none");
+
+    builds();
 
     if (system(("rm -rf '" + T + "'").c_str()) != 0) fprintf(stderr, "could not remove %s\n", T.c_str());
     printf("%d passed, %d failed\n", g_pass, g_fail);

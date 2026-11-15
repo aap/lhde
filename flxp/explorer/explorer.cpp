@@ -530,11 +530,22 @@ COLORREF g_bk = RGB(255, 255, 255);
 
 // Shell.start_icon (shell/starticon.h) in place of frame 0's flag: XP's micro brand has its flag in the 20 x 19 box at
 // (1, 1) of the 22 px frame; the picture is 20 px there, over the frame's background colour. Nothing for windows.
+// windows:BUILD: frame 0 of that build's own micro brand (shell::start_flag_brand) is the whole frame, its top-left pixel the
+// band's colour; a build without one has its flag in the box as the other pictures.
 static void replace_logo()
 {
     if (g_size < 22) return;
-    gdi::Bitmap* im = shell::start_icon_image(shell::start_icon_choice(shell::start_icon_setting()), 20);
+    std::string choice = shell::start_icon_choice(shell::start_icon_setting());
+    gdi::Bitmap* im = nullptr;
+    bool whole = false;
+    if (!shell::start_flag_build(choice).empty() && (im = shell::start_flag_brand(shell::start_flag_build(choice), g_size))) {
+        whole = true;
+        uint32_t c = im->row(0)[0];
+        g_bk = RGB((c >> 16) & 255, (c >> 8) & 255, c & 255);
+    }
+    if (!im) im = shell::start_icon_image(choice, 20);
     if (!im) return;
+    int at = whole ? 0 : 1;
     BITMAPINFO bi = {};
     bi.bmiHeader.biSize = sizeof bi.bmiHeader;
     bi.bmiHeader.biWidth = g_size;
@@ -548,13 +559,13 @@ static void replace_logo()
         uint32_t* p = (uint32_t*)bits;
         int br = GetRValue(g_bk), bg = GetGValue(g_bk), bb = GetBValue(g_bk);
         for (int i = 0; i < g_size * g_size; i++) p[i] = 0xff000000u | (uint32_t)br << 16 | (uint32_t)bg << 8 | (uint32_t)bb;
-        for (int y = 0; y < im->height && y + 1 < g_size; y++)
-            for (int x = 0; x < im->width && x + 1 < g_size; x++) {
+        for (int y = 0; y < im->height && y + at < g_size; y++)
+            for (int x = 0; x < im->width && x + at < g_size; x++) {
                 uint32_t c = im->row(y)[x], a = c >> 24;
                 int r = (int)(((c >> 16) & 255) * a + br * (255 - a)) / 255;
                 int gg = (int)(((c >> 8) & 255) * a + bg * (255 - a)) / 255;
                 int b = (int)((c & 255) * a + bb * (255 - a)) / 255;
-                p[(y + 1) * g_size + x + 1] = 0xff000000u | (uint32_t)r << 16 | (uint32_t)gg << 8 | (uint32_t)b;
+                p[(y + at) * g_size + x + at] = 0xff000000u | (uint32_t)r << 16 | (uint32_t)gg << 8 | (uint32_t)b;
             }
         HDC src = CreateCompatibleDC(nullptr), dst = CreateCompatibleDC(nullptr);
         HGDIOBJ os = SelectObject(src, frame), od = SelectObject(dst, g_strip);

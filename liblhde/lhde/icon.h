@@ -45,6 +45,8 @@ unsigned long *lhde_icon_key_image(const char *key, int size, unsigned long *n, 
    path.icons); NULL goes back to the session theme's, resolved on the next lookup. Also forgets the cached recipes, desktop
    files and icon themes: call it after a theme switch */
 void lhde_app_icons_set(const char *icons);
+/* a PE file (an .exe or .dll of the imported tree) has the resource type / id (RT_BITMAP 2, RT_GROUP_ICON 14, ...): 1 or 0 */
+int lhde_pe_has_resource(const char *path, unsigned type, unsigned id);
 
 #ifdef __cplusplus
 }

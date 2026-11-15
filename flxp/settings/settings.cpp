@@ -43,6 +43,7 @@
 #include "shell/lhtheme.h"
 #include "shell/runtime.h"
 #include "shell/settings.h"
+#include "shell/starticon.h"
 #include "shell/wallpapers.h"
 #include "shell/ui.h"
 #include "wuxtheme/ut.h"
@@ -1845,10 +1846,9 @@ std::map<int, std::vector<Item>> shell_items;
 const std::vector<Item> kSbModes = { { "Full", "full" }, { "Minimized", "minimized" }, { "Pinned", "pinned" }, { "None", "none" } };
 // SETTINGS.md [sidebar] stacking: luxshell's two labels
 const std::vector<Item> kSbStacks = { { "On top of windows", "top" }, { "Under windows (desktop)", "bottom" } };
-// THEME-FORMAT.md Shell.start_icon: the imported Windows flag, lhde's own drawings (share/icons/flags), by the system
-const std::vector<Item> kStartIcons = { { "Windows flag (imported)", "windows" }, { "lhde", "lhde" }, { "Linux penguin", "linux" },
-                                        { "FreeBSD daemon", "freebsd" }, { "Automatic (by the system)", "auto" } };
-std::vector<Item> start_icon_items;   // kStartIcons, and a value of the user's or the theme's not among them
+// THEME-FORMAT.md Shell.start_icon (shell::start_icon_items): the theme's Windows flag, each imported build's flag, lhde's own
+// drawings (share/icons/flags), by the system; and a value of the user's or the theme's not among them
+std::vector<Item> start_icon_items;
 
 std::vector<Item> items_for(int id)
 {
@@ -1889,7 +1889,8 @@ void fill_shell(HWND dlg)
     set_text(dlg, IDC_AP_SBMODE_SRC, cur.sbmode != committed.sbmode ? "Changed: Apply keeps it for every theme"
                                      : cur.sbmode.empty() ? "The theme's (Shell.sidebar); yours once changed" : "Your setting, for every theme");
     fill_list(dlg, IDC_AP_SBSTACK, s, cur.sbstack);
-    start_icon_items = kStartIcons;
+    start_icon_items.clear();
+    for (const auto& it : shell::start_icon_items()) start_icon_items.push_back(Item{ it.first, it.second });
     std::string icon = cur.starticon.empty() ? value("Shell.start_icon") : cur.starticon;
     fill_list(dlg, IDC_AP_STARTICON, start_icon_items, icon.empty() ? "windows" : icon);
     set_text(dlg, IDC_AP_STARTICON_SRC, cur.starticon != committed.starticon ? "Changed: Apply keeps it for every theme"

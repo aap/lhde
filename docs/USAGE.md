@@ -373,7 +373,9 @@ where it comes from.
 ### The Start button's flag
 The classic taskbar's Start button and the Explorer's brand band show the imported Windows flag. Another picture takes its
 place with settings.ini `[taskbar] start_icon` (Display Properties > Shell > Start icon) or a theme's `Shell.start_icon`:
-`windows` (the flag, the default), `lhde` (lhde's own mark, two overlapping windows), `linux` (a penguin), `freebsd` (a red
+`windows` (the flag, the default), `windows:2k` or `windows:xp` (Windows 2000's or XP's own flag under any theme, when
+that build is imported: the menu lists "Windows 2000 flag", "Windows XP flag"; the Longhorn builds' explorer.exe has no
+Start bitmap, so they are not offered, and a build that is not there gives the theme's flag), `lhde` (lhde's own mark, two overlapping windows), `linux` (a penguin), `freebsd` (a red
 daemon's face), `auto` (the penguin on Linux, the daemon on FreeBSD, lhde's mark elsewhere), or a picture of your own as a
 path (`~/pictures/start.png`, an `.ico`), `file:PACK/PATH` (an imported icon pack) or an icon key (`computer`). It is drawn at
 the flag's size, 16 px on the classic button, 20 px under a visual style. The three drawings are lhde's own
