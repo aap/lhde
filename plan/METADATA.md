@@ -1,8 +1,15 @@
-# From Longhorn 4051's preview/task pane to xattrs in flxp (thinking notes, 2026-10-31)
+# Metadata: from Longhorn 4051's task band to extended attributes in flxp
 
-Context: `~/src/lhde/plan/xattribs.txt` (xattrs for tagging, descriptions, annotations; luxfs tooling) and
-`plan/flxp_wux.txt` ("details and task pane"). Longhorn facts from `taskpane/README.md` (data.md, native.md,
-managed.md) and `explorer-views/icon-views.md`; screenshots lh4051-1528xx / 1523xx / 1524xx.
+Status: steps 1, 1b, 2 and 4 are in (Details columns, the infotip, Add Tag, the 4051 band's three states with editable rows and
+invitations, the Properties sheet's Metadata tab, the Filter box over name/desc/tags/comment; docs/USAGE.md "Metadata", the
+catalogue under it: docs/CATALOGUE.md). Open: step 3 (tasks as data), saved filters, where a colour shows (plan/IDEAS.md),
+section 4's naming questions; the small gaps are in plan/BUGS.md. See plan/STATUS.md.
+
+aap's starting point: WinFS had some good parts, so use it for inspiration. ext4 and ZFS support xattrs; the uses are tagging,
+descriptions, comments and annotations, and organising agentic workflows. xattr support in flxp first; later a metadata catalogue
+synchronised with local and remote file systems (plan/CATALOGUE-REMOTE-PHOTOS.md); the existing tooling is ~/src/luxfs.
+Longhorn facts from `taskpane/README.md` (data.md, native.md, managed.md) and `explorer-views/icon-views.md` in the research
+workspace; screenshots lh4051-1528xx / 1523xx / 1524xx. (Thinking notes of 2026-10-31.)
 
 ## 1. What 4051 actually did (the parts that matter here)
 * **One band, three states.** Nothing selected: "N items / in this folder" over a folder-type image, plus the task grid.
@@ -43,8 +50,8 @@ WinFS property store by **xattrs on the file** and the model carries over almost
 The xattr idea covers the **property** side (what the pane shows and edits). The **task** side is independent and can
 stay data-driven in the Longhorn sense without WinFS: a task list keyed by experiences is just a table.
 
-## 3. A staged plan that matches the todo
-1. **Properties first (xattribs.txt "initial features")**: description and tags as Details columns; the pane's metadata
+## 3. A staged plan
+1. **Properties first** (done): description and tags as Details columns; the pane's metadata
    column shows desc/tags/comment with invitations when empty; hover infotip shows them (the 4051 rich infotip already
    lists properties below the preview); context menu "Edit Description", "Add Tag" (selected items), a full editor
    later. Read/write via libattr; mirror luxfs's names so `x`/`lsx` and flxp agree (docs/ANNOTATIONS.md is the shared
@@ -62,7 +69,7 @@ stay data-driven in the Longhorn sense without WinFS: a task list keyed by exper
    docs/USAGE.md "Metadata"); later saved filters; later a catalog/index only if walking xattrs gets slow
    (4051's WinFS was that index; we can start without one, `lsx -t DIR` is the measure).
 5. **Agent workflows**: the same xattrs are what agents already read/write in `~/fun/longhorn`; flxp becomes the viewer
-   and editor of that metadata, which is the "organize agentic workflows" use in xattribs.txt.
+   and editor of that metadata, which is the "organise agentic workflows" use above.
 
 ## 4. Things to decide
 * Names: keep `user.xdg.tags`/`user.xdg.comment` (freedesktop) for interoperability, `user.lux.desc` for the one-line

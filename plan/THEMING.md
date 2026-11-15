@@ -1,4 +1,8 @@
-# Theming and resources
+# Theming without Microsoft files, and a theme installer
+
+Status: the free baseline is in (the ReactOS import and the free pack with the Pexels photos, every theme resolved against it by
+`make check-free`; docs/THEME-FORMAT.md section 6, docs/USAGE.md "Getting the Windows resources"); section 1's nothing-imported
+points and the installer (section 3) are open, not started. The smaller theme gaps are in plan/BUGS.md. See plan/STATUS.md.
 
 aap (2026-10-31): a fully working desktop without any Microsoft resources, with free Wine/ReactOS fallbacks for everything
 (except maybe the Longhorn-specific parts; we'll see): that probably means classic mode, but there may be free msstyles around.
@@ -6,18 +10,18 @@ Then a graphical theme installer: something that provides the base shell files/r
 A test for wux; inspiration: 3683's (broken) Avalon settings dialog, and what Vista made of it.
 
 ## 1. The desktop with nothing imported (the baseline)
-aap: Wine's icons have no resource ids, ReactOS's do: an all-ReactOS-compatible mode. The reactos source and the free fallback
-chain are in (docs/THEME-FORMAT.md section 6, docs/USAGE.md "Getting the Windows resources"); a desktop with only ReactOS
-imported is the free baseline. Left:
+aap: Wine's icons have no resource ids, ReactOS's do: an all-ReactOS-compatible mode. The ReactOS source and the free fallback
+chain are in; a desktop with only ReactOS imported is the free baseline. Left:
 * With nothing imported at all (not even ReactOS): Marlett's glyphs come out as letters unless the system has Wine's Marlett;
   ship or fetch it, or draw the glyphs (luxwm had bitmaps that were bit-exact at 16x14); a fontconfig alias set for Tahoma /
   Microsoft Sans Serif without an import.
-* The ReactOS styles' start panel user pane is a blank white band (no StartPanel UserPane art?); check against ReactOS.
-* Cursors: an X cursor theme in XP's shapes (free ones exist); ReactOS's are user32.dll resources.
+* Cursors: an X cursor theme in XP's shapes (free ones exist); ReactOS's are user32.dll resources. (wux already takes the X
+  cursor theme's shapes.)
 * Sounds, wallpaper: a generated classic wallpaper (the teal), none for sounds.
 
 ## 2. Free visual styles
-* Community XP styles: licences vary; the installer can import any .msstyles the user has (lhde-import --style exists).
+* Community XP styles: licences vary; the installer can import any .msstyles the user has (`lhde-import --style`,
+  `lhde-import --styles DIR` exist).
 
 ## 3. The theme installer (a wux program)
 * Provides the base resources: pick an ISO / WIM / resource pack / Windows directory, see what builds it holds, import with
@@ -28,15 +32,3 @@ imported is the free baseline. Left:
 * Look: 3683's Avalon settings dialog and Vista's Personalization as inspiration; XP's Display Properties stays the classic
   path. Where it lives: Display Properties' Themes tab ("Install theme...") and a standalone `lhde-setup`.
 * Also the place for lhde-theme dirs' view of the three trees.
-
-## 4. Open smaller points
-* RealAero 0.3 moved the Explorer plates' header lines up 3 rows (76/77 instead of 79/80; LGFRAMEEXPLORER, LGFRAMEMAXEXPLORER):
-  realaero's explorer_rows / max_explorer_rows are fitted to pre-0.1, so under 0.3 the Explorer header loses its lines. Values
-  per release (the frame set could read them from the style's [about] release), or fit to 0.3 if aap prefers it.
-* RealAero 0.3's patched Microsoft.Windows.WCPClient.dll: lhdebaml cannot decode its desktopaurora.baml (34720 bytes, "BAML
-  2004: bad record 0x0 at 0x84b8"); BetaWiki says the package's Desktop Aurora BAML is "in the correct format".
-* The frame set of an Aero patch other than RealAero (generated/frames/NAME, twiwmtb-aero) borrows realaero's geometry: TWIWMTB's
-  plates have no caption-button pill, and the maximised caption text (white, fitted to RealAero's dark plate) sits on its light grey
-  glass. Fit it when a screenshot of 4074 with that style exists.
-* Aero vision's resources resolve into the research workspace ([elsewhere] in explain); the import should own them.
-* Slate vision and Metal vision are still .todo theme files.

@@ -3,6 +3,9 @@
 Current documents describe lhde as it is. They carry no dated status blocks: what changed and when is in the commit log, and
 the design journals of the merge and before are in `history/` (kept unchanged, never updated; nothing current should need them).
 
+Where the project stands (what works, what is in progress, what is next) is `plan/STATUS.md`, with the bugs, ideas and design
+plans beside it in `plan/`.
+
 | file | what |
 | --- | --- |
 | `BUILDING.md` | building, installing and running: the prerequisites (one command for Void), what `make` builds and installs, the sessions, the settings that reach the Windows files |

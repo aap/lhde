@@ -27,9 +27,10 @@ then docs/BUILDING.md (build, install, run). docs/README.md lists every document
   anywhere under `/u/aap/n` (network mounts); the research workspace `~/fun/longhorn` is read by the paths a brief names, not
   crawled. A search of the whole home directory walks the NFS mounts and holds thousands of descriptors for minutes.
 
-- **`plan/` is the issue tracker**, aap's notes by area (flxp_wux, luxwm, luxshell, other_programs, xattribs, ...). An item
-  that is done leaves the file in the same commit that does it; an item that turns out wrong or decided against is removed with a
-  one-line reason in the commit message. Add what you find (a bug seen twice, a leftover) as a bullet under the right area, briefly.
+- **`plan/` is the tracker**: STATUS.md (where things stand; the session updates it each round), BUGS.md (one line per concrete
+  item, dated; a fixed item leaves in the commit that fixes it, one found wrong or decided against leaves with a one-line reason
+  in the commit message), IDEAS.md (wishes, one line each), and one design file per undertaking with a status line (finished
+  plans move to docs/history/). Agents add what they find to BUGS.md, briefly, and never write status into docs/.
 
 ## Working here
 

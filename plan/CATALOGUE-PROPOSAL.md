@@ -1,5 +1,8 @@
 # A catalogue for lhde: the proposal for review
 
+Status: proposal reviewed 2026-11-15 (Astra's review at the end); step 2 is in (luxfind open), steps 1 and 3 are next; the
+working plan is plan/CATALOGUE-REMOTE-PHOTOS.md. See plan/STATUS.md.
+
 Written for aap to comment on and to put to Codex and Astra. lhde is a Windows XP / Longhorn-era desktop for X11 (Linux and
 FreeBSD) whose Explorer, flxp, annotates files with extended attributes: description (one line), comment (text), tags,
 colour, run-as, and luxfs's author/source/build. The annotations show up as Details columns, in the infotip, in a task band,
@@ -82,7 +85,7 @@ milliseconds over a whole tree and thumbnails that appear on a remote mount.
 1. Responsive Explorer: async enumeration, EXIF-preview thumbnails on mounts within a byte budget, luxview's three stages,
    the slow-path harness with numbers as tests.
 2. `lhde-cat` locally: SQLite schema with identity and journal, import-du, index with budget, find/stats/set/journal, the
-   Filter box over it, luxfind. (In progress: the catalogue tool.)
+   Filter box over it, luxfind.
 3. `lhde-remote` over ssh (Python, 13.1-safe), flxp's provider, tested against indra and soma.
 4. Sync and the authority switch per root, commit to the remote.
 5. Photo query views, bulk tagging, the gallery from the catalogue.

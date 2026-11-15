@@ -1,4 +1,8 @@
-# Annotations at scale: the catalogue, remote trees, photos and a gallery (a plan, 2026-11-15)
+# Annotations at scale: the catalogue, remote trees, photos and a gallery
+
+Status: the working plan (2026-11-15; the reviewed design is plan/CATALOGUE-PROPOSAL.md). Step 2 is in (lhde-cat, flxp's Filter
+box and writes over it, docs/CATALOGUE.md; luxfind and tree-wide queries open) with the machines list as groundwork for step 3;
+steps 1 and 3 are next. See plan/STATUS.md.
 
 aap: most of the stuff lives on indra; organising it means tagging and reorganising old photos over the network; a
 directory listing with thumbnails should not be much data; thumbnails could be made on the remote; finding photos is too
@@ -83,7 +87,6 @@ Each step is useful on its own; (a) and (b) are the foundation the rest stands o
   Open: luxfind, queries across the whole root in flxp); (3) lhde-remote over ssh with the flxp provider, tested against indra (13.1)
   and soma; (4) the journal and sync; (5) photo query views and the gallery.
 
-* lhde-cat: confirm relations from the CLI; resolve applies every conflicting op, not the winner only
 
 ## "My machines" (aap, 2026-11-15) and what ZFS offers
 aap: a list of the machines I have and how to reach them, with a synchronised catalogue of their file systems; something
