@@ -27,7 +27,19 @@ command -v setfattr > /dev/null && command -v getfattr > /dev/null || { echo "sk
 R=$T/root
 mkdir -p "$R/docs/sub" "$R/pics/2019" "$R/pics/2021"
 touch "$T/x" && setfattr -n user.t -v 1 "$T/x" 2> /dev/null || { echo "skip: no user attributes on $T"; exit 0; }
-db_of() { python3 -c 'import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); print("\n".join("|".join("" if v is None else str(v) for v in r) for r in c.execute(sys.argv[2])))' "$T/state/lhde/catalogue/$1.db" "$2"; }
+# SQL on a database: through python3's sqlite3 module, else the sqlite3 shell (FreeBSD's python3 has the module only with
+# py312-sqlite3); rows one per line, columns joined by |, NULL as nothing; sql_hold DB: another program that has read
+# from DB and keeps its connection open for 30 s, printing "open" once it has (run with &: it execs)
+if python3 -c 'import sqlite3' 2> /dev/null; then
+    sql() { python3 -c 'import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); print("\n".join("|".join("" if v is None else str(v) for v in r) for r in c.execute(sys.argv[2])))' "$1" "$2"; }
+    sql_script() { python3 -c 'import sqlite3, sys; sqlite3.connect(sys.argv[1]).executescript(sys.argv[2])' "$1" "$2"; }
+    sql_hold() { exec python3 -c 'import sqlite3, sys, time; c = sqlite3.connect(sys.argv[1]); c.execute("SELECT count(*) FROM locations").fetchone(); print("open", flush=True); time.sleep(30)' "$1"; }
+elif command -v sqlite3 > /dev/null; then
+    sql() { sqlite3 -batch -noheader -separator '|' "$1" "$2"; }
+    sql_script() { sqlite3 -batch "$1" "$2"; }
+    sql_hold() { exec sqlite3 -batch -cmd 'SELECT count(*) FROM locations' -cmd '.print open' -cmd '.shell exec sleep 30' "$1" < /dev/null; }
+else echo "skip: needs python3's sqlite3 or the sqlite3 shell"; exit 0; fi
+db_of() { sql "$T/state/lhde/catalogue/$1.db" "$2"; }
 db() { db_of t "$1"; }
 
 # ---- the scratch root ------------------------------------------------------------------------------------------------
@@ -298,19 +310,11 @@ else echo "note: no user namespaces: the mount point checks are skipped"; fi
 # ---- directory paths (dirs): subtree queries, kept through import, index, kind changes, a migration; rename-root ----
 # every directory location's dirs path is the chain of its parents' names, and nothing else is in dirs
 dirs_bad() {
-    python3 - "$T/state/lhde/catalogue/$1.db" <<'EOF'
-import sqlite3, sys
-c = sqlite3.connect(sys.argv[1])
-loc = {i: (p, n, k) for i, p, n, k in c.execute("SELECT id, parent, name, kind FROM locations")}
-def path(i):
-    p, n, k = loc[i]
-    if p == 0: return ''
-    pp = path(p)
-    return n if pp == '' else pp + '/' + n
-dirs = dict(c.execute("SELECT id, path FROM dirs"))
-want = {i: path(i) for i, (p, n, k) in loc.items() if k == 'd'}
-print(sum(1 for i in set(dirs) | set(want) if dirs.get(i) != want.get(i)))
-EOF
+    db_of "$1" "WITH RECURSIVE p(id, path) AS (SELECT id, '' FROM locations WHERE parent = 0
+        UNION ALL SELECT l.id, CASE WHEN p.path = '' THEN l.name ELSE p.path || '/' || l.name END FROM locations l JOIN p ON l.parent = p.id),
+      want(id, path) AS (SELECT p.id, p.path FROM p JOIN locations l ON l.id = p.id WHERE l.kind = 'd')
+      SELECT count(*) FROM (SELECT id FROM dirs UNION SELECT id FROM want) u
+      WHERE (SELECT path FROM dirs WHERE id = u.id) IS NOT (SELECT path FROM want WHERE id = u.id)"
 }
 eq "dirs after import-du and index" "0" "$(dirs_bad t)"
 eq "dirs after the excludes and mounts" "0" "$(dirs_bad home)"
@@ -329,7 +333,7 @@ eq "a file became a directory: --in it" "docs/note2.txt/inner.txt" "$($B find t 
 eq "dirs after kind changes" "0" "$(dirs_bad t)"
 eq "the group index in catalogue order" "$($B find t --type 'image/*' --quiet | head -n 3)" "$($B find t --type 'image/*' --limit 3 --quiet)"
 # the migration fills dirs from the locations of an older database
-python3 -c 'import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); c.executescript("DROP TABLE dirs; DROP INDEX locations_group; ALTER TABLE roots DROP COLUMN machine; DELETE FROM migrations WHERE version >= 3")' "$T/state/lhde/catalogue/t.db"
+sql_script "$T/state/lhde/catalogue/t.db" "DROP TABLE dirs; DROP INDEX locations_group; ALTER TABLE roots DROP COLUMN machine; DELETE FROM migrations WHERE version >= 3"
 $B stats t > /dev/null
 eq "migrated: dirs filled" "0" "$(dirs_bad t)"
 eq "migrated: version" "4" "$(db "SELECT max(version) FROM migrations")"
@@ -347,11 +351,12 @@ if [ $pics = 1 ] && [ -x build/bin/flxp-thumb ]; then
     eq "renamed: their paths" "20" "$(db_of t2 "SELECT count(*) FROM thumbs WHERE cache_path LIKE '%/t2.thumbs/%'")"
 fi
 $B rename-root t2 plain > /dev/null 2>&1 && no "rename-root onto an existing name" || ok
-python3 -c 'import sqlite3, sys, time; c = sqlite3.connect(sys.argv[1]); c.execute("SELECT count(*) FROM locations").fetchone(); print("open", flush=True); time.sleep(30)' "$T/state/lhde/catalogue/t2.db" > "$T/reader" &
+# another program with the database open: it has read from it and keeps its connection for 30 s (sql_hold)
+sql_hold "$T/state/lhde/catalogue/t2.db" > "$T/reader" 2> /dev/null &
 reader=$!
 i=0; while [ $i -lt 50 ] && ! grep -q open "$T/reader"; do sleep 0.1; i=$((i + 1)); done
 $B rename-root t2 t3 > /dev/null 2> "$T/busy" && no "rename-root while another program has it open" || ok
-kill $reader 2> /dev/null; wait $reader 2> /dev/null
+pkill -P $reader 2> /dev/null; kill $reader 2> /dev/null; wait $reader 2> /dev/null
 has "refused while open" "in use" "$(cat "$T/busy")"
 eq "and left as it was" "t2" "$(db_of t2 "SELECT name FROM roots")"
 $B rename-root t2 t > /dev/null || no "rename-root back"
