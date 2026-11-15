@@ -691,6 +691,25 @@ desktop, which leaves after five idle minutes or when a starting flxp-desktop ta
 own environment, so `DISPLAY` must be in it (`dbus-update-activation-environment DISPLAY`; the bus lhde-session starts has it). Another
 file manager that already owns the name keeps it (flxp-desktop says so on stderr); `FLXP_FM1_DEBUG=1` logs every request.
 
+## How the Explorer lists a folder (flxp)
+
+A local folder is listed as it is read: every entry's name, then its stat (size, date, folder or file, read-only), and the
+stored properties when a Details column, the sort or the filter needs them, before the list is filled; on a local disk that
+takes milliseconds even for thousands of entries. On a network mount (NFS, SMB, 9p, sshfs and the other FUSE network file
+systems: the same test as the thumbnails' below) each of those costs a round trip to the server, so a folder of 2000 photos at
+50 ms would stay blank for minutes. There the list is filled from the directory's names alone (readdir: the name, whether it is
+a folder, the type and icon from the name) and shown at once; the stats, and the stored properties a column, the sort, the
+filter or the task band's description needs, come in from eight worker threads, the top of the list first, and the rows are
+updated in place as they arrive, a batch at most every quarter of a second, without losing the selection, the focus or the
+scroll position. Size and Date Modified are empty until an entry's stat is in, and a link to a folder shows as a file until
+then. Sorted by Name the order is right from the start; sorted by size, date or a stored property the list keeps its order
+while the data comes in and is sorted once when the last of it is in, so it moves under the mouse once. The status bar counts
+the entries at once and adds up their sizes as they come. Nothing the Explorer does on its own reads an entry of such a folder
+on its window's thread: the infotip shows what the list has read, the Tiles view and the details leave out a picture's
+Dimensions, the status bar and Open With take a file's type from its name, the folder tree and the breadcrumb's drop-downs know
+folders from the directory entries; F5 and a change seen on disk read the names again and the stats behind them. What you ask
+for yourself (opening a file, Properties, Add Tag, copying) still reads the files it needs while you wait.
+
 ## The Explorer's views (flxp)
 
 In the Longhorn frame (and the Longhorn file dialog) the Explorer's list has build 4074's three views, each at an image size:

@@ -671,6 +671,7 @@ static void update_details()
     bool xp = places::window() && !g.longhorn;
     if (!g.folder || (!xp && !g.taskband)) return;
     std::vector<Item> sel = browser::selection(g);
+    browser::want_stored(g, sel);   // a network folder's: read by the lister, described again when they are in
     int focus = -1;
     int fi = (int)SendMessageW(g.list, LVM_GETNEXTITEM, (WPARAM)-1, LVNI_FOCUSED);
     if (fi >= 0 && fi < (int)g.items.size())
@@ -704,9 +705,12 @@ static void update_status()
         // one file: XP shows its type here; we add the program that opens it
         if (sel == 1 && last >= 0 && last < (int)g.items.size() && !g.items[(size_t)last].is_folder() && !(g.items[(size_t)last].flags & shell::IsVirtual)) {
             const Item& it = g.items[(size_t)last];
-            std::string mime = shell::mime_type(it.path);
+            // (a network folder's file: its type by the name alone, no stat or sniffing on this thread)
+            bool slow = it.flags & shell::IsSlow;
+            std::string mime = slow ? shell::mime_type_for_name(it.name) : shell::mime_type(it.path);
+            if (mime.empty()) mime = "application/octet-stream";
             text = "Type: " + it.type;
-            if (shell::is_program(it.path, mime)) text += "   (program)";
+            if (!slow && shell::is_program(it.path, mime)) text += "   (program)";
             else if (const shell::App* a = shell::default_app(mime)) text += "   Opens with: " + a->name;
         }
     } else {
@@ -825,7 +829,7 @@ static void tree_fill(HTREEITEM h)
     auto f = shell::folder_for(*p);
     if (!f) return;
     std::vector<Item> kids;
-    f->enumerate(kids, g.show_hidden);
+    f->enumerate_names(kids, g.show_hidden);   // (folders by d_type: a network folder is not stat'ed entry by entry)
     shell::sort_items(kids, shell::SortBy::Name, true);
     int n = 0;
     for (const Item& it : kids) {

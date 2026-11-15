@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <unistd.h>
+#include <time.h>
 #include <algorithm>
 #include <math.h>
 #include "shell/namespace.h"
@@ -329,6 +330,7 @@ static void tip_track(Browser& b, int x, int y)
 }
 
 enum { WM_COLUMNS_DRAGGED = WM_APP + 0x3c1 };   // posted to the list after a header drag
+enum { WM_LISTED = WM_APP + 0x3c2, LIST_TIMER = 0x4c495354, LIST_PERIOD = 250 };   // a slow folder's entries (listed() below)
 
 // Ctrl+wheel over the list: the zoom (the Longhorn hosts), as Vista's; the infotip; the header's menu
 // and the header's drag order
@@ -352,6 +354,8 @@ static LRESULT CALLBACK list_subclass(HWND h, UINT msg, WPARAM wp, LPARAM lp, UI
         ((NMHDR*)lp)->hwndFrom == (HWND)SendMessageW(h, LVM_GETHEADER, 0, 0))
         PostMessageW(h, WM_COLUMNS_DRAGGED, 0, 0);
     if (msg == WM_COLUMNS_DRAGGED) { save_columns(b); return 0; }   // (take_layout reads the order)
+    if (msg == WM_LISTED) { listed(b); return 0; }
+    if (msg == WM_TIMER && wp == LIST_TIMER) { KillTimer(h, LIST_TIMER); b.list_timer = false; listed(b); return 0; }
     if (msg == WM_CONTEXTMENU && b.choose_columns && (HWND)wp == (HWND)SendMessageW(h, LVM_GETHEADER, 0, 0)) {
         column_menu(b, GetParent(h), (SHORT)LOWORD(lp), (SHORT)HIWORD(lp));
         return 0;
@@ -426,12 +430,21 @@ bool wants_stored(const Browser& b)
     return false;
 }
 
+static shell::Lister& lister_of(const Browser& b);
+
 // the stored properties of the items, when a column needs them (else none: what is not
-// shown is not read); from the folder's catalogue when it has one
+// shown is not read); from the folder's catalogue when it has one. A slow folder's are read
+// by the lister and come in with listed()
 static void read_stored(const Browser& b, std::vector<Item>& items)
 {
-    if (wants_stored(b) && b.folder && b.folder->is_filesystem()) { shell::details::read_stored(items, b.folder->path()); return; }
-    for (Item& it : items) it.xattrs.clear();
+    if (wants_stored(b) && b.folder && b.folder->is_filesystem()) {
+        if (!b.slow) { shell::details::read_stored(items, b.folder->path()); return; }
+        std::vector<Item> need;
+        for (const Item& it : items) if (!(it.flags & shell::IsStored)) need.push_back(it);
+        if (!need.empty()) lister_of(b).add(need, false, true);
+        return;
+    }
+    for (Item& it : items) { it.xattrs.clear(); it.flags &= ~(uint32_t)shell::IsStored; }
 }
 
 // The user's widths and header order into b.column_layout: the list's column i shows
@@ -809,8 +822,19 @@ void refresh(Browser& b)
 {
     if (!b.folder) return;
     b.all_items.clear();
-    b.folder->enumerate(b.all_items, b.show_hidden);
-    read_stored(b, b.all_items);
+    b.slow = b.folder->slow();
+    if (b.lister) b.lister->cancel();
+    if (b.slow) {
+        // a network folder: shown from readdir alone, its stats (and the stored properties a column
+        // needs) filled in by the lister, the top of the list first
+        b.folder->enumerate_names(b.all_items, b.show_hidden);
+        std::vector<Item> order = b.all_items;
+        shell::sort_items(order, b.sort, b.ascending);
+        lister_of(b).start(b.folder->path(), order, true, wants_stored(b));
+    } else {
+        b.folder->enumerate(b.all_items, b.show_hidden);
+        read_stored(b, b.all_items);
+    }
     apply_filter(b);
     follow(b);
     b.shown();
@@ -898,20 +922,56 @@ void unfollow(Browser& b)
 // already made stay. Group view (a type's group may come or go) and an order
 // the sort changes (a date sort when a file is written) refill instead, with
 // the selection, focus and scroll position put back.
+static void merge(Browser& b, std::vector<Item> all, bool keep_order);
+
+// A slow folder (b.slow) is listed again from readdir alone: the entries it had keep what
+// was known of them while the lister reads their stats again (the new ones are pending).
 void update(Browser& b)
 {
     if (!b.folder || !b.list) return;
     std::vector<Item> all;
-    if (!b.folder->enumerate(all, b.show_hidden) && all.empty()) return;
-    read_stored(b, all);
+    if (b.slow) {
+        if (!b.folder->enumerate_names(all, b.show_hidden) && all.empty()) return;
+        std::map<std::string, const Item*> known;
+        for (const Item& it : b.all_items) known[it.path] = &it;
+        for (Item& it : all) {
+            auto k = known.find(it.path);
+            if (k != known.end()) it = *k->second;
+        }
+        std::vector<Item> order = all;
+        shell::sort_items(order, b.sort, b.ascending);
+        lister_of(b).add(order, true, wants_stored(b));
+    } else {
+        if (!b.folder->enumerate(all, b.show_hidden) && all.empty()) return;
+        read_stored(b, all);
+    }
+    merge(b, all, b.slow && lister_of(b).busy());
+}
+
+// all as the folder's items now, brought into the list in place (update() above). keep_order: the list's
+// order stays (a slow folder's data coming in: one re-sort when the last of it is in, not one per batch);
+// entries new to the list go after the others, in the sort's order
+static void merge(Browser& b, std::vector<Item> all, bool keep_order)
+{
     std::vector<Item> items;
     for (const Item& it : all) if (passes(b, it)) items.push_back(it);
     shell::sort_items(items, b.sort, b.ascending);
     std::map<std::string, size_t> at_new, at_old;
-    for (size_t i = 0; i < items.size(); i++) at_new[items[i].path] = i;
     for (size_t i = 0; i < b.items.size(); i++) at_old[b.items[i].path] = i;
+    if (keep_order) {
+        std::stable_sort(items.begin(), items.end(), [&](const Item& x, const Item& y) {
+            auto a = at_old.find(x.path), c = at_old.find(y.path);
+            size_t i = a == at_old.end() ? (size_t)-1 : a->second, j = c == at_old.end() ? (size_t)-1 : c->second;
+            return i < j;
+        });
+    }
+    for (size_t i = 0; i < items.size(); i++) at_new[items[i].path] = i;
     // the kept items must keep their order (then deletions and insertions are enough)
     bool ordered = !b.grouped || b.group_titles.empty();
+    if (keep_order && !ordered) {   // grouped: in place unless an item comes or goes
+        ordered = items.size() == b.items.size();
+        for (const Item& it : items) ordered = ordered && at_old.count(it.path);
+    }
     size_t last = 0; bool first = true;
     bool any = items.size() != b.items.size();
     for (size_t i = 0; i < b.items.size() && ordered; i++) {
@@ -985,6 +1045,95 @@ void update(Browser& b)
     b.filling = false;
     b.changed_on_disk();
     trace_count(b);
+}
+
+// ---- a slow folder's entries filled in (shell/lister.h) -------------------------------------------
+// The lister's threads post WM_LISTED to the list; the batches are taken at most every LIST_PERIOD ms
+// (what comes in between waits for the next), put into all_items and merged in place, the list's order
+// kept while more is coming; the last batch re-sorts once.
+
+static void lister_notify(void* ctx)   // a worker thread
+{
+    Browser* b = (Browser*)ctx;
+    if (b->list) PostMessageW(b->list, WM_LISTED, 0, 0);
+}
+
+static shell::Lister& lister_of(const Browser& b)
+{
+    Browser& m = const_cast<Browser&>(b);
+    if (!m.lister) m.lister.reset(new shell::Lister(lister_notify, &m));
+    return *m.lister;
+}
+
+bool want_stored(Browser& b, const std::vector<Item>& items)
+{
+    if (!b.slow) return false;
+    std::vector<Item> need;
+    for (const Item& it : items) if ((it.flags & shell::IsSlow) && !(it.flags & shell::IsStored)) need.push_back(it);
+    if (need.empty()) return false;
+    lister_of(b).add(need, false, true);
+    return true;
+}
+
+static long long now_ms()
+{
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (long long)t.tv_sec * 1000 + t.tv_nsec / 1000000;
+}
+
+void listed(Browser& b)
+{
+    if (!b.lister || !b.list) return;
+    bool more = b.lister->busy();
+    long long now = now_ms();
+    if (more && now - b.listed_at < LIST_PERIOD) {
+        if (!b.list_timer) { b.list_timer = true; SetTimer(b.list, LIST_TIMER, (UINT)(LIST_PERIOD - (now - b.listed_at)), nullptr); }
+        return;
+    }
+    if (b.list_timer) { KillTimer(b.list, LIST_TIMER); b.list_timer = false; }
+    // not under the user's hands: a rename in progress, a drop being aimed (the next batch, or the timer, brings it)
+    if (b.filling || SendMessageW(b.list, LVM_GETEDITCONTROL, 0, 0) || g_drop_item >= 0) {
+        b.list_timer = true;
+        SetTimer(b.list, LIST_TIMER, LIST_PERIOD, nullptr);
+        return;
+    }
+    std::vector<shell::Lister::Filled> got;
+    b.lister->take(got);
+    if (got.empty() && more) return;
+    b.listed_at = now;
+    std::map<std::string, size_t> at;
+    for (size_t i = 0; i < b.all_items.size(); i++) at[b.all_items[i].path] = i;
+    std::vector<Item> all = b.all_items;
+    std::vector<bool> gone(all.size(), false);
+    for (const shell::Lister::Filled& f : got) {
+        auto a = at.find(f.item.path);
+        if (a == at.end()) continue;
+        Item& it = all[a->second];
+        if (f.gone) { gone[a->second] = true; continue; }
+        if (f.stat) {
+            bool was = it.is_folder();
+            const uint32_t from_stat = shell::IsFolder | shell::IsLink | shell::IsReadOnly;
+            it.flags = (it.flags & ~(from_stat | shell::IsPending)) | (f.item.flags & from_stat);
+            it.size = f.item.size;
+            it.mtime = f.item.mtime;
+            if (was != it.is_folder()) {   // a link to a folder, an entry without d_type: its name's type was a guess
+                it.type = shell::type_name(it.name, it.is_folder());
+                it.icon = shell::icon_key(it.name, it.is_folder());
+            }
+        }
+        if (f.stored) { it.xattrs = f.item.xattrs; it.flags |= shell::IsStored; }
+    }
+    std::vector<Item> kept;
+    for (size_t i = 0; i < all.size(); i++) if (!gone[i]) kept.push_back(std::move(all[i]));
+    merge(b, kept, more);
+    static bool trace = getenv("FLXP_TRACE_LIST") != nullptr;
+    if (trace) {   // tests/headless/slowpath.sh: "listed: N of M", the entries whose stat is in
+        int n = 0;
+        for (const Item& it : b.all_items) if (!(it.flags & shell::IsPending)) n++;
+        fprintf(stderr, "listed: %d of %d\n", n, (int)b.all_items.size());
+        fflush(stderr);
+    }
 }
 
 bool navigate(Browser& b, const std::string& path, bool record)
@@ -1229,7 +1378,7 @@ static std::vector<std::string> lh_tile_lines(const Item& it)
         return out;
     }
     int w = 0, h = 0;
-    if (shell::thumbs::can_thumbnail(it.path) && shell::thumbs::picture_size(it.path, &w, &h))
+    if (!(it.flags & shell::IsSlow) && shell::thumbs::can_thumbnail(it.path) && shell::thumbs::picture_size(it.path, &w, &h))
         out.push_back("Dimensions: " + std::to_string(w) + " x " + std::to_string(h));
     if (!it.type.empty()) out.push_back("Type: " + it.type);
     if (!(it.flags & shell::IsVirtual)) out.push_back("Size: " + shell::format_size(it.size));
@@ -1256,7 +1405,7 @@ static std::vector<std::string> xp_tile_lines(Browser& b, const Item& it)
     std::vector<shell::SortBy> cols;
     bool folder = it.is_folder() || (it.flags & shell::IsDrive);
     int w = 0, h = 0;
-    bool picture = !folder && shell::thumbs::can_thumbnail(it.path) && shell::thumbs::picture_size(it.path, &w, &h);
+    bool picture = !folder && !(it.flags & shell::IsSlow) && shell::thumbs::can_thumbnail(it.path) && shell::thumbs::picture_size(it.path, &w, &h);
     if (!folder) cols = { shell::SortBy::Type, shell::SortBy::Size };
     std::vector<std::string> slots;
     if (b.sort != shell::SortBy::Name) slots.push_back(column(b.sort));

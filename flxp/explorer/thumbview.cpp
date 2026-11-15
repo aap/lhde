@@ -616,7 +616,8 @@ void fill(const std::vector<shell::Item>& items)
         g_where[it.path] = std::make_pair((int)i, it.mtime);
         int slot = g_done.find(key(it.path, it.mtime));
         set_image((int)i, slot >= 0 ? g_slot_image[(size_t)slot] : default_image(it.icon, it.is_folder()));
-        if ((it.flags & shell::IsVirtual) || it.path.empty() || it.path[0] != '/') continue;
+        // (a slow folder's entry whose stat has not come in: asked for when it has, with its mtime)
+        if ((it.flags & (shell::IsVirtual | shell::IsPending)) || it.path.empty() || it.path[0] != '/') continue;
         if (it.is_folder() ? g_size >= (g_lh ? 32 : 48) : shell::thumbs::can_thumbnail(it.path))   // a folder below that: its icon
             g_items[i] = Wanted{ it.path, it.icon, it.mtime, it.is_folder() };
     }

@@ -165,34 +165,12 @@ public:
     }
     bool is_filesystem() const override { return true; }
 
-    bool enumerate(std::vector<Item>& out, bool include_hidden) override
+    bool enumerate(std::vector<Item>& out, bool include_hidden) override { return list(out, include_hidden, false); }
+    bool enumerate_names(std::vector<Item>& out, bool include_hidden) override { return list(out, include_hidden, slow()); }
+    bool slow() const override
     {
-        DIR* d = opendir(path_.c_str());
-        if (!d) return false;
-        struct dirent* e;
-        while ((e = readdir(d))) {
-            if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
-            bool hidden = e->d_name[0] == '.';
-            if (hidden && !include_hidden) continue;
-            if (strstr(e->d_name, ".flxp-part")) continue;   // a file being copied (fileops): it shows when it is complete
-            Item it;
-            it.name = e->d_name;
-            it.path = path_ == "/" ? "/" + it.name : path_ + "/" + it.name;
-            struct stat st;
-            bool is_link = lstat(it.path.c_str(), &st) == 0 && S_ISLNK(st.st_mode);
-            if (stat(it.path.c_str(), &st) != 0) { if (lstat(it.path.c_str(), &st) != 0) continue; }
-            if (S_ISDIR(st.st_mode)) it.flags |= IsFolder;
-            if (hidden) it.flags |= IsHidden;
-            if (is_link) it.flags |= IsLink;
-            if (access(it.path.c_str(), W_OK) != 0) it.flags |= IsReadOnly;
-            it.size = (uint64_t)st.st_size;
-            it.mtime = (int64_t)st.st_mtime;
-            it.type = type_name(it.name, it.is_folder());
-            it.icon = icon_key(it.name, it.is_folder());
-            out.push_back(std::move(it));
-        }
-        closedir(d);
-        return true;
+        if (slow_ < 0) slow_ = lhde_fs_is_remote(path_.c_str()) ? 1 : 0;
+        return slow_ > 0;
     }
 
     std::shared_ptr<Folder> bind(const Item& child) override
@@ -205,7 +183,77 @@ public:
 
 private:
     std::string path_;
+    mutable int slow_ = -1;
+
+    // names_only: the entries as readdir gives them (d_type; DT_UNKNOWN and links are files until their stat says)
+    bool list(std::vector<Item>& out, bool include_hidden, bool names_only)
+    {
+        DIR* d = opendir(path_.c_str());
+        if (!d) return false;
+        struct dirent* e;
+        while ((e = readdir(d))) {
+            if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+            bool hidden = e->d_name[0] == '.';
+            if (hidden && !include_hidden) continue;
+            if (strstr(e->d_name, ".flxp-part")) continue;   // a file being copied (fileops): it shows when it is complete
+            Item it;
+            it.name = e->d_name;
+            it.path = path_ == "/" ? "/" + it.name : path_ + "/" + it.name;
+            if (hidden) it.flags |= IsHidden;
+            if (names_only) {
+                it.flags |= IsSlow | IsPending;
+                if (e->d_type == DT_DIR) it.flags |= IsFolder;
+                if (e->d_type == DT_LNK) it.flags |= IsLink;
+                it.type = type_name(it.name, it.is_folder());
+                it.icon = icon_key(it.name, it.is_folder());
+                out.push_back(std::move(it));
+                continue;
+            }
+            struct stat st;
+            bool is_link = lstat(it.path.c_str(), &st) == 0 && S_ISLNK(st.st_mode);
+            if (stat(it.path.c_str(), &st) != 0) { if (lstat(it.path.c_str(), &st) != 0) continue; }
+            if (S_ISDIR(st.st_mode)) it.flags |= IsFolder;
+            if (is_link) it.flags |= IsLink;
+            if (access(it.path.c_str(), W_OK) != 0) it.flags |= IsReadOnly;
+            it.size = (uint64_t)st.st_size;
+            it.mtime = (int64_t)st.st_mtime;
+            it.type = type_name(it.name, it.is_folder());
+            it.icon = icon_key(it.name, it.is_folder());
+            out.push_back(std::move(it));
+        }
+        closedir(d);
+        return true;
+    }
 };
+
+// the write permission the mode gives this user (root: always), as access(W_OK) answers without ACLs
+static bool writable(const struct stat& st)
+{
+    uid_t u = geteuid();
+    if (u == 0) return true;
+    if (st.st_uid == u) return st.st_mode & S_IWUSR;
+    gid_t groups[256];
+    int n = getgroups(256, groups);
+    bool member = st.st_gid == getegid();
+    for (int i = 0; i < n && !member; i++) member = groups[i] == st.st_gid;
+    return member ? (st.st_mode & S_IWGRP) : (st.st_mode & S_IWOTH);
+}
+
+bool stat_entry(Item& it)
+{
+    struct stat st;
+    if (lstat(it.path.c_str(), &st) != 0) return false;
+    bool is_link = S_ISLNK(st.st_mode);
+    bool dangling = false;
+    if (is_link) { struct stat to; if (stat(it.path.c_str(), &to) == 0) st = to; else dangling = true; }   // a dangling link: as itself
+    it.flags &= ~(uint32_t)(IsFolder | IsLink | IsReadOnly | IsPending);
+    if (S_ISDIR(st.st_mode)) it.flags |= IsFolder;
+    if (is_link) it.flags |= IsLink;
+    if (dangling || !writable(st)) it.flags |= IsReadOnly;   // (access(W_OK) follows the link: no target, not writable)
+    it.size = (uint64_t)st.st_size;
+    it.mtime = (int64_t)st.st_mtime;
+    return true;
+}
 
 // ---- virtual folders: Desktop (root) and My Computer ------------------------------
 

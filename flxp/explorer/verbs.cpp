@@ -107,6 +107,10 @@ void error_box(const std::string& text) { dialogs::message(g_host->window(), "fl
 bool is_wallpaper_image(const Item& it)
 {
     if (!is_fs(it) || it.is_folder()) return false;
+    if (it.flags & shell::IsSlow) {   // a network folder's file: by its name (its first bytes would be a round trip)
+        std::string e = shell::lower(it.name.substr(it.name.find_last_of('.') + 1));
+        return it.name.find('.') != std::string::npos && (e == "png" || e == "jpg" || e == "jpeg" || e == "jpe" || e == "bmp");
+    }
     FILE* f = fopen(it.path.c_str(), "rb");
     if (!f) return false;
     unsigned char h[8] = {};
@@ -157,7 +161,9 @@ static std::vector<std::string> same_type(const std::vector<Item>& items, std::s
     std::vector<std::string> out;
     for (const Item& it : items) {
         if (it.is_folder() || !is_fs(it)) continue;
-        std::string m = shell::mime_type(it.path);
+        // (a network folder's files by their names: no stat per item on this thread)
+        std::string m = it.flags & shell::IsSlow ? shell::mime_type_for_name(it.name) : shell::mime_type(it.path);
+        if (m.empty()) m = "application/octet-stream";
         if (out.empty()) *mime = m;
         if (m == *mime) out.push_back(it.path);
     }

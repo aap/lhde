@@ -119,7 +119,7 @@ Facts probe(const Item& it)
     Facts f;
     if (virtual_path(it.path)) { f.kind = Facts::System; return f; }
     if (it.path.empty() || it.path[0] != '/') return f;
-    f.network = thumbs::on_network(it.path);
+    f.network = (it.flags & IsSlow) || thumbs::on_network(it.path);
     if (it.flags & IsDrive) {
         f.kind = Facts::Drive;
         struct statvfs st;
@@ -136,13 +136,15 @@ Facts probe(const Item& it)
         }, &at);
         return f;
     }
-    f.xattrs = read_stored(it.path);
+    // a slow folder's entry: what the list read of it (shell/lister.h), no round trip here; no Dimensions
+    bool slow = it.flags & IsSlow;
+    f.xattrs = slow ? it.xattrs : read_stored(it.path);
     if (it.is_folder()) return f;
     std::string key = icon_key(it.name, false);
     if (key == "audio") f.kind = Facts::Audio;
     if (key == "image") {
         f.kind = Facts::Picture;
-        thumbs::picture_size(it.path, &f.width, &f.height);
+        if (!slow) thumbs::picture_size(it.path, &f.width, &f.height);
     }
     f.thumbnail = thumbs::can_thumbnail(it.path);
     if (f.thumbnail && f.kind == Facts::Other && thumbs::own_picture(it.path)) f.kind = Facts::Picture;   // a picture by another name
@@ -159,7 +161,8 @@ Item location_item(const Folder& folder)
     if (virtual_path(it.path)) { it.flags |= IsVirtual; it.type = "System Folder"; return it; }
     it.type = type_name(it.name, true);
     struct stat st;
-    if (stat(it.path.c_str(), &st) == 0) it.mtime = st.st_mtime;
+    if (folder.slow()) it.flags |= IsSlow;   // (its date: not asked on the UI thread)
+    else if (stat(it.path.c_str(), &st) == 0) it.mtime = st.st_mtime;
     std::string base = it.path.substr(it.path.find_last_of('/') + 1);
     if (!base.empty() && base[0] == '.') it.flags |= IsHidden;
     // a drive of My Computer: its name there ("Local Disk (/)")
@@ -569,7 +572,7 @@ std::string infotip(const Item& it)
         line("Date Modified", format_date(it.mtime));
     }
     Stored s = it.xattrs;
-    if (s.empty() && fs) s = read_stored(it.path);
+    if (s.empty() && fs && !(it.flags & IsSlow)) s = read_stored(it.path);   // (a slow entry: what the list read)
     for (const Property& p : registry()) {
         if (p.xattr.empty()) continue;
         for (const auto& kv : s) {

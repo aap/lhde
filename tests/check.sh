@@ -59,6 +59,9 @@ result "detailstest ($(tail -n 1 "$T/details.log"))" $? "$T/details.log"
 # the shell layer and the catalogue (liblhcat): details::write into the journal, read_stored from a catalogued folder
 build/tests/cattest > "$T/cat.log" 2>&1
 result "cattest ($(tail -n 1 "$T/cat.log"))" $? "$T/cat.log"
+# a slow folder's listing (shell/lister.h): readdir's names and the lister's stats add up to the full listing
+build/tests/listertest > "$T/lister.log" 2>&1
+result "listertest ($(tail -n 1 "$T/lister.log"))" $? "$T/lister.log"
 # the Details columns' layout (shell/columns.h) and the per-folder records of flxp-views, on a scratch state directory
 build/tests/columnstest > "$T/columns.log" 2>&1
 result "columnstest ($(tail -n 1 "$T/columns.log"))" $? "$T/columns.log"

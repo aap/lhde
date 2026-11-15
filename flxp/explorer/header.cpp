@@ -1640,7 +1640,7 @@ void open_menu(int i)
     auto f = shell::folder_for(g_crumbs[(size_t)i].path);
     auto parent = kids_of ? f : f ? f->parent() : nullptr;
     std::vector<shell::Item> kids;
-    if (parent) parent->enumerate(kids, false);
+    if (parent) parent->enumerate_names(kids, false);   // (folders by d_type on a network mount: no stat per entry)
     shell::sort_items(kids, shell::SortBy::Name, true);
     HMENU m = CreatePopupMenu();
     std::vector<std::string> paths;

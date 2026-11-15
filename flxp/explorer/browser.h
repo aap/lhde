@@ -22,6 +22,7 @@
 #include "shell/columns.h"
 #include "shell/details.h"
 #include "shell/dirwatch.h"
+#include "shell/lister.h"
 #include "shell/viewmodel.h"
 #include "w32/w32.h"
 #include "commands.h"
@@ -114,6 +115,13 @@ struct Browser {
     std::unique_ptr<shell::DirWatch> dirwatch;
     int follow_pending = 0;                          // DirWatch bits since the last update
     bool follow_armed = false;                       // the coalescing timer runs
+    // a slow folder (Folder::slow, a network mount): listed from readdir alone, its entries' stats and
+    // stored properties filled in by the lister's threads and merged in place as they come (browser.cpp
+    // listed); nothing on the UI thread waits on one of its entries
+    bool slow = false;
+    std::unique_ptr<shell::Lister> lister;
+    long long listed_at = 0;                         // the last batch merged (ms, monotonic)
+    bool list_timer = false;
     std::map<std::string, bool> collapsed;           // groups folded by the user, by title
     std::vector<std::string> group_titles;           // the list's groups as last filled (by id)
     // the Details columns: the layout (shell/columns.h: every known column in the user's
@@ -194,6 +202,12 @@ void refresh(Browser& b);              // enumerate the folder again, fill, then
 void follow(Browser& b);
 void unfollow(Browser& b);
 void update(Browser& b);               // enumerate again, change the list item by item (keeps selection, scroll)
+// A slow folder's entries filled in (WM_LISTED from the lister's threads, handled by the list's subclass):
+// merged in place, the list's order kept while more is coming, one re-sort with the last
+void listed(Browser& b);
+// The stored properties of items of a slow folder not read yet (the selection the details describe): asked of the
+// lister, they come in with listed() and then changed_on_disk(); true when some were asked for
+bool want_stored(Browser& b, const std::vector<Item>& items);
 bool navigate(Browser& b, const std::string& path, bool record = true);
 void go_back(Browser& b);
 void go_forward(Browser& b);

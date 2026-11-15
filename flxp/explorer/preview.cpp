@@ -96,10 +96,8 @@ void Pictures::want(const std::vector<std::string>& paths, int size)
     if (p->loader) p->gen = p->loader->cancel();
     for (size_t i = 0; i < paths.size(); i++) {
         if (p->got.count(paths[i])) continue;
-        struct stat st;
-        if (stat(paths[i].c_str(), &st) != 0) continue;
         if (!p->loader) { p->loader = new shell::thumbs::Loader(notify, p, 1); p->gen = p->loader->generation(); }
-        p->loader->request(p->gen, (int)i, paths[i], (int64_t)st.st_mtime, size);
+        p->loader->request(p->gen, (int)i, paths[i], 0, size);   // (the loader stats it, on its thread)
     }
 }
 
@@ -111,10 +109,9 @@ void Pictures::want_folder(const std::string& path, const std::string& icon_key,
     if (p->fbmp) DeleteObject(p->fbmp);
     p->fbmp = nullptr;
     if (p->floader) p->fgen = p->floader->cancel();
-    struct stat st;
-    if (path.empty() || size < 16 || stat(path.c_str(), &st) != 0) return;
+    if (path.empty() || size < 16) return;   // (a folder that is gone: no pictures, found on the loader's thread)
     if (!p->floader) { p->floader = new shell::thumbs::Loader(notify, p, 1); p->fgen = p->floader->generation(); }
-    p->floader->request(p->fgen, 0, path, (int64_t)st.st_mtime, size, true, thumbview::folder_mini_size(size, longhorn));
+    p->floader->request(p->fgen, 0, path, 0, size, true, thumbview::folder_mini_size(size, longhorn));
 }
 
 HBITMAP Pictures::get_folder(const std::string& path, int size, int* w, int* h)

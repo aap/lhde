@@ -33,9 +33,25 @@ namespace thumbs {
 
 // ---- where thumbnails are made -----------------------------------------------------
 
+// Asked for every item a view shows, on the UI thread: each answer is kept (statfs is a round trip on a network mount),
+// and a path inside a directory already known to be on one is on one too (a local mount under a network one aside)
 bool on_network(const std::string& path)
 {
-    return lhde_fs_is_remote(path.c_str());
+    static std::mutex lock;
+    static std::map<std::string, bool> known;
+    std::string parent = dir_of(path);
+    {
+        std::lock_guard<std::mutex> l(lock);
+        auto k = known.find(path);
+        if (k != known.end()) return k->second;
+        k = known.find(parent);
+        if (k != known.end() && k->second) return true;
+    }
+    bool remote = lhde_fs_is_remote(path.c_str());
+    std::lock_guard<std::mutex> l(lock);
+    if (known.size() > 4096) known.clear();
+    known[path] = remote;
+    return remote;
 }
 
 bool picture_size(const std::string& path, int* w, int* h)
