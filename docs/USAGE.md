@@ -374,13 +374,15 @@ where it comes from.
 The classic taskbar's Start button and the Explorer's brand band show the imported Windows flag. Another picture takes its
 place with settings.ini `[taskbar] start_icon` (Display Properties > Shell > Start icon) or a theme's `Shell.start_icon`:
 `windows` (the flag, the default), `windows:2k` or `windows:xp` (Windows 2000's or XP's own flag under any theme, when
-that build is imported: the menu lists "Windows 2000 flag", "Windows XP flag"; the Longhorn builds' explorer.exe has no
-Start bitmap, so they are not offered, and a build that is not there gives the theme's flag), `lhde` (lhde's own mark, two overlapping windows), `linux` (a penguin), `freebsd` (a red
+that build is imported: the menu lists "Windows 2000 flag", "Windows XP flag"), `windows:4051` or `windows:4074` (the
+Longhorn builds' white flag, from their shell branding DLL shellbrd.dll: "Longhorn 4051 flag", "Longhorn 4074 flag"; a 4074
+tree without shellbrd.dll shows Jade's flag of the same design instead), a build that is not there gives the theme's flag, `lhde` (lhde's own mark, two overlapping windows), `linux` (a penguin), `freebsd` (a red
 daemon's face), `auto` (the penguin on Linux, the daemon on FreeBSD, lhde's mark elsewhere), or a picture of your own as a
 path (`~/pictures/start.png`, an `.ico`), `file:PACK/PATH` (an imported icon pack) or an icon key (`computer`). It is drawn at
 the flag's size, 16 px on the classic button, 20 px under a visual style. The three drawings are lhde's own
 (`share/icons/flags`, made by `tools/start_icons.py`); the Avalon Start buttons of luxshell's packs are bitmaps and keep their
-flag. docs/THEME-FORMAT.md section 2b.
+flag. docs/THEME-FORMAT.md section 2b. shellbrd.dll is part of the 4051 and 4074 imports; a Windows tree imported before it
+was gets it by importing those media again (files already there are kept).
 
 The terminal every part of the desktop starts (Super+Return, Open Terminal Here, Quick Launch's Command Prompt, a
 `Terminal=true` program) is settings.ini `[commands] terminal` (docs/SETTINGS.md "The terminal"), by default the first of `cmd`,

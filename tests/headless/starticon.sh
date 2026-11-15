@@ -5,9 +5,9 @@
 # button's content, the left 20 of luna's) and there in many pixels; the key changed while the bar runs (with
 # _LH_SETTINGS_CHANGED) redraws it as a fresh start would, and back to windows gives the flag again. windows:BUILD: a stand-in
 # build's flag differs from the theme's inside the cell only, as 2000's does when imported (and differs from the stand-in's);
-# windows:4074 (its explorer.exe has no Start bitmap) is the white flag of jade4074's CompositedWindow.DEFAULTICON when that style
-# is imported, inside the cell only and different from the stand-in's, else the theme's flag byte for byte, as a build not
-# imported is.
+# windows:4074 (its explorer.exe has no Start bitmap) is the white flag of its shellbrd.dll (1040 / 1041), else of jade4074's
+# CompositedWindow.DEFAULTICON, when either is imported, inside the cell only and different from the stand-in's, else the
+# theme's flag byte for byte, as a build not imported is.
 # Needs Xvfb, xdotool, xprop and ImageMagick. Usage: tests/headless/starticon.sh [:DISPLAY]
 D=${1:-:76}
 R=$(cd "$(dirname "$0")/../.." && pwd)
@@ -19,7 +19,8 @@ luna=$("$R/build/bin/lhde-theme" find styles/luna.msstyles 2>/dev/null)   # the 
 styles=$("$R/build/bin/lhde-theme" find styles 2>/dev/null)
 k2=$("$R/build/bin/lhde-theme" find resources/2k/explorer.exe 2>/dev/null)     # 2000's flag (16 px, 4-bit), when imported
 k4074=$("$R/build/bin/lhde-theme" find resources/4074/explorer.exe 2>/dev/null) # 4074's explorer.exe: no Start bitmap
-jade=$("$R/build/bin/lhde-theme" find styles/jade4074.msstyles 2>/dev/null)     # 4074's flag: its CompositedWindow.DEFAULTICON
+jade=$("$R/build/bin/lhde-theme" find styles/jade4074.msstyles 2>/dev/null)     # 4074's flag's design: its CompositedWindow.DEFAULTICON
+sb4074=$("$R/build/bin/lhde-theme" find resources/4074/shellbrd.dll 2>/dev/null) # 4074's flag: shellbrd.dll's 1040 / 1041
 T=$(mktemp -d)
 trap '[ -n "$KEEP" ] || rm -rf "$T"' EXIT
 mkdir -p $T/home/.config/lhde
@@ -113,20 +114,21 @@ inside_cell() {
     if [ "${n:-0}" -ge 40 ] && [ $((x + w)) -le $(($3 + 1)) ] 2>/dev/null; then ok "$1: windows:$2 differs from the theme's flag in $n pixels, all inside the flag's cell ($box)"
     else bad "$1: windows:$2 against the theme's flag: $n pixels in $box (the cell: the first $3 px)"; fi
 }
-# windows:BUILD: the stand-in zzflag's own flag, 2000's when imported; 4074's from jade4074 when imported (its explorer.exe has
-# no Start bitmap); a build not imported has none: the theme's flag
+# windows:BUILD: the stand-in zzflag's own flag, 2000's when imported; 4074's from shellbrd.dll or jade4074 when imported (its
+# explorer.exe has no Start bitmap); a build not imported has none: the theme's flag
 builds() {
     th=$1 cell=$2
     for v in windows:zzflag windows:4074 windows:9999; do bar $th $v; shot $T/$th-${v#windows:}.png; unbar; done
     inside_cell $th zzflag $cell
-    if [ -n "$jade" ]; then
+    if [ -n "$sb4074$jade" ]; then
+        from="jade4074's"; [ -n "$sb4074" ] && from="shellbrd.dll's"
         inside_cell $th 4074 $cell
         if same $T/$th-4074.png $T/$th-zzflag.png; then bad "$th: windows:4074 is the stand-in's flag"
-        else ok "$th: windows:4074 (jade4074's white flag) differs from the stand-in's flag"; fi
+        else ok "$th: windows:4074 ($from white flag) differs from the stand-in's flag"; fi
         vs=windows:9999
     else vs="windows:4074 windows:9999"; fi
     for v in $vs; do
-        why="not imported"; [ $v = windows:4074 ] && [ -n "$k4074" ] && why="its explorer.exe has no IDB_START, jade4074 not imported"
+        why="not imported"; [ $v = windows:4074 ] && [ -n "$k4074" ] && why="its explorer.exe has no IDB_START, neither shellbrd.dll nor jade4074 imported"
         if same $T/$th-windows.png $T/$th-${v#windows:}.png; then ok "$th: $v ($why) is the theme's flag"
         else bad "$th: $v ($why): $(diff_box $T/$th-windows.png $T/$th-${v#windows:}.png)"; fi
     done

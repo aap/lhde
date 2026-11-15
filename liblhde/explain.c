@@ -102,6 +102,15 @@ static const char *flag_exe(const char *build, char *out, size_t n)
     return lhde_data_find(rel, out, n) && lhde_pe_has_resource(out, 2, 143) ? out : NULL;
 }
 
+/* resources/BUILD/shellbrd.dll when it has 1040 (the Longhorn builds' Start button flag), else NULL */
+static const char *flag_shellbrd(const char *build, char *out, size_t n)
+{
+    char rel[96];
+    if (!build[0]) return NULL;
+    snprintf(rel, sizeof rel, "resources/%s/shellbrd.dll", build);
+    return lhde_data_find(rel, out, n) && lhde_pe_has_resource(out, 2, 1040) ? out : NULL;
+}
+
 /* the Start button's picture (docs/THEME-FORMAT.md section 2b): settings.ini [taskbar] start_icon over Shell.start_icon */
 static void start_flag_row(const lhde_theme *t)
 {
@@ -123,18 +132,23 @@ static void start_flag_row(const lhde_theme *t)
             else more(r, "build %s's own flag: explorer.exe's IDB_START 143, on the classic button too (it has no IDB_STARTCLASSIC)", build);
             return;
         }
+        if (strcasecmp(build, "reactos") && flag_shellbrd(build, exe, sizeof exe)) {
+            file(r, exe);
+            more(r, "build %s's own flag: shellbrd.dll's 1040 (25x20, a visual style) and 1041 (16x16, classic)", build);
+            return;
+        }
         char sp[PATH_MAX] = "";
-        if (!strcmp(build, "4074")) {   /* 4074's white flag: Jade's CompositedWindow.DEFAULTICON (flxp/shell/starticon) */
+        if (!strcmp(build, "4074")) {   /* without shellbrd.dll: Jade's CompositedWindow.DEFAULTICON, the flag's design (flxp/shell/starticon) */
             lhde_style_path("jade4074", sp, sizeof sp);
             if (sp[0]) {
                 file(r, sp);
-                more(r, "build 4074's flag: jade4074's CompositedWindow.DEFAULTICON (20x17, alpha), the white flag of 4074's Start button");
+                more(r, "build 4074's flag: jade4074's CompositedWindow.DEFAULTICON (20x17, alpha), the design of 4074's Start flag (resources/4074/shellbrd.dll, its own, is not imported)");
                 return;
             }
         }
         char rel[96]; snprintf(rel, sizeof rel, "resources/%s/explorer.exe", build);
         snprintf(r->status, sizeof r->status, "missing -> fallback windows");
-        if (!strcmp(build, "4074")) more(r, "styles/jade4074.msstyles (4074's flag) is not imported");
+        if (!strcmp(build, "4074")) more(r, "neither resources/4074/shellbrd.dll (4074's flag) nor styles/jade4074.msstyles is imported");
         more(r, lhde_data_find(rel, exe, sizeof exe) ? "resources/%s/explorer.exe has no Start bitmap (IDB_START 143): the theme's flag"
                                                      : "resources/%s is not imported: the theme's flag", build);
     } else if (strcasecmp(v, "windows")) {

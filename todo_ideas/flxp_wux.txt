@@ -21,10 +21,7 @@
 
 * Shell.start_icon: the Explorer's brand band changes only at its next theme change, not live as the taskbar does. The
 	Avalon packs' Start buttons keep their flag (bitmaps; a pack key for a separate flag image, as 4042's start_compose,
-	would let them follow). windows:4074 is Jade's CompositedWindow.DEFAULTICON, the same design as the flag on 4074's
-	classic Start button (lh4074-014649.png) but not its pixels: the screenshot's panes are pure white where Jade's are shaded
-	(about 24 levels per channel apart); the real bitmap is in none of the imported 4074 files (explorer, shell32, browseui,
-	imageres, comctl32, themeui, the styles): user32.dll's IDI_WINLOGO or another file not imported?
+	would let them follow).
 
 * the classic theme's icon set (2k) has no Go glyph, so a classic Explorer has no Go button, while XP's classic Explorer has
 	it (WinXP-193211.png)
