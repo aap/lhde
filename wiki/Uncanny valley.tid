@@ -1,0 +1,9 @@
+title: Uncanny valley
+tags: vision
+created: 202611151855
+modified: 202611151855
+modifier: claude
+
+§§ A desktop that looks almost right is worse than one that looks different.  So measurements against the real builds beat taste: pixel positions from VM screenshots, resource ids from the files, behaviour from what XP actually does.  Where a choice is taste (the vision themes, the free wallpapers) it says so where it is made.
+
+§§ The proof is mechanical: a frame regression renders every theme's window frames and must stay byte-identical, and headless tests compare pixels at measured points.  The lab (`session/lab.sh`) puts any theme on a virtual display in seconds.

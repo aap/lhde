@@ -1,0 +1,9 @@
+title: My machines
+tags: idea
+created: 202611151855
+modified: 202611151855
+modifier: claude
+
+§§ A list of my machines and how to reach them, with a synchronised catalogue of their file systems: something between KDE Connect and a directory service.  The list is a text file, `machines.ini`, and every catalogue root is bound to a machine; the same file drives the ssh helper, a sidebar tile for reachability and a laptop's battery, and a window in the idiom of XP's My Network Places.
+
+§§ ZFS on indra and soma helps twice: `zfs diff` between snapshots is a change feed without a watcher, and `zfs send` replicates a catalogue with its thumbnails exactly.  A wux window for pools, datasets and snapshots, local or over ssh, is the admin side of the same idea; a Previous Versions tab on the Properties sheet, as Server 2003 had, is the daily side.

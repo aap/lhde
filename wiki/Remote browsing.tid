@@ -1,0 +1,9 @@
+title: Remote browsing
+tags: vision plan next
+created: 202611151855
+modified: 202611151855
+modifier: claude
+
+§§ The daily pain: a photo folder on an NFS mount lists slowly, thumbnails take forever or never come, and opening a picture blocks until it is loaded.  The cause is round trips, not bytes: the Explorer stats every entry before showing the list, and a thumbnail needs the whole file.
+
+§§ The cure in order: show the list from readdir alone and fill the rest from a worker; thumbnails from the cache, then from the JPEG's own EXIF preview in its first 64 KB, the full decode last within a budget; a small Python helper on the remote host over ssh that answers a folder with its attributes in one go and makes thumbnails where the files are.  indra runs FreeBSD 13.1, so the helper must be one script with no build.

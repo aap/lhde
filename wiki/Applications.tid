@@ -1,0 +1,9 @@
+title: Applications
+tags: component
+created: 202611151855
+modified: 202611151855
+modifier: claude
+
+§§ Written so far on the entry point: luxpad (Notepad, ported from ReactOS's), luxview (XP's Picture and Fax Viewer and 4051's viewer), luxshot (screenshots with metadata), luxattr (the Properties sheet without a session).  Each proved something about wux and left a list of what it had to reach for.
+
+§§ Wanted next: luxfind, the query window over the [[Catalogue]]; mupf, a PDF viewer on mupdf; luxpad++ on SciTE; a binary editor for PDP words; the calendar; a greeter that is XP's Welcome screen.

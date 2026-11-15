@@ -1,0 +1,11 @@
+title: lhde
+tags: vision
+created: 202611151855
+modified: 202611151855
+modifier: claude
+
+§§ I wanted an accurate Windows Explorer for Linux.  It became a native desktop for X11 in the look of Windows XP and the Longhorn builds of 2003 and 2004, and a museum of that look at the same time.  The Win32 core comes from Wine and ReactOS; the art is read at run time from the user's own Windows files, never shipped ([[No Microsoft files]]).
+
+§§ The parts: flxp, the Explorer; luxwm, the window manager; luxshell, Longhorn's Avalon bars and sidebar; wux, the Win32-style toolkit everything is written against ([[Three layers]]); liblhde, the theme and resource resolver.  It runs on Linux and FreeBSD ([[A Unix desktop]]).
+
+§§ Two things matter above the rest: crossing the [[Uncanny valley]], and [[The PDC 2003 demo]] as the Longhorn goal.  The repository is [[github.com/aap/lhde|https://github.com/aap/lhde]]; the map is its docs/ARCHITECTURE.md.
