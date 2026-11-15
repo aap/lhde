@@ -12,8 +12,9 @@ from the system's freedesktop thumbnailers into the shared ~/.cache/thumbnails. 
    (5 MB per photo) and are disabled on network mounts; opening a picture in a viewer blocks until it is loaded.
 2. Finding things is per folder. There is no way to ask "every photo tagged family from 2019" across a tree, let alone across
    hosts, and no way to browse or tag a remote tree while offline.
-3. Scale: the two `du` listings in ~/idx describe 1.56 M entries (home) and 7.1 M entries, 26 TB (the stash), with about
-   255 k pictures by extension in the stash alone. Anything per-file-per-round-trip is out; anything that needs the whole tree
+3. Scale: the two `du` listings in ~/idx describe 1.56 M entries (home, 1.06 TB by its `.` row) and 7.1 M entries (the stash,
+   4.86 TiB by its `.` row of 5,213,649,379 KiB; the listings' rows are disk usage in KiB and include directory totals, so they
+   are usage estimates, not file lengths), with about 255 k pictures by extension in the stash alone. Anything per-file-per-round-trip is out; anything that needs the whole tree
    walked before it is useful is out too.
 4. Authority: today the file system is the truth and attributes travel with the file. For a photo collection that is edited
    locally in bulk and lives remotely, the better model may be a local catalogue as the truth, with edits committed to the
@@ -97,3 +98,34 @@ milliseconds over a whole tree and thumbnails that appear on a remote mount.
 * Identity: content hash of the whole file, or a cheap prefix hash plus size for pictures, with the full hash on demand?
 * Where should the thumbnails of a remote catalogue live when synced: freedesktop's cache keyed by the remote URI, or inside
   the catalogue directory so the catalogue is self-contained and copyable?
+
+## The review (Astra, 2026-11-15) and what the design takes from it
+Taken whole:
+* **Objects, not inode chains.** Catalogue objects have their own ids; (dev, ino), hashes and paths are evidence recorded as
+  locations and observations. A hard link, a reused inode, a replaced file at the same path, an identical deliberate copy:
+  none may silently merge or move annotations. Ambiguous evidence stays separate with a suggested move/duplicate relation
+  for the user to confirm. Full hashes on demand only; a prefix hash finds candidates and authorises nothing.
+* **Three values per attribute**: the last observed file-system value, the catalogue's desired value, and any pending write
+  or conflict. Scans update observations and never erase a pending edit; a commit compares the observed value first and
+  never erases an external change it has not seen. Switching a root's authority reconciles outstanding differences first.
+* **Edits are operations with revisions**: op id, object, attribute, the revision being edited, the new value or explicit
+  deletion; one accepting catalogue per root assigns revisions; a repeated op returns its existing result; a stale base
+  revision becomes a conflict. Tags as add/remove intents so two offline additions merge. Timestamps are history, not
+  the arbiter; vector clocks only if independent peers ever become necessary, and op ids plus base revisions keep that open.
+* **Three states an edit can be in**: saved locally (a durable SQLite transaction acknowledges an offline edit),
+  replicated, written to the file. None implied by another. Write-back is idempotent and checks the expected previous value.
+* **Scans are observations**: a completed successful directory scan establishes absence; an interrupted one, a permission
+  error or a disconnected root cannot. Intermediate external changes are unknowable without a watcher; the journal does
+  not pretend otherwise. Coverage is visible: "attributes not read" differs from "no tags", negative queries exclude unknowns.
+* **The remote helper streams**: a persistent ssh session, requests bounded by entries, time and bytes, responses streamed;
+  Python's os.*xattr is Linux-only, so the helper gets an extattr back end on FreeBSD.
+* **Thumbnails alongside the catalogue** as optional files referenced by object and observed content version, shared with
+  the freedesktop cache where practical (that cache is URI-keyed with mtime validation, not content-addressed: one file with
+  a local and a remote path has two keys); missing thumbnails invalidate nothing.
+* **Scope stays explicit**: the folder Filter box keeps its folder; "search this tree" is a separate choice (luxfind).
+* **First implementation stops at** seeding, resumable enrichment, useful queries and journaled edits on one small
+  collection; then remote batched reads; then conditional write-back through one accepting catalogue. The responsive
+  Explorer work proceeds independently.
+* **The early tests that matter**: an interrupted scan, a duplicate submission, a lost acknowledgement, a file replaced
+  before write-back, conflicting offline edits.
+Corrected: the stash is 4.86 TiB, not 26 TB (the first number summed every row, directory totals included).
