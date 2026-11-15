@@ -280,6 +280,17 @@ static void touchpad(void)
     HAS(logged(), "xinput set-prop 12 libinput Device Enabled 0\n");
     IEQ(lhde_hw_touchpad(&t), 1);
     IEQ(t.enabled, 0);
+    /* turned off, the X server detaches it from the core pointer: a floating slave, still found (soma's Xorg) */
+    stub("xinput", "case \"$1\" in\nlist) printf '\\342\\210\\274 SynPS/2 Synaptics TouchPad   \\tid=10\\t[floating slave]\\n';;\n"
+                   "list-props) printf '\\tDevice Enabled (186):\\t0\\n\\tlibinput Tapping Enabled (349):\\t0\\n';;\nesac");
+    IEQ(lhde_hw_touchpad(&t), 1);
+    IEQ(t.id, 10);
+    EQ(t.name, "SynPS/2 Synaptics TouchPad");
+    EQ(t.prop, "Device Enabled");
+    IEQ(t.enabled, 0);
+    clear_log();
+    IEQ(lhde_hw_touchpad_set(1), 0);
+    HAS(logged(), "xinput set-prop 10 Device Enabled 1\n");
     /* the synaptics driver: "Device Enabled" only */
     stub("xinput", "case \"$1\" in\nlist) printf '  SynPS/2 Synaptics TouchPad   \\tid=11\\t[slave  pointer  (2)]\\n';;\n"
                    "list-props) printf '\\tDevice Enabled (139):\\t1\\n\\tSynaptics Tap Time (290):\\t180\\n';;\nesac");

@@ -1,6 +1,6 @@
 -- Touchpad: a tray item (traycontrol.lua C.item) that turns the touchpad off and on (XP has none; the notification-area
--- icon of the laptop vendors' tools). liblhde's hardware layer (lh.hw_touchpad: xinput's first slave pointer named
--- *touchpad* or *trackpad*, its "libinput Device Enabled" or "Device Enabled"; the X server's device on every system), read
+-- icon of the laptop vendors' tools). liblhde's hardware layer (lh.hw_touchpad: xinput's first slave pointer, floating while
+-- off, named *touchpad* or *trackpad*, its "libinput Device Enabled" or "Device Enabled"; the X server's device on every system), read
 -- in a child (C.hw) every 2 s, every 10 s while there is none (a USB one plugged in), not again without xinput; a click
 -- sets it (lh.hw_touchpad_set). Hidden while no touchpad is found. Tooltip "Touchpad: on (click to turn it off)"; no flyout.
 local C = dofile(lh.lua_dir .. "/traycontrol.lua")

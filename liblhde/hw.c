@@ -339,12 +339,13 @@ int lhde_hw_touchpad(lhde_touchpad *t)
     static char out[16384];
     const char *list[] = { "xinput", "list", NULL };
     if (hw_run(list, out, sizeof out) != 0) { hw_copy(t->error, "xinput list failed"); return 0; }
-    /* "⎜   ↳ SynPS/2 Synaptics TouchPad              	id=12	[slave  pointer  (2)]" */
+    /* "⎜   ↳ SynPS/2 Synaptics TouchPad              	id=12	[slave  pointer  (2)]"; turned off ("Device Enabled" 0),
+     * the X server detaches it from its master: "∼ SynPS/2 Synaptics TouchPad              	id=10	[floating slave]" */
     for (char *l = out; l && *l;) {
         char *nl = strchr(l, '\n');
         if (nl) *nl = 0;
-        char *id = strstr(l, "id="), *sl = strstr(l, "[slave");
-        if (id && sl && strstr(sl, "pointer") && (ci_contains(l, "touchpad") || ci_contains(l, "trackpad"))) {
+        char *id = strstr(l, "id="), *sl = strstr(l, "[slave"), *fl = strstr(l, "[floating slave");
+        if (id && ((sl && strstr(sl, "pointer")) || fl) && (ci_contains(l, "touchpad") || ci_contains(l, "trackpad"))) {
             t->id = atoi(id + 3);
             char *s = l;
             while (*s && !isalnum((unsigned char)*s)) s++;   /* the tree's box-drawing prefix */
