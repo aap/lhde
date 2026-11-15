@@ -6,8 +6,8 @@
 # retried operation id, two offline edits against one revision (tags merge, set/set conflicts), touch after an external
 # change, a move and a duplicate as relations, an interrupted and a killed scan (nothing gone, resumed), thumbnails through
 # flxp-thumb; then liblhcat's own test (normalization, picture headers, sha256, a 2,000,000-line listing under 30 s and a
-# tag query on it under 50 ms; LHCAT_PERF_LINES=N for another size). Needs setfattr/getfattr; everything is under a
-# temporary directory removed at the end.
+# tag query on it under 50 ms; LHCAT_PERF_LINES=N for another size). Needs setfattr/getfattr (on FreeBSD extattr's tools
+# through tests/headless/xattrs.sh); everything is under a temporary directory removed at the end.
 cd "$(dirname "$0")/.." || exit 1
 B=$PWD/build/bin/lhde-cat
 T=$(mktemp -d)
@@ -22,6 +22,7 @@ eq() {   # WHAT EXPECTED GOT
 has() {   # WHAT NEEDLE TEXT
     case "$3" in *"$2"*) ok ;; *) no "$1: [$2] not in [$3]" ;; esac
 }
+. tests/headless/xattrs.sh   # getfattr / setfattr over extattr where attr is not installed (FreeBSD)
 command -v setfattr > /dev/null && command -v getfattr > /dev/null || { echo "skip: no setfattr/getfattr"; exit 0; }
 R=$T/root
 mkdir -p "$R/docs/sub" "$R/pics/2019" "$R/pics/2021"
