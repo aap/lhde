@@ -13,6 +13,7 @@ sessions are started. The repository, one build for the parts that were separate
 | `luxnav/`   | libluxnav, the Longhorn navigation bar (the vision header; C API `lhnav_*`, `lhnav.h`), linked into flxp and navdemo | x11 `lhnav/` |
 | `luxshell/` | the Avalon bars, sidebar, tiles, toasts, start menu: C core + Lua (`*.lua`, `tiles/`) | x11 `lhshell/` (without `assets/`) |
 | `liblhde/`  | liblhde (`<lhde/data.h>`, `<lhde/theme.h>`, `<lhde/settings.h>`, `<lhde/hw.h>`): the three trees and every lookup in them, the theme resolver, the settings store, the hardware layer; `lhde-theme` (with `explain` and `dirs`), `lhde-hw`; `tests/resolve.c`, `tests/hw.c` | new (was `lhtheme/`) |
+| `liblhcat/` | liblhcat (`lhcat.h`): the catalogue (docs/CATALOGUE.md); `lhde-cat`; `tests/cat.c` (with `tests/catalogue.sh`) | new |
 | `session/`  | `lhde-session` (start, theme, taskbar, shell, picom, desktop, stop), `lab.sh` (the headless bench), `lhwall.sh`, theme-reload/-watch, picom configs | x11 `xinitrc.lab`, `second-display.sh`, `lab.sh`, ... |
 | `apps/`     | lhde's applications on the public entry point (`wux/wux.h`, `shell/shell.h`, the recipe `apps/app.mk`; docs/APPLICATIONS.md): `luxshot` (screenshots), `luxattr` (the attributes editor), `luxpad` (the notepad), `luxview` (the picture viewer), `skeleton` (the one to copy) | new |
 | `examples/` | extendframe, navdemo, aurorademo (its tables made at build time from the Windows tree) | x11 `examples/` |
@@ -33,7 +34,8 @@ the user's own files (settings below).
 
 Needs a C and C++17 compiler, GNU make, Python 3 (the standard library: every `make` runs
 `tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, xext, xcursor, xfixes, xkbcommon, freetype2,
-fontconfig, libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, flxp-desktop's FileManager1, luxshell);
+fontconfig, libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, flxp-desktop's FileManager1, luxshell),
+sqlite3 (the catalogue, liblhcat: flxp and lhde-cat; with FTS5, as distributions build it);
 for the lux side also xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4).
 Every `.res` is checked in (`wux/rc/`, `wux/w32/stdres.res`, `flxp/rc/`, `tests/w32/test.res`):
 the mingw-w64 cross toolchain (`x86_64-w64-mingw32-windres`, which preprocesses with its gcc) is needed
@@ -55,7 +57,7 @@ On Void Linux, everything above in one command:
 
     xbps-install -S gcc make pkg-config python3 libX11-devel libXext-devel libXcursor-devel libxkbcommon-devel libXfixes-devel \
         libXinerama-devel libXft-devel freetype-devel fontconfig-devel libpng-devel libjpeg-turbo-devel \
-        libwebp-devel dbus-devel cairo-devel pango-devel lua54-devel \
+        libwebp-devel dbus-devel sqlite-devel cairo-devel pango-devel lua54-devel \
         python3-Pillow 7zip cabextract xz tar \
         dbus picom feh xprop xsetroot xinit xorg-server-xephyr xorg-server-xvfb xdotool ImageMagick xclip lua54
 
@@ -107,7 +109,7 @@ lhde builds and runs on FreeBSD 15 (amd64) with clang, libc++ and GNU make; 15 i
 explorer following its folders), renameat2 and O_PATH, which flxp's file operations use. The packages:
 
     pkg install gmake pkgconf python3 py312-pillow 7-zip cabextract libX11 libXext libXcursor libxkbcommon libXfixes \
-        libXinerama libXft freetype2 fontconfig png jpeg-turbo webp dbus cairo pango lua54 \
+        libXinerama libXft freetype2 fontconfig png jpeg-turbo webp dbus sqlite3 cairo pango lua54 \
         picom feh xprop xsetroot xinit xephyr xorg-vfbserver xdotool ImageMagick7 xclip gtar
 
 (`python3` is the package that puts `python3` on the PATH; `7-zip` installs `7z` and `7zz`, there is no p7zip.) Then, as above
@@ -258,7 +260,14 @@ luxshell's Log Off and by `lhde-session stop` with nothing left: `tests/headless
 missing: the headless tests without Xvfb/xdotool (clipboard also xclip), ut-dump
 without imported visual styles (`lhde-theme find styles`: the Windows tree's `index/styles`; `LHDE_STYLES` overrides).
 Then the lux side (`make check-lux`): liblhde's hardware layer over recorded trees for both systems and stub commands
-(`build/liblhde/tests/hw`: batteries, backlights, the volume back ends, the OSS mute, the touchpad), luxshell builds and its
+(`build/liblhde/tests/hw`: batteries, backlights, the volume back ends, the OSS mute, the touchpad), the catalogue
+(`make check-liblhcat`, `tests/catalogue.sh`: lhde-cat over a scratch root of 100 annotated files and 20 JPEGs with EXIF made
+with Pillow: import-du, index and a second index reading nothing, find by tag, date, type, text, colour and directory, set /
+tag / unset with the journal, deferred writes and commit, a file changed before the write-back, duplicate and retried
+operation ids, offline edits against one revision, both authorities, a move and a duplicate as relations, an interrupted and a
+killed scan, an unreadable directory, thumbnails through flxp-thumb, an offline root; then `build/liblhcat/tests/cat`: the
+values as flxp stores them, the picture headers, sha256, a 2,000,000-line listing imported in under 30 s and a tag query on it
+in under 50 ms), luxshell builds and its
 Lua parses (`luac -p`), its tray items, the power tile and the Classic Tray tile hosting them work over that layer with a
 fake tree and stub system commands (`luxshell/tests/tiles.sh`), every tile is in the sidebar menu's parts list
 (`luxshell/tests/parts.py`), and luxwm's frame

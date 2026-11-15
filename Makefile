@@ -26,6 +26,8 @@
 #   luxwm/luxwm.mk        luxwm, luxwmc -> build/bin; its tests -> build/luxwm/tests
 #   luxshell/luxshell.mk  luxshell -> build/bin (its Lua stays in luxshell/, installed to PKGLIBDIR/luxshell)
 #   examples/examples.mk  extendframe, navdemo, aurorademo -> build/examples
+#   liblhcat/liblhcat.mk  liblhcat (lhcat.h): the catalogue of a root's files and attributes -> build/lib/liblhcat.a,
+#                         build/bin/lhde-cat (sqlite3)
 #   liblhde/liblhde.mk    liblhde (lhde/data.h, theme.h, settings.h, icon.h): the data directories, the theme resolver,
 #                         the settings store -> build/lib/liblhde.{a,so.1}, lhde.pc, build/bin/lhde-theme
 #   share/ session/ tools/ installed as they are: DATADIR (themes/*.theme, navbar/*.ini, icons/*.theme + apps.ini + flags/*.png, sources/*.ini,
@@ -44,7 +46,7 @@ PKGS      = x11 xext xcursor xfixes xkbcommon freetype2 fontconfig libpng libjpe
 CXXFLAGS ?= -g -O1
 CXXFLAGS += -pthread -std=c++17 -fno-exceptions -fno-rtti -Wall -Wextra -MMD -MP -Iwux -Iflxp -I. $(shell pkg-config --cflags $(PKGS))
 CXXFLAGS += $(if $(WEBP),-DFLXP_WEBP)
-LDLIBS    = $(shell pkg-config --libs $(PKGS)) -pthread
+LDLIBS    = $(shell pkg-config --libs $(PKGS)) $(shell pkg-config --libs sqlite3) -pthread
 
 # the win32 headers (Wine's, vendored) and the shim's CRT redirections. WINE_UNICODE_NATIVE makes Wine's headers type WCHAR
 # as wchar_t (16 bits with -fshort-wchar; L"..." literals are WCHAR strings) rather than char16_t; it is defined here, once,
@@ -95,6 +97,7 @@ all:
 
 include wuxtheme/wuxtheme.mk   # first: wux.mk leaves its objects out of libwux.a
 include liblhde/liblhde.mk     # before luxnav.mk and flxp.mk: libluxnav and flxp carry its data.o, ini.o
+include liblhcat/liblhcat.mk   # before flxp.mk: the shell layer links the catalogue
 include luxnav/luxnav.mk       # before flxp.mk: its programs link $(LUXNAVA)
 include wux/wux.mk
 include flxp/flxp.mk
@@ -109,15 +112,15 @@ include apps/luxattr/luxattr.mk
 include apps/luxpad/luxpad.mk
 include apps/luxview/luxview.mk
 
-all: libs programs tests liblhde luxwm luxshell examples
-libs: $(WUXA) $(UTA) $(UTSO) $(UTPC) $(LHDEA) $(LHDESO) $(LHDEPC) $(LUXNAVA) $(LUXNAVSO) $(LUXNAVPC)
-programs: $(PROGRAMS) $(LUXWM_PROGRAMS) build/bin/luxshell build/bin/lhde-theme build/bin/lhde-hw
+all: libs programs tests liblhde liblhcat luxwm luxshell examples
+libs: $(WUXA) $(UTA) $(UTSO) $(UTPC) $(LHDEA) $(LHDESO) $(LHDEPC) $(LHCATA) $(LUXNAVA) $(LUXNAVSO) $(LUXNAVPC)
+programs: $(PROGRAMS) $(LUXWM_PROGRAMS) build/bin/luxshell build/bin/lhde-theme build/bin/lhde-hw build/bin/lhde-cat
 
 # make check: tests/check.sh (tests/tests.mk), then the lux side's, then the free baseline (after luxwm's regression, whose
 # classic renders it compares with)
 check: check-lux
 check-lux: all
-	@$(MAKE) --no-print-directory check-liblhde check-luxshell check-luxwm
+	@$(MAKE) --no-print-directory check-liblhde check-liblhcat check-luxshell check-luxwm
 	@$(MAKE) --no-print-directory check-free
 # make check-free: every shipped theme resolves with only the free pack's sources imported (build/free/windows, from the free
 # pack: FREE_PACK, or ReactOS's ISO: LHDE_REACTOS_ISO or ~/lib/windows_isos, with the photos of FREE_WALLPAPERS, or the pack make
@@ -278,9 +281,9 @@ clean:
 	rm -rf build
 
 # the desktop files' claims into APPDIR's mimeinfo.cache, which GIO and xdg-open read instead of the files (not into a DESTDIR)
-install: install-libs install-liblhde install-flxp install-luxnav install-luxwm install-luxshell install-data
+install: install-libs install-liblhde install-liblhcat install-flxp install-luxnav install-luxwm install-luxshell install-data
 	@[ -n "$(DESTDIR)" ] || ! command -v update-desktop-database >/dev/null || update-desktop-database -q $(APPDIR)
-uninstall: uninstall-luxshell uninstall-luxwm uninstall-luxnav uninstall-data uninstall-liblhde uninstall-libs uninstall-flxp
+uninstall: uninstall-luxshell uninstall-luxwm uninstall-luxnav uninstall-data uninstall-liblhcat uninstall-liblhde uninstall-libs uninstall-flxp
 
 .PHONY: all libs programs tests clean install uninstall check check-lux check-free check-bare install-data uninstall-data \
         install-resources-free install-resources-windows install-resources-full free-pack fetch-free-pack

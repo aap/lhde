@@ -102,6 +102,8 @@ USER FILES                           yours; lhde writes only what you change in 
   flxp-view-sizes                      the size each of the Explorer's Longhorn views had last
   flxp-columns                         the Details columns chosen, their order and widths
   flxp-mfu, flxp-run-history           the start panel's launch counts, the Run box's history
+  catalogue/NAME.db, NAME.thumbs/      lhde-cat's catalogue of the root NAME (docs/CATALOGUE.md); under a root whose
+                                       authority is the catalogue its uncommitted edits and journal are the only copy
 ```
 
 **Lookup.** A program asks for a file by kind and name, i.e. by its relative name (`styles/jade4074.msstyles`,

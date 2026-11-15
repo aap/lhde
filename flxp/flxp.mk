@@ -99,7 +99,16 @@ build/bin/flxp-settings: $(SETOBJS) $(FILEDLGLIB) $(O)/flxp/desktop/wallpaper.o 
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $(SETOBJS) $(FILEDLGLIB) $(O)/flxp/desktop/wallpaper.o $(EXPLSHARED) $(W32LINK) $(LDLIBS) $(shell pkg-config --libs libpng libjpeg) -no-pie
 
-FLXP_PROGRAMS = flxp flxp-desktop flxp-taskbar flxp-settings flxp-filedialog flxp-portal
+# flxp-thumb: the shell layer's thumbnails for programs outside flxp (lhde-cat index --thumbs), native: no win32, no display
+FLXPTHUMB_OBJS = $(O)/flxp/thumb/main.o $(patsubst %.cpp,$(O)/%.o,$(WUX_NATIVE) wux/w32/utf.cpp) $(SHELLOBJS)
+$(O)/flxp/thumb/main.o: flxp/thumb/main.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+build/bin/flxp-thumb: $(FLXPTHUMB_OBJS)
+	@mkdir -p $(dir $@)
+	$(CXX) -o $@ $(FLXPTHUMB_OBJS) $(LDLIBS)
+
+FLXP_PROGRAMS = flxp flxp-desktop flxp-taskbar flxp-settings flxp-filedialog flxp-portal flxp-thumb
 PROGRAMS = $(addprefix build/bin/,$(FLXP_PROGRAMS)) build/bin/flxp-startmenu $(UTDUMP)
 flxp: $(addprefix build/bin/,$(FLXP_PROGRAMS)) build/bin/flxp-startmenu
 # flxp-startmenu: flxp-taskbar's start panel without the bar (luxshell's start-menu provider), the same binary by another name

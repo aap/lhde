@@ -78,5 +78,7 @@ Each step is useful on its own; (a) and (b) are the foundation the rest stands o
   fun part (`luxfind`: XP's Search Companion / 4051's query views; a query box, the results in the shared list view, double
   click opens luxview, drag to tag). flxp's core stays unaware beyond the provider and the filter hook.
 * Steps, each a satisfying end in itself: (1) async enumeration + EXIF thumbnails + the slow-path harness; (2) lhde-cat
-  locally + the Filter box over it + luxfind; (3) lhde-remote over ssh with the flxp provider, tested against indra (13.1)
+  locally + the Filter box over it + luxfind (in: lhde-cat with import-du, index, touch, find, the observed/desired/pending
+  attributes, the operation journal and the authority setting, flxp's Filter box and details::write on it; docs/CATALOGUE.md.
+  Open: luxfind, queries across the whole root in flxp); (3) lhde-remote over ssh with the flxp provider, tested against indra (13.1)
   and soma; (4) the journal and sync; (5) photo query views and the gallery.

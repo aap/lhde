@@ -924,6 +924,13 @@ whole folder shows again; Enter goes back to the list keeping the filter; anothe
 the window and is not remembered. The attributes are read once per folder when a word needs them (or a column shows them) and
 follow changes on disk.
 
+**The catalogue (lhde-cat).** A catalogue keeps a whole tree's files and attributes in a database for quick queries and edits
+(docs/CATALOGUE.md): `lhde-cat add-root photos ~/Pictures`, then `lhde-cat index photos` (or `import-du photos LISTING` for a
+`du -a` listing first), then `lhde-cat find photos --tag family --since 2019 --type 'image/*'`, `lhde-cat tag FILE +family`,
+`lhde-cat set FILE desc "..."`, `lhde-cat show FILE`, `lhde-cat stats photos`. With `--authority catalogue` the edits stay in
+the catalogue until `lhde-cat commit photos` writes them to the files, refusing any value changed on a file since it was
+last read (`lhde-cat conflicts`, `resolve`).
+
 They travel with the file where its attributes travel: a move on the same file system, flxp's own copy and move (also across
 file systems), `cp -a` (or `--preserve=xattr`), `rsync -X`, `tar --xattrs`. They do not travel with `cp` without `-a`, most
 archive and sync tools by default, or git.

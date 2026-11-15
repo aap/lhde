@@ -20,6 +20,7 @@ the design journals of the merge and before are in `history/` (kept unchanged, n
 | `LICENSING.md` | which licence covers which part: lhde's GPL-2, Wine's vendored code and resources (LGPL), berry's (MIT), what the user imports |
 | `APPLICATIONS.md` | writing an application: the three layers, the headers (`wux/wux.h`, `shell/shell.h`), the recipe (`apps/app.mk`), the entry point, what is not public yet |
 | `ANNOTATIONS.md` | file annotations as extended attributes (lhde-import, lhde-pack) |
+| `CATALOGUE.md` | the catalogue (liblhcat, `lhde-cat`): objects and locations, observed/desired/pending attributes, the operation journal and the authority setting, the three fills, the queries, what flxp reads from it |
 | `history/` | journals: `flxp-NOTES.md` (flxp's implementation notes), `THEMES.md` (the registry before theme files), `LAYOUT-draft.md` (the merge plan and the step reports), `THEME-FORMAT-status.md` (open points, decisions, status of the theme format), `CLASSIC-DECO-NOTES.md` |
 
 Per-component READMEs (`luxwm/README.md`, ...) say what a directory holds and how to build it; the docs here say how it works.

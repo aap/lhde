@@ -35,6 +35,7 @@ Two directories, one rule each. liblhde gives every path (`lhde_config_file`, `l
 | `flxp-tags` | the tags last added (Add Tag..., the Properties sheet), one a line, the latest first, at most 100: the tag boxes offer them |
 | `flxp-desktop-positions` | the desktop's icon positions |
 | `flxp-mfu`, `flxp-run-history` | the start panel's launch counts, the Run box's history |
+| `catalogue/NAME.db` | the catalogue of the root NAME (docs/CATALOGUE.md; `NAME.thumbs/` its own thumbnails with `index --self-contained`): a cache of the files under filesystem authority; under catalogue authority the edits not committed yet and the journal live only here, the one exception to "costs nothing but convenience" |
 | `luxpad.ini` | luxpad's window (`[window]` x, y, width, height, maximized) and last search (`[search]` find, replace, match_case, whole_word, down) |
 | `luxview.ini` | luxview's window (`[window]` x, y, width, height, maximized) and whether 4051's filmstrip shows (`[view]` filmstrip; docs/USAGE.md "luxview") |
 
