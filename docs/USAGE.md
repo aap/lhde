@@ -903,7 +903,9 @@ Where they show:
   back to XP's four (Name, Size, Type, Date Modified) and forgets them too. With "Remember each folder's view settings" off
   (`remember_views = 0`) the columns are one set for every folder, kept in `flxp-columns`.
 - **The infotip.** Resting the pointer on an item shows XP's tip: Type, Date Modified and Size, then Description, Tags,
-  Comment (its first line), Color ("Color: Red") and "Runs with: python3" (the command's program) when they are set.
+  Comment (its first line), Color ("Color: Red") and "Runs with: python3" (the command's program) when they are set. In
+  XP's Details the item is its name (the tip shows over the Name column); in the Longhorn frame's Details, which selects
+  whole rows, the item is the whole row, for the tip as for the hover and a click.
 - **The panes.** XP's Details rollout lists them when set (read-only, as XP's did; "Color: Red"); 4051's task band shows the
   description, tags and the comment's first line for one item, with "Add a description", "Add tags", "Add comments" when
   empty, and the colour as a square after the item's name. Run as shows in neither.

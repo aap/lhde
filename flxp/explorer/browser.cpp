@@ -314,9 +314,11 @@ static void tip_track(Browser& b, int x, int y)
     }
     std::string t = shell::details::infotip(b.items[(size_t)i]);
     if (t.empty()) return;
-    RECT r = {}; r.left = b.view == LVS_REPORT ? LVIR_LABEL : LVIR_SELECTBOUNDS;
+    // Details with full-row select (the Longhorn frame): the whole row is the item, for the tip as for the hover and the click
+    bool row = b.view == LVS_REPORT && (SendMessageW(b.list, LVM_GETEXTENDEDLISTVIEWSTYLE, 0, 0) & LVS_EX_FULLROWSELECT);
+    RECT r = {}; r.left = row ? LVIR_BOUNDS : b.view == LVS_REPORT ? LVIR_LABEL : LVIR_SELECTBOUNDS;
     if (!SendMessageW(b.list, LVM_GETITEMRECT, (WPARAM)i, (LPARAM)&r)) return;
-    if (b.view == LVS_REPORT) {   // the row's Name column (XP: the tip is the name's)
+    if (b.view == LVS_REPORT && !row) {   // the row's Name column (XP: the tip is the name's)
         RECT ic = {}; ic.left = LVIR_ICON;
         SendMessageW(b.list, LVM_GETITEMRECT, (WPARAM)i, (LPARAM)&ic);
         r.left = ic.left;
