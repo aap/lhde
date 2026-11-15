@@ -82,3 +82,7 @@ Each step is useful on its own; (a) and (b) are the foundation the rest stands o
   attributes, the operation journal and the authority setting, flxp's Filter box and details::write on it; docs/CATALOGUE.md.
   Open: luxfind, queries across the whole root in flxp); (3) lhde-remote over ssh with the flxp provider, tested against indra (13.1)
   and soma; (4) the journal and sync; (5) photo query views and the gallery.
+
+* lhde-cat: a path-prefix query (`--in backup`) over 7 M rows takes 1.9 s and `--type image/* --limit` 255 ms on 2 M: the
+	parent+name storage needs a subtree index (a directory id range or a materialised path prefix) and the type filter an index
+	ordered by id; confirm relations from the CLI; resolve applies every conflicting op, not the winner only
