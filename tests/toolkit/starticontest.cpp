@@ -5,11 +5,14 @@
 // and what cannot be loaded gives no picture. windows:BUILD over stand-in explorer.exe, shell32.dll and browseui.dll files
 // (32-bit .res files): the builds with a Start bitmap and the Shell tab's list, XP's 143 / 176 with their alpha, 2000's one
 // 16 px 8-bit flag keyed and centred in the styled cell, a styled flag only cut to 16 px, the brands' frame 0, and the builds
-// without one (Longhorn's explorer.exe, ReactOS's logo, not imported) falling back to the theme's flag.
+// without one (Longhorn's explorer.exe, ReactOS's logo, not imported) falling back to the theme's flag. windows:4074 with
+// jade4074 from the caller's LHDE_WINDOWS (skipped when it has none): the white flag of its CompositedWindow.DEFAULTICON in the
+// styled and the classic cell, alpha kept; without the style, the theme's flag.
 // Usage: build/tests/starticontest
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/utsname.h>
 #include <string>
 #include <vector>
@@ -194,11 +197,77 @@ static void builds()
     CHECK_EQ(shape(start_flag_brand("5112", 22)), "none");
 }
 
+// the box of a picture's pixels with alpha, "X,Y WxH"; how many are opaque near-white, how many partly transparent
+static std::string alpha_box(const gdi::Bitmap* b, int* white, int* partial)
+{
+    int x0 = b->width, y0 = b->height, x1 = -1, y1 = -1;
+    *white = *partial = 0;
+    for (int y = 0; y < b->height; y++)
+        for (int x = 0; x < b->width; x++) {
+            uint32_t c = b->row(y)[x], a = c >> 24;
+            if (!a) continue;
+            if (x < x0) x0 = x;
+            if (y < y0) y0 = y;
+            if (x > x1) x1 = x;
+            if (y > y1) y1 = y;
+            if (a == 255 && ((c >> 16) & 255) > 220 && ((c >> 8) & 255) > 220 && (c & 255) > 220) (*white)++;
+            if (a < 255) (*partial)++;
+        }
+    return x1 < 0 ? "empty" : std::to_string(x0) + "," + std::to_string(y0) + " " + std::to_string(x1 - x0 + 1) + "x" + std::to_string(y1 - y0 + 1);
+}
+
+// windows:4074: 4074's explorer.exe has no IDB_START; its flag is Jade's CompositedWindow.DEFAULTICON (20 x 17, alpha), from
+// the caller's Windows tree (read only: a link to its styles/jade4074.msstyles in the scratch data directory)
+static void style_flag(const std::string& windows)
+{
+    std::string jade = windows + "/index/styles/jade4074.msstyles";
+    if (!is_file(jade)) { printf("skip windows:4074's flag: no %s\n", jade.c_str()); return; }
+    std::string link = T + "/lhde/styles/jade4074.msstyles";
+    make_dirs(dir_of(link));
+    CHECK(symlink(jade.c_str(), link.c_str()) == 0);
+    lhde_data_reset();
+    std::string all;
+    for (const std::string& s : start_flag_builds()) all += s + " ";
+    CHECK_EQ(all, "2k xp 4074 zz25 ");
+    CHECK_EQ(start_icon_choice("windows:4074"), "windows:4074");
+    std::string src = start_icon_source("windows:4074", 16), want = "/styles/jade4074.msstyles#CompositedWindow.DEFAULTICON";
+    CHECK(src.compare(0, 6, "style:") == 0 && src.size() > want.size() && src.compare(src.size() - want.size(), want.size(), want) == 0);
+    int white = 0, partial = 0;
+    // a visual style's cell: the 20 x 17 flag as it is, centred in the left 20 x 20 (XP's flag box), its alpha kept
+    gdi::Bitmap* f = start_flag_image("4074", true);
+    CHECK(f && f->width == 25 && f->height == 20);
+    if (f) {
+        CHECK_EQ(alpha_box(f, &white, &partial), "0,1 20x17");
+        CHECK(white >= 60 && partial >= 20);
+        gdi::destroy_bitmap(f);
+    }
+    // classic: shrunk to 16 x 14, centred in the 16 x 16 cell
+    f = start_flag_image("4074", false);
+    CHECK(f && f->width == 16 && f->height == 16);
+    if (f) {
+        CHECK_EQ(alpha_box(f, &white, &partial), "0,1 16x14");
+        CHECK(white >= 20 && partial >= 10);
+        gdi::destroy_bitmap(f);
+    }
+    // the Explorer's brand: no micro brand of 4074's, the flag alone at 20 px
+    CHECK_EQ(shape(start_flag_brand("4074", 22)), "none");
+    CHECK_EQ(shape(start_icon_image("windows:4074", 20)), "20x20 opaque clear");
+    // the style gone: the theme's flag again
+    unlink(link.c_str());
+    lhde_data_reset();
+    CHECK_EQ(start_icon_choice("windows:4074"), "windows");
+    CHECK_EQ(shape(start_flag_image("4074", true)), "none");
+}
+
 int main()
 {
     char tmpl[] = "/tmp/starticontest.XXXXXX";
     if (!mkdtemp(tmpl)) { perror("mkdtemp"); return 2; }
     T = tmpl;
+    // the caller's Windows tree, for windows:4074's flag (jade4074)
+    const char* lw = getenv("LHDE_WINDOWS");
+    const char* home = getenv("HOME");
+    std::string windows = lw && *lw ? lw : std::string(home ? home : "") + "/.local/share/lhde-windows";
     setenv("HOME", T.c_str(), 1);
     setenv("XDG_CONFIG_HOME", (T + "/config").c_str(), 1);
     setenv("XDG_DATA_HOME", (T + "/data").c_str(), 1);
@@ -286,6 +355,7 @@ int main()
     CHECK_EQ(shape(start_icon_image("file:mine/none.png", 16)), "none");
 
     builds();
+    style_flag(windows);
 
     if (system(("rm -rf '" + T + "'").c_str()) != 0) fprintf(stderr, "could not remove %s\n", T.c_str());
     printf("%d passed, %d failed\n", g_pass, g_fail);

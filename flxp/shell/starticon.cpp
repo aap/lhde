@@ -9,11 +9,19 @@
 #include "gdi/bitmap.h"
 #include "gdi/bmp.h"
 #include "gdi/image.h"
+#include "gdi/png.h"
 #include "config.h"
 #include "icons.h"
 #include "lhdata.h"
 #include "lhtheme.h"
 #include "settings.h"
+#include "wuxtheme/ut.h"
+// weak: a program that links the shell model without libwuxtheme (the toolkit tests) has no style flags, nothing else changes
+#pragma weak ut_open
+#pragma weak ut_close
+#pragma weak ut_part
+#pragma weak ut_prop
+#pragma weak ut_get_stream
 
 namespace shell {
 
@@ -127,6 +135,63 @@ gdi::Bitmap* to_square(gdi::Bitmap* src, int size)
     return out;
 }
 
+// A build whose explorer.exe has no IDB_START but whose own visual style has the flag its Start button shows: 4074's classic
+// Start button carries a white four-pane flag, drawn as Jade's CompositedWindow.DEFAULTICON (20 x 17, a PNG with alpha; Jade
+// is 4074's default look). The other Longhorn styles' Start::Button images are flagless pills and their
+// Sidebar.STARTBUTTON is the Sidebar's own button, so no other build is here.
+const struct { const char* build; const char* style; } kStyleFlags[] = { { "4074", "jade4074" } };
+
+// the file of the style that has BUILD's flag, when it is imported ("" otherwise)
+std::string flag_style_path(const std::string& build)
+{
+    for (const auto& f : kStyleFlags)
+        if (build == f.build) return lhde_find(std::string("styles/") + f.style + ".msstyles");
+    return "";
+}
+
+// BUILD's flag from its style (CompositedWindow.DEFAULTICON's PNG stream), straight alpha; null when the style is not
+// imported or has no such stream
+gdi::Bitmap* style_flag(const std::string& build)
+{
+    std::string path = flag_style_path(build);
+    if (path.empty() || !ut_open) return nullptr;
+    ut_theme* t = ut_open(path.c_str(), nullptr, nullptr);
+    if (!t) return nullptr;
+    gdi::Bitmap* out = nullptr;
+    int part = ut_part(t, "CompositedWindow", "DEFAULTICON"), prop = ut_prop(t, "PNGSTREAM");
+    const void* data = nullptr;
+    size_t size = 0;
+    if (part > 0 && prop > 0 && ut_get_stream(t, "CompositedWindow", part, 0, prop, &data, &size) && data)
+        out = gdi::decode_png((const uint8_t*)data, size);
+    ut_close(t);
+    return out;
+}
+
+bool has_style_flag(const std::string& build)
+{
+    gdi::Bitmap* b = style_flag(build);
+    if (b) gdi::destroy_bitmap(b);
+    return b != nullptr;
+}
+
+// src in the box (bx, by, bw, bh) of a blank cw x ch cell: centred, shrunk keeping its aspect ratio when it does not fit;
+// takes src
+gdi::Bitmap* in_cell(gdi::Bitmap* src, int cw, int ch, int bx, int by, int bw, int bh)
+{
+    if (!src) return nullptr;
+    if (src->width > bw || src->height > bh) {
+        int fw = 0, fh = 0;
+        gdi::fit_size(src->width, src->height, bw, bh, false, &fw, &fh);
+        gdi::Bitmap* f = gdi::resample(src, fw, fh);
+        gdi::destroy_bitmap(src);
+        if (!(src = f)) return nullptr;
+    }
+    gdi::Bitmap* cell = blank(cw, ch);
+    if (cell) copy_rect(src, 0, 0, src->width, src->height, cell, bx + (bw - src->width) / 2, by + (bh - src->height) / 2);
+    gdi::destroy_bitmap(src);
+    return cell;
+}
+
 const std::vector<std::pair<std::string, std::string>> kNamed = {
     { "lhde", "lhde" }, { "Linux penguin", "linux" }, { "FreeBSD daemon", "freebsd" }, { "Automatic (by the system)", "auto" } };
 
@@ -137,7 +202,7 @@ std::string start_flag_build(const std::string& choice) { return flag_build_of(c
 bool start_flag_available(const std::string& build)
 {
     if (build.empty() || build == "reactos") return false;
-    return has_bitmap(build, "explorer.exe", 143);
+    return has_bitmap(build, "explorer.exe", 143) || has_style_flag(build);
 }
 
 std::vector<std::string> start_flag_builds()
@@ -166,7 +231,8 @@ gdi::Bitmap* start_flag_image(const std::string& build, bool styled)
 {
     if (!start_flag_available(build)) return nullptr;
     gdi::Bitmap* start = build_bitmap(build, "explorer.exe", 143);
-    if (!start) return nullptr;
+    if (!start)   // the style's flag: in the left 20 x 20 of the styled cell, where XP's flag is; the classic cell whole
+        return styled ? in_cell(style_flag(build), 25, 20, 0, 0, 20, 20) : in_cell(style_flag(build), 16, 16, 0, 0, 16, 16);
     key_alpha(start);
     if (styled) {
         if (start->width == 25 && start->height == 20) return start;
@@ -245,6 +311,7 @@ std::string start_icon_source(const std::string& choice, int size)
     std::string build = flag_build_of(choice);
     if (!build.empty()) {
         if (!start_flag_available(build)) return "";
+        if (!has_bitmap(build, "explorer.exe", 143)) return "style:" + flag_style_path(build) + "#CompositedWindow.DEFAULTICON";
         int id = size <= 16 && has_bitmap(build, "explorer.exe", 176) ? 176 : 143;
         return "pe:" + resource_file(build, "explorer.exe") + "#" + std::to_string(id);
     }

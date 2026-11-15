@@ -67,7 +67,7 @@ comments, the order and the keys it does not know: it reads the whole file, chan
               locked = 1                 ; the classic bar's Lock the Taskbar; 0: the bands' grippers show (flxp-taskbar)
               hide_inactive = 1          ; the classic bar's chevron hides the icons unchanged for an hour (XP's Hide inactive icons)
               start_icon = linux         ; the picture in place of the Windows flag, for every theme (absent: the theme's Shell.start_icon;
-                                         ; windows | windows:BUILD (that build's own flag: 2k, xp) | lhde | linux | freebsd | auto
+                                         ; windows | windows:BUILD (that build's own flag: 2k, xp, 4074) | lhde | linux | freebsd | auto
                                          ; | file:PACK/PATH | a path | an icon key: THEME-FORMAT 2b)
 [sidebar]     mode = full                ; full | minimized | pinned (absent: the theme's Shell.sidebar; Super+H: minimized ⇄ back)
               width = 150                ; 100..600 (the sizer drag)

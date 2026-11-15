@@ -194,7 +194,8 @@ key table, and the Super keys it calls free are unbound), `tools/start_icons.py`
 `build/tests/keyicontest` (an icon key's image with nothing imported: Wine's set), `build/tests/starticontest` (Shell.start_icon:
 windows by default and from settings.ini over the theme, lhde, linux and freebsd at 16, 20, 24 and 32 px, auto by uname, a file,
 `file:PACK/PATH`, an icon key; windows:BUILD over stand-in explorer.exe files: the builds with a flag, the Shell tab's list, 2000's
-keyed 16 px flag, XP's alpha, the brands, Longhorn's and missing builds as the theme's flag), `build/tests/filetypestest` (the File Types page's model on a scratch tree:
+keyed 16 px flag, XP's alpha, the brands, Longhorn's and missing builds as the theme's flag; windows:4074 with jade4074 from
+`LHDE_WINDOWS`, skipped without it: its white flag in the styled and the classic cell, alpha kept), `build/tests/filetypestest` (the File Types page's model on a scratch tree:
 the extensions, where a default comes from, Change and Restore, the actions' copy, the user's extensions), `tests/mime.py` (which program opens a type on a scratch XDG tree
 with a distribution, lhde's `lhde-mimeapps.list` and a home: lhde-mime's verdicts against the spec's order, flxp's reader
 (`build/tests/assoctest default`), `xdg-mime query default` and `gio mime` against them when installed, `lhde-mime default` /
@@ -232,7 +233,7 @@ program's copy, New / Delete an extension): `tests/headless/filetypes.sh`, Defau
 role, Change... for one type wins over it): `tests/headless/defprogs.sh`, flxp-taskbar's tray (XEmbed icons in 18 px cells, a tooltip, the chevron; its own items over the hardware layer's fake tree: Brightness with a backlight, the wheel setting it), Quick Launch and taskbar menu under luxwm
 (xprop, xwininfo; luxshell/tests/trayicon): `tests/headless/taskbar.sh`, the Start button with `[taskbar] start_icon` under classic and luna (luna when
 imported): `windows` the same pixels as without the key, `linux` different only inside the flag's cell, changed live and back,
-`windows:BUILD` (a stand-in build's flag and 2000's when imported) inside the cell, `windows:4074` and a missing build the flag:
+`windows:BUILD` (a stand-in build's flag, 2000's when imported, 4074's when jade4074 is) inside the cell, a missing build the flag:
 `tests/headless/starticon.sh`, every IDC_ cursor shown under the X cursor theme's name (XFixes): `tests/headless/cursors.sh`, Super+R
 opening the start menu's Run dialog (luxwm, luxshell, flxp-startmenu) and settings.ini `[commands] run` instead:
 `tests/headless/runkey.sh`, luxshell keeping exactly one start-menu provider when the provider's command name is not

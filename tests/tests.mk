@@ -18,6 +18,8 @@ build/tests/%: $(O)/tests/toolkit/%.o $(NATIVE_OBJS)
 	@mkdir -p $(dir $@)
 	$(CXX) -o $@ $^ $(LDLIBS)
 build/tests/luxviewtest: $(O)/apps/luxview/model_native.o   # luxview's view model, no win32
+build/tests/starticontest: LDLIBS += -Lbuild/lib -Wl,--no-as-needed -lwuxtheme '-Wl,-rpath,$$ORIGIN/../lib'   # the style flags
+build/tests/starticontest: | $(UTSO)
 
 $(O)/tests/w32/%.o: tests/w32/%.cpp
 	@mkdir -p $(dir $@)
