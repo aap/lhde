@@ -19,6 +19,7 @@ $(O)/flxp/explorer/header.o: luxnav/lhnav.h | $(LUXNAVA)
 SHELLOBJS = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/shell/*.cpp)) $(LHDE_OBJS) $(LHCAT_OBJS)
 # liblhcat (lhcat.h): the catalogue the Filter box reads and details::write keeps up to date (shell/details.cpp)
 $(O)/flxp/shell/details.o: CXXFLAGS += -Iliblhcat $(SQLITE_CFLAGS)
+$(O)/flxp/shell/thumbs.o: CXXFLAGS += -Iliblhcat   # a JPEG's EXIF thumbnail (lhcat_picture_parse)
 # liblhde (<lhde/data.h>, <lhde/theme.h>, <lhde/settings.h>): the data directories, the theme resolver and the settings
 # store; its objects are linked into every flxp program and test with the shell model
 $(O)/flxp/shell/lhdata.o $(O)/flxp/shell/lhtheme.o $(O)/flxp/shell/settings.o $(O)/flxp/settings/settings.o: CXXFLAGS += -Iliblhde

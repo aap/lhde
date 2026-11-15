@@ -102,6 +102,12 @@ first by aap's choice. The window that starts gets cmd.exe's icon through the cl
 class is one of the terminals there; a terminal of another class is added in `~/.config/lhde/icons/apps.ini`. flxp.ini has no
 `terminal` key any more (settings.ini's is the desktop's); one left there is not read.
 
+**Thumbnails on a network mount** (flxp.ini; docs/USAGE.md "The Explorer's views"): `thumbnails_network = 1 | 0` (empty:
+1) shows them there at all; `thumbnails_network_budget` is how many megabytes of pictures (or documents for a thumbnailer) a
+folder may have read whole for their thumbnails each time it is opened, past the cache and the JPEGs' EXIF thumbnails (empty:
+64; 0: none read whole, the EXIF thumbnails and the cache only). Like every flxp.ini key also `FLXP_THUMBNAILS_NETWORK_BUDGET`
+for one run.
+
 **Switches** are `1` or `0` in every file lhde reads (settings.ini, flxp.ini, theme files) and in the `FLXP_<KEY>` /
 `LHSHELL_*` environment; `on`, `off`, `yes`, `no`, `true`, `false` are not accepted: such a value is reported once on stderr
 and taken as unset (the default). One parser each: flxp's `shell::flag_value` (`setting_flag`, `store::flag`), luxshell's

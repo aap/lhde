@@ -49,7 +49,8 @@ std::vector<std::string> folder_pictures(const std::string& dir)
             shell::Item it;
             it.name = e->d_name;
             it.path = (dir == "/" ? "" : dir) + "/" + e->d_name;
-            if (!shell::is_file(it.path)) continue;
+            // a file by its directory entry: a stat for each would be a round trip each on a network mount
+            if (e->d_type != DT_REG && !shell::is_file(it.path)) continue;
             items.push_back(it);
         }
         closedir(d);
@@ -136,22 +137,24 @@ static gdi::Bitmap* decode_fit(const std::string& path, int bw, int bh, int* ow,
     return b;
 }
 
-static gdi::Bitmap* cached_thumbnail(const std::string& path, int* ow, int* oh, void*)
+// The first look: the shared cache's current thumbnail (only one that is there: making one is a decode like the
+// picture's own), else a JPEG's own EXIF thumbnail (shell/thumbs.h exif_preview: at most 64 KB of the file, worth it on a
+// network mount where the picture itself takes a while to come)
+static gdi::Bitmap* first_look(const std::string& path, int* ow, int* oh, void*)
 {
     *ow = *oh = 0;
-    // only one that is there: making one is a decode like the picture's own
-    if (!shell::exists(shell::thumbs::cache_path(path, 256)) && !shell::exists(shell::thumbs::cache_path(path, 128)))
-        return nullptr;
-    gdi::Bitmap* b = shell::thumbs::get(path, 0, 256);
-    if (b) shell::thumbs::picture_size(path, ow, oh);
-    return b;
+    gdi::Bitmap* b = nullptr;
+    if (shell::exists(shell::thumbs::cache_path(path, 256))) b = shell::thumbs::cached_thumbnail(path, 256);
+    if (!b && shell::exists(shell::thumbs::cache_path(path, 128))) b = shell::thumbs::cached_thumbnail(path, 128);
+    if (b) { shell::thumbs::picture_size(path, ow, oh); return b; }
+    return shell::thumbs::exif_preview(path, 0, ow, oh);
 }
 
 Decoder default_decoder()
 {
     Decoder d;
     d.decode = decode_fit;
-    d.preview = cached_thumbnail;
+    d.preview = first_look;
     return d;
 }
 

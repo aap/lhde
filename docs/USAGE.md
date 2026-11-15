@@ -753,10 +753,21 @@ folder 4074's photo standing in the open folder where the build has that art (sh
 folder's `folder.jpg` first, else its first picture), else the folder icon with up to four pictures on it. There is no square
 behind them; selection and hover are the theme's `Explorer::ListView` LISTITEM underlay (Slate tan, Jade blue; in Icons around
 the icon and its label, not the whole cell), the classic highlight in styles without it. View > Show Thumbnails (and Folder
-Options) turn them off for every folder (`thumbnails = 0` in `flxp.ini`); on network mounts (NFS, SMB, sshfs and other FUSE
-network filesystems) they are off unless `thumbnails_network = 1`, since every picture would be read over the network. The
-thumbnails are cached in `~/.cache/thumbnails` (the freedesktop spec, shared with other programs: 128 px in `normal/`, 256 px in
-`large/`), so a picture is decoded once and its thumbnail read back after that.
+Options) turn them off for every folder (`thumbnails = 0` in `flxp.ini`). The thumbnails are cached in `~/.cache/thumbnails`
+(the freedesktop spec, shared with other programs: 128 px in `normal/`, 256 px in `large/`), so a picture is decoded once and its
+thumbnail read back after that.
+
+On a network mount (NFS, SMB, sshfs and other FUSE network filesystems) reading a 5 MB photo for a 96 px thumbnail is what
+takes the time, so a thumbnail comes in three stages there. First the cache: while it has a current thumbnail nothing else is
+read. Then a JPEG's own EXIF thumbnail, the small picture (usually 160 x 120) a camera stores in the file's first few kilobytes
+(APP1 Exif, IFD1's JPEGInterchangeFormat): flxp reads at most the first 64 KB of the file in one go, decodes it, turns it as the
+EXIF Orientation says and shows it at the thumbnail's size at once. Every item asked for gets these two stages before any full
+decode starts, so a folder's thumbnails appear in a second or two. Last the full decode, which replaces the EXIF thumbnail, but
+only while the pictures read whole for the folder stay within `thumbnails_network_budget` megabytes (64 by default, counted
+from when the folder is opened): a folder of 2000 photos does not pull 10 GB, and the rest keep their EXIF thumbnail (or their
+icon, a picture without one). The EXIF thumbnail is never written to the cache, where it would stand for the full thumbnail
+for every other program; the full one is, so the folder's next visit finds those. `thumbnails_network = 0` reads nothing over
+the network for a thumbnail. A local folder skips the EXIF stage: the cache, then the full decode, as always.
 
 flxp decodes JPEG, PNG, WebP, BMP and ICO itself. Any other file gets a thumbnail when a **thumbnailer entry** takes its type (by
 its name; the nearest parent type's entry when its own has none): a PDF, PostScript or DjVu page, a video's frame, a GIF or TIFF.
@@ -773,8 +784,9 @@ decodes at once, with stdin, stdout and stderr on `/dev/null` and only `PATH`, `
 environment, in a process group of its own that is killed after 10 seconds; its PNG goes to a temporary file in
 `~/.cache/thumbnails`, is not read above 16 MB, and is stored like any thumbnail (the page drawn like a picture, in the photo
 frame; the XP Details pane and the 4051 band show it as a picture's preview). A document that fails or times out gets the
-failure marker and is not tried again until it changes. None runs for a file on a network mount unless
-`thumbnails_network = 1`, and a folder's own picture is made from its pictures only.
+failure marker and is not tried again until it changes. On a network mount a thumbnailer reads its file whole, so it runs
+within the folder's `thumbnails_network_budget` (and not at all with `thumbnails_network = 0`), after every EXIF stage, and a
+folder's own picture is made from its pictures only.
 
 Memory is bounded whatever the folder holds. A picture is never decoded at full size for its thumbnail where the format allows it:
 a JPEG decodes at 1/2, 1/4 or 1/8 of its size (DCT scaling) straight from the file, a PNG is reduced row by row as it is read, a
@@ -826,7 +838,7 @@ selected it describes the folder itself (its name in bold, "File Folder", Date M
 Disk", File System, Free Space, Total Size); with one item its name, type and its kind's lines in XP's order and wording ("Date
 Modified: Today, October 31, 2026, 12:45 PM", "Size: 23.1 KB", "Dimensions: 800 x 600", "Attributes: Read-only, Hidden"), the
 extended attributes when they are set; a picture gets its thumbnail above the name (at most 150 x 100), except in the Thumbnails
-view and where thumbnails are off (`thumbnails = 0`, or a network mount without `thumbnails_network = 1`); a folder gets none, as
+view and where thumbnails are off (`thumbnails = 0`, or a network mount with `thumbnails_network = 0`); a folder gets none, as
 in XP (its mini previewer is for items that are not folders). Several items: "N items
 selected." and the files' "Total File Size" (for up to 100 items). Like XP the section starts folded except in My Computer; its
 chevron folds and opens it, and from then on it stays as it was left (`places_details = 0|1` in `flxp.ini`).
@@ -1033,7 +1045,8 @@ and reactos imports; a Windows tree imported before it was gets it by importing 
 kept).
 
 It opens at once: the window, the toolbar and the title are up before anything is decoded. The picture follows in two
-stages: the thumbnail from the shared thumbnail cache when there is one (drawn blown up to size at once), then the picture
+stages: the thumbnail from the shared thumbnail cache when there is one, else a JPEG's own EXIF thumbnail (at most the first
+64 KB of the file, as the Explorer reads it on a network mount), drawn blown up to size at once; then the picture
 decoded at the size the window needs, on a thread of its own (a 6000 x 4000 JPEG in an 800 px window is decoded at a quarter
 by libjpeg and resampled, never held whole). A run of Next never shows an older picture over the one asked for, and closing
 the window while a picture decodes is safe. When the picture is complete, the next one in the direction you walk is decoded

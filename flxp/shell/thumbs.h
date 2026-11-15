@@ -60,10 +60,24 @@ std::vector<std::string> thumbnailer_argv(const Thumbnailer& t, const std::strin
 void set_thumbnailer_limits(int timeout_ms, size_t max_bytes);
 int thumbnailer_runs();                             // children started so far
 
-// Whether the Longhorn views show thumbnails in a folder: flxp.ini thumbnails = 1 | 0
-// (default 1) and, on a network mount (reading every picture over the network is
-// slow), thumbnails_network = 0 | 1 (default 0).
+// Whether the views show thumbnails in a folder: flxp.ini thumbnails = 1 | 0 (default 1) and, on a network mount,
+// thumbnails_network = 1 | 0 (default 1; 0: nothing is read over the network for a thumbnail).
 bool enabled_for(const std::string& folder);
+// On a network mount a thumbnail comes in three stages: the cache (nothing else is read while it has a current one), the
+// JPEG's own EXIF thumbnail (exif_preview: at most EXIF_READ bytes of the file), and the picture's full decode (or a
+// thumbnailer's run) last, only while the files read whole for a folder stay within thumbnails_network_budget MB
+// (default 64; 0: none read whole) - the rest keep their EXIF thumbnail, or their icon. A local folder: the cache, then
+// the full decode, as always.
+enum { EXIF_READ = 64 * 1024 };
+uint64_t network_budget();                                  // thumbnails_network_budget in bytes (UI thread)
+// A JPEG's EXIF thumbnail (APP1 Exif, IFD1's JPEGInterchangeFormat; usually 160 x 120): read from the first EXIF_READ bytes
+// of the file in one read, decoded, turned as its Orientation tag says and fitted into size x size (enlarged too; 0: as
+// it is). *w, *h: the picture's own size as shown (its frame header's, turned), 0 when not in those bytes. Null: none.
+// Never stored in the thumbnail cache (it would stand for the full thumbnail there). Thread-safe.
+gdi::Bitmap* exif_preview(const std::string& path, int size, int* w = nullptr, int* h = nullptr);
+int previews();                                             // EXIF thumbnails made so far
+// The current cached thumbnail at cache size (a larger one resampled), nothing else tried; null when there is none
+gdi::Bitmap* cached_thumbnail(const std::string& path, int cache_size);
 // A path on a network filesystem: NFS, SMB/CIFS, 9p, AFS, Ceph, Coda, or a FUSE mount
 // of sshfs, rclone, curlftpfs, gvfs, davfs2, s3fs and the like.
 bool on_network(const std::string& path);
@@ -98,18 +112,25 @@ public:
         std::string path;
         gdi::Bitmap* bmp = nullptr; // fitted into view_size x view_size (no upscaling); null: none
         std::vector<gdi::Bitmap*> minis;   // folder requests: up to 4 pictures inside, fitted into mini_size
+        // a network file's EXIF thumbnail (enlarged to view_size too): the same request's result follows (null when the
+        // full decode was past the folder's budget: the preview stays)
+        bool preview = false;
+        bool over_budget = false;   // not read whole: past thumbnails_network_budget for its folder
     };
     Loader(Notify notify, void* ctx, int threads = 0);   // 0: up to 4 by the CPU count
     ~Loader();
     // Queue a file; results come back in request order per thread. folder:
     // the first pictures inside it (by name; flxp's own pictures only) instead, mini_size square each.
     // A file that is not one of flxp's own pictures gets its thumbnailer here (UI thread), none on a
-    // network mount unless thumbnails_network = 1.
+    // network mount with thumbnails_network = 0. A file on a network mount goes through the three stages
+    // (enabled_for above): every request's cache and EXIF stage before any full decode, the full decodes
+    // within the budget of the request's folder (it starts again when a request is for another folder).
     void request(uint32_t gen, int id, const std::string& path, int64_t mtime, int view_size, bool folder = false, int mini_size = 0);
     uint32_t cancel();              // drops everything pending, returns the new generation
     uint32_t generation() const;
     bool busy() const;              // jobs queued or being made
     bool take(Result& out);         // UI thread: next finished result (free_result it)
+    uint64_t spent() const;         // bytes of network files read whole for the current folder
     struct Impl;                    // the threads (kept out of here: <thread> and win32's min/max)
 private:
     Impl* impl_;

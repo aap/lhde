@@ -27,6 +27,7 @@ static shell::thumbs::Slots g_done;              // key(path, mtime) -> slot: th
 static std::vector<int> g_slot_image;            // slot -> its image in g_il
 static std::map<std::string, int64_t> g_asked;   // path -> the mtime requested (F5 asks again for changed files)
 static std::set<std::string> g_pending;          // paths requested and not back yet
+static std::set<std::string> g_preview_only;     // keys whose image is a network picture's EXIF thumbnail, its last stage to come
 static std::map<std::string, std::pair<int, int64_t>> g_where;   // path -> list index and mtime, as last filled
 struct Wanted { std::string path, icon; int64_t mtime; bool folder; };
 static std::vector<Wanted> g_items;              // list index -> what its thumbnail would be made of (path empty: none)
@@ -444,6 +445,7 @@ static void reset_images()
     g_done.reset((size_t)g_size * g_size * 4);
     g_slot_image.clear();
     g_pending.clear();
+    g_preview_only.clear();
 }
 
 bool longhorn() { return g_lh; }
@@ -594,7 +596,8 @@ static void ask_near()
     uint32_t gen = g_loader->generation();
     for (int i : near) {
         const Wanted& it = g_items[(size_t)i];
-        if (it.path.empty() || g_done.find(key(it.path, it.mtime)) >= 0) continue;
+        // (an EXIF thumbnail alone, its full decode dropped by a scroll: asked for again)
+        if (it.path.empty() || (g_done.find(key(it.path, it.mtime)) >= 0 && !g_preview_only.count(key(it.path, it.mtime)))) continue;
         auto a = g_asked.find(it.path);
         if (a != g_asked.end() && a->second == it.mtime) continue;
         g_asked[it.path] = it.mtime;
@@ -630,15 +633,20 @@ void on_ready()
     shell::thumbs::Loader::Result r;
     int made = 0;
     while (g_loader->take(r)) {
-        g_pending.erase(r.path);
+        // a network picture's EXIF thumbnail: shown in its slot, the full one (or nothing: past the folder's budget,
+        // the preview stays) still to come
+        if (!r.preview) g_pending.erase(r.path);
         int64_t mtime = g_asked.count(r.path) ? g_asked[r.path] : 0;
         std::string k = key(r.path, mtime);
+        if (r.preview) g_preview_only.insert(k);
+        else g_preview_only.erase(k);
         int image = -1;
         if (r.bmp || !r.minis.empty()) {
             std::vector<std::string> evicted;
             int slot = g_done.insert(k, &evicted);
             g_evicted += (int)evicted.size();
             for (const std::string& e : evicted) {   // back to the default image; asked for again when near
+                g_preview_only.erase(e);
                 std::string path = e.substr(0, e.rfind('\n'));
                 g_asked.erase(path);
                 auto w = g_where.find(path);

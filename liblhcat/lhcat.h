@@ -252,10 +252,17 @@ struct lhcat_picture {
     int orientation;                    /* EXIF Orientation 1..8, 0 not given */
     char taken_at[20];                  /* "YYYY-MM-DD HH:MM:SS" from DateTimeOriginal (else DateTime); "" none */
     char camera[96];                    /* "Make Model" (Model alone when it starts with Make); "" none */
+    /* the EXIF thumbnail (IFD1's JPEGInterchangeFormat and its Length: a small JPEG, typically 160 x 120, inside the
+       APP1 block near the file's start): its offset from the start of the file (of buf for lhcat_picture_parse) and
+       length in bytes; 0 none */
+    uint64_t thumb_offset;
+    uint32_t thumb_length;
 };
 /* The facts of the picture in the open file fd of that type: a JPEG's EXIF APP1 (IFD0 and the Exif IFD) and its frame's
    size, PNG's IHDR, GIF's screen, WebP's VP8/VP8L/VP8X header, BMP's info header, TIFF's IFD0. Headers only (a JPEG's
-   markers up to its frame); the bytes read are added to *bytes. 1 something found, 0 nothing, -1 a read error. */
+   markers up to its frame); the bytes read are added to *bytes. 1 something found, 0 nothing, -1 a read error.
+   lhcat_picture_parse reads the same from the first n bytes of a file (flxp and luxview read 64 KiB for a JPEG's EXIF
+   thumbnail, shell/thumbs.h exif_preview). */
 int lhcat_picture_read(int fd, const char *type, struct lhcat_picture *p, uint64_t *bytes);
 int lhcat_picture_parse(const unsigned char *buf, size_t n, const char *type, struct lhcat_picture *p);
 /* sha256 of the open file: of its first 64 KiB and of the whole (hex, 65 bytes each); bytes read added to *bytes */

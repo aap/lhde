@@ -1,5 +1,6 @@
 #include <sys/stat.h>
 #include <map>
+#include <set>
 #include "preview.h"
 #include "gdi/image.h"
 #include "shell/thumbs.h"
@@ -15,6 +16,7 @@ struct Pictures::Impl {
     int size = 0;
     std::vector<std::string> paths;                      // wanted
     std::map<std::string, gdi::Bitmap*> got;             // straight alpha, as the loader made them
+    std::set<std::string> previews;                      // the got that are a network picture's EXIF thumbnail (the full one to come)
     struct Fitted { HBITMAP bmp = nullptr; int w = 0, h = 0, max_w = 0, max_h = 0; };
     std::map<std::string, Fitted> fitted;
     // the folder (want_folder)
@@ -90,12 +92,13 @@ void Pictures::want(const std::vector<std::string>& paths, int size)
         for (const std::string& q : paths) keep |= q == it->first;
         if (keep) { ++it; continue; }
         drop_fitted(p, it->first);
+        p->previews.erase(it->first);
         gdi::destroy_bitmap(it->second);
         it = p->got.erase(it);
     }
     if (p->loader) p->gen = p->loader->cancel();
     for (size_t i = 0; i < paths.size(); i++) {
-        if (p->got.count(paths[i])) continue;
+        if (p->got.count(paths[i]) && !p->previews.count(paths[i])) continue;
         if (!p->loader) { p->loader = new shell::thumbs::Loader(notify, p, 1); p->gen = p->loader->generation(); }
         p->loader->request(p->gen, (int)i, paths[i], 0, size);   // (the loader stats it, on its thread)
     }
@@ -140,8 +143,12 @@ bool Pictures::take()
     while (p->loader && p->loader->take(r)) {
         bool wanted = false;
         for (const std::string& q : p->paths) wanted |= q == r.path;
-        if (r.gen == p->gen && r.bmp && wanted && !p->got.count(r.path)) {
+        bool had = p->got.count(r.path), had_preview = p->previews.count(r.path);
+        if (r.gen == p->gen && !r.preview) p->previews.erase(r.path);   // the last stage (nothing: the preview stays)
+        if (r.gen == p->gen && r.bmp && wanted && (!had || (had_preview && !r.preview))) {
+            if (had) { gdi::destroy_bitmap(p->got[r.path]); drop_fitted(p, r.path); }   // the full one over the preview
             p->got[r.path] = r.bmp;
+            if (r.preview) p->previews.insert(r.path);
             r.bmp = nullptr;
             any = true;
         }

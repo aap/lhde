@@ -61,8 +61,29 @@ static void exif_date(const char *in, char *out)
     out[19] = 0;
 }
 
-/* the TIFF structure at b (an EXIF block after "Exif\0\0", or a TIFF file) into p; 1 when anything was found */
-static int parse_tiff(const unsigned char *b, size_t n, struct lhcat_picture *p, int tiff_file)
+/* IFD1, the thumbnail's IFD (the one IFD0's next-IFD offset names): its JPEG's place, base + the offset in the TIFF */
+static void thumbnail_ifd(const struct tiff *t, size_t ifd0, uint64_t base, struct lhcat_picture *p)
+{
+    if (ifd0 + 2 > t->n) return;
+    size_t ifd = u32(t, ifd0 + 2 + 12 * (size_t)u16(t, ifd0));
+    if (!ifd || ifd + 2 > t->n) return;
+    unsigned count = u16(t, ifd);
+    uint32_t at = 0, len = 0;
+    for (unsigned i = 0; i < count && i < 64; i++) {
+        size_t e = ifd + 2 + 12 * (size_t)i;
+        if (e + 12 > t->n) break;
+        unsigned tag = u16(t, e);
+        if (tag == 0x0201) at = (uint32_t)number(t, e);
+        else if (tag == 0x0202) len = (uint32_t)number(t, e);
+    }
+    if (!at || len < 4) return;
+    p->thumb_offset = base + at;
+    p->thumb_length = len;
+}
+
+/* the TIFF structure at b (an EXIF block after "Exif\0\0", or a TIFF file) into p; 1 when anything was found. base: where
+   b is in the file (the EXIF thumbnail's offset is from there) */
+static int parse_tiff(const unsigned char *b, size_t n, struct lhcat_picture *p, int tiff_file, uint64_t base)
 {
     struct tiff t = { b, n, 0 };
     if (n < 8) return 0;
@@ -100,11 +121,12 @@ static int parse_tiff(const unsigned char *b, size_t n, struct lhcat_picture *p,
         }
     }
     if (p->orientation < 1 || p->orientation > 8) p->orientation = 0;
+    if (!tiff_file) thumbnail_ifd(&t, u32(&t, 4), base, p);
     exif_date(original[0] ? original : date, p->taken_at);
     if (model[0] && make[0] && strncasecmp(model, make, strlen(make)))
         snprintf(p->camera, sizeof p->camera, "%s %s", make, model);
     else snprintf(p->camera, sizeof p->camera, "%s", model[0] ? model : make);
-    return found || p->taken_at[0] || p->camera[0] || p->width;
+    return found || p->taken_at[0] || p->camera[0] || p->width || p->thumb_length;
 }
 
 /* ---- the formats ------------------------------------------------------------------------------------------------------ */
@@ -194,7 +216,7 @@ static int jpeg(struct src *s, struct lhcat_picture *p)
             if (!seg) return -1;
             ssize_t r = src_read(s, off + 4, seg, len - 2);
             if (r < 0) { free(seg); return -1; }
-            if (r >= 6 && !memcmp(seg, "Exif\0\0", 6)) found = parse_tiff(seg + 6, (size_t)r - 6, p, 0);
+            if (r >= 6 && !memcmp(seg, "Exif\0\0", 6)) found = parse_tiff(seg + 6, (size_t)r - 6, p, 0, off + 4 + 6);
             free(seg);
         } else if (m >= 0xC0 && m <= 0xCF && m != 0xC4 && m != 0xC8 && m != 0xCC) {
             unsigned char f[5];
@@ -219,7 +241,7 @@ int lhcat_picture_parse(const unsigned char *buf, size_t n, const char *type, st
         struct src s = { -1, buf, n, NULL };
         return jpeg(&s, p);
     }
-    if (n >= 4 && (!memcmp(buf, "II*\0", 4) || !memcmp(buf, "MM\0*", 4))) return parse_tiff(buf, n, p, 1);
+    if (n >= 4 && (!memcmp(buf, "II*\0", 4) || !memcmp(buf, "MM\0*", 4))) return parse_tiff(buf, n, p, 1, 0);
     (void)type;
     return small_formats(buf, n, p);
 }
@@ -237,7 +259,7 @@ int lhcat_picture_read(int fd, const char *type, struct lhcat_picture *p, uint64
         unsigned char *b = malloc(n);
         if (!b) return -1;
         ssize_t r = src_read(&s, 0, b, n);
-        int f = r > 0 ? parse_tiff(b, (size_t)r, p, 1) : r < 0 ? -1 : 0;
+        int f = r > 0 ? parse_tiff(b, (size_t)r, p, 1, 0) : r < 0 ? -1 : 0;
         free(b);
         return f;
     }

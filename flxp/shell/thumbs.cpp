@@ -27,6 +27,7 @@
 #include "mime.h"
 #include "gdi/image.h"
 #include "gdi/png.h"
+#include "lhcat.h"
 
 namespace shell {
 namespace thumbs {
@@ -92,8 +93,15 @@ bool picture_size(const std::string& path, int* w, int* h)
 bool enabled_for(const std::string& folder)
 {
     if (!setting_flag("thumbnails", true)) return false;
-    if (setting_flag("thumbnails_network", false)) return true;
+    if (setting_flag("thumbnails_network", true)) return true;
     return !on_network(folder);
+}
+
+uint64_t network_budget()
+{
+    std::string v = setting("thumbnails_network_budget");
+    long long mb = v.empty() ? 64 : atoll(v.c_str());
+    return mb < 0 ? 0 : (uint64_t)mb << 20;
 }
 
 // ---- MD5 (RFC 1321) ---------------------------------------------------------------
@@ -562,28 +570,91 @@ static std::string run_thumbnailer(const Thumbnailer& t, const std::string& path
     return "";
 }
 
+// What the cache has for the file as it is (mtime): 1 a current thumbnail (*out, at cache size), -1 a current failure
+// marker, 0 nothing
+static int from_cache(const std::string& path, int64_t mtime, int cache_size, gdi::Bitmap** out)
+{
+    std::string uri = uri_from_path(path);
+    std::string hash = md5_hex(uri);
+    std::string dir = cache_dir();
+    gdi::Bitmap* b = nullptr;
+    *out = nullptr;
+    if (cached(dir + "/" + size_dir(cache_size) + "/" + hash + ".png", uri, mtime, &b)) { *out = b; return 1; }
+    // a larger current thumbnail serves a smaller size too
+    if (cache_size <= 128 && cached(dir + "/large/" + hash + ".png", uri, mtime, &b)) {
+        int w, h;
+        gdi::fit_size(b->width, b->height, cache_size, cache_size, false, &w, &h);
+        if (w == b->width && h == b->height) { *out = b; return 1; }
+        *out = gdi::resample(b, w, h);
+        gdi::destroy_bitmap(b);
+        return *out ? 1 : 0;
+    }
+    if (cached(dir + "/fail/flxp-1.0/" + hash + ".png", uri, mtime, nullptr)) return -1;
+    return 0;
+}
+
+gdi::Bitmap* cached_thumbnail(const std::string& path, int cache_size)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) return nullptr;
+    gdi::Bitmap* b = nullptr;
+    return from_cache(path, (int64_t)st.st_mtime, cache_size, &b) > 0 ? b : nullptr;
+}
+
+static std::atomic<int> g_previews{0};
+int previews() { return g_previews; }
+
+gdi::Bitmap* exif_preview(const std::string& path, int size, int* w, int* h)
+{
+    if (w) *w = 0;
+    if (h) *h = 0;
+    int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return nullptr;
+    std::vector<unsigned char> buf(EXIF_READ);
+    ssize_t n = pread(fd, buf.data(), buf.size(), 0);   // one read: one round trip on a network mount
+    close(fd);
+    if (n < 4 || buf[0] != 0xff || buf[1] != 0xd8) return nullptr;
+    struct lhcat_picture p;
+    if (lhcat_picture_parse(buf.data(), (size_t)n, nullptr, &p) <= 0 || !p.thumb_length) return nullptr;
+    if (p.thumb_offset + p.thumb_length > (uint64_t)n) return nullptr;   // past what was read: no preview
+    gdi::Bitmap* b = gdi::decode_jpeg(buf.data() + p.thumb_offset, p.thumb_length);
+    if (!b) return nullptr;
+    b = gdi::orient(b, p.orientation);
+    bool turned = p.orientation >= 5;
+    if (w) *w = turned ? p.height : p.width;
+    if (h) *h = turned ? p.width : p.height;
+    int ow = b->width, oh = b->height;
+    if (size > 0) {
+        int fw, fh;
+        gdi::fit_size(b->width, b->height, size, size, true, &fw, &fh);
+        if (fw != b->width || fh != b->height) {
+            gdi::Bitmap* s = gdi::resample(b, fw, fh);
+            gdi::destroy_bitmap(b);
+            b = s;
+            if (!b) return nullptr;
+        }
+    }
+    g_previews++;
+    if (trace())
+        fprintf(stderr, "thumbs: exif %s %dx%d at %dx%d (picture %dx%d, turned %d)\n", path.c_str(), ow, oh, b->width, b->height,
+                turned ? p.height : p.width, turned ? p.width : p.height, p.orientation);
+    return b;
+}
+
 gdi::Bitmap* get(const std::string& path, int64_t mtime, int cache_size, const Thumbnailer* by)
 {
     struct stat st;
     if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) return nullptr;
     mtime = (int64_t)st.st_mtime;
+    gdi::Bitmap* b = nullptr;
+    int have = from_cache(path, mtime, cache_size, &b);
+    if (have > 0) return b;
+    if (have < 0) return nullptr;
     std::string uri = uri_from_path(path);
     std::string hash = md5_hex(uri);
     std::string dir = cache_dir();
     std::string file = dir + "/" + size_dir(cache_size) + "/" + hash + ".png";
-    gdi::Bitmap* b = nullptr;
-    if (cached(file, uri, mtime, &b)) return b;
-    // a larger current thumbnail serves a smaller size too
-    if (cache_size <= 128 && cached(dir + "/large/" + hash + ".png", uri, mtime, &b)) {
-        int w, h;
-        gdi::fit_size(b->width, b->height, cache_size, cache_size, false, &w, &h);
-        if (w == b->width && h == b->height) return b;
-        gdi::Bitmap* s = gdi::resample(b, w, h);
-        gdi::destroy_bitmap(b);
-        return s;
-    }
     std::string fail = dir + "/fail/flxp-1.0/" + hash + ".png";
-    if (cached(fail, uri, mtime, nullptr)) return nullptr;
     bool in_cache = path.compare(0, dir.size() + 1, dir + "/") == 0;   // never thumbnail thumbnails
     char mt[32], sz[32];
     snprintf(mt, sizeof mt, "%lld", (long long)mtime);
@@ -668,9 +739,31 @@ static gdi::Bitmap* fitted(gdi::Bitmap* b, int size)
     return s;
 }
 
+static bool jpeg_name(const std::string& path)
+{
+    size_t dot = path.rfind('.');
+    if (dot == std::string::npos || path.find('/', dot) != std::string::npos) return false;
+    std::string e = path.substr(dot + 1);
+    for (char& c : e) if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+    return e == "jpg" || e == "jpeg" || e == "jpe" || e == "jfif";
+}
+
+// a picture of a network folder in the three stages, the full decode only when charge(its size) allows it
+template <class Charge> static gdi::Bitmap* staged(const std::string& path, int cache_size, Charge charge)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) return nullptr;
+    gdi::Bitmap* b = nullptr;
+    int have = from_cache(path, (int64_t)st.st_mtime, cache_size, &b);
+    if (have) return b;
+    if (charge((uint64_t)st.st_size)) return get(path, (int64_t)st.st_mtime, cache_size);
+    return jpeg_name(path) ? exif_preview(path, 0) : nullptr;
+}
+
 // XP's folder thumbnail: the first pictures of a folder (it collects 8 candidates
-// for 4 previews, in case some fail)
-static std::vector<gdi::Bitmap*> folder_minis(const std::string& dir, int mini)
+// for 4 previews, in case some fail). On a network mount each picture in the three
+// stages, charge() deciding whether it may be read whole.
+template <class Charge> static std::vector<gdi::Bitmap*> folder_minis(const std::string& dir, int mini, bool network, Charge charge)
 {
     std::vector<gdi::Bitmap*> out;
     std::vector<std::string> names;
@@ -691,27 +784,60 @@ static std::vector<gdi::Bitmap*> folder_minis(const std::string& dir, int mini)
     std::stable_partition(names.begin(), names.end(), own);
     for (size_t i = 0; i < names.size() && i < 8 && out.size() < 4; i++) {
         std::string p = dir + "/" + names[i];
-        if (gdi::Bitmap* b = fitted(get(p, 0, 128), mini)) out.push_back(b);
+        if (gdi::Bitmap* b = fitted(network ? staged(p, 128, charge) : get(p, 0, 128), mini)) out.push_back(b);
     }
     return out;
 }
 
 struct Loader::Impl {
+    // by: the thumbnailer of a file that is not a picture. network: the three stages; full: the last one (the size
+    // read whole, charged against the folder's budget)
     struct Job { uint32_t gen; int id; std::string path; int64_t mtime; int size; bool folder; int mini;
-                 bool picture; const Thumbnailer* by; };   // by: the thumbnailer of a file that is not a picture
+                 bool picture; const Thumbnailer* by; bool network; bool full; uint64_t bytes; };
     Notify notify;
     void* ctx;
-    std::mutex lock;
+    mutable std::mutex lock;
     std::condition_variable cv;
-    std::deque<Job> jobs;
+    std::deque<Job> jobs;           // the cache and EXIF stage (and every local request)
+    std::deque<Job> fulls;          // a network file's full decode: after every job above
     std::deque<Result> done;
     std::vector<std::thread> threads;
     std::atomic<uint32_t> gen{1};
     int working = 0;                // jobs taken by a thread and not done (under lock)
     bool quit = false;
     std::atomic<bool> stop{false};  // the destructor: a running thumbnailer is killed
+    std::string budget_dir;         // the folder the budget is being spent on
+    uint64_t budget = 64u << 20, spent = 0;
     void run();
+    bool charge(uint64_t bytes);    // within the budget: spent (true), else false
+    void finish(const Job& job, Result& r);
 };
+
+bool Loader::Impl::charge(uint64_t bytes)
+{
+    std::lock_guard<std::mutex> l(lock);
+    if (spent + bytes > budget) return false;
+    spent += bytes;
+    return true;
+}
+
+void Loader::Impl::finish(const Job& job, Result& r)
+{
+    bool wake;
+    {
+        std::lock_guard<std::mutex> l(lock);
+        if (job.gen != gen || quit) { free_result(r); return; }
+        wake = done.empty();
+        done.push_back(r);
+    }
+    if (wake && notify) notify(ctx);   // one wake-up per batch: the UI takes everything there is
+}
+
+uint64_t Loader::spent() const
+{
+    std::lock_guard<std::mutex> l(impl_->lock);
+    return impl_->spent;
+}
 
 Loader::Loader(Notify notify, void* ctx, int threads) : impl_(new Impl)
 {
@@ -730,6 +856,7 @@ Loader::~Loader()
         std::lock_guard<std::mutex> l(impl_->lock);
         impl_->quit = true;
         impl_->jobs.clear();
+        impl_->fulls.clear();
     }
     impl_->stop = true;
     impl_->cv.notify_all();
@@ -743,17 +870,22 @@ uint32_t Loader::generation() const { return impl_->gen; }
 bool Loader::busy() const
 {
     std::lock_guard<std::mutex> l(impl_->lock);
-    return !impl_->jobs.empty() || impl_->working > 0;
+    return !impl_->jobs.empty() || !impl_->fulls.empty() || impl_->working > 0;
 }
 
 void Loader::request(uint32_t gen, int id, const std::string& path, int64_t mtime, int view_size, bool folder, int mini_size)
 {
     bool picture = folder || own_picture(path);
+    bool network = on_network(path);
     const Thumbnailer* by = nullptr;
-    if (!picture && (setting_flag("thumbnails_network", false) || !on_network(path))) by = thumbnailer_for(path);
+    if (!picture && (!network || setting_flag("thumbnails_network", true))) by = thumbnailer_for(path);
+    uint64_t budget = network ? network_budget() : 0;
+    std::string dir = dir_of(path);
     {
         std::lock_guard<std::mutex> l(impl_->lock);
-        impl_->jobs.push_back(Impl::Job{ gen, id, path, mtime, view_size, folder, mini_size, picture, by });
+        if (network && dir != impl_->budget_dir) { impl_->budget_dir = dir; impl_->spent = 0; }   // another folder
+        if (network) impl_->budget = budget;
+        impl_->jobs.push_back(Impl::Job{ gen, id, path, mtime, view_size, folder, mini_size, picture, by, network, false, 0 });
     }
     impl_->cv.notify_one();
 }
@@ -762,6 +894,7 @@ uint32_t Loader::cancel()
 {
     std::lock_guard<std::mutex> l(impl_->lock);
     impl_->jobs.clear();
+    impl_->fulls.clear();
     for (Result& r : impl_->done) free_result(r);
     impl_->done.clear();
     return ++impl_->gen;
@@ -786,26 +919,56 @@ void Loader::Impl::run()
         Job job;
         {
             std::unique_lock<std::mutex> l(lock);
-            cv.wait(l, [this] { return quit || !jobs.empty(); });
+            cv.wait(l, [this] { return quit || !jobs.empty() || !fulls.empty(); });
             if (quit) return;
-            job = jobs.front();
-            jobs.pop_front();
+            std::deque<Job>& q = !jobs.empty() ? jobs : fulls;   // every cache and EXIF stage before a full decode
+            job = q.front();
+            q.pop_front();
             if (job.gen != gen) continue;
             working++;
         }
         Result r;
         r.gen = job.gen; r.id = job.id; r.path = job.path;
-        if (job.folder) r.minis = folder_minis(job.path, job.mini);
-        else if (job.picture || job.by) r.bmp = fitted(get(job.path, job.mtime, cache_size_for(job.size), job.by), job.size);
-        bool wake;
+        int cache_size = cache_size_for(job.size);
+        if (job.folder) {
+            r.minis = folder_minis(job.path, job.mini, job.network, [this](uint64_t n) { return charge(n); });
+        } else if (job.network && job.full) {
+            // the last stage: the whole file, while the folder's budget allows it
+            if (charge(job.bytes)) r.bmp = fitted(get(job.path, job.mtime, cache_size, job.by), job.size);
+            else {
+                r.over_budget = true;
+                if (trace()) fprintf(stderr, "thumbs: over budget %s (%llu KB)\n", job.path.c_str(), (unsigned long long)(job.bytes >> 10));
+            }
+        } else if (job.network && (job.picture || job.by)) {
+            // the cache, then the EXIF thumbnail (a JPEG), then the full decode queued behind every request's first stages
+            struct stat st;
+            bool ok = stat(job.path.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+            int have = ok ? from_cache(job.path, (int64_t)st.st_mtime, cache_size, &r.bmp) : -1;
+            if (!have) {
+                if (job.picture && jpeg_name(job.path)) {
+                    Result pre = r;
+                    pre.preview = true;
+                    pre.bmp = exif_preview(job.path, job.size);
+                    if (pre.bmp) finish(job, pre);
+                }
+                Job full = job;
+                full.full = true;
+                full.mtime = (int64_t)st.st_mtime;
+                full.bytes = (uint64_t)st.st_size;
+                std::lock_guard<std::mutex> l(lock);
+                working--;
+                if (job.gen == gen && !quit) fulls.push_back(full);
+                continue;
+            }
+            r.bmp = fitted(r.bmp, job.size);
+        } else if (job.picture || job.by) {
+            r.bmp = fitted(get(job.path, job.mtime, cache_size, job.by), job.size);
+        }
         {
             std::lock_guard<std::mutex> l(lock);
             working--;
-            if (job.gen != gen || quit) { free_result(r); continue; }
-            wake = done.empty();
-            done.push_back(r);
         }
-        if (wake && notify) notify(ctx);   // one wake-up per batch: the UI takes everything there is
+        finish(job, r);
     }
 }
 

@@ -29,6 +29,9 @@ Bitmap* decode_jpeg(const uint8_t* data, size_t size, int max_size = 0, int* ori
 Bitmap* decode_icon_image(const uint8_t* data, size_t size, bool cursor = false);
 Bitmap* decode_ico(const uint8_t* data, size_t size);       // .ico/.cur file: the best frame
 
+// b turned as an EXIF Orientation (1..8) says, 1 or another value: as it is; b is taken (the result replaces it)
+Bitmap* orient(Bitmap* b, int orientation);
+
 // Resample to exactly dw x dh: area average where an axis shrinks, bilinear
 // where it grows; alpha-weighted so transparent pixels do not darken edges.
 Bitmap* resample(const Bitmap* src, int dw, int dh);

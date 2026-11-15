@@ -4,7 +4,8 @@
 // grows by less than 16 MB), the PNG's reduction against the full decode, an interlaced PNG, the size ceilings; the
 // view's images bounded by bytes (thumbs::Slots: 300 inserts, the pinned ones kept, least recently used first); a
 // cancelled generation decodes nothing more, and three loaders decode at most two pictures at once (thumbs::Loader);
-// gdi::resample of a 6000 x 4000 bitmap without a buffer of every source row.
+// gdi::resample of a 6000 x 4000 bitmap without a buffer of every source row; a JPEG's EXIF thumbnail (thumbs::exif_preview:
+// as stored, turned by Orientation 6, fitted and enlarged, none past the first 64 KB or without one, never cached).
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -347,6 +348,80 @@ static void thumbnailer_checks()
     check("no temporary output left", left == 0, std::to_string(left));
 }
 
+// ---- a JPEG's EXIF thumbnail (thumbs::exif_preview) -------------------------------------------------------------------
+
+static std::string bytes_of(const std::string& path)
+{
+    std::string s;
+    shell::read_file(path, s);
+    return s;
+}
+
+// main with an APP1 Exif block right after SOI: IFD0 with Orientation, IFD1 with the thumbnail as JPEGInterchangeFormat;
+// pad: an APP2 of that many bytes before it (an EXIF block past the first 64 KB)
+static std::string with_exif(const std::string& main, const std::string& thumb, int orientation, size_t pad)
+{
+    auto le16 = [](std::string& s, unsigned v) { s += (char)(v & 255); s += (char)(v >> 8); };
+    auto le32 = [&](std::string& s, uint32_t v) { le16(s, v & 0xffff); le16(s, v >> 16); };
+    std::string t = "II*";
+    t += '\0';
+    le32(t, 8);
+    uint32_t ifd1 = 8 + 2 + 12 + 4, data = ifd1 + 2 + 2 * 12 + 4;
+    le16(t, 1); le16(t, 0x0112); le16(t, 3); le32(t, 1); le16(t, (unsigned)orientation); le16(t, 0); le32(t, ifd1);
+    le16(t, 2); le16(t, 0x0201); le16(t, 4); le32(t, 1); le32(t, data); le16(t, 0x0202); le16(t, 4); le32(t, 1); le32(t, (uint32_t)thumb.size());
+    le32(t, 0);
+    t += thumb;
+    std::string app1 = "\xff\xe1";
+    size_t len = 2 + 6 + t.size();
+    app1 += (char)(len >> 8); app1 += (char)(len & 255);
+    app1 += std::string("Exif\0\0", 6) + t;
+    std::string out = main.substr(0, 2);
+    while (pad > 0) {   // APP2 segments of filler
+        size_t n = pad > 60000 ? 60000 : pad;
+        out += "\xff\xe2"; out += (char)((n + 2) >> 8); out += (char)((n + 2) & 255); out += std::string(n, 'x');
+        pad -= n;
+    }
+    return out + app1 + main.substr(2);
+}
+
+static void exif_checks()
+{
+    std::string th = dir + "/exif-thumb.jpg", main = dir + "/exif-main.jpg";
+    check("write the EXIF thumbnail", write_jpeg(th, 160, 120, false));
+    check("write the EXIF picture", write_jpeg(main, 1600, 1200, false));
+    std::string tb = bytes_of(th), mb = bytes_of(main);
+    std::string turned = dir + "/turned.jpg", plain = dir + "/plain.jpg", far = dir + "/far.jpg";
+    shell::write_file_atomic(turned, with_exif(mb, tb, 6, 0));
+    shell::write_file_atomic(plain, with_exif(mb, tb, 1, 0));
+    shell::write_file_atomic(far, with_exif(mb, tb, 1, 70000));
+    int w = 0, h = 0;
+    int before = shell::thumbs::previews();
+    gdi::Bitmap* b = shell::thumbs::exif_preview(plain, 0, &w, &h);
+    check("EXIF thumbnail found", b != nullptr);
+    check("EXIF thumbnail as stored", b && b->width == 160 && b->height == 120, b ? std::to_string(b->width) + "x" + std::to_string(b->height) : "");
+    check("the picture's own size", w == 1600 && h == 1200, std::to_string(w) + "x" + std::to_string(h));
+    if (b) gdi::destroy_bitmap(b);
+    b = shell::thumbs::exif_preview(turned, 0, &w, &h);
+    check("Orientation 6: turned", b && b->width == 120 && b->height == 160, b ? std::to_string(b->width) + "x" + std::to_string(b->height) : "");
+    check("Orientation 6: the picture's size turned", w == 1200 && h == 1600, std::to_string(w) + "x" + std::to_string(h));
+    if (b) gdi::destroy_bitmap(b);
+    b = shell::thumbs::exif_preview(plain, 96);
+    check("fitted into 96", b && b->width == 96 && b->height == 72, b ? std::to_string(b->width) + "x" + std::to_string(b->height) : "");
+    if (b) gdi::destroy_bitmap(b);
+    b = shell::thumbs::exif_preview(plain, 256);
+    check("enlarged to 256", b && b->width == 256 && b->height == 192, b ? std::to_string(b->width) + "x" + std::to_string(b->height) : "");
+    if (b) gdi::destroy_bitmap(b);
+    check("previews counted", shell::thumbs::previews() - before == 4, std::to_string(shell::thumbs::previews() - before));
+    b = shell::thumbs::exif_preview(far, 0);
+    check("an EXIF block past the first 64 KB: none", b == nullptr);
+    if (b) gdi::destroy_bitmap(b);
+    b = shell::thumbs::exif_preview(main, 0);
+    check("no EXIF block: none", b == nullptr);
+    if (b) gdi::destroy_bitmap(b);
+    // never in the cache: a full thumbnail is still to be made
+    check("nothing cached", shell::thumbs::cached_thumbnail(plain, 128) == nullptr);
+}
+
 int main()
 {
     const char* t = getenv("TMPDIR");
@@ -538,6 +613,7 @@ int main()
     }
 
     thumbnailer_checks();
+    exif_checks();
 
     std::string cmd = "rm -rf '" + dir + "'";
     if (system(cmd.c_str()) != 0) printf("note: %s failed\n", cmd.c_str());

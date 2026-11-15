@@ -44,7 +44,7 @@ static int exif_orientation(const uint8_t* d, size_t n)
     return 1;
 }
 
-static Bitmap* orient(Bitmap* s, int o)
+Bitmap* orient(Bitmap* s, int o)
 {
     if (o <= 1 || !s) return s;
     int w = s->width, h = s->height;

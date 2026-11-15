@@ -4,8 +4,9 @@
 // with a slow fake decoder.
 //
 // Loading a picture is two stages: the thumbnail from the shared cache (shell/thumbs.h's freedesktop cache, when one is
-// there: drawn blown up to size at once) and the decode at the size the window needs (a 6000 x 4000 JPEG in a 1280 px
-// window is decoded at 1/4 by libjpeg's DCT scaling and resampled to the fitted size, never kept whole). Zooming in past
+// there; else a JPEG's own EXIF thumbnail, thumbs::exif_preview: drawn blown up to size at once) and the decode at the
+// size the window needs (a 6000 x 4000 JPEG in a 1280 px window is decoded at 1/4 by libjpeg's DCT scaling and resampled
+// to the fitted size, never kept whole). Zooming in past
 // what was decoded asks for a larger decode; zooming out resamples what is there. Each request carries the generation of
 // the picture it is for: going to another picture starts a new generation, drops what is queued, and a decode of an older
 // generation that finishes is thrown away, so a fast run of Next never shows an older picture over the current one. When
