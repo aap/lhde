@@ -294,6 +294,67 @@ EOF
     has "--cross-fs enters it" "cross=1" "$ns"
 else echo "note: no user namespaces: the mount point checks are skipped"; fi
 
+# ---- directory paths (dirs): subtree queries, kept through import, index, kind changes, a migration; rename-root ----
+# every directory location's dirs path is the chain of its parents' names, and nothing else is in dirs
+dirs_bad() {
+    python3 - "$T/state/lhde/catalogue/$1.db" <<'EOF'
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1])
+loc = {i: (p, n, k) for i, p, n, k in c.execute("SELECT id, parent, name, kind FROM locations")}
+def path(i):
+    p, n, k = loc[i]
+    if p == 0: return ''
+    pp = path(p)
+    return n if pp == '' else pp + '/' + n
+dirs = dict(c.execute("SELECT id, path FROM dirs"))
+want = {i: path(i) for i, (p, n, k) in loc.items() if k == 'd'}
+print(sum(1 for i in set(dirs) | set(want) if dirs.get(i) != want.get(i)))
+EOF
+}
+eq "dirs after import-du and index" "0" "$(dirs_bad t)"
+eq "dirs after the excludes and mounts" "0" "$(dirs_bad home)"
+eq "--in: directory by directory, names sorted" "docs/sub/moved20.txt docs/sub/note80.txt docs/sub/note81.txt" "$($B find t --in docs/sub --limit 3 --quiet | tr '\n' ' ' | sed 's/ $//')"
+eq "--in with a tag: the same order" "docs/sub/moved20.txt docs/sub/note80.txt" "$($B find t --in docs/sub --tag work --limit 2 --quiet | tr '\n' ' ' | sed 's/ $//')"
+eq "--in a subdirectory's subtree" "$($B find t --quiet | grep -c '^pics/')" "$($B find t --in pics --quiet | wc -l | tr -d ' ')"
+eq "--in a file" "1" "$($B find t --in docs/note1.txt --quiet > /dev/null 2>&1; echo $?)"
+eq "--in a name that is a prefix of another" "0" "$($B find t --in doc --quiet 2> /dev/null | wc -l | tr -d ' ')"
+mkdir -p "$R/docs-old" && echo x > "$R/docs-old/x.txt" && $B index t --quiet > /dev/null
+eq "--in docs leaves docs-old out" "0" "$($B find t --in docs --quiet | grep -c docs-old)"
+# a file that becomes a directory, a directory that becomes a file
+rm "$R/docs/note2.txt" && mkdir "$R/docs/note2.txt" && echo y > "$R/docs/note2.txt/inner.txt"
+rm -r "$R/docs-old" && echo z > "$R/docs-old"
+$B index t --quiet > /dev/null
+eq "a file became a directory: --in it" "docs/note2.txt/inner.txt" "$($B find t --in docs/note2.txt --quiet)"
+eq "dirs after kind changes" "0" "$(dirs_bad t)"
+eq "the group index in catalogue order" "$($B find t --type 'image/*' --quiet | head -n 3)" "$($B find t --type 'image/*' --limit 3 --quiet)"
+# the migration fills dirs from the locations of an older database
+python3 -c 'import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); c.executescript("DROP TABLE dirs; DROP INDEX locations_group; DELETE FROM migrations WHERE version >= 3")' "$T/state/lhde/catalogue/t.db"
+$B stats t > /dev/null
+eq "migrated: dirs filled" "0" "$(dirs_bad t)"
+eq "migrated: version" "3" "$(db "SELECT max(version) FROM migrations")"
+eq "migrated: the group index" "1" "$(db "SELECT count(*) FROM sqlite_schema WHERE name = 'locations_group'")"
+# rename-root: the row, the file, the thumbnails' directory and their recorded paths
+work=$($B find t --tag work --quiet | wc -l | tr -d ' ')
+$B rename-root t t2 > /dev/null || no "rename-root"
+eq "renamed: the file" "no|yes" "$([ -e "$T/state/lhde/catalogue/t.db" ] && echo yes || echo no)|$([ -e "$T/state/lhde/catalogue/t2.db" ] && echo yes || echo no)"
+eq "renamed: no log left" "no" "$([ -e "$T/state/lhde/catalogue/t.db-wal" ] || [ -e "$T/state/lhde/catalogue/t2.db-wal" ] && echo yes || echo no)"
+eq "renamed: the row" "t2" "$(db_of t2 "SELECT name FROM roots")"
+eq "renamed: find" "$work" "$($B find t2 --tag work --quiet | wc -l | tr -d ' ')"
+has "renamed: roots" "t2	$R" "$($B roots)"
+if [ $pics = 1 ] && [ -x build/bin/flxp-thumb ]; then
+    eq "renamed: the thumbnails' directory" "yes" "$([ -d "$T/state/lhde/catalogue/t2.thumbs" ] && echo yes || echo no)"
+    eq "renamed: their paths" "20" "$(db_of t2 "SELECT count(*) FROM thumbs WHERE cache_path LIKE '%/t2.thumbs/%'")"
+fi
+$B rename-root t2 plain > /dev/null 2>&1 && no "rename-root onto an existing name" || ok
+python3 -c 'import sqlite3, sys, time; c = sqlite3.connect(sys.argv[1]); c.execute("SELECT count(*) FROM locations").fetchone(); print("open", flush=True); time.sleep(30)' "$T/state/lhde/catalogue/t2.db" > "$T/reader" &
+reader=$!
+i=0; while [ $i -lt 50 ] && ! grep -q open "$T/reader"; do sleep 0.1; i=$((i + 1)); done
+$B rename-root t2 t3 > /dev/null 2> "$T/busy" && no "rename-root while another program has it open" || ok
+kill $reader 2> /dev/null; wait $reader 2> /dev/null
+has "refused while open" "in use" "$(cat "$T/busy")"
+eq "and left as it was" "t2" "$(db_of t2 "SELECT name FROM roots")"
+$B rename-root t2 t > /dev/null || no "rename-root back"
+
 # ---- liblhcat's own -------------------------------------------------------------------------------------------------
 mkdir -p "$T/perf"
 XDG_STATE_HOME="$T/perf" build/liblhcat/tests/cat ${LHCAT_PERF_LINES:-} > "$T/cat.log" 2>&1 || no "liblhcat tests: $(cat "$T/cat.log")"

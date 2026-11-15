@@ -26,7 +26,10 @@ holds the thumbnails of an index run with `--self-contained`. The databases use 
   (the disk usage, from a du listing), mtime, ctime (nanoseconds), dev, ino, `type` (MIME), `observed_at`, `state`
   (`present`, `gone`, or `excluded`: not walked, see "What a walk enters") and `coverage`. The path is the
   chain of parent locations' names (`parent`, `name`; the root's own location has parent 0 and the name ""), which keeps a
-  7-million-row listing to about 180 bytes a row.
+  7-million-row listing to about 180 bytes a row. **Directories** have their path once more in `dirs` (id, path; the
+  root's ""), kept by every write of a location's kind: a subtree is then a range of the path index (`path >= P AND
+  path < P "0"` and either `P` itself or `>= P "/"`, '0' being the byte after '/'), and a path is a directory's path
+  and a name, without walking the parents.
 - **Coverage** is a bit mask of what a location's facts are based on: 1 listed (a du listing), 2 statted, 4 typed, 8 its
   attributes read, 16 a picture's facts read, 32 a thumbnail made (or found impossible), 64 hashed. `find` says how many of
   the locations a query could look at had their attributes read; a negative query (`--no-tag`) leaves out the ones whose
@@ -169,7 +172,7 @@ another machine: it is filled by import-du only; `add-root NAME REALPATH` later 
     lhde-cat add-root NAME PATH [--authority filesystem|catalogue] [--offline] [--exclude GLOB]...
     lhde-cat excludes NAME [+GLOB|-GLOB]...
     lhde-cat index NAME [SUBPATH] [--exclude GLOB]... [--cross-fs] [--time MIN] [--dry-run] [--budget MB] [--thumbs 128|256] ...
-    lhde-cat roots
+    lhde-cat roots | rename-root OLD NEW
     lhde-cat find NAME [--tag T] [--no-tag T [--include-unknown]] [--desc TEXT] [--text WORDS] [--type image/*]
                        [--since DATE] [--until DATE] [--color C] [--in SUBPATH] [--files|--dirs] [--limit N] [--json]
     lhde-cat stats NAME
@@ -183,7 +186,10 @@ another machine: it is filled by import-du only; `add-root NAME REALPATH` later 
 
 `find` prints the paths relative to the root (`--json`: an array of rows with kind, object, coverage, size, usage_kib,
 mtime, type, taken_at), in the order they were catalogued, and on stderr the count, the time and the coverage of the
-attributes. `--tag` is a whole tag (case-blind), `--desc` a part of the description, `--text` words that must each be in
+attributes. With `--in` they come directory by directory in path order, each directory's entries by name: without an
+attribute condition (or with a rare type) by walking the subtree's range of `dirs`, so `--limit` stops at once, with one
+from that condition's index and sorted after. A type group (`image/*`) is answered from `locations_group` (the type up to
+its '/', with the rowid) in catalogue order, so `--limit` stops early there too. `--tag` is a whole tag (case-blind), `--desc` a part of the description, `--text` words that must each be in
 the description, comment or tags (a word's prefix) or in the name (a part of it), `--type` a type or a group (`image/*`),
 `--since` and `--until` dates `YYYY`, `YYYY-MM` or `YYYY-MM-DD` over the date taken, else the mtime (`--until 2019-06` takes
 in the whole of June). ATTR is a short name (`desc`, `tags`, `comment`, `color`, `run`, `author`, `source`, `build`, `notes`,
@@ -204,15 +210,24 @@ file observed again), so the catalogue follows flxp's edits. Nothing else in flx
 ## Schema and versions
 
 `migrations(version, applied_at, what)` records the schema versions applied; a database is migrated on open and a newer
-one than the program knows is refused (version 2 widened the state check of `locations` in place, no rows rewritten).
-The tables: `roots` (name, path, host, authority, offline, excludes, added_at, listed_at,
-indexed_at), `objects`, `locations`, `relations`, `hashes`, `attrs`, `tags`, `picture`, `thumbs`, `journal`, `scans`, the
-FTS5 table `text`. Indices: locations by (parent, name) (unique), name, type, object and inode; attrs by (name, desired)
-and pending; tags by (tag, object) and object; picture by taken_at; hashes by full hash; journal by object and time.
+one than the program knows is refused (version 2 widened the state check of `locations` in place, no rows rewritten;
+version 3 fills `dirs` from the locations, about 9 s on the 7.1 M-row stash). The tables: `roots` (name, path, host,
+authority, offline, excludes, added_at, listed_at, indexed_at), `objects`, `locations`, `dirs`, `relations`, `hashes`,
+`attrs`, `tags`, `picture`, `thumbs`, `journal`, `scans`, the FTS5 table `text`. Indices: locations by (parent, name)
+(unique), name, type, the type's group (`substr(type, 1, instr(type, '/'))`), object and inode; dirs by path; attrs by
+(name, desired) and pending; tags by (tag, object) and object; picture by taken_at; hashes by full hash; journal by object
+and time.
 
-Measured on this machine: a generated 2,000,000-line listing imports at about 230,000 lines a second (9 s); `find --tag`
+`lhde-cat rename-root OLD NEW` renames a root: its row, its database file and its `NAME.thumbs/` with the thumbnail paths
+recorded into it. It takes the database's lock exclusively first (refused while another program has it open: flxp, a
+second lhde-cat), checkpoints the log into the file and renames that file alone.
+
+Measured on this machine: a generated 2,000,000-line listing imports at about 130,000 lines a second (15 s); `find --tag`
 over it answers in 5 ms with the paths; aap's 7.1-million-line stash listing (650 MB) imports in 35 s (200,000 lines a second; again over
-the same rows in 19 s) into a 1.26 GB database, whose root total is the listing's `.` line, 4.86 TiB. `LHCAT_COMMIT_MS` changes the time between an index's commits
+the same rows in 19 s) into a 1.26 GB database, whose root total is the listing's `.` line, 4.86 TiB; `dirs` (571,237
+directories, 114 MB with its index) and the group index (93 MB) make it 1.46 GB. Over it `find --in backup --limit 100`
+(a subtree of 5.5 M rows) takes 2 ms, `--in serien` (5,949 rows, all) 18 ms, `--type image/* --limit 100` 0.2 ms, the
+whole of `--in backup` 7.2 s and of `--type image/*` (524 k) 0.4 s with the paths printed. `LHCAT_COMMIT_MS` changes the time between an index's commits
 and `LHCAT_TEST_STOP=N` (or `kill:N`) stops (or kills) an index after N entries, `LHCAT_TEST_NO_MOUNTTAB` leaves the mount table out (the device comparison alone), for the tests. `make check-liblhcat` (`tests/catalogue.sh`, `liblhcat/tests/cat.c`) checks all of the above on a scratch root.
 
 ## Not there yet

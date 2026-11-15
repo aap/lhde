@@ -19,6 +19,7 @@ static const char *USAGE =
     "                                            here (a listing of another machine's); a home directory gets the default\n"
     "                                            excludes (" ".cache/ .local/share/Trash/ .thumbnails/ **/node_modules/)\n"
     "  roots                                     the roots and their paths\n"
+    "  rename-root OLD NEW                       the root and its database renamed (not while another program has it open)\n"
     "  excludes NAME [+GLOB|-GLOB]...            the root's exclude globs (relative to the root, a trailing / for\n"
     "                                            directories, ** any depth), with some added or removed\n"
     "  import-du NAME FILE [--block BYTES]       a du -a listing (FILE - for stdin) as listed-only locations\n"
@@ -814,6 +815,13 @@ int main(int argc, char **argv)
     }
     if (!strcmp(cmd, "roots")) return lhcat_roots(print_root, NULL) < 0;
     if (!strcmp(cmd, "excludes")) return cmd_excludes(n, a);
+    if (!strcmp(cmd, "rename-root")) {
+        if (n != 2) return usage();
+        char err[1024];
+        if (lhcat_rename_root(a[0], a[1], err, sizeof err)) return fail("%s", err, NULL);
+        printf("%s -> %s\n", a[0], a[1]);
+        return 0;
+    }
     if (!strcmp(cmd, "import-du")) return cmd_import_du(n, a);
     if (!strcmp(cmd, "index")) return cmd_index(n, a);
     if (!strcmp(cmd, "touch")) return cmd_each_path(n, a, 0);

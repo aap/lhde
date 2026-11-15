@@ -23,8 +23,9 @@ struct lhcat {
     char err[1024];
     char program[64];
     char host[256];
-    sqlite3_stmt *st_child;             /* SELECT id FROM files WHERE parent = ? AND name = ? */
-    sqlite3_stmt *st_node;              /* SELECT parent, name FROM files WHERE id = ? */
+    sqlite3_stmt *st_child;             /* a location by (parent, name) */
+    sqlite3_stmt *st_node;              /* a location's parent, name and its parent's path (dirs) */
+    sqlite3_stmt *st_dir_add, *st_dir_del;   /* lhcat__dir_set's */
     struct { int64_t id; char *path; } pcache[LHCAT_PATH_CACHE];   /* directories' paths by id */
     char *pathbuf;
     size_t pathcap;
@@ -46,6 +47,9 @@ int64_t lhcat__child(lhcat *c, int64_t parent, const char *name, size_t len);
 void lhcat__forget(lhcat *c, int64_t id);
 void lhcat__forget_all(lhcat *c);
 
+/* the directory path of the location id (parent, name) recorded in dirs (is_dir), or its row dropped; -1 on an error.
+   Every writer of a location's kind calls it when the kind becomes or stops being 'd' */
+int lhcat__dir_set(lhcat *c, int64_t id, int64_t parent, const char *name, size_t len, int is_dir);
 /* a new object and its location (parent, name, kind) with no facts yet; *id the location. 1 on success */
 int lhcat__new_location(lhcat *c, int64_t parent, const char *name, size_t len, char kind, int64_t *id);
 /* one attribute of the file (follow: through a symbolic link); 1 a value (malloc'ed into *out), 0 not set, -1 an error */

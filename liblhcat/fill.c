@@ -292,6 +292,7 @@ static int mark(lhcat *c, struct lhcat__walk *w, int64_t parent, const char *nam
 {
     int64_t id = 0;
     int had_children = 0;
+    char prev_kind = 0;
     sqlite3_reset(w->sel);
     sqlite3_bind_int64(w->sel, 1, parent);
     sqlite3_bind_text(w->sel, 2, name, -1, SQLITE_STATIC);
@@ -299,6 +300,7 @@ static int mark(lhcat *c, struct lhcat__walk *w, int64_t parent, const char *nam
         id = sqlite3_column_int64(w->sel, 0);
         const char *k = (const char *)sqlite3_column_text(w->sel, 7);
         const char *s = (const char *)sqlite3_column_text(w->sel, 9);
+        prev_kind = k ? k[0] : 0;
         had_children = k && k[0] == 'd' && s && !strcmp(s, "present");
     }
     sqlite3_reset(w->sel);
@@ -311,6 +313,8 @@ static int mark(lhcat *c, struct lhcat__walk *w, int64_t parent, const char *nam
     sqlite3_bind_int64(w->mark, 4, lhcat__now_ms() > w->started ? lhcat__now_ms() : w->started);
     int ok = sqlite3_step(w->mark) == SQLITE_DONE;
     sqlite3_reset(w->mark);
+    if (ok && prev_kind && (prev_kind == 'd') != (kind == 'd') && lhcat__dir_set(c, id, parent, name, strlen(name), kind == 'd'))
+        return -1;
     if (ok && had_children) {
         sqlite3_reset(w->mark_under);
         sqlite3_bind_int64(w->mark_under, 1, id);
@@ -461,6 +465,7 @@ int lhcat__entry(lhcat *c, struct lhcat__walk *w, int64_t parent, const char *na
     const char *type = kind == 'd' ? "inode/directory" : kind == 'l' ? "inode/symlink" : kind == 'f' ? lhcat_type_for_name(name) : NULL;
     int64_t id = 0, object = 0;
     int coverage = 0, had_ino = 0, same_file = 0, present = 0;
+    char prev_kind = 0;
     int pict = kind == 'f' && is_picture(type);
     int want = LHCAT_STATTED | LHCAT_ATTRS | (pict ? LHCAT_EXIF : 0) | (pict && w->o.thumbs ? LHCAT_THUMB : 0) |
                (kind == 'f' && w->o.hash ? LHCAT_HASHED : 0);
@@ -475,7 +480,9 @@ int lhcat__entry(lhcat *c, struct lhcat__walk *w, int64_t parent, const char *na
         const char *state = (const char *)sqlite3_column_text(w->sel, 9);
         present = state && !strcmp(state, "present");
         had_ino = sqlite3_column_type(w->sel, 5) != SQLITE_NULL;
-        same_file = (k && k[0] == kind) && (!had_ino || (sqlite3_column_int64(w->sel, 5) == (int64_t)st->st_ino &&
+        prev_kind = k ? k[0] : 0;
+        /* a mount point recorded, now entered (--cross-fs): the same directory */
+        same_file = (k && (k[0] == kind || (k[0] == 'm' && kind == 'd'))) && (!had_ino || (sqlite3_column_int64(w->sel, 5) == (int64_t)st->st_ino &&
                                                          sqlite3_column_int64(w->sel, 6) == (int64_t)st->st_dev));
         int same = same_file && had_ino && present &&
                    sqlite3_column_int64(w->sel, 2) == (int64_t)st->st_size &&
@@ -673,7 +680,9 @@ int lhcat__entry(lhcat *c, struct lhcat__walk *w, int64_t parent, const char *na
     sqlite3_bind_int(f, 11, coverage);
     int ok = sqlite3_step(f) == SQLITE_DONE;
     sqlite3_reset(f);
-    return ok ? 0 : lhcat__dbfail(c, rel);
+    if (!ok) return lhcat__dbfail(c, rel);
+    if (prev_kind && (prev_kind == 'd') != (kind == 'd')) return lhcat__dir_set(c, id, parent, name, strlen(name), kind == 'd');
+    return 0;
 }
 
 /* ---- the walk -------------------------------------------------------------------------------------------------------- */
@@ -1010,6 +1019,7 @@ static int64_t du_row(struct du *d, int64_t parent, const char *name, size_t len
         sqlite3_reset(u);
         if (!ok) { lhcat__dbfail(d->c, "import"); return 0; }
         id = sqlite3_last_insert_rowid(d->c->db);
+        if (kind == 'd' && lhcat__dir_set(d->c, id, parent, name, len, 1)) return 0;
     } else {
         sqlite3_stmt *u = d->upd;
         sqlite3_reset(u);

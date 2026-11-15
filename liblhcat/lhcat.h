@@ -25,7 +25,7 @@ extern "C" {
 typedef struct lhcat lhcat;
 typedef struct sqlite3 sqlite3;
 
-#define LHCAT_SCHEMA 2          /* the schema version a new database gets; older ones are migrated on open */
+#define LHCAT_SCHEMA 3          /* the schema version a new database gets; older ones are migrated on open */
 #define LHCAT_NAME_MAX 64       /* a root's name: letters, digits, '-', '_', '.', not starting with '.' */
 
 /* what a location's facts cover (locations.coverage) */
@@ -67,6 +67,9 @@ int lhcat_roots(lhcat_root_fn fn, void *ctx);
 /* the root whose path holds the absolute path PATH (the longest such): its name; *rel (when not null) points into PATH
    after the root's path. 0 when found, -1 none. The roots are read again when the directory changed. */
 int lhcat_root_for(const char *path, char *name, size_t n, const char **rel);
+/* The root OLD named NEW: its row, its database file (checkpointed whole into it first) and its thumbnails' directory
+   with the paths recorded to it. Refused when NEW exists or another program has the catalogue open. */
+int lhcat_rename_root(const char *old, const char *new_name, char *err, size_t errn);
 
 /* ---- a catalogue ----------------------------------------------------------------------------------------------------- */
 lhcat *lhcat_open(const char *name, char *err, size_t errn);

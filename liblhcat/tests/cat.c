@@ -197,8 +197,31 @@ static void performance(long lines)
     qq.limit = 100;
     t0 = now();
     n = lhcat_find(c, &qq, hit_count, &hits, NULL, NULL);
-    printf("perf: find --type image/* --limit 100: %.1f ms\n", (now() - t0) * 1000);
+    t = now() - t0;
+    printf("perf: find --type image/* --limit 100: %.1f ms\n", t * 1000);
     CHECK(n == 100);
+    CHECK(t < 0.050);
+    /* a subtree: the whole tree's directory and one year's, first rows and all */
+    qq.type = NULL;
+    qq.in = "photos";
+    t0 = now();
+    n = lhcat_find(c, &qq, hit_count, &hits, NULL, NULL);
+    t = now() - t0;
+    printf("perf: find --in photos --limit 100: %.1f ms\n", t * 1000);
+    CHECK(n == 100 && t < 0.050);
+    qq.in = "photos/2001";
+    qq.limit = 0;
+    t0 = now();
+    n = lhcat_find(c, &qq, hit_count, &hits, NULL, NULL);
+    t = now() - t0;
+    sqlite3_prepare_v2(db, "WITH y(id) AS (SELECT id FROM locations WHERE name = '2001' AND kind = 'd'),"
+                           " a(id) AS (SELECT id FROM locations WHERE parent IN (SELECT id FROM y))"
+                           " SELECT count(*) FROM locations WHERE parent IN (SELECT id FROM y UNION SELECT id FROM a)", -1, &q, NULL);
+    want = sqlite3_step(q) == SQLITE_ROW ? sqlite3_column_int64(q, 0) : -1;
+    sqlite3_finalize(q);
+    printf("perf: find --in photos/2001: %lld found, %.1f ms (the paths too)\n", (long long)n, t * 1000);
+    CHECK(n > 0 && n == want);   /* its albums and their files */
+    CHECK(t < 0.5);
     lhcat_close(c);
     unlink(listing);
 }

@@ -76,6 +76,17 @@ static const struct { int version; const char *what; const char *sql; int (*fn)(
        'm': a mount point the walk did not enter. excludes: the root's exclude globs, one a line */
     { 2, "excluded locations, mount points, the root's exclude list",
       "ALTER TABLE roots ADD COLUMN excludes TEXT;", widen_state },
+    /* dirs: every directory location's path ("" the root's), kept by lhcat__dir_set, so that a subtree is a range of the path
+       index; locations_group: the type's group ("image/") with the rowid, so a group query in catalogue order stops at
+       its limit */
+    { 3, "directory paths (subtree queries), the type group index",
+      "CREATE TABLE dirs(id INTEGER PRIMARY KEY, path TEXT NOT NULL);"
+      "WITH RECURSIVE t(id, path) AS (SELECT id, '' FROM locations WHERE parent = 0 UNION ALL"
+      "  SELECT l.id, CASE WHEN t.path = '' THEN l.name ELSE t.path || '/' || l.name END"
+      "  FROM t JOIN locations l ON l.parent = t.id WHERE l.kind = 'd')"
+      " INSERT INTO dirs(id, path) SELECT id, path FROM t;"
+      "CREATE INDEX dirs_path ON dirs(path);"
+      "CREATE INDEX locations_group ON locations(substr(type, 1, instr(type, '/')));", NULL },
 };
 #define NMIGRATIONS (int)(sizeof MIGRATIONS / sizeof MIGRATIONS[0])
 
@@ -183,7 +194,32 @@ int lhcat__new_location(lhcat *c, int64_t parent, const char *name, size_t len, 
     else *id = sqlite3_last_insert_rowid(c->db);
     sqlite3_finalize(o);
     sqlite3_finalize(l);
+    if (ok && kind == 'd' && lhcat__dir_set(c, *id, parent, name, len, 1)) ok = 0;
     return ok;
+}
+
+int lhcat__dir_set(lhcat *c, int64_t id, int64_t parent, const char *name, size_t len, int is_dir)
+{
+    if (!is_dir) {
+        if (!c->st_dir_del && !(c->st_dir_del = lhcat__prepare(c, "DELETE FROM dirs WHERE id = ?1"))) return -1;
+        sqlite3_reset(c->st_dir_del);
+        sqlite3_bind_int64(c->st_dir_del, 1, id);
+        int ok = sqlite3_step(c->st_dir_del) == SQLITE_DONE;
+        sqlite3_reset(c->st_dir_del);
+        return ok ? 0 : lhcat__dbfail(c, "dirs");
+    }
+    /* the parent's path and the name ("" the root's own); a parent without a path (not a directory) gives the name */
+    if (!c->st_dir_add && !(c->st_dir_add = lhcat__prepare(c,
+            "INSERT OR REPLACE INTO dirs(id, path) VALUES(?1, CASE WHEN ?2 = 0 THEN '' ELSE coalesce((SELECT"
+            " CASE WHEN path = '' THEN ?3 ELSE path || '/' || ?3 END FROM dirs WHERE id = ?2), ?3) END)")))
+        return -1;
+    sqlite3_reset(c->st_dir_add);
+    sqlite3_bind_int64(c->st_dir_add, 1, id);
+    sqlite3_bind_int64(c->st_dir_add, 2, parent);
+    sqlite3_bind_text(c->st_dir_add, 3, name, (int)len, SQLITE_STATIC);
+    int ok = sqlite3_step(c->st_dir_add) == SQLITE_DONE;
+    sqlite3_reset(c->st_dir_add);
+    return ok ? 0 : lhcat__dbfail(c, "dirs");
 }
 
 void lhcat_set_program(lhcat *c, const char *program)
@@ -284,7 +320,7 @@ static lhcat *open_db(const char *name, int create, char *err, size_t errn)
         return NULL;
     }
     c->st_child = lhcat__prepare(c, "SELECT id FROM locations WHERE parent = ?1 AND name = ?2");
-    c->st_node = lhcat__prepare(c, "SELECT parent, name FROM locations WHERE id = ?1");
+    c->st_node = lhcat__prepare(c, "SELECT l.parent, l.name, d.path FROM locations l LEFT JOIN dirs d ON d.id = l.parent WHERE l.id = ?1");
     if (!c->st_child || !c->st_node) { snprintf(err, errn, "%s", c->err); lhcat_close(c); return NULL; }
     sqlite3_stmt *q = lhcat__prepare(c, "SELECT path, authority, offline, excludes FROM roots WHERE name = ?1");
     if (q) {
@@ -319,6 +355,8 @@ void lhcat_close(lhcat *c)
     if (!c) return;
     sqlite3_finalize(c->st_child);
     sqlite3_finalize(c->st_node);
+    sqlite3_finalize(c->st_dir_add);
+    sqlite3_finalize(c->st_dir_del);
     lhcat__forget_all(c);
     free(c->pathbuf);
     free(c->excludes);
@@ -435,6 +473,65 @@ int lhcat_add_root(const char *name, const char *path, const char *authority, in
     lhcat_close(c);
     g_roots_serial++;
     return rc;
+}
+
+int lhcat_rename_root(const char *old, const char *new_name, char *err, size_t errn)
+{
+    if (!valid_name(new_name)) { snprintf(err, errn, "'%s' is not a root's name (letters, digits, '-', '_', '.')", new_name); return -1; }
+    char from[PATH_MAX], to[PATH_MAX], dir[PATH_MAX];
+    db_path(old, from, sizeof from);
+    db_path(new_name, to, sizeof to);
+    lhcat_dir(dir, sizeof dir);
+    struct stat st;
+    if (stat(to, &st) == 0) { snprintf(err, errn, "a catalogue named '%s' exists already (%s)", new_name, to); return -1; }
+    lhcat *c = lhcat_open(old, err, errn);
+    if (!c) return -1;
+    /* the only connection: an exclusive lock taken before anything is read (another program with it open refuses it) */
+    int rc = lhcat__exec(c, "PRAGMA locking_mode = EXCLUSIVE");
+    if (!rc) {
+        sqlite3_busy_timeout(c->db, 0);
+        if (lhcat__exec(c, "BEGIN EXCLUSIVE")) {
+            snprintf(err, errn, "%s is in use by another program (%s)", from, c->err);
+            lhcat_close(c);
+            return -1;
+        }
+    }
+    char oldthumbs[PATH_MAX + 16], newthumbs[PATH_MAX + 16];
+    snprintf(oldthumbs, sizeof oldthumbs, "%s/%s.thumbs/", dir, old);
+    snprintf(newthumbs, sizeof newthumbs, "%s/%s.thumbs/", dir, new_name);
+    sqlite3_stmt *u = rc ? NULL : lhcat__prepare(c, "UPDATE roots SET name = ?2 WHERE name = ?1");
+    sqlite3_stmt *t = rc ? NULL : lhcat__prepare(c, "UPDATE thumbs SET cache_path = ?2 || substr(cache_path, length(?1) + 1)"
+                                                    " WHERE substr(cache_path, 1, length(?1)) = ?1");
+    if (u && t) {
+        sqlite3_bind_text(u, 1, old, -1, SQLITE_STATIC);
+        sqlite3_bind_text(u, 2, new_name, -1, SQLITE_STATIC);
+        sqlite3_bind_text(t, 1, oldthumbs, -1, SQLITE_STATIC);
+        sqlite3_bind_text(t, 2, newthumbs, -1, SQLITE_STATIC);
+        if (sqlite3_step(u) != SQLITE_DONE || sqlite3_step(t) != SQLITE_DONE) rc = lhcat__dbfail(c, "rename-root");
+    } else rc = -1;
+    sqlite3_finalize(u);
+    sqlite3_finalize(t);
+    if (!rc) rc = lhcat__exec(c, "COMMIT");
+    else sqlite3_exec(c->db, "ROLLBACK", NULL, NULL, NULL);
+    if (!rc) rc = lhcat__exec(c, "PRAGMA wal_checkpoint(TRUNCATE)");
+    if (rc) { snprintf(err, errn, "%s", c->err); lhcat_close(c); return -1; }
+    lhcat_close(c);
+    /* the database whole in its main file now: it and the thumbnails' directory take the new name */
+    char wal[PATH_MAX + 8], shm[PATH_MAX + 8];
+    snprintf(wal, sizeof wal, "%s-wal", from);
+    snprintf(shm, sizeof shm, "%s-shm", from);
+    if (stat(wal, &st) == 0 && st.st_size > 0) { snprintf(err, errn, "%s still has a write-ahead log: not renamed", from); return -1; }
+    unlink(wal);
+    unlink(shm);
+    if (rename(from, to) != 0) { snprintf(err, errn, "%s: %s", to, strerror(errno)); return -1; }
+    oldthumbs[strlen(oldthumbs) - 1] = 0;
+    newthumbs[strlen(newthumbs) - 1] = 0;
+    if (stat(oldthumbs, &st) == 0 && rename(oldthumbs, newthumbs) != 0) {
+        snprintf(err, errn, "%s: %s", newthumbs, strerror(errno));
+        return -1;
+    }
+    g_roots_serial++;
+    return 0;
 }
 
 struct root { char name[LHCAT_NAME_MAX + 1]; char *path; };
@@ -613,6 +710,22 @@ const char *lhcat_path(lhcat *c, int64_t id)
     int64_t parent = sqlite3_column_int64(st, 0);
     const char *name = (const char *)sqlite3_column_text(st, 1);
     int nlen = sqlite3_column_bytes(st, 1);
+    const char *dp = (const char *)sqlite3_column_text(st, 2);
+    if (dp && parent) {   /* the parent's path from dirs */
+        size_t dlen = (size_t)sqlite3_column_bytes(st, 2), need = dlen + (size_t)nlen + 2;
+        if (need > c->pathcap) {
+            char *b = realloc(c->pathbuf, need * 2);
+            if (!b) { sqlite3_reset(st); return NULL; }
+            c->pathbuf = b;
+            c->pathcap = need * 2;
+        }
+        size_t o = 0;
+        if (dlen) { memcpy(c->pathbuf, dp, dlen); c->pathbuf[dlen] = '/'; o = dlen + 1; }
+        memcpy(c->pathbuf + o, name ? name : "", (size_t)nlen);
+        c->pathbuf[o + (size_t)nlen] = 0;
+        sqlite3_reset(st);
+        return c->pathbuf;
+    }
     char nm[NAME_MAX * 4 + 1];
     snprintf(nm, sizeof nm, "%.*s", nlen, name ? name : "");
     sqlite3_reset(st);
