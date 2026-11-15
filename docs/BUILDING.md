@@ -126,7 +126,8 @@ luxshot) and the catalogue's `tests/catalogue.sh` through `getextattr` / `setext
 getfattr and setfattr do not exist there); catalogue.sh reads its databases with the `sqlite3` shell where python3 has no
 sqlite3 module (`py312-sqlite3` is a package of its own); thumbstest's thumbnailer entries use `/usr/local/share/mime`;
 `slowfs.so` wraps the extattr_* calls and answers statfs with `f_fstypename` "nfs", and slowpath.sh passes with the same
-bounds. liblhcat's 50 ms tag query can miss on ZFS: its first query reads back the database the test has just written.
+bounds. liblhcat's tag query is timed a second time when the first misses its 50 ms: on ZFS the first one reads back the
+database the test has just written (37-105 ms of system time on a ThinkPad T460, 3.4 ms the second time).
 What skips there and why: swatchtest without a `DISPLAY`; thumbstest's peak RSS checks (no `/proc/self/clear_refs`;
 thumbsmem.sh samples a peak with ps on both systems); luxwm's frame regression and ut-dump without the frame sets'
 styles (a tree with the free pack only); fileops_test's moves between two file systems when its scratch directories share

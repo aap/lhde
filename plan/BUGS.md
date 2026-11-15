@@ -116,8 +116,6 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   GET_BST on /dev/acpi, group operator, would give them).
 - 2026-11-14 FreeBSD 15's inotify may give no IN_ATTRIB for a watched folder's entries, so changed attribute columns wait for F5;
   a per-file watch or a ctime poll of the shown rows (check).
-- 2026-11-16 liblhcat/tests/cat.c's 50 ms bound on find --tag over 2,000,000 rows mostly fails on soma (ZFS): the first query
-  after writing the 400 MB database takes 37-105 ms in system time reading pages back (3.4 ms warm, 3 ms on aap's Linux).
 
 ## Tests
 - 2026-11-14 The headless tests' luxshell runs `pactl subscribe`, which autospawns pulseaudio where it is installed but not running:
