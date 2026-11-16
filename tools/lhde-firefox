@@ -91,8 +91,9 @@ def current_theme():
 
 
 def template():
-    for p in ((lhde_theme('find', 'firefox/userChrome.css.in') or '').strip(),
-              os.path.join(HERE, '..', 'share', 'firefox', 'userChrome.css.in')):
+    # the source tree's own first (run from a checkout, its template goes with its code), then lhde's data directories
+    for p in (os.path.join(HERE, '..', 'share', 'firefox', 'userChrome.css.in'),
+              (lhde_theme('find', 'firefox/userChrome.css.in') or '').strip()):
         if p and os.path.isfile(p):
             with open(p) as f:
                 return f.read()
@@ -506,9 +507,11 @@ FF4_FILES = {'tab': 'tab.png', 'toolbar-png': 'Toolbar.png', 'close': 'close.png
 FF4_TOOLBAR = (209, 221, 237)
 
 
-# the rows luxwm's glass is extended into Firefox's window under the glass themes ([extend_frame] firefox): the menu bar (24)
-# and the tab row (3 + 25), the template's; with the menu bar hidden the rest lies under the opaque navigation bar
-FF4_GLASS_ROWS = 24 + 3 + 25
+# the rows luxwm's glass is extended into Firefox's window under the glass themes ([extend_frame] firefox), the template's.
+# Firefox 4's look: the tab row (3 + 25), the menu bar hidden (Firefox's default; shown, it pushes the tabs below the glass
+# and they get the caption's colour behind them). The extension must end where the opaque rows begin: luxwm draws the
+# frame's inner edge lines along the sides only below it, so an opaque row inside it has no edge at the left and right.
+FF4_GLASS_ROWS = 3 + 25
 
 
 def theme_glass(t):
@@ -517,8 +520,8 @@ def theme_glass(t):
 
 
 def ff4_dir():
-    for p in ((lhde_theme('find', 'firefox/ff4/MANIFEST') or '').strip(),
-              os.path.join(HERE, '..', 'share', 'firefox', 'ff4', 'MANIFEST')):
+    for p in (os.path.join(HERE, '..', 'share', 'firefox', 'ff4', 'MANIFEST'),
+              (lhde_theme('find', 'firefox/ff4/MANIFEST') or '').strip()):
         if p and os.path.isfile(p):
             return os.path.dirname(os.path.realpath(p))
     return None

@@ -1376,9 +1376,9 @@ import) the CSS uses colours and Firefox 4's pictures alone. Into `user.js`, in 
 `browser.theme.toolbar-theme = 1` (light chrome whatever GTK's theme), `browser.compactmode.show = true`,
 `sidebar.revamp = false`, `sidebar.verticalTabs = false`, `browser.search.widget.removeAfterDaysUnused = 36500`, and under a
 glass theme `mozilla.widget.use-argb-visuals = true` (the window can be transparent where the glass shows). Under a glass
-theme `install` also writes `[extend_frame] firefox = 0 0 52 0` into settings.ini (the menu bar's 24 rows and the tab row's
-28; with the menu bar hidden the rest lies under the opaque navigation bar), and takes it out again for a theme without
-glass and on `remove`. Once, into `prefs.js` (kept as `prefs.js.lhde-backup`), the search box is placed after the address
+theme `install` also writes `[extend_frame] firefox = 0 0 28 0` into settings.ini (the tab row's 28 rows: the glass ends
+where the opaque navigation bar begins, so luxwm's inner edge lines outline it; the menu bar, shown, pushes the tabs below
+the glass and the caption's colour shows behind them), and takes it out again for a theme without glass and on `remove`. Once, into `prefs.js` (kept as `prefs.js.lhde-backup`), the search box is placed after the address
 and the bookmarks toolbar set to hidden unless shown; both are ordinary toolbar settings afterwards, and `remove` leaves them.
 
 Firefox reads userChrome.css at start only, and nothing runs `lhde-firefox` on a theme switch yet: run `install` again after

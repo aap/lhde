@@ -684,11 +684,15 @@
 /* ---- the glass themes, composited: the menu bar and the tabs on luxwm's glass ----------------------------------------- */
 /* Firefox 4 on Windows 7 with glass extended the frame behind the menu bar and the tabs. Here luxwm does: Firefox runs with an
    ARGB window (user.js mozilla.widget.use-argb-visuals), leaves the top of its window transparent, and luxwm paints its glass
-   plate under it (_LHWM_EXTEND_FRAME, which luxwm sets on Firefox from settings.ini [extend_frame] firefox = 0 0 N 0:
-   lhde-firefox install writes N, the tab row's and the menu bar's rows; docs/CLIENT-PROTOCOL.md "Extended frames"). Only
-   while a compositor runs (-moz-gtk-csd-transparency-available; without one Firefox's window is opaque and the opaque rules
-   above stand). Firefox 4's own for glass (browser-aero.css, -moz-windows-compositor): no background on the tab row, its
-   shadow line moved to the navigation bar's top with 3.5 px corners, black text with a white glow on the glass. */
+   plate under it (_LHWM_EXTEND_FRAME, which luxwm sets on Firefox from settings.ini [extend_frame] firefox = 0 0 28 0:
+   lhde-firefox install writes the tab row's rows; docs/CLIENT-PROTOCOL.md "Extended frames"). Only while a compositor runs
+   (-moz-gtk-csd-transparency-available; without one Firefox's window is opaque and the opaque rules above stand). Firefox
+   4's own for glass (browser-aero.css, -moz-windows-compositor): no background on the tab row, black text with a white
+   glow on the glass. Its shadow line along the navigation bar's top is luxwm's here: the extension ends where the
+   navigation bar begins, so luxwm's inner edge lines run under the tab row and on down the sides of the opaque rows (the
+   frame's outline round the controls; an opaque row inside the extension has no edge at the sides, and the bar's rounded
+   corners left the plate's pixels out). The menu bar, shown, pushes the tab row below the glass: it then gets the caption's
+   colour behind it, as without glass. */
 @media (-moz-gtk-csd-transparency-available) {
   :root, #main-window, body, #navigator-toolbox, #titlebar {
     background: transparent !important;
@@ -708,11 +712,13 @@
     text-shadow: 0 0 0.5em #ffffff, 0 0 0.5em #ffffff, 0 1px 0 rgba(255, 255, 255, 0.4) !important;
   }
   .tabbrowser-tab { text-shadow: none !important; }
-  #TabsToolbar { background: none !important; margin-bottom: -1px !important; position: relative !important; z-index: 1 !important; }
-  #nav-bar {
-    border-top: 1px solid rgba(26, 26, 26, 0.4) !important;
-    border-radius: 3.5px 3.5px 0 0 !important;
-    background-clip: padding-box !important;
+  #TabsToolbar { background: none !important; }
+  #navigator-toolbox:has(#toolbar-menubar:not([inactive])) #TabsToolbar {
+    background-color: var(--lhde-ff4-frame) !important;
+    background-image: var(--lhde-ff4-frame-image) !important;
+    background-size: var(--lhde-ff4-frame-image-size) !important;
+    background-position: var(--lhde-ff4-frame-image-pos) !important;
+    background-repeat: no-repeat !important;
   }
 }
 /*@END@*/

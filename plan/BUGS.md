@@ -124,8 +124,8 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   mupdf before it) open neither; the role wants a per-type fallback to a program that claims the type.
 - 2026-11-16 mupf: before its window is shown the view's client width reads 37519616 (MUPF_TRACE's first `view` lines, from
   layout_chrome on the unsized frame); harmless, the size is right once mapped, the cause not looked for.
-- 2026-11-16 lhde-firefox, glass themes with the menu bar hidden: luxwm's glass extends 52 rows (menu bar + tab row) and so 24 rows
-  into the navigation bar, whose sides there lack luxwm's dark client-edge line (it starts at row 52); the extension cannot follow the menu bar.
+- 2026-11-16 lhde-firefox, glass themes: [extend_frame] is fixed, so the menu bar, shown (Alt), pushes the tab row below luxwm's glass
+  (the caption's colour behind it then) and lies in the glass without luxwm's side lines; luxwm could follow _NET_WM_OPAQUE_REGION.
 - 2026-11-16 lhde-firefox: the search box's engine button (Firefox 160's moz-button .searchmode-switcher) keeps its grey pill; neither
   ::part(button) nor --button-background-color from userChrome.css reaches it (Firefox 4's engine icon sat on the field).
 
