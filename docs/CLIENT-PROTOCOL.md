@@ -247,7 +247,8 @@ the header:
   new state at once, renders the frame in the new state into a pixmap (`draw_text`, `wm_frame_stage_out`), sets the focus and
   `_NET_ACTIVE_WINDOW`, and copies the pixmap into the decoration window when the property says the new state (no rendering is
   left then, so the compositor gets the header and the frame within a fraction of a millisecond), or after 200 ms
-  (`ACTIVE_WAIT_MS`; a client that is busy). Repaints meanwhile (an Expose) keep the state shown; the window menu opens only
+  (`ACTIVE_WAIT_MS`; a client that is busy). Repaints meanwhile (an Expose, a move or resize: its frame goes out with
+  the new geometry at once) keep the state shown, and a frame painted ahead for another size is not copied; the window menu opens only
   after the wait; drags go on and paint the frame when the property comes.
 
 `_NET_ACTIVE_WINDOW` is replaced in one step, never deleted first (a moment without an active window would show every header

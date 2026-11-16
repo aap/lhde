@@ -554,7 +554,9 @@ draw_text(struct client *c, bool focused)
             LOGP("frame 0x%lx: %s once the client's header is", c->window, focused ? "active" : "inactive");
         }
         if (now < c->active_wait) {
-            if (!c->dirty) ahead = true;
+            /* a geometry change (geom_paint: wm_frame_pre_upload) goes out with this paint, not with a later copy: in the state
+               still shown, like an Expose */
+            if (!c->dirty && !wm_frame_pre_upload) ahead = true;
             else paint_focused = c->painted_active != 0;
         } else {
             LOGP("frame 0x%lx: the client's header did not follow within %d ms", c->window, ACTIVE_WAIT_MS);
@@ -605,7 +607,8 @@ draw_text(struct client *c, bool focused)
         XFlush(display);
         return;
     }
-    if (c->stage && c->stage->pix != None && c->stage->dec == c->dec && c->stage_focused == (int)paint_focused && !c->dirty)
+    if (c->stage && c->stage->pix != None && c->stage->dec == c->dec && c->stage_focused == (int)paint_focused && !c->dirty &&
+        c->stage->w == c->geom.width && c->stage->h == c->geom.height && !wm_frame_pre_upload)
         wm_frame_stage_show(display, c->stage);   /* painted ahead with what is current (every change since painted it again) */
     else {
         if (c->stage) wm_frame_stage_drop(display, c->stage);

@@ -165,7 +165,8 @@ extern unsigned long wm_frame_upload_serial;   /* request serial of the last wm_
 extern void (*wm_frame_pre_upload)(void *); extern void *wm_frame_pre_upload_arg;
 /* a frame painted ahead and shown later (luxwm's activation in step, CLIENT-PROTOCOL.md): when wm_frame_stage_out is set, the next
    wm_frame_paint_ex4 uploads to an offscreen pixmap and stops there, filling *wm_frame_stage_out (reset by that paint);
-   wm_frame_stage_show sets the window's shape and copies the pixels in (a short batch, no rendering), wm_frame_stage_drop frees it */
+   wm_frame_stage_show sets the window's shape and copies the pixels in (a short batch, no rendering), wm_frame_stage_drop frees it.
+   Not together with wm_frame_pre_upload: a staged paint does not call it (the caller paints a geometry change at once) */
 struct wm_frame_stage { Pixmap pix; Window dec; int w, h, n, hx, hy, hw, hh; unsigned long sum; XRectangle rects[128]; };
 extern struct wm_frame_stage *wm_frame_stage_out;
 void wm_frame_stage_show(Display *dpy, struct wm_frame_stage *s);
