@@ -2731,11 +2731,12 @@ int main(int argc, char** argv)
     double stall_ms = stalls && *stalls ? atof(stalls) : -1;
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
-        if (loop_keys(msg)) continue;
         struct timespec t0, t1;
         if (stall_ms >= 0) clock_gettime(CLOCK_MONOTONIC, &t0);
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
+        if (!loop_keys(msg)) {   // (the window's own keys timed too: Alt+Left, F5)
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
         if (stall_ms < 0) continue;
         clock_gettime(CLOCK_MONOTONIC, &t1);
         double ms = (double)(t1.tv_sec - t0.tv_sec) * 1000 + (double)(t1.tv_nsec - t0.tv_nsec) / 1e6;
