@@ -7,6 +7,8 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
 ## Explorer (flxp)
 - 2026-11-16 aap: in Details only the area around an unselected row's text counts as the file (hover, click), a selected one's whole row
   does. Not reproduced headless (aerovision, jade4074, slate4051 Details: hover and click take every column; detailsrow.sh); case needed.
+- 2026-11-16 slate4051's menu band hot frame (ExplorerMenu::Toolbar.BUTTON, bitmap 340) composites darker in flxp (lhbar.cpp: 45 56 7f
+  over 24 43 8e) than ut-dump's render of it straight-alpha over the same colour (7e 8f b9, what lhde-firefox shows); one treats the alpha wrong.
 - 2026-10-31 XP's Customize Toolbar dialog (View > Toolbars > Customize...: buttons, text options) is not there; only Icon Options is.
 - 2026-11-13 After luna -> jade4074 -> classic the menu band's items sit 1 px off a fresh classic start's (File..Help, x 8..241;
   themeswitch.sh allows 0.5 %); a fresh classic Explorer draws a black 1 px line left of the Go strip that a switched one does not.
