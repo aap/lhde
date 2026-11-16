@@ -707,6 +707,13 @@ static void SCROLL_RefreshScrollBar( HWND hwnd, INT nBar,
     HDC hdc = GetDCEx( hwnd, 0,
                            DCX_CACHE | ((nBar == SB_CTL) ? 0 : DCX_WINDOW) );
     if (!hdc) return;
+    if (nBar != SB_CTL)   /* lhde: the window DC clipped to the bar: what wux presents again is the bar, not the window */
+    {
+        RECT bar;
+        INT arrow_size, thumb_size, thumb_pos;
+        SCROLL_GetScrollBarRect( hwnd, nBar, &bar, &arrow_size, &thumb_size, &thumb_pos );
+        IntersectClipRect( hdc, bar.left, bar.top, bar.right, bar.bottom );
+    }
 
     SCROLL_DrawScrollBar( hwnd, hdc, nBar, g_tracking_info.hit_test, &g_tracking_info, arrows, interior );
     ReleaseDC( hwnd, hdc );

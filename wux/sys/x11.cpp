@@ -5,17 +5,23 @@
 #include <string.h>
 #include <time.h>
 #include <sys/select.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <poll.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string>
 #include <vector>
 #include <X11/Xlib.h>
+#include <X11/Xlib-xcb.h>
+#include <xcb/xcb.h>
+#include <xcb/xcbext.h>     // xcb_poll_for_reply
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <X11/keysym.h>
 #include <xkbcommon/xkbcommon.h>
 #include <X11/extensions/shape.h>
+#include <X11/extensions/XShm.h>
 #include <X11/extensions/Xfixes.h>
 #include <X11/Xcursor/Xcursor.h>
 #include "sys.h"
@@ -50,6 +56,15 @@ struct NativeWindow {
     int (*shadow_alpha)(int, int, int, int) = nullptr;
     ::Window shadow_xw = 0;
     gdi::Rect shadow_at;    // the rect it was painted for
+    // _NET_WM_STATE as last read (is_maximized, is_fullscreen): read again after its PropertyNotify (toplevels select
+    // PropertyChangeMask; a popup's is read each time), so that IsZoomed in a paint is no round trip to the server
+    bool state_known = false;
+    std::vector<Atom> state;
+    // present's MIT-SHM segment (the window's size and depth) and whether the server is still reading it
+    XShmSegmentInfo shm_info = {};
+    XImage* shm_img = nullptr;
+    bool shm_busy = false;
+    uint32_t shm_sent = 0;
 };
 
 static Display* dpy;
@@ -66,6 +81,9 @@ static FrameInfo frame;             // root properties, refreshed on PropertyNot
 static std::vector<Atom> watched;    // watch_root_property(): id = index + 1
 
 static void read_frame_info();
+static void shm_free(NativeWindow* w);
+static void cm_watch();
+static bool shm_ok();
 static void wake_init();
 static void xdnd_init();
 static void set_xdnd_aware(::Window xw);
@@ -110,6 +128,11 @@ bool init()
     read_frame_info();
     wake_init();
     xdnd_init();
+    // what the message loop would otherwise ask the server the first time it needs it, asked here: whether a compositing
+    // manager runs (copy_area_ok), MIT-SHM (present), where the pointer is (message_pointer_pos)
+    cm_watch();
+    shm_ok();
+    message_pointer_pos();
     return true;
 }
 
@@ -196,6 +219,7 @@ static void make_xwindow(NativeWindow* w)
         attr.background_pixmap = None;
         mask |= CWBackPixmap;
     }
+    w->state_known = false;
     w->xw = XCreateWindow(dpy, root, r.left, r.top,
                           r.width() > 0 ? r.width() : 1, r.height() > 0 ? r.height() : 1,
                           0, depth, InputOutput, visual, mask, &attr);
@@ -253,6 +277,7 @@ bool set_argb(NativeWindow* w, bool on)
     XFreeGC(dpy, w->gc);
     XDestroyWindow(dpy, w->xw);
     w->argb = on;
+    shm_free(w);   // (the other depth)
     make_xwindow(w);
     std::string t = w->title;
     set_title(w, t.c_str());
@@ -275,6 +300,7 @@ void destroy_window(NativeWindow* w)
     for (size_t i = 0; i < windows.size(); i++)
         if (windows[i] == w) { windows.erase(windows.begin() + i); break; }
     drop_shadow_show(w, w->rect, false);
+    shm_free(w);
     XFreeGC(dpy, w->gc);
     XDestroyWindow(dpy, w->xw);
     if (w->cmap) XFreeColormap(dpy, w->cmap);
@@ -555,20 +581,26 @@ static void press_arrived(const XButtonEvent& b)
     if (press_is_foreign) foreign_count++;
 }
 
-bool is_maximized(NativeWindow* w)
+static const std::vector<Atom>& wm_state(NativeWindow* w)
 {
+    if (w->state_known) return w->state;
+    w->state.clear();
     Atom type; int format; unsigned long count, after; unsigned char* data = nullptr;
-    bool v = false, h = false;
     if (XGetWindowProperty(dpy, w->xw, a_state, 0, 64, False, XA_ATOM, &type, &format, &count, &after, &data) == Success && data) {
-        for (unsigned long i = 0; i < count; i++) {
-            Atom a = (Atom)((long*)data)[i];
-            if (a == a_max_v) v = true;
-            if (a == a_max_h) h = true;
-        }
+        for (unsigned long i = 0; i < count; i++) w->state.push_back((Atom)((long*)data)[i]);
         XFree(data);
     }
-    return v && h;
+    w->state_known = !w->popup;
+    return w->state;
 }
+
+static bool has_state(NativeWindow* w, Atom a)
+{
+    for (Atom s : wm_state(w)) if (s == a) return true;
+    return false;
+}
+
+bool is_maximized(NativeWindow* w) { return has_state(w, a_max_v) && has_state(w, a_max_h); }
 
 void set_maximized(NativeWindow* w, int action)
 {
@@ -583,14 +615,8 @@ void set_fullscreen(NativeWindow* w, bool on)
 
 bool is_fullscreen(NativeWindow* w)
 {
-    Atom fs = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
-    Atom type; int format; unsigned long count, after; unsigned char* data = nullptr;
-    bool on = false;
-    if (XGetWindowProperty(dpy, w->xw, a_state, 0, 64, False, XA_ATOM, &type, &format, &count, &after, &data) == Success && data) {
-        for (unsigned long i = 0; i < count; i++) if ((Atom)((long*)data)[i] == fs) on = true;
-        XFree(data);
-    }
-    return on;
+    static Atom fs = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
+    return has_state(w, fs);
 }
 
 void* window_user(NativeWindow* w) { return w->user; }
@@ -670,7 +696,7 @@ void show_window(NativeWindow* w, bool show)
     if (show && w->popup) XMapRaised(dpy, w->xw);
     else if (show) XMapWindow(dpy, w->xw); else XUnmapWindow(dpy, w->xw);
     if (show && w->type == WindowType::Desktop) XLowerWindow(dpy, w->xw);   // without a window manager too
-    if (!show) drop_shadow_show(w, w->rect, false);
+    if (!show) { drop_shadow_show(w, w->rect, false); shm_free(w); }   // (segments are few: FreeBSD allows 192 by default)
     XFlush(dpy);
 }
 
@@ -784,20 +810,166 @@ void set_window_rect(NativeWindow* w, const gdi::Rect& r)
 
 gdi::Rect window_rect(NativeWindow* w) { return w->rect; }
 
-void present(NativeWindow* w, const gdi::Bitmap* bmp, const gdi::Rect& a)
+// A compositing manager (the owner of _NET_WM_CM_Sn) redirects every window into a pixmap of its own, so a copy within
+// the window always finds its pixels; whether one runs is followed through XFixes (cm_event), asked once.
+static struct { bool asked = false, running = false; Atom atom = None; int xfixes_event = -1; } cm;
+
+static void cm_watch()
 {
-    gdi::Rect r = gdi::intersect(a, bmp->rect());
-    if (r.empty()) return;
-    // ARGB windows: the backbuffer is premultiplied BGRA, which is exactly
-    // the depth-32 TrueColor visual's ZPixmap layout (a 32bpp image).
+    cm.asked = true;
+    char n[32];
+    snprintf(n, sizeof n, "_NET_WM_CM_S%d", screen);
+    cm.atom = XInternAtom(dpy, n, False);
+    int err;
+    if (XFixesQueryExtension(dpy, &cm.xfixes_event, &err))
+        XFixesSelectSelectionInput(dpy, root, cm.atom, XFixesSetSelectionOwnerNotifyMask | XFixesSelectionWindowDestroyNotifyMask |
+                                   XFixesSelectionClientCloseNotifyMask);
+    else cm.xfixes_event = -1;
+    cm.running = XGetSelectionOwner(dpy, cm.atom) != None;
+}
+
+static bool cm_event(const XEvent& x)
+{
+    if (cm.xfixes_event < 0 || x.type != cm.xfixes_event + XFixesSelectionNotify) return false;
+    const XFixesSelectionNotifyEvent& e = (const XFixesSelectionNotifyEvent&)x;
+    if (e.selection != cm.atom) return false;
+    cm.running = e.subtype == XFixesSetSelectionOwnerNotify && e.owner != None;
+    return true;
+}
+
+bool copy_area_ok(NativeWindow* w)
+{
+    if (!cm.asked) cm_watch();
+    return w->mapped && cm.running && cm.xfixes_event >= 0;   // (without XFixes a compositor gone would go unseen)
+}
+
+// ---- presenting -------------------------------------------------------------------------------------------------------
+//
+// The back buffer reaches the window through MIT-SHM where the server has it (a local display): the pixels go into a
+// segment the server reads itself, and the request on the connection is a few dozen bytes, so a present never blocks
+// the program writing to a server busy behind a compositor's frame (an XPutImage of a strip is tens of KB, more than
+// the socket holds while the server is away). The segment is the window's size; it is not written again until the
+// server says it has read it (ShmCompletion): till then present_busy is true and the caller keeps what it would send.
+// Without MIT-SHM (a remote display), and for a present of less than 16 KB, the pixels go as XPutImage. A hidden window
+// gives its segment back.
+
+static struct { bool asked = false, ok = false; int event = -1; } shm;
+static bool shm_failed;
+static int shm_error(Display*, XErrorEvent*) { shm_failed = true; return 0; }
+
+static bool shm_ok()
+{
+    if (shm.asked) return shm.ok;
+    shm.asked = true;
+    shm.ok = XShmQueryExtension(dpy) && (shm.event = XShmGetEventBase(dpy)) >= 0;
+    return shm.ok;
+}
+
+static void shm_free(NativeWindow* w)
+{
+    if (!w->shm_img) return;
+    XShmDetach(dpy, &w->shm_info);
+    w->shm_img->data = nullptr;
+    XDestroyImage(w->shm_img);
+    shmdt(w->shm_info.shmaddr);
+    w->shm_img = nullptr;
+    w->shm_busy = false;
+}
+
+// the window's segment, the back buffer's size and the window's depth; false: none (the server cannot attach it)
+static bool shm_for(NativeWindow* w, const gdi::Bitmap* bmp)
+{
+    if (!shm_ok()) return false;
+    unsigned depth = w->argb ? 32u : (unsigned)DefaultDepth(dpy, screen);
+    if (w->shm_img && w->shm_img->width == bmp->width && w->shm_img->height == bmp->height && (unsigned)w->shm_img->depth == depth)
+        return true;
+    shm_free(w);
+    Visual* vis = w->argb ? argb_visual.visual : DefaultVisual(dpy, screen);
+    XImage* img = XShmCreateImage(dpy, vis, depth, ZPixmap, nullptr, &w->shm_info, (unsigned)bmp->width, (unsigned)bmp->height);
+    if (!img) { shm.ok = false; return false; }
+    if (img->bits_per_pixel != 32) { XDestroyImage(img); shm.ok = false; return false; }
+    w->shm_info.shmid = shmget(IPC_PRIVATE, (size_t)img->bytes_per_line * (size_t)img->height, IPC_CREAT | 0600);
+    if (w->shm_info.shmid < 0) { XDestroyImage(img); return false; }   // (none left: XPutImage this time)
+    w->shm_info.shmaddr = img->data = (char*)shmat(w->shm_info.shmid, nullptr, 0);
+    w->shm_info.readOnly = False;
+    shm_failed = false;
+    int (*old)(Display*, XErrorEvent*) = XSetErrorHandler(shm_error);
+    if (w->shm_info.shmaddr != (char*)-1) XShmAttach(dpy, &w->shm_info);
+    XSync(dpy, False);   // (once a size: whether the server could attach it, a remote one cannot)
+    XSetErrorHandler(old);
+    shmctl(w->shm_info.shmid, IPC_RMID, nullptr);   // gone with the last detach
+    if (w->shm_info.shmaddr == (char*)-1 || shm_failed) {
+        if (w->shm_info.shmaddr != (char*)-1) shmdt(w->shm_info.shmaddr);
+        img->data = nullptr;
+        XDestroyImage(img);
+        shm.ok = false;
+        return false;
+    }
+    w->shm_img = img;
+    w->shm_busy = false;
+    return true;
+}
+
+static bool shm_event(const XEvent& x)
+{
+    if (!shm.ok || x.type != shm.event + ShmCompletion) return false;
+    const XShmCompletionEvent& e = (const XShmCompletionEvent&)x;
+    for (NativeWindow* w : windows) if (w->xw == e.drawable) w->shm_busy = false;
+    return true;
+}
+
+bool present_busy(NativeWindow* w)
+{
+    // (a completion that never comes, the window gone meanwhile: the segment is taken back after a second)
+    if (w->shm_busy && ticks() - w->shm_sent > 1000) w->shm_busy = false;
+    return w->shm_busy;
+}
+
+static XImage* image_of(NativeWindow* w, const gdi::Bitmap* bmp)
+{
+    // ARGB windows: the backbuffer is premultiplied BGRA, which is exactly the depth-32 TrueColor visual's ZPixmap layout
     Visual* vis = w->argb ? argb_visual.visual : DefaultVisual(dpy, screen);
     unsigned depth = w->argb ? 32u : (unsigned)DefaultDepth(dpy, screen);
-    XImage* img = XCreateImage(dpy, vis, depth, ZPixmap, 0, (char*)bmp->pixels, (unsigned)bmp->width, (unsigned)bmp->height,
-                               32, bmp->stride * 4);
-    if (!img) return;
-    XPutImage(dpy, w->xw, w->gc, img, r.left, r.top, r.left, r.top, (unsigned)r.width(), (unsigned)r.height());
-    img->data = nullptr;
-    XDestroyImage(img);
+    return XCreateImage(dpy, vis, depth, ZPixmap, 0, (char*)bmp->pixels, (unsigned)bmp->width, (unsigned)bmp->height, 32,
+                        bmp->stride * 4);
+}
+
+void present(NativeWindow* w, const gdi::Bitmap* bmp, const std::vector<ScrollCopy>& copies, const std::vector<gdi::Rect>& rects)
+{
+    // the copies first, then the pixels: with MIT-SHM all of it small requests in a row, so that a compositor's frame
+    // does not fall between a copy and the strip it uncovers
+    for (const ScrollCopy& c : copies)
+        if (!c.dst.empty())
+            XCopyArea(dpy, w->xw, w->xw, w->gc, c.dst.left - c.dx, c.dst.top - c.dy, (unsigned)c.dst.width(),
+                      (unsigned)c.dst.height(), c.dst.left, c.dst.top);
+    std::vector<gdi::Rect> in;
+    for (const gdi::Rect& a : rects) {
+        gdi::Rect r = gdi::intersect(a, bmp->rect());
+        if (!r.empty()) in.push_back(r);
+    }
+    if (in.empty()) { XFlush(dpy); return; }
+    size_t bytes = 0;
+    for (const gdi::Rect& r : in) bytes += (size_t)r.width() * (size_t)r.height() * 4;
+    if (bytes >= 16384 && shm_for(w, bmp)) {   // (a few small rects fit the connection as they are)
+        XImage* img = w->shm_img;
+        for (size_t i = 0; i < in.size(); i++) {
+            const gdi::Rect& r = in[i];
+            for (int32_t y = r.top; y < r.bottom; y++)
+                memcpy(img->data + (size_t)y * img->bytes_per_line + (size_t)r.left * 4, bmp->row(y) + r.left, (size_t)r.width() * 4);
+            XShmPutImage(dpy, w->xw, w->gc, img, r.left, r.top, r.left, r.top, (unsigned)r.width(), (unsigned)r.height(),
+                         i + 1 == in.size());   // the last one says when the server has read the segment
+        }
+        w->shm_busy = true;
+        w->shm_sent = ticks();
+    } else {
+        XImage* img = image_of(w, bmp);
+        if (img) {
+            for (const gdi::Rect& r : in)
+                XPutImage(dpy, w->xw, w->gc, img, r.left, r.top, r.left, r.top, (unsigned)r.width(), (unsigned)r.height());
+            img->data = nullptr;
+            XDestroyImage(img);
+        }
+    }
     XFlush(dpy);
 }
 
@@ -1583,10 +1755,13 @@ void drop_finish(uint32_t effect)
     dt = DropTarget();
 }
 
+static void note_pointer(const XEvent& x);
+
 static bool translate(XEvent& x, Event& ev)
 {
     memset(&ev, 0, sizeof ev);
     ev.kind = EventKind::Nothing;
+    note_pointer(x);
     switch (x.type) {   // a server time for the selections and XDND messages we send
     case MotionNotify: last_time = x.xmotion.time; break;
     case ButtonPress: case ButtonRelease: last_time = x.xbutton.time; break;
@@ -1598,6 +1773,8 @@ static bool translate(XEvent& x, Event& ev)
         else if (x.type == ButtonPress || x.type == ButtonRelease || x.type == MotionNotify) thaw_pointer();
     }
     if (source_event(x)) return false;
+    if (cm_event(x)) return false;
+    if (shm_event(x)) return true;   // (ev: Nothing) the loop looks again: a present may have waited for it
     if (x.type == PropertyNotify && x.xproperty.window == root) {
         Atom a = x.xproperty.atom;
         for (size_t i = 0; i < watched.size(); i++)
@@ -1642,7 +1819,7 @@ static bool translate(XEvent& x, Event& ev)
     if (x.type == PropertyNotify) {
         if (x.xproperty.atom == a_header_pixmap) ev.keysym = WindowHeaderPixmap;
         else if (x.xproperty.atom == a_caption_rect) ev.keysym = WindowCaptionRect;
-        else if (x.xproperty.atom == a_state) ev.keysym = WindowState;
+        else if (x.xproperty.atom == a_state) { ev.keysym = WindowState; w->state_known = false; }
         else return false;
         ev.kind = EventKind::WindowPropertyChanged;
         ev.time = (uint32_t)x.xproperty.time;
@@ -1652,6 +1829,10 @@ static bool translate(XEvent& x, Event& ev)
     case Expose:
         ev.kind = EventKind::Exposed;
         ev.rect = gdi::rect_xywh(x.xexpose.x, x.xexpose.y, x.xexpose.width, x.xexpose.height);
+        return true;
+    case GraphicsExpose:   // a copy_area whose source was not all there (the compositor gone meanwhile): presented again
+        ev.kind = EventKind::Exposed;
+        ev.rect = gdi::rect_xywh(x.xgraphicsexpose.x, x.xgraphicsexpose.y, x.xgraphicsexpose.width, x.xgraphicsexpose.height);
         return true;
     case ConfigureNotify: {
         int rx = 0, ry = 0; ::Window child;
@@ -1834,6 +2015,66 @@ gdi::Point pointer_pos()
     ::Window root, child; int rx = 0, ry = 0, wx, wy; unsigned mask;
     XQueryPointer(dpy, RootWindow(dpy, screen), &root, &child, &rx, &ry, &wx, &wy, &mask);
     return gdi::Point{rx, ry};
+}
+
+// The pointer as the events have told it (message_pointer_pos): every motion, button, crossing and key event carries the
+// root position. While the pointer is over one of our windows, a button is down (the implicit grab) or we hold a grab,
+// every move comes to us and the last event's position is the pointer's. Otherwise it is asked of the server without
+// waiting: the query goes out, and its answer is taken on a later call once it has come.
+static struct {
+    gdi::Point pos;
+    bool known = false, inside = false;
+    unsigned buttons = 0;           // Button1Mask.. held, from the events
+    bool asking = false;
+    unsigned seq = 0;               // the query out (xcb sequence)
+} ptr;
+
+static void note_pointer(const XEvent& x)
+{
+    switch (x.type) {
+    case MotionNotify:
+        ptr.pos = gdi::Point{x.xmotion.x_root, x.xmotion.y_root};
+        ptr.buttons = x.xmotion.state & (Button1Mask | Button2Mask | Button3Mask);
+        break;
+    case ButtonPress: case ButtonRelease: {
+        ptr.pos = gdi::Point{x.xbutton.x_root, x.xbutton.y_root};
+        unsigned b = x.xbutton.button >= 1 && x.xbutton.button <= 3 ? Button1Mask << (x.xbutton.button - 1) : 0;
+        if (x.type == ButtonPress) ptr.buttons |= b; else ptr.buttons &= ~b;
+        break;
+    }
+    case EnterNotify: case LeaveNotify:
+        ptr.pos = gdi::Point{x.xcrossing.x_root, x.xcrossing.y_root};
+        ptr.inside = x.type == EnterNotify;
+        break;
+    case KeyPress: case KeyRelease:
+        ptr.pos = gdi::Point{x.xkey.x_root, x.xkey.y_root};
+        break;
+    default:
+        return;
+    }
+    ptr.known = true;
+}
+
+gdi::Point message_pointer_pos()
+{
+    xcb_connection_t* c = XGetXCBConnection(dpy);
+    if (ptr.asking) {
+        void* reply = nullptr; xcb_generic_error_t* err = nullptr;
+        if (xcb_poll_for_reply(c, ptr.seq, &reply, &err)) {
+            ptr.asking = false;
+            xcb_query_pointer_reply_t* r = (xcb_query_pointer_reply_t*)reply;
+            if (r && !(ptr.inside || ptr.buttons || own_grab || ds.active)) { ptr.pos = gdi::Point{r->root_x, r->root_y}; ptr.known = true; }
+            free(reply);
+            free(err);
+        }
+    }
+    if (!ptr.known) { ptr.pos = pointer_pos(); ptr.known = true; return ptr.pos; }   // once, before the first event
+    if (!ptr.asking && !(ptr.inside || ptr.buttons || own_grab || ds.active)) {
+        ptr.seq = xcb_query_pointer(c, root).sequence;
+        ptr.asking = true;
+        xcb_flush(c);
+    }
+    return ptr.pos;
 }
 
 gdi::Size screen_size()

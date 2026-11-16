@@ -14,6 +14,9 @@ struct Toplevel {
     sys::NativeWindow* native;
     gdi::Bitmap* back;
     gdi::Region dirty;      // backbuffer areas changed since last present
+    // scroll_window's copies on the server not made yet: present_now makes them, then sends what is dirty, so that a
+    // compositor never shows a copy without its uncovered strip
+    std::vector<sys::ScrollCopy> copies;
     bool argb = false;      // native window is ARGB, backbuffer tracks alpha
 };
 
@@ -448,6 +451,7 @@ bool set_window_pos(Window* w, Window* after, const Rect& nr, uint32_t flags)
                 gdi::destroy_bitmap(w->top->back);
                 w->top->back = gdi::create_bitmap(r.width(), r.height());
                 w->top->dirty.clear();
+                w->top->copies.clear();
             }
         } else if (w->parent && visible_before && !(flags & SWP_NOREDRAW)) {
             Rect o = gdi::offset(old, -w->parent->client.left, -w->parent->client.top);
@@ -753,7 +757,25 @@ void scroll_window(Window* w, int32_t dx, int32_t dy, const Rect* scroll, const 
     }
     gdi::Region unc = src;
     unc.subtract(dst);
-    mark_dirty(w, src);
+    Window* t = toplevel_of(w);
+    if ((t->style & WS_VISIBLE) && sys::copy_area_ok(t->top->native)) {
+        // the window's pixels on the server move the same way (XCopyArea, at the next present: what Windows'
+        // ScrollWindowEx does on the screen), so only what was not presented yet goes out again: a dirty area that moved
+        // into dst, and what dst does not cover. The strip uncovered is the caller's to paint (SW_INVALIDATE), which
+        // marks it then.
+        for (const Rect& d : dst.rects()) t->top->copies.push_back(sys::ScrollCopy{d, dx, dy});
+        if (t->top->copies.size() > 64) {   // (presents held back long: the window again, whole)
+            t->top->copies.clear();
+            t->top->dirty.set(t->top->back->rect());
+        }
+        gdi::Region& dirty = t->top->dirty;
+        gdi::Region moved = dirty;
+        moved.offset(dx, dy);
+        moved.intersect(dst);
+        dirty.subtract(dst);
+        dirty.add(moved);
+    } else
+        mark_dirty(w, src);
     // shift the pending update region along
     gdi::Region upd = w->update;
     upd.intersect(sr);
@@ -805,14 +827,23 @@ static Window* find_dirty(Window* w)
     return nullptr;
 }
 
+static uint32_t g_presented;     // sys::ticks() of the last present_now
+static bool g_backlog;          // present_now left a toplevel to the next one (the server still reading its last)
+
 void present_now()
 {
+    g_presented = sys::ticks();
+    g_backlog = false;
     caret_update();
     for (Window* t : g_toplevels) {
         Toplevel* tl = t->top;
-        if (tl->dirty.empty()) continue;
-        if (t->style & WS_VISIBLE)
-            for (const Rect& r : tl->dirty.rects()) sys::present(tl->native, tl->back, r);
+        if (tl->dirty.empty() && tl->copies.empty()) continue;
+        if (t->style & WS_VISIBLE) {
+            // the server still reading the last present (sys::present_busy): this one waits, and the loop comes back
+            if (sys::present_busy(tl->native)) { g_backlog = true; continue; }
+            sys::present(tl->native, tl->back, tl->copies, tl->dirty.rects());
+        }
+        tl->copies.clear();
         tl->dirty.clear();
     }
 }
@@ -853,7 +884,7 @@ static void drain_cross_thread()
     }
     for (Message& m : in) {
         if (m.w && !is_window(m.w)) continue;   // destroyed meanwhile
-        m.pt = sys::pointer_pos();
+        m.pt = sys::message_pointer_pos();
         g_queue.push_back(m);
     }
 }
@@ -868,7 +899,7 @@ void post(Window* w, uint32_t msg, WParam wp, LParam lp)
         sys::wake();
         return;
     }
-    post_full(w, msg, wp, lp, sys::ticks(), sys::pointer_pos(), nullptr);
+    post_full(w, msg, wp, lp, sys::ticks(), sys::message_pointer_pos(), nullptr);
 }
 
 Result def_proc(Window* w, uint32_t msg, WParam wp, LParam lp)
@@ -955,6 +986,7 @@ bool set_argb(Window* w, bool on)
     if (t->argb == on) return true;
     t->argb = on;
     t->back->has_alpha = on;
+    t->copies.clear();   // (a new X window)
     // whatever is in the backbuffer was drawn for the other kind of surface
     memset(t->back->pixels, 0, (size_t)t->back->stride * t->back->height * 4);
     w->nc_invalid = true;
@@ -1529,13 +1561,13 @@ static void handle_event(const sys::Event& ev)
         for (Window* t : g_toplevels) {
             bool queued = false;
             for (const Message& q : g_queue) if (q.w == t && q.msg == msg) { queued = true; break; }
-            if (!queued) post_full(t, msg, 0, 0, ev.time, sys::pointer_pos(), nullptr);
+            if (!queued) post_full(t, msg, 0, 0, ev.time, sys::message_pointer_pos(), nullptr);
         }
         return;
     }
     if (ev.kind == sys::EventKind::RootPropertyChanged) {
         for (RootHook& h : g_root_hooks) if (h.id == ev.keysym) h.pending = true;
-        for (Window* t : g_toplevels) post_full(t, WM_FLXP_ROOTPROPERTY, (WParam)ev.keysym, 0, ev.time, sys::pointer_pos(), nullptr);
+        for (Window* t : g_toplevels) post_full(t, WM_FLXP_ROOTPROPERTY, (WParam)ev.keysym, 0, ev.time, sys::message_pointer_pos(), nullptr);
         return;
     }
     Window* t = (Window*)sys::window_user(ev.window);
@@ -1545,7 +1577,7 @@ static void handle_event(const sys::Event& ev)
         uint32_t msg = ev.keysym == sys::WindowHeaderPixmap ? WM_FLXP_HEADERPIXMAP :
                        ev.keysym == sys::WindowState ? WM_FLXP_WINDOWSTATE : WM_FLXP_CAPTIONRECT;
         for (const Message& q : g_queue) if (q.w == t && q.msg == msg) return;
-        post_full(t, msg, 0, 0, ev.time, sys::pointer_pos(), nullptr);
+        post_full(t, msg, 0, 0, ev.time, sys::message_pointer_pos(), nullptr);
         return;
     }
     switch (ev.kind) {
@@ -1566,6 +1598,7 @@ static void handle_event(const sys::Event& ev)
             tl->back = gdi::create_bitmap(r.width(), r.height());
             tl->back->has_alpha = tl->argb;
             tl->dirty.clear();
+            tl->copies.clear();
             recalc_client(t);
             t->nc_invalid = true;
             invalidate(t);
@@ -1677,7 +1710,7 @@ static bool matches(const Message& m, Window* filter, uint32_t min, uint32_t max
     return true;
 }
 
-// Try to produce a message without blocking: queued, timer, or paint.
+// Try to produce a message without blocking: queued, paint, or timer.
 static bool next_message(Message& m, Window* filter, uint32_t min, uint32_t max, bool remove)
 {
     for (size_t i = 0; i < g_queue.size(); i++) {
@@ -1686,26 +1719,8 @@ static bool next_message(Message& m, Window* filter, uint32_t min, uint32_t max,
         if (remove) g_queue.erase(g_queue.begin() + i);
         return true;
     }
-    // timers
-    uint32_t now = sys::ticks();
-    for (size_t i = 0; i < g_timers.size(); i++) {
-        Timer& t = g_timers[i];
-        if ((int)(t.due - now) > 0) continue;
-        if (t.id == (uintptr_t)-2 && !t.w) {        // caret blink
-            if (remove) { t.due = now + t.interval; if (g_caret.hidden == 0) caret_toggle_draw(); }
-            continue;
-        }
-        if (!is_window(t.w) && t.w) continue;
-        Message tm; memset(&tm, 0, sizeof tm);
-        tm.w = t.w; tm.msg = WM_TIMER; tm.wp = t.id; tm.lp = (LParam)t.callback; tm.time = now; tm.pt = sys::pointer_pos();
-        if (!matches(tm, filter, min, max)) continue;
-        // the next one an interval from now, after the pointer's round trip: a server busy behind a compositor can hold it
-        // for longer than a short interval, and a due time from before it would fire the timer again at once
-        if (remove) t.due = sys::ticks() + t.interval;
-        m = tm;
-        return true;
-    }
     // paint
+    uint32_t now = sys::ticks();
     if (!max || (WM_PAINT >= min && WM_PAINT <= max)) {
         std::vector<Window*> tops = g_toplevels;
         for (Window* t : tops) {
@@ -1719,7 +1734,7 @@ static bool next_message(Message& m, Window* filter, uint32_t min, uint32_t max,
                 if (d->nc_invalid) { d->nc_invalid = false; send(d, WM_NCPAINT, 1, 0); if (!is_window(d)) { d = find_dirty(t); continue; } }
                 if (!d->update.empty()) {
                     Message pm; memset(&pm, 0, sizeof pm);
-                    pm.w = d; pm.msg = WM_PAINT; pm.time = now; pm.pt = sys::pointer_pos();
+                    pm.w = d; pm.msg = WM_PAINT; pm.time = now; pm.pt = sys::message_pointer_pos();
                     m = pm;
                     return true;
                 }
@@ -1727,8 +1742,46 @@ static bool next_message(Message& m, Window* filter, uint32_t min, uint32_t max,
             }
         }
     }
+    // timers, after the paints (Windows' order: WM_TIMER is the last a queue gives, so a timer due again at once cannot
+    // keep a window from painting)
+    for (size_t i = 0; i < g_timers.size(); i++) {
+        Timer& t = g_timers[i];
+        if ((int)(t.due - now) > 0) continue;
+        if (t.id == (uintptr_t)-2 && !t.w) {        // caret blink
+            if (remove) { t.due = now + t.interval; if (g_caret.hidden == 0) caret_toggle_draw(); }
+            continue;
+        }
+        if (!is_window(t.w) && t.w) continue;
+        Message tm; memset(&tm, 0, sizeof tm);
+        tm.w = t.w; tm.msg = WM_TIMER; tm.wp = t.id; tm.lp = (LParam)t.callback; tm.time = now; tm.pt = sys::message_pointer_pos();
+        if (!matches(tm, filter, min, max)) continue;
+        // the next one an interval after this one is taken (Windows'), its pt the pointer as of the events read so far:
+        // a query of the server here would wait behind a compositor's frame, for longer than a short interval
+        if (remove) t.due = now + t.interval;
+        m = tm;
+        return true;
+    }
     return false;
 }
+
+// What was painted reaches the screen at least once a frame (16 ms), not only when the queue is empty: a loop that never
+// runs dry (a 16 ms timer whose steps take longer than 16 ms, a stream of mouse moves each repainting a view) would
+// otherwise show nothing until it ends. On Windows a paint draws on the screen (with DWM, into the surface it composes
+// each frame) whatever the queue holds. A window still to be painted waits for its paint (a scroll's strip shown before
+// it is drawn would show what the copy left there), up to 100 ms. A present waits while the server has not read the last
+// (present_now, sys::present_busy); what is painted meanwhile goes out with the next, and the loop looks again every 8 ms
+// (backlog_wait) as well as when the server says it has.
+static void present_if_due()
+{
+    uint32_t since = sys::ticks() - g_presented;
+    if (since < 16) return;
+    if (since < 100)
+        for (Window* t : g_toplevels)
+            if (is_window(t) && find_dirty(t)) return;
+    present_now();
+}
+
+static int backlog_wait(int timeout) { return g_backlog && (timeout < 0 || timeout > 8) ? 8 : timeout; }
 
 bool peek_message(Message& m, Window* filter, uint32_t min, uint32_t max, bool remove)
 {
@@ -1738,6 +1791,7 @@ bool peek_message(Message& m, Window* filter, uint32_t min, uint32_t max, bool r
     sys::dispatch_fd_watches();
     drain_cross_thread();
     if (g_quit) { memset(&m, 0, sizeof m); m.msg = WM_QUIT; m.wp = (WParam)g_exit_code; return true; }
+    present_if_due();
     return next_message(m, filter, min, max, remove);
 }
 
@@ -1750,11 +1804,11 @@ bool get_message(Message& m, Window* filter, uint32_t min, uint32_t max)
         sys::dispatch_fd_watches();
         drain_cross_thread();
         if (g_quit) { memset(&m, 0, sizeof m); m.msg = WM_QUIT; m.wp = (WParam)g_exit_code; return false; }
+        present_if_due();
         if (next_message(m, filter, min, max, true)) return true;
         if (g_toplevels.empty()) { memset(&m, 0, sizeof m); m.msg = WM_QUIT; return false; }
         present_now();
-        int timeout = next_timer_timeout();
-        if (sys::wait_event(ev, timeout)) handle_event(ev);
+        if (sys::wait_event(ev, backlog_wait(next_timer_timeout()))) handle_event(ev);
     }
 }
 
@@ -1769,7 +1823,7 @@ void wait_message()
     if (!g_queue.empty() || g_quit) return;
     if (next_message(m, nullptr, 0, 0, false)) return;
     present_now();
-    if (sys::wait_event(ev, next_timer_timeout())) handle_event(ev);
+    if (sys::wait_event(ev, backlog_wait(next_timer_timeout()))) handle_event(ev);
 }
 
 void toplevels(std::vector<Window*>& out) { out = g_toplevels; }

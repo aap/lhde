@@ -138,8 +138,12 @@ bool is_fullscreen(NativeWindow* w);
 // Either way the window is marked _LH_DROP_SHADOW: the compositor adds none.
 void set_drop_shadow(NativeWindow* w, int size, int (*alpha)(int x, int y, int w, int h));
 
-// Copy the given area of bmp to the window. bmp must be at least window-sized.
-void present(NativeWindow* w, const gdi::Bitmap* bmp, const gdi::Rect& area);
+struct ScrollCopy { gdi::Rect dst; int32_t dx, dy; };
+// Present to the window: the copies in order (each the window's pixels in dst - (dx, dy) copied to dst: ScrollWindowEx on
+// the server), then rects of bmp (the window's size). Through MIT-SHM where the server has it: then present_busy is true
+// until the server has read the pixels, and a present meanwhile must wait (the loop is woken when it has).
+void present(NativeWindow* w, const gdi::Bitmap* bmp, const std::vector<ScrollCopy>& copies, const std::vector<gdi::Rect>& rects);
+bool present_busy(NativeWindow* w);
 
 // Returns false on timeout. timeout_ms < 0 waits forever.
 bool wait_event(Event& ev, int timeout_ms);
@@ -153,7 +157,16 @@ void watch_fd(int fd, void (*callback)(int fd, void* user), void* user);
 void unwatch_fd(int fd);
 void dispatch_fd_watches();
 
-gdi::Point pointer_pos();
+// Scrolling on the server (ScrollWindowEx). copy_area_ok: the server holds all of the window's pixels (a compositing
+// manager redirects it into a pixmap), so a copy never reads an obscured part; without one the scrolled area is presented
+// again instead.
+bool copy_area_ok(NativeWindow* w);
+
+gdi::Point pointer_pos();           // the pointer now: a round trip to the server
+// The pointer as of the events read so far (a message's pt, Windows' GetMessagePos): no round trip while the pointer
+// is over our windows, a button is down or we hold a grab; else the answer of a query sent without waiting on the last
+// call (a step behind)
+gdi::Point message_pointer_pos();
 gdi::Size screen_size();
 uint32_t ticks();    // monotonic milliseconds
 
