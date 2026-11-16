@@ -9,11 +9,16 @@
 // Dlg derives from it) over shell::Folder.
 #define NOMINMAX
 #include "res/res.h"   // before the win32 headers: their macros clash with its names
+#include <errno.h>
+#include <fcntl.h>
 #include <fnmatch.h>
+#include <signal.h>
+#include <spawn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <algorithm>
 #include <map>
@@ -2592,9 +2597,133 @@ static LRESULT CALLBACK msg_filter(int code, WPARAM wp, LPARAM lp)
     return CallNextHookEx(g_hook, code, wp, lp);
 }
 
+// ---- the Longhorn look in another process ----
+// The Longhorn look is built on the shared widget's singletons (the header, the places pane: one per process). In a
+// process that has them already (an application under the Longhorn header, the Explorer) the dialog runs in
+// flxp-filedialog, a process of its own beside this program (the same one the portal runs), transient for and modal to
+// the owner's window, while this one keeps drawing with the owner disabled; the result comes back on a pipe. False when
+// that cannot be (no flxp-filedialog, no owner window): the caller shows the XP look here.
+
+extern "C" char** environ;
+
+namespace {
+struct Elsewhere { std::string out; bool done = false; HWND wake = nullptr; };
+
+void elsewhere_read(int fd, void* user)
+{
+    Elsewhere* e = (Elsewhere*)user;
+    char buf[4096];
+    ssize_t n = read(fd, buf, sizeof buf);
+    if (n > 0) { e->out.append(buf, (size_t)n); return; }
+    if (n < 0 && (errno == EINTR || errno == EAGAIN)) return;
+    e->done = true;                   // EOF: the dialog is closed
+    sys::unwatch_fd(fd);
+    PostMessageW(e->wake, WM_NULL, 0, 0);   // the loop below looks again
+}
+}
+
+static bool run_elsewhere(HWND owner, const Options& o, Result* r)
+{
+    HWND root = owner ? GetAncestor(owner, GA_ROOT) : nullptr;
+    uint64_t xid = root ? sys::native_id(sys::window_for_user((void*)root)) : 0;
+    std::string exe = shell::exe_dir() + "/flxp-filedialog";
+    if (!xid || access(exe.c_str(), X_OK) != 0) return false;
+    char id[32];
+    snprintf(id, sizeof id, "x11:%llx", (unsigned long long)xid);
+    std::vector<std::string> a = { exe, "--look", "longhorn", "--parent", id, "--null", "--print-filter", "--print-read-only",
+                                   "--exit-with-stdin" };
+    if (o.mode == Mode::Save) a.push_back("--save");
+    else if (o.mode == Mode::Folder) a.push_back("--directory");
+    if (o.multiple) a.push_back("--multiple");
+    auto opt = [&](const char* k, const std::string& v) { if (!v.empty()) { a.push_back(k); a.push_back(v); } };
+    opt("--title", o.title);
+    opt("--accept-label", o.accept_label);
+    opt("--filename", o.default_name);
+    a.push_back("--directory-start");   // (empty: as here, the default name's folder or the remembered one, not the cwd)
+    a.push_back(o.initial_dir);
+    opt("--app-location", o.app_location);
+    opt("--default-ext", o.default_ext);
+    for (const Filter& f : o.filters) {
+        std::string spec = f.name + "|";
+        for (const std::string& pt : f.patterns) spec += pt + " ";
+        for (const std::string& mt : f.mime_types) spec += mt + " ";
+        a.push_back("--filter");
+        a.push_back(spec);
+    }
+    if (!o.filters.empty()) opt("--current-filter", std::to_string(o.filter_index));
+    a.push_back(o.overwrite_prompt ? "--confirm-overwrite" : "--no-confirm-overwrite");
+    if (!o.file_must_exist) a.push_back("--allow-missing");
+    if (o.create_prompt) a.push_back("--create-prompt");
+    if (o.show_read_only) a.push_back(o.read_only ? "--read-only" : "--read-only-box");
+    if (o.show_hidden) a.push_back("--show-hidden");
+    std::vector<char*> argv;
+    for (std::string& s : a) argv.push_back(&s[0]);
+    argv.push_back(nullptr);
+    // fds: the result (its stdout); in: its stdin, whose end here is held until it is done: when this process ends
+    // without closing the dialog, the dialog ends too (--exit-with-stdin)
+    int fds[2], in[2];
+    if (pipe(fds) != 0) return false;
+    if (pipe(in) != 0) { close(fds[0]); close(fds[1]); return false; }
+    fcntl(fds[0], F_SETFD, FD_CLOEXEC);
+    fcntl(in[1], F_SETFD, FD_CLOEXEC);
+    posix_spawn_file_actions_t fa;
+    posix_spawn_file_actions_init(&fa);
+    posix_spawn_file_actions_adddup2(&fa, in[0], 0);
+    posix_spawn_file_actions_adddup2(&fa, fds[1], 1);
+    posix_spawn_file_actions_addclose(&fa, in[0]);
+    posix_spawn_file_actions_addclose(&fa, fds[1]);
+    pid_t pid = -1;
+    int err = posix_spawn(&pid, exe.c_str(), &fa, nullptr, argv.data(), environ);
+    posix_spawn_file_actions_destroy(&fa);
+    close(fds[1]);
+    close(in[0]);
+    if (err != 0) { close(fds[0]); close(in[1]); return false; }
+    Elsewhere e;
+    e.wake = root;
+    sys::watch_fd(fds[0], elsewhere_read, &e);
+    bool was_enabled = IsWindowEnabled(root);
+    EnableWindow(root, FALSE);
+    MSG m;
+    bool quit = false;
+    WPARAM quit_code = 0;
+    while (!e.done) {
+        if (GetMessageW(&m, nullptr, 0, 0) <= 0) { quit = true; quit_code = m.wParam; break; }
+        TranslateMessage(&m);
+        DispatchMessageW(&m);
+    }
+    if (!e.done) { sys::unwatch_fd(fds[0]); kill(pid, SIGTERM); }
+    close(fds[0]);
+    close(in[1]);
+    int status = 0;
+    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+    if (was_enabled) EnableWindow(root, TRUE);
+    SetActiveWindow(root);
+    if (quit) PostQuitMessage((int)quit_code);
+    // NUL-separated records: filter=N, read_only=B, then the paths
+    r->ok = false;
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) return true;   // cancelled (1) or failed: nothing chosen
+    size_t at = 0;
+    while (at < e.out.size()) {
+        size_t z = e.out.find('\0', at);
+        if (z == std::string::npos) z = e.out.size();
+        std::string rec = e.out.substr(at, z - at);
+        at = z + 1;
+        if (!rec.compare(0, 7, "filter=")) r->filter_index = atoi(rec.c_str() + 7);
+        else if (!rec.compare(0, 10, "read_only=")) r->read_only = rec[10] == '1';
+        else if (!rec.empty()) r->paths.push_back(rec);
+    }
+    r->ok = !r->paths.empty();
+    if (r->ok) r->folder = r->paths[0].substr(0, r->paths[0].rfind('/'));
+    return true;
+}
+
 Result run(void* owner, const Options& o)
 {
     Result r;
+    // the Longhorn look wants the shared widget's singletons: where they are taken (an application's own Longhorn header,
+    // the Explorer) it runs in a process of its own; a caller's template (extra_create) cannot go there: the XP look here
+    bool lh = longhorn_look(o), taken = places::window() || header::search_box();
+    if (lh && taken && !o.extra_create && run_elsewhere((HWND)owner, o, &r)) return r;
     Dlg d;
     d.o = &o;
     d.r = &r;
@@ -2607,8 +2736,8 @@ Result run(void* owner, const Options& o)
     d.small = d.icons.small;
     d.large = d.icons.large;
     // the Longhorn look uses the shared widget's singletons (header, places
-    // pane): only one such dialog at a time, and not inside an explorer
-    d.lh = longhorn_look(o) && !places::window() && !header::search_box();
+    // pane): here only when they are free (else run_elsewhere above)
+    d.lh = lh && !taken;
     Dlg* outer = g_cur;
     HHOOK outer_hook = g_hook;
     g_cur = &d;

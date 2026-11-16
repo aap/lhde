@@ -2,6 +2,7 @@
 // Prints the chosen paths one per line (or NUL-separated with --null) and
 // exits 0; exit 1 on cancel, 2 on bad usage. The xdg-desktop-portal backend
 // (flxp-portal) runs this for every request.
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +13,7 @@
 #include "shell/config.h"
 #include "w32/w32.h"
 #include "w32/user.h"
+#include "sys/sys.h"
 
 // The shared start-up plumbing (shell/runtime.cpp: fonts, theme name ->
 // .msstyles, flxp.ini). Weak so this builds while that file does not exist.
@@ -39,6 +41,12 @@ static void usage(FILE* f)
           "  --null                          separate output paths with NUL instead of newline\n"
           "  --separator STR                 separator between paths (zenity)\n"
           "  --print-filter                  first output record: filter=<index of the filter in effect>\n"
+          "  --print-read-only               a record read_only=0|1 (the Open as read-only box), after filter=\n"
+          "  --allow-missing                 open: a name that does not exist is accepted\n"
+          "  --create-prompt                 open: offer to create a missing file\n"
+          "  --read-only-box | --read-only   open: the \"Open as read-only\" box (--read-only: checked)\n"
+          "  --app-location DIR              the caller's folder (the Longhorn look's App Location place)\n"
+          "  --exit-with-stdin               cancel when standard input ends (the caller's end of a pipe closed)\n"
           "  --uri                           print file:// URIs instead of paths\n"
           "  --look xp|longhorn|auto         the dialog's look (default: filedlg= in flxp.ini, else the\n"
           "                                  explorer's frame style: Longhorn under luxwm's Longhorn themes)\n"
@@ -75,7 +83,7 @@ static filedlg::Filter parse_filter(const std::string& spec)
 int main(int argc, char** argv)
 {
     filedlg::Options o;
-    bool null_sep = false, print_filter = false, uris = false;
+    bool null_sep = false, print_filter = false, print_read_only = false, uris = false, exit_with_stdin = false;
     std::string sep = "\n";
     char cwd[4096];
     if (getcwd(cwd, sizeof cwd)) o.initial_dir = cwd;
@@ -110,6 +118,13 @@ int main(int argc, char** argv)
         else if (a == "--null" || a == "-0") null_sep = true;
         else if (a == "--separator") sep = arg();
         else if (a == "--print-filter") print_filter = true;
+        else if (a == "--print-read-only") print_read_only = true;
+        else if (a == "--allow-missing") o.file_must_exist = false;
+        else if (a == "--create-prompt") o.create_prompt = true;
+        else if (a == "--read-only-box") o.show_read_only = true;
+        else if (a == "--read-only") o.show_read_only = o.read_only = true;
+        else if (a == "--app-location") o.app_location = arg();
+        else if (a == "--exit-with-stdin") exit_with_stdin = true;
         else if (a == "--uri") uris = true;
         else if (a == "--look") {
             std::string l = arg();
@@ -121,18 +136,28 @@ int main(int argc, char** argv)
     // a --filename with a directory decides the folder unless one was given
     if (!explicit_dir && o.default_name.find('/') != std::string::npos) o.initial_dir.clear();
     // the folder the caller asked for is its "App Location" (the Longhorn look's Common Places)
-    if (explicit_dir) o.app_location = o.initial_dir;
+    if (!o.app_location.empty()) {}
+    else if (explicit_dir) o.app_location = o.initial_dir;
     else if (o.default_name.find('/') != std::string::npos) o.app_location = o.default_name.substr(0, o.default_name.rfind('/') + 1);
 
     if (shell::setup_fonts) shell::setup_fonts();
     if (shell::setup_theme) shell::setup_theme();
     w32::init();
+    // the caller (filedlg's run in a process that has the Longhorn header already) holds the pipe's other end: its end is
+    // the dialog's
+    if (exit_with_stdin)
+        sys::watch_fd(0, [](int fd, void*) {
+            char b[256];
+            ssize_t n = read(fd, b, sizeof b);
+            if (n == 0 || (n < 0 && errno != EINTR && errno != EAGAIN)) _exit(1);
+        }, nullptr);
 
     filedlg::Result r = filedlg::run(nullptr, o);
     if (!r.ok) return 1;
     const char* s = null_sep ? "" : sep.c_str();
     size_t slen = null_sep ? 1 : sep.size();
     if (print_filter) { printf("filter=%d", r.filter_index); fwrite(null_sep ? "\0" : "\n", 1, 1, stdout); }
+    if (print_read_only) { printf("read_only=%d", r.read_only ? 1 : 0); fwrite(null_sep ? "\0" : "\n", 1, 1, stdout); }
     for (size_t i = 0; i < r.paths.size(); i++) {
         std::string p = uris ? shell::uri_from_path(r.paths[i]) : r.paths[i];
         fwrite(p.data(), 1, p.size(), stdout);

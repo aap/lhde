@@ -680,6 +680,14 @@ the name inline (XP's AutoComplete only suggests unless "Use inline AutoComplete
 `python3` and Enter in a folder that also holds `python3-config` opens `python3`. A name with `*` or `?` filters the list,
 a folder's name (or a path ending in `/`) goes there, quoted names choose several files.
 
+The Longhorn dialog is built on the Explorer's header and places pane, which a process has once: a program that has its own
+Longhorn header (mupf) or is the Explorer shows it from `flxp-filedialog` beside it (the program's folder), a process of its
+own transient for and modal to the program's window, the result coming back on a pipe; it ends with the program. In such
+a program a dialog with controls of the caller's own (a template, as luxpad's Encoding box) is the XP one: they cannot
+cross to another process.
+`flxp-filedialog --help` lists its options (`--print-read-only`, `--allow-missing`, `--create-prompt`, `--read-only-box`,
+`--app-location`, `--exit-with-stdin` are the ones this needs beyond the zenity-style set).
+
 ## Show in Folder (org.freedesktop.FileManager1)
 
 Firefox's and Chromium's "Show in Folder", and other programs that show a file in the file manager, ask the session bus for
