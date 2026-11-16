@@ -7,7 +7,7 @@
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, luxview.sh xprop, xwininfo and ImageMagick, detailsrow.sh ImageMagick, filter.sh and runas.sh setfattr
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick, startmenu.sh xprop and python3, menushadow.sh
 #                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick, starticon.sh xprop and ImageMagick (luna when imported),
-#                thumbsmem.sh ImageMagick, slowpath.sh python3 with PIL, thumbdocs.sh ImageMagick and pdftoppm or mutool (gs, ddjvu and c44 for its PS and DjVu), nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed, xsession.sh xprop and
+#                thumbsmem.sh ImageMagick, slowpath.sh and slowpath-ui.sh python3 with PIL, thumbdocs.sh ImageMagick and pdftoppm or mutool (gs, ddjvu and c44 for its PS and DjVu), nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed, xsession.sh xprop and
 #                dbus-daemon, picom when installed); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
@@ -187,6 +187,10 @@ else
     # after it, EXIF thumbnails before any full decode, the byte budget; the same folder local as before (needs python3's PIL)
     tests/headless/slowpath.sh "$3" > "$T/slowpath.log" 2>&1; rc=$?
     result "headless/slowpath.sh$(grep -m1 '^skip' "$T/slowpath.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/slowpath.log"
+    # the same shim with a photo share (150 folders of 30 JPEGs, one of 2000): after the first paint the window's thread
+    # asks the slow tree nothing while the list is scrolled, hovered and selected, in the Longhorn and the XP frame
+    tests/headless/slowpath-ui.sh "$1" > "$T/slowpath-ui.log" 2>&1; rc=$?
+    result "headless/slowpath-ui.sh$(grep -m1 '^skip' "$T/slowpath-ui.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/slowpath-ui.log"
     # a PDF, a PostScript and a DjVu file's thumbnails made by the thumbnailer entries (lhde's share/thumbnailers), in the cache, on screen
     tests/headless/thumbdocs.sh "$2" > "$T/thumbdocs.log" 2>&1; rc=$?
     result "headless/thumbdocs.sh ($(tail -n 1 "$T/thumbdocs.log"))" $rc "$T/thumbdocs.log"
