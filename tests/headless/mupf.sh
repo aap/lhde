@@ -8,9 +8,10 @@
 # the window comes back with the pane shown; a file that is not a document gives a message box, not a crash; a protected
 # copy (mutool's encryption, when mutool is installed) asks for its password, again after a wrong one, and opens. The view
 # (view X Y W H, scroll SX SY PW PH): at 50% the page is in the middle of the view across; at the end the wheel and a drag
-# go no further; the middle button held and moved scrolls toward the pointer, clicked it stays on until a click. A HOME and
-# XDG directories of its own. Needs mupf (built when MuPDF is installed), Xvfb, xdotool, python3 and ImageMagick; prints
-# "skip: ..." and passes without them. Usage: tests/headless/mupf.sh [:DISPLAY]
+# go no further; the middle button held and moved scrolls toward the pointer, clicked it stays on until a click, its origin
+# mark drawn where it began, in a step of a few pixels every 16 ms (none more than 50 ms apart), and Ctrl+G ends it without
+# opening Go To Page. A HOME and XDG directories of its own. Needs mupf (built when MuPDF is installed), Xvfb, xdotool,
+# python3 and ImageMagick; prints "skip: ..." and passes without them. Usage: tests/headless/mupf.sh [:DISPLAY]
 D=${1:-:79}
 R=$(cd "$(dirname "$0")/../.." && pwd)
 B=$R/build/bin/mupf
@@ -39,7 +40,6 @@ expect() {   # expect NAME FILE X Y R,G,B
 python3 -I "$R/tests/headless/mkpdf.py" $T/docs/test.pdf || { echo "FAIL mkpdf.py could not write the PDF"; exit 1; }
 printf 'not a document\0\1\2\3' > $T/docs/broken.pdf
 
-mkdir -p $XDG_STATE_HOME/lhde; printf '[view]\nautoscroll = 1\n' > $XDG_STATE_HOME/lhde/mupf.ini   # the middle button's autoscroll is off by default
 start_xvfb $D -screen 0 1280x900x24 -nolisten tcp || { echo "FAIL Xvfb $D did not start"; stop_xvfb; exit 1; }
 "$R/build/bin/luxwm" > $T/luxwm.log 2>&1 & PW=$!
 wm_up() { xprop -root _NET_SUPPORTING_WM_CHECK 2>/dev/null | grep -q 'window id'; }
@@ -50,6 +50,7 @@ xprop -root -f _LH_THEME 8u -set _LH_THEME $theme
 sleep .3
 
 traced() { grep -q "$1" $T/out.log; }                         # a trace line matching
+traced_n() { [ "$(grep -c "$1" $T/out.log)" -ge "$2" ]; }        # at least N of them
 last() { grep "^$1 " $T/out.log | tail -1 | sed "s/^$1 //"; }  # the last trace line of a kind
 page_is() { last status | cut -d'|' -f2 | grep -qx "$1"; }
 message_is() { last status | cut -d'|' -f1 | grep -qx "$1"; }
@@ -189,8 +190,29 @@ else
     xdotool mousemove $MX $((MY + 60)); sleep .5
     y1=$(last scroll | cut -d' ' -f2)
     [ "$y1" -gt "$y0" ] 2>/dev/null && ok "a later motion scrolls: from $y0 to $y1" || bad "the sticky autoscroll did not scroll: $y0 to $y1"
+    # the origin mark where the button went down, its dark dot in the middle, gone when the mode ends
+    import -window root $T/auto1.png
+    expect "the origin mark's dot where the click was" $T/auto1.png $MX $MY 48,48,48
+    # the steps (autoscroll step TICK DX,DY SX,SY): a step a timer tick (16 ms), none more than 50 ms after the one before,
+    # a few pixels each (8 or 9 at 60 px from the mark), no leap
+    steps=$(sed -n '/^autoscroll sticky/,$p' $T/out.log | grep '^autoscroll step' | awk '
+        { split($4, d, ","); if (n++) { g = $3 - t; if (g > gap) gap = g; sum += g } t = $3; if (d[2] > big) big = d[2] }
+        END { if (n > 1) printf "%d %d %d %d", n, sum / (n - 1), gap, big }')
+    set -- $steps
+    [ -n "$4" ] && [ $2 -ge 12 ] && [ $2 -le 24 ] && [ $3 -le 50 ] && [ $4 -le 20 ] &&
+        ok "the steps are regular: $1 steps, $2 ms apart on average, at most $3 ms, at most $4 px" ||
+        bad "the steps are not regular (steps, mean ms, largest gap ms, largest px): ${steps:-none}"
     xdotool click 1; sleep .3
     check "a click ends it" 2 "$(grep -c '^autoscroll off' $T/out.log)"
+    import -window root $T/auto2.png
+    got=$(px $T/auto2.png $MX $MY); [ "$got" != 48,48,48 ] && ok "the mark is gone: ($MX,$MY) $got" || bad "the mark stayed"
+    # an accelerator's key ends it as well and does nothing else: Ctrl+G opens no Go To Page
+    xdotool mousemove $MX $MY click 2
+    wait_for 5 traced_n "^autoscroll sticky" 2
+    key ctrl+g; sleep .5
+    check "Ctrl+G ends it" 3 "$(grep -c '^autoscroll off' $T/out.log)"
+    if xdotool search --name '^Go To Page$' >/dev/null 2>&1; then bad "Ctrl+G opened Go To Page"; key Escape; sleep .3
+    else ok "and opened nothing"; fi
     quit
 fi
 
