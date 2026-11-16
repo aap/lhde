@@ -827,7 +827,7 @@ static void tree_fill(HTREEITEM h)
     if (SendMessageW(g.tree, TVM_GETNEXTITEM, TVGN_CHILD, (LPARAM)h)) return;   // already filled
     const std::string* p = tree_path(h);
     if (!p) return;
-    auto f = shell::folder_for(*p);
+    auto f = shell::folder_for(*p, true);   // (a node is a folder its parent's listing gave, or the root)
     if (!f) return;
     std::vector<Item> kids;
     f->enumerate_names(kids, g.show_hidden);   // (folders by d_type: a network folder is not stat'ed entry by entry)
