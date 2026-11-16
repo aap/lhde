@@ -147,6 +147,7 @@ struct App {
     HBITMAP back = nullptr;
     uint32_t* bits = nullptr;
     int bw = 0, bh = 0;
+    RECT clip = {};     // the paint's rectangle in the view: paint_view draws into the back buffer there and nowhere else
     // history: pages left by a jump
     std::vector<Place> back_pages, fwd_pages;
     // a Markdown file (markdown.h): its title the first H1
@@ -440,7 +441,7 @@ Anchor anchor_at(int vx, int vy)
     return a;
 }
 
-void scrolled();
+void scrolled(bool repaint = true);
 
 // lays the pages out again (a new zoom, mode, size or rotation), the anchor's page point kept where it was in the view (a
 // centre anchor: at the view's new centre, so a resize keeps the centre)
@@ -470,8 +471,9 @@ void relayout(const Anchor& anchor)
     scrolled();
 }
 
-// the view moved: the current page, what to render, the page box
-void scrolled()
+// the view moved: the current page, what to render, the page box; repaint: the whole view painted again (false: the caller
+// moved the pixels and invalidated what they do not cover)
+void scrolled(bool repaint)
 {
     if (g.opened && is_continuous(g.mode)) {
         int c = current_page(g.lay, g.sx, g.sy, g.vw, g.vh);
@@ -479,16 +481,30 @@ void scrolled()
     }
     update_page_box();
     request();
-    InvalidateRect(g.view, nullptr, FALSE);
+    if (repaint) InvalidateRect(g.view, nullptr, FALSE);
 }
 
+RECT autoscroll_mark_rect();
+
+// the view's pixels moved with the pages (ScrollWindowEx, a copy on the X server; Acrobat's and mupdf's views scroll so), the
+// strip uncovered painted; the autoscroll mark stays where it is, so it is painted again there and where the copy took it
 void scroll_to(int x, int y)
 {
+    int ox = g.sx, oy = g.sy;
     g.sx = x;
     g.sy = y;
     clamp_scroll();
     update_scrollbars();
-    scrolled();
+    int dx = ox - g.sx, dy = oy - g.sy;
+    if (!g.back || (!dx && !dy) || abs(dx) >= g.vw || abs(dy) >= g.vh) { scrolled(); return; }
+    ScrollWindowEx(g.view, dx, dy, nullptr, nullptr, nullptr, nullptr, SW_INVALIDATE);
+    if (g.autoscroll) {
+        RECT m = autoscroll_mark_rect();
+        InvalidateRect(g.view, &m, FALSE);
+        OffsetRect(&m, dx, dy);
+        InvalidateRect(g.view, &m, FALSE);
+    }
+    scrolled(false);
 }
 
 // to page p (y points down it): the page's top at the view's top
@@ -653,7 +669,8 @@ void make_back()
 
 void fill(int x, int y, int w, int h, uint32_t c)
 {
-    int x0 = std::max(0, x), y0 = std::max(0, y), x1 = std::min(g.bw, x + w), y1 = std::min(g.bh, y + h);
+    int x0 = std::max((int)g.clip.left, x), y0 = std::max((int)g.clip.top, y), x1 = std::min((int)g.clip.right, x + w),
+        y1 = std::min((int)g.clip.bottom, y + h);
     for (int yy = y0; yy < y1; yy++) {
         uint32_t* row = g.bits + (size_t)yy * g.bw;
         for (int xx = x0; xx < x1; xx++) row[xx] = c;
@@ -672,7 +689,8 @@ void draw_tile(const Tile* t, int bx, int by, int bwid, int bhei, bool same_zoom
     int dx1 = bx + (int)ceil((t->x + t->w) * kx), dy1 = by + (int)ceil((t->y + t->h) * ky);
     dx1 = std::min(dx1, bx + bwid);
     dy1 = std::min(dy1, by + bhei);
-    int x0 = std::max(0, dx0), y0 = std::max(0, dy0), x1 = std::min(g.bw, dx1), y1 = std::min(g.bh, dy1);
+    int x0 = std::max((int)g.clip.left, dx0), y0 = std::max((int)g.clip.top, dy0), x1 = std::min((int)g.clip.right, dx1),
+        y1 = std::min((int)g.clip.bottom, dy1);
     if (x1 <= x0 || y1 <= y0) return;
     std::vector<int> col;
     if (!exact) {
@@ -715,8 +733,8 @@ void paint_hits(int page, int x, int y, const Box& b)
         bool current = g.search.current == (int)(it - hits.begin());
         for (const RectF& rf : it->rects) {
             RECT r = hit_rect(page, rf, x, y);
-            int x0 = std::max({ 0, (int)r.left, x }), y0 = std::max({ 0, (int)r.top, y });
-            int x1 = std::min({ g.bw, (int)r.right, x + b.w }), y1 = std::min({ g.bh, (int)r.bottom, y + b.h });
+            int x0 = std::max({ (int)g.clip.left, (int)r.left, x }), y0 = std::max({ (int)g.clip.top, (int)r.top, y });
+            int x1 = std::min({ (int)g.clip.right, (int)r.right, x + b.w }), y1 = std::min({ (int)g.clip.bottom, (int)r.bottom, y + b.h });
             for (int yy = y0; yy < y1; yy++) {
                 uint32_t* row = g.bits + (size_t)yy * g.bw;
                 for (int xx = x0; xx < x1; xx++) {
@@ -737,9 +755,13 @@ void paint_hits(int page, int x, int y, const Box& b)
 
 void paint_autoscroll_mark();
 
-void paint_view(HDC dc)
+// the view's rectangle rc (the paint's): the back buffer drawn there, then copied to the window. A scroll moves what is in
+// the window already (scroll_to), and the strip it uncovers is all a step paints.
+void paint_view(HDC dc, const RECT& rc)
 {
     make_back();
+    g.clip = { std::max(0, (int)rc.left), std::max(0, (int)rc.top), std::min(g.bw, (int)rc.right), std::min(g.bh, (int)rc.bottom) };
+    if (g.clip.right <= g.clip.left || g.clip.bottom <= g.clip.top) return;
     // mupdf's grey around the pages (WORKSPACE); a reflowable document white from edge to edge, as a browser shows a page
     fill(0, 0, g.bw, g.bh, g.lay.flow ? 0xffffffff : WORKSPACE);
     std::string shown;
@@ -777,7 +799,8 @@ void paint_view(HDC dc)
         }
     }
     paint_autoscroll_mark();
-    BitBlt(dc, 0, 0, g.bw, g.bh, g.mem, 0, 0, SRCCOPY);
+    BitBlt(dc, g.clip.left, g.clip.top, g.clip.right - g.clip.left, g.clip.bottom - g.clip.top, g.mem, g.clip.left, g.clip.top,
+           SRCCOPY);
     if (g.trace && shown != g.shown_trace) {
         g.shown_trace = shown;
         if (!shown.empty()) trace("shown%s", shown.c_str());
@@ -2521,8 +2544,8 @@ void paint_autoscroll_mark()
     // an arrow head pointing up, its tip 11 px from the middle, 9 px wide at its base 4.5 px nearer (in its own frame)
     auto head = [](double x, double y) { return y >= -11 && y <= -6.5 && fabs(x) <= y + 11; };
     RECT b = autoscroll_mark_rect();
-    for (int y = std::max(0, (int)b.top); y < std::min(g.bh, (int)b.bottom); y++)
-        for (int x = std::max(0, (int)b.left); x < std::min(g.bw, (int)b.right); x++) {
+    for (int y = std::max((int)g.clip.top, (int)b.top); y < std::min((int)g.clip.bottom, (int)b.bottom); y++)
+        for (int x = std::max((int)g.clip.left, (int)b.left); x < std::min((int)g.clip.right, (int)b.right); x++) {
             double cr = 0, cg = 0, cb = 0, ca = 0;   // premultiplied, summed over the samples
             for (int sy = 0; sy < 4; sy++)
                 for (int sx = 0; sx < 4; sx++) {
@@ -2685,7 +2708,7 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC dc = BeginPaint(hwnd, &ps);
-        paint_view(dc);
+        paint_view(dc, ps.rcPaint);
         EndPaint(hwnd, &ps);
         return 0;
     }
