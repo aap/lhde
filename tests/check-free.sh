@@ -12,6 +12,7 @@
 #     not carry: the built-in Windows Standard);
 #   - every icon key of the icon set recipes (share/icons/*.theme) and every key the class map (share/icons/apps.ini) names
 #     has an image in the free set (lhde-theme icon --set reactos --key KEY: reactos itself, or Wine's for what ReactOS lacks);
+#   - lhde-firefox generate writes a userChrome.css for every shipped theme (colours alone where the styles are absent);
 #   - luxwm's Windows Classic frames render through the frame regression (regress.sh --classic-only, ReactOS's Tahoma and Marlett)
 #     against a baseline of their own, build/luxwm/regress/baseline-free.sha256 (written on the first run); whether they equal the
 #     normal run's classic renders (whose fonts are the imported build's) is reported, not required.
@@ -66,6 +67,17 @@ done
 [ $fails -eq 0 ] || { echo "FAIL  free baseline: $fails of $n themes"; exit 1; }
 echo "ok    free baseline: $n themes resolve with only the free pack imported ($W, from $(basename "$iso")${walls:+ and $walls})"
 [ -z "$nowall" ] || echo "      (without the free themes' photos: no FREE_WALLPAPERS directory beside the ISO, their wallpaper is missing)"
+# lhde-firefox's userChrome.css for every shipped theme from the free tree alone: the Longhorn themes' styles are absent, so
+# the CSS uses colours alone and must still be written (docs/USAGE.md "Firefox")
+nf=0
+for f in share/themes/*.theme; do
+	t=$(basename "$f" .theme); nf=$((nf + 1)); mkdir -p "$B/firefox/$t"
+	if ! python3 -I tools/lhde-firefox generate "$t" -o "$B/firefox/$t/userChrome.css" > "$B/firefox/$t/log" 2>&1 ||
+	   ! grep -q -e '--lhde-band-low:' -e '--lhde-xp-face:' "$B/firefox/$t/userChrome.css"; then
+		echo "FAIL  free baseline: lhde-firefox generate $t"; cat "$B/firefox/$t/log"; exit 1
+	fi
+done
+echo "ok    free baseline: lhde-firefox writes a userChrome.css for the $nf themes"
 keys=$(sed -n '/^\[icons\]/,/^\[/{s/^\([a-z_0-9]*\) *=.*/\1/p;}' share/icons/*.theme | sort -u)
 mapped=$(sed -n '/^\[classes\]/,/^\[/{s/^[^;[][^=]*= *\([a-z_0-9]*\) *$/\1/p;}' share/icons/apps.ini | sort -u)
 nk=0 bad=
