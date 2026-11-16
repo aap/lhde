@@ -1084,6 +1084,19 @@ the images role ("File types and programs"), so a double click on a picture open
 `LUXVIEW_TRACE=1` prints what it shows and draws on stdout (`title ...`, `shown NAME picture 784x523 of 6000x4000 rss ...`,
 `drawn 733x550 zoom 46%`), for scripts.
 
+## luxfind, the query window
+
+`luxfind` (Super+F, the start panel's Search, the Explorer's Search for files or folders) finds files in the catalogues
+(docs/CATALOGUE.md: `lhde-cat add-root`, `import-du`, `index`) without touching the files: type a part of a name and the
+list follows as you type, with the count of matches in the status bar; Tags narrows to files carrying every tag given
+(Enter or a pick from its list), Type to folders, pictures, music, video, documents or a MIME type, Look in to one root or a
+folder under it (`luxfind DIR` starts there). Double click or Enter opens a result as the Explorer would, the context menu is
+the Explorer's with Open Containing Folder. A root whose directory does not answer (an NFS mount of a machine that is off)
+is named in the status bar; its results still show, and Add Tag or Tag Selected (the Tags box's text added to the
+selection) records the tags in the catalogue as edits not written yet (the Pending column), as it does on a root whose
+catalogue is the authority. Commit (the pane's button, File > Commit Pending Edits) writes them once the root answers;
+`lhde-cat diff NAME` shows the same list. Ctrl+F the name box, Ctrl+W closes; Alt and the underlined letter reaches a box.
+
 ## File types and programs (lhde-mime)
 
 Which program opens a file comes from the freedesktop files every program reads (docs/SETTINGS.md "Associations" has the

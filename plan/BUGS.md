@@ -66,6 +66,8 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   start_compose) would let them follow Shell.start_icon.
 
 ## Dialogs and wux
+- 2026-11-16 An Alt accelerator (TranslateAcceleratorW) loses the next key: DefWindowProc never sees the other key go down, so the
+  Alt release enters the menu bar (wux/w32/defwnd.cpp g_menu_sys_key); luxfind passes the WM_SYSKEYDOWN on as a workaround.
 - 2026-11-01 Appearance's style list shows a DisplayName outside Latin-1 as '?' (zxbiyao's 诛仙主题之碧瑶版(绿色) as
   ????????(??)): style_label goes through narrow strings.
 - 2026-10-31 Keyboard cues: Wine's buttons, statics and tabs draw mnemonics without asking WM_QUERYUISTATE, so dialog labels stay
@@ -111,6 +113,12 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   too: a source ini key (author = reactos, ...) would say whose they are.
 
 ## Catalogue
+- 2026-11-16 luxfind: the Properties sheet on a root that cannot be reached is refused (its General page stats the file); the
+  Metadata page alone could run on the catalogue's values (a PropertiesOptions flag that leaves the file alone).
+- 2026-11-16 luxfind: thumbnails come from the files (thumbview), not from the catalogue's thumbs table, so a root that cannot be
+  reached shows icons; the results of such a root are marked IsPending to keep the worker off them.
+- 2026-11-16 luxfind: Win+F (luxwm's exec) looks in every root, not in the active Explorer's folder; that needs the folder from
+  the active window (a property flxp would publish).
 - 2026-11-15 lhde-cat: relations cannot be confirmed from the command line; resolve applies every conflicting op, not the winner only.
 
 ## FreeBSD

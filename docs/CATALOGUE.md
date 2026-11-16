@@ -231,7 +231,39 @@ those the catalogue observed; an item that changed since (an attribute written b
 read from the file as before. On a network mount that is one stat per item instead of an attribute call per property.
 `shell::details::write` and `change_tags` (Add Tag, the band's editor, the Properties sheet, luxattr) record each write
 they made in the catalogue holding the file (`lhcat_record_write`: an applied `set` or `unset` with the program's name, the
-file observed again), so the catalogue follows flxp's edits. Nothing else in flxp reads it yet.
+file observed again), so the catalogue follows flxp's edits. Nothing else in flxp reads it yet; the Explorer's Search for
+files or folders (4051's band) starts luxfind on the folder shown.
+
+## luxfind, the query window
+
+`luxfind [--root NAME] [--name PART] [--tag TAGS] [--type TYPE] [DIR]` (apps/luxfind; docs/USAGE.md "luxfind") asks every
+catalogue at once, or one root, or a folder under one (DIR, or Look in's Browse...). Its pane: a part of the name (searched
+as typed, 250 ms after the last key), Tags (every one must hold; applied when chosen from its list or ended with Enter),
+Type (all, Folders, Pictures `image/*`, Music `audio/*`, Video `video/*`, Documents: text and the office and PDF types; or a
+type or group typed), Look in. An empty query lists everything. The results come from a worker thread (model.h `Search`:
+`lhcat_find` with `stop`, `with_attrs`, one root after the other) 2,000 rows at a time, the next page when the list is
+scrolled near its end; a second thread counts the same query to the end, so the status bar says "2,000 of 5,994 items" while
+the first page shows. The first name query on a catalogue brings its name index up to date on the worker ("Indexing the
+names of NAME..." in the status bar). Columns: Name, In Folder (the root's name and the directory), Size, Type, Date
+Modified, Tags, Description, Pending ("Not written": an edit waits in the catalogue; "Conflict"). A header click sorts
+what is loaded.
+
+Whether a root's files can be reached is a `stat` of its directory on a thread of its own, answered in 3 s or taken as "no
+answer", kept 30 s; a check that hangs (a dead NFS server) is left to itself and no second one starts. A root added
+`--offline` is not reachable. The status bar names the roots that are not ("indra: not reachable (no answer in 3 s)").
+Double click and Enter open a result as the Explorer does, Open Containing Folder is `flxp --select`; on a root that is
+not reachable a message box says so instead (nothing waits on the files).
+
+Edits: Add Tag, Tag Selected (the Tags box's text added to the selected results) and the Properties sheet's Metadata page
+go through the shell layer's route (`shell::details::Route`, set by luxfind): on a reachable root whose authority is the
+file system the file is written and the write recorded, as the Explorer writes; on a root that is not reachable, or whose
+authority is the catalogue, the value becomes an operation that waits (`lhcat_apply` without writing: tag operations for
+tags, set or unset for the rest), the row's Pending column says "Not written" and `lhde-cat diff` lists it. A deferred
+operation does not look at the file at all (no touch: the file may not be reachable). The pane's Commit button (and File >
+Commit Pending Edits, per root) runs `lhcat_commit` on a thread when the root is reachable and shows what it wrote and the
+conflicts as the catalogue counts them (`lhde-cat conflicts NAME` lists them; nothing is resolved on its own). The
+Properties sheet needs the files (its General page), so on a root that is not reachable luxfind says so and offers Add
+Tag.
 
 ## Schema and versions
 
@@ -261,6 +293,6 @@ and `LHCAT_TEST_STOP=N` (or `kill:N`) stops (or kills) an index after N entries,
 ## Not there yet
 
 The remote side (`lhde-remote` over ssh, a catalogue built on the remote), syncing catalogues by their journals, the watcher
-(inotify) keeping a catalogue current between index runs, confirming relations from the command line, luxfind (the query
-window), flxp's queries across the whole root rather than the folder shown, the gallery, and `lhdecat.py` for the Python
+(inotify) keeping a catalogue current between index runs, confirming relations from the command line, luxfind's
+thumbnails from the catalogue's own `thumbs` and its Metadata page offline, the gallery, and `lhdecat.py` for the Python
 tools.

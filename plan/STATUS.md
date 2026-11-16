@@ -59,17 +59,18 @@ Done and covered by `make check` unless a line says otherwise.
 
 ## In progress
 - The catalogue: plan/CATALOGUE-REMOTE-PHOTOS.md (design: plan/CATALOGUE-PROPOSAL.md), step 1 in (a network folder
-  listed from readdir and filled in by workers, three-stage thumbnails, the slow-path harness; its leftovers in BUGS.md), step 2 in (luxfind and tree-wide queries
-  open), the machines list done as groundwork for step 3.
+  listed from readdir and filled in by workers, three-stage thumbnails, the slow-path harness; its leftovers in BUGS.md), step 2 in (luxfind and the name index
+  in; flxp's tree-wide queries open), the machines list done as groundwork for step 3.
 - Metadata: plan/METADATA.md, steps 1, 1b, 2 and 4 in; step 3 (tasks as data) not started.
 - UTF-8 API: plan/UTF8-API.md, the conversion pair in; the UTF-8 functions and the move file by file not started.
 - Theming without Microsoft files: plan/THEMING.md, the ReactOS baseline in; nothing-imported points and the installer open.
 
 ## Next
 1. lhde-remote over ssh (one Python file, FreeBSD 13.1-safe) and flxp's provider, tested against indra and soma (step 3).
-2. luxfind, the query window over the catalogue (step 2's open part).
-3. The aurora in flxp, the PDC 2003 4050 demo's last piece (plan/IDEAS.md; it gets a plan file when started).
-4. Publish the free pack release (plan/BUGS.md "Repository").
+2. The aurora in flxp, the PDC 2003 4050 demo's last piece (plan/IDEAS.md; it gets a plan file when started).
+3. Publish the free pack release (plan/BUGS.md "Repository").
+4. VM screenshots of 4051's library views (All Pictures and Videos, All Documents opened, with results) and of XP's Search
+   Companion results, so luxfind's look can be measured (it is a choice now; docs/CATALOGUE.md "luxfind").
 
 ## Decisions
 Choices made that an item might re-open; each says where it came from.

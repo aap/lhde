@@ -1,8 +1,8 @@
 # Annotations at scale: the catalogue, remote trees, photos and a gallery
 
-Status: the working plan (2026-11-15; the reviewed design is plan/CATALOGUE-PROPOSAL.md). Step 2 is in (lhde-cat, flxp's Filter
-box and writes over it, docs/CATALOGUE.md; luxfind and tree-wide queries open) with the machines list as groundwork for step 3;
-steps 1 and 3 are next. See plan/STATUS.md.
+Status: the working plan (2026-11-15; the reviewed design is plan/CATALOGUE-PROPOSAL.md). Step 2 is in (lhde-cat with its name index, flxp's
+Filter box and writes over it, luxfind the query window with offline edits and commits, docs/CATALOGUE.md; flxp's queries
+across the whole root open) with the machines list as groundwork for step 3; steps 1 and 3 are next. See plan/STATUS.md.
 
 aap: most of the stuff lives on indra; organising it means tagging and reorganising old photos over the network; a
 directory listing with thumbnails should not be much data; thumbnails could be made on the remote; finding photos is too
@@ -86,7 +86,8 @@ Each step is useful on its own; (a) and (b) are the foundation the rest stands o
   first look, tests/headless/slowfs.c and slowpath.sh; open: readdir itself off the UI thread, plan/BUGS.md); (2) lhde-cat
   locally + the Filter box over it + luxfind (in: lhde-cat with import-du, index, touch, find, the observed/desired/pending
   attributes, the operation journal and the authority setting, flxp's Filter box and details::write on it; docs/CATALOGUE.md.
-  Open: luxfind, queries across the whole root in flxp); (3) lhde-remote over ssh with the flxp provider, tested against indra (13.1)
+  luxfind with the name index, deferred edits and commits. Open: queries across the whole root in flxp, luxfind's thumbnails
+  from the catalogue); (3) lhde-remote over ssh with the flxp provider, tested against indra (13.1)
   and soma; (4) the journal and sync; (5) photo query views and the gallery.
 
 

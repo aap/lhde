@@ -140,7 +140,7 @@ for Linux; DIR/sysctl/NAME, DIR/dev/backlight/NAME, DIR/dev/mixerN for FreeBSD),
 ends everything the lab started. A headless test goes in `tests/headless/` (its own HOME and XDG directories, xdotool to drive
 the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
 
-## Four worked examples
+## Five worked examples
 
 - **luxshot** (`apps/luxshot`): a dialog program with an Xlib part (`capture_native.cpp`), the Open/Save dialog for Browse...,
   the annotations written with `shell::details::write`, PNG encoding and the clipboard (`FlxpWritePng`, `FlxpEncodePng`).
@@ -171,6 +171,18 @@ the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
   the Save dialog for Copy To, `set_window_icon_key`, `theme_build` (which look). `tests/headless/luxview.sh` drives it, what it
   shows read from `LUXVIEW_TRACE=1`.
 
+- **luxfind** (`apps/luxfind`): the query window over the catalogues (docs/CATALOGUE.md "luxfind"). A model with two worker
+  threads (`model.h`, `model_native.cpp`: liblhcat's queries with a stop flag, a stat per root on a thread of its own, the
+  commits) that posts the window a message; the window is a pane of plain controls (edit, combo boxes, buttons, made with
+  CreateWindowExW without a template) beside the Explorer's list. From the shell layer: `details::Route` (the annotations of
+  the files luxfind keeps itself, written as catalogue operations), `change_tags`, `remember_tags`, `split_list`,
+  `registry`, `type_name`, `icon_key`, `spawn`, `exe_dir`, `message_box`, `one_line_edit`, `set_window_icon_key`, the Folder
+  dialog (`filedlg::run`). What it had to reach for (below): the Explorer's browsing widget for the list
+  (`explorer/browser.h`: `create_list`, `append_list`, `update_item`, `sort_by_column`, `set_view`, `selection`, the In Folder
+  and Pending columns, `column_text`), its icons (`explorer/uiicons.h`), thumbnails (`explorer/thumbview.h`), context menu and
+  verbs (`explorer/verbs.h`, `explorer/commands.h`); with those headers `wux/wux.h` cannot be included as well (the OLE
+  drop effects defined twice), so it declares `WuxInit` itself and converts with w32's `utf8_of` / `utf16_of`.
+
 ## Not public yet: what an application cannot reach
 
 What the first applications needed and the public surface lacks, the list of what to move:
@@ -196,4 +208,10 @@ What the first applications needed and the public surface lacks, the list of wha
   asking.
 - **No `GdiFlush`**: wux draws at once, so a program that writes into a DIB section's bits after GDI calls (luxview) needs no
   flush, but one written for Windows calls it and does not link.
+- **The browsing list, its icons, thumbnails and the context menu are the Explorer's** (`flxp/explorer/browser.h`,
+  `uiicons.h`, `thumbview.h`, `verbs.h`): luxfind includes them (linked through `WUX_APP_FILEDIALOG`), and their w32 headers
+  do not mix with `wux/wux.h`. They belong with the shell facilities, with the Open/Save dialog.
+- **An Alt accelerator loses the next key**: wux's DefWindowProc takes the Alt key's release for the menu bar unless it saw
+  the other key go down, and `TranslateAcceleratorW` keeps that key from it; luxfind passes an accelerator's WM_SYSKEYDOWN
+  to DefWindowProcW as well.
 - **The X clipboard is not INCR**: typed data larger than the server's request size (16 MB with BIG-REQUESTS) is refused.
