@@ -40,7 +40,7 @@ const UINT WM_ENGINE = WM_APP + 1;
 const int CACHE_BUDGET = 64 << 20;     // the rendered pages kept (layout.h's Cache)
 const int LINE = 40;                   // an arrow key's or a wheel notch's third, in pixels
 const int PREFETCH_AHEAD = 2, PREFETCH_BEHIND = 1;
-const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_PAGE_OF = 14, ID_TREE = 15;
+const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_PAGE_OF = 14, ID_TREE = 15, ID_FIND_EDIT = 16;
 // the Contents pane: XP's Explorer bar (a title row with its close button over a tree, a splitter beside it); the sizes
 // are mupf's
 const int PANE_TITLE = 22, SPLITTER = 4, PANE_MIN = 80, PANE_DEFAULT = 200;
@@ -81,6 +81,17 @@ struct App {
     int toc_w = PANE_DEFAULT;
     std::vector<TocItem> toc;
     RECT pane = {}, pane_close = {};
+    // the search: its hits in page order, each a rectangle a line, the one shown
+    HWND find_edit = nullptr;
+    struct Hit { int page = 0, index = 0; std::vector<RectF> rects; };
+    struct {
+        uint32_t id = 0;
+        std::string needle;
+        bool done = true;
+        int searched = 0, current = -1;
+        bool shown_first = false;
+        std::vector<Hit> hits;
+    } search;
     // the back buffer
     HDC mem = nullptr;
     HBITMAP back = nullptr;
@@ -516,6 +527,48 @@ void draw_tile(const Tile* t, int bx, int by, int bwid, int bhei, bool same_zoom
     }
 }
 
+// a hit's rectangle in the view: the page's (x, y) and its box
+RECT hit_rect(int page, const RectF& r, int x, int y)
+{
+    double ax, ay, bx, by;
+    page_to_px(r.x0, r.y0, g.sizes[page], g.rot, g.zoom, &ax, &ay);
+    page_to_px(r.x1, r.y1, g.sizes[page], g.rot, g.zoom, &bx, &by);
+    RECT o = { x + (int)floor(std::min(ax, bx)), y + (int)floor(std::min(ay, by)), x + (int)ceil(std::max(ax, bx)),
+               y + (int)ceil(std::max(ay, by)) };
+    return o;
+}
+
+// the search's hits on a page: each multiplied with yellow (a highlighter's: the text stays black), the one shown blended
+// with the selection colour instead (mupf's colours; Acrobat 6 selected the hit shown alone)
+void paint_hits(int page, int x, int y, const Box& b)
+{
+    auto& hits = g.search.hits;
+    auto it = std::lower_bound(hits.begin(), hits.end(), page, [](const App::Hit& h, int p) { return h.page < p; });
+    COLORREF sel = GetSysColor(COLOR_HIGHLIGHT);
+    for (; it != hits.end() && it->page == page; ++it) {
+        bool current = g.search.current == (int)(it - hits.begin());
+        for (const RectF& rf : it->rects) {
+            RECT r = hit_rect(page, rf, x, y);
+            int x0 = std::max({ 0, (int)r.left, x }), y0 = std::max({ 0, (int)r.top, y });
+            int x1 = std::min({ g.bw, (int)r.right, x + b.w }), y1 = std::min({ g.bh, (int)r.bottom, y + b.h });
+            for (int yy = y0; yy < y1; yy++) {
+                uint32_t* row = g.bits + (size_t)yy * g.bw;
+                for (int xx = x0; xx < x1; xx++) {
+                    uint32_t p = row[xx];
+                    uint32_t r8 = p >> 16 & 0xff, g8 = p >> 8 & 0xff, b8 = p & 0xff;
+                    if (current) {
+                        r8 = (r8 + GetRValue(sel)) / 2;
+                        g8 = (g8 + GetGValue(sel)) / 2;
+                        b8 = (b8 + GetBValue(sel)) / 2;
+                    } else
+                        b8 = b8 * 40 / 255;   // times (255, 255, 40)
+                    row[xx] = 0xff000000u | r8 << 16 | g8 << 8 | b8;
+                }
+            }
+        }
+    }
+}
+
 void paint_view(HDC dc)
 {
     make_back();
@@ -536,6 +589,7 @@ void paint_view(HDC dc)
                 draw_tile(t, x, y, b.w, b.h, same);
                 exact = exact || same;
             }
+            paint_hits(p, x, y, b);
             fill(x - 1, y - 1, b.w + 2, 1, 0xff000000);
             fill(x - 1, y + b.h, b.w + 2, 1, 0xff000000);
             fill(x - 1, y, 1, b.h, 0xff000000);
@@ -571,6 +625,10 @@ void close_doc()
     g.sizes.clear();
     g.links.clear();
     g.toc.clear();
+    g.search.needle.clear();
+    g.search.hits.clear();
+    g.search.current = -1;
+    g.search.done = true;
     fill_toc();
     g.title.clear();
     g.format.clear();
@@ -595,6 +653,8 @@ void open_doc(const std::string& path)
     update_title();
     trace("open %s", g.path.c_str());
 }
+
+void take_hits(const Event& e);
 
 void on_engine()
 {
@@ -643,6 +703,9 @@ void on_engine()
             e.tile = nullptr;
             InvalidateRect(g.view, nullptr, FALSE);
             break;
+        case Event::HITS: case Event::SEARCH_DONE:
+            take_hits(e);
+            break;
         case Event::LINKS:
             g.links[e.page] = std::move(e.links);
             break;
@@ -651,6 +714,120 @@ void on_engine()
         }
     }
     if (sizes_changed) relayout(top_anchor());
+}
+
+// ---- the search --------------------------------------------------------------------------------------------------------
+
+void search_status()
+{
+    auto& s = g.search;
+    char b[128];
+    int n = (int)s.hits.size();
+    if (s.needle.empty()) b[0] = 0;
+    else if (!s.done && n == 0) snprintf(b, sizeof b, "Searching... page %d of %d", std::min(s.searched + 1, g.pages), g.pages);
+    else if (!s.done) snprintf(b, sizeof b, "Searching... match %d of %d", s.current + 1, n);
+    else if (n == 0) snprintf(b, sizeof b, "No matches were found.");
+    else snprintf(b, sizeof b, "Match %d of %d", s.current + 1, n);
+    set_status(0, b);
+}
+
+// to hit i: its page, scrolled so its first line is in view (a third down the view when it was not)
+void show_hit(int i)
+{
+    auto& s = g.search;
+    if (i < 0 || i >= (int)s.hits.size()) return;
+    s.current = i;
+    const App::Hit& h = s.hits[i];
+    if (!is_continuous(g.mode) && h.page != g.current) go_page(h.page, 0, false);
+    const Box& b = g.lay.page[h.page];
+    if (!b.empty() && !h.rects.empty()) {
+        RECT r = hit_rect(h.page, h.rects[0], b.x, b.y);   // in the plane
+        int x = g.sx, y = g.sy;
+        if (r.top < g.sy || r.bottom > g.sy + g.vh) y = r.top - g.vh / 3;
+        if (r.left < g.sx || r.right > g.sx + g.vw) x = r.left - g.vw / 3;
+        if (is_continuous(g.mode)) {
+            g.sx = x;
+            g.sy = y;
+            clamp_scroll();
+            update_scrollbars();
+            g.current = h.page;   // the hit's page, even when the next shows more of itself
+            update_page_box();
+            request();
+            InvalidateRect(g.view, nullptr, FALSE);
+        } else scroll_to(x, y);
+    }
+    InvalidateRect(g.view, nullptr, FALSE);
+    search_status();
+    trace("match %d of %zu page %d", i + 1, s.hits.size(), h.page + 1);
+}
+
+void start_search(const std::string& needle)
+{
+    auto& s = g.search;
+    s.needle = needle;
+    s.hits.clear();
+    s.current = -1;
+    s.searched = 0;
+    s.shown_first = false;
+    s.done = needle.empty() || !g.opened;
+    if (g.opened) s.id = g.eng->search(needle, g.current);
+    trace("search %s", needle.c_str());
+    search_status();
+    InvalidateRect(g.view, nullptr, FALSE);
+}
+
+// F3, Shift+F3, Return in the box: the next or previous hit; a new word in the box searches for it
+void find(int dir)
+{
+    std::string text = g.find_edit ? WuxWindowText(g.find_edit) : "";
+    if (text.empty()) {
+        if (g.find_edit) { SetFocus(g.find_edit); SendMessageW(g.find_edit, EM_SETSEL, 0, -1); }
+        return;
+    }
+    auto& s = g.search;
+    if (text != s.needle) { start_search(text); return; }
+    int n = (int)s.hits.size();
+    if (n == 0) {
+        if (s.done) MessageBeep(MB_OK);
+        return;
+    }
+    show_hit(((s.current < 0 ? (dir > 0 ? -1 : 0) : s.current) + dir + n) % n);
+}
+
+// a page's hits from the engine: in page order among the others; the first to come (the first after the current page) shown
+void take_hits(const Event& e)
+{
+    auto& s = g.search;
+    if (e.search != s.id) return;
+    s.searched = e.searched;
+    if (e.kind == Event::SEARCH_DONE) {
+        s.done = true;
+        trace("search done %zu", s.hits.size());
+        search_status();
+        return;
+    }
+    std::vector<App::Hit> add;
+    for (size_t i = 0; i < e.hits.size(); i++) {
+        int k = i < e.hit_of.size() ? e.hit_of[i] : 0;
+        if (add.empty() || add.back().index != k) {
+            App::Hit h;
+            h.page = e.page;
+            h.index = k;
+            add.push_back(h);
+        }
+        add.back().rects.push_back(e.hits[i]);
+    }
+    auto at = std::lower_bound(s.hits.begin(), s.hits.end(), e.page, [](const App::Hit& h, int p) { return h.page < p; });
+    int pos = (int)(at - s.hits.begin());
+    s.hits.insert(at, add.begin(), add.end());
+    if (s.current >= pos) s.current += (int)add.size();
+    if (!s.shown_first && !add.empty()) {
+        s.shown_first = true;
+        show_hit(pos);
+    } else {
+        search_status();
+        InvalidateRect(g.view, nullptr, FALSE);
+    }
 }
 
 void open_dialog()
@@ -836,6 +1013,15 @@ void command(int id)
             go_page(p, 0, false);
         }
         break;
+    case CMD_FIND:
+        if (g.find_edit) {
+            if (!g.show_toolbar) { g.show_toolbar = true; layout_chrome(); }
+            SetFocus(g.find_edit);
+            SendMessageW(g.find_edit, EM_SETSEL, 0, -1);
+        }
+        break;
+    case CMD_FIND_NEXT: find(1); break;
+    case CMD_FIND_PREV: find(-1); break;
     case CMD_ABOUT: DialogBoxParamW(g.res, MAKEINTRESOURCEW(IDD_ABOUT), g.wnd, about_proc, 0); break;
     }
     update_toolbar();
@@ -982,15 +1168,22 @@ const char* tip_for(int id)
     case CMD_ACTUAL: return "Actual Size";
     case CMD_FIT_PAGE: return "Fit Page";
     case CMD_FIT_WIDTH: return "Fit Width";
+    case CMD_FIND_NEXT: return "Find Next";
     }
     return "";
 }
 
 WNDPROC edit_base = nullptr;
 
-// the page box: Return goes to the page typed, Escape back to the pages
+// the page box: Return goes to the page typed; the find box: Return finds (Shift+Return backwards), the box keeping the
+// focus for the next; Escape back to the pages
 LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 {
+    if (msg == WM_KEYDOWN && wp == VK_RETURN && h == g.find_edit) {
+        find(GetKeyState(VK_SHIFT) < 0 ? -1 : 1);
+        update_toolbar();
+        return 0;
+    }
     if (msg == WM_KEYDOWN && (wp == VK_RETURN || wp == VK_ESCAPE)) {
         if (wp == VK_RETURN && h == g.page_edit) {
             int n = atoi(WuxWindowText(h).c_str());
@@ -1008,7 +1201,8 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     return CallWindowProcW(edit_base, h, msg, wp, lp);
 }
 
-// the toolbar (mupf's taste: Open | Previous, Next, the page box | Zoom Out, Zoom In | Actual Size, Fit Page, Fit Width)
+// the toolbar (mupf's taste: Open | Previous, Next, the page box | Zoom Out, Zoom In | Actual Size, Fit Page, Fit Width |
+// the find box and Find Next, as Acrobat 6 had its Find box in the toolbar)
 void make_toolbar()
 {
     g.toolbar = CreateWindowExW(0, TOOLBARCLASSNAMEW, nullptr,
@@ -1031,6 +1225,9 @@ void make_toolbar()
         { GL_ACTUAL, CMD_ACTUAL, E, BTNS_BUTTON, {0}, 0, -1 },
         { GL_FITPAGE, CMD_FIT_PAGE, E, BTNS_CHECK, {0}, 0, -1 },
         { GL_FITWIDTH, CMD_FIT_WIDTH, E, BTNS_CHECK, {0}, 0, -1 },
+        { 8, 0, 0, BTNS_SEP, {0}, 0, -1 },
+        { 150, ID_FIND_EDIT, 0, BTNS_SEP, {0}, 0, -1 },   // the find box goes over this
+        { GL_FIND, CMD_FIND_NEXT, E, BTNS_BUTTON, {0}, 0, -1 },
     };
     SendMessageW(g.toolbar, TB_ADDBUTTONSW, sizeof b / sizeof b[0], (LPARAM)b);
     SendMessageW(g.toolbar, TB_AUTOSIZE, 0, 0);
@@ -1042,6 +1239,11 @@ void make_toolbar()
     g.page_of = CreateWindowExW(0, L"STATIC", nullptr, WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, r.left + 48, ey, r.right - r.left - 50,
                                 eh, g.toolbar, (HMENU)(INT_PTR)ID_PAGE_OF, nullptr, nullptr);
     edit_base = (WNDPROC)SetWindowLongPtrW(g.page_edit, GWLP_WNDPROC, (LONG_PTR)edit_proc);
+    SendMessageW(g.toolbar, TB_GETITEMRECT, 13, (LPARAM)&r);
+    g.find_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", nullptr, WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, r.left + 2, ey,
+                                  r.right - r.left - 4, eh, g.toolbar, (HMENU)(INT_PTR)ID_FIND_EDIT, nullptr, nullptr);
+    SendMessageW(g.find_edit, EM_SETCUEBANNER, FALSE, (LPARAM)L"Find");
+    SetWindowLongPtrW(g.find_edit, GWLP_WNDPROC, (LONG_PTR)edit_proc);
 }
 
 void apply_font()
@@ -1051,7 +1253,7 @@ void apply_font()
     ncm.cbSize = sizeof ncm;
     SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
     g.font = CreateFontIndirectW(&ncm.lfMessageFont);
-    for (HWND h : { g.page_edit, g.page_of, g.tree })
+    for (HWND h : { g.page_edit, g.page_of, g.tree, g.find_edit })
         if (h) SendMessageW(h, WM_SETFONT, (WPARAM)g.font, TRUE);
 }
 
