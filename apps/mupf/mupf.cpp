@@ -94,7 +94,8 @@ struct App {
     std::string crumbs_for;             // what the crumbs were made of: the document and the outline entry
     RECT pane = {}, pane_close = {};
     // the search: its hits in page order, each a rectangle a line, the one shown
-    HWND find_edit = nullptr;
+    HWND find_edit = nullptr;           // the toolbar's Find box (the XP themes; a header without its search box)
+    bool header_find = false;           // the Find box is the Longhorn header's search box
     struct Hit { int page = 0, index = 0; std::vector<RectF> rects; };
     struct {
         uint32_t id = 0;
@@ -225,6 +226,7 @@ void set_status(int part, const std::string& text)
 
 void update_header();
 void configure_header();
+void layout_chrome();
 void follow_toc();
 
 void update_page_box()
@@ -811,14 +813,28 @@ void start_search(const std::string& needle)
     InvalidateRect(g.view, nullptr, FALSE);
 }
 
+// the Find box shown and focused, its text selected: the header's search box (it may hide behind its magnifier) or the
+// toolbar's
+void focus_find()
+{
+    if (g.header_find) { shell::lhheader::open_search(); return; }
+    if (!g.find_edit) return;
+    if (!g.show_toolbar) { g.show_toolbar = true; layout_chrome(); }
+    SetFocus(g.find_edit);
+    SendMessageW(g.find_edit, EM_SETSEL, 0, -1);
+}
+
+std::string find_text()
+{
+    HWND box = g.header_find ? shell::lhheader::search_box() : g.find_edit;
+    return box ? WuxWindowText(box) : "";
+}
+
 // F3, Shift+F3, Return in the box: the next or previous hit; a new word in the box searches for it
 void find(int dir)
 {
-    std::string text = g.find_edit ? WuxWindowText(g.find_edit) : "";
-    if (text.empty()) {
-        if (g.find_edit) { SetFocus(g.find_edit); SendMessageW(g.find_edit, EM_SETSEL, 0, -1); }
-        return;
-    }
+    std::string text = find_text();
+    if (text.empty()) { focus_find(); return; }
     auto& s = g.search;
     if (text != s.needle) { start_search(text); return; }
     int n = (int)s.hits.size();
@@ -882,8 +898,6 @@ void open_dialog()
 }
 
 // ---- the window --------------------------------------------------------------------------------------------------------
-
-void layout_chrome();
 
 // a protected document's password (IDD_PASSWORD): true with the text typed on OK
 INT_PTR CALLBACK password_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
@@ -1093,13 +1107,7 @@ void command(int id)
             go_page(p, 0, false);
         }
         break;
-    case CMD_FIND:
-        if (g.find_edit) {
-            if (!g.show_toolbar) { g.show_toolbar = true; layout_chrome(); }
-            SetFocus(g.find_edit);
-            SendMessageW(g.find_edit, EM_SETSEL, 0, -1);
-        }
-        break;
+    case CMD_FIND: focus_find(); break;
     case CMD_FIND_NEXT: find(1); break;
     case CMD_FIND_PREV: find(-1); break;
     case CMD_ABOUT: DialogBoxParamW(g.res, MAKEINTRESOURCEW(IDD_ABOUT), g.wnd, about_proc, 0); break;
@@ -1109,7 +1117,7 @@ void command(int id)
 
 // ---- the toolbar -------------------------------------------------------------------------------------------------------
 
-enum { GL_OPEN, GL_PREV, GL_NEXT, GL_ZOOMOUT, GL_ZOOMIN, GL_ACTUAL, GL_FITPAGE, GL_FITWIDTH, GL_CONTENTS, GL_FIND, GL_COUNT };
+enum { GL_PREV, GL_NEXT, GL_ZOOMOUT, GL_ZOOMIN, GL_ACTUAL, GL_FITPAGE, GL_FITWIDTH, GL_CONTENTS, GL_FIND, GL_COUNT };
 
 // the glyphs: plain shapes in XP's toolbar colours on a key colour (mupf's own drawing, 16 x 16)
 void draw_glyph(HDC dc, int i, int ox)
@@ -1140,17 +1148,6 @@ void draw_glyph(HDC dc, int i, int ox)
         }
     };
     switch (i) {
-    case GL_OPEN: {
-        op = pen(RGB(150, 110, 20), 1); ob = brush(RGB(250, 210, 90));
-        POINT f[6] = { { ox + 1, 3 }, { ox + 6, 3 }, { ox + 7, 5 }, { ox + 14, 5 }, { ox + 14, 13 }, { ox + 1, 13 } };
-        Polygon(dc, f, 6);
-        done(op, ob);
-        op = pen(RGB(150, 110, 20), 1); ob = brush(RGB(255, 235, 150));
-        POINT l[4] = { { ox + 3, 7 }, { ox + 15, 7 }, { ox + 13, 13 }, { ox + 1, 13 } };
-        Polygon(dc, l, 4);
-        done(op, ob);
-        break;
-    }
     case GL_PREV: case GL_NEXT: {
         op = pen(dark, 1); ob = brush(blue);
         Ellipse(dc, ox + 0, 0, ox + 16, 16);
@@ -1240,7 +1237,6 @@ HIMAGELIST make_glyphs()
 const char* tip_for(int id)
 {
     switch (id) {
-    case CMD_OPEN: return "Open";
     case CMD_PREV: return "Previous Page";
     case CMD_NEXT: return "Next Page";
     case CMD_ZOOM_OUT: return "Zoom Out";
@@ -1281,8 +1277,9 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     return CallWindowProcW(edit_base, h, msg, wp, lp);
 }
 
-// the toolbar (mupf's taste: Open | Previous, Next, the page box | Zoom Out, Zoom In | Actual Size, Fit Page, Fit Width |
-// the find box and Find Next, as Acrobat 6 had its Find box in the toolbar). Under the XP themes a toolbar of its own at the
+// the toolbar (mupf's taste: Previous, Next, the page box | Zoom Out, Zoom In | Actual Size, Fit Page, Fit Width | the find
+// box and Find Next, as Acrobat 6 had its Find box in the toolbar; under the Longhorn header the header's search box is the
+// Find box, and the toolbar ends with Fit Width). Under the XP themes a toolbar of its own at the
 // top (CCS_NOMOVEY: it stays where layout_chrome puts it); under the Longhorn header a band on the menu band's row, as the
 // Explorer's 4051 command bar (flxp/explorer/explorer.cpp, lhtool): a flat list toolbar in the rebar, no gripper, its band
 // header 30 px (4051's gap from Help to the first button), on the folder type's gradient (lhbar) with its frames.
@@ -1305,8 +1302,6 @@ void make_toolbar(bool band)
     const BYTE E = TBSTATE_ENABLED;
     const BYTE CHECK = band && lhbar::enabled() ? BTNS_BUTTON : BTNS_CHECK;
     TBBUTTON b[] = {
-        { GL_OPEN, CMD_OPEN, E, BTNS_BUTTON, {0}, 0, -1 },
-        { 8, 0, 0, BTNS_SEP, {0}, 0, -1 },
         { GL_PREV, CMD_PREV, E, BTNS_BUTTON, {0}, 0, -1 },
         { GL_NEXT, CMD_NEXT, E, BTNS_BUTTON, {0}, 0, -1 },
         { 96, ID_PAGE_EDIT, 0, BTNS_SEP, {0}, 0, -1 },    // the page box and "of N" go over this
@@ -1321,7 +1316,8 @@ void make_toolbar(bool band)
         { 150, ID_FIND_EDIT, 0, BTNS_SEP, {0}, 0, -1 },   // the find box goes over this
         { GL_FIND, CMD_FIND_NEXT, E, BTNS_BUTTON, {0}, 0, -1 },
     };
-    const int n = (int)(sizeof b / sizeof b[0]);
+    // the header's search box is the Find box: the toolbar ends with Fit Width
+    const int n = (int)(sizeof b / sizeof b[0]) - (band && g.header_find ? 3 : 0);
     // on the bar the gaps are disabled empty buttons, as the Explorer's (a flat separator would draw its etch)
     if (band) for (TBBUTTON& t : b) if (t.fsStyle == BTNS_SEP && !t.idCommand) { t.dwData = t.iBitmap; t.iBitmap = I_IMAGENONE; t.fsStyle = BTNS_BUTTON; }
     SendMessageW(g.toolbar, TB_ADDBUTTONSW, n, (LPARAM)b);
@@ -1334,18 +1330,20 @@ void make_toolbar(bool band)
         }
     SendMessageW(g.toolbar, TB_AUTOSIZE, 0, 0);
     RECT r;
-    SendMessageW(g.toolbar, TB_GETITEMRECT, 4, (LPARAM)&r);
+    SendMessageW(g.toolbar, TB_GETITEMRECT, 2, (LPARAM)&r);
     int eh = 20, ey = r.top + (r.bottom - r.top - eh) / 2;
     g.page_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", nullptr, WS_CHILD | WS_VISIBLE | ES_NUMBER | ES_CENTER | ES_AUTOHSCROLL,
                                   r.left + 4, ey, 40, eh, g.toolbar, (HMENU)(INT_PTR)ID_PAGE_EDIT, nullptr, nullptr);
     g.page_of = CreateWindowExW(0, L"STATIC", nullptr, WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, r.left + 48, ey, r.right - r.left - 50,
                                 eh, g.toolbar, (HMENU)(INT_PTR)ID_PAGE_OF, nullptr, nullptr);
     edit_base = (WNDPROC)SetWindowLongPtrW(g.page_edit, GWLP_WNDPROC, (LONG_PTR)edit_proc);
-    SendMessageW(g.toolbar, TB_GETITEMRECT, 13, (LPARAM)&r);
-    g.find_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", nullptr, WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, r.left + 2, ey,
-                                  r.right - r.left - 4, eh, g.toolbar, (HMENU)(INT_PTR)ID_FIND_EDIT, nullptr, nullptr);
-    SendMessageW(g.find_edit, EM_SETCUEBANNER, FALSE, (LPARAM)L"Find");
-    SetWindowLongPtrW(g.find_edit, GWLP_WNDPROC, (LONG_PTR)edit_proc);
+    if (n == (int)(sizeof b / sizeof b[0])) {
+        SendMessageW(g.toolbar, TB_GETITEMRECT, n - 2, (LPARAM)&r);
+        g.find_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", nullptr, WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, r.left + 2, ey,
+                                      r.right - r.left - 4, eh, g.toolbar, (HMENU)(INT_PTR)ID_FIND_EDIT, nullptr, nullptr);
+        SendMessageW(g.find_edit, EM_SETCUEBANNER, FALSE, (LPARAM)L"Find");
+        SetWindowLongPtrW(g.find_edit, GWLP_WNDPROC, (LONG_PTR)edit_proc);
+    }
     if (g.font) for (HWND h : { g.page_edit, g.page_of, g.find_edit }) SendMessageW(h, WM_SETFONT, (WPARAM)g.font, TRUE);
     if (!band) return;
     // the band: as high as a button, after the menu band on its row
@@ -1491,9 +1489,9 @@ void paint_pane(HDC dc)
 // Under the Longhorn themes the window has the Explorer's header (shell/lhheader.h): Back and Forward are mupf's history,
 // the breadcrumb the document's name, then the outline's path to the page shown (the entries above the current one:
 // "Part II > Chapter 4 > 4.2"), then the leaf "Page N of M"; a segment's drop-down lists the entries beside it and goes
-// there (the document's: the top level). The address edit takes a page number. The header's search box and favourites
-// star are hidden: mupf's Find box is in its toolbar, and it keeps no favourites (a choice, not Longhorn's: its viewers
-// had no header).
+// there (the document's: the top level). The address edit takes a page number. The header's search box is the Find box
+// (with header_search off the toolbar's comes back); the favourites star is hidden: mupf keeps no favourites (a choice,
+// not Longhorn's: its viewers had no header).
 
 // the outline entry covering page p: the last one in the outline's order that starts on p or before it; -1 when none
 int toc_entry_at(int p)
@@ -1665,7 +1663,6 @@ void sync_header()
     if (want) {
         shell::lhheader::set_lhwm(shell::lhheader::lhwm_running());   // under another window manager: the Small size
         configure_header();
-        shell::lhheader::hide(shell::lhheader::SHOW_SEARCH);
         shell::lhheader::hide(shell::lhheader::SHOW_FAVORITES);
         shell::lhheader::Callbacks cb;
         cb.go = header_go;
@@ -1677,7 +1674,17 @@ void sync_header()
         };
         cb.command = [](int id) { command(id == shell::lhheader::TRAVEL_BACK ? CMD_BACK : CMD_FORWARD); };
         cb.history = header_history;
+        // the search box is the Find box: Return searches (Shift+Return backwards), Escape clears the search; nothing while
+        // typing (a search runs over the whole document)
+        cb.filter = [](const std::string&) {};
+        cb.done = [](bool keep) {
+            if (keep) find(GetKeyState(VK_SHIFT) < 0 ? -1 : 1);
+            else { start_search(""); SetFocus(g.view); }
+            update_toolbar();
+        };
         g.header = shell::lhheader::create(g.wnd, cb);
+        g.header_find = shell::lhheader::shown(shell::lhheader::SHOW_SEARCH) && shell::lhheader::search_box();
+        trace("find box %s", g.header_find ? "header" : "toolbar");
         // the menu below the header and the toolbar on its row: the Explorer's rebar (its styles) with the menu band and,
         // on the same row, the toolbar's band, on the 4051 command bar's gradient (lhbar)
         SetMenu(g.wnd, nullptr);
@@ -1702,6 +1709,7 @@ void sync_header()
     } else {
         shell::lhheader::destroy();
         g.header = nullptr;
+        g.header_find = false;
         destroy_toolbar();
         lhbar::detach(g.rebar);
         menuband::set_custom_draw(nullptr);
