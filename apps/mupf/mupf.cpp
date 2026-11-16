@@ -16,6 +16,7 @@
 // from the engine's queue (its render aborted) before it costs anything.
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -55,10 +56,10 @@ const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_T
 const int PANE_TITLE = 22, SPLITTER = 4, PANE_MIN = 80, PANE_DEFAULT = 200;
 const UINT_PTR TIMER_RELOAD = 1;       // a Markdown file written: read again once the writes have settled
 const int RELOAD_DELAY = 150;
-// the view's timer: a reflowable document laid out again once the window's size has settled (a drag-resize lays it out
-// once, not at every step)
-const UINT_PTR TIMER_REFLOW = 2;
-const int REFLOW_DELAY = 120;
+// the view's timers: a reflowable document laid out again once the window's size has settled (a drag-resize lays it out
+// once, not at every step); the middle button's autoscroll, a step a frame
+const UINT_PTR TIMER_REFLOW = 2, TIMER_AUTOSCROLL = 3;
+const int REFLOW_DELAY = 120, AUTOSCROLL_TICK = 16;
 // mupdf's grey around the pages: mupdf's X11 viewer (the `mupdf` command) clears its window to 0x707070 (measured: its
 // window beside a page, 112,112,112), darker than Acrobat 6's application workspace colour (128 under XP's styles)
 const uint32_t WORKSPACE = 0xff707070;
@@ -154,6 +155,11 @@ struct App {
     POINT pan_at = {};
     int pan_sx = 0, pan_sy = 0;
     int wheel = 0;
+    // the middle button's autoscroll (Firefox's): held and moved, or clicked and left on (sticky) until a click or a key
+    bool autoscroll = false, auto_sticky = false, auto_moved = false;
+    POINT auto_at = {}, auto_pt = {};   // where it began and where the pointer is, in the view
+    DWORD auto_tick = 0;
+    double auto_rx = 0, auto_ry = 0;    // the fractions of a pixel not scrolled yet
     bool trace = false;
     std::string status_text[3], shown_trace, view_trace, scroll_trace;
 };
@@ -2269,6 +2275,61 @@ void follow(const Link& l)
     if (!shell::spawn({ "xdg-open", l.uri }, "", &err)) shell::message_box(g.wnd, "mupf", err, MB_OK | MB_ICONEXCLAMATION);
 }
 
+// ---- the middle button: Firefox's autoscroll ----
+//
+// Held down and moved, the view scrolls toward the pointer at a speed that grows with its distance from where the button went
+// down, until the button comes up; clicked without moving, the same stays on (the pointer steers it) until the next click
+// or key. The speed is after Firefox's (AutoScrollChild's accelerate()): a distance of d pixels scrolls
+// (d/12)^1.5 - 1 pixels every 20 ms, nothing within 12 pixels. Across too when the pages are wider than the view.
+// The pointer is the cursor theme's all-scroll (IDC_SIZEALL), not XP's: the reader-mode cursors (user32's OCR_RDR2DIM,
+// OCR_RDRNORTH ...) are not among wux's cursors, and no origin mark is drawn (Firefox's and IE's round compass).
+
+double autoscroll_speed(int d)
+{
+    double v = d / 12.0;
+    if (v > 1) return v * sqrt(v) - 1;
+    if (v < -1) return v * sqrt(-v) + 1;
+    return 0;
+}
+
+void autoscroll_stop()
+{
+    if (!g.autoscroll) return;
+    g.autoscroll = g.auto_sticky = false;
+    KillTimer(g.view, TIMER_AUTOSCROLL);
+    if (GetCapture() == g.view) ReleaseCapture();
+    SetCursor(LoadCursorW(nullptr, (LPCWSTR)IDC_ARROW));
+    update_toolbar();
+    trace("autoscroll off %d,%d", g.sx, g.sy);
+}
+
+void autoscroll_start(POINT at)
+{
+    g.autoscroll = true;
+    g.auto_sticky = g.auto_moved = false;
+    g.auto_at = g.auto_pt = at;
+    g.auto_rx = g.auto_ry = 0;
+    g.auto_tick = GetTickCount();
+    SetCapture(g.view);
+    SetTimer(g.view, TIMER_AUTOSCROLL, AUTOSCROLL_TICK, nullptr);
+    SetCursor(LoadCursorW(nullptr, (LPCWSTR)IDC_SIZEALL));
+    trace("autoscroll on %d,%d", g.sx, g.sy);
+}
+
+void autoscroll_step()
+{
+    DWORD now = GetTickCount();
+    double frames = std::min(5.0, (now - g.auto_tick) / 20.0);   // Firefox's time compensation, a step a 20 ms
+    g.auto_tick = now;
+    bool across = !g.lay.flow && g.lay.width > g.vw;
+    g.auto_rx += across ? autoscroll_speed(g.auto_pt.x - g.auto_at.x) * frames : 0;
+    g.auto_ry += autoscroll_speed(g.auto_pt.y - g.auto_at.y) * frames;
+    int dx = (int)g.auto_rx, dy = (int)g.auto_ry;
+    g.auto_rx -= dx;
+    g.auto_ry -= dy;
+    if (dx || dy) scroll_to(g.sx + dx, g.sy + dy);
+}
+
 LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
@@ -2277,6 +2338,21 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_TIMER:
         if (wp == TIMER_REFLOW) { reflow(); return 0; }
+        if (wp == TIMER_AUTOSCROLL) { if (g.autoscroll) autoscroll_step(); return 0; }
+        break;
+    case WM_MBUTTONDOWN:
+        SetFocus(hwnd);
+        if (g.autoscroll) autoscroll_stop();   // a click ends the sticky mode
+        else autoscroll_start({ (short)LOWORD(lp), (short)HIWORD(lp) });
+        return 0;
+    case WM_MBUTTONUP:
+        if (g.autoscroll && !g.auto_sticky) {
+            if (g.auto_moved) autoscroll_stop();
+            else { g.auto_sticky = true; trace("autoscroll sticky"); }   // a click: on until the next click or key
+        }
+        return 0;
+    case WM_RBUTTONDOWN:
+        if (g.autoscroll) { autoscroll_stop(); return 0; }
         break;
     case WM_ERASEBKGND:
         return 1;
@@ -2309,16 +2385,23 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     }
     case WM_MOUSEWHEEL: {
+        if (g.autoscroll) autoscroll_stop();
         g.wheel += (short)HIWORD(wp);
         POINT p = { (short)LOWORD(lp), (short)HIWORD(lp) };
         ScreenToClient(hwnd, &p);
+        // a notch: the system's wheel lines (SPI_GETWHEELSCROLLLINES, a screen for WHEEL_PAGESCROLL) of LINE pixels down;
+        // with Shift its wheel characters across (Firefox's Shift+wheel), LINE pixels each
+        UINT lines = 3, chars = 3;
+        SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, &lines, 0);
+        SystemParametersInfoW(SPI_GETWHEELSCROLLCHARS, 0, &chars, 0);
         while (g.wheel >= WHEEL_DELTA || g.wheel <= -WHEEL_DELTA) {
             bool up = g.wheel > 0;
             g.wheel += up ? -WHEEL_DELTA : WHEEL_DELTA;
             if (LOWORD(wp) & MK_CONTROL) {
                 if (g.opened) set_zoom(Z_CUSTOM, up ? zoom_in(g.zoom) : zoom_out(g.zoom), anchor_at(p.x, p.y));
-            } else if (LOWORD(wp) & MK_SHIFT) scroll_to(g.sx + (up ? -3 : 3) * LINE, g.sy);
-            else scroll_lines((up ? -3 : 3) * LINE);
+            } else if (LOWORD(wp) & MK_SHIFT) scroll_to(g.sx + (up ? -1 : 1) * (int)std::min(chars, 100u) * LINE, g.sy);
+            else if (lines == WHEEL_PAGESCROLL) scroll_screen(up ? -1 : 1);
+            else scroll_lines((up ? -1 : 1) * (int)std::min(lines, 100u) * LINE);
         }
         update_toolbar();
         return 0;
@@ -2328,6 +2411,7 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_LBUTTONDOWN:
         SetFocus(hwnd);
+        if (g.autoscroll) { autoscroll_stop(); return 0; }   // the click that ends the sticky mode does nothing else
         g.panning = true;
         g.pan_moved = false;
         g.pan_at = { (short)LOWORD(lp), (short)HIWORD(lp) };
@@ -2336,6 +2420,11 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         SetCapture(hwnd);
         return 0;
     case WM_MOUSEMOVE:
+        if (g.autoscroll) {
+            g.auto_pt = { (short)LOWORD(lp), (short)HIWORD(lp) };
+            if (abs(g.auto_pt.x - g.auto_at.x) + abs(g.auto_pt.y - g.auto_at.y) > 3) g.auto_moved = true;
+            return 0;
+        }
         if (g.panning) {
             int dx = (short)LOWORD(lp) - g.pan_at.x, dy = (short)HIWORD(lp) - g.pan_at.y;
             if (abs(dx) + abs(dy) > 3) g.pan_moved = true;
@@ -2355,8 +2444,14 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_CAPTURECHANGED:
         g.panning = false;
+        if (g.autoscroll && (HWND)lp != hwnd) {
+            g.autoscroll = g.auto_sticky = false;
+            KillTimer(hwnd, TIMER_AUTOSCROLL);
+            trace("autoscroll off %d,%d", g.sx, g.sy);
+        }
         return 0;
     case WM_SETCURSOR:
+        if (g.autoscroll) { SetCursor(LoadCursorW(nullptr, (LPCWSTR)IDC_SIZEALL)); return TRUE; }
         if (LOWORD(lp) == HTCLIENT) {
             POINT p;
             GetCursorPos(&p);
@@ -2367,6 +2462,7 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         }
         break;
     case WM_KEYDOWN: {
+        if (g.autoscroll) { autoscroll_stop(); return 0; }   // a key ends it, and does nothing else (Firefox's)
         bool ctrl = GetKeyState(VK_CONTROL) < 0, shift = GetKeyState(VK_SHIFT) < 0;
         bool hscroll = g.lay.width > g.vw && !g.lay.flow;
         switch (wp) {
