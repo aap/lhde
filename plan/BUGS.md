@@ -77,6 +77,8 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
 - 2026-11-13 A dropped menu under Jade has a 1 px white line inside its outline where 4074's is the body's 245 grey
   (lh4074-083401.png: the Edit menu's outline at x=78, 245 from x=79).
 - 2026-11-14 Ctrl+digit posts WM_CHAR of the digit (Ctrl+1 gives 0x31); Windows gives none for Ctrl+1..9.
+- 2026-11-16 An Alt+key accelerator (TranslateAcceleratorW eats the WM_SYSKEYDOWN) leaves defwnd.cpp's Alt-alone flag set, so releasing
+  Alt enters the menu bar's keyboard mode; Windows does not. mupf passes its Alt+Left/Right on to DefWindowProc instead.
 - 2026-11-01 flxp-filedialog: a right click right after the pointer arrives opens the context menu and closes it at once (Xvfb,
   xdotool's burst press+release past a synchronous grab, as menus.sh works around) (check with a real mouse).
 

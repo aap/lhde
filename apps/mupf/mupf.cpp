@@ -615,6 +615,7 @@ void paint_view(HDC dc)
 void engine_notify(void*) { PostMessageW(g.wnd, WM_ENGINE, 0, 0); }
 
 void fill_toc();
+void trace_toc();
 
 void close_doc()
 {
@@ -1285,6 +1286,7 @@ void fill_toc()
     SendMessageW(g.tree, WM_SETREDRAW, TRUE, 0);
     InvalidateRect(g.tree, nullptr, TRUE);
     trace("toc %zu", g.toc.size());
+    trace_toc();
 }
 
 // the trace of the rows on screen: "tocitem INDEX X Y TITLE", the middle of each row's text in root coordinates
@@ -1714,7 +1716,11 @@ int main(int argc, char** argv)
 
     MSG m;
     while (GetMessageW(&m, nullptr, 0, 0) > 0) {
-        if (TranslateAcceleratorW(g.wnd, g.accel, &m)) continue;
+        // Alt+Left and Alt+Right (Back, Forward) go on to DefWindowProc as well, which then knows Alt was not pressed alone
+        // and does not open the menu bar when it is released (an accelerator's key never reaches it)
+        if (m.message == WM_SYSKEYDOWN && (m.wParam == VK_LEFT || m.wParam == VK_RIGHT) && (HIWORD(m.lParam) & KF_ALTDOWN))
+            command(m.wParam == VK_LEFT ? CMD_BACK : CMD_FORWARD);
+        else if (TranslateAcceleratorW(g.wnd, g.accel, &m)) continue;
         TranslateMessage(&m);
         DispatchMessageW(&m);
     }
