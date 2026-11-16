@@ -149,6 +149,7 @@ struct Browser {
     virtual void shown() {}                                  // after refresh (titles, address, header, tree)
     virtual void view_changed() {}                           // after set_view (menus, toolbar)
     virtual void filter_cleared() {}                         // navigate() emptied the filter (the boxes)
+    virtual std::string column_text(const Item&, int) { return ""; }   // a search's In Folder ("": the directory)
 };
 
 // The list view: style must give the view (LVS_REPORT, ...) and the rest the
@@ -184,6 +185,10 @@ void sort_by_column(Browser& b, int index);   // a header click: that column, ag
 // LVN_GETDISPINFOW: a Color subitem's image, its swatch in the list's small images (a provisional look)
 void subitem_image(Browser& b, NMLVDISPINFOW* di);
 void fill_list(Browser& b);            // the list from b.items (sorted), the selection after refresh
+// More of b.items at the end of the list as they are (a search's results while they come: not sorted, no groups), and
+// one item's text again after a change of it
+void append_list(Browser& b, size_t from);
+void update_item(Browser& b, size_t i);
 void sort_feedback(Browser& b);        // the header's sort arrow and the tinted column
 // The filter (4074's "Filter by" box in the left pane, the header's search box): the
 // items every word of the text matches (shell::details::Filter: the name, the

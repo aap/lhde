@@ -9,9 +9,11 @@
 namespace shell {
 namespace columns {
 
-static const struct { const char* name; int width; bool shown; } KNOWN[] = {
-    { "name", 180, true }, { "size", 96, true }, { "type", 120, true }, { "modified", 120, true },
-    { "description", 180, false }, { "tags", 120, false }, { "comment", 150, false }, { "color", 100, false },
+// search: a search's column (SortBy::Folder, Pending), in a layout only when its host put it there (not in builtin())
+static const struct { const char* name; int width; bool shown; bool search; } KNOWN[] = {
+    { "name", 180, true, false }, { "size", 96, true, false }, { "type", 120, true, false }, { "modified", 120, true, false },
+    { "description", 180, false, false }, { "tags", 120, false, false }, { "comment", 150, false, false },
+    { "color", 100, false, false }, { "folder", 180, true, true }, { "pending", 70, true, true },
 };
 static const int N_KNOWN = (int)(sizeof KNOWN / sizeof KNOWN[0]);
 
@@ -26,7 +28,7 @@ static int id_of(const std::string& name)
 Layout builtin()
 {
     Layout l;
-    for (int i = 0; i < N_KNOWN; i++) l.push_back(Column{ i, KNOWN[i].shown, KNOWN[i].width });
+    for (int i = 0; i < N_KNOWN; i++) if (!KNOWN[i].search) l.push_back(Column{ i, KNOWN[i].shown, KNOWN[i].width });
     return l;
 }
 
@@ -39,7 +41,8 @@ static Column* find(Layout& l, int id)
 Layout parse(const std::string& text, const Layout& base_in)
 {
     Layout base = base_in;
-    for (int i = 0; i < N_KNOWN; i++) if (!find(base, i)) base.push_back(Column{ i, KNOWN[i].shown, KNOWN[i].width });
+    for (int i = 0; i < N_KNOWN; i++)
+        if (!find(base, i) && !KNOWN[i].search) base.push_back(Column{ i, KNOWN[i].shown, KNOWN[i].width });
     Layout out;
     size_t i = 0;
     while (i < text.size()) {
@@ -51,7 +54,7 @@ Layout parse(const std::string& text, const Layout& base_in)
         if (hidden) w.erase(0, 1);
         size_t colon = w.find(':');
         int id = id_of(w.substr(0, colon));
-        if (id < 0 || find(out, id)) continue;
+        if (id < 0 || find(out, id) || !find(base, id)) continue;
         Column c = *find(base, id);
         c.shown = !hidden;
         int px = colon == std::string::npos ? 0 : atoi(w.c_str() + colon + 1);

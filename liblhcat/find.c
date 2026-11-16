@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct sql { char *s; size_t n, cap; const char *bind[32]; int nb; };
+struct sql { char *s; size_t n, cap; const char *bind[64]; int nb; };
 
 static void add(struct sql *q, const char *text)
 {
@@ -23,9 +23,9 @@ static void add(struct sql *q, const char *text)
 }
 
 /* a text bound as the next ?: the caller's strings live through the query, made ones are kept in owned[] */
-struct owned { char *s[32]; int n; };
-static const char *keep(struct owned *o, char *s) { if (o->n < 32) o->s[o->n++] = s; return s; }
-static void bind(struct sql *q, const char *v) { if (q->nb < 32) q->bind[q->nb++] = v; }
+struct owned { char *s[64]; int n; };
+static const char *keep(struct owned *o, char *s) { if (o->n < 64) o->s[o->n++] = s; return s; }
+static void bind(struct sql *q, const char *v) { if (q->nb < 64) q->bind[q->nb++] = v; }
 
 /* %part% for LIKE with its own escape */
 static char *like_part(const char *v)
@@ -113,8 +113,8 @@ static void subtree(struct sql *q, const char *col, const struct subtree *t)
 static void facts(struct sql *q, struct owned *o, const struct lhcat_query *f, const struct subtree *in, int walk_order)
 {
     if (f->type && *f->type) {
-        char *types[8];
-        int nt = split_commas(f->type, types, 8);
+        char *types[16];
+        int nt = split_commas(f->type, types, 16);
         add(q, nt > 1 ? " AND (" : " AND ");
         for (int i = 0; i < nt; i++) {
             size_t n = strlen(types[i]);

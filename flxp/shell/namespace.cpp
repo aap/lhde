@@ -134,6 +134,16 @@ void sort_items(std::vector<Item>& items, SortBy by, bool ascending)
         case SortBy::Size: c = a.size < b.size ? -1 : a.size > b.size ? 1 : natural_compare(a.name, b.name); break;
         case SortBy::Type: c = a.type.compare(b.type); if (!c) c = natural_compare(a.name, b.name); break;
         case SortBy::Date: c = a.mtime < b.mtime ? -1 : a.mtime > b.mtime ? 1 : natural_compare(a.name, b.name); break;
+        case SortBy::Folder:   // the directory, then the name
+            c = natural_compare(a.path.substr(0, a.path.rfind('/')), b.path.substr(0, b.path.rfind('/')));
+            if (!c) c = natural_compare(a.name, b.name);
+            break;
+        case SortBy::Pending: {
+            int x = a.flags & HasConflict ? 2 : a.flags & HasEdits ? 1 : 0, y = b.flags & HasConflict ? 2 : b.flags & HasEdits ? 1 : 0;
+            c = x - y;
+            if (!c) c = natural_compare(a.name, b.name);
+            break;
+        }
         default:   // a stored property: empty ones first (XP's order for a column without a value), then by name
             if (prop) c = natural_compare(a.stored(prop->xattr), b.stored(prop->xattr));
             if (!c) c = natural_compare(a.name, b.name);

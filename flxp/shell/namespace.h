@@ -19,6 +19,9 @@ enum ItemFlags : uint32_t {
     // from the entry's d_type, type and icon from its name); IsStored once its stored properties (xattrs) were read,
     // whether any is set or not.
     IsSlow = 64, IsPending = 128, IsStored = 256,
+    // A catalogue's item (luxfind): an edit of its annotations is in the catalogue and not on the file yet (HasEdits), or
+    // the file changed under one (HasConflict); docs/CATALOGUE.md "Attributes: observed, desired, pending"
+    HasEdits = 512, HasConflict = 1024,
 };
 
 struct Item {
@@ -37,9 +40,10 @@ struct Item {
 };
 
 // What a list sorts by and what its Details columns are: the first four are
-// derived from the item, the others are stored properties (shell/details.h
-// column_property)
-enum class SortBy { Name, Size, Type, Date, Description, Tags, Comment, Color };
+// derived from the item, the next four are stored properties (shell/details.h
+// column_property); Folder and Pending are a search's (luxfind: XP's Search Results
+// "In Folder", and whether an edit waits in the catalogue), never a folder's
+enum class SortBy { Name, Size, Type, Date, Description, Tags, Comment, Color, Folder, Pending };
 
 class Folder {
 public:

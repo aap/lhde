@@ -407,6 +407,10 @@ const std::vector<Column>& all_columns()
         { (int)shell::SortBy::Tags, "Tags", 120, LVCFMT_LEFT },
         { (int)shell::SortBy::Comment, "Comment", 150, LVCFMT_LEFT },
         { (int)shell::SortBy::Color, "Color", 100, LVCFMT_LEFT },   // a swatch and the name: a provisional look
+        // a search's (luxfind): XP's Search Results "In Folder"; whether an edit waits in the catalogue (a choice: XP
+        // had nothing of the kind, the name and width are ours)
+        { (int)shell::SortBy::Folder, "In Folder", 180, LVCFMT_LEFT },
+        { (int)shell::SortBy::Pending, "Pending", 70, LVCFMT_LEFT },
     };
     return c;
 }
@@ -699,6 +703,8 @@ static void put_item(Browser& b, size_t i, int group, bool insert)
         if (id == (int)shell::SortBy::Size) text = b.size_shown(it) ? shell::format_size(it.size) : "";
         else if (id == (int)shell::SortBy::Type) text = it.type;
         else if (id == (int)shell::SortBy::Date) text = it.mtime ? shell::format_date(it.mtime) : "";
+        else if (id == (int)shell::SortBy::Folder) { text = b.column_text(it, id); if (text.empty()) text = shell::dir_of(it.path); }
+        else if (id == (int)shell::SortBy::Pending) text = it.flags & shell::HasConflict ? "Conflict" : it.flags & shell::HasEdits ? "Not written" : "";
         else if (const shell::details::Property* p = shell::details::column_property((shell::SortBy)id))
             text = shell::details::shown(*p, it.stored(p->xattr));
         std::u16string t = W(text);
@@ -755,6 +761,23 @@ void fill_list(Browser& b)
 
 // XP: the sort column gets HDF_SORTUP/DOWN in the
 // header and becomes the list's selected (tinted) column
+void append_list(Browser& b, size_t from)
+{
+    b.filling = true;
+    SendMessageW(b.list, WM_SETREDRAW, FALSE, 0);
+    for (size_t i = from; i < b.items.size(); i++) put_item(b, i, -1, true);
+    thumbview::fill(b.items);
+    SendMessageW(b.list, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(b.list, nullptr, TRUE);
+    b.filled();
+    b.filling = false;
+}
+
+void update_item(Browser& b, size_t i)
+{
+    if (i < b.items.size()) put_item(b, i, -1, false);
+}
+
 void sort_feedback(Browser& b)
 {
     HWND hdr = (HWND)SendMessageW(b.list, LVM_GETHEADER, 0, 0);

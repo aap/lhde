@@ -116,6 +116,21 @@ bool remove_tag(const std::string& path, const std::string& tag, std::string* er
 // other tags kept in their order. Nothing is written when nothing changes.
 bool change_tags(const std::string& path, const std::vector<std::string>& add, const std::vector<std::string>& remove,
                  std::string* err);
+// A route: a program that keeps some files' annotations itself (luxfind: the files of a root that cannot be reached, or
+// whose catalogue is the authority, docs/CATALOGUE.md) sets one, and for a path it takes, read_attr, list_attrs, write,
+// change_tags (as tag operations), read_stored and known_tags ask it instead of the file; nothing else changes. The
+// values given to set are normalized as write stores them ("" removes). UI thread; none by default.
+struct Route {
+    virtual ~Route() = default;
+    virtual bool takes(const std::string& path) = 0;    // (a directory's path with a '/' after it: its files)
+    virtual bool read(const std::string& path, const std::string& xattr, std::string* value) = 0;   // false: unknown
+    virtual std::vector<std::string> names(const std::string& path) = 0;   // the user.* names set
+    virtual bool set(const std::string& path, const std::string& xattr, const std::string& value, std::string* err) = 0;
+    virtual bool tags(const std::string& path, const std::vector<std::string>& add, const std::vector<std::string>& remove,
+                      std::string* err) = 0;
+};
+void set_route(Route* r);
+Route* route();
 // The tags to offer where a tag is typed (Add Tag..., the Properties sheet): those of `paths`, then the recently used
 // ones (remember_tags), then those of the other files in the paths' folders (at most 2000 entries a folder); each once.
 std::vector<std::string> known_tags(const std::vector<std::string>& paths);

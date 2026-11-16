@@ -401,8 +401,9 @@ int lhcat_apply(lhcat *c, const char *rel, const struct lhcat_op *op, int write,
         return 0;
     }
     sqlite3_finalize(seen);
-    /* the file observed now, so the value a write replaces is the one on disk */
-    if (lhcat_touch(c, rel) != 0) {
+    /* the file observed now, so the value a write replaces is the one on disk; a deferred operation does not look at the
+       file (it may not be reachable: an offline root, a dead mount; the commit compares with what is on disk then) */
+    if (write && lhcat_touch(c, rel) != 0) {
         if (!c->err[0]) lhcat__fail(c, "%s: not there", rel);
         goto fail;
     }

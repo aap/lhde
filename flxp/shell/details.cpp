@@ -205,11 +205,18 @@ static void follow(const std::string& path, const std::string& xattr, const std:
         fprintf(stderr, "%s: the catalogue %s did not follow: %s\n", lhde_progname(), lhcat_name(c), lhcat_error(c));
 }
 
+// ---- a route: another keeper of some files' annotations ------------------------------------------------------------------
+static Route* g_route;
+void set_route(Route* r) { g_route = r; }
+Route* route() { return g_route; }
+static bool routed(const std::string& path) { return g_route && g_route->takes(path); }
+
 // the size first, then a buffer of that size; ERANGE: it grew in between, ask again
 Read read_attr(const std::string& path, const std::string& xattr, std::string* value, int* error)
 {
     value->clear();
     if (error) *error = 0;
+    if (routed(path)) return g_route->read(path, xattr, value) ? (value->empty() ? Read::Missing : Read::Value) : Read::Failed;
     for (int tries = 0; tries < 8; tries++) {
         ssize_t n = lhde_xattr_get(path.c_str(), xattr.c_str(), nullptr, 0);
         if (n > 0) {
@@ -237,6 +244,7 @@ Read list_attrs(const std::string& path, std::vector<std::string>* names, int* e
 {
     names->clear();
     if (error) *error = 0;
+    if (routed(path)) { *names = g_route->names(path); return names->empty() ? Read::Missing : Read::Value; }
     for (int tries = 0; tries < 8; tries++) {
         ssize_t n = lhde_xattr_list(path.c_str(), nullptr, 0);
         std::string buf;
@@ -357,6 +365,7 @@ std::string join_list(const std::vector<std::string>& items)
 // setxattr, or removexattr for an empty value (not being there is fine then)
 static bool put(const std::string& path, const std::string& xattr, const std::string& value, std::string* err)
 {
+    if (routed(path)) { std::string e; if (g_route->set(path, xattr, value, &e)) return true; if (err) *err = e; return false; }
     int rc = value.empty() ? lhde_xattr_remove(path.c_str(), xattr.c_str()) : lhde_xattr_set(path.c_str(), xattr.c_str(), value.data(), value.size());
     if (rc == 0 || (value.empty() && errno == LHDE_ENOATTR)) return true;
     if (!err) return false;
@@ -396,7 +405,7 @@ bool write(const std::string& path, const Property& p, const std::string& text, 
     std::string old;
     if (!read_current(path, p, &old, err)) return false;   // the value it replaces was not seen
     if (!put(path, p.xattr, v, err)) return false;
-    follow(path, p.xattr, old, v);
+    if (!routed(path)) follow(path, p.xattr, old, v);
     return true;
 }
 
@@ -404,6 +413,15 @@ bool change_tags(const std::string& path, const std::vector<std::string>& add, c
                  std::string* err)
 {
     const Property* p = property("tags");
+    if (routed(path)) {   // tag operations (two machines' additions merge), not the list written whole
+        std::vector<std::string> a, r;
+        for (const std::string& t : add) for (const std::string& u : split_list(t)) a.push_back(u);
+        for (const std::string& t : remove) r.push_back(t);
+        std::string e;
+        if (g_route->tags(path, a, r, &e)) return true;
+        if (err) *err = e;
+        return false;
+    }
     std::string old;
     if (!read_current(path, *p, &old, err)) return false;
     std::vector<std::string> have = split_list(old);
@@ -479,6 +497,7 @@ std::vector<std::string> known_tags(const std::vector<std::string>& paths)
         if (std::find(dirs.begin(), dirs.end(), d) == dirs.end() && dirs.size() < 8) dirs.push_back(d);
     }
     for (const std::string& d : dirs) {
+        if (routed(d + "/")) continue;   // (not read from the files)
         DIR* dir = opendir(d.c_str());
         if (!dir) continue;
         int n = 0;
