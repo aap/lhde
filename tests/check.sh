@@ -71,6 +71,9 @@ result "thumbstest ($(tail -n 1 "$T/thumbs.log"))" $? "$T/thumbs.log"
 # luxview's view model (apps/luxview/model.h): the list's order, generations, the prefetch, the budget, closing during a decode
 build/tests/luxviewtest > "$T/luxview-model.log" 2>&1
 result "luxviewtest ($(tail -n 1 "$T/luxview-model.log"))" $? "$T/luxview-model.log"
+# mupf's page layout and render cache (apps/mupf/layout.h): the layouts, the fits, the current page, the cache's budget
+build/tests/mupftest > "$T/mupf-layout.log" 2>&1
+result "mupftest ($(tail -n 1 "$T/mupf-layout.log"))" $? "$T/mupf-layout.log"
 # lhde-import's overwrite policy (kept without --force, written with it) on a scratch tree and a stand-in file
 tests/import-policy.sh > "$T/import.log" 2>&1
 result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"
