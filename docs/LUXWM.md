@@ -1042,6 +1042,10 @@ and restore go through `max_transition()`.
 
   picom starts client and frame animations in the same millisecond, except "open": the decoration window is created at the MapRequest,
   so picom imports it one frame (30..50 ms on the lab) after the client.
+- **Fullscreen is not animated.** Entering fullscreen takes the frame away but keeps its decoration window mapped, shaped empty and
+  shrunk to 1 x 1 under the fullscreen client (`client_decorations_park`); leaving it gives the same window back its shape, size and
+  paint, with a compositor under a server grab together with the client's return, so the frame is there in the first composited
+  frame, as on XP. A new window there would be mapped and get picom's "open" animation or default fade (`tests/headless/fullscreen.sh`).
 - **Without a compositor** luxwm draws XP's animation itself (`anim_classic`), on the root with the server grabbed, from the frame
   rectangle to the taskbar button (`_NET_WM_ICON_GEOMETRY`, written by luxshell; fallback a 160x24 rectangle at the bottom-left of the
   work area) and back on restore, and from the old to the new rectangle on maximise/restore (XP does that too). XP's win32k uses

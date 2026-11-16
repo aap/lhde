@@ -15,6 +15,7 @@ struct client_geom {
 
 struct client {
     Window window, dec;
+    Window fs_dec;                      /* the decoration window kept, mapped and shaped empty, while fullscreen (client_decorations_park) */
     int ws, x_hide;
     bool decorated, hidden, fullscreen, mono, was_fs;
     bool minimized, attention, below;   /* minimised (hidden by the user, not by a workspace switch), EWMH demands-attention, always below */
