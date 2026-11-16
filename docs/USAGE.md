@@ -1126,8 +1126,8 @@ catalogue is the authority. Commit (the pane's button, File > Commit Pending Edi
 `lhde-cat diff NAME` shows the same list. Ctrl+F the name box, Ctrl+W closes; Alt and the underlined letter reaches a box.
 ## mupf, the document viewer
 
-`mupf FILE` opens a PDF, an XPS or OpenXPS document, an EPUB, a comic book (CBZ), FictionBook or MOBI file, or a Markdown
-file (below), drawn by MuPDF
+`mupf FILE` opens a PDF, an XPS or OpenXPS document, an EPUB, a comic book (CBZ), FictionBook or MOBI file, a Markdown
+file, or a Typst or LaTeX source (both below), drawn by MuPDF
 (built when MuPDF's library is installed: docs/BUILDING.md); File > Open (Ctrl+O) is the Open dialog, and a file dropped on
 the window opens too. XP had no PDF viewer of its own: the window is in the idiom of XP's programs, and where a choice had
 a model it is Acrobat Reader 6's (2003): the menu bar (File, Edit, View, Go, Help) with Acrobat's items and keys, the pages
@@ -1164,10 +1164,14 @@ above about 270%) is drawn as the part in view.
   Continuous (the pages in a column, the default), Facing and Continuous - Facing (two pages side by side), Show Cover Page (with
   facing: the first page alone on the right, then 2-3, 4-5, as a book opens).
 - **Zoom**: Zoom In and Out (Ctrl++ and Ctrl+-, Ctrl+wheel about the pointer) go by Acrobat's steps, 8.33% to 1600%; Actual Size
-  (Ctrl+1) is 100%, 96 pixels to the inch; Fit Page (Ctrl+0) and Fit Width (Ctrl+2) follow the window's size. Rotate
+  (Ctrl+1) is 100%, 96 pixels to the inch; Fit Page (Ctrl+0) and Fit Width (Ctrl+2) follow the window's size, as does mupdf's
+  fit height (H: the page's height in the window whatever its width; no menu item). Rotate
   Clockwise and Counterclockwise (Ctrl+], Ctrl+[) turn the view, not the file.
 - **Pages**: Page Up and Page Down, Left and Right when the page fits the width, Home and End; Space scrolls a screen; the status
-  bar's arrows and its page number (a click, type a number, Return) and Go To Page (Ctrl+G); Back and Forward (Alt+Left,
+  bar's arrows and its page number (a click, type a number, Return) and Go To Page (Ctrl+G); mupdf's keys as well (`,` `.`
+  the previous and next page, `<` `>` ten pages, `123g` page 123, `g` `G` the first and last, `j` `k` `h` `l` a line,
+  `W` `H` `Z` fit width, height and page, `+` `-`, `/` the Find box, `n` `N` the next and previous match, `r` reload,
+  `q` quit: docs/KEYS.md); Back and Forward (Alt+Left,
   Alt+Right) return over jumps (a page number, a contents entry, a link, Home, End). A drag moves the pages (Acrobat's hand); a click on a link follows it, to its
   page or, for a web address, with xdg-open. The wheel scrolls the system's wheel lines (three of 40 px a notch),
   Shift+wheel and a sideways wheel (a tilt wheel, a touchpad's horizontal scroll) across. The middle button is Firefox's
@@ -1177,8 +1181,11 @@ above about 270%) is drawn as the part in view.
   accelerator's too; Shift, Ctrl and Alt alone do not end it). Where it began, a round grey mark with arrow heads (up and
   down, left and right too when the pages are wider than the view) is drawn over the pages, IE's and Firefox's; its look is
   a choice, XP's reader-mode bitmaps not being ours to copy. Its cursor is the cursor theme's all-scroll (the core cursor
-  font's fleur without one). `autoscroll = 0` under `[view]` in `mupf.ini` turns it off: for a TrackPoint whose middle
-  button scrolls in the X server (libinput's button scrolling) and still delivers a click when let go.
+  font's fleur without one). `mupf_autoscroll = 0` in flxp.ini (or `FLXP_MUPF_AUTOSCROLL=0`) turns it off: for a TrackPoint
+  whose middle button scrolls in the X server (libinput's button scrolling) and still delivers a click when let go. A middle
+  click starts it wherever the focus was (the header's search box, the Contents pane): the view takes the focus.
+- **Focus**: the pages have the keyboard focus when a document opens and after a click in them; the Contents pane's tree
+  only when it is clicked (F4 shows it and leaves the keys with the pages), the Find box when it is clicked or asked for.
 - **Contents** (View > Contents, F4, the cross in its title closes it): the document's outline in a tree on the left, as XP's
   Explorer bar; a click on an entry goes there, the arrow keys go as they select, and as the pages move the entry they are in
   is selected (Acrobat 7's). The splitter beside it sizes it.
@@ -1206,25 +1213,48 @@ line wraps instead of scrolling, no syntax colours, no pictures from the web (on
 `![](...)` is read from the file's directory), task boxes as the characters ☐ and ☑. A front matter block (`---` lines at the
 top) is left out. The window's title is the first H1 (else the file's name), the Contents pane the headings H1 to H3 (it
 follows the scroll), a link to another `.md` file opens it in the same window (Back returns to where you were; `other.md#part`
-to that heading), `#heading` goes to the heading, and a web address goes to xdg-open. The file is followed on disk: written
-by an editor beside it, it is laid out again within a moment, the view where it was, so a text editor and mupf side by side
-are an editor with a preview.
+to that heading), `#heading` goes to the heading, and a web address goes to xdg-open. Written by an editor beside it, it is
+laid out again within a moment, the view where it was, so a text editor and mupf side by side are an editor with a preview.
 
 EPUB, FictionBook, MOBI and MuPDF's other reflowable documents are shown the same way: laid out to the window's width (at
-most 980 px at 100%), white without a page around them, scrolled down, a chapter after the other.
+most 980 px at 100%), white without a page around them, scrolled down, a chapter after the other. Having no pages to step
+through, Page Up and Page Down (and Left, Right, `,` `.`) scroll them a screen less a line, Home and End (`g`, `G`) go to
+the top and the bottom.
+
+**Every document is followed on disk**: written again (by `typst watch in.typ out.pdf`, `latexmk -pvc`, an editor), it is
+opened again within a moment (150 ms after the last write), on the same page and at the same place on it, at the same zoom,
+the history, the outline's expansion and the search kept; File > Reload (`r`) does the same at once. The pages shown stay
+until the new file is in, so it does not flash; a file caught half written is read again three times, 300 ms apart, and
+then the status bar says it could not be read, the old pages staying until the next write.
+
+**Typst and LaTeX sources**: `mupf paper.typ` runs `typst watch paper.typ` itself (typst found on PATH when mupf runs; without
+it the status bar says so) into `~/.local/state/lhde/mupf-PID/paper.pdf`, shows that PDF and opens it again after every
+compile that succeeds, so a text editor and mupf beside it are a writing environment: a save is on screen about 0.2 s later
+for a few pages. A compile that fails shows typst's diagnostics in a pane under the pages (the message, the file, line and
+column, the line with a caret under the place) and says so in the status bar ("typst: compiled with errors (the last good
+document is shown)"); the last good PDF stays until the next compile that succeeds closes the pane. `mupf paper.tex` does the
+same with `latexmk -pvc -pdf` (run in the source's directory, `-view=none`, TeX in nonstop mode with `-halt-on-error`; the pane
+shows TeX's `!` lines with their `l.N` context), a few seconds a compile. The window's title and the header's first segment
+are the source's name. The compiler ends when mupf exits, closes the file or opens another one, and its directory is
+removed with it (one left by a mupf that was killed is removed the next time a source is shown). `text/x-typst` is
+mupf's by lhde's defaults (it is in no role); `.tex` stays with the editor (mupf does not claim it: a claimant would win
+over the editor that `text/plain` has where nothing names `text/x-tex`), so `mupf paper.tex` is typed.
 
 A password-protected document asks for its password (Acrobat 6's Password dialog: "'NAME' is protected. Please enter a
 Document Open Password.", again after a wrong one; Cancel leaves the window empty). There is no printing, no text selection
 and no bookmarks.
 What mupf remembers: `~/.local/state/lhde/mupf.ini` (`[window]` `x`, `y`, `width`, `height`, `maximized`; `[view]` `toolbar`,
-`statusbar`, `contents` and `contents_width`, `large_header`, `autoscroll` (the middle button, 1), `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
-1 Fit Page, 2 Fit Width) and `zoom` in thousandths), written when it exits. `mupf.desktop` (installed with it) claims what MuPDF
-opens, lhde's defaults give it PDF, XPS, EPUB and Markdown, and it is the first choice of the document viewer's role. `MUPF_TRACE=1`
+`statusbar`, `contents` and `contents_width`, `large_header`, `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
+1 Fit Page, 2 Fit Width, 3 mupdf's fit height) and `zoom` in thousandths), written when it exits (an `autoscroll` key there, which
+one build wrote, is not read and is dropped). `mupf.desktop` (installed with it) claims what MuPDF
+opens and Typst sources, lhde's defaults give it PDF, XPS, EPUB, Markdown and Typst, and it is the first choice of the document viewer's role. `MUPF_TRACE=1`
 prints what it opens, draws and shows on stdout (`opened 2 pages PDF 1.4`, `rendered 1 816x1056 of 816x1056 at 100%`,
 `shown 1:X,Y,WxH ...`, `view X Y W H` (the view in root coordinates), `scroll SX SY PW PH` (where the view is in the
 plane of the pages, and the plane's size), `flow W`, `reflow W` and `relaid N pages W` (a reflowable document laid out W
 points wide), `autoscroll on X,Y`, `autoscroll sticky`, `autoscroll step TICK DX,DY SX,SY` (a step: GetTickCount's milliseconds, the pixels scrolled, where the view is), `autoscroll off X,Y`, `tocentry INDEX LEVEL PAGE Y TITLE` (the outline's places, in points), `linkrect PAGE X0 Y0 X1 Y1
-TARGET` (a page's links), `watch DIR` and `reload FILE` (a Markdown file followed and read again), `status MESSAGE|Page 1 of 2|100%`, `pagenav PREVX PREVY TEXTX TEXTY NEXTX NEXTY` (the status bar's
+TARGET` (a page's links), `watch DIR` and `reload FILE` (a document followed and read again), `restored SX,SY page N` (where a
+reload or a jump to another file put the view), `key C` (one of mupdf's keys), `compile PROGRAM PDF`, `compiled SUMMARY`,
+`compile failed SUMMARY`, `compiler ended SUMMARY` (a source's compiler), `status MESSAGE|Page 1 of 2|100%`, `pagenav PREVX PREVY TEXTX TEXTY NEXTX NEXTY` (the status bar's
 arrows and number, from the window's top left), `pagenav next`, `page edit`, `tocitem INDEX X Y TITLE`, `toc follows INDEX
 TITLE`, `header N rows`, `rebar N rows`, `large header on`, `find box header`, `crumbs A > B > Page 1 of 2`, `header go KEY`),
 for scripts.

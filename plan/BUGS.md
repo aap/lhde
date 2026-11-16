@@ -149,6 +149,8 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   screen with blur: a client's round trip waits behind it, so anything that scrolls in the lab draws at ~12 frames a second
   (mupf's autoscroll: a step every 70-85 ms; 16 ms without picom or with its glx backend). Timing measured in the lab is not
   the real session's.
+- 2026-11-16 mupfheader.sh's behaviour part (MUPFHEADER_BEHAVIOUR) assumes the flxp header: under aerovision (lhnav draws it)
+  no `lhheader crumb` lines are traced, so its drop-down, Back and first-segment checks fail (3 FAILs); slate4051, the default, passes.
 
 ## Repository
 - 2026-11-14 Publish the free pack: a GitHub release tagged `resources` with lhde-resources-free-3.zip (FREE_PACK_URL's default,

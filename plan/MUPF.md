@@ -4,7 +4,9 @@ Status: the first version is in (apps/mupf; docs/USAGE.md "mupf", docs/KEYS.md, 
 thread, the cache, the four page layouts, zoom, the Contents pane, the search, links, Back and Forward, the Longhorn header,
 the password prompt, Markdown files (md4c's HTML laid out by MuPDF, GitHub's look, followed on disk), the view as mupdf's
 (its grey, the page centred, the scroll range stopping at the pages' edge), reflowable documents (Markdown, EPUB) laid
-out to the window's width without a page, Firefox's middle-button autoscroll; tests/headless/mupf.sh,
+out to the window's width without a page, Firefox's middle-button autoscroll, mupdf's keys beside Acrobat's, every
+document followed on disk (reloaded where the view was), Typst and LaTeX sources shown through `typst watch` and `latexmk
+-pvc` (apps/mupf/compile.h) with the compiler's diagnostics in a pane; tests/headless/mupf.sh,
 mupfheader.sh, mupfmd.sh and tests/toolkit/mupftest.cpp, mdtest.cpp. Open: the items below, in the
 order they would come.
 
@@ -43,6 +45,9 @@ narrower padding in a narrow window (15 px under 768 px; mupf keeps 32), syntax 
 
 - Show the pane at open when the PDF asks for it (/PageMode /UseOutlines), as Acrobat does.
 - Printing waits for wux's (APPLICATIONS.md "No printing").
+- The compilers: typst's warnings are not shown (a compile with warnings reloads as a good one); SyncTeX and typst's
+  jump from a click in the PDF to the source line (and back from the editor) would make it a full writing environment;
+  latexmk's -pdf is pdflatex (a `latexmkrc` choosing xelatex or lualatex is latexmk's own and works).
 - The autoscroll's reader-mode cursors (OCR_RDR2DIM, OCR_RDRNORTH ...) if wux gets cursors beyond the theme's named ones;
   its mark is drawn in the view and so stays inside it (Firefox's is a popup over everything).
 - A reflowable document's layout is mupdf's tall page cut to its ink: an EPUB chapter is one such page, laid out again

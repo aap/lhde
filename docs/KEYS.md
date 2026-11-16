@@ -138,7 +138,11 @@ The text keys are the Edit control's (below).
 
 A drag moves a picture larger than the window.
 
-## mupf (fixed, Acrobat Reader 6's where it had one)
+## mupf (fixed, Acrobat Reader 6's where it had one, mupdf's beside them)
+
+mupdf's keys act while the pages have the focus (a typed `/` or `n` in the Find box is text). In a reflowable document
+(Markdown, EPUB), which has no pages to step through, "the previous / next page" is a screen up or
+down (less a line) and "the first / last page" its top and bottom.
 
 | Keys | Action |
 | --- | --- |
@@ -148,6 +152,14 @@ A drag moves a picture larger than the window.
 | Up, Down; the wheel; Shift+wheel | scroll (the wheel: the system's wheel lines, three of 40 px; Shift+wheel across; Single Page: past the page's end to the next) |
 | Space, Shift+Space, Backspace | a screen down / up |
 | Home, End | the first / last page |
+| `,` `.` (mupdf's) | the previous / next page |
+| `<` `>` (mupdf's) | ten pages back / on (a reflowable document: ten screens) |
+| `j` `k` `h` `l` (mupdf's) | a line down, up, left, right |
+| `g`, `G`; a number and `g` (mupdf's) | the first / last page; that page (`123g`) |
+| `W`, `H`, `Z` (mupdf's) | Fit Width, fit height (the page's height in the window), Fit Page |
+| `+` `-` (mupdf's) | zoom in / out |
+| `/`, `n`, `N` (mupdf's) | the Find box; the next / previous match |
+| `r`, `q` (mupdf's) | reload the file (File > Reload), exit |
 | Ctrl+G | Go To Page |
 | Alt+Left, Alt+Right | back, forward over jumps |
 | Ctrl++, Ctrl+-; Ctrl+wheel | zoom in / out (about the pointer with the wheel) |
@@ -163,7 +175,7 @@ A drag moves a picture larger than the window.
 
 A drag moves the pages; a click on a link follows it. The middle button scrolls as Firefox's autoscroll: held and moved,
 toward the pointer until it is let go; clicked, until the next click or key (Shift, Ctrl and Alt alone excepted).
-`autoscroll = 0` under `[view]` in mupf.ini turns it off, for a TrackPoint set up with libinput's button scrolling.
+`mupf_autoscroll = 0` in flxp.ini turns it off, for a TrackPoint set up with libinput's button scrolling.
 
 ## Every program built on wux (fixed)
 
