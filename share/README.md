@@ -11,6 +11,7 @@ relative name overrides the one here; the Windows tree's `index/` (`~/.local/sha
 - `icons/flags/NAME-SIZE.png`: lhde's own Start button pictures (`lhde`, `linux`, `freebsd` at 16, 20, 24 and 32 px;
   `Shell.start_icon`, docs/THEME-FORMAT.md section 2b), drawn in code by `tools/start_icons.py`; run it again after changing a
   drawing (`make check` compares).
+- `firefox/userChrome.css.in`: the template of `tools/lhde-firefox`'s userChrome.css (docs/USAGE.md "Firefox").
 - `sources/*.ini`: what tools/lhde-pack takes from each Windows build and what lhde-import derives from it.
 - `frames/NAME/theme.ini`: luxwm's frame sets, the tuning keys; their pixels (or a cache) come from lhde-import.
 - `applications/lhde-mimeapps.list`: lhde's default programs, installed to `$PREFIX/share/applications` (not `share/lhde`; an

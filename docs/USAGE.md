@@ -1273,6 +1273,39 @@ the role opens. OK or Apply writes `settings.ini [programs]` and the role file a
 role without a choice takes lhde's (luxpad for text, flxp for folders, the first installed of a list of known viewers and
 players for the others; nothing while none is installed). From a terminal: `lhde-mime roles`, `lhde-mime role ROLE APP`.
 
+## Firefox (lhde-firefox)
+
+`tools/lhde-firefox` gives Firefox's own chrome the theme's look through a userChrome.css. For a Longhorn theme
+(`Explorer.chrome = longhorn`) the top of the window becomes flxp's header band below luxwm's caption: the style's navigation
+bar picture (`Navbar::Rebar`, opaque: Firefox cannot be transparent on X11, so where flxp's header is glass the band is the
+one flxp draws without composition), Back and Forward as the style's travel buttons (TravelBack/TravelFwd), the address on
+the breadcrumb's row (a field only while hovered or focused), the search box at the right, and below the band the tabs on a
+flat row in its lower colour, the selected one lighter. Under Aero vision the band keeps flxp's header height and the travel
+art is scaled into it. The XP and classic themes get a plain toolbar in the theme's button-face colours (Internet Explorer
+6's). Tahoma or Segoe UI come from the theme's font directory. Which parts are measured against flxp and which are taste is
+said in the template, `share/firefox/userChrome.css.in`. Menus, context menus and popups are GTK's and keep its theme.
+
+    lhde-firefox install                     the current theme into the default profile (Firefox closed)
+    lhde-firefox install jade4074 --profile ~/.config/mozilla/firefox/xxxx.default-release
+    lhde-firefox remove                      undo it
+    lhde-firefox generate [THEME] [-o FILE]  only the CSS (stdout, or FILE with the rendered pieces in lhde-art/ beside it)
+    lhde-firefox profiles                    the profiles profiles.ini lists ($XDG_CONFIG_HOME/mozilla/firefox, ~/.mozilla/firefox)
+
+`install` refuses a profile that is in use (its `.parentlock` is held, or its `lock` names a live process): close Firefox
+first. It writes `chrome/userChrome.css` (a userChrome.css of your own is kept as `userChrome.css.lhde-backup` and put back
+by `remove`) and `chrome/lhde-art/`: the band and the travel buttons rendered from your visual style by ut-dump, since
+Firefox cannot read a .msstyles; fonts and everything else stay in the Windows tree and are referenced by `file://` URL.
+Without the Windows tree (or with only the free ReactOS import) the CSS uses colours alone. Into `user.js`, in a marked block
+that `remove` takes out again: `toolkit.legacyUserProfileCustomizations.stylesheets = true` (Firefox reads userChrome.css),
+`browser.tabs.inTitlebar = 0` (luxwm draws the frame and caption), `browser.uidensity = 1` (compact),
+`browser.theme.toolbar-theme = 1` (light chrome whatever GTK's theme), `browser.compactmode.show = true`,
+`sidebar.revamp = false`, `sidebar.verticalTabs = false`, `browser.search.widget.removeAfterDaysUnused = 36500`. Once, into
+`prefs.js` (kept as `prefs.js.lhde-backup`), the search box is placed after the address and the bookmarks toolbar set to
+hidden unless shown; both are ordinary toolbar settings afterwards, and `remove` leaves them.
+
+Firefox reads userChrome.css at start only, and nothing runs `lhde-firefox` on a theme switch yet: run `install` again after
+switching (the place for that hook is luxshell's `lh-theme` handler in runtime.lua, which sees every `_LH_THEME` change).
+
 ## Start menu, taskbar autohide, sidebar modes (luxshell, docs/SHELL-DESIGN.md 6.4, 7.3, 13)
 
 **Start menu.** The Start button and the Super key (luxwm sends the root client message `_LHSHELL_START` when Super is pressed

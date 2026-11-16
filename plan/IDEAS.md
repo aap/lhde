@@ -10,6 +10,8 @@ becomes a plan file (plan/NAME.md, with a status line) when work on it starts, a
 - 2026-10-31 aap: a graphical theme installer and a desktop with nothing imported: plan/THEMING.md.
 - 2026-11-13 aap: the colour label as an icon overlay badge, XP's idiom (a dot of 8-10 px with a 1 px dark edge at the icon's
   bottom right in every view, scaled with it); the Details column stays for sorting; a hex field in the Metadata tab later.
+- 2026-11-16 Firefox: a GTK theme from the visual style for what lhde-firefox's userChrome.css cannot reach (menus, context
+  menus, popups, form widgets); lhde-firefox install run on a theme switch from luxshell's lh-theme handler (closed profiles).
 - 2026-11-01 survey: E's theming as a concept: one theme skins WM, shell and every app, an app adds or overrides a few parts; a
   runnable one-file example per widget.
 
