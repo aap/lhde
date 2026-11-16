@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <mutex>
 #include "liblhde/compat.h"
 #include "config.h"
 #include "util.h"
@@ -97,10 +98,32 @@ static std::vector<std::string> split_dirs(const char* var, const char* fallback
 std::vector<std::string> config_dirs() { return split_dirs("XDG_CONFIG_DIRS", "/etc/xdg"); }
 std::vector<std::string> data_dirs() { return split_dirs("XDG_DATA_DIRS", "/usr/local/share:/usr/share"); }
 
+// flxp.ini as last read, read again when its stat changes (an atomic write is a new inode; the time to the nanosecond,
+// the size): a view asks for settings on every scroll step, and the file is one stat away instead of an open and a read
+static std::string ini_text()
+{
+    static std::mutex lock;
+    static std::string dir, path, text;
+    static struct stat was;
+    static bool have;
+    std::lock_guard<std::mutex> l(lock);
+    std::string d = config_home();
+    if (d != dir) { dir = d; path = settings_path(); have = false; }   // (settings_path makes the directory, once here)
+    struct stat st;
+    if (stat(path.c_str(), &st) != 0) { have = false; text.clear(); return text; }
+    if (have && st.st_ino == was.st_ino && st.st_dev == was.st_dev && st.st_size == was.st_size &&
+        st.st_mtim.tv_sec == was.st_mtim.tv_sec && st.st_mtim.tv_nsec == was.st_mtim.tv_nsec)
+        return text;
+    text.clear();
+    have = read_file(path, text);
+    was = st;
+    return text;
+}
+
 std::string file_setting(const std::string& key, const std::string& fallback)
 {
-    std::string text;
-    if (!read_file(settings_path(), text)) return fallback;
+    std::string text = ini_text();
+    if (text.empty()) return fallback;
     size_t i = 0;
     while (i < text.size()) {
         size_t j = text.find('\n', i);
