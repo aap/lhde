@@ -145,7 +145,7 @@ A drag moves a picture larger than the window.
 | Ctrl+O, Ctrl+W, Ctrl+D, Ctrl+Q | open, close the document, Document Properties, exit |
 | Page Up, Page Down | the previous / next page (with facing: pair) |
 | Left, Right | the previous / next page; scroll sideways when the page is wider than the window |
-| Up, Down; the wheel; Shift+wheel | scroll (Single Page: past the page's end to the next) |
+| Up, Down; the wheel; Shift+wheel | scroll (the wheel: the system's wheel lines, three of 40 px; Shift+wheel across; Single Page: past the page's end to the next) |
 | Space, Shift+Space, Backspace | a screen down / up |
 | Home, End | the first / last page |
 | Ctrl+G | Go To Page |
@@ -161,7 +161,8 @@ A drag moves a picture larger than the window.
 | Esc in the header's search box | clear the search |
 | Alt, F10, Alt+letter | the menu bar |
 
-A drag moves the pages; a click on a link follows it.
+A drag moves the pages; a click on a link follows it. The middle button scrolls as Firefox's autoscroll: held and moved,
+toward the pointer until it is let go; clicked, until the next click or key.
 
 ## Every program built on wux (fixed)
 

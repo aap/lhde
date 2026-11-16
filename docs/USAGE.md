@@ -1131,8 +1131,12 @@ file (below), drawn by MuPDF
 (built when MuPDF's library is installed: docs/BUILDING.md); File > Open (Ctrl+O) is the Open dialog, and a file dropped on
 the window opens too. XP had no PDF viewer of its own: the window is in the idiom of XP's programs, and where a choice had
 a model it is Acrobat Reader 6's (2003): the menu bar (File, Edit, View, Go, Help) with Acrobat's items and keys, the pages
-on the application workspace grey (128) with a black frame and a dark shadow, the page layouts, the Find box in the
-toolbar. The toolbar's order and glyphs (Zoom Out, Zoom In | Actual Size, Fit Page, Fit Width | the Find box, Find Next) are
+with a black frame and a dark shadow, the page layouts, the Find box in the toolbar. Around the pages is mupdf's grey
+(112: the `mupdf` viewer's, measured; Acrobat's was the application workspace colour, 128), and they sit as mupdf shows
+them: a page narrower than the window in the middle of it, in Single Page and Facing a page shorter than it in the
+middle down it too (the continuous layouts start at the top, as Acrobat's); a larger one opens at its middle and
+scrolls as far as its edge and the margin around it, no further, by any means (the bars, the keys, the wheel, a drag).
+Resizing the window keeps what is in its middle there. The toolbar's order and glyphs (Zoom Out, Zoom In | Actual Size, Fit Page, Fit Width | the Find box, Find Next) are
 mupf's, as is the status bar's page part, which is the page navigation under both looks: the previous and next arrows
 around "Page N of M" (greyed at the first and last page); a click on the text makes the number an edit (type a number,
 Return). There is no shot of Acrobat 6 to measure.
@@ -1165,7 +1169,12 @@ above about 270%) is drawn as the part in view.
 - **Pages**: Page Up and Page Down, Left and Right when the page fits the width, Home and End; Space scrolls a screen; the status
   bar's arrows and its page number (a click, type a number, Return) and Go To Page (Ctrl+G); Back and Forward (Alt+Left,
   Alt+Right) return over jumps (a page number, a contents entry, a link, Home, End). A drag moves the pages (Acrobat's hand); a click on a link follows it, to its
-  page or, for a web address, with xdg-open.
+  page or, for a web address, with xdg-open. The wheel scrolls the system's wheel lines (three of 40 px a notch),
+  Shift+wheel across. The middle button is Firefox's autoscroll: held down and moved, the pages scroll toward the pointer,
+  the faster the farther it is from where the button went down (Firefox's speed: nothing within 12 px), until it comes
+  up; clicked without moving, the same stays on, the pointer steering it, until the next click or key. Its cursor is the
+  cursor theme's all-scroll, without Firefox's round mark where it began: XP's reader-mode cursors (user32's OCR_RDR*)
+  are not among wux's cursors.
 - **Contents** (View > Contents, F4, the cross in its title closes it): the document's outline in a tree on the left, as XP's
   Explorer bar; a click on an entry goes there, the arrow keys go as they select, and as the pages move the entry they are in
   is selected (Acrobat 7's). The splitter beside it sizes it.
@@ -1179,8 +1188,13 @@ above about 270%) is drawn as the part in view.
 **Markdown** (`.md`, `.markdown`, `.mkd`; `text/markdown`, which lhde's defaults give to mupf; a `README` without an
 extension is text and stays with luxpad): `mupf README.md` reads a repository's README as GitHub shows it, without a browser.
 md4c (`apps/mupf/vendor/md4c`) converts it with GitHub's extensions (tables, strikethrough, task lists, bare web addresses
-as links, `#Heading` without the space; inline HTML such as `<img width="49%">` and `<p>` kept) and MuPDF lays the page out
-660 points wide as one tall page. The look is a choice, no program of the era rendered Markdown: GitHub's README stylesheet
+as links, `#Heading` without the space; inline HTML such as `<img width="49%">` and `<p>` kept) and MuPDF lays it out as
+one tall page as wide as the window, as a browser does, up to GitHub's README column (980 px, centred in a wider
+window); a moment (120 ms) after the window's size changes it is laid out again for the new width, the view at the same
+place in the file (a drag-resize lays it out once, not at every step; until then the lines are where they were). It is
+not a page: white from the window's edge to edge, no frame, no shadow, no grey, no horizontal scroll bar. The zoom makes
+the text larger or smaller and lays it out again (Fit Page and Fit Width are 100%); Page Layout and Rotate do not
+apply. The look is a choice, no program of the era rendered Markdown: GitHub's README stylesheet
 (its spacing and sizes, the headings with their rule under H1 and H2, code in a monospace block on light grey, tables with
 borders, a quote with a bar on its left, its link blue) with the body in the theme's UI font (Tahoma under XP, Segoe UI under
 Jade where imported), 16 px at 100%. Where it falls short of GitHub: no rounded corners, no striped table rows, a long code
@@ -1192,6 +1206,9 @@ to that heading), `#heading` goes to the heading, and a web address goes to xdg-
 by an editor beside it, it is laid out again within a moment, the view where it was, so a text editor and mupf side by side
 are an editor with a preview.
 
+EPUB, FictionBook, MOBI and MuPDF's other reflowable documents are shown the same way: laid out to the window's width (at
+most 980 px at 100%), white without a page around them, scrolled down, a chapter after the other.
+
 A password-protected document asks for its password (Acrobat 6's Password dialog: "'NAME' is protected. Please enter a
 Document Open Password.", again after a wrong one; Cancel leaves the window empty). There is no printing, no text selection
 and no bookmarks.
@@ -1200,7 +1217,9 @@ What mupf remembers: `~/.local/state/lhde/mupf.ini` (`[window]` `x`, `y`, `width
 1 Fit Page, 2 Fit Width) and `zoom` in thousandths), written when it exits. `mupf.desktop` (installed with it) claims what MuPDF
 opens, lhde's defaults give it PDF, XPS, EPUB and Markdown, and it is the first choice of the document viewer's role. `MUPF_TRACE=1`
 prints what it opens, draws and shows on stdout (`opened 2 pages PDF 1.4`, `rendered 1 816x1056 of 816x1056 at 100%`,
-`shown 1:X,Y,WxH ...`, `tocentry INDEX LEVEL PAGE Y TITLE` (the outline's places, in points), `linkrect PAGE X0 Y0 X1 Y1
+`shown 1:X,Y,WxH ...`, `view X Y W H` (the view in root coordinates), `scroll SX SY PW PH` (where the view is in the
+plane of the pages, and the plane's size), `flow W`, `reflow W` and `relaid N pages W` (a reflowable document laid out W
+points wide), `autoscroll on X,Y`, `autoscroll sticky`, `autoscroll off X,Y`, `tocentry INDEX LEVEL PAGE Y TITLE` (the outline's places, in points), `linkrect PAGE X0 Y0 X1 Y1
 TARGET` (a page's links), `watch DIR` and `reload FILE` (a Markdown file followed and read again), `status MESSAGE|Page 1 of 2|100%`, `pagenav PREVX PREVY TEXTX TEXTY NEXTX NEXTY` (the status bar's
 arrows and number, from the window's top left), `pagenav next`, `page edit`, `tocitem INDEX X Y TITLE`, `toc follows INDEX
 TITLE`, `header N rows`, `rebar N rows`, `large header on`, `find box header`, `crumbs A > B > Page 1 of 2`, `header go KEY`),
