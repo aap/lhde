@@ -17,8 +17,8 @@ usage:
   lhde-firefox profiles                     the profiles profiles.ini lists, which is the default, which are in use
 
 The look: for a Longhorn theme (Explorer.chrome = longhorn) the Explorer header band of flxp (travel buttons, the address on
-the breadcrumb's row, the search box at the right) with the tabs below it; for the others a plain XP toolbar in the
-theme's colours. Colours, fonts and pictures come from liblhde's resolver (lhde-theme resolve --shell) and from the visual
+the breadcrumb's row, the search box at the right) with the tabs and flxp's menu band below it; for the others Firefox 4's
+look on XP in the theme's colours and parts (its tabs, toolbar button frames). Colours, fonts and pictures come from liblhde's resolver (lhde-theme resolve --shell) and from the visual
 style through ut-dump; without the Windows tree (or with only the free ReactOS import) the CSS uses colours alone.
 Nothing of the Windows tree is copied: fonts and frame pictures are file:// URLs into it; only the parts that live inside a
 .msstyles are rendered into the profile.
@@ -223,6 +223,39 @@ def url(path):
     return 'url("file://%s")' % path
 
 
+def write_png(path, rows):
+    """8-bit RGBA"""
+    h, w = len(rows), len(rows[0])
+    raw = b''.join(b'\0' + bytes(c for p in row for c in p) for row in rows)
+
+    def chunk(typ, body):
+        return struct.pack('>I', len(body)) + typ + body + struct.pack('>I', zlib.crc32(typ + body) & 0xffffffff)
+    with open(path, 'wb') as f:
+        f.write(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)) +
+                chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b''))
+
+
+def clear_corners(path):
+    """a rendered XP part whose corners carry the bitmap's opaque background (Luna's tab items: the dialog colour
+    241 239 223 outside the rounded corners and in the spare right column): that colour made transparent where it
+    touches the picture's top corners or its right edge"""
+    rows = read_png(path)
+    if not rows:
+        return False
+    h, w = len(rows), len(rows[0])
+    bg = rows[0][0]
+    if bg[3] < 255 or rows[0][w - 1] != bg or rows[0][w // 2] == bg:
+        return True                                       # transparent already, or square corners: nothing to clear
+    rows = [list(r) for r in rows]
+    todo = [(0, 0), (w - 1, 0)] + [(w - 1, y) for y in range(h)]
+    while todo:
+        x, y = todo.pop()
+        if 0 <= x < w and 0 <= y < h and rows[y][x] == bg:
+            rows[y][x] = (0, 0, 0, 0)
+            todo += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    write_png(path, rows)
+    return True
+
 
 # ---- fonts: the theme's font directory (the Windows tree), else fontconfig -------------------------------------------
 
@@ -412,28 +445,55 @@ def longhorn_menu_vars(t, style, art):
     return v
 
 
-def xp_vars(t, style):
-    """the plain XP toolbar: the style's [sysmetrics] (Luna), else the theme's classic colours"""
+def xp_vars(t, style, art):
+    """the XP look (Firefox 4's on XP): the style's [sysmetrics] (Luna), else the theme's classic colours; with art, the
+    style's tab (Tab.TABITEM) and toolbar button (Toolbar.BUTTON) pictures"""
     sm = style.section('sysmetrics') if style.ok() else {}
 
     def c(key, dflt):
         return rgb(sm.get(key.upper())) or rgb(t.get('Colors_' + key.lower())) or dflt
     face = c('btnface', (212, 208, 200))
-    light = c('light3d', mix(face, (255, 255, 255), 0.5))
+    hilite = c('btnhighlight', (255, 255, 255))
     shadow = c('btnshadow', (128, 128, 128))
+    dark = c('dkshadow3d', (64, 64, 64))
     text = c('btntext', (0, 0, 0))
     font = (sm.get('MENUFONT') or t.get('Metrics_menufont') or 'Tahoma').split(',')[0].strip()
     themed = bool(sm)
-    return {
-        # taste: under a visual style a light gradient from LIGHT3D to BTNFACE (Internet Explorer 6's toolbars under Luna
-        # are a plain BTNFACE band with light edges), the classic look flat BTNFACE
-        'xp-bg': 'linear-gradient(%s, %s)' % (css(light), css(face)) if themed else css(face),
-        'xp-face': css(face), 'xp-text': css(text), 'xp-light': css(c('btnhighlight', (255, 255, 255))),
-        'xp-shadow': css(shadow), 'xp-field-border': css(rgb(sm.get('EDGESHADOWCOLOR')) or (127, 157, 185) if themed else shadow),
-        'xp-tab-selected': css(mix(face, (255, 255, 255), 0.6)), 'xp-tab-hover': css(mix(face, (255, 255, 255), 0.3)),
+    v = {
+        'xp-face': css(face), 'xp-text': css(text), 'xp-light': css(hilite), 'xp-shadow': css(shadow), 'xp-dark': css(dark),
+        'xp-field-border': css(rgb(sm.get('EDGESHADOWCOLOR')) or (127, 157, 185) if themed else shadow),
         # the rebar's band line (flxp under Luna: EDGESHADOWCOLOR 216 210 189 over BTNHIGHLIGHT; classic: BTNSHADOW)
         'xp-etch': css((style.colour('Rebar', 'BAND', 'EDGESHADOWCOLOR') if themed else None) or shadow),
-    }, font
+        # classic: Windows' tab control (raised, the selected one joined to the pane by the pane's BTNHIGHLIGHT edge)
+        'xp-tab-line': css(hilite), 'xp-nav-top': css(face),
+        'xp-tab-normal': 'none', 'xp-tab-hot': 'none', 'xp-tab-selected': 'none',
+        'xp-tb-hot': 'none', 'xp-tb-pressed': 'none', 'xp-tb-checked': 'none',
+    }
+    if art and style.ok() and style.has('Tab.TABITEM'):
+        done = True
+        sel = None
+        for state in ('NORMAL', 'HOT', 'SELECTED'):
+            p = os.path.join(art, 'tab-%s.png' % state.lower())
+            if style.render('Tab', 'TABITEM', state, 40, 24, p) and clear_corners(p):
+                v['xp-tab-%s' % state.lower()] = url(p)
+                if state == 'SELECTED':
+                    sel = read_png(p)
+            else:
+                done = False
+        if done and sel:
+            # the line under the tabs is the selected tab's side edge (Luna: the pane's 145 155 156), the navigation
+            # toolbar starts in the selected tab's bottom colour, so the tab joins it (Firefox 4's look)
+            v['xp-tab-line'] = css(sel[len(sel) // 2][0][:3])
+            v['xp-nav-top'] = css(sel[-1][len(sel[-1]) // 2][:3])
+        else:
+            for state in ('normal', 'hot', 'selected'):
+                v['xp-tab-%s' % state] = 'none'
+    if art and style.ok() and style.has('Toolbar.BUTTON'):
+        for state in ('HOT', 'PRESSED', 'CHECKED'):
+            p = os.path.join(art, 'tb-%s.png' % state.lower())
+            if style.render('Toolbar', 'BUTTON', state, 24, 24, p):
+                v['xp-tb-%s' % state.lower()] = url(p)
+    return v, font
 
 
 def generate(theme, out=None):
@@ -455,7 +515,7 @@ def generate(theme, out=None):
                 face = 'Tahoma'
         mface, mpx = menu_font(t, style, (face, px))
     else:
-        v, face = xp_vars(t, style)
+        v, face = xp_vars(t, style, art)
         px = 11                                            # Tahoma 8 pt at 96 dpi
         mface, mpx = menu_font(t, style, (face, px))
     rules, family = font_faces(face, t.get('path_fonts', ''))

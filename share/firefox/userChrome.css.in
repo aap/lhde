@@ -1,5 +1,5 @@
-/* lhde's look for Firefox's own chrome (userChrome.css): the Longhorn Explorer header for the Longhorn themes, a plain XP
-   toolbar for the XP and classic ones. Template of tools/lhde-firefox, which writes the theme's values into the block of
+/* lhde's look for Firefox's own chrome (userChrome.css): the Longhorn Explorer header for the Longhorn themes, Firefox 4's
+   look on XP for the XP and classic ones. Template of tools/lhde-firefox, which writes the theme's values into the block of
    custom properties below (from liblhde's resolver and the visual style through ut-dump) and keeps the sections for the
    theme's family; docs/USAGE.md "Firefox". Firefox 160's element ids (browser.xhtml, browser/omni.ja).
 
@@ -299,7 +299,7 @@
 /*@END@*/
 
 /*@IF xp@*/
-/* ---- the XP toolbar (Internet Explorer 6's): the band in the style's Rebar colour, Tahoma 8 pt, flat tabs ------------- */
+/* ---- the XP look: Firefox 4's on XP in the theme's parts, Tahoma 8 pt --------------------------------------------- */
 #toolbar-menubar { order: 0; }
 #TabsToolbar { order: 1; }
 #nav-bar { order: 2; }
@@ -312,12 +312,12 @@
   height: 24px !important;
   min-height: 24px !important;
   max-height: 24px !important;
-}
-#toolbar-menubar {
   padding: 0 0 2px 2px !important;
-  border: 0 !important;
   background: linear-gradient(to top, var(--lhde-xp-light) 0 1px, var(--lhde-xp-etch) 1px 2px, transparent 2px),
               var(--lhde-xp-face) !important;
+}
+#toolbar-menubar {
+  border: 0 !important;
   color: var(--lhde-xp-text) !important;
 }
 #toolbar-menubar > .toolbar-items, #menubar-items, #main-menubar { height: 22px !important; align-items: stretch !important; }
@@ -333,13 +333,25 @@
   border-color: var(--lhde-xp-shadow) var(--lhde-xp-light) var(--lhde-xp-light) var(--lhde-xp-shadow) !important;
 }
 
+/* Firefox 4's look on XP (its screenshots at 96 dpi), in the style's parts. Measured there: the tab row in BTNFACE with
+   the selected tab joined to the navigation toolbar below it, that toolbar 36 rows from near white to BTNFACE with a
+   BTNSHADOW line under it. Luna's own: the tabs are the style's Tab.TABITEM (rounded, the orange line of the hot and
+   selected tab), the line under them the selected tab's edge, the toolbar buttons' frames Toolbar.BUTTON, the fields'
+   border 127 157 185 (flxp's address bar). Without a style (classic): Windows' tab control drawn with the 3D colours.
+   Taste, Firefox 4's own and not XP's: the round 32 px Back button with Forward tucked against it (flxp's XP toolbar has
+   Internet Explorer's flat Back and Forward). Firefox 4's orange application button is Firefox's, not XP's, and is not
+   imitated: the menu is Firefox's current one at the right. The window frame stays luxwm's: Firefox 4 drew its tabs in
+   the title bar only on Vista and 7 with glass, on XP the frame was the system's (docs/USAGE.md). */
 :root {
   --toolbar-bgcolor: var(--lhde-xp-face) !important;
   --toolbar-color: var(--lhde-xp-text) !important;
   --toolbox-bgcolor: var(--lhde-xp-face) !important;
   --toolbox-bgcolor-inactive: var(--lhde-xp-face) !important;
   --toolbox-textcolor: var(--lhde-xp-text) !important;
+  --toolbox-textcolor-inactive: var(--lhde-xp-text) !important;
   --toolbarbutton-icon-fill: var(--lhde-xp-text) !important;
+  --toolbarbutton-hover-background: transparent !important;
+  --toolbarbutton-active-background: transparent !important;
   --toolbar-field-background-color: #ffffff !important;
   --toolbar-field-color: #000000 !important;
   --toolbar-field-border-color: var(--lhde-xp-field-border) !important;
@@ -347,39 +359,169 @@
   --toolbar-field-focus-color: #000000 !important;
   --toolbar-field-focus-border-color: var(--lhde-xp-field-border) !important;
   --urlbar-height: 22px !important;
+  --urlbar-min-height: 22px !important;
   --urlbar-border-radius: 0px !important;
   --urlbarview-border-radius: 0px !important;
   --tab-border-radius: 0px !important;
-  --tab-min-height: 22px !important;
+  --tab-min-height: 23px !important;
+  --tab-block-margin: 0px !important;
   --tab-margin-block: 0px !important;
+  --tab-shadow-max-size: 0px !important;
+  --tab-selected-shadow: none !important;
   --tab-box-shadow-selected: none !important;
-  --tab-background-color-selected: var(--lhde-xp-tab-selected) !important;
-  --tab-background-color-hover: var(--lhde-xp-tab-hover) !important;
+  --tab-background-color: transparent !important;
+  --tab-background-color-selected: transparent !important;
+  --tab-selected-bgcolor: transparent !important;
+  --tab-background-color-hover: transparent !important;
+  --tab-text-color: var(--lhde-xp-text) !important;
+  --tab-text-color-selected: var(--lhde-xp-text) !important;
   --tabs-navbar-separator-style: none !important;
 }
+#navigator-toolbox { background: var(--lhde-xp-face) !important; color: var(--lhde-xp-text) !important; }
 #nav-bar, #TabsToolbar, #PersonalToolbar {
-  background: var(--lhde-xp-bg) !important;
   color: var(--lhde-xp-text) !important;
-  border-bottom: 1px solid var(--lhde-xp-shadow) !important;
-  border-top: 1px solid var(--lhde-xp-light) !important;
   font-family: var(--lhde-font) !important;
   font-size: var(--lhde-font-size) !important;
+  border-top: 0 !important;
+  box-shadow: none !important;
 }
-#TabsToolbar { border-top: 0 !important; }      /* under the menu bar's etched line */
+
+/* the tab row: BTNFACE, 2 rows above the tabs, the line under them (the selected tab covers it) */
+#TabsToolbar {
+  background: linear-gradient(to top, var(--lhde-xp-tab-line) 0 1px, transparent 1px), var(--lhde-xp-face) !important;
+  border-bottom: 0 !important;
+  padding-top: 2px !important;
+  min-height: 0 !important;
+  height: 26px !important;
+  max-height: 26px !important;
+}
+#TabsToolbar :is(.toolbar-items, #TabsToolbar-customization-target), #tabbrowser-tabs, #tabbrowser-arrowscrollbox {
+  min-height: 0 !important;
+  height: 24px !important;
+  max-height: 24px !important;
+  align-items: stretch !important;
+}
+#tabbrowser-tabs { --tab-min-height: 23px !important; padding-inline: 2px 0 !important; border: 0 !important; }
+.tabbrowser-tab {
+  padding: 0 !important;
+  min-height: 24px !important;
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+  color: var(--lhde-xp-text) !important;
+}
+.tabbrowser-tab, .tab-stack, .tab-content { height: 24px !important; max-height: 24px !important; min-height: 0 !important; }
+.tabbrowser-tab:not(:first-child) { margin-inline-start: -1px !important; }
+.tab-stack { align-items: stretch !important; }
+/* the unselected tabs 2 rows lower and 1 row short of the line (XP's tab control: the selected tab is 2 rows taller) */
+/* the classic tab is the 1 px border (BTNHIGHLIGHT left and top, BTNSHADOW right) on BTNFACE; a style's picture covers it */
+.tab-background {
+  margin: 2px 0 1px !important;
+  min-height: 0 !important;
+  border: 1px solid !important;
+  border-color: var(--lhde-xp-light) var(--lhde-xp-dark) transparent var(--lhde-xp-light) !important;
+  border-bottom: 0 !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: var(--lhde-xp-face) padding-box !important;
+  border-image: var(--lhde-xp-tab-normal) 6 fill / 6px stretch !important;
+}
+.tabbrowser-tab:hover > .tab-stack > .tab-background:not([selected], [multiselected]) {
+  border-image: var(--lhde-xp-tab-hot) 6 fill / 6px stretch !important;
+}
+.tab-background:is([selected], [multiselected]) {
+  margin: 0 !important;
+  border-image: var(--lhde-xp-tab-selected) 6 fill / 6px 6px 0 6px stretch !important;
+}
+.tab-content { padding-inline: 6px 3px !important; }
+.tabbrowser-tab:not([selected]) .tab-content { padding-top: 2px !important; }
+.tab-label { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
+.tab-close-button { width: 16px !important; height: 16px !important; padding: 3px !important; margin-inline-end: 0 !important; }
+#tabs-newtab-button, #new-tab-button { --toolbarbutton-inner-padding: 3px !important; }
+
+/* the navigation toolbar: from the selected tab's bottom colour to BTNFACE, the BTNSHADOW line under it */
+#nav-bar {
+  background: linear-gradient(var(--lhde-xp-nav-top), var(--lhde-xp-face)) !important;
+  border-bottom: 1px solid var(--lhde-xp-shadow) !important;
+  min-height: 37px !important;
+  padding-block: 1px !important;
+}
+#PersonalToolbar {
+  background: var(--lhde-xp-face) !important;
+  border-bottom: 1px solid var(--lhde-xp-shadow) !important;
+}
 #urlbar-container { order: 1; }
 #stop-reload-button { order: 2; }
 #search-container { order: 3; }
 #nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button, #library-button) { order: 4; }
 #urlbar, #urlbar-input, #searchbar, .tab-label { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
-#urlbar .urlbar-background { border-radius: 0 !important; }
-.tab-background {
-  margin: 2px 0 0 !important;
+#urlbar .urlbar-background, #searchbar-new .urlbar-background, #search-container .urlbar-background {
   border-radius: 0 !important;
-  outline: none !important;
+  border: 1px solid var(--lhde-xp-field-border) !important;
+  background-color: #ffffff !important;
   box-shadow: none !important;
-  border: 1px solid var(--lhde-xp-shadow) !important;
-  border-bottom: 0 !important;
+  outline: none !important;
 }
-.tab-background:is([selected], [multiselected]) { margin-top: 0 !important; }
-.tab-close-button { width: 16px !important; height: 16px !important; padding: 3px !important; }
+
+/* the toolbar buttons: Toolbar.BUTTON's hot, pressed and checked frames (classic: raised and sunken 1 px) */
+:is(#nav-bar, #PersonalToolbar, #TabsToolbar) .toolbarbutton-1 > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack, .toolbarbutton-text) {
+  border-radius: 0 !important;
+  border: 1px solid transparent !important;
+  background: none !important;
+}
+:is(#nav-bar, #PersonalToolbar, #TabsToolbar) .toolbarbutton-1:not([disabled]):hover > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+  border-color: var(--lhde-xp-light) var(--lhde-xp-shadow) var(--lhde-xp-shadow) var(--lhde-xp-light) !important;
+  border-image: var(--lhde-xp-tb-hot) 4 fill / 4px stretch !important;
+}
+:is(#nav-bar, #PersonalToolbar, #TabsToolbar) .toolbarbutton-1:not([disabled]):is(:hover:active, [open]) > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+  border-color: var(--lhde-xp-shadow) var(--lhde-xp-light) var(--lhde-xp-light) var(--lhde-xp-shadow) !important;
+  border-image: var(--lhde-xp-tb-pressed) 4 fill / 4px stretch !important;
+}
+:is(#nav-bar, #PersonalToolbar) .toolbarbutton-1:not([disabled]):is([checked], [starred]) > .toolbarbutton-icon {
+  border-color: var(--lhde-xp-shadow) var(--lhde-xp-light) var(--lhde-xp-light) var(--lhde-xp-shadow) !important;
+  border-image: var(--lhde-xp-tb-checked) 4 fill / 4px stretch !important;
+}
+
+/* taste, Firefox 4's: Back a round 32 px button, Forward a smaller one tucked against its right (the keyhole) */
+#back-button, #forward-button {
+  padding: 0 !important;
+  margin: 0 !important;
+  align-self: center !important;
+}
+#back-button { position: relative !important; z-index: 2 !important; margin-inline-start: 3px !important; }
+#forward-button { position: relative !important; z-index: 1 !important; }
+#back-button[disabled], #forward-button[disabled] { opacity: 1 !important; }
+#nav-bar #back-button > .toolbarbutton-icon {
+  box-sizing: border-box !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 7px !important;
+  border: 1px solid var(--lhde-xp-shadow) !important;
+  border-radius: 50% !important;
+  background: linear-gradient(#ffffff, var(--lhde-xp-face)) !important;
+  box-shadow: inset 0 1px #ffffff !important;
+  border-image: none !important;
+}
+#nav-bar #forward-button > .toolbarbutton-icon {
+  box-sizing: border-box !important;
+  width: 30px !important;
+  height: 22px !important;
+  padding: 2px 3px 2px 9px !important;
+  margin-inline-start: -7px !important;
+  border: 1px solid var(--lhde-xp-shadow) !important;
+  border-radius: 0 4px 4px 0 !important;
+  background: linear-gradient(#ffffff, var(--lhde-xp-face)) !important;
+  border-image: none !important;
+}
+#nav-bar :is(#back-button, #forward-button):not([disabled]):hover > .toolbarbutton-icon {
+  background: linear-gradient(#ffffff, var(--lhde-xp-nav-top)) !important;
+  border-color: var(--lhde-xp-field-border) !important;
+  border-image: none !important;
+}
+#nav-bar :is(#back-button, #forward-button):not([disabled]):hover:active > .toolbarbutton-icon {
+  background: linear-gradient(var(--lhde-xp-face), #ffffff) !important;
+  border-image: none !important;
+}
+#back-button[disabled] > .toolbarbutton-icon, #forward-button[disabled] > .toolbarbutton-icon { opacity: 1 !important; }
+#back-button[disabled] .toolbarbutton-icon, #forward-button[disabled] .toolbarbutton-icon { fill: var(--lhde-xp-shadow) !important; }
 /*@END@*/
