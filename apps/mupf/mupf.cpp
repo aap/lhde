@@ -145,7 +145,7 @@ struct App {
     int pan_sx = 0, pan_sy = 0;
     int wheel = 0;
     bool trace = false;
-    std::string status_text[3], shown_trace;
+    std::string status_text[3], shown_trace, view_trace, scroll_trace;
 };
 App g;
 
@@ -292,6 +292,21 @@ void view_size()
     g.vh = std::max(1, (int)r.bottom);
 }
 
+// the trace of where the view is: "view X Y W H" (the view in root coordinates), "scroll SX SY PW PH" (in the plane)
+void trace_where()
+{
+    if (!g.trace) return;
+    POINT o = { 0, 0 };
+    ClientToScreen(g.view, &o);
+    char v[64], at[64];
+    snprintf(v, sizeof v, "%d %d %d %d", (int)o.x, (int)o.y, g.vw, g.vh);
+    snprintf(at, sizeof at, "%d %d %d %d", g.sx, g.sy, g.lay.width, g.lay.height);
+    if (g.view_trace != v) trace("view %s", v);
+    if (g.scroll_trace != at) trace("scroll %s", at);
+    g.view_trace = v;
+    g.scroll_trace = at;
+}
+
 void update_scrollbars()
 {
     SCROLLINFO si = {};
@@ -307,8 +322,10 @@ void update_scrollbars()
     si.nPage = g.vw;
     si.nPos = g.sx;
     SetScrollInfo(g.view, SB_HORZ, &si, TRUE);
+    trace_where();
 }
 
+// the scroll position within the plane (the pages and their margin: a drag, the wheel or a key stops at their edge)
 void clamp_scroll()
 {
     g.sx = std::max(0, std::min(g.sx, g.lay.width - g.vw));
@@ -322,7 +339,7 @@ void compute_zoom()
 }
 
 // the page under a point of the view and where on it, as fractions of the page box; false when none is
-struct Anchor { int page = -1; double fx = 0, fy = 0; int vx = 0, vy = 0; };
+struct Anchor { int page = -1; double fx = 0, fy = 0; int vx = 0, vy = 0; bool centre = false; };
 Anchor anchor_at(int vx, int vy)
 {
     Anchor a;
@@ -349,12 +366,15 @@ Anchor anchor_at(int vx, int vy)
 
 void scrolled();
 
-// lays the pages out again (a new zoom, mode, size or rotation), the anchor's page point kept where it was in the view
-void relayout(const Anchor& a)
+// lays the pages out again (a new zoom, mode, size or rotation), the anchor's page point kept where it was in the view (a
+// centre anchor: at the view's new centre, so a resize keeps the centre)
+void relayout(const Anchor& anchor)
 {
     if (g.in_layout) return;
     g.in_layout = true;
     view_size();
+    Anchor a = anchor;
+    if (a.centre) { a.vx = g.vw / 2; a.vy = g.vh / 2; }
     if (g.opened && a.page >= 0 && !is_continuous(g.mode)) g.current = a.page;
     compute_zoom();
     g.lay = make_layout(g.sizes, g.rot, g.zoom, g.mode, g.cover, g.current, g.vw, g.vh);
@@ -476,6 +496,7 @@ void set_zoom(ZoomMode m, double z, const Anchor& a)
 }
 
 Anchor centre_anchor() { return anchor_at(g.vw / 2, is_continuous(g.mode) ? 0 : g.vh / 2); }
+Anchor resize_anchor() { Anchor a = anchor_at(g.vw / 2, g.vh / 2); a.centre = true; return a; }
 Anchor top_anchor() { return anchor_at(g.vw / 2, 0); }
 
 // ---- rendering ---------------------------------------------------------------------------------------------------------
@@ -823,6 +844,7 @@ void on_engine()
             {
                 Anchor none;
                 relayout(none);
+                scroll_to((g.lay.width - g.vw) / 2, 0);   // a page wider than the view: its middle (mupdf centres it)
             }
             if (g.markdown && !g.watch) watch_file();
             if (g.restore) {
@@ -2152,7 +2174,7 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
     case WM_SIZE:
-        if (!g.in_layout) relayout(top_anchor());
+        if (!g.in_layout) relayout(resize_anchor());
         return 0;
     case WM_ERASEBKGND:
         return 1;

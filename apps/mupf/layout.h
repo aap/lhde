@@ -65,7 +65,9 @@ struct Layout {
 const int PAGE_GAP = 10, PLANE_MARGIN = 10;
 
 // the layout of a document's pages; the non-continuous modes show current's spread alone. The plane is at least the view's
-// size; narrower spreads are centred.
+// size and is the scroll range: the pages and PLANE_MARGIN around them, so a drag stops at their edge. A spread narrower
+// than the view is centred across it (mupdf's and Acrobat's); in the non-continuous modes a spread shorter than the view is
+// centred down it too (mupdf's single page), while the continuous modes start at the top (Acrobat's).
 Layout make_layout(const std::vector<SizeF>& sizes, int rot, double zoom, Mode m, bool cover, int current, int view_w,
                    int view_h);
 // the zoom at which current's spread fills the view's width (Fit Width), or fits in the view whole (Fit Page)

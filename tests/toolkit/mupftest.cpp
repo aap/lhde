@@ -92,18 +92,21 @@ int main()
     check("continuous: page 2 below it after the gap", "196,548 408x528", box(c.page[1]));
     check("continuous: the plane", "800x1624", std::to_string(c.width) + "x" + std::to_string(c.height));
     Layout s = make_layout(three, 0, 0.5, MODE_SINGLE, false, 1, 800, 600);
-    check("single: page 2 alone", "196,10 408x528", box(s.page[1]));
+    check("single: page 2 alone, in the middle of the view both ways (mupdf's)", "196,36 408x528", box(s.page[1]));
     check("single: page 1 not laid out", "-", box(s.page[0]));
     check("single: the plane is the view", "800x600", std::to_string(s.width) + "x" + std::to_string(s.height));
     Layout f = make_layout(three, 0, 0.5, MODE_CONTINUOUS_FACING, false, 0, 800, 600);
     check("facing: pages 1 and 2 against the fold", "10,10 408x528 428,10 408x528", box(f.page[0]) + " " + box(f.page[1]));
+    Layout big = make_layout(three, 0, 1.0, MODE_SINGLE, false, 0, 800, 600);
+    check("single, taller than the view: from the margin, the plane the page and its margin", "10,10 816x1056 836x1076",
+          box(big.page[0]) + " " + std::to_string(big.width) + "x" + std::to_string(big.height));
     check("facing: page 3 alone on the left", "10,548 408x528", box(f.page[2]));
     check("facing: the plane wider than the view", 846, f.width);
     Layout fc = make_layout(three, 0, 0.5, MODE_FACING, true, 0, 1000, 600);
-    check("cover: page 1 right of the fold", "505,10 408x528", box(fc.page[0]));
+    check("cover: page 1 right of the fold", "505,36 408x528", box(fc.page[0]));
     check("cover: page 2 not shown with it", "-", box(fc.page[1]));
     Layout fc2 = make_layout(three, 0, 0.5, MODE_FACING, true, 2, 1000, 600);
-    check("cover: page 3 shows with page 2", "87,10 408x528 505,10 408x528", box(fc2.page[1]) + " " + box(fc2.page[2]));
+    check("cover: page 3 shows with page 2", "87,36 408x528 505,36 408x528", box(fc2.page[1]) + " " + box(fc2.page[2]));
 
     // fits
     check("fit width: 800 px for 612 pt", "95", pct(fit_width(three, 0, MODE_CONTINUOUS, false, 0, 800)));

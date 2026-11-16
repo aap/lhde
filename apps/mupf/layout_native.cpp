@@ -127,6 +127,7 @@ Layout make_layout(const std::vector<SizeF>& sizes, int rot, double zoom, Mode m
                    int view_h)
 {
     Layout l;
+    const int margin = PLANE_MARGIN;
     l.mode = m;
     l.cover = cover;
     l.rot = rot;
@@ -145,9 +146,9 @@ Layout make_layout(const std::vector<SizeF>& sizes, int rot, double zoom, Mode m
         spread_size(sizes, s, rot, zoom, m, cover, &w, &h);
         widest = std::max(widest, w);
     }
-    l.width = std::max(view_w, widest + 2 * PLANE_MARGIN);
+    l.width = std::max(view_w, widest + 2 * margin);
     int cx = l.width / 2;
-    int y = PLANE_MARGIN;
+    int y = margin;
     for (int s = first; s <= last; s++) {
         int w, h;
         spread_size(sizes, s, rot, zoom, m, cover, &w, &h);
@@ -173,7 +174,12 @@ Layout make_layout(const std::vector<SizeF>& sizes, int rot, double zoom, Mode m
         }
         y += h + (s < last ? PAGE_GAP : 0);
     }
-    l.height = std::max(view_h, y + PLANE_MARGIN);
+    l.height = std::max(view_h, y + margin);
+    // a spread shown alone and shorter than the view: in the middle of it, as mupdf shows a page
+    int down = l.height - (y + margin);
+    if (!is_continuous(m) && down > 1)
+        for (Box& b : l.page)
+            if (!b.empty()) b.y += down / 2;
     return l;
 }
 
