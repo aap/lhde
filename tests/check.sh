@@ -4,7 +4,7 @@
 # failures. Tests that need assets skip when these are absent:
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
-#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, luxview.sh xprop, xwininfo and ImageMagick, detailsrow.sh ImageMagick, filter.sh and runas.sh setfattr
+#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, luxview.sh xprop, xwininfo and ImageMagick, mupf.sh mupf (MuPDF), python3 and ImageMagick, detailsrow.sh ImageMagick, filter.sh and runas.sh setfattr
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick, startmenu.sh xprop and python3, menushadow.sh
 #                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick, starticon.sh xprop and ImageMagick (luna when imported),
 #                thumbsmem.sh ImageMagick, slowpath.sh python3 with PIL, thumbdocs.sh ImageMagick and pdftoppm or mutool (gs, ddjvu and c44 for its PS and DjVu), nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed, xsession.sh xprop and
@@ -202,6 +202,9 @@ else
     # luxview: a folder with a 6000 x 4000 JPEG, the window at once, the walk, zoom, Delete, the slide show, Properties, RSS, the looks
     tests/headless/luxview.sh "$1" > "$T/luxview.log" 2>&1; rc=$?
     result "headless/luxview.sh$(grep -m1 '^skip' "$T/luxview.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/luxview.log"
+    # mupf: a PDF written by mkpdf.py, ink on page 1, Page Down, the link, the search's hits, the Contents pane (skips without MuPDF)
+    tests/headless/mupf.sh "$2" > "$T/mupf.log" 2>&1; rc=$?
+    result "headless/mupf.sh$(grep -m1 '^skip' "$T/mupf.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/mupf.log"
     tests/headless/properties.sh "$3" > "$T/properties.log" 2>&1; rc=$?
     result "headless/properties.sh$(grep -m1 '^skip' "$T/properties.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/properties.log"
     # the window and program icons (lhde_app_icon): Open With, Properties' Opens with, luxshell's task buttons, Alt+Tab
