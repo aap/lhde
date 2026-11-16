@@ -75,6 +75,13 @@ void sort_items(std::vector<Item>& items, SortBy by, bool ascending);
 // when the entry is gone. Any thread. The read-only flag comes from the mode bits for the user and its groups, as
 // access(2) answers without ACLs (which would be one more round trip).
 bool stat_entry(Item& it);
+// A folder's entries as readdir gives them (IsSlow | IsPending, IsFolder and IsLink from d_type: DT_UNKNOWN and links are
+// files until their stat says; no type or icon yet), the opendir saying that path is still a folder: false and *error
+// (errno) when it is not one or cannot be read. Any thread (shell::Reader's).
+bool read_names(const std::string& path, std::vector<Item>& out, bool include_hidden, int* error = nullptr);
+// The type and icon by the name of the entries read_names gave (those without a type). The UI thread: the MIME database
+// has no lock.
+void name_types(std::vector<Item>& items);
 std::string format_size(uint64_t bytes);     // "1.2 MB" like Explorer's details view ("12 KB")
 std::string format_date(int64_t t);          // "10/23/2026 12:45 PM"
 std::string type_name(const std::string& filename, bool folder);

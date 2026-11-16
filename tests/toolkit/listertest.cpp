@@ -1,7 +1,9 @@
 // A slow folder's listing (shell/namespace.h enumerate_names, stat_entry; shell/lister.h) on a scratch folder: what the
 // names alone give and what the lister fills in add up to what enumerate gives (folders, links to folders, a dangling
 // link, sizes, dates, a read-only file), the stored properties read when asked (where the file system has user xattrs),
-// a new start drops the last one's results, and every entry comes back once.
+// a new start drops the last one's results, and every entry comes back once; the Reader's names (type by name), a folder
+// that is not there, a cancelled request never delivered.
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -143,6 +145,39 @@ int main()
         check("the comment", "a note", c);
         check("IsStored", "1", !got.empty() && (got[0].item.flags & IsStored) ? "1" : "0");
     } else printf("note: no user xattrs in /tmp, the stored properties not checked\n");
+
+    // the Reader: the names (type and icon by the name), a folder that is not there, a request cancelled before its
+    // answer is never delivered
+    {
+        Reader reader(notify, nullptr);
+        uint32_t t1 = reader.read(d, false), t2 = reader.read(d + "/nothere", false), t3 = reader.read(d, true);
+        reader.cancel(t3);
+        std::vector<Reader::Result> res, part;
+        for (int i = 0; i < 500 && res.size() < 2; i++) {
+            {
+                std::unique_lock<std::mutex> k(g_lock);
+                g_cv.wait_for(k, std::chrono::milliseconds(10));
+            }
+            if (reader.take(part)) res.insert(res.end(), part.begin(), part.end());
+        }
+        usleep(100000);
+        if (reader.take(part)) res.insert(res.end(), part.begin(), part.end());
+        check("reader: two answers", "2", std::to_string(res.size()));
+        for (const Reader::Result& r : res) {
+            if (r.ticket == t1) {
+                std::map<std::string, const Item*> by;
+                for (const Item& it : r.items) by[it.name] = &it;
+                check("reader: read", "1", r.ok ? "1" : "0");
+                check("reader: no hidden entry", "0", std::to_string(by.count(".hidden")));
+                check("reader: a.txt's type by its name", "Text Document", by.count("a.txt") ? by["a.txt"]->type : "");
+                check("reader: sub a folder (d_type), pending", "1",
+                      by.count("sub") && by["sub"]->is_folder() && (by["sub"]->flags & IsPending) ? "1" : "0");
+            } else if (r.ticket == t2) {
+                check("reader: not there", "0", r.ok ? "1" : "0");
+                check("reader: ENOENT", std::to_string(ENOENT), std::to_string(r.error));
+            } else check("reader: the cancelled one delivered", "", std::to_string(r.ticket));
+        }
+    }
 
     chmod((d + "/ro.txt").c_str(), 0644);
     for (const char* n : { "a.txt", "b.jpg", "ro.txt", "tosub", "dangling", ".hidden" }) unlink((d + "/" + n).c_str());

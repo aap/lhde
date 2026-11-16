@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <dirent.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -176,8 +177,14 @@ public:
     }
     bool is_filesystem() const override { return true; }
 
-    bool enumerate(std::vector<Item>& out, bool include_hidden) override { return list(out, include_hidden, false); }
-    bool enumerate_names(std::vector<Item>& out, bool include_hidden) override { return list(out, include_hidden, slow()); }
+    bool enumerate(std::vector<Item>& out, bool include_hidden) override { return list(out, include_hidden); }
+    bool enumerate_names(std::vector<Item>& out, bool include_hidden) override
+    {
+        if (!slow()) return list(out, include_hidden);
+        if (!read_names(path_, out, include_hidden)) return false;
+        name_types(out);
+        return true;
+    }
     bool slow() const override
     {
         if (slow_ < 0) slow_ = thumbs::on_network(path_) ? 1 : 0;   // (known to the views' items after it)
@@ -196,8 +203,7 @@ private:
     std::string path_;
     mutable int slow_ = -1;
 
-    // names_only: the entries as readdir gives them (d_type; DT_UNKNOWN and links are files until their stat says)
-    bool list(std::vector<Item>& out, bool include_hidden, bool names_only)
+    bool list(std::vector<Item>& out, bool include_hidden)
     {
         DIR* d = opendir(path_.c_str());
         if (!d) return false;
@@ -211,15 +217,6 @@ private:
             it.name = e->d_name;
             it.path = path_ == "/" ? "/" + it.name : path_ + "/" + it.name;
             if (hidden) it.flags |= IsHidden;
-            if (names_only) {
-                it.flags |= IsSlow | IsPending;
-                if (e->d_type == DT_DIR) it.flags |= IsFolder;
-                if (e->d_type == DT_LNK) it.flags |= IsLink;
-                it.type = type_name(it.name, it.is_folder());
-                it.icon = icon_key(it.name, it.is_folder());
-                out.push_back(std::move(it));
-                continue;
-            }
             struct stat st;
             bool is_link = lstat(it.path.c_str(), &st) == 0 && S_ISLNK(st.st_mode);
             if (stat(it.path.c_str(), &st) != 0) { if (lstat(it.path.c_str(), &st) != 0) continue; }
@@ -236,6 +233,38 @@ private:
         return true;
     }
 };
+
+bool read_names(const std::string& path, std::vector<Item>& out, bool include_hidden, int* error)
+{
+    DIR* d = opendir(path.c_str());
+    if (!d) { if (error) *error = errno; return false; }
+    struct dirent* e;
+    while ((e = readdir(d))) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+        bool hidden = e->d_name[0] == '.';
+        if (hidden && !include_hidden) continue;
+        if (strstr(e->d_name, ".flxp-part")) continue;   // a file being copied (fileops): it shows when it is complete
+        Item it;
+        it.name = e->d_name;
+        it.path = path == "/" ? "/" + it.name : path + "/" + it.name;
+        it.flags = IsSlow | IsPending;
+        if (hidden) it.flags |= IsHidden;
+        if (e->d_type == DT_DIR) it.flags |= IsFolder;
+        if (e->d_type == DT_LNK) it.flags |= IsLink;
+        out.push_back(std::move(it));
+    }
+    closedir(d);
+    return true;
+}
+
+void name_types(std::vector<Item>& items)
+{
+    for (Item& it : items) {
+        if (!it.type.empty()) continue;
+        it.type = type_name(it.name, it.is_folder());
+        it.icon = icon_key(it.name, it.is_folder());
+    }
+}
 
 // the write permission the mode gives this user (root: always), as access(W_OK) answers without ACLs
 static bool writable(const struct stat& st)
