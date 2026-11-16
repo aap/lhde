@@ -37,6 +37,10 @@ Needs a C and C++17 compiler, GNU make, Python 3 (the standard library: every `m
 fontconfig, libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, flxp-desktop's FileManager1, luxshell),
 sqlite3 (the catalogue, liblhcat: flxp and lhde-cat; with FTS5, as distributions build it);
 for the lux side also xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4).
+mupf, the document viewer, needs MuPDF's library (1.2x, the fz_* API): `pkg-config mupdf` when it answers, else the headers
+in `/usr/include/mupdf` or `/usr/local/include/mupdf` with `-lmupdf` (a static `libmupdf.a` also with `libmupdf-third`,
+libjpeg and libm, as Void's is), else `make MUPDF_DIR=` a built MuPDF checkout; without any it is not built, `make` says
+so in one line and its tests skip (`MUPDF=no` leaves it out on purpose).
 Every `.res` is checked in (`wux/rc/`, `wux/w32/stdres.res`, `flxp/rc/`, `tests/w32/test.res`):
 the mingw-w64 cross toolchain (`x86_64-w64-mingw32-windres`, which preprocesses with its gcc) is needed
 only when a `.rc` or a header it includes changes, and Wine's sources only to rebuild Wine's resources
@@ -57,7 +61,7 @@ On Void Linux, everything above in one command:
 
     xbps-install -S gcc make pkg-config python3 libX11-devel libXext-devel libXcursor-devel libxkbcommon-devel libXfixes-devel \
         libXinerama-devel libXft-devel freetype-devel fontconfig-devel libpng-devel libjpeg-turbo-devel \
-        libwebp-devel dbus-devel sqlite-devel cairo-devel pango-devel lua54-devel \
+        libwebp-devel dbus-devel sqlite-devel cairo-devel pango-devel lua54-devel mupdf-devel \
         python3-Pillow 7zip cabextract xz tar \
         dbus picom feh xprop xsetroot xinit xorg-server-xephyr xorg-server-xvfb xdotool ImageMagick xclip lua54
 
@@ -109,7 +113,7 @@ lhde builds and runs on FreeBSD 15 (amd64) with clang, libc++ and GNU make; 15 i
 explorer following its folders), renameat2 and O_PATH, which flxp's file operations use. The packages:
 
     pkg install gmake pkgconf python3 py312-pillow 7-zip cabextract libX11 libXext libXcursor libxkbcommon libXfixes \
-        libXinerama libXft freetype2 fontconfig png jpeg-turbo webp dbus sqlite3 cairo pango lua54 \
+        libXinerama libXft freetype2 fontconfig png jpeg-turbo webp dbus sqlite3 cairo pango lua54 mupdf \
         picom feh xprop xsetroot xinit xephyr xorg-vfbserver xdotool ImageMagick7 xclip gtar
 
 (`python3` is the package that puts `python3` on the PATH; `7-zip` installs `7z` and `7zz`, there is no p7zip.) Then, as above
