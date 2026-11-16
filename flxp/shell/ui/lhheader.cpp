@@ -3086,6 +3086,7 @@ HWND window() { return g_wnd; }
 
 void set_title(const std::string& title)
 {
+    if (title == g_fixed_title && (title.empty() || title == g_title)) return;   // (mupf sets it on every scroll step)
     g_fixed_title = title;
     if (!title.empty()) g_title = title;
     if (vision() && g_wnd) { vision_metrics(); layout(); }
