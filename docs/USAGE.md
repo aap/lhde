@@ -1128,17 +1128,23 @@ catalogue is the authority. Commit (the pane's button, File > Commit Pending Edi
 the window opens too. XP had no PDF viewer of its own: the window is in the idiom of XP's programs, and where a choice had
 a model it is Acrobat Reader 6's (2003): the menu bar (File, Edit, View, Go, Help) with Acrobat's items and keys, the pages
 on the application workspace grey (128) with a black frame and a dark shadow, the page layouts, the Find box in the
-toolbar. The toolbar's order and glyphs (Open | Previous Page, Next Page, the page box "N of M" | Zoom Out, Zoom In | Actual
-Size, Fit Page, Fit Width | the Find box, Find Next) are mupf's; there is no shot of Acrobat 6 to measure.
+toolbar. The toolbar's order and glyphs (Zoom Out, Zoom In | Actual Size, Fit Page, Fit Width | the Find box, Find Next) are
+mupf's, as is the status bar's page part, which is the page navigation under both looks: the previous and next arrows
+around "Page N of M" (greyed at the first and last page); a click on the text makes the number an edit (type a number,
+Return). There is no shot of Acrobat 6 to measure.
 
 Under the Longhorn themes (the session theme's `Explorer.chrome`, as for the Explorer) the window has the Explorer's header
-above the toolbar: the same band, title and breadcrumb, pixel for pixel, with Back and Forward as mupf's (their drop-downs
+at its top: the same band, title and breadcrumb, pixel for pixel, with Back and Forward as mupf's (their drop-downs
 list the pages they go to), the document's title as the title, and as the breadcrumb the file's name, the outline's entries
 down to the one the page is in ("Part II > Chapter 4 > 4.2") and "Page N of M". A segment's chevron lists the entries beside
 it (the file's: the outline's top level) and goes to the one chosen; a click on a segment goes to its entry (the file's: page
-1); a click on the breadcrumb's empty part is the address edit, which takes a page number. The header's search box and
-star are left out (the Find box is in the toolbar; mupf keeps no favourites), and the menu is a band below the header, as
-the Explorer's. Its size is the Explorer's (`header_size`) unless flxp.ini's `mupf_header_size` says otherwise.
+1); a click on the breadcrumb's empty part is the address edit, which takes a page number. The header's search box is the
+Find box (the toolbar's Find box and Find Next are gone; with `header_search` off they come back), the star is left out
+(mupf keeps no favourites). Below the header is the Explorer's 4051 command bar: one row on the folder type's gradient with
+the menu band and, on the same row after it, the toolbar, here the zoom and fit buttons alone. The header is the Small one
+by default (4074's Toolbar Size > Small, as the file dialog's: one row under the frame's caption, which keeps the title);
+View > Large Header gives it the Explorer's size (`header_size`, else the theme's), so the two can be compared; flxp.ini's
+`mupf_header_size` wins over both. File > Open is the Longhorn dialog (from `flxp-filedialog`: "The Open and Save dialog").
 
 It never waits on a document: MuPDF opens, draws and searches on a thread of its own while the window scrolls and zooms
 with what is there; a page not drawn yet is white, a page drawn at another zoom is shown scaled until the new one comes,
@@ -1152,15 +1158,16 @@ above about 270%) is drawn as the part in view.
 - **Zoom**: Zoom In and Out (Ctrl++ and Ctrl+-, Ctrl+wheel about the pointer) go by Acrobat's steps, 8.33% to 1600%; Actual Size
   (Ctrl+1) is 100%, 96 pixels to the inch; Fit Page (Ctrl+0) and Fit Width (Ctrl+2) follow the window's size. Rotate
   Clockwise and Counterclockwise (Ctrl+], Ctrl+[) turn the view, not the file.
-- **Pages**: Page Up and Page Down, Left and Right when the page fits the width, Home and End; Space scrolls a screen; the page box
-  in the toolbar (type a number, Return) and Go To Page (Ctrl+G); Back and Forward (Alt+Left, Alt+Right) return over jumps (a
-  page box, a contents entry, a link, Home, End). A drag moves the pages (Acrobat's hand); a click on a link follows it, to its
+- **Pages**: Page Up and Page Down, Left and Right when the page fits the width, Home and End; Space scrolls a screen; the status
+  bar's arrows and its page number (a click, type a number, Return) and Go To Page (Ctrl+G); Back and Forward (Alt+Left,
+  Alt+Right) return over jumps (a page number, a contents entry, a link, Home, End). A drag moves the pages (Acrobat's hand); a click on a link follows it, to its
   page or, for a web address, with xdg-open.
 - **Contents** (View > Contents, F4, the cross in its title closes it): the document's outline in a tree on the left, as XP's
   Explorer bar; a click on an entry goes there, the arrow keys go as they select, and as the pages move the entry they are in
   is selected (Acrobat 7's). The splitter beside it sizes it.
-- **Find** (Ctrl+F: the toolbar's Find box): Return searches from the current page on (case does not matter) and shows the first
-  hit; Return again, F3 or Find Next go to the next hit, Shift+Return and Shift+F3 back. Every hit is marked yellow, the one
+- **Find** (Ctrl+F: the toolbar's Find box, under the Longhorn header the header's search box): Return searches from the
+  current page on (case does not matter) and shows the first hit; Return again, F3 or Find Next go to the next hit,
+  Shift+Return and Shift+F3 back; Escape in the header's box clears the search. Every hit is marked yellow, the one
   shown in the selection colour; the status bar says "Match 2 of 7" or "No matches were found.".
 - **Full Screen** (Ctrl+L) shows the pages alone; Escape leaves it. **Document Properties** (Ctrl+D) is the Explorer's Properties
   sheet of the file.
@@ -1169,12 +1176,14 @@ A password-protected document asks for its password (Acrobat 6's Password dialog
 Document Open Password.", again after a wrong one; Cancel leaves the window empty). There is no printing, no text selection
 and no bookmarks.
 What mupf remembers: `~/.local/state/lhde/mupf.ini` (`[window]` `x`, `y`, `width`, `height`, `maximized`; `[view]` `toolbar`,
-`statusbar`, `contents` and `contents_width`, `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
+`statusbar`, `contents` and `contents_width`, `large_header`, `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
 1 Fit Page, 2 Fit Width) and `zoom` in thousandths), written when it exits. `mupf.desktop` (installed with it) claims what MuPDF
 opens, lhde's defaults give it PDF, XPS and EPUB, and it is the first choice of the document viewer's role. `MUPF_TRACE=1`
 prints what it opens, draws and shows on stdout (`opened 2 pages PDF 1.4`, `rendered 1 816x1056 of 816x1056 at 100%`,
-`shown 1:X,Y,WxH ...`, `status MESSAGE|Page 1 of 2|100%`, `tocitem INDEX X Y TITLE`, `toc follows INDEX TITLE`, `header N rows`,
-`crumbs A > B > Page 1 of 2`, `header go KEY`), for scripts.
+`shown 1:X,Y,WxH ...`, `status MESSAGE|Page 1 of 2|100%`, `pagenav PREVX PREVY TEXTX TEXTY NEXTX NEXTY` (the status bar's
+arrows and number, from the window's top left), `pagenav next`, `page edit`, `tocitem INDEX X Y TITLE`, `toc follows INDEX
+TITLE`, `header N rows`, `rebar N rows`, `large header on`, `find box header`, `crumbs A > B > Page 1 of 2`, `header go KEY`),
+for scripts.
 
 ## File types and programs (lhde-mime)
 

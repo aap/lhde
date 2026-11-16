@@ -153,11 +153,12 @@ A drag moves a picture larger than the window.
 | Ctrl++, Ctrl+-; Ctrl+wheel | zoom in / out (about the pointer with the wheel) |
 | Ctrl+1, Ctrl+0, Ctrl+2 | Actual Size, Fit Page, Fit Width |
 | Ctrl+], Ctrl+[ | rotate the view clockwise / counterclockwise |
-| Ctrl+F | the Find box |
+| Ctrl+F | the Find box (under the Longhorn header the header's search box) |
 | Return, Shift+Return in the Find box; F3, Shift+F3 | search, the next / previous hit |
 | F4 | the Contents pane |
 | Ctrl+L | Full Screen (Esc leaves it) |
-| Return, Esc in the page box | go to the page typed, back to the pages |
+| Return, Esc in the status bar's page number (a click on it) | go to the page typed, back to the pages |
+| Esc in the header's search box | clear the search |
 | Alt, F10, Alt+letter | the menu bar |
 
 A drag moves the pages; a click on a link follows it.

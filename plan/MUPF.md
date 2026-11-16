@@ -20,8 +20,11 @@ beside the display lists.
 ## The Longhorn header
 
 In: under the Longhorn themes mupf has the Explorer's header (shell/lhheader.h; docs/USAGE.md "mupf"), the outline's path
-as the crumbs, the Contents pane following the page. Open: the header's search box as the Find box (hidden now, the Find box
-is the toolbar's); the toolbar's own Previous / Next beside the header's Back / Forward is mupf's taste, not measured.
+as the crumbs, the Contents pane following the page, the search box as the Find box, the menu band and the toolbar on one
+row (the Explorer's 4051 command bar), the Small header with View > Large Header to compare, the page navigation in the
+status bar under both looks, the Longhorn Open dialog (flxp-filedialog). Open: which size to keep (aap: "until it's
+decided"); under the header the toolbar holds the zoom and fit buttons alone, and whether it stays is aap's call; its glyphs
+are mupf's XP-coloured drawings on the bar's dark gradient.
 
 ## Smaller
 

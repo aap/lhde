@@ -231,16 +231,20 @@ the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
   `engine_native.cpp`: MuPDF's fz_* API, the only file that includes MuPDF's headers, built with the flags `apps/mupf/mupf.mk`
   finds) owns the document on its thread and posts what it has; the layout and the render cache (`layout.h`,
   `layout_native.cpp`, driven by `tests/toolkit/mupftest.cpp`) are plain C++. A class menu and accelerators from its .rc, a
-  comctl32 toolbar with an image list of its own glyphs and two Edit controls over separators (the page box, the Find box with
-  a cue banner, both subclassed for Return), a tree view in a pane with a splitter drawn by the frame, a view window with
+  comctl32 toolbar with an image list of its own glyphs and an Edit control over a separator (the Find box with a cue banner,
+  subclassed for Return), a status bar with an owner-drawn part (`SBT_OWNERDRAW`, `WM_DRAWITEM`: the page navigation, the
+  status bar subclassed for its clicks, an Edit made over it for the number), a tree view in a pane with a splitter drawn by the frame, a view window with
   scroll bars (Wine's user32 scroll bars, `SetScrollInfo` with `SIF_DISABLENOSCROLL`) drawing into its DIB section, a status
   bar of three parts, dialogs from the .rc (Go To Page, Password), `GetOpenFileNameW`, `DragAcceptFiles`, `FlxpSetFullscreen`; from the
   shell layer `properties`, `spawn` (a link's web address through xdg-open), `message_box`, `set_window_icon_key`, and
   liblhde's state file. Under the Longhorn themes it is the example of the Longhorn header (`shell/lhheader.h`): the
   outline's path to the page as the crumbs, the leaf "Page N of M" changed alone as the pages scroll (`set_leaf`), the
   drop-downs from the outline, its own history behind Back and Forward, the address edit for a page number, the search box
-  and the star hidden, the menu as a menu band below the header and the toolbar below that (`CCS_NOMOVEY`: it stays where
-  the layout puts it); `tests/headless/mupfheader.sh` compares its header with the Explorer's. `tests/headless/mupf.sh` drives it on a PDF written by `tests/headless/mkpdf.py`, what it shows read
+  as its Find box (`done`), the star hidden, the Small size unless asked (`configure("mupf_", "small")`, again and `refit`
+  for View > Large Header), the menu as a menu band below the header and the toolbar as a band on its row, on the Explorer's
+  4051 command bar (`explorer/lhbar.h`, reached for: `attach`, `custom_draw` for both bands); `tests/headless/mupfheader.sh`
+  compares its header and that row with the Explorer's. Its Open dialog is the Longhorn one from `flxp-filedialog`, since
+  the dialog's header is the process's one. `tests/headless/mupf.sh` drives it on a PDF written by `tests/headless/mkpdf.py`, what it shows read
   from `MUPF_TRACE=1`. What it had to work around: an Alt+key accelerator leaves DefWindowProc thinking Alt was pressed alone
   (releasing it opens the menu bar), so Alt+Left and Alt+Right go on to it from the loop; a strip drawn on a key colour into a
   `CreateCompatibleBitmap` and added with `ImageList_AddMasked` showed black where the key was in some cells, so the glyphs
