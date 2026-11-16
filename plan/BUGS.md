@@ -126,6 +126,10 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   layout_chrome on the unsized frame); harmless, the size is right once mapped, the cause not looked for.
 - 2026-11-16 lhde-firefox, glass themes: [extend_frame] is fixed, so the menu bar, shown (Alt), pushes the tab row below luxwm's glass
   (the caption's colour behind it then) and lies in the glass without luxwm's side lines; luxwm could follow _NET_WM_OPAQUE_REGION.
+- 2026-11-16 lhde-firefox install into a profile Firefox never started: the widget it places (prefs.js uiCustomization.state with
+  currentVersion 0) is dropped by Firefox's first start, which writes its default layout; a second install places it.
+- 2026-11-16 lhde-firefox's Longhorn navigation: Back and the star keep the active art in an inactive window (flxp takes the
+  style's Inactive variants, Jade's SmallInactiveTravelBack); Firefox's CSS can switch on :-moz-window-inactive.
 - 2026-11-16 lhde-firefox: the search box's engine button (Firefox 160's moz-button .searchmode-switcher) keeps its grey pill; neither
   ::part(button) nor --button-background-color from userChrome.css reaches it (Firefox 4's engine icon sat on the field).
 
