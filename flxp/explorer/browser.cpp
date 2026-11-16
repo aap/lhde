@@ -685,12 +685,13 @@ static void make_groups(Browser& b, std::vector<int>& group_of)
 static void put_tile_lines(Browser& b, size_t i);
 static void trace_count(const Browser& b);
 
-// list item i from b.items[i] (lParam i): inserted, or set again (a change on disk)
-static void put_item(Browser& b, size_t i, int group, bool insert)
+// list item i from b.items[i] (lParam i): inserted, or set again (a change on disk; image: its icon too, which
+// thumbview::fill then replaces with its thumbnail)
+static void put_item(Browser& b, size_t i, int group, bool insert, bool image = true)
 {
     const Item& it = b.items[i];
     LVITEMW lvi = {};
-    lvi.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
+    lvi.mask = LVIF_TEXT | LVIF_PARAM | (insert || image ? LVIF_IMAGE : 0);
     lvi.iItem = (int)i;
     std::u16string name = W(it.name);
     lvi.pszText = (LPWSTR)name.c_str();
@@ -1173,9 +1174,31 @@ void listed(Browser& b)
         }
         if (f.stored) { it.xattrs = f.item.xattrs; it.flags |= shell::IsStored; }
     }
-    std::vector<Item> kept;
-    for (size_t i = 0; i < all.size(); i++) if (!gone[i]) kept.push_back(std::move(all[i]));
-    merge(b, kept, more);
+    // A contained change: only stored properties came in (the selection's, a column's), nothing went, and the order
+    // stays (more is coming, or the sort is not by one of them) with no filter looking at them: the rows that changed
+    // are set again, their images (thumbnails) as they are, and nothing else is touched
+    bool contained = !got.empty() && b.query.empty() && (more || !shell::details::column_property(b.sort));
+    for (const shell::Lister::Filled& f : got) contained = contained && f.stored && !f.stat && !f.gone && at.count(f.item.path);
+    if (contained) {
+        std::map<std::string, size_t> shown;
+        for (const shell::Lister::Filled& f : got) shown[f.item.path] = (size_t)-1;
+        for (size_t i = 0; i < b.items.size(); i++) { auto s = shown.find(b.items[i].path); if (s != shown.end()) s->second = i; }
+        b.filling = true;
+        for (const auto& s : shown) {
+            if (s.second == (size_t)-1) continue;
+            const Item& now = all[at[s.first]];
+            if (same_item(b.items[s.second], now)) continue;
+            b.items[s.second] = now;
+            put_item(b, s.second, -1, false, false);
+        }
+        b.filling = false;
+        b.all_items = std::move(all);
+        b.changed_on_disk();
+    } else {
+        std::vector<Item> kept;
+        for (size_t i = 0; i < all.size(); i++) if (!gone[i]) kept.push_back(std::move(all[i]));
+        merge(b, kept, more);
+    }
     static bool trace = getenv("FLXP_TRACE_LIST") != nullptr;
     if (trace) {   // tests/headless/slowpath.sh: "listed: N of M", the entries whose stat is in
         int n = 0;

@@ -718,7 +718,7 @@ are in. A folder whose server does not answer holds that thread and nothing else
 later folder is read by another thread (four at most at once; a fifth waits for one of them), and what the stuck one reads
 when the server answers is dropped if the window has gone elsewhere. F5 reads the names and every stat again (the rows
 shown stay until the new list is in), a change seen on disk (inotify: what this machine changed) reads the names again and
-stats the new entries. What you ask
+stats the new entries; when only stored properties come in (the selection's, a column's) just those rows are set again. What you ask
 for yourself (opening a file, Properties, Add Tag, copying) still reads the files it needs while you wait.
 `FLXP_TRACE_STALLS=MS` prints every message the window's thread spent MS milliseconds or more on (`stall: 123.4 ms message
 0x020a list`: a wheel turn on the list with the repaint it does at once; with 0, every message), and

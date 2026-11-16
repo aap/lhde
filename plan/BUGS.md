@@ -29,8 +29,6 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   file's xattrs, Open's mime_type stats and sniffs, Properties); 500 selected files = 500 round trips before the dialog.
 - 2026-11-15 Network folder: the task band shows "Add a description" for the moment (0.1-0.3 s) before the lister has read the
   selection's stored properties; an edit begun then starts empty.
-- 2026-11-16 Network folder: a selection change (its stored properties read by the lister) merges the whole list again on the UI
-  thread, 11-78 ms per batch for 1248 entries on soma; only the changed rows need touching.
 - 2026-11-15 The network thumbnail budget is per Loader: thumbview's and the two panes' loaders (preview.cpp) each have one, so a
   folder may read up to three budgets whole.
 - 2026-11-14 Properties sheet, General page: the "Opens with" program's icon is drawn over the start of its name ("[icon]pad" for
