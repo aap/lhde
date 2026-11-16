@@ -42,7 +42,7 @@
 #include "verbs.h"
 #include "w32/w32.h"
 #include "w32/user.h"
-#include "menuband.h"
+#include "shell/menuband.h"
 #include "uxtheme.h"
 #include "vssym32.h"
 extern "C" {

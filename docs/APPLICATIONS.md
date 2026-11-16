@@ -146,6 +146,11 @@ What an application does, in `shell::lhheader`:
   Enter (unset: no address edit); `command(TRAVEL_BACK | TRAVEL_FORWARD)`; `history(back, x, y)` the buttons' drop-down;
   `filter(text)` and `done(keep)` the search box; `favorites(x, y)`, `tool(id, x, y)`, `drop(i, d, commit)` (a segment as a
   drop target), `bookmark(path)` and the vision toolbar's `views_id` / `new_folder_id` are the Explorer's and may stay unset.
+- **The menu**: a menu bar would lie between luxwm's caption and the header, so under the header the window's menu goes into
+  the client below it, as the Explorer's does: `SetMenu(frame, nullptr)`, a rebar under the header, and in it the menu band
+  (`shell/menuband.h`, the Explorer's: `menuband::create(rebar, frame, menu, id)`), with `menuband::on_notify` from
+  `WM_NOTIFY`, `on_menuselect` from `WM_MENUSELECT`, `key_menu` from `WM_SYSCOMMAND`'s `SC_KEYMENU` and `on_activate` from
+  `WM_ACTIVATE`; `menuband::forget()` when the rebar goes (back to an XP theme, `SetMenu(frame, menu)` again).
 - Ctrl+L is the application's accelerator for `edit_address()`, as the Explorer's.
 
 ## Hardware (lhde/hw.h)

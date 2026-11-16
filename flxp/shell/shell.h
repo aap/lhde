@@ -28,6 +28,7 @@
 //                 Metadata)
 //   lhheader.h    the Longhorn header of a window (the 4051/4074 band, the vision header): crumbs, drop-downs, Back and
 //                 Forward, the address edit, the search box; luxwm's glass under it and the input holes (frame_message)
+//   menuband.h    the menu as a toolbar band in a rebar (the Explorer's; an application's under the Longhorn header)
 //   filedlg.h     the Open/Save dialog itself (filedlg::run). GetOpenFileNameW / GetSaveFileNameW reach the same dialog;
 //                 either needs $(WUX_APP_FILEDIALOG) on the link line (apps/app.mk)
 #pragma once
@@ -49,4 +50,5 @@
 #include "shell/xclip.h"
 #include "shell/ui.h"
 #include "shell/lhheader.h"
+#include "shell/menuband.h"
 #include "filedlg/filedlg.h"

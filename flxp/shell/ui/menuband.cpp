@@ -1,7 +1,11 @@
 #include <string.h>
 #include <string>
 #include <vector>
-#include "menuband.h"
+#include "w32/w32.h"
+extern "C" {
+#include "commctrl.h"
+}
+#include "shell/menuband.h"
 #include "uxtheme.h"
 
 namespace menuband {
@@ -298,6 +302,13 @@ bool key_menu(WCHAR ch)
     SetFocus(g_tb);
     SendMessageW(g_tb, TB_SETHOTITEM, 0, 0);
     return true;
+}
+
+void forget()
+{
+    g_tb = g_owner = g_rebar = nullptr;
+    g_menu = nullptr;
+    g_tracking = g_switch_to = -1;
 }
 
 } // namespace menuband
