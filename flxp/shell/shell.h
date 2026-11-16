@@ -26,6 +26,8 @@
 //   ui.h          the win32 part: message_box (MessageBoxW with UTF-8 strings), load_image / icon_for_key / icon_for
 //                 (an icon theme's source or a file's icon as an HICON), properties (the Properties sheet: General,
 //                 Metadata)
+//   lhheader.h    the Longhorn header of a window (the 4051/4074 band, the vision header): crumbs, drop-downs, Back and
+//                 Forward, the address edit, the search box; luxwm's glass under it and the input holes (frame_message)
 //   filedlg.h     the Open/Save dialog itself (filedlg::run). GetOpenFileNameW / GetSaveFileNameW reach the same dialog;
 //                 either needs $(WUX_APP_FILEDIALOG) on the link line (apps/app.mk)
 #pragma once
@@ -46,4 +48,5 @@
 #include "shell/bookmarks.h"
 #include "shell/xclip.h"
 #include "shell/ui.h"
+#include "shell/lhheader.h"
 #include "filedlg/filedlg.h"

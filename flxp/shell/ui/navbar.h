@@ -3,7 +3,7 @@
 // Its background is the theme part Navbar::Rebar.BACKGROUND (Inactive-,
 // Max-, MaxInactiveNavbar by focus and maximise state) over the client
 // width, ending in its own dark last row (4074's Rebar.SPLITTER over the
-// last 4 rows is not drawn: the clean 4051 edge, header.cpp), the travel
+// last 4 rows is not drawn: the clean 4051 edge, lhheader.cpp), the travel
 // (Back/Forward) and Favorites AnimationButtons, the NavbarBase gripper
 // before the search/favorites buttons, the breadcrumb arrow glyphs, and the
 // Navbar.TITLE / breadcrumb fonts and colours.

@@ -10,10 +10,10 @@
 #               .desktop file, the portal files
 
 # ---- luxnav (luxnav/luxnav.mk: build/lib/libluxnav.a, included before this file) ---------------------
-# The explorer header's vision mode: header.cpp includes luxnav's lhnav.h, every program links libluxnav.a through
+# The Longhorn header's vision mode: shell/ui/lhheader.cpp includes luxnav's lhnav.h, every program links libluxnav.a through
 # WUX_LINK / W32DEPS ($(LUXNAVA)).
-$(O)/flxp/explorer/header.o: CXXFLAGS += -Iluxnav
-$(O)/flxp/explorer/header.o: luxnav/lhnav.h | $(LUXNAVA)
+$(O)/flxp/shell/ui/lhheader.o: CXXFLAGS += -Iluxnav
+$(O)/flxp/shell/ui/lhheader.o: luxnav/lhnav.h | $(LUXNAVA)
 
 # ---- objects ----------------------------------------------------------------------------
 SHELLOBJS = $(patsubst %.cpp,$(O)/%.o,$(wildcard flxp/shell/*.cpp)) $(LHDE_OBJS) $(LHCAT_OBJS)

@@ -6,8 +6,8 @@ facilities beside it. Three layers, and an application touches only the first tw
 | layer | where | what it gives | how an application reaches it |
 | --- | --- | --- | --- |
 | wux | `wux/` | windows, controls (Wine's comctl32), drawing, input, menus, dialogs, the clipboard, message dispatch, the visual style | `#include "wux/wux.h"` |
-| the shell facilities | `flxp/shell/`, `flxp/filedlg/` | XDG directories and settings, the settings store, the session theme's record, MIME types, launching, the property registry and the annotations, file operations, thumbnails, icon themes, the Open/Save dialog | `#include "shell/shell.h"` |
-| the Explorer | `flxp/explorer/` | the browser, the views, the task panes, the headers | not at all |
+| the shell facilities | `flxp/shell/`, `flxp/filedlg/` | XDG directories and settings, the settings store, the session theme's record, MIME types, launching, the property registry and the annotations, file operations, thumbnails, icon themes, the Open/Save dialog, the Longhorn header | `#include "shell/shell.h"` |
+| the Explorer | `flxp/explorer/` | the browser, the views, the task panes, the folders as the header's crumbs | not at all |
 
 Everything an application may use is named in those two headers; a declaration it needs that is elsewhere belongs in one of
 them (and the list at the end says what still is not).
@@ -36,11 +36,11 @@ them (and the list at the end says what still is not).
 - Resources: `NAME.rc` (dialog templates in dialog units for "MS Shell Dlg" 8, flxp's metrics: `flxp/rc/explorer.rc`) is
   compiled to `NAME.res` by mingw's windres when the .rc changes; the .res is checked in, so a build needs no windres.
 - Linking: `$(app_link)` links the objects with `libwux.a` and `build/lib/libflxpshell.a` (the shell facilities: flxp/shell's
-  objects with its win32 part flxp/shell/ui and liblhde's, the same objects flxp's programs link) whole, then `libwuxtheme.a`.
-  `WUX_APP_DEPS` are those archives; `WUX_APP_FILEDIALOG` adds the Open/Save dialog (`GetOpenFileNameW`, `GetSaveFileNameW`,
-  `filedlg::run`); without it those calls fail with `CDERR_INITIALIZATION`. An application that draws the Longhorn
-  navigation bar adds `$(LUXNAVA)` to its prerequisites and `-Iluxnav` to its flags. `WUX_APP_LINK` is the same link line for a
-  rule written by hand.
+  objects with its win32 part flxp/shell/ui and liblhde's, the same objects flxp's programs link) whole, then `libluxnav.a`
+  (the Longhorn header's vision mode draws with it) and `libwuxtheme.a`. `WUX_APP_DEPS` are those archives;
+  `WUX_APP_FILEDIALOG` adds the Open/Save dialog (`GetOpenFileNameW`, `GetSaveFileNameW`, `filedlg::run`); without it those
+  calls fail with `CDERR_INITIALIZATION`. An application that calls luxnav's `lhnav_*` itself adds `-Iluxnav` to its flags
+  (the Longhorn header below needs nothing). `WUX_APP_LINK` is the same link line for a rule written by hand.
 
 ## The entry point
 
@@ -107,6 +107,46 @@ flxp-settings' display), `shell::app_hicon(desktop_id, px)` (a program's icon: l
 `shell::properties(owner, paths, options)` (the Properties sheet: General and Metadata, as the Explorer's Properties opens it),
 `shell::one_line_edit` (an edit whose paste joins the clipboard's lines). The shell
 layer's warnings on stderr start with the program's name (`shell::program_name()`, argv[0]'s basename).
+
+## The Longhorn header (shell/lhheader.h)
+
+The band the 4051 and 4074 Explorer have at the top of the window, as the Explorer draws it (the same code,
+`flxp/shell/ui/lhheader.cpp`): the round Back and Forward buttons with their history drop-downs, the large title, the
+breadcrumb with a drop-down on every segment's chevron and an address edit over it (Ctrl+L, or a click on its empty part),
+the search box and the favourites star; under a theme whose `Explorer.navbar` is `vision`, luxnav's header instead
+(docs/NAVBAR.md). On luxwm with a compositor it lies on the frame's glass, without one it is the theme's opaque navigation
+bar or luxwm's header pixmap; its height, fonts and art follow the session theme, its size and elements the settings (flxp.ini
+`<prefix>header_size`, `<prefix>header_search`, ...; an application's prefix falls back to the Explorer's keys). One header per
+process. What the crumbs mean is the application's: the header shows them and calls back.
+
+What an application does, in `shell::lhheader`:
+
+- **Whether**: `want_longhorn()` (the session theme's `Explorer.chrome`, luxwm running) decides; under the XP themes the window
+  keeps its own chrome. Again on `WM_THEMECHANGED` (a switch to or from a Longhorn theme: `create` / `destroy` and
+  `unextend_frame`).
+- **Before `create`**: `configure("NAME_", "")` (the settings' prefix; "" as the size: the Explorer's), and `hide(SHOW_SEARCH)`,
+  `hide(SHOW_FAVORITES)` for the elements it has no use for (they are then off whatever the settings say).
+- **`create(frame, callbacks)`**, then `extend_frame(frame)`: the header is a child of the top-level window at (0, 0); the window's
+  other children go below `height()`, laid out by the application, which calls `relayout(width, height())` from its
+  `WM_SIZE`. `extend_frame` tells luxwm all it needs (docs/CLIENT-PROTOCOL.md): the glass continued behind the header
+  (`DwmExtendFrameIntoClientArea` by `extend_top()`), the frame flags (`NO_ICON`; `NO_TITLE` when the header shows the
+  title; `CLIENT_CAPTION` on glass at the Medium size and up, so the window grows by luxwm's caption rows and the header covers
+  them) and the input hole over luxwm's caption buttons (`FlxpDwmSetInputHole`). luxwm treats every client asking for these
+  alike; there is nothing to declare beyond them.
+- **The frame's messages**: `frame_message(frame, msg, wp, lp, &result, layout)` first in the window procedure; it answers
+  `WM_NCHITTEST` (the header's empty parts are the caption, so the window is dragged and maximised there), follows composition,
+  luxwm's caption rectangle and frame state, the header pixmap, `_NET_ACTIVE_WINDOW` (the active and inactive look) and the
+  theme, and returns true when the message is done; `WM_SIZE`, `WM_ACTIVATE` and `WM_THEMECHANGED` go on to the application too.
+- **The contents**: `set_crumbs({...})` with a `Crumb` each (`text`, `key`: the application's, given back; `icon`: an icon key;
+  `dropdown`: whether its chevron opens a list; `tip`), the last being the leaf, the place shown, whose text is also the title
+  unless `set_title` gave one; `set_leaf(text)` changes the leaf alone; `set_history(can_back, can_forward)`;
+  `set_address(text)` what the address edit starts with.
+- **The callbacks** (`Callbacks`, each optional): `go(key)` a segment clicked or a drop-down entry chosen; `entries(i,
+  children)` the drop-down of segment i as `Entry`s (text, key, bold: the one on the path); `address(text)` the address edit's
+  Enter (unset: no address edit); `command(TRAVEL_BACK | TRAVEL_FORWARD)`; `history(back, x, y)` the buttons' drop-down;
+  `filter(text)` and `done(keep)` the search box; `favorites(x, y)`, `tool(id, x, y)`, `drop(i, d, commit)` (a segment as a
+  drop target), `bookmark(path)` and the vision toolbar's `views_id` / `new_folder_id` are the Explorer's and may stay unset.
+- Ctrl+L is the application's accelerator for `edit_address()`, as the Explorer's.
 
 ## Hardware (lhde/hw.h)
 

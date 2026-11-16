@@ -34,17 +34,18 @@ apps/%.res: apps/%.rc
 	$(call run_windres,-I $(dir $<))
 
 # link: wux and the shell facilities whole (their weak references and the style probe resolve as in flxp), then luxnav
-# when the application asked for it ($(LUXNAVA) among its prerequisites: the Longhorn navigation bar, -Iluxnav; it comes
-# after liblhde's objects in libflxpshell.a so its own copy of them is not pulled), libwuxtheme as an archive.
-WUX_APP_DEPS = $(SHELLA) $(WUXA) $(UTA)
-WUX_APP_LINK = $(UT_PROBE) -Wl,--whole-archive $(SHELLA) $(WUXA) -Wl,--no-whole-archive $(UTA) $(LDLIBS) -no-pie
+# (the shell layer's Longhorn header, shell/lhheader.h, draws the vision header with it; an application that calls
+# lhnav_* itself adds -Iluxnav to its flags; it comes after liblhde's objects in libflxpshell.a so its own copy of them
+# is not pulled), libwuxtheme as an archive.
+WUX_APP_DEPS = $(SHELLA) $(WUXA) $(LUXNAVA) $(UTA)
+WUX_APP_LINK = $(UT_PROBE) -Wl,--whole-archive $(SHELLA) $(WUXA) -Wl,--no-whole-archive $(LUXNAVA) $(UTA) $(LDLIBS) -no-pie
 # the Open/Save dialog (GetOpenFileNameW, GetSaveFileNameW, filedlg::run, filedlg::message_box): today it is built on the
-# Explorer's browsing widget, so it brings flxp/explorer (all but its main) and luxnav along
-WUX_APP_FILEDIALOG = $(FILEDLGLIB) $(EXPLSHARED) $(LUXNAVA)
+# Explorer's browsing widget, so it brings flxp/explorer (all but its main) along
+WUX_APP_FILEDIALOG = $(FILEDLGLIB) $(EXPLSHARED)
 app_objs = $(patsubst %.cpp,$(O)/%.o,$(wildcard apps/$(1)/*.cpp))
 define app_link
 @mkdir -p $(dir $@)
-$(CXX) -o $@ $(filter %.o,$^) $(UT_PROBE) -Wl,--whole-archive $(SHELLA) $(WUXA) -Wl,--no-whole-archive $(filter $(LUXNAVA),$^) \
+$(CXX) -o $@ $(filter %.o,$^) $(UT_PROBE) -Wl,--whole-archive $(SHELLA) $(WUXA) -Wl,--no-whole-archive $(LUXNAVA) \
     $(UTA) $(LDLIBS) -no-pie
 endef
 
