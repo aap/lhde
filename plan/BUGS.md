@@ -86,6 +86,10 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   Alt enters the menu bar's keyboard mode; Windows does not. mupf passes its Alt+Left/Right on to DefWindowProc instead.
 - 2026-11-16 (check) ImageList_AddMasked of a 32 bpp CreateCompatibleBitmap strip drawn with GDI on magenta: some cells came out with a
   black background instead of transparent (mupf's first toolbar glyphs: the magnifiers, the page glyphs; the folder and arrows were right).
+- 2026-11-16 wux does not coalesce WM_MOUSEMOVE (Windows keeps one move pending, the latest): a drag that scrolls on every move
+  (mupf's hand) handles each X motion event, and a burst of them holds its paint back until it is through.
+- 2026-11-16 GetCursorPos is still an XQueryPointer round trip: TrackMouseEvent's hover timer and some controls call it on mouse
+  moves, and under a busy compositor each waits for its frame (the message loop itself no longer asks: message_pointer_pos).
 - 2026-11-01 flxp-filedialog: a right click right after the pointer arrives opens the context menu and closes it at once (Xvfb,
   xdotool's burst press+release past a synchronous grab, as menus.sh works around) (check with a real mouse).
 
@@ -149,10 +153,11 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   it writes ~/.config/pulse into the scratch HOME and lingers; set PULSE_SERVER to nothing or stop it.
 - 2026-11-15 slowpath.sh covers the Icons view sorted by Name only: the once-only re-sort of a size or date sort and the Details
   columns filling in on a network folder have no test.
-- 2026-11-16 The lab's picom (xrender, picom-glass.conf's use-damage = false) holds Xvfb about 65 ms a frame repainting the whole
-  screen with blur: a client's round trip waits behind it, so anything that scrolls in the lab draws at ~12 frames a second
-  (mupf's autoscroll: a step every 70-85 ms; 16 ms without picom or with its glx backend). Timing measured in the lab is not
-  the real session's.
+- 2026-11-16 The lab's picom (xrender, picom-glass.conf's use-damage = false) holds Xvfb 65-120 ms a frame repainting the whole
+  screen with blur: a wux program no longer waits for it (16 ms autoscroll steps), but what reaches the lab's screen comes at
+  ~10 frames a second, and its glx backend on Xvfb does not show an ARGB window's new contents at all. The real session's
+  picom glx frame time during a scroll (blur re-done over the whole screen each frame) is unmeasured; if mupf's autoscroll is
+  still uneven there, time picom's frames (its --log-level=debug) before touching picom-glass.conf.
 - 2026-11-16 mupfheader.sh's behaviour part (MUPFHEADER_BEHAVIOUR) assumes the flxp header: under aerovision (lhnav draws it)
   no `lhheader crumb` lines are traced, so its drop-down, Back and first-segment checks fail (3 FAILs); slate4051, the default, passes.
 

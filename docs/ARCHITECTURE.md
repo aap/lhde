@@ -29,6 +29,15 @@ scripts, ut-dump over every imported style, then the lux side: liblhde's resolve
 frame regression against a local baseline; last the free baseline (`make check-free`: every theme with only ReactOS imported).
 `make check-bare` runs all of it with nothing imported and nothing configured (CI): every test passes or skips.
 
+A wux toplevel is one X window and one back buffer in the program; a paint draws into the back buffer and marks what it
+touched, and the message loop presents the marked areas (`wux/win/window.cpp` `present_now`) when it runs dry and at least
+once every 16 ms while it does not. A present goes through MIT-SHM where the server has it, so the program never waits on
+a server busy behind the compositor's frame; the next one waits until the server has read the last (its ShmCompletion).
+Under a compositing manager ScrollWindowEx moves the window's pixels on the server (XCopyArea) and only the strip it uncovers
+is sent; without one the scrolled area is sent again. Nothing in the loop's path waits for a reply from the server: a
+message's pt is the pointer as the events left it, IsZoomed reads `_NET_WM_STATE` as last notified
+(`tests/headless/xcalls.c` counts the round trips of a program, `tests/headless/timerbusy.sh` checks them).
+
 ## A running session
 
 `lhde-session start [THEME]` (a real X server on `:1`, `--nested` in Xephyr, `--attach` to a running server; `lhde-session

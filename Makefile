@@ -42,7 +42,7 @@
 CXX      ?= g++
 # WebP (wux/gdi/image.cpp) when libwebp is installed: FLXP_WEBP, libwebpdemux for animations' first frame
 WEBP     := $(shell pkg-config --exists libwebp libwebpdemux && echo libwebp libwebpdemux)
-PKGS      = x11 xext xcursor xfixes xkbcommon freetype2 fontconfig libpng libjpeg $(WEBP)
+PKGS      = x11 x11-xcb xcb xext xcursor xfixes xkbcommon freetype2 fontconfig libpng libjpeg $(WEBP)
 CXXFLAGS ?= -g -O1
 CXXFLAGS += -pthread -std=c++17 -fno-exceptions -fno-rtti -Wall -Wextra -MMD -MP -Iwux -Iflxp -I. $(shell pkg-config --cflags $(PKGS))
 CXXFLAGS += $(if $(WEBP),-DFLXP_WEBP)

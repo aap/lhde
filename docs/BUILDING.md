@@ -33,7 +33,7 @@ the user's own files (settings below).
 ## Building
 
 Needs a C and C++17 compiler, GNU make, Python 3 (the standard library: every `make` runs
-`tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, xext, xcursor, xfixes, xkbcommon, freetype2,
+`tools/lhdeaurora.py` for aurorademo's tables) and pkg-config with x11, x11-xcb and xcb (libX11 and libxcb install them), xext, xcursor, xfixes, xkbcommon, freetype2,
 fontconfig, libpng, libjpeg (libwebp/libwebpdemux optional), dbus-1 (flxp-portal, flxp-desktop's FileManager1, luxshell),
 sqlite3 (the catalogue, liblhcat: flxp and lhde-cat; with FTS5, as distributions build it);
 for the lux side also xinerama, xft, cairo, cairo-xlib, pangocairo and lua5.4 (system Lua 5.4).
