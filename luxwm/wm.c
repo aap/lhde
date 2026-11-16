@@ -165,6 +165,13 @@ static int xfade_tick(void);
 static void max_transition(struct client *c, bool to_max, int x, int y, int w, int h);
 static int comp_written = -1;   /* _LHWM_COMPOSITED last written */
 static Atom lhwm_hdrpix_atom, lhwm_caprect_atom;   /* _LHWM_HEADER_PIXMAP, _LHWM_CAPTION_RECT (CLIENT-PROTOCOL.md) */
+/* activation in step (CLIENT-PROTOCOL.md "Activation in step"): a client whose header follows the activation state publishes the
+   state it shows as _LHWM_ACTIVE_DRAWN; its frame is painted in a new state once the header shows it, or after ACTIVE_WAIT_MS */
+#define ACTIVE_WAIT_MS 200
+static Atom lhwm_drawn_atom;
+static void client_read_drawn(struct client *c);
+static int active_wait_tick(void);
+static void active_wait_settle(void);
 static unsigned theme_gen;      /* bumped on every theme load: header pixmaps are rendered again */
 static void margins_for(struct client *c, const struct theme *th, int max, int *l, int *r, int *t, int *b);
 static void header_update(struct client *c, bool focused);
@@ -532,6 +539,29 @@ static void
 draw_text(struct client *c, bool focused)
 {
     if (!c->decorated || c->dec == None) return;
+    /* A new activation state for a client that draws a header following it (_LHWM_ACTIVE_DRAWN). DWM composes the frame and the
+       client's extended header together, so on Windows both change in the same frame; here the client hears of the change
+       (FocusIn, _NET_ACTIVE_WINDOW) after luxwm has decided it and paints its header later. So the frame waits until the client
+       says its header shows the new state (client_read_drawn), at most ACTIVE_WAIT_MS (paint_dirty). Meanwhile the frame is
+       painted ahead into a pixmap (c->stage), so that only a copy is left when the header follows: the compositor gets both
+       within a fraction of a millisecond. The header pixmap goes out at once (the client paints with it); an Expose meanwhile
+       is repainted in the state still shown. */
+    bool paint_focused = focused, ahead = false;
+    if (c->drawn_active >= 0 && c->painted_active >= 0 && c->painted_active != (int)focused && c->drawn_active != (int)focused) {
+        double now = now_ms();
+        if (c->active_wait <= 0) {
+            c->active_wait = now + ACTIVE_WAIT_MS;
+            LOGP("frame 0x%lx: %s once the client's header is", c->window, focused ? "active" : "inactive");
+        }
+        if (now < c->active_wait) {
+            if (!c->dirty) ahead = true;
+            else paint_focused = c->painted_active != 0;
+        } else {
+            LOGP("frame 0x%lx: the client's header did not follow within %d ms", c->window, ACTIVE_WAIT_MS);
+            c->active_wait = 0;
+        }
+    } else
+        c->active_wait = 0;
     struct frame_ext ext, *e = NULL;
     bool comp = compositor && theme.mode == THEME_DWM, cc = (c->ext_flags & FRAME_CLIENT_CAPTION) != 0;
     unsigned pf = (unsigned)c->ext_flags & ~(unsigned)FRAME_NO_HEADER_PIXMAP;   /* the painter's flags (NO_HEADER_PIXMAP is header_update's) */
@@ -566,9 +596,23 @@ draw_text(struct client *c, bool focused)
         if (crect.width >= MINIMUM_DIM && crect.height >= MINIMUM_DIM && crect.x + crect.width <= c->geom.width && crect.y + crect.height <= c->geom.height) {
             hole = crect; hp = &hole; }
     }
-    wm_frame_paint_ex4(display, argb_visual, &theme, c->dec, c->geom.width, c->geom.height, c->title, client_icon(c), focused, c->hover, c->pressed, c->mono, e, hp,
-                    xfade_weight(c), &crect);
-    c->paint_serial = wm_frame_upload_serial; c->dirty = false;
+    if (ahead) {   /* the frame in the new state into c->stage, shown below once the header follows */
+        if (!c->stage && !(c->stage = calloc(1, sizeof *c->stage))) { header_update(c, focused); return; }
+        wm_frame_stage_out = c->stage; c->stage_focused = focused;
+        wm_frame_paint_ex4(display, argb_visual, &theme, c->dec, c->geom.width, c->geom.height, c->title, client_icon(c), focused, c->hover, c->pressed, c->mono, e, hp,
+                        xfade_weight(c), &crect);
+        header_update(c, focused);
+        XFlush(display);
+        return;
+    }
+    if (c->stage && c->stage->pix != None && c->stage->dec == c->dec && c->stage_focused == (int)paint_focused && !c->dirty)
+        wm_frame_stage_show(display, c->stage);   /* painted ahead with what is current (every change since painted it again) */
+    else {
+        if (c->stage) wm_frame_stage_drop(display, c->stage);
+        wm_frame_paint_ex4(display, argb_visual, &theme, c->dec, c->geom.width, c->geom.height, c->title, client_icon(c), paint_focused, c->hover, c->pressed, c->mono, e, hp,
+                        xfade_weight(c), &crect);
+    }
+    c->paint_serial = wm_frame_upload_serial; c->dirty = false; c->painted_active = paint_focused;
     header_update(c, focused);
     XFlush(display);   /* XNextEvent will not flush while events keep arriving */
 }
@@ -637,13 +681,62 @@ header_update(struct client *c, bool focused)
     c->hdr_pix = pix; c->hdr_key = key;
 }
 
-/* repaint the frames that got an Expose since their last paint (called when the event queue is empty) */
+static Bool drawn_pred(Display *d, XEvent *ev, XPointer arg) { UNUSED(d); UNUSED(arg); return ev->type == PropertyNotify && ev->xproperty.atom == lhwm_drawn_atom; }
+
+/* repaint the frames that got an Expose since their last paint (called when the event queue is empty), and the frames whose
+   clients' headers now show a new activation state, or have not within ACTIVE_WAIT_MS (draw_text) */
 static void
 paint_dirty(void)
 {
+    XEvent ev;   /* _LHWM_ACTIVE_DRAWN first: the modal loops (drags) leave PropertyNotify events queued */
+    while (XCheckIfEvent(display, &ev, drawn_pred, NULL)) {
+        struct client *c = get_client_from_window(ev.xproperty.window);
+        if (c != NULL && c->window == ev.xproperty.window) client_read_drawn(c);
+    }
+    double now = now_ms();
+    for (int i = 0; i < WORKSPACE_NUMBER; i++)
+        for (struct client *c = c_list[i]; c; c = c->next) {
+            int a = client_active(c);
+            if (c->dirty) { if (prof) fprintf(stderr, "luxwm prof: expose repaint 0x%lx\n", c->dec); draw_text(c, a); }
+            else if (c->active_wait > 0 && (c->drawn_active == a || c->painted_active == a || now >= c->active_wait)) draw_text(c, a);
+        }
+}
+
+/* ms until the first frame that waits for its client's header is painted anyway (draw_text), -1: none waits */
+static int
+active_wait_tick(void)
+{
+    double now = now_ms(), first = 0;
     for (int i = 0; i < WORKSPACE_NUMBER; i++)
         for (struct client *c = c_list[i]; c; c = c->next)
-            if (c->dirty) { if (prof) fprintf(stderr, "luxwm prof: expose repaint 0x%lx\n", c->dec); draw_text(c, client_active(c)); }
+            if (c->active_wait > 0 && (first <= 0 || c->active_wait < first)) first = c->active_wait;
+    if (first <= 0) return -1;
+    return first <= now ? 0 : (int)(first - now + 0.999);
+}
+
+/* before a modal loop that does not repaint frames (the window menu): the frames waiting for their clients' headers are painted
+   first, as the headers follow or at their deadline */
+static void
+active_wait_settle(void)
+{
+    for (int t; paint_dirty(), (t = active_wait_tick()) >= 0; ) {
+        struct pollfd pfd = { .fd = ConnectionNumber(display), .events = POLLIN };
+        XFlush(display);
+        poll(&pfd, 1, t);
+    }
+}
+
+/* the client's _LHWM_ACTIVE_DRAWN (-1: not set); a frame waiting for it is painted when it matches, or at once when it goes */
+static void
+client_read_drawn(struct client *c)
+{
+    Atom ty; int fmt; unsigned long n, after; unsigned char *d = NULL;
+    c->drawn_active = -1;
+    if (XGetWindowProperty(display, c->window, lhwm_drawn_atom, 0, 1, False, XA_CARDINAL, &ty, &fmt, &n, &after, &d) == Success && d) {
+        if (fmt == 32 && n == 1) c->drawn_active = ((unsigned long *)d)[0] ? 1 : 0;
+        XFree(d);
+    }
+    if (c->active_wait > 0 && (c->drawn_active < 0 || c->drawn_active == (int)client_active(c))) draw_text(c, client_active(c));
 }
 
 static void
@@ -1136,7 +1229,9 @@ handle_client_message(XEvent *e)
         long d = cme->data.l[0];
         if (c && d >= 0 && d < WORKSPACE_NUMBER && d != c->ws) { LOGP("_NET_WM_DESKTOP: 0x%lx to desktop %ld", c->window, d); client_send_to_ws(c, (int)d); }
     } else if (cme->message_type == net_atom[NetCurrentDesktop]) {
-        if (cme->data.l[0] >= 0 && cme->data.l[0] < WORKSPACE_NUMBER)   /* a pager's or luxshell's request (lh.set_desktop) */
+        /* a pager's or luxshell's request (lh.set_desktop); the current desktop is no change (xdotool windowactivate and taskbars
+           send it before _NET_ACTIVE_WINDOW: switch_ws would refocus the top window first) */
+        if (cme->data.l[0] >= 0 && cme->data.l[0] < WORKSPACE_NUMBER && cme->data.l[0] != curr_ws)
             switch_ws(cme->data.l[0]);
     } else if (cme->message_type == net_atom[NetRestackWindow]) {
         client_restack(get_client_from_window(cme->window), cme->window, (Window)cme->data.l[1], cme->data.l[2], cme->data.l[0]);
@@ -1210,7 +1305,9 @@ handle_button_press(XEvent *e)
     }
     /* compared with the real input focus: after a click on the desktop f_client is still the last focused window, but inactive */
     if (c != f_client || !client_has_focus(c)) {
-        switch_ws(c->ws);
+        /* only to another desktop: switch_ws focuses the desktop's top window first, which painted the active frame inactive
+           and active again before the clicked one took over */
+        if (c->ws != curr_ws) switch_ws(c->ws);
         client_manage_focus(c);
     }
     // If it's not window movement or resize then process focus on click
@@ -1479,6 +1576,10 @@ handle_property_notify(XEvent *e)
         draw_text(c, client_active(c));
         return;
     }
+    if (ev->atom == lhwm_drawn_atom) {   /* set, changed or deleted: a frame waiting for the client's header follows (draw_text) */
+        if (ev->window == c->window) client_read_drawn(c);
+        return;
+    }
 
     if (ev->state == PropertyDelete)
         return;
@@ -1653,6 +1754,7 @@ client_forget(struct client *c)
     if (c->icon) cairo_surface_destroy((cairo_surface_t *)c->icon);
     if (c->icon32) cairo_surface_destroy((cairo_surface_t *)c->icon32);
     if (c->hdr_pix) XFreePixmap(display, c->hdr_pix);
+    if (c->stage) { wm_frame_stage_drop(display, c->stage); free(c->stage); }
     free(c);
     client_raise(f_client);
     ewmh_update_stacking();
@@ -1912,7 +2014,7 @@ ipc_pointer_focus(long *d)
          * otherwise menu's will be hidden behind the parent window
          */
         if (c != f_client) {
-            switch_ws(c->ws);
+            if (c->ws != curr_ws) switch_ws(c->ws);
             client_manage_focus(c);
         }
     }
@@ -2131,8 +2233,10 @@ client_manage_focus(struct client *c)
     if (c != NULL && c->minimized)
         client_restore(c);   /* focusing a minimised window (Alt+Tab, activation) restores it */
     if (c != NULL && f_client != NULL) {
-        client_set_color(f_client, conf.iu_color, conf.bu_color);
-        draw_text(f_client, false);
+        if (f_client != c) {   /* focusing the focused window again paints nothing inactive (its frame blinked) */
+            client_set_color(f_client, conf.iu_color, conf.bu_color);
+            draw_text(f_client, false);
+        }
         manage_xsend_icccm(c, wm_atom[WMTakeFocus]);
     }
 
@@ -2244,6 +2348,8 @@ manage_new_window(Window w, XWindowAttributes *wa)
        a new _LHWM_EXTEND_FRAME) must not slip through before the full event mask is selected after mapping */
     XSelectInput(display, w, PropertyChangeMask);
     client_read_ext(c);
+    c->painted_active = -1;
+    client_read_drawn(c);
     client_read_hints(c);   /* WM_NORMAL_HINTS: the size is fitted by the client_refresh below */
     c->mwm_funcs = read_mwm_funcs(w);
     { int l, r, t, b; margins(c, &l, &r, &t, &b);
@@ -2945,6 +3051,8 @@ run(void)
             int to = anim_expire();   /* _LHWM_ANIMATE back to anim_style after a geometry animation */
             int tf = xfade_tick();     /* the next frame of a maximise/restore crossfade */
             if (tf >= 0 && (to < 0 || tf < to)) to = tf;
+            int ta = active_wait_tick();   /* a frame waiting for its client's header: painted at its deadline */
+            if (ta >= 0 && (to < 0 || ta < to)) to = ta;
             if (to >= 0) {
                 struct pollfd pfd = { .fd = ConnectionNumber(display), .events = POLLIN };
                 XFlush(display);
@@ -3210,6 +3318,7 @@ setup(void)
         lhwm_flags_atom = XInternAtom(display, "_LHWM_FRAME_FLAGS", False);
         lhwm_hdrpix_atom = XInternAtom(display, "_LHWM_HEADER_PIXMAP", False);
         lhwm_caprect_atom = XInternAtom(display, "_LHWM_CAPTION_RECT", False);
+        lhwm_drawn_atom = XInternAtom(display, "_LHWM_ACTIVE_DRAWN", False);
         lhwm_comp_atom = XInternAtom(display, "_LHWM_COMPOSITED", False);
         lhwm_desklayer_atom = XInternAtom(display, "_LHWM_DESKTOP_LAYER", False);
         lhwm_metrics_atom = XInternAtom(display, "_LHWM_FRAME_METRICS", False);
@@ -3722,9 +3831,9 @@ ewmh_set_viewport(void)
 static void
 ewmh_set_focus(struct client *c)
 {
-        XDeleteProperty(display, root, net_atom[NetActiveWindow]);
         f_client = c;
-        /* Tell EWMH about our new window */
+        /* Tell EWMH about our new window (replaced in one step: deleting it first showed clients a moment without an active
+           window, as an inactive header) */
         XChangeProperty(display, root, net_atom[NetActiveWindow], XA_WINDOW, 32, PropModeReplace, (unsigned char *) &(c->window), 1);
 }
 
@@ -5128,6 +5237,7 @@ static void
 wm_menu_open(struct client *c, int x, int y, unsigned flags, unsigned button, bool from_icon)
 {
     if (c == NULL || (c->hidden && !c->minimized)) return;   /* minimised: hidden too */
+    active_wait_settle();   /* the menu's loop paints no frames: a click on an inactive caption icon activates first */
     Window w = c->window; void *arg = (void *)(uintptr_t)w;
     bool fixed = c->max_w > 0 && c->max_h > 0 && c->min_w == c->max_w && c->min_h == c->max_h, mini = c->minimized;
     unsigned mx = c->mono && !mini ? WMMENU_DISABLED : 0, mn = mini ? WMMENU_DISABLED : 0;
@@ -5196,18 +5306,21 @@ drag_pred(Display *d, XEvent *ev, XPointer arg)
     return sync_ev >= 0 && ev->type == sync_ev + XSyncAlarmNotify;
 }
 
-/* the next drag event (drag_pred), waiting at most timeout ms (-1: no limit); false on timeout. Frames exposed meanwhile are
-   repainted before blocking. */
+/* the next drag event (drag_pred), waiting at most timeout ms (-1: no limit); false on timeout. Frames exposed meanwhile, and
+   frames waiting for their clients' headers (draw_text), are repainted before blocking. */
 static bool
 drag_next_event(XEvent *ev, int timeout)
 {
+    double until = timeout >= 0 ? now_ms() + timeout : -1;
     for (;;) {
         if (XCheckIfEvent(display, ev, drag_pred, NULL))
             return true;
         paint_dirty();
         XFlush(display);
         struct pollfd pfd = { .fd = ConnectionNumber(display), .events = POLLIN };
-        if (poll(&pfd, 1, timeout) == 0)
+        int t = until < 0 ? -1 : MAX((int)(until - now_ms() + 0.999), 0), ta = active_wait_tick();
+        if (ta >= 0 && (t < 0 || ta < t)) t = ta;
+        if (poll(&pfd, 1, t) == 0 && until >= 0 && now_ms() >= until)
             return false;
     }
 }

@@ -57,6 +57,13 @@ struct client {
                                            PropertyNotify (docs/LUXWM.md "Size hints", "Caption buttons") */
     long fext[4];                       /* _NET_FRAME_EXTENTS last written (fext_set) */
     bool fext_set;
+    int drawn_active;                   /* _LHWM_ACTIVE_DRAWN as the client last wrote it: the activation state its own header shows
+                                           (1 active, 0 inactive); -1: not set, the client does not take part (CLIENT-PROTOCOL.md) */
+    int painted_active;                 /* the activation state the decoration window shows; -1: not painted yet */
+    double active_wait;                 /* a frame paint in a new activation state waits for the client's header until then (ms,
+                                           now_ms(); 0: none waits) (draw_text) */
+    struct wm_frame_stage *stage;       /* meanwhile the frame in that state, painted ahead (frame.h; NULL until first needed) */
+    int stage_focused;                  /* the activation state it was painted in */
 };
 
 enum { SNAP_NONE, SNAP_LEFT, SNAP_RIGHT, SNAP_VERT, SNAP_MAX /* a drag target only: maximise */ };

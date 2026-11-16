@@ -1055,6 +1055,40 @@ static void put_rect(Display *dpy, Drawable win, GC gc, XImage *xi, int x, int y
     if (w > 0 && h > 0) XPutImage(dpy, win, gc, xi, x, y, x, y, (unsigned)w, (unsigned)h);
 }
 
+struct wm_frame_stage *wm_frame_stage_out;
+static GC frame_gc = None;   /* any depth-32 drawable on this screen will do */
+
+/* the window's shape, when it differs from the one last set on it */
+static void send_shape(Display *dpy, Window dec, int w, int h, XRectangle *rects, int n, unsigned long sum) {
+    int slot = (int)(dec % 256);
+    if (n > 0 && (shape_cache[slot].win != dec || shape_cache[slot].w != w || shape_cache[slot].h != h || shape_cache[slot].sum != sum)) {
+        XShapeCombineRectangles(dpy, dec, ShapeBounding, 0, 0, rects, n, ShapeSet, YXBanded);
+        shape_cache[slot].win = dec; shape_cache[slot].w = w; shape_cache[slot].h = h; shape_cache[slot].sum = sum; }
+}
+
+/* the staged pixels into the window: all of them, or the four bands around the hole (hw > 0) */
+static void copy_stage(Display *dpy, Pixmap stage, Window dec, int w, int h, int hx, int hy, int hw, int hh) {
+    if (hw > 0) {
+        XCopyArea(dpy, stage, dec, frame_gc, 0, 0, (unsigned)w, (unsigned)hy, 0, 0);
+        if (h - hy - hh > 0) XCopyArea(dpy, stage, dec, frame_gc, 0, hy + hh, (unsigned)w, (unsigned)(h - hy - hh), 0, hy + hh);
+        if (hx > 0) XCopyArea(dpy, stage, dec, frame_gc, 0, hy, (unsigned)hx, (unsigned)hh, 0, hy);
+        if (w - hx - hw > 0) XCopyArea(dpy, stage, dec, frame_gc, hx + hw, hy, (unsigned)(w - hx - hw), (unsigned)hh, hx + hw, hy);
+    } else XCopyArea(dpy, stage, dec, frame_gc, 0, 0, (unsigned)w, (unsigned)h, 0, 0);
+}
+
+void wm_frame_stage_show(Display *dpy, struct wm_frame_stage *s) {
+    if (s->pix == None) return;
+    send_shape(dpy, s->dec, s->w, s->h, s->rects, s->n, s->sum);
+    wm_frame_upload_serial = NextRequest(dpy);
+    copy_stage(dpy, s->pix, s->dec, s->w, s->h, s->hx, s->hy, s->hw, s->hh);
+    wm_frame_stage_drop(dpy, s);
+}
+
+void wm_frame_stage_drop(Display *dpy, struct wm_frame_stage *s) {
+    if (s->pix != None) XFreePixmap(dpy, s->pix);
+    s->pix = None;
+}
+
 void wm_frame_paint_ex3(Display *dpy, Visual *vis, const struct theme *t, Window dec, int w, int h, const char *title, cairo_surface_t *icon,
                      int focused, int hover, int pressed, int maximized, const struct frame_ext *ext, const XRectangle *hole, double maxfade) {
     wm_frame_paint_ex4(dpy, vis, t, dec, w, h, title, icon, focused, hover, pressed, maximized, ext, hole, maxfade, NULL);
@@ -1118,20 +1152,16 @@ void wm_frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window
     XRectangle rects[128]; int n = wm_frame_shape_rects(t, img, maximized, rects, 128);
     unsigned long sum = (unsigned long)n;
     for (int i = 0; i < n; i++) sum = sum * 31 + rects[i].x * 7 + rects[i].y * 13 + rects[i].width * 17 + rects[i].height;
-    int slot = (int)(dec % 256);
     /* wm_frame_pre_upload (LUXWM.md "Resize without flicker"): the pixels go to an offscreen pixmap first; then the hook resizes the
        windows, and the shape and a copy into the window follow at once, so the server gets the new geometry and the new pixels as
-       one short batch (a compositor never sees the window at the new size with the old or half-uploaded pixels) */
+       one short batch (a compositor never sees the window at the new size with the old or half-uploaded pixels).
+       wm_frame_stage_out: the same pixmap, kept for wm_frame_stage_show */
     void (*pre)(void *) = wm_frame_pre_upload; wm_frame_pre_upload = NULL;
-    Pixmap stage = pre ? XCreatePixmap(dpy, dec, (unsigned)w, (unsigned)h, 32) : None;
+    struct wm_frame_stage *so = wm_frame_stage_out; wm_frame_stage_out = NULL;
+    Pixmap stage = pre || so ? XCreatePixmap(dpy, dec, (unsigned)w, (unsigned)h, 32) : None;
     Drawable dst = stage != None ? stage : dec;
-    static GC gc = None;
-    if (gc == None) gc = XCreateGC(dpy, dec, 0, NULL);   /* any depth-32 drawable on this screen will do */
-    #define SEND_SHAPE() do { \
-        if (n > 0 && (shape_cache[slot].win != dec || shape_cache[slot].w != w || shape_cache[slot].h != h || shape_cache[slot].sum != sum)) { \
-            XShapeCombineRectangles(dpy, dec, ShapeBounding, 0, 0, rects, n, ShapeSet, YXBanded); \
-            shape_cache[slot].win = dec; shape_cache[slot].w = w; shape_cache[slot].h = h; shape_cache[slot].sum = sum; } } while (0)
-    if (stage == None) SEND_SHAPE();
+    GC gc = frame_gc == None ? (frame_gc = XCreateGC(dpy, dec, 0, NULL)) : frame_gc;
+    if (stage == None) send_shape(dpy, dec, w, h, rects, n, sum);
     double t2 = prof_now();
     wm_frame_upload_serial = NextRequest(dpy);   /* the pixels go out from here on: Expose events older than this are covered */
     if (hw > 0) {   /* only the four bands around the hole, straight XPutImage of the painted rows */
@@ -1152,26 +1182,25 @@ void wm_frame_paint_ex4(Display *dpy, Visual *vis, const struct theme *t, Window
         cr = cairo_create(xs); cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE); cairo_set_source_surface(cr, img, 0, 0); cairo_paint(cr);
         cairo_destroy(cr); cairo_surface_flush(xs); cairo_surface_destroy(xs);
     }
-    if (stage != None) {
+    if (so) {   /* kept: shape and copy later (wm_frame_stage_show) */
+        if (so->pix != None) XFreePixmap(dpy, so->pix);
+        so->pix = stage; so->dec = dec; so->w = w; so->h = h; so->n = n; so->sum = sum;
+        so->hx = hx; so->hy = hy; so->hw = hw; so->hh = hh;
+        memcpy(so->rects, rects, sizeof(XRectangle) * (size_t)n);
+    } else if (stage != None) {
         /* the upload is through first; then resize, shape and copy go out as one short batch under a server grab, so no other
            client's request (the compositor's) runs between them: without the grab a compositor catches, in about one
            drag of two, the client resized but the frame's right band not yet copied */
         XSync(dpy, False);
         XGrabServer(dpy);
         pre(wm_frame_pre_upload_arg);
-        SEND_SHAPE();
+        send_shape(dpy, dec, w, h, rects, n, sum);
         wm_frame_upload_serial = NextRequest(dpy);   /* the Expose events of the resize are older: covered */
-        if (hw > 0) {
-            XCopyArea(dpy, stage, dec, gc, 0, 0, (unsigned)w, (unsigned)hy, 0, 0);
-            if (h - hy - hh > 0) XCopyArea(dpy, stage, dec, gc, 0, hy + hh, (unsigned)w, (unsigned)(h - hy - hh), 0, hy + hh);
-            if (hx > 0) XCopyArea(dpy, stage, dec, gc, 0, hy, (unsigned)hx, (unsigned)hh, 0, hy);
-            if (w - hx - hw > 0) XCopyArea(dpy, stage, dec, gc, hx + hw, hy, (unsigned)(w - hx - hw), (unsigned)hh, hx + hw, hy);
-        } else XCopyArea(dpy, stage, dec, gc, 0, 0, (unsigned)w, (unsigned)h, 0, 0);
+        copy_stage(dpy, stage, dec, w, h, hx, hy, hw, hh);
         XUngrabServer(dpy);
         XFreePixmap(dpy, stage);
         XFlush(dpy);   /* the grab lasts only for this batch */
     }
-    #undef SEND_SHAPE
     cairo_surface_destroy(img);
     wm_frame_prof_ms[0] += t1 - t0; wm_frame_prof_ms[1] += t2 - t1; wm_frame_prof_ms[2] += prof_now() - t2; wm_frame_prof_ms[3] += 1;
 }
