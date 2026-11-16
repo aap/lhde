@@ -54,8 +54,10 @@ const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_T
 // the Contents pane: XP's Explorer bar (a title row with its close button over a tree, a splitter beside it); the sizes
 // are mupf's
 const int PANE_TITLE = 22, SPLITTER = 4, PANE_MIN = 80, PANE_DEFAULT = 200;
-const UINT_PTR TIMER_RELOAD = 1;       // a Markdown file written: read again once the writes have settled
-const int RELOAD_DELAY = 150;
+// the document's file written: read again once the writes have settled; a read that fails (a file caught half written)
+// tried again RELOAD_TRIES times RELOAD_RETRY ms apart
+const UINT_PTR TIMER_RELOAD = 1;
+const int RELOAD_DELAY = 150, RELOAD_RETRY = 300, RELOAD_TRIES = 3;
 // the view's timers: a reflowable document laid out again once the window's size has settled (a drag-resize lays it out
 // once, not at every step); the middle button's autoscroll, a step a frame
 const UINT_PTR TIMER_REFLOW = 2, TIMER_AUTOSCROLL = 3;
@@ -87,6 +89,7 @@ struct App {
     bool opened = false;
     std::string path, title, format, error;
     bool password_tried = false;        // the document was opened with a password (a FAILED one asks again)
+    std::string password;               // the password it was opened with (a reload opens it with the same)
     int pages = 0;
     std::vector<SizeF> sizes;
     std::map<int, std::vector<Link>> links;
@@ -144,13 +147,15 @@ struct App {
     int bw = 0, bh = 0;
     // history: pages left by a jump
     std::vector<Place> back_pages, fwd_pages;
-    // a Markdown file (markdown.h): its title the first H1, followed on disk (a write lays it out again, the view kept)
+    // a Markdown file (markdown.h): its title the first H1
     bool markdown = false;
     FontFiles md_font;                  // its body's faces: the theme's UI font
+    // every document is followed on disk: a write opens it again, the page, the scroll position and the zoom kept
     shell::DirWatch* watch = nullptr;   // the file's directory (an editor may write a new file and rename it over)
     long long file_stamp = -1;          // the file's mtime and size when read, to tell a change of it from its neighbours'
-    bool keep_history = false;          // the next open_doc keeps Back and Forward (a file followed, a reload)
-    bool reloading = false;             // the open is the same file read again: the title stays
+    bool reload = false;                // the open under way is the same file read again: the pages shown stay until it is in
+    int reload_tries = 0;
+    bool keep_history = false;          // the next open_doc keeps Back and Forward (a file followed)
     bool restore = false;               // once opened: to restore_at (a reload's view, Back to another file)
     Place restore_at;
     std::string restore_anchor;         // once opened: to this heading's anchor (a link to "other.md#part")
@@ -387,6 +392,7 @@ void want_flow()
 void reflow()
 {
     KillTimer(g.view, TIMER_REFLOW);
+    if (g.reload) { SetTimer(g.view, TIMER_REFLOW, REFLOW_DELAY, nullptr); return; }   // (laid out once it is in)
     float w = flow_width();
     if (!g.flow || !g.opened || fabsf(w - g.flow_w) < 0.5f) return;
     g.flow_frac = g.lay.height > 0 ? (double)g.sy / g.lay.height : 0;
@@ -791,7 +797,7 @@ void unwatch_file()
     trace("watch off");
 }
 
-// the Markdown file's directory followed (DirWatch): an entry written, created or renamed there arms the reload timer,
+// the document's directory followed (DirWatch): an entry written, created or renamed there arms the reload timer,
 // which reads the file again when its stamp changed
 void watch_file()
 {
@@ -828,7 +834,9 @@ void close_doc()
     g.title.clear();
     g.format.clear();
     g.error.clear();
-    if (!g.reloading) unwatch_file();
+    unwatch_file();
+    KillTimer(g.wnd, TIMER_RELOAD);
+    g.reload = false;
     g.flow = g.relaying = false;
     g.flow_w = 0;
     KillTimer(g.view, TIMER_REFLOW);
@@ -851,31 +859,37 @@ void open_doc(const std::string& path, const std::string& password = std::string
     g.path = abs ? abs : path;
     free(abs);
     g.password_tried = !password.empty();
+    g.password = password;
     g.markdown = md::is_markdown(g.path);
     g.file_stamp = file_stamp(g.path);
     // (a reflowable document is laid out to the view at once: the width is asked of every document, used by those)
     view_size();
     g.gen = g.eng->open(g.path, password, flow_width());
     g.cache->set_gen(g.gen);
-    if (!g.reloading) {
-        set_status(0, "Opening...");
-        update_title();
-    }
+    set_status(0, "Opening...");
+    update_title();
     trace("open %s", g.path.c_str());
 }
 
-// the same file again (written on disk, or the theme's font changed), the view where it was
+// the same file again (written on disk, File > Reload, the theme's font changed), the view where it was: the engine opens
+// it as a new generation while the pages shown stay, drawn from the cache's tiles (stale: never covering a need, so the new
+// document's replace them as they come); nothing is asked of the engine until it is in (relaying). The page, the scroll
+// position and the zoom are kept (OPENED: restore), the history, the outline's expansion when it is the same, the search.
 void reload_doc()
 {
     if (g.path.empty()) return;
+    if (!g.opened) { open_doc(g.path, g.password); return; }   // (nothing shown: an open)
+    KillTimer(g.wnd, TIMER_RELOAD);
     g.restore = true;
     g.restore_at = { g.path, g.current, g.sx, g.sy };
     g.restore_anchor.clear();
-    g.keep_history = g.reloading = true;
-    std::string title = g.title;
-    open_doc(g.path);
-    g.title = title;   // (until the new one comes)
-    g.keep_history = g.reloading = false;
+    g.reload = true;
+    g.file_stamp = file_stamp(g.path);
+    KillTimer(g.view, TIMER_REFLOW);
+    view_size();
+    g.gen = g.eng->open(g.path, g.password, flow_width());
+    g.cache->set_gen(g.gen);
+    g.relaying = true;
     trace("reload %s", g.path.c_str());
 }
 
@@ -940,18 +954,30 @@ void relaid(Event& e)
 void on_engine()
 {
     Event e;
-    bool sizes_changed = false;
+    bool sizes_changed = false, reload = false;
     while (g.eng->take(e)) {
         if (e.gen != g.gen) { delete e.tile; continue; }
         switch (e.kind) {
         case Event::OPENED:
             if (e.relaid) { relaid(e); break; }
+            reload = g.reload;
+            g.reload = g.relaying = false;
+            g.reload_tries = 0;
             g.opened = true;
             g.pages = e.pages;
             g.sizes = e.sizes;
             g.title = e.title;
             g.format = e.format;
-            g.toc = std::move(e.toc);
+            if (reload) {   // the same entries: the tree as it is, expanded as it was
+                bool same = e.toc.size() == g.toc.size();
+                for (size_t i = 0; same && i < e.toc.size(); i++) same = e.toc[i].title == g.toc[i].title && e.toc[i].level == g.toc[i].level;
+                g.toc = std::move(e.toc);
+                if (!same) fill_toc();
+                g.links.clear();   // (the stale tiles stay behind until the new renders replace them)
+            } else {
+                g.toc = std::move(e.toc);
+                fill_toc();
+            }
             g.markdown = e.markdown;
             g.flow = e.reflowable;
             g.flow_w = e.flow_w;
@@ -960,8 +986,8 @@ void on_engine()
                 g.mode = MODE_CONTINUOUS;
                 g.rot = 0;
             }
-            fill_toc();
-            g.current = 0;
+            // a reload: at the page it was on (a Single Page layout lays that page out alone)
+            g.current = reload ? std::max(0, std::min(g.restore_at.page, g.pages - 1)) : 0;
             g.sx = g.sy = 0;
             set_status(0, "");
             trace("opened %d pages %s", g.pages, g.format.c_str());
@@ -974,7 +1000,7 @@ void on_engine()
                 scroll_to((g.lay.width - g.vw) / 2, 0);   // a page wider than the view: its middle (mupdf centres it)
             }
             if (g.flow) trace("flow %g", g.flow_w);   // laid out to the view: this many points wide
-            if (g.markdown && !g.watch) watch_file();
+            if (!g.watch) watch_file();
             if (g.restore) {
                 g.restore = false;
                 std::string anchor = g.restore_anchor;
@@ -989,8 +1015,22 @@ void on_engine()
                 else if (g.restore_at.page > 0) go_page(g.restore_at.page, 0, false);
                 trace("restored %d,%d page %d", g.sx, g.sy, g.current + 1);
             }
+            if (reload && !g.search.needle.empty()) {   // the hits found again, the view left where it is
+                start_search(g.search.needle);
+                g.search.shown_first = true;
+            }
             break;
         case Event::FAILED: {
+            if (g.reload) {   // the file caught half written, or broken now: the pages as they were, tried again
+                trace("reload failed %s", e.error.c_str());
+                if (++g.reload_tries <= RELOAD_TRIES) SetTimer(g.wnd, TIMER_RELOAD, RELOAD_RETRY, nullptr);
+                else {
+                    g.reload = false;   // (relaying stays: the next write opens it again)
+                    g.reload_tries = 0;
+                    set_status(0, "The document could not be read again: " + e.error);
+                }
+                break;
+            }
             g.error = e.error;
             set_status(0, "");
             update_title();
@@ -2756,7 +2796,8 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         if (wp == TIMER_RELOAD) {
             KillTimer(hwnd, TIMER_RELOAD);
             long long stamp = file_stamp(g.path);
-            if (g.markdown && stamp != -1 && stamp != g.file_stamp) reload_doc();
+            if (g.reload && g.reload_tries > 0) reload_doc();   // a read that failed: again
+            else if (stamp != -1 && stamp != g.file_stamp) reload_doc();
             return 0;
         }
         break;
