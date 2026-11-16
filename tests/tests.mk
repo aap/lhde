@@ -68,7 +68,7 @@ $(XCALLS): tests/headless/xcalls.c
 ACTIVEWATCH = build/tests/activewatch
 $(ACTIVEWATCH): tests/headless/activewatch.c
 	@mkdir -p $(dir $@)
-	$(CC) -O2 -Wall -Wextra -o $@ $< -lX11
+	$(CC) -O2 -Wall -Wextra $(shell pkg-config --cflags --libs x11 2>/dev/null || echo -lX11) -o $@ $<
 
 tests: $(TOOLKIT_TESTS) $(W32_TESTS) $(TEST_DATA) $(SLOWFS) $(XCALLS) $(ACTIVEWATCH)
 w32test: $(W32_TESTS) $(TEST_DATA)
