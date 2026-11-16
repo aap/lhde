@@ -89,6 +89,14 @@ static const struct { int version; const char *what; const char *sql; int (*fn)(
       "CREATE INDEX locations_group ON locations(substr(type, 1, instr(type, '/')));", NULL },
     /* machine: the section of machines.ini the root's files are on (NULL: not said) */
     { 4, "the machine of a root", "ALTER TABLE roots ADD COLUMN machine TEXT;", NULL },
+    /* names: the locations' names as trigrams (FTS5, contentless: only the index is kept), so a part of a name is found
+       without reading every row; names_upto the last location id in it. A location's name never changes (a new path is
+       a new row), so the index is appended to (lhcat_names_update) and never rewritten; what is past names_upto is
+       looked at row by row. The migration makes it empty: filling 2.5 M names takes 20 s, too long for an open. */
+    { 5, "the name index (trigrams of the locations' names)",
+      "CREATE VIRTUAL TABLE names USING fts5(name, content = '', detail = none, tokenize = 'trigram case_sensitive 0');"
+      "CREATE TABLE names_upto(upto INTEGER NOT NULL);"
+      "INSERT INTO names_upto VALUES(0);", NULL },
 };
 #define NMIGRATIONS (int)(sizeof MIGRATIONS / sizeof MIGRATIONS[0])
 

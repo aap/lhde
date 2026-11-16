@@ -230,6 +230,27 @@ static void performance(long lines)
     printf("perf: find --in photos/2001: %lld found, %.1f ms (the paths too)\n", (long long)n, t * 1000);
     CHECK(n > 0 && n == want);   /* its albums and their files */
     CHECK(t < 0.5);
+    /* a part of the name: the name index (import-du made it), then a rare part, a common one with a limit, one in no
+       name, a short one */
+    qq.in = NULL;
+    int64_t left = -1;
+    n = lhcat_names_update(c, 0, &left);
+    CHECK(n == 0 && left == 0);
+    struct { const char *part; int limit; int64_t want; } names[] = { { "img_01233.TXT", 0, -1 }, { "img_", 2000, 2000 },
+                                                                    { "nowhere", 0, 0 }, { "_0", 2000, 2000 } };
+    for (size_t i = 0; i < sizeof names / sizeof names[0]; i++) {
+        qq.name = names[i].part;
+        qq.limit = names[i].limit;
+        hits = 0;
+        t0 = now();
+        n = lhcat_find(c, &qq, hit_count, &hits, NULL, NULL);
+        t = now() - t0;
+        printf("perf: find --name %s%s: %lld found, %.1f ms\n", names[i].part, qq.limit ? " --limit 2000" : "", (long long)n, t * 1000);
+        if (names[i].want >= 0) CHECK(n == names[i].want);
+        else CHECK(n > 0 && n == hits);
+        CHECK(t < 0.1);
+    }
+    qq.name = NULL;
     lhcat_close(c);
     unlink(listing);
 }

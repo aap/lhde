@@ -25,7 +25,7 @@ extern "C" {
 typedef struct lhcat lhcat;
 typedef struct sqlite3 sqlite3;
 
-#define LHCAT_SCHEMA 4          /* the schema version a new database gets; older ones are migrated on open */
+#define LHCAT_SCHEMA 5          /* the schema version a new database gets; older ones are migrated on open */
 #define LHCAT_NAME_MAX 64       /* a root's name: letters, digits, '-', '_', '.', not starting with '.' */
 
 /* what a location's facts cover (locations.coverage) */
@@ -216,18 +216,23 @@ int lhcat_list_dir(lhcat *c, const char *rel, lhcat_entry_fn fn, void *ctx);
 
 /* ---- queries ------------------------------------------------------------------------------------------------------------- */
 struct lhcat_query {
-    const char *tag;                    /* a tag, whole (case ignored) */
+    const char *tag;                    /* a tag, whole (case ignored); several separated by commas: each must hold */
     const char *no_tag;                 /* not this tag: only locations whose attributes were read, unless include_unknown */
     int include_unknown;
     const char *desc;                   /* a part of the description (case ignored) */
     const char *text;                   /* words over the description, comment and tags (prefix match) and the name (part) */
-    const char *type;                   /* a MIME type, "image/" followed by a star: a whole group */
+    const char *type;                   /* a MIME type, "image/" followed by a star: a whole group; several separated
+                                           by commas: any of them */
     const char *since, *until;          /* "YYYY", "YYYY-MM", "YYYY-MM-DD" (a time may follow): the picture's date taken,
                                            else the mtime; until takes in its whole year, month or day */
     const char *color;                  /* a colour name */
     const char *in;                     /* below this directory */
     int kind;                           /* 0 any, 'f', 'd' */
     int limit;                          /* 0: no limit */
+    const char *name;                   /* a part of the name (ASCII case ignored); from the name index when it is 3
+                                           characters or more (lhcat_names_update), else row by row */
+    volatile int *stop;                 /* when set and non-zero, the query stops at the next row (another thread) */
+    int with_attrs;                     /* each hit carries its desired attributes and what is pending */
 };
 struct lhcat_hit {
     int64_t id, object;
@@ -235,11 +240,22 @@ struct lhcat_hit {
     int kind, coverage;
     int64_t size, usage_kib, mtime;     /* -1 when not known */
     const char *type, *taken_at;        /* NULL when not known */
+    /* with_attrs: the desired values set (name0, value0, ...: the names on disk) and how many of the object's
+       attributes are pending = write and conflict; otherwise 0 and NULL */
+    int nattrs;
+    const char *const *attrs;
+    int pending, conflicts;
 };
 typedef void (*lhcat_hit_fn)(void *ctx, const struct lhcat_hit *h);
 /* the present locations matching every condition, in the order they were catalogued; the count (-1 on an error).
    *covered (when not null): of the locations the query's other conditions allow, how many had their attributes read */
 int64_t lhcat_find(lhcat *c, const struct lhcat_query *q, lhcat_hit_fn fn, void *ctx, int64_t *scope, int64_t *covered);
+/* The name index brought up to date: the names of the locations catalogued since it was last brought up to date
+   (at most max, 0: all), in transactions of 50,000; the count added, -1 on an error. *left (when not null) what is still
+   not in it. A query reads the rows not in it one by one, so a name query is right either way, only slower. index and
+   import-du call it at their end (2 M names take 2.5 s), touch does not; lhde-cat find --name does, and luxfind on its
+   worker. */
+int64_t lhcat_names_update(lhcat *c, int64_t max, int64_t *left);
 
 /* ---- what the catalogue reads from files -------------------------------------------------------------------------------- */
 /* the MIME type of a file name from the freedesktop globs ("*.ext" patterns of globs2 in $XDG_DATA_HOME and

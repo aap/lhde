@@ -924,6 +924,7 @@ int lhcat_index(lhcat *c, const char *subpath, const struct lhcat_index_opts *o,
         if (t) { sqlite3_bind_int64(t, 1, lhcat__now_ms() / 1000); sqlite3_step(t); sqlite3_finalize(t); }
     } else if (scan_update(c, &w, "interrupted", w.last[0] ? w.last : w.cursor)) goto fail;
     if (lhcat__exec(c, "COMMIT")) goto fail;
+    if (lhcat_names_update(c, 0, NULL) < 0) goto fail;   /* the new names into the name index */
     progress(&w, NULL, 1);
     rc = 0;
 fail:
@@ -1129,6 +1130,7 @@ int lhcat_import_du(lhcat *c, FILE *in, uint64_t block, lhcat_progress_fn fn, vo
         if (t) { sqlite3_bind_int64(t, 1, d.now / 1000); sqlite3_step(t); sqlite3_finalize(t); }
     }
     if (lhcat__exec(c, "COMMIT")) goto out;
+    if (lhcat_names_update(c, 0, NULL) < 0) goto out;   /* the new names into the name index (2 M in 2.5 s) */
     if (fn) fn(ctx, &d.p);
     rc = 0;
 out:

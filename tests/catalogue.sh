@@ -101,6 +101,16 @@ eq "--color" "25" "$($B find t --color Blue --quiet | wc -l | tr -d ' ')"
 eq "--in" "20" "$($B find t --in docs/sub --files --quiet | wc -l | tr -d ' ')"
 eq "--type text/plain" "100" "$($B find t --type 'text/*' --quiet | wc -l | tr -d ' ')"
 eq "--no-tag" "75" "$($B find t --no-tag work --in docs --files --quiet | wc -l | tr -d ' ')"
+# a part of the name: from the name index (3 characters and more), row by row (fewer), the rows not in the index yet too
+eq "the name index is up to date after index" "$(db "SELECT max(id) FROM locations")" "$(db "SELECT upto FROM names_upto")"
+eq "--name a part" "docs/note13.txt" "$($B find t --name TE13 --quiet)"
+eq "--name short" "$($B find t --text 13 --files --quiet | sort)" "$($B find t --name 13 --files --quiet | sort)"
+eq "--name none" "0" "$($B find t --name zzzq --quiet | wc -l | tr -d ' ')"
+sql_script "$T/state/lhde/catalogue/t.db" "UPDATE names_upto SET upto = (SELECT min(id) FROM locations WHERE name = 'note13.txt') - 1"
+eq "--name past the index" "docs/note13.txt" "$($B find t --name note13 --limit 1 --quiet)"
+eq "find --name brings the index up" "$(db "SELECT max(id) FROM locations")" "$(db "SELECT upto FROM names_upto")"
+eq "--tag a,b: both" "$($B find t --tag work --quiet | sort)" "$($B find t --tag 'work, WORK' --quiet | sort)"
+eq "--type a,b: either" "$(($($B find t --type 'text/*' --quiet | wc -l) + $($B find t --type inode/directory --quiet | wc -l)))" "$($B find t --type 'text/*,inode/directory' --quiet | wc -l | tr -d ' ')"
 err=$($B find t --tag work 2>&1 > /dev/null)
 has "coverage said" "have their attributes read" "$err"
 if [ $pics = 1 ]; then
@@ -333,11 +343,12 @@ eq "a file became a directory: --in it" "docs/note2.txt/inner.txt" "$($B find t 
 eq "dirs after kind changes" "0" "$(dirs_bad t)"
 eq "the group index in catalogue order" "$($B find t --type 'image/*' --quiet | head -n 3)" "$($B find t --type 'image/*' --limit 3 --quiet)"
 # the migration fills dirs from the locations of an older database
-sql_script "$T/state/lhde/catalogue/t.db" "DROP TABLE dirs; DROP INDEX locations_group; ALTER TABLE roots DROP COLUMN machine; DELETE FROM migrations WHERE version >= 3"
+sql_script "$T/state/lhde/catalogue/t.db" "DROP TABLE dirs; DROP INDEX locations_group; ALTER TABLE roots DROP COLUMN machine; DROP TABLE names; DROP TABLE names_upto; DELETE FROM migrations WHERE version >= 3"
 $B stats t > /dev/null
 eq "migrated: dirs filled" "0" "$(dirs_bad t)"
-eq "migrated: version" "4" "$(db "SELECT max(version) FROM migrations")"
+eq "migrated: version" "5" "$(db "SELECT max(version) FROM migrations")"
 eq "migrated: the group index" "1" "$(db "SELECT count(*) FROM sqlite_schema WHERE name = 'locations_group'")"
+eq "migrated: the name index empty" "0|1" "$(db "SELECT upto FROM names_upto")|$(db "SELECT count(*) FROM sqlite_schema WHERE name = 'names'")"
 # rename-root: the row, the file, the thumbnails' directory and their recorded paths
 work=$($B find t --tag work --quiet | wc -l | tr -d ' ')
 $B rename-root t t2 > /dev/null || no "rename-root"

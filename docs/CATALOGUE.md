@@ -173,7 +173,7 @@ another machine: it is filled by import-du only; `add-root NAME REALPATH` later 
     lhde-cat excludes NAME [+GLOB|-GLOB]...
     lhde-cat index NAME [SUBPATH] [--exclude GLOB]... [--cross-fs] [--time MIN] [--dry-run] [--budget MB] [--thumbs 128|256] ...
     lhde-cat roots | rename-root OLD NEW | machines [--probe]
-    lhde-cat find NAME [--tag T] [--no-tag T [--include-unknown]] [--desc TEXT] [--text WORDS] [--type image/*]
+    lhde-cat find NAME [--tag T] [--no-tag T [--include-unknown]] [--desc TEXT] [--text WORDS] [--name PART] [--type image/*]
                        [--since DATE] [--until DATE] [--color C] [--in SUBPATH] [--files|--dirs] [--limit N] [--json]
     lhde-cat stats NAME
     lhde-cat show PATH
@@ -189,12 +189,28 @@ mtime, type, taken_at), in the order they were catalogued, and on stderr the cou
 attributes. With `--in` they come directory by directory in path order, each directory's entries by name: without an
 attribute condition (or with a rare type) by walking the subtree's range of `dirs`, so `--limit` stops at once, with one
 from that condition's index and sorted after. A type group (`image/*`) is answered from `locations_group` (the type up to
-its '/', with the rowid) in catalogue order, so `--limit` stops early there too. `--tag` is a whole tag (case-blind), `--desc` a part of the description, `--text` words that must each be in
-the description, comment or tags (a word's prefix) or in the name (a part of it), `--type` a type or a group (`image/*`),
+its '/', with the rowid) in catalogue order, so `--limit` stops early there too. `--tag` is a whole tag (case-blind; several separated by commas must each hold), `--desc` a part of the description,
+`--name` a part of the name (ASCII case-blind; see "The name index"), `--text` words that must each be in
+the description, comment or tags (a word's prefix) or in the name (a part of it), `--type` a type or a group (`image/*`; several separated by commas: any of them),
 `--since` and `--until` dates `YYYY`, `YYYY-MM` or `YYYY-MM-DD` over the date taken, else the mtime (`--until 2019-06` takes
 in the whole of June). ATTR is a short name (`desc`, `tags`, `comment`, `color`, `run`, `author`, `source`, `build`, `notes`,
 `todo`) or a `user.*` name. `set`, `unset` and `tag` write at once on a root whose authority is the file system and defer to
 `commit` on one whose authority is the catalogue; `--write` and `--defer` choose. Exit status 3 means a conflict.
+
+### The name index
+
+`names` is an FTS5 table of the locations' names with the trigram tokenizer (case folded), contentless (only the index
+is kept: 70 MB over vishnu's 2.5 M names), rowid the location; `names_upto` holds the last location id in it. A
+location's name never changes (another path is another row), so the index is only appended to:
+`lhcat_names_update` adds the rows past `names_upto`, 50,000 a transaction. `import-du` and `index` call it at their end
+(2 M names in 2.5 s), `touch` does not, `find --name` does first, and luxfind's worker does when it opens a catalogue. A
+part of three characters or more is looked up as its trigrams (at every third character and the last: "readme" is
+`"rea" AND "dme"`), and the candidates, with every row past `names_upto`, are checked by `LIKE`; the rows come in
+catalogue order from the index itself, so a limit stops early. A shorter part is a `LIKE` over every row, which a limit
+also stops early for a common one. Measured on a copy of vishnu (2,517,737 locations): a rare part was 380 to 440 ms
+as a `LIKE` scan of every name, whatever the limit; from the index `readme` takes 5 ms for the first 2,000 of 5,994
+(17 ms for all), `png` 2.3 ms for the first 2,000 of 185,959 (128 ms for all), `qzx` 0.2 ms; a one-letter `a` 1.7 ms
+for the first 2,000 (1 s for all 1.2 M), `ab` 26 ms (560 ms for all 48,743); `--tag research` (1,566) 5 ms.
 
 ## Machines
 
@@ -221,9 +237,11 @@ file observed again), so the catalogue follows flxp's edits. Nothing else in flx
 
 `migrations(version, applied_at, what)` records the schema versions applied; a database is migrated on open and a newer
 one than the program knows is refused (version 2 widened the state check of `locations` in place, no rows rewritten;
-version 3 fills `dirs` from the locations, about 9 s on the 7.1 M-row stash; version 4 adds `roots.machine`). The tables: `roots` (name, path, host,
+version 3 fills `dirs` from the locations, about 9 s on the 7.1 M-row stash; version 4 adds `roots.machine`; version 5
+makes the name index `names` and `names_upto` empty, filled by the next import, index or name query, as filling it on
+open would take seconds). The tables: `roots` (name, path, host,
 authority, offline, excludes, machine, added_at, listed_at, indexed_at), `objects`, `locations`, `dirs`, `relations`, `hashes`,
-`attrs`, `tags`, `picture`, `thumbs`, `journal`, `scans`, the FTS5 table `text`. Indices: locations by (parent, name)
+`attrs`, `tags`, `picture`, `thumbs`, `journal`, `scans`, `names_upto`, the FTS5 tables `text` and `names`. Indices: locations by (parent, name)
 (unique), name, type, the type's group (`substr(type, 1, instr(type, '/'))`), object and inode; dirs by path; attrs by
 (name, desired) and pending; tags by (tag, object) and object; picture by taken_at; hashes by full hash; journal by object
 and time.
@@ -232,7 +250,7 @@ and time.
 recorded into it. It takes the database's lock exclusively first (refused while another program has it open: flxp, a
 second lhde-cat), checkpoints the log into the file and renames that file alone.
 
-Measured on this machine: a generated 2,000,000-line listing imports at about 130,000 lines a second (15 s); `find --tag`
+Measured on this machine: a generated 2,000,000-line listing imports in about 12 s, its name index included; `find --tag`
 over it answers in 5 ms with the paths; aap's 7.1-million-line stash listing (650 MB) imports in 35 s (200,000 lines a second; again over
 the same rows in 19 s) into a 1.26 GB database, whose root total is the listing's `.` line, 4.86 TiB; `dirs` (571,237
 directories, 114 MB with its index) and the group index (93 MB) make it 1.46 GB. Over it `find --in backup --limit 100`

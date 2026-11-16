@@ -36,7 +36,7 @@ static const char *USAGE =
     "                                            under each top-level entry and writes nothing\n"
     "  touch PATH...                             observe these files again (after a write)\n"
     "  hash PATH...                              hash these files now\n"
-    "  find NAME [--tag T] [--no-tag T [--include-unknown]] [--desc TEXT] [--text WORDS] [--type image/*]\n"
+    "  find NAME [--tag T] [--no-tag T [--include-unknown]] [--desc TEXT] [--text WORDS] [--name PART] [--type image/*]\n"
     "           [--since DATE] [--until DATE] [--color C] [--in SUBPATH] [--files|--dirs] [--limit N] [--json] [--quiet]\n"
     "  stats NAME                                rows, coverage, pictures, tags, types, years, sizes\n"
     "  show PATH                                 a location with its object, attributes, relations and journal\n"
@@ -313,7 +313,8 @@ static int cmd_find(int argc, char **argv)
         const char *a = argv[i];
         const char **slot = !strcmp(a, "--tag") ? &q.tag : !strcmp(a, "--no-tag") ? &q.no_tag : !strcmp(a, "--desc") ? &q.desc
                           : !strcmp(a, "--text") ? &q.text : !strcmp(a, "--type") ? &q.type : !strcmp(a, "--since") ? &q.since
-                          : !strcmp(a, "--until") ? &q.until : !strcmp(a, "--color") ? &q.color : !strcmp(a, "--in") ? &q.in : NULL;
+                          : !strcmp(a, "--until") ? &q.until : !strcmp(a, "--color") ? &q.color : !strcmp(a, "--in") ? &q.in
+                          : !strcmp(a, "--name") ? &q.name : NULL;
         if (slot && i + 1 < argc) *slot = argv[++i];
         else if (!strcmp(a, "--limit") && i + 1 < argc) q.limit = atoi(argv[++i]);
         else if (!strcmp(a, "--include-unknown")) q.include_unknown = 1;
@@ -325,6 +326,7 @@ static int cmd_find(int argc, char **argv)
     }
     lhcat *c = open_name(argv[0]);
     if (!c) return 1;
+    if (q.name && lhcat_names_update(c, 0, NULL) < 0) fprintf(stderr, "lhde-cat: the name index: %s\n", lhcat_error(c));
     if (f.json) putchar('[');
     int attr_query = q.tag || q.no_tag || q.desc || q.text || q.color;
     int64_t scope = 0, covered = 0;
