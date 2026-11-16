@@ -205,10 +205,12 @@
 #PanelUI-button { margin-bottom: var(--lhde-row-bottom) !important; align-self: flex-end !important; }
 #PanelUI-menu-button, #unified-extensions-button, #fxa-toolbar-menu-button, #downloads-button { opacity: 0.9; }
 
-/* the tabs: a flat row below the band in its lower colour, the selected tab lighter and joined to the page */
+/* the tabs: a flat row below the band in its lower colour, the selected tab lighter and joined to the page. The band's own
+   last row is its line (Slate's dark one, Jade's blue one), as flxp's header ends on it (lhheader.cpp paint_bottom) and its
+   menu band follows at once: no border of the row's own above it, or the line is doubled */
 #TabsToolbar {
   background: var(--lhde-band-low) !important;
-  border-top: 1px solid var(--lhde-band-line) !important;
+  border-top: 0 !important;
   border-bottom: 1px solid var(--lhde-tab-line) !important;
   color: var(--lhde-tab-text) !important;
   min-height: 0 !important;
