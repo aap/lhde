@@ -5,7 +5,7 @@
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, luxview.sh xprop, xwininfo and ImageMagick, luxfind.sh getfattr and setfattr, detailsrow.sh ImageMagick, filter.sh and runas.sh setfattr
-#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, luxview.sh xprop, xwininfo and ImageMagick, mupf.sh mupf (MuPDF), python3 and ImageMagick, mupfheader.sh the same and xwininfo, an imported Longhorn style (picom for the glass), detailsrow.sh ImageMagick, filter.sh and runas.sh setfattr
+#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, luxview.sh xprop, xwininfo and ImageMagick, mupf.sh and mupfmd.sh mupf (MuPDF), python3 and ImageMagick, mupfheader.sh the same and xwininfo, an imported Longhorn style (picom for the glass), detailsrow.sh ImageMagick, filter.sh and runas.sh setfattr
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick, startmenu.sh xprop and python3, menushadow.sh
 #                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick, starticon.sh xprop and ImageMagick (luna when imported),
 #                thumbsmem.sh ImageMagick, slowpath.sh and slowpath-ui.sh python3 with PIL, thumbdocs.sh ImageMagick and pdftoppm or mutool (gs, ddjvu and c44 for its PS and DjVu), nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed, xsession.sh xprop and
@@ -75,6 +75,9 @@ result "luxviewtest ($(tail -n 1 "$T/luxview-model.log"))" $? "$T/luxview-model.
 # mupf's page layout and render cache (apps/mupf/layout.h): the layouts, the fits, the current page, the cache's budget
 build/tests/mupftest > "$T/mupf-layout.log" 2>&1
 result "mupftest ($(tail -n 1 "$T/mupf-layout.log"))" $? "$T/mupf-layout.log"
+# mupf's Markdown (apps/mupf/markdown.h): md4c's HTML for GitHub's dialect, the headings' anchors, the task boxes, front matter
+build/tests/mdtest > "$T/mupf-md.log" 2>&1
+result "mdtest ($(tail -n 1 "$T/mupf-md.log"))" $? "$T/mupf-md.log"
 # lhde-import's overwrite policy (kept without --force, written with it) on a scratch tree and a stand-in file
 tests/import-policy.sh > "$T/import.log" 2>&1
 result "import-policy ($(tail -n 1 "$T/import.log"))" $? "$T/import.log"
@@ -213,6 +216,10 @@ else
     # mupf: a PDF written by mkpdf.py, ink on page 1, Page Down, the link, the search's hits, the Contents pane (skips without MuPDF)
     tests/headless/mupf.sh "$2" > "$T/mupf.log" 2>&1; rc=$?
     result "headless/mupf.sh$(grep -m1 '^skip' "$T/mupf.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/mupf.log"
+    # mupf on a README.md: the title, ink where the heading, the table and the picture are, the Contents pane, a link to
+    # another .md file and back, the file written and laid out again
+    tests/headless/mupfmd.sh "$1" > "$T/mupfmd.log" 2>&1; rc=$?
+    result "headless/mupfmd.sh$(grep -m1 '^skip' "$T/mupfmd.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/mupfmd.log"
     # mupf's Longhorn header is the Explorer's: the bands of both windows identical but for the crumbs; the crumbs at work
     tests/headless/mupfheader.sh "$3" > "$T/mupfheader.log" 2>&1; rc=$?
     result "headless/mupfheader.sh$(grep -m1 '^skip' "$T/mupfheader.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/mupfheader.log"

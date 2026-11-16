@@ -20,6 +20,7 @@ build/tests/%: $(O)/tests/toolkit/%.o $(NATIVE_OBJS)
 	$(CXX) -o $@ $^ $(LDLIBS)
 build/tests/luxviewtest: $(O)/apps/luxview/model_native.o   # luxview's view model, no win32
 build/tests/mupftest: $(O)/apps/mupf/layout_native.o     # mupf's layout and render cache, no win32, no mupdf
+build/tests/mdtest: $(O)/apps/mupf/markdown_native.o $(patsubst %,$(O)/apps/mupf/vendor/md4c/%.o,md4c md4c-html entity)   # mupf's Markdown, md4c
 build/tests/starticontest: LDLIBS += -Lbuild/lib -Wl,--no-as-needed -lwuxtheme '-Wl,-rpath,$$ORIGIN/../lib'   # the style flags
 build/tests/starticontest: | $(UTSO)
 

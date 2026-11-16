@@ -815,6 +815,8 @@ void on_engine()
             g.sx = g.sy = 0;
             set_status(0, "");
             trace("opened %d pages %s", g.pages, g.format.c_str());
+            for (size_t i = 0; g.trace && i < g.toc.size(); i++)   // the outline: where each entry goes, in points
+                trace("tocentry %zu %d %d %g %s", i, g.toc[i].level, g.toc[i].page + 1, g.toc[i].y, g.toc[i].title.c_str());
             update_title();
             {
                 Anchor none;
@@ -867,6 +869,9 @@ void on_engine()
             take_hits(e);
             break;
         case Event::LINKS:
+            for (const Link& l : e.links)   // a page's links: their rectangles in points and where they go
+                trace("linkrect %d %g %g %g %g %s", e.page + 1, l.rect.x0, l.rect.y0, l.rect.x1, l.rect.y1,
+                      l.page >= 0 ? ("page " + std::to_string(l.page + 1)).c_str() : l.uri.c_str());
             g.links[e.page] = std::move(e.links);
             break;
         default:
