@@ -1,6 +1,7 @@
 # mupf: lhde's document viewer (docs/USAGE.md "mupf"): PDF, XPS, EPUB and the other formats of mupdf, drawn by mupdf on a
 # thread of its own (engine_native.cpp, the one file that includes mupdf's headers); its layout and render cache
-# (layout_native.cpp) are plain C++ that tests/toolkit/mupftest.cpp drives. File > Open is the Open dialog, so the file
+# (layout_native.cpp) are plain C++ that tests/toolkit/mupftest.cpp drives; a Markdown file is converted to HTML by md4c
+# (markdown_native.cpp, tests/toolkit/mdtest.cpp) and laid out by mupdf's HTML engine. File > Open is the Open dialog, so the file
 # dialog's objects. Installed, with mupf.desktop (the types mupdf opens: Open With, the document viewer's role).
 #
 # mupdf (1.2x, the fz_* API) is found, first that answers:
@@ -42,7 +43,14 @@ else ifneq ($(wildcard /usr/local/include/mupdf/fitz.h),)
   MUPDF_LIBS := $(call mupdf_libs,/usr/local/lib)
 endif
 
-MUPF_OBJS = $(call app_objs,mupf)
+# md4c (apps/mupf/vendor/md4c, MIT, unchanged: its MANIFEST) converts Markdown to HTML (markdown_native.cpp); plain C99,
+# compiled as it comes, its warnings not ours
+MD4C_OBJS = $(patsubst %,$(O)/apps/mupf/vendor/md4c/%.o,md4c md4c-html entity)
+$(O)/apps/mupf/vendor/md4c/%.o: apps/mupf/vendor/md4c/%.c
+	@mkdir -p $(dir $@)
+	$(CC) -g -O1 -std=c99 -w -MMD -MP -c $< -o $@
+-include $(MD4C_OBJS:.o=.d)
+MUPF_OBJS = $(call app_objs,mupf) $(MD4C_OBJS)
 $(O)/apps/mupf/engine_native.o: CXXFLAGS += $(MUPDF_CFLAGS)
 $(O)/apps/mupf/mupf.o: apps/mupf/mupf.res
 apps/mupf/mupf.res: apps/mupf/resource.h

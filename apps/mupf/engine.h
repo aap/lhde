@@ -2,6 +2,9 @@
 // results, so it never waits on a document. No win32 and no mupdf types here: engine_native.cpp is the one file that
 // includes mupdf's headers.
 //
+// A Markdown file (markdown.h) is converted to an HTML page and opened as mupdf's HTML, its directory the page's base, laid
+// out at a width of mupf's and as one tall page cut to its ink (a README read as a column, not in sheets).
+//
 // What the thread does, most urgent first: open a document (its page count, the first page's size, the outline, the
 // title); render the jobs the window wants, in its order (a job no longer wanted is abandoned: mupdf's cookie aborts
 // the page being drawn); the other pages' sizes, a batch at a time (until they are known every page is taken to be
@@ -30,7 +33,21 @@ struct Link {
     RectF rect;
     int page = -1;              // a destination in the document, else -1 and uri
     float y = 0;
-    std::string uri;
+    std::string uri;            // a web address; in a Markdown file also a relative one that is not in it (another file)
+};
+
+// the faces a Markdown page's body is drawn in (the theme's UI font: the window finds the files, the engine hands them to
+// mupdf when the stylesheet names the family): regular, bold, italic, bold italic; an empty file is the regular one's
+struct FontFiles {
+    std::string family;
+    std::string file[4];
+    int index[4] = { 0, 0, 0, 0 };
+    bool operator==(const FontFiles& o) const
+    {
+        for (int i = 0; i < 4; i++) if (file[i] != o.file[i] || index[i] != o.index[i]) return false;
+        return family == o.family;
+    }
+    bool operator!=(const FontFiles& o) const { return !(*this == o); }
 };
 
 struct Job {
@@ -44,8 +61,9 @@ struct Event {
     uint32_t gen = 0;           // the document's generation
     // OPENED
     int pages = 0;
-    std::string title, format;
-    std::vector<TocItem> toc;
+    std::string title, format;  // a Markdown file's title is its first H1's text, its format "Markdown"
+    std::vector<TocItem> toc;   // a Markdown file's: its headings H1 to H3 (mupdf's HTML has no outline)
+    bool markdown = false;
     // OPENED, SIZES: the sizes of pages first .. first + sizes.size() - 1
     int first = 0;
     std::vector<SizeF> sizes;
@@ -76,6 +94,8 @@ public:
     // user's or the owner's)
     uint32_t open(const std::string& path, const std::string& password = std::string());
     void close();
+    // the faces of Markdown's body text, for the documents opened from now on
+    void set_font(const FontFiles& f);
     // the jobs to do now, most wanted first; what was asked before and is not here is dropped
     void want(const std::vector<Job>& jobs);
     // search the document for text (case-insensitive, mupdf's fz_search_page), from page from to the end and round to it;

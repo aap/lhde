@@ -2,6 +2,8 @@
 // only one that calls mupdf, so the context needs no locks. mupdf's fz_try / fz_catch are setjmp and longjmp: no object
 // with a destructor lives inside one of their blocks.
 #include "engine.h"
+#include "markdown.h"
+#include <strings.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +24,11 @@ const size_t STORE_MAX = 64u << 20;    // mupdf's own store (fonts, decoded imag
 const int LISTS_KEPT = 8;              // the display lists kept: the pages last drawn
 const int SIZES_BATCH = 32;            // page sizes read between other work
 const int SEARCH_QUADS = 512;          // the rectangles one page's search reports at most
+// Markdown: laid out as one page this tall (in points), cut to its ink and the bottom margin below it; a longer file goes on
+// to more pages of this height
+const float MD_PAGE_H = 100000;
+const float MD_EM = 12;                // the default font size (16 px), the stylesheet's body size
+const float MD_BOTTOM = 30;            // the margin below the last ink (the stylesheet's bottom padding)
 }   // namespace
 
 struct Engine::Impl {
@@ -41,6 +48,7 @@ struct Engine::Impl {
     int search_from = 0;
     uint32_t search_id = 0;
     std::deque<Event> events;
+    FontFiles font_asked;
     fz_cookie* running = nullptr;       // the render in progress, its job
     Job running_job;
 
@@ -55,6 +63,9 @@ struct Engine::Impl {
     struct List { int page; fz_display_list* list; };
     std::deque<List> lists;             // most recent first
     std::set<int> links_sent;
+    bool markdown = false;
+    FontFiles font;                     // the faces installed (load_font)
+    fz_font* fonts[4] = {};             // loaded from them
     // the search being done
     bool searching = false;
     std::string s_needle;
@@ -72,7 +83,37 @@ struct Engine::Impl {
     void search_step();
     void outline(fz_outline* o, int level, std::vector<TocItem>& out);
     int resolve(const char* uri, float* y);
+    fz_document* open_markdown(const std::string& path, std::vector<TocItem>* toc, std::string* title, const char** err);
+    void drop_fonts();
 };
+
+// mupdf's system font hook: the Markdown stylesheet's family from the files the window found (else mupdf's own faces)
+static fz_font* load_font(fz_context* ctx, const char* name, int bold, int italic, int)
+{
+    Engine::Impl* d = (Engine::Impl*)fz_user_context(ctx);
+    if (!d || !name || d->font.family.empty() || strcasecmp(name, d->font.family.c_str())) return nullptr;
+    // a font object for each style asked: mupdf marks the one it is given for a style the face lacks (fake bold, slant),
+    // so the regular face standing in for its italic is an object of its own
+    int want = (bold ? 1 : 0) + (italic ? 2 : 0), i = want;
+    if (d->font.file[i].empty()) i = d->font.file[i & 1].empty() ? 0 : i & 1;   // bold italic as bold, else regular
+    if (d->font.file[i].empty()) return nullptr;
+    if (!d->fonts[want]) {
+        fz_font* f = nullptr;
+        fz_var(f);
+        fz_try(ctx) { f = fz_new_font_from_file(ctx, name, d->font.file[i].c_str(), d->font.index[i], 0); }
+        fz_catch(ctx) { f = nullptr; }
+        d->fonts[want] = f;
+    }
+    return d->fonts[want] ? fz_keep_font(ctx, d->fonts[want]) : nullptr;
+}
+
+void Engine::Impl::drop_fonts()
+{
+    for (fz_font*& f : fonts) {
+        if (f) fz_drop_font(fz, f);
+        f = nullptr;
+    }
+}
 
 static bool same_job(const Job& a, const Job& b)
 {
@@ -152,6 +193,12 @@ uint32_t Engine::search(const std::string& needle, int from)
     return ++d->search_id;
 }
 
+void Engine::set_font(const FontFiles& f)
+{
+    std::lock_guard<std::mutex> lk(d->mu);
+    d->font_asked = f;
+}
+
 bool Engine::take(Event& e)
 {
     std::lock_guard<std::mutex> lk(d->mu);
@@ -174,7 +221,11 @@ void Engine::Impl::push(Event&& e)
 void Engine::Impl::run()
 {
     fz = fz_new_context(nullptr, nullptr, STORE_MAX);
-    if (fz) fz_register_document_handlers(fz);
+    if (fz) {
+        fz_register_document_handlers(fz);
+        fz_set_user_context(fz, this);
+        fz_install_load_system_font_funcs(fz, load_font, nullptr, nullptr);
+    }
     std::unique_lock<std::mutex> lk(mu);
     for (;;) {
         cv.wait(lk, [&] {
@@ -188,8 +239,13 @@ void Engine::Impl::run()
             uint32_t g = gen;
             open_pending = close_pending = false;
             searching = false;
+            FontFiles f = font_asked;
             lk.unlock();
             do_close();
+            if (f != font) {   // (the closed document's fonts are dropped with it)
+                drop_fonts();
+                font = f;
+            }
             if (opening) do_open(path, password, g);
             lk.lock();
             continue;
@@ -243,6 +299,7 @@ void Engine::Impl::run()
     }
     lk.unlock();
     do_close();
+    if (fz) drop_fonts();
     if (fz) fz_drop_context(fz);
     fz = nullptr;
 }
@@ -259,6 +316,7 @@ void Engine::Impl::do_close()
     known.clear();
     sizes_next = 0;
     searching = false;
+    markdown = false;
 }
 
 void Engine::Impl::outline(fz_outline* o, int level, std::vector<TocItem>& out)
@@ -299,6 +357,75 @@ int Engine::Impl::resolve(const char* uri, float* y)
     return n;
 }
 
+// mupdf resolves an id to its element's first baseline: a heading's top, with some of the space above it, is its size and
+// a bit higher (the stylesheet's sizes: H1 2em, H2 1.5em, H3 1.25em and smaller)
+static float heading_top(float y, int level)
+{
+    float size = MD_EM * (level <= 1 ? 2 : level == 2 ? 1.5f : 1.25f);
+    return std::max(0.0f, y - size * 1.15f - 9);
+}
+
+// the Markdown file as an HTML page (markdown.h) opened by mupdf with the file's directory as its archive, so a relative
+// <img src> and link resolve there; the headings H1 to H3 its outline
+fz_document* Engine::Impl::open_markdown(const std::string& path, std::vector<TocItem>* toc, std::string* title,
+                                         const char** err)
+{
+    std::string text;
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f) { *err = "The file cannot be read."; return nullptr; }
+    char buf[65536];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n);
+    fclose(f);
+    md::Style st;
+    if (!font.file[0].empty()) st.family = font.family;
+    md::Page page = md::convert(text, st);
+    *title = page.title;
+    size_t slash = path.rfind('/');
+    std::string dir = slash == std::string::npos ? "." : slash == 0 ? "/" : path.substr(0, slash);
+    fz_buffer* b = nullptr;
+    fz_stream* stm = nullptr;
+    fz_archive* arc = nullptr;
+    fz_document* d = nullptr;
+    const char* html = page.html.c_str();
+    size_t len = page.html.size();
+    fz_var(b);
+    fz_var(stm);
+    fz_var(arc);
+    fz_var(d);
+    fz_try(fz) {
+        b = fz_new_buffer_from_copied_data(fz, (const unsigned char*)html, len);
+        stm = fz_open_buffer(fz, b);
+        arc = fz_open_directory(fz, dir.c_str());
+        d = fz_open_document_with_stream_and_dir(fz, "text/html", stm, arc);
+        fz_layout_document(fz, d, md::PAGE_WIDTH_PT, MD_PAGE_H, MD_EM);
+    }
+    fz_always(fz) {
+        fz_drop_stream(fz, stm);
+        fz_drop_archive(fz, arc);
+        fz_drop_buffer(fz, b);
+    }
+    fz_catch(fz) {
+        if (d) fz_drop_document(fz, d);
+        d = nullptr;
+        *err = "The Markdown file cannot be laid out.";
+    }
+    if (!d) return nullptr;
+    doc = d;
+    for (const md::Heading& h : page.headings) {
+        if (h.level > 3) continue;
+        TocItem it;
+        it.title = h.text;
+        it.level = h.level - 1;
+        it.open = true;
+        it.page = resolve(("#" + h.id).c_str(), &it.y);
+        it.y = heading_top(it.y, h.level);
+        toc->push_back(std::move(it));
+    }
+    doc = nullptr;
+    return d;
+}
+
 void Engine::Impl::do_open(const std::string& path, const std::string& password, uint32_t g)
 {
     Event e;
@@ -307,20 +434,32 @@ void Engine::Impl::do_open(const std::string& path, const std::string& password,
     const char* err = nullptr;
     char msg[512] = "";
     bool locked = false;
-    fz_var(err);
-    fz_var(locked);
-    fz_try(fz) {
-        doc = fz_open_document(fz, path.c_str());
-        if (fz_needs_password(fz, doc) && !fz_authenticate_password(fz, doc, password.c_str())) {
-            err = password.empty() ? "The document is protected by a password." : "The password is not right.";
-            locked = true;
-        } else {
-            pages = fz_count_pages(fz, doc);
+    std::vector<TocItem> md_toc;
+    std::string md_title;
+    markdown = md::is_markdown(path);
+    if (markdown) {
+        doc = open_markdown(path, &md_toc, &md_title, &err);
+        if (doc) {
+            fz_try(fz) { pages = fz_count_pages(fz, doc); }
+            fz_catch(fz) { pages = 0; }
         }
     }
-    fz_catch(fz) {
-        snprintf(msg, sizeof msg, "%s", fz_caught_message(fz));
-        err = msg;
+    fz_var(err);
+    fz_var(locked);
+    if (!markdown) {
+        fz_try(fz) {
+            doc = fz_open_document(fz, path.c_str());
+            if (fz_needs_password(fz, doc) && !fz_authenticate_password(fz, doc, password.c_str())) {
+                err = password.empty() ? "The document is protected by a password." : "The password is not right.";
+                locked = true;
+            } else {
+                pages = fz_count_pages(fz, doc);
+            }
+        }
+        fz_catch(fz) {
+            snprintf(msg, sizeof msg, "%s", fz_caught_message(fz));
+            err = msg;
+        }
     }
     if (!err && pages <= 0) err = "The document has no pages.";
     if (err) {
@@ -339,13 +478,21 @@ void Engine::Impl::do_open(const std::string& path, const std::string& password,
     e.kind = Event::OPENED;
     e.pages = pages;
     char buf[1024] = "";
-    if (fz_lookup_metadata(fz, doc, FZ_META_INFO_TITLE, buf, sizeof buf) > 0) e.title = buf;
+    if (markdown) {
+        e.markdown = true;
+        e.title = md_title;
+        e.format = "Markdown";
+        e.toc = std::move(md_toc);
+    }
+    if (!markdown && fz_lookup_metadata(fz, doc, FZ_META_INFO_TITLE, buf, sizeof buf) > 0) e.title = buf;
     buf[0] = 0;
-    if (fz_lookup_metadata(fz, doc, FZ_META_FORMAT, buf, sizeof buf) > 0) e.format = buf;
+    if (!markdown && fz_lookup_metadata(fz, doc, FZ_META_FORMAT, buf, sizeof buf) > 0) e.format = buf;
     fz_outline* o = nullptr;
     fz_var(o);
-    fz_try(fz) { o = fz_load_outline(fz, doc); }
-    fz_catch(fz) { o = nullptr; }
+    if (!markdown) {
+        fz_try(fz) { o = fz_load_outline(fz, doc); }
+        fz_catch(fz) { o = nullptr; }
+    }
     if (o) {
         outline(o, 0, e.toc);
         fz_drop_outline(fz, o);
@@ -363,15 +510,28 @@ bool Engine::Impl::ensure_bound(int page)
     if (!doc || page < 0 || page >= pages) return false;
     if (known[page]) return true;
     fz_page* p = nullptr;
-    fz_rect r = fz_empty_rect;
+    fz_device* dev = nullptr;
+    fz_rect r = fz_empty_rect, ink = fz_empty_rect;
+    bool cut = markdown && page == pages - 1;   // the last page of a Markdown file: to its ink
     fz_var(p);
     fz_var(r);
+    fz_var(dev);
+    fz_var(cut);
     fz_try(fz) {
         p = fz_load_page(fz, doc, page);
         r = fz_bound_page(fz, p);
+        if (cut) {
+            dev = fz_new_bbox_device(fz, &ink);
+            fz_run_page(fz, p, dev, fz_identity, nullptr);
+            fz_close_device(fz, dev);
+        }
     }
-    fz_always(fz) { fz_drop_page(fz, p); }
+    fz_always(fz) {
+        fz_drop_device(fz, dev);
+        fz_drop_page(fz, p);
+    }
     fz_catch(fz) { r = fz_empty_rect; }
+    if (cut && !fz_is_empty_rect(r)) r.y1 = std::min(r.y1, std::max(r.y0 + 100, (fz_is_empty_rect(ink) ? r.y0 : ink.y1) + MD_BOTTOM));
     if (fz_is_empty_rect(r)) r = page > 0 && known[0] ? bounds[0] : fz_make_rect(0, 0, 612, 792);
     bounds[page] = r;
     known[page] = 1;
@@ -437,6 +597,8 @@ fz_display_list* Engine::Impl::list_for(int page, fz_cookie* ck)
                        l->rect.y1 - bounds[page].y0 };
             if (l->uri && fz_is_external_link(fz, l->uri)) k.uri = l->uri;
             else k.page = resolve(l->uri, &k.y);
+            if (k.page >= 0 && markdown) k.y = heading_top(k.y, 1);   // (an anchor is a heading's, mostly)
+            if (k.page < 0 && k.uri.empty() && markdown && l->uri && l->uri[0] && l->uri[0] != '#') k.uri = l->uri;
             if (k.page >= 0 || !k.uri.empty()) e.links.push_back(std::move(k));
         }
         push(std::move(e));

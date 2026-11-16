@@ -13,10 +13,12 @@
 // the view draws what the cache (layout.h) holds, a page at another zoom scaled until its rendering at this one arrives,
 // white where nothing is yet. What is wanted is asked again on every scroll and zoom, so a page scrolled past is dropped
 // from the engine's queue (its render aborted) before it costs anything.
+#include <ctype.h>
 #include <errno.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -28,8 +30,11 @@
 #include "shell/shell.h"
 #include "explorer/lhbar.h"   // the Explorer's 4051 command bar under the header (docs/APPLICATIONS.md "mupf")
 #include "lhde/settings.h"
+#include "sys/sys.h"     // sys::watch_fd: the message loop reads the Markdown file's DirWatch (docs/APPLICATIONS.md)
 #include "engine.h"
 #include "layout.h"
+#include "markdown.h"
+#include "uifont.h"
 #include "resource.h"
 
 WUX_RESOURCES(mupf_res, "apps/mupf/mupf.res");
@@ -47,6 +52,11 @@ const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_T
 // the Contents pane: XP's Explorer bar (a title row with its close button over a tree, a splitter beside it); the sizes
 // are mupf's
 const int PANE_TITLE = 22, SPLITTER = 4, PANE_MIN = 80, PANE_DEFAULT = 200;
+const UINT_PTR TIMER_RELOAD = 1;       // a Markdown file written: read again once the writes have settled
+const int RELOAD_DELAY = 150;
+
+// a place in the history: a document, its page and, for a place in another file, where the view was (-1: the page's top)
+struct Place { std::string path; int page = 0, sx = -1, sy = -1; };
 
 enum ZoomMode { Z_CUSTOM, Z_FIT_PAGE, Z_FIT_WIDTH };
 
@@ -114,7 +124,17 @@ struct App {
     uint32_t* bits = nullptr;
     int bw = 0, bh = 0;
     // history: pages left by a jump
-    std::vector<int> back_pages, fwd_pages;
+    std::vector<Place> back_pages, fwd_pages;
+    // a Markdown file (markdown.h): its title the first H1, followed on disk (a write lays it out again, the view kept)
+    bool markdown = false;
+    FontFiles md_font;                  // its body's faces: the theme's UI font
+    shell::DirWatch* watch = nullptr;   // the file's directory (an editor may write a new file and rename it over)
+    long long file_stamp = -1;          // the file's mtime and size when read, to tell a change of it from its neighbours'
+    bool keep_history = false;          // the next open_doc keeps Back and Forward (a file followed, a reload)
+    bool reloading = false;             // the open is the same file read again: the title stays
+    bool restore = false;               // once opened: to restore_at (a reload's view, Back to another file)
+    Place restore_at;
+    std::string restore_anchor;         // once opened: to this heading's anchor (a link to "other.md#part")
     // the hand: a drag pans; a click on a link follows it
     bool panning = false, pan_moved = false;
     POINT pan_at = {};
@@ -249,7 +269,9 @@ void update_page_box()
 
 void update_title()
 {
-    std::string t = g.opened || !g.path.empty() ? base_of(g.path) + " - mupf" : "mupf";
+    // a Markdown file's title is its first H1 (the page's own name, as a browser shows a README's), else the file's name
+    std::string name = g.markdown && !g.title.empty() ? g.title : base_of(g.path);
+    std::string t = g.opened || !g.path.empty() ? name + " - mupf" : "mupf";
     SetWindowTextW(g.wnd, WS(t));
     trace("title %s", t.c_str());
 }
@@ -374,7 +396,10 @@ void go_page(int p, float y_pt = 0, bool history = true)
     if (!g.opened || g.pages <= 0) return;
     p = std::max(0, std::min(p, g.pages - 1));
     if (history && p != g.current) {
-        g.back_pages.push_back(g.current);
+        Place here;
+        here.path = g.path;
+        here.page = g.current;
+        g.back_pages.push_back(here);
         g.fwd_pages.clear();
     }
     g.current = p;
@@ -641,6 +666,43 @@ void fill_toc();
 void trace_toc();
 bool ask_password(std::string* pw);
 
+long long file_stamp(const std::string& path)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st) != 0) return -1;
+    return ((long long)st.st_mtim.tv_sec * 1000000000LL + st.st_mtim.tv_nsec) ^ ((long long)st.st_size << 40);
+}
+
+void unwatch_file()
+{
+    if (!g.watch) return;
+    if (g.watch->fd() >= 0) sys::unwatch_fd(g.watch->fd());
+    delete g.watch;
+    g.watch = nullptr;
+    KillTimer(g.wnd, TIMER_RELOAD);
+    trace("watch off");
+}
+
+// the Markdown file's directory followed (DirWatch): an entry written, created or renamed there arms the reload timer,
+// which reads the file again when its stamp changed
+void watch_file()
+{
+    unwatch_file();
+    size_t slash = g.path.rfind('/');
+    if (slash == std::string::npos) return;
+    g.watch = new shell::DirWatch;
+    if (!g.watch->watch(slash ? g.path.substr(0, slash) : "/") || g.watch->fd() < 0) {
+        delete g.watch;
+        g.watch = nullptr;
+        trace("watch none");
+        return;
+    }
+    sys::watch_fd(g.watch->fd(), [](int, void*) {
+        if (g.watch && g.watch->take()) SetTimer(g.wnd, TIMER_RELOAD, RELOAD_DELAY, nullptr);
+    }, nullptr);
+    trace("watch %s", g.watch->dir().c_str());
+}
+
 void close_doc()
 {
     if (g.eng) g.eng->close();
@@ -658,9 +720,12 @@ void close_doc()
     g.title.clear();
     g.format.clear();
     g.error.clear();
+    if (!g.reloading) unwatch_file();
     g.current = 0;
-    g.back_pages.clear();
-    g.fwd_pages.clear();
+    if (!g.keep_history) {
+        g.back_pages.clear();
+        g.fwd_pages.clear();
+    }
     g.sx = g.sy = 0;
     set_status(0, "");
     Anchor none;
@@ -674,10 +739,58 @@ void open_doc(const std::string& path, const std::string& password = std::string
     g.path = abs ? abs : path;
     free(abs);
     g.password_tried = !password.empty();
+    g.markdown = md::is_markdown(g.path);
+    g.file_stamp = file_stamp(g.path);
     g.gen = g.eng->open(g.path, password);
-    set_status(0, "Opening...");
-    update_title();
+    if (!g.reloading) {
+        set_status(0, "Opening...");
+        update_title();
+    }
     trace("open %s", g.path.c_str());
+}
+
+// the same file again (written on disk, or the theme's font changed), the view where it was
+void reload_doc()
+{
+    if (g.path.empty()) return;
+    g.restore = true;
+    g.restore_at = { g.path, g.current, g.sx, g.sy };
+    g.restore_anchor.clear();
+    g.keep_history = g.reloading = true;
+    std::string title = g.title;
+    open_doc(g.path);
+    g.title = title;   // (until the new one comes)
+    g.keep_history = g.reloading = false;
+    trace("reload %s", g.path.c_str());
+}
+
+// another document from the history or a link, the history kept; to the place once it is open
+void open_place(const Place& p, const std::string& anchor = std::string())
+{
+    g.restore = true;
+    g.restore_at = p;
+    g.restore_anchor = anchor;
+    g.keep_history = true;
+    open_doc(p.path);
+    g.keep_history = false;
+}
+
+// to a place: in this document at once, another one opened
+void go_place(const Place& p)
+{
+    if (p.path != g.path) { open_place(p); return; }
+    if (p.sy >= 0) scroll_to(p.sx, p.sy);
+    else go_page(p.page, 0, false);
+}
+
+// where the view is, for the history: a page in this document; in another one also the scroll position
+Place here_place(bool position)
+{
+    Place p;
+    p.path = g.path;
+    p.page = g.current;
+    if (position) { p.sx = g.sx; p.sy = g.sy; }
+    return p;
 }
 
 void take_hits(const Event& e);
@@ -696,6 +809,7 @@ void on_engine()
             g.title = e.title;
             g.format = e.format;
             g.toc = std::move(e.toc);
+            g.markdown = e.markdown;
             fill_toc();
             g.current = 0;
             g.sx = g.sy = 0;
@@ -705,6 +819,21 @@ void on_engine()
             {
                 Anchor none;
                 relayout(none);
+            }
+            if (g.markdown && !g.watch) watch_file();
+            if (g.restore) {
+                g.restore = false;
+                std::string anchor = g.restore_anchor;
+                g.restore_anchor.clear();
+                int entry = -1;
+                for (size_t i = 0; !anchor.empty() && i < g.toc.size(); i++)
+                    if (md::slug(g.toc[i].title) == anchor) { entry = (int)i; break; }
+                if (entry >= 0) {
+                    g.toc_at = entry;
+                    go_page(g.toc[(size_t)entry].page, g.toc[(size_t)entry].y, false);
+                } else if (g.restore_at.sy >= 0) scroll_to(g.restore_at.sx, g.restore_at.sy);
+                else if (g.restore_at.page > 0) go_page(g.restore_at.page, 0, false);
+                trace("restored %d,%d page %d", g.sx, g.sy, g.current + 1);
             }
             break;
         case Event::FAILED: {
@@ -881,8 +1010,9 @@ void open_dialog()
     OPENFILENAMEW ofn = {};
     ofn.lStructSize = sizeof ofn;
     ofn.hwndOwner = g.wnd;
-    ofn.lpstrFilter = L"All Documents (*.pdf, *.xps, *.oxps, *.epub, *.cbz, *.fb2, *.mobi)\0*.pdf;*.xps;*.oxps;*.epub;*.cbz;*.fb2;*.mobi\0"
-                      L"Adobe PDF Files (*.pdf)\0*.pdf\0XPS Documents (*.xps, *.oxps)\0*.xps;*.oxps\0All Files (*.*)\0*.*\0";
+    ofn.lpstrFilter = L"All Documents (*.pdf, *.xps, *.oxps, *.epub, *.cbz, *.fb2, *.mobi, *.md)\0*.pdf;*.xps;*.oxps;*.epub;*.cbz;*.fb2;*.mobi;*.md;*.markdown;*.mkd\0"
+                      L"Adobe PDF Files (*.pdf)\0*.pdf\0XPS Documents (*.xps, *.oxps)\0*.xps;*.oxps\0"
+                      L"Markdown Files (*.md, *.markdown, *.mkd)\0*.md;*.markdown;*.mkd\0All Files (*.*)\0*.*\0";
     ofn.lpstrFile = file;
     ofn.nMaxFile = sizeof file / sizeof file[0];
     ofn.lpstrTitle = L"Open";
@@ -1085,18 +1215,18 @@ void command(int id)
         break;
     case CMD_BACK:
         if (!g.back_pages.empty()) {
-            int p = g.back_pages.back();
+            Place p = g.back_pages.back();
             g.back_pages.pop_back();
-            g.fwd_pages.push_back(g.current);
-            go_page(p, 0, false);
+            g.fwd_pages.push_back(here_place(p.path != g.path));
+            go_place(p);
         }
         break;
     case CMD_FORWARD:
         if (!g.fwd_pages.empty()) {
-            int p = g.fwd_pages.back();
+            Place p = g.fwd_pages.back();
             g.fwd_pages.pop_back();
-            g.back_pages.push_back(g.current);
-            go_page(p, 0, false);
+            g.back_pages.push_back(here_place(p.path != g.path));
+            go_place(p);
         }
         break;
     case CMD_FIND: focus_find(); break;
@@ -1381,6 +1511,22 @@ void apply_font()
     g.status_font = sf;
 }
 
+// Markdown's body in the theme's UI font (the message font's family, as the dialogs' text); a change of it lays an open
+// Markdown file out again
+void apply_md_font()
+{
+    if (!g.eng) return;
+    NONCLIENTMETRICSW ncm = {};
+    ncm.cbSize = sizeof ncm;
+    SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
+    FontFiles f = ui_font_files(WuxUtf8(ncm.lfMessageFont.lfFaceName));
+    if (f == g.md_font) return;
+    g.md_font = f;
+    g.eng->set_font(f);
+    trace("markdown font %s", f.family.empty() ? "(sans-serif)" : f.family.c_str());
+    if (g.markdown && g.opened) reload_doc();
+}
+
 // ---- the status bar's page part ----------------------------------------------------------------------------------------
 // The page part of the status bar is the page navigation: [<] Page N of M [>], the arrows small buttons (the previous and
 // the next page or spread, greyed at the ends), a click on the text the page number as an edit (Return goes there, Escape
@@ -1582,7 +1728,7 @@ void toc_go(HTREEITEM h)
     it.mask = TVIF_PARAM;
     it.hItem = h;
     if (!SendMessageW(g.tree, TVM_GETITEMW, 0, (LPARAM)&it) || it.lParam < 0 || (size_t)it.lParam >= g.toc.size()) return;
-    trace("toc go %s page %d", g.toc[it.lParam].title.c_str(), g.toc[it.lParam].page + 1);
+    trace("toc go %s page %d y %g", g.toc[it.lParam].title.c_str(), g.toc[it.lParam].page + 1, g.toc[it.lParam].y);
     g.toc_sel = (int)it.lParam;   // (the row is selected already)
     go_entry((int)it.lParam);
 }
@@ -1621,9 +1767,15 @@ void paint_pane(HDC dc)
 // the outline entry covering page p: the last one in the outline's order that starts on p or before it; -1 when none
 int toc_entry_at(int p)
 {
+    // a Markdown file is one tall page: of the headings on the page shown, those above a point a quarter down the view
+    float top = 1e30f;
+    if (g.markdown && p == g.current && p >= 0 && (size_t)p < g.lay.page.size() && !g.lay.page[p].empty() && g.rot == 0) {
+        float x;
+        px_to_page(0, g.sy + g.vh / 4 - g.lay.page[p].y, g.sizes[p], g.rot, g.zoom, &x, &top);
+    }
     int at = -1;
     for (size_t i = 0; i < g.toc.size(); i++)
-        if (g.toc[i].page >= 0 && g.toc[i].page <= p) at = (int)i;
+        if (g.toc[i].page >= 0 && (g.toc[i].page < p || (g.toc[i].page == p && (g.toc[i].y <= top || at < 0)))) at = (int)i;
     return at;
 }
 
@@ -1666,7 +1818,8 @@ std::string leaf_text()
 void follow_toc()
 {
     int at = g.opened ? toc_entry_at(g.current) : -1;
-    if (at >= 0 && g.toc_at >= 0 && (size_t)g.toc_at < g.toc.size() && g.toc[(size_t)g.toc_at].page == g.toc[(size_t)at].page)
+    if (!g.markdown && at >= 0 && g.toc_at >= 0 && (size_t)g.toc_at < g.toc.size() &&
+        g.toc[(size_t)g.toc_at].page == g.toc[(size_t)at].page)
         at = g.toc_at;
     g.toc_at = at;
     if (at == g.toc_sel) return;
@@ -1754,12 +1907,14 @@ void header_go(const std::string& key)
 // the history's drop-down (the Explorer's: the places, the nearest first): the pages Back or Forward would go to
 void header_history(bool back, int x, int y)
 {
-    std::vector<int>& from = back ? g.back_pages : g.fwd_pages;
+    std::vector<Place>& from = back ? g.back_pages : g.fwd_pages;
     HMENU m = CreatePopupMenu();
     int n = 0;
     for (int k = (int)from.size() - 1; k >= 0 && n < 12; k--, n++) {
-        int p = from[(size_t)k], at = toc_entry_at(p);
-        std::string t = "Page " + std::to_string(p + 1) + (at >= 0 ? " - " + g.toc[(size_t)at].title : "");
+        const Place& pl = from[(size_t)k];
+        int p = pl.page, at = pl.path == g.path ? toc_entry_at(p) : -1;
+        std::string t = pl.path != g.path ? base_of(pl.path)
+                                          : "Page " + std::to_string(p + 1) + (at >= 0 ? " - " + g.toc[(size_t)at].title : "");
         AppendMenuW(m, MF_STRING, (UINT)n + 1, WS(t));
     }
     int cmd = n ? TrackPopupMenu(m, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD, x, y, 0, g.wnd, nullptr) : 0;
@@ -1932,10 +2087,55 @@ const Link* link_at(int vx, int vy)
     return nullptr;
 }
 
+// a link's file on this machine: a file: URI's path, or a relative reference (no scheme) from the document's directory,
+// %XX decoded; the fragment (after '#') apart. "" for a web address.
+std::string local_target(const std::string& uri, std::string* fragment)
+{
+    std::string u = uri;
+    size_t hash = u.find('#');
+    if (hash != std::string::npos) { *fragment = u.substr(hash + 1); u.resize(hash); }
+    bool file = !u.compare(0, 7, "file://");
+    if (file) u = u.substr(7);
+    else {
+        size_t colon = u.find(':'), slash = u.find('/');
+        if (colon != std::string::npos && (slash == std::string::npos || colon < slash)) return "";   // a scheme
+    }
+    std::string path;
+    for (size_t i = 0; i < u.size(); i++) {
+        if (u[i] == '%' && i + 2 < u.size() && isxdigit((unsigned char)u[i + 1]) && isxdigit((unsigned char)u[i + 2])) {
+            path += (char)strtol(u.substr(i + 1, 2).c_str(), nullptr, 16);
+            i += 2;
+        } else path += u[i];
+    }
+    if (path.empty()) return "";
+    if (path[0] != '/') {
+        size_t slash = g.path.rfind('/');
+        path = (slash == std::string::npos ? std::string(".") : g.path.substr(0, slash)) + "/" + path;
+    }
+    return path;
+}
+
 void follow(const Link& l)
 {
     if (l.page >= 0) { trace("link page %d", l.page + 1); go_page(l.page, l.y); return; }
     trace("link %s", l.uri.c_str());
+    std::string fragment, target = local_target(l.uri, &fragment);
+    struct stat st;
+    if (!target.empty() && stat(target.c_str(), &st) == 0) {
+        // another Markdown file in this window, Back returning here (a README's links to its docs); any other file
+        // to its program
+        if (S_ISREG(st.st_mode) && md::is_markdown(target)) {
+            g.back_pages.push_back(here_place(true));
+            g.fwd_pages.clear();
+            Place p;
+            p.path = target;
+            open_place(p, fragment);
+            return;
+        }
+        std::string err;
+        if (!shell::spawn({ "xdg-open", target }, "", &err)) shell::message_box(g.wnd, "mupf", err, MB_OK | MB_ICONEXCLAMATION);
+        return;
+    }
     std::string err;
     if (!shell::spawn({ "xdg-open", l.uri }, "", &err)) shell::message_box(g.wnd, "mupf", err, MB_OK | MB_ICONEXCLAMATION);
 }
@@ -2177,6 +2377,14 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         on_engine();
         update_toolbar();
         return 0;
+    case WM_TIMER:
+        if (wp == TIMER_RELOAD) {
+            KillTimer(hwnd, TIMER_RELOAD);
+            long long stamp = file_stamp(g.path);
+            if (g.markdown && stamp != -1 && stamp != g.file_stamp) reload_doc();
+            return 0;
+        }
+        break;
     case WM_THEMECHANGED: case WM_SETTINGCHANGE: case WM_SYSCOLORCHANGE:
         if (msg == WM_THEMECHANGED) {
             lhbar::theme_changed();   // the theme's gradient, before a command bar is made for it
@@ -2184,6 +2392,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             if (g.rebar) menuband::fonts_changed();
         }
         apply_font();
+        apply_md_font();
         layout_chrome();
         InvalidateRect(g.view, nullptr, FALSE);
         break;
@@ -2207,7 +2416,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 void usage(FILE* f)
 {
     fputs("usage: mupf [FILE]\n"
-          "  A PDF, XPS, EPUB, CBZ, FB2 or MOBI document, drawn by mupdf. MUPF_TRACE=1 prints what is opened, shown and\n"
+          "  A PDF, XPS, EPUB, CBZ, FB2 or MOBI document, or a Markdown file (.md), drawn by mupdf. MUPF_TRACE=1 prints what is opened, shown and\n"
           "  rendered on stdout.\n", f);
 }
 
@@ -2262,6 +2471,7 @@ int main(int argc, char** argv)
     apply_font();
     DragAcceptFiles(g.wnd, TRUE);
     g.eng = new Engine(engine_notify, nullptr);
+    apply_md_font();
     sync_header();
     layout_chrome();
     update_title();
