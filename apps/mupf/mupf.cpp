@@ -1777,6 +1777,7 @@ int toc_entry_at(int p)
     if (g.markdown && p == g.current && p >= 0 && (size_t)p < g.lay.page.size() && !g.lay.page[p].empty() && g.rot == 0) {
         float x;
         px_to_page(0, g.sy + g.vh / 4 - g.lay.page[p].y, g.sizes[p], g.rot, g.zoom, &x, &top);
+        if (g.sy <= g.lay.page[p].y) top = -1;   // the page's top in view: the first heading
     }
     int at = -1;
     for (size_t i = 0; i < g.toc.size(); i++)
