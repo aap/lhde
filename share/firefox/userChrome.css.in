@@ -23,10 +23,22 @@
   font-family: var(--lhde-font) !important;
   border-bottom: 0 !important;
 }
-#toolbar-menubar { order: 0; }
-#nav-bar { order: 1; }
-#TabsToolbar { order: 2; }
 #PersonalToolbar { order: 3; }
+
+/* the menu bar (Alt, or View > Toolbars > Menu Bar): Firefox's GTK menu bar items drawn as the theme's. Its height is set
+   only while it is shown: Firefox collapses it with [inactive] (an !important user rule would win over that) */
+#main-menubar > menu {
+  appearance: none !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  color: inherit !important;
+  font-family: var(--lhde-menu-font) !important;
+  font-size: var(--lhde-menu-font-size) !important;
+}
+#main-menubar > menu > .menubar-text, #main-menubar > menu > label { margin: 0 !important; color: inherit !important; }
+#toolbar-menubar .titlebar-buttonbox-container, #toolbar-menubar .titlebar-spacer { display: none !important; }
 
 /* things with no place in the period's header */
 #nav-bar toolbarspring,
@@ -107,6 +119,41 @@
   background-color: var(--lhde-band-color-inactive) !important;
   color: var(--lhde-text-inactive) !important;
 }
+#nav-bar { order: 0; }
+#toolbar-menubar { order: 1; }
+#TabsToolbar { order: 2; }
+
+/* the menu bar: flxp's menu band under the header (flxp/explorer/lhbar.cpp: Slate's Document::Rebar strip, 22 rows, white
+   menu-font text, ExplorerMenu::Toolbar.BUTTON as the hot and pressed frames over the band's full height; the first item's
+   frame 2 px from the left edge, its text 9 px inside the frame: measured on flxp slate4051 and jade4074) */
+#toolbar-menubar:not([inactive]) {
+  height: var(--lhde-menu-h) !important;
+  min-height: var(--lhde-menu-h) !important;
+  max-height: var(--lhde-menu-h) !important;
+}
+#toolbar-menubar {
+  padding: 0 0 0 2px !important;
+  border: 0 !important;
+  background-color: transparent !important;
+  background-image: var(--lhde-menu-bg) !important;
+  box-shadow: inset 0 1px var(--lhde-menu-highlight) !important;
+  border-image-source: var(--lhde-menu-image) !important;
+  border-image-slice: 1 1 0 1 fill !important;
+  border-image-width: 1px 1px 0 1px !important;
+  border-image-repeat: stretch !important;
+  color: var(--lhde-menu-text) !important;
+}
+:root:-moz-window-inactive #toolbar-menubar { color: var(--lhde-menu-text-inactive) !important; }
+#toolbar-menubar > .toolbar-items, #menubar-items, #main-menubar { height: var(--lhde-menu-h) !important; align-items: stretch !important; }
+#main-menubar > menu {
+  padding: 0 8px 0 9px !important;
+  min-height: var(--lhde-menu-h) !important;
+}
+#main-menubar > menu:is([_moz-menuactive="true"], :hover) {
+  border-image: var(--lhde-menu-hot) 5 fill / 5px stretch !important;
+}
+#main-menubar > menu[open] { border-image: var(--lhde-menu-pressed) 5 fill / 5px stretch !important; }
+
 /* the travel buttons fill the band's height, the rest sits on the breadcrumb's row */
 #nav-bar-customization-target {
   align-items: flex-end !important;
@@ -253,6 +300,39 @@
 
 /*@IF xp@*/
 /* ---- the XP toolbar (Internet Explorer 6's): the band in the style's Rebar colour, Tahoma 8 pt, flat tabs ------------- */
+#toolbar-menubar { order: 0; }
+#TabsToolbar { order: 1; }
+#nav-bar { order: 2; }
+
+/* the menu bar: a plain row in the window's face colour over the toolbars (Firefox 4's on XP), 22 rows as flxp's menu band
+   under Luna, then the rebar's etched line (Rebar.BAND EDGESHADOWCOLOR over BTNHIGHLIGHT, flxp's line between its bands;
+   classic: BTNSHADOW). Items: Tahoma 8, the first text 10 px from the left; hot raised 1 px (BTNHIGHLIGHT, BTNSHADOW),
+   open sunken, as flxp's menu band (Internet Explorer 6's, measured under Luna) */
+#toolbar-menubar:not([inactive]) {
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+}
+#toolbar-menubar {
+  padding: 0 0 2px 2px !important;
+  border: 0 !important;
+  background: linear-gradient(to top, var(--lhde-xp-light) 0 1px, var(--lhde-xp-etch) 1px 2px, transparent 2px),
+              var(--lhde-xp-face) !important;
+  color: var(--lhde-xp-text) !important;
+}
+#toolbar-menubar > .toolbar-items, #menubar-items, #main-menubar { height: 22px !important; align-items: stretch !important; }
+#main-menubar > menu {
+  padding: 0 8px 0 7px !important;
+  margin: 1px 0 2px !important;
+  border: 1px solid transparent !important;
+}
+#main-menubar > menu:is([_moz-menuactive="true"], :hover) {
+  border-color: var(--lhde-xp-light) var(--lhde-xp-shadow) var(--lhde-xp-shadow) var(--lhde-xp-light) !important;
+}
+#main-menubar > menu[open] {
+  border-color: var(--lhde-xp-shadow) var(--lhde-xp-light) var(--lhde-xp-light) var(--lhde-xp-shadow) !important;
+}
+
 :root {
   --toolbar-bgcolor: var(--lhde-xp-face) !important;
   --toolbar-color: var(--lhde-xp-text) !important;
@@ -285,6 +365,7 @@
   font-family: var(--lhde-font) !important;
   font-size: var(--lhde-font-size) !important;
 }
+#TabsToolbar { border-top: 0 !important; }      /* under the menu bar's etched line */
 #urlbar-container { order: 1; }
 #stop-reload-button { order: 2; }
 #search-container { order: 3; }

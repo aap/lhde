@@ -1302,7 +1302,8 @@ players for the others; nothing while none is installed). From a terminal: `lhde
 bar picture (`Navbar::Rebar`, opaque: Firefox cannot be transparent on X11, so where flxp's header is glass the band is the
 one flxp draws without composition), Back and Forward as the style's travel buttons (TravelBack/TravelFwd), the address on
 the breadcrumb's row (a field only while hovered or focused), the search box at the right, and below the band the tabs on a
-flat row in its lower colour, the selected one lighter. Under Aero vision the band keeps flxp's header height and the travel
+flat row in its lower colour, the selected one lighter. The menu bar (Alt, or kept on) is flxp's menu band under the
+header: Slate's blue strip, white text in the menu font, the style's hot and pressed frames. Under Aero vision the band keeps flxp's header height and the travel
 art is scaled into it. The XP and classic themes get a plain toolbar in the theme's button-face colours (Internet Explorer
 6's). Tahoma or Segoe UI come from the theme's font directory. Which parts are measured against flxp and which are taste is
 said in the template, `share/firefox/userChrome.css.in`. Menus, context menus and popups are GTK's and keep its theme.

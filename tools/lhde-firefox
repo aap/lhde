@@ -136,7 +136,7 @@ class Style:
 
     def colour(self, cls, part, prop='TEXTCOLOR'):
         v = self.get(cls, part, prop)
-        m = re.match(r'(\d+),\s*(\d+),\s*(\d+)', v or '')
+        m = re.match(r'(\d+)[,\s]+(\d+)[,\s]+(\d+)', v or '')        # "216, 210, 189" (v4) or "216 210 189" (XP)
         return tuple(int(x) for x in m.groups()) if m else None
 
     def size_of(self, cls, part, state='NORMAL'):
@@ -221,6 +221,7 @@ def rgb(v):
 
 def url(path):
     return 'url("file://%s")' % path
+
 
 
 # ---- fonts: the theme's font directory (the Windows tree), else fontconfig -------------------------------------------
@@ -361,6 +362,56 @@ def longhorn_vars(t, style, art):
     return v, lay
 
 
+def menu_font(t, style, dflt):
+    """the menu font (the style's [sysmetrics] MENUFONT, else the theme's Metrics): (face, px at 96 dpi)"""
+    sm = style.section('sysmetrics') if style.ok() else {}
+    f = sm.get('MENUFONT') or t.get('Metrics_menufont') or ''
+    parts = [p.strip() for p in f.split(',')]
+    face = parts[0] if parts and parts[0] else dflt[0]
+    try:
+        pt = float(parts[1])
+        px = int(round(-pt if pt < 0 else pt * 96 / 72))
+    except (IndexError, ValueError):
+        px = dflt[1]
+    return face, px
+
+
+def longhorn_menu_vars(t, style, art):
+    """flxp's menu band under the header (flxp/explorer/lhbar.cpp): the Document::Rebar BACKGROUND strip of the build's
+    slate.msstyles (838x8, sizing margins 1 1 1 0: a highlight row over a horizontal gradient), white text
+    (ExplorerMenu::Toolbar TEXTCOLOR), the hot and pressed frames ExplorerMenu::Toolbar.BUTTON; flxp takes Slate's strip
+    under every Longhorn style, so does this"""
+    build = os.path.basename(t.get('path_resources', ''))
+    slate = Style((lhde_theme('find', 'styles/slate%s.msstyles' % build) or '').strip()) if re.match(r'^\d{4}$', build) else None
+    src = slate if slate and slate.ok() and slate.has('Document::Rebar') else style if style.ok() and style.has('Document::Rebar') else None
+    v = {'menu-h': '22px'}                  # flxp's menu band: 22 rows (1 highlight row, 21 of gradient), the hot frame all of them
+    rows = None
+    if src and art:
+        p = os.path.join(art, 'menu-band.png')
+        if src.render('Document::Rebar', 'BACKGROUND', 'NORMAL', 838, 8, p):
+            rows = read_png(p)
+            v['menu-image'] = url(p)
+        for state in ('HOT', 'PRESSED'):
+            p = os.path.join(art, 'menu-%s.png' % state.lower())
+            if src.has('ExplorerMenu::Toolbar') and src.render('ExplorerMenu::Toolbar', 'BUTTON', state, 40, 22, p):
+                v['menu-%s' % state.lower()] = url(p)
+    if rows:
+        w = len(rows[0])
+        edge, centre = rows[3][1][:3], rows[3][w // 2][:3]
+    else:
+        edge, centre = (36, 67, 142), (85, 115, 187)          # lhbar.cpp's drawn gradient
+    v.setdefault('menu-image', 'none')
+    v.setdefault('menu-hot', 'none')
+    v.setdefault('menu-pressed', 'none')
+    text = (src.colour('ExplorerMenu::Toolbar', '0') if src else None) or (255, 255, 255)
+    v.update({
+        'menu-bg': 'linear-gradient(to right, %s, %s, %s)' % (css(edge), css(centre), css(edge)),
+        'menu-highlight': css(mix(centre, (255, 255, 255), 0.24)),
+        'menu-text': css(text), 'menu-text-inactive': css(mix(text, centre, 0.45)),   # lhbar.cpp text_color
+    })
+    return v
+
+
 def xp_vars(t, style):
     """the plain XP toolbar: the style's [sysmetrics] (Luna), else the theme's classic colours"""
     sm = style.section('sysmetrics') if style.ok() else {}
@@ -380,6 +431,8 @@ def xp_vars(t, style):
         'xp-face': css(face), 'xp-text': css(text), 'xp-light': css(c('btnhighlight', (255, 255, 255))),
         'xp-shadow': css(shadow), 'xp-field-border': css(rgb(sm.get('EDGESHADOWCOLOR')) or (127, 157, 185) if themed else shadow),
         'xp-tab-selected': css(mix(face, (255, 255, 255), 0.6)), 'xp-tab-hover': css(mix(face, (255, 255, 255), 0.3)),
+        # the rebar's band line (flxp under Luna: EDGESHADOWCOLOR 216 210 189 over BTNHIGHLIGHT; classic: BTNSHADOW)
+        'xp-etch': css((style.colour('Rebar', 'BAND', 'EDGESHADOWCOLOR') if themed else None) or shadow),
     }, font
 
 
@@ -394,17 +447,26 @@ def generate(theme, out=None):
         os.makedirs(art)
     if longhorn:
         v, lay = longhorn_vars(t, style, art)
+        v.update(longhorn_menu_vars(t, style, art))
         face, px = lay['face'], lay['crumb_px']
         if style.ok():
             f = style.get('Navbar', 'TITLE', 'FONT') or ''
             if f.startswith('Tahoma'):
                 face = 'Tahoma'
+        mface, mpx = menu_font(t, style, (face, px))
     else:
         v, face = xp_vars(t, style)
         px = 11                                            # Tahoma 8 pt at 96 dpi
+        mface, mpx = menu_font(t, style, (face, px))
     rules, family = font_faces(face, t.get('path_fonts', ''))
     v['font'] = family
     v['font-size'] = '%dpx' % px
+    if mface != face:
+        more, v['menu-font'] = font_faces(mface, t.get('path_fonts', ''))
+        rules += more
+    else:
+        v['menu-font'] = family
+    v['menu-font-size'] = '%dpx' % mpx
     if art and not os.listdir(art):
         os.rmdir(art)
     first = ('/* generated by lhde-firefox for the theme %s (%s, %s); do not edit: lhde-firefox generate writes it again */\n'
