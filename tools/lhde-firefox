@@ -2,29 +2,32 @@
 """lhde-firefox: Firefox's own chrome in the lhde theme's look, through userChrome.css (docs/USAGE.md "Firefox").
 
 usage:
-  lhde-firefox generate [THEME] [--look ff4|explorer] [-o FILE]
+  lhde-firefox generate [THEME] [--look longhorn|ff4|explorer] [-o FILE]
                                             a userChrome.css for THEME (default: the current theme) on stdout or into FILE;
                                             with -o Firefox 4's pictures (share/firefox/ff4) are copied and the pieces of
                                             the visual style Firefox cannot read from a .msstyles are rendered by ut-dump
                                             into lhde-art/ beside FILE
-  lhde-firefox install [THEME] [--look ff4|explorer] [--profile DIR]
+  lhde-firefox install [THEME] [--look longhorn|ff4|explorer] [--profile DIR]
                                             write it into the profile's chrome/userChrome.css (an existing one not ours is
                                             kept as userChrome.css.lhde-backup), the prefs the look needs into user.js, and
-                                            once the search box into the toolbar layout (prefs.js); under a glass theme
-                                            settings.ini [extend_frame] firefox for luxwm; the profile must be closed.
-                                            DIR: a profile directory or a profile's name in profiles.ini; default: the
-                                            default profile
+                                            once the look's widget into the toolbar layout (prefs.js: the search box, or the
+                                            Longhorn navigation's star); under a glass theme settings.ini [extend_frame]
+                                            firefox for luxwm; the profile must be closed. DIR: a profile directory or a
+                                            profile's name in profiles.ini; default: the default profile
   lhde-firefox remove [--profile DIR]       undo install: our userChrome.css and lhde-art/ out (the backup back), our block
                                             out of user.js, the [extend_frame] key out of settings.ini
   lhde-firefox profiles                     the profiles profiles.ini lists, which is the default, which are in use
 
-The look: for a Longhorn theme (Explorer.chrome = longhorn) Firefox 4's on Windows 7, with its own pictures, under luxwm's
-caption: the tabs on the caption's colour without glass, on luxwm's glass under the glass themes when composited
-(--look explorer: flxp's Explorer header band, with the tabs and flxp's menu band below it); for the others Firefox 4's
-look on XP in the theme's colours and parts (its tabs, toolbar button frames). Colours, fonts and pictures come from
-liblhde's resolver (lhde-theme resolve --shell) and from the visual style through ut-dump; without the Windows tree (or with
-only the free ReactOS import) the CSS uses colours (and Firefox 4's pictures) alone. Nothing of the Windows tree is copied:
-fonts are file:// URLs into it; only the parts that live inside a .msstyles are rendered into the profile.
+The looks of a Longhorn theme (Explorer.chrome = longhorn): `longhorn`, the default under a theme with glass, the Longhorn
+navigation after the 2004 browser concepts on flxp's Small header (the round Back, the address, the star) with document
+tabs below it, on luxwm's glass, and Firefox 4's look in the same file while there is no compositor; `ff4`, the default
+without glass, Firefox 4's on Windows 7 with its own pictures under luxwm's caption, the tabs on the caption's colour (on
+the glass under a glass theme); `explorer`, flxp's Explorer header band with the tabs and flxp's menu band below it. The
+XP and classic themes get Firefox 4's look on XP in the theme's colours and parts (its tabs, toolbar button frames).
+Colours, fonts and pictures come from liblhde's resolver (lhde-theme resolve --shell) and from the visual style through
+ut-dump; without the Windows tree (or with only the free ReactOS import) the CSS uses colours (and Firefox 4's pictures)
+alone. Nothing of the Windows tree is copied: fonts are file:// URLs into it; only the parts that live inside a .msstyles
+are rendered into the profile.
 
 A theme switch could run `lhde-firefox install` again for a closed profile (or generate into it: Firefox reads
 userChrome.css at start only); that hook belongs beside session/theme-reload.sh and is not built.
@@ -512,6 +515,29 @@ FF4_TOOLBAR = (209, 221, 237)
 # and they get the caption's colour behind them). The extension must end where the opaque rows begin: luxwm draws the
 # frame's inner edge lines along the sides only below it, so an opaque row inside it has no edge at the left and right.
 FF4_GLASS_ROWS = 3 + 25
+# the Longhorn look: flxp's Small header band (lhheader.cpp SMALL_BAND, the file dialog's and mupf's header: travel button,
+# address and star on one row under luxwm's caption, which keeps the title), then the tab row: the concept's 23-row tabs
+# and the 2 rows of luxwm's inner edge lines under them, the outline the content starts below
+LH_BAND = 36
+LH_TAB = 23
+LH_GLASS_ROWS = LH_BAND + LH_TAB + 2
+
+# the looks of the Longhorn themes, and the conditions a section of the template is wrapped in: the Longhorn navigation
+# under a glass theme stands while Firefox's window can be transparent (a compositor runs), Firefox 4's look otherwise
+LOOKS = ('longhorn', 'ff4', 'explorer')
+LOOK_NAMES = {'longhorn': 'Longhorn navigation', 'ff4': 'Firefox 4', 'explorer': 'Longhorn Explorer band', 'xp': 'XP toolbar'}
+TRANSPARENT = '(-moz-gtk-csd-transparency-available)'
+OPAQUE = 'not (-moz-gtk-csd-transparency-available)'
+
+
+def default_look(theme, t):
+    """a Longhorn theme with glass gets the Longhorn navigation, unless luxwm says the session that runs it has no
+    compositor now (_LHWM_COMPOSITED 0, asked only for the session's own theme); the others Firefox 4's look"""
+    if not theme_glass(t):
+        return 'ff4'
+    if theme == current_theme() and composited() is False:
+        return 'ff4'
+    return 'longhorn'
 
 
 def theme_glass(t):
@@ -619,6 +645,93 @@ def ff4_vars(t, style, art):
     return v, lay
 
 
+def lh_vars(style, art):
+    """the Longhorn navigation (--look longhorn): flxp's Small header (flxp/shell/ui/lhheader.cpp: the travel art
+    SmallTravelBack::AnimationButton 27x36 at x 2 filling the 36-row band, its disc's centre on row 14, the star
+    SmallFavorites 27x27 on the band's top row 4 px from the right edge) with the tabs of the 2004 browser concept below
+    it; Vista's TravelBand (5048, 5112: what luxnav draws there) where the style has no AnimationButton art, orbs drawn
+    after the concept without a style"""
+    v = {'lh-band-h': '%dpx' % LH_BAND, 'lh-tab-h': '%dpx' % LH_TAB, 'lh-tabs-h': '%dpx' % (LH_TAB + 2),
+         'lh-travel-x': '%dpx' % NAV_X}
+    states = ('normal', 'hot', 'pressed', 'disabled')
+    edge = '0 0 0 1px rgba(0, 0, 0, 0.25), inset 0 1px rgba(255, 255, 255, 0.6)'   # a drawn orb's edge
+    back = fav = None
+    if art and style.ok():
+        if style.has('SmallTravelBack::AnimationButton'):
+            # 4074's styles and RealAero: the even Small pair (flxp's header_small_buttons auto); the Back plate alone
+            s = style.size_of('SmallTravelBack::AnimationButton', 'ABBACKGROUND')
+            if s:
+                back = {'cls': 'SmallTravelBack::AnimationButton', 'part': 'ABBACKGROUND', 'w': s[0], 'h': s[1], 'img': s, 'top': 0}
+        elif style.has('TravelBack::AnimationButton'):
+            # 4051's: the big Back art scaled to the band (flxp box-filters the pair to it: header_small_buttons uneven)
+            s = style.size_of('TravelBack::AnimationButton', 'ABBACKGROUND')
+            if s:
+                back = {'cls': 'TravelBack::AnimationButton', 'part': 'ABBACKGROUND', 'w': round(s[0] * LH_BAND / s[1]),
+                        'h': LH_BAND, 'img': s, 'top': 0}
+        elif style.has('TravelBand'):
+            # Vista's (5048, 5112): TRAVELBUTTONS is Back | Forward, one picture per state; Back is its left half, the orb
+            # centred on the Small band's disc row (14), as luxnav centres it on its orb row
+            s = style.size_of('TravelBand', 'TRAVELBUTTONS')
+            if s:
+                back = {'cls': 'TravelBand', 'part': 'TRAVELBUTTONS', 'w': s[0] // 2, 'h': s[1], 'img': s,
+                        'top': max(0, 14 - s[1] // 2)}
+        for cls in ('SmallFavorites::AnimationButton', 'Favorites::AnimationButton'):
+            if style.has(cls):
+                s = style.size_of(cls, 'ABBACKGROUND')
+                if s:
+                    k = 27 / s[1] if s[1] > 27 else 1           # the normal star at the small one's height (flxp: two thirds)
+                    fav = {'cls': cls, 'w': round(s[0] * k), 'h': round(s[1] * k), 'img': s}
+                break
+    if back:
+        for st in states:
+            p = os.path.join(art, 'lh-back-%s.png' % st)
+            if not style.render(back['cls'], back['part'], st.upper(), back['img'][0], back['img'][1], p):
+                back = None
+                break
+            v['lh-back-' + st] = url(p)
+    if back:
+        v.update({'lh-back-w': '%dpx' % back['w'], 'lh-back-h': '%dpx' % back['h'], 'lh-back-top': '%dpx' % back['top'],
+                  'lh-back-size': '%dpx %dpx' % ((back['w'] * 2, back['h']) if back['cls'] == 'TravelBand' else (back['w'], back['h'])),
+                  'lh-back-glyph': 'none', 'lh-back-orb': 'none', 'lh-orb-size': '0px',
+                  'lh-back-edge': 'none'})
+    else:
+        # no art: a glass ball after the concept's green Back (30 px there; 21 here, the Small art's disc) with Firefox's
+        # arrow; taste
+        for st in states:
+            v['lh-back-' + st] = 'none'
+        v.update({'lh-back-w': '27px', 'lh-back-h': '27px', 'lh-back-top': '3px', 'lh-back-size': 'auto', 'lh-orb-size': '21px',
+                  'lh-back-edge': edge,
+                  'lh-back-glyph': 'url("chrome://browser/skin/back.svg")',
+                  'lh-back-orb': 'radial-gradient(circle at 50% 28%, #e4f8d8 0, #6cc94a 42%, #23831d 78%, #155e12 100%)'})
+    if fav:
+        for st in states:
+            p = os.path.join(art, 'lh-fav-%s.png' % st)
+            if not style.render(fav['cls'], 'ABBACKGROUND', st.upper(), fav['img'][0], fav['img'][1], p):
+                fav = None
+                break
+            v['lh-fav-' + st] = url(p)
+    if fav:
+        v.update({'lh-fav-w': '%dpx' % fav['w'], 'lh-fav-h': '%dpx' % fav['h'], 'lh-fav-glyph': 'none', 'lh-fav-orb': 'none',
+                  'lh-fav-orb-size': '0px', 'lh-fav-edge': 'none'})
+    else:
+        # the concept's star: a gold glass ball with a white star; taste
+        for st in states:
+            v['lh-fav-' + st] = 'none'
+        v.update({'lh-fav-w': '27px', 'lh-fav-h': '27px', 'lh-fav-orb-size': '21px', 'lh-fav-edge': edge,
+                  'lh-fav-glyph': 'url("chrome://browser/skin/bookmark-hollow.svg")',
+                  'lh-fav-orb': 'radial-gradient(circle at 50% 28%, #fff4c4 0, #eab43a 42%, #a9661a 82%, #7a4510 100%)'})
+    return v
+
+
+def composited():
+    """luxwm says it draws glass (root _LHWM_COMPOSITED, docs/CLIENT-PROTOCOL.md); None when it cannot be asked"""
+    if not os.environ.get('DISPLAY') or not shutil.which('xprop'):
+        return None
+    out = run(['xprop', '-root', '_LHWM_COMPOSITED'])
+    m = re.search(r'=\s*(\d+)', out or '')
+    return m.group(1) == '1' if m else None
+
+
 def generate(theme, out=None, look=None):
     t = resolve(theme)
     style = Style(t.get('path_style', ''), t.get('VisualStyle_color', ''), t.get('VisualStyle_size', ''))
@@ -629,17 +742,36 @@ def generate(theme, out=None, look=None):
         shutil.rmtree(art, ignore_errors=True)
         os.makedirs(art)
     keep = 'xp'
+    glass = theme_glass(t)
     if longhorn:
-        keep = 'longhorn' if look == 'explorer' else 'ff4'
-    blocks = {keep}
-    if keep == 'ff4':
+        keep = look or default_look(theme, t)
+    # the sections of the template to keep, each with the condition it is wrapped in ('' = none)
+    blocks = {keep: ''}
+    rows = 0
+    if keep == 'longhorn':
+        # the Longhorn navigation; under a glass theme only while Firefox's window can be transparent (a compositor),
+        # Firefox 4's look without one, from the same file
         v, lay = ff4_vars(t, style, art)
-        if theme_glass(t):
-            blocks.add('ff4glass')
+        v.update(longhorn_menu_vars(t, style, art))
+        v.update(lh_vars(style, art))
+        if glass:
+            blocks = {'longhorn': TRANSPARENT, 'lhglass': TRANSPARENT, 'ff4': OPAQUE}
+            rows = LH_GLASS_ROWS
+        else:
+            blocks['lhopaque'] = ''
+        # the address and the tabs in flxp's breadcrumb face and size (Segoe UI 12 px, Tahoma 11 px), the menu bar in
+        # the style's menu font as flxp's menu band
+        face, px = lay['face'], lay['crumb_px']
+        mface, mpx = menu_font(t, style, (face, px))
+    elif keep == 'ff4':
+        v, lay = ff4_vars(t, style, art)
+        if glass:
+            blocks['ff4glass'] = ''
+            rows = FF4_GLASS_ROWS
         # Firefox 4 drew its chrome in the system's menu font: the style's MENUFONT (Tahoma 11 px, Segoe UI 12 px)
         face, px = menu_font(t, style, (lay['face'], lay['crumb_px']))
         mface, mpx = face, px
-    elif longhorn:
+    elif keep == 'explorer':
         v, lay = longhorn_vars(t, style, art)
         v.update(longhorn_menu_vars(t, style, art))
         face, px = lay['face'], lay['crumb_px']
@@ -664,17 +796,22 @@ def generate(theme, out=None, look=None):
     if art and not os.listdir(art):
         os.rmdir(art)
     first = ('/* generated by lhde-firefox for the theme %s (%s, %s); do not edit: lhde-firefox generate writes it again */\n'
-             % (theme, t.get('Theme_name', theme), {'ff4': 'Firefox 4', 'longhorn': 'Longhorn header', 'xp': 'XP toolbar'}[keep]))
+             % (theme, t.get('Theme_name', theme), LOOK_NAMES[keep]))
     head = rules + [':root {\n' + ''.join('  --lhde-%s: %s;\n' % kv for kv in sorted(v.items())) + '}']
     text = first + template().replace('/*@VARS@*/', '\n'.join(head))
-    text = re.sub(r'/\*@IF (\w+)@\*/\n(.*?)/\*@END@\*/\n',
-                  lambda m: m.group(2) if m.group(1) in blocks else '', text, flags=re.S)
+
+    def section(m):
+        if m.group(1) not in blocks:
+            return ''
+        cond = blocks[m.group(1)]
+        return '@media %s {\n%s}\n' % (cond, m.group(2)) if cond else m.group(2)
+    text = re.sub(r'/\*@IF (\w+)@\*/\n(.*?)/\*@END@\*/\n', section, text, flags=re.S)
     if out:
         with open(out, 'w') as f:
             f.write(text)
     else:
         sys.stdout.write(text)
-    return text, ('ff4glass' in blocks)
+    return text, rows, keep
 
 
 # ---- profiles ----------------------------------------------------------------------------------------------------------
@@ -775,9 +912,11 @@ def strip_block(text):
     return re.sub(r'\n?' + re.escape(BEGIN) + r'.*?' + re.escape(END) + r'\n?', '\n', text, flags=re.S).strip('\n')
 
 
-def add_search_box(prof):
-    """once: the search box into the toolbar layout after the address (prefs.js's browser.uiCustomization.state), and the
-    bookmarks toolbar hidden unless shown (never shown by default); the user may move or show them afterwards"""
+def place_widget(prof, widget):
+    """once: a widget into the navigation bar (prefs.js's browser.uiCustomization.state): the search box after the address
+    (Firefox 4's look, the Explorer band), the bookmarks menu button at the end (the Longhorn navigation's star: flxp's
+    favorites star opens the favorites); and the bookmarks toolbar hidden unless shown (never shown by default). Not when
+    the widget is placed anywhere already; the user may move or remove it afterwards"""
     import json
     pj = os.path.join(prof, 'prefs.js')
     text = open(pj, errors='replace').read() if os.path.isfile(pj) else ''
@@ -797,9 +936,12 @@ def add_search_box(prof):
         nav = ['back-button', 'forward-button', 'stop-reload-button', 'urlbar-container', 'downloads-button',
                'fxa-toolbar-menu-button', 'unified-extensions-button']
         state['placements']['nav-bar'] = nav
-    if any('search-container' in p for p in state['placements'].values()):
+    if any(widget in p for p in state['placements'].values()):
         return False
-    nav.insert(nav.index('urlbar-container') + 1 if 'urlbar-container' in nav else len(nav), 'search-container')
+    if widget == 'search-container' and 'urlbar-container' in nav:
+        nav.insert(nav.index('urlbar-container') + 1, widget)
+    else:
+        nav.append(widget)
     line = 'user_pref("browser.uiCustomization.state", %s);' % json.dumps(json.dumps(state, separators=(',', ':')))
     if idx is None:
         lines.append(line)
@@ -826,7 +968,8 @@ def install(theme, prof, look=None):
         if not ours:
             shutil.copy2(uc, uc + '.lhde-backup')
             print('kept your userChrome.css as %s' % (uc + '.lhde-backup'))
-    _, glass = generate(theme, uc, look)
+    _, rows, look = generate(theme, uc, look)
+    glass = rows > 0
     uj = os.path.join(prof, 'user.js')
     old = strip_block(open(uj, errors='replace').read()) if os.path.isfile(uj) else ''
     block = [BEGIN, '// the prefs of lhde\'s Firefox look (docs/USAGE.md "Firefox")']
@@ -836,14 +979,17 @@ def install(theme, prof, look=None):
     block.append(END)
     with open(uj, 'w') as f:
         f.write((old + '\n\n' if old else '') + '\n'.join(block) + '\n')
-    added = add_search_box(prof)
+    # the Longhorn navigation has no search box (the address searches as well; Firefox's Settings > Search brings it
+    # back), its star is the bookmarks menu button
+    widget = 'bookmarks-menu-button' if look == 'longhorn' else 'search-container'
+    added = place_widget(prof, widget)
     # luxwm extends its glass into Firefox's window for these rows (settings.ini [extend_frame]; docs/SETTINGS.md); a
     # theme without glass takes the key out again
     lt = tool('lhde-theme')
     if lt:
-        run([lt, 'setting', 'extend_frame', 'firefox', '0 0 %d 0' % FF4_GLASS_ROWS if glass else '-'])
-    print('installed the %s look into %s' % (theme, prof))
-    print('  %s, %s%s%s' % (uc, uj, ', the search box placed in prefs.js' if added else '',
+        run([lt, 'setting', 'extend_frame', 'firefox', '0 0 %d 0' % rows if glass else '-'])
+    print('installed the %s look of %s into %s' % (LOOK_NAMES.get(look, look), theme, prof))
+    print('  %s, %s%s%s' % (uc, uj, (', the %s placed in prefs.js' % ('star' if look == 'longhorn' else 'search box')) if added else '',
                             ', settings.ini [extend_frame] firefox' if glass else ''))
 
 
@@ -887,8 +1033,8 @@ def main(argv):
                 prof = rest[i + 1]
             elif a == '--look':
                 look = rest[i + 1]
-                if look not in ('ff4', 'explorer'):
-                    sys.exit('lhde-firefox: --look ff4 or --look explorer')
+                if look not in LOOKS:
+                    sys.exit('lhde-firefox: --look %s' % '|'.join(LOOKS))
             else:
                 out = rest[i + 1]
             i += 2
