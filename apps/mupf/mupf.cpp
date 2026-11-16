@@ -42,7 +42,7 @@ const UINT WM_ENGINE = WM_APP + 1;
 const int CACHE_BUDGET = 64 << 20;     // the rendered pages kept (layout.h's Cache)
 const int LINE = 40;                   // an arrow key's or a wheel notch's third, in pixels
 const int PREFETCH_AHEAD = 2, PREFETCH_BEHIND = 1;
-const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_PAGE_OF = 14, ID_TREE = 15, ID_FIND_EDIT = 16,
+const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_TREE = 15, ID_FIND_EDIT = 16,
           ID_REBAR = 17, ID_MENUBAND = 18;
 // the Contents pane: XP's Explorer bar (a title row with its close button over a tree, a splitter beside it); the sizes
 // are mupf's
@@ -51,7 +51,10 @@ const int PANE_TITLE = 22, SPLITTER = 4, PANE_MIN = 80, PANE_DEFAULT = 200;
 enum ZoomMode { Z_CUSTOM, Z_FIT_PAGE, Z_FIT_WIDTH };
 
 struct App {
-    HWND wnd = nullptr, toolbar = nullptr, status = nullptr, view = nullptr, page_edit = nullptr, page_of = nullptr;
+    HWND wnd = nullptr, toolbar = nullptr, status = nullptr, view = nullptr;
+    HWND page_edit = nullptr;           // the status bar's page number, as an edit while it is typed in (page_nav)
+    HFONT status_font = nullptr;
+    int nav_pressed = 0;                // the page part's arrow held down: -1 previous, 1 next
     HINSTANCE res = nullptr;
     HACCEL accel = nullptr;
     HMENU menu = nullptr;
@@ -220,7 +223,8 @@ void set_status(int part, const std::string& text)
 {
     if (g.status_text[part] == text) return;
     g.status_text[part] = text;
-    if (g.status) SendMessageW(g.status, SB_SETTEXTW, part, (LPARAM)WS(text));
+    // the page part is drawn by the window (page_nav: the arrows around the text)
+    if (g.status) SendMessageW(g.status, SB_SETTEXTW, part == 1 ? 1 | SBT_OWNERDRAW : part, part == 1 ? 0 : (LPARAM)WS(text));
     trace("status %s|%s|%s", g.status_text[0].c_str(), g.status_text[1].c_str(), g.status_text[2].c_str());
 }
 
@@ -239,16 +243,6 @@ void update_page_box()
     if (g.opened) snprintf(b, sizeof b, "%d%%", z);
     else b[0] = 0;
     set_status(2, b);
-    if (g.page_edit && GetFocus() != g.page_edit) {
-        if (g.opened) snprintf(b, sizeof b, "%d", g.current + 1);
-        else b[0] = 0;
-        SetWindowTextW(g.page_edit, WS(b));
-    }
-    if (g.page_of) {
-        if (g.opened) snprintf(b, sizeof b, "of %d", g.pages);
-        else b[0] = 0;
-        SetWindowTextW(g.page_of, WS(b));
-    }
     follow_toc();
     update_header();
 }
@@ -1015,15 +1009,13 @@ void update_toolbar()
     if (!g.toolbar) return;
     auto en = [](int id, bool on) { SendMessageW(g.toolbar, TB_ENABLEBUTTON, id, MAKELONG(on, 0)); };
     bool d = g.opened;
-    en(CMD_PREV, d && step_page(-1) >= 0);
-    en(CMD_NEXT, d && step_page(1) >= 0);
     for (int id : { CMD_ZOOM_IN, CMD_ZOOM_OUT, CMD_ACTUAL, CMD_FIT_PAGE, CMD_FIT_WIDTH }) en(id, d);
     if (bar_drawn()) InvalidateRect(g.toolbar, nullptr, TRUE);   // band_checked
     else {
         SendMessageW(g.toolbar, TB_CHECKBUTTON, CMD_FIT_PAGE, MAKELONG(g.zmode == Z_FIT_PAGE, 0));
         SendMessageW(g.toolbar, TB_CHECKBUTTON, CMD_FIT_WIDTH, MAKELONG(g.zmode == Z_FIT_WIDTH, 0));
     }
-    EnableWindow(g.page_edit, d);
+    if (g.status) InvalidateRect(g.status, nullptr, FALSE);   // the page part's arrows, enabled or not
     if (g.header) shell::lhheader::set_history(d && !g.back_pages.empty(), d && !g.fwd_pages.empty());
 }
 
@@ -1117,7 +1109,7 @@ void command(int id)
 
 // ---- the toolbar -------------------------------------------------------------------------------------------------------
 
-enum { GL_PREV, GL_NEXT, GL_ZOOMOUT, GL_ZOOMIN, GL_ACTUAL, GL_FITPAGE, GL_FITWIDTH, GL_CONTENTS, GL_FIND, GL_COUNT };
+enum { GL_PREV, GL_NEXT, GL_PREV_OFF, GL_NEXT_OFF, GL_ZOOMOUT, GL_ZOOMIN, GL_ACTUAL, GL_FITPAGE, GL_FITWIDTH, GL_CONTENTS, GL_FIND, GL_COUNT };
 
 // the glyphs: plain shapes in XP's toolbar colours on a key colour (mupf's own drawing, 16 x 16)
 void draw_glyph(HDC dc, int i, int ox)
@@ -1148,12 +1140,13 @@ void draw_glyph(HDC dc, int i, int ox)
         }
     };
     switch (i) {
-    case GL_PREV: case GL_NEXT: {
-        op = pen(dark, 1); ob = brush(blue);
+    case GL_PREV: case GL_NEXT: case GL_PREV_OFF: case GL_NEXT_OFF: {
+        bool off = i == GL_PREV_OFF || i == GL_NEXT_OFF;
+        op = pen(off ? RGB(150, 150, 150) : dark, 1); ob = brush(off ? RGB(190, 190, 190) : blue);
         Ellipse(dc, ox + 0, 0, ox + 16, 16);
         done(op, ob);
         op = pen(white, 1); ob = brush(white);
-        if (i == GL_PREV) { POINT t[3] = { { ox + 10, 4 }, { ox + 10, 11 }, { ox + 5, 7 } }; Polygon(dc, t, 3); }
+        if (i == GL_PREV || i == GL_PREV_OFF) { POINT t[3] = { { ox + 10, 4 }, { ox + 10, 11 }, { ox + 5, 7 } }; Polygon(dc, t, 3); }
         else { POINT t[3] = { { ox + 6, 4 }, { ox + 6, 11 }, { ox + 11, 7 } }; Polygon(dc, t, 3); }
         done(op, ob);
         break;
@@ -1237,8 +1230,6 @@ HIMAGELIST make_glyphs()
 const char* tip_for(int id)
 {
     switch (id) {
-    case CMD_PREV: return "Previous Page";
-    case CMD_NEXT: return "Next Page";
     case CMD_ZOOM_OUT: return "Zoom Out";
     case CMD_ZOOM_IN: return "Zoom In";
     case CMD_ACTUAL: return "Actual Size";
@@ -1263,7 +1254,7 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     if (msg == WM_KEYDOWN && (wp == VK_RETURN || wp == VK_ESCAPE)) {
         if (wp == VK_RETURN && h == g.page_edit) {
             int n = atoi(WuxWindowText(h).c_str());
-            SetFocus(g.view);
+            SetFocus(g.view);   // (the edit hides: WM_KILLFOCUS)
             if (n >= 1 && n <= g.pages) go_page(n - 1);
             else update_page_box();
             update_toolbar();
@@ -1274,11 +1265,15 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     }
     if (msg == WM_CHAR && (wp == '\r' || wp == 27)) return 0;   // no beep
+    if (msg == WM_KILLFOCUS && h == g.page_edit) {
+        ShowWindow(h, SW_HIDE);   // the page part's text again
+        InvalidateRect(g.status, nullptr, FALSE);
+    }
     return CallWindowProcW(edit_base, h, msg, wp, lp);
 }
 
-// the toolbar (mupf's taste: Previous, Next, the page box | Zoom Out, Zoom In | Actual Size, Fit Page, Fit Width | the find
-// box and Find Next, as Acrobat 6 had its Find box in the toolbar; under the Longhorn header the header's search box is the
+// the toolbar (mupf's taste: Zoom Out, Zoom In | Actual Size, Fit Page, Fit Width | the find box and Find Next, as Acrobat 6
+// had its Find box in the toolbar; the pages are the status bar's (page_nav); under the Longhorn header the header's search box is the
 // Find box, and the toolbar ends with Fit Width). Under the XP themes a toolbar of its own at the
 // top (CCS_NOMOVEY: it stays where layout_chrome puts it); under the Longhorn header a band on the menu band's row, as the
 // Explorer's 4051 command bar (flxp/explorer/explorer.cpp, lhtool): a flat list toolbar in the rebar, no gripper, its band
@@ -1302,10 +1297,6 @@ void make_toolbar(bool band)
     const BYTE E = TBSTATE_ENABLED;
     const BYTE CHECK = band && lhbar::enabled() ? BTNS_BUTTON : BTNS_CHECK;
     TBBUTTON b[] = {
-        { GL_PREV, CMD_PREV, E, BTNS_BUTTON, {0}, 0, -1 },
-        { GL_NEXT, CMD_NEXT, E, BTNS_BUTTON, {0}, 0, -1 },
-        { 96, ID_PAGE_EDIT, 0, BTNS_SEP, {0}, 0, -1 },    // the page box and "of N" go over this
-        { 8, 0, 0, BTNS_SEP, {0}, 0, -1 },
         { GL_ZOOMOUT, CMD_ZOOM_OUT, E, BTNS_BUTTON, {0}, 0, -1 },
         { GL_ZOOMIN, CMD_ZOOM_IN, E, BTNS_BUTTON, {0}, 0, -1 },
         { 8, 0, 0, BTNS_SEP, {0}, 0, -1 },
@@ -1330,21 +1321,16 @@ void make_toolbar(bool band)
         }
     SendMessageW(g.toolbar, TB_AUTOSIZE, 0, 0);
     RECT r;
-    SendMessageW(g.toolbar, TB_GETITEMRECT, 2, (LPARAM)&r);
-    int eh = 20, ey = r.top + (r.bottom - r.top - eh) / 2;
-    g.page_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", nullptr, WS_CHILD | WS_VISIBLE | ES_NUMBER | ES_CENTER | ES_AUTOHSCROLL,
-                                  r.left + 4, ey, 40, eh, g.toolbar, (HMENU)(INT_PTR)ID_PAGE_EDIT, nullptr, nullptr);
-    g.page_of = CreateWindowExW(0, L"STATIC", nullptr, WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, r.left + 48, ey, r.right - r.left - 50,
-                                eh, g.toolbar, (HMENU)(INT_PTR)ID_PAGE_OF, nullptr, nullptr);
-    edit_base = (WNDPROC)SetWindowLongPtrW(g.page_edit, GWLP_WNDPROC, (LONG_PTR)edit_proc);
     if (n == (int)(sizeof b / sizeof b[0])) {
         SendMessageW(g.toolbar, TB_GETITEMRECT, n - 2, (LPARAM)&r);
+        int eh = 20, ey = r.top + (r.bottom - r.top - eh) / 2;
         g.find_edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", nullptr, WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, r.left + 2, ey,
                                       r.right - r.left - 4, eh, g.toolbar, (HMENU)(INT_PTR)ID_FIND_EDIT, nullptr, nullptr);
         SendMessageW(g.find_edit, EM_SETCUEBANNER, FALSE, (LPARAM)L"Find");
+        if (!edit_base) edit_base = (WNDPROC)GetWindowLongPtrW(g.find_edit, GWLP_WNDPROC);
         SetWindowLongPtrW(g.find_edit, GWLP_WNDPROC, (LONG_PTR)edit_proc);
+        if (g.font) SendMessageW(g.find_edit, WM_SETFONT, (WPARAM)g.font, TRUE);
     }
-    if (g.font) for (HWND h : { g.page_edit, g.page_of, g.find_edit }) SendMessageW(h, WM_SETFONT, (WPARAM)g.font, TRUE);
     if (!band) return;
     // the band: as high as a button, after the menu band on its row
     SIZE sz = {0, 0};
@@ -1358,7 +1344,10 @@ void make_toolbar(bool band)
     rb.hwndChild = g.toolbar;
     rb.wID = ID_TOOLBAR;
     rb.cxHeader = 30;                                  // the Explorer's: 4051's gap after Help
-    rb.cxMinChild = (UINT)sz.cx; rb.cyMinChild = (UINT)(item.bottom - item.top); rb.cyChild = rb.cyMinChild; rb.cx = (UINT)sz.cx;
+    rb.cxMinChild = (UINT)sz.cx; rb.cyMinChild = (UINT)(item.bottom - item.top); rb.cyChild = rb.cyMinChild;
+    // the row's room left after the menu band (the rebar gives extra room to the last band wider than the first band's
+    // minimum, else to the first: a toolbar narrower than the menu would be pushed to the right edge)
+    rb.cx = 0x7fff;
     SendMessageW(g.rebar, RB_INSERTBANDW, 1, (LPARAM)&rb);
     trace("toolbar band %dx%d", (int)sz.cx, (int)(item.bottom - item.top));
 }
@@ -1370,9 +1359,9 @@ void destroy_toolbar()
         int i = (int)SendMessageW(g.rebar, RB_IDTOINDEX, ID_TOOLBAR, 0);
         if (i >= 0) SendMessageW(g.rebar, RB_DELETEBAND, (WPARAM)i, 0);
     }
-    if (GetFocus() == g.find_edit || GetFocus() == g.page_edit) SetFocus(g.view);
-    DestroyWindow(g.toolbar);   // its edits with it
-    g.toolbar = g.page_edit = g.page_of = g.find_edit = nullptr;
+    if (GetFocus() == g.find_edit) SetFocus(g.view);
+    DestroyWindow(g.toolbar);   // its edit with it
+    g.toolbar = g.find_edit = nullptr;
 }
 
 void apply_font()
@@ -1382,8 +1371,140 @@ void apply_font()
     ncm.cbSize = sizeof ncm;
     SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
     g.font = CreateFontIndirectW(&ncm.lfMessageFont);
-    for (HWND h : { g.page_edit, g.page_of, g.tree, g.find_edit })
+    for (HWND h : { g.tree, g.find_edit })
         if (h) SendMessageW(h, WM_SETFONT, (WPARAM)g.font, TRUE);
+    // the status bar the style's status font, as the Explorer's (its page part and the page edit too)
+    HFONT sf = CreateFontIndirectW(&ncm.lfStatusFont);
+    for (HWND h : { g.status, g.page_edit })
+        if (h) SendMessageW(h, WM_SETFONT, (WPARAM)sf, TRUE);
+    if (g.status_font) DeleteObject(g.status_font);
+    g.status_font = sf;
+}
+
+// ---- the status bar's page part ----------------------------------------------------------------------------------------
+// The page part of the status bar is the page navigation: [<] Page N of M [>], the arrows small buttons (the previous and
+// the next page or spread, greyed at the ends), a click on the text the page number as an edit (Return goes there, Escape
+// or a click elsewhere leaves it). Longhorn's and XP's viewers had no such part (Acrobat 6 had its page box and arrows in
+// a toolbar at the bottom of the window): the layout is mupf's choice, the arrows mupf's glyphs.
+const int NAV_ARROW = 16, NAV_PAD = 2;
+
+// the part's arrows and text in the status bar's client coordinates; false without a status bar or a document
+bool nav_rects(RECT* prev, RECT* text, RECT* next)
+{
+    RECT r;
+    if (!g.status || !IsWindowVisible(g.status) || !SendMessageW(g.status, SB_GETRECT, 1, (LPARAM)&r)) return false;
+    int cy = (r.top + r.bottom) / 2;
+    *prev = { r.left + NAV_PAD, cy - NAV_ARROW / 2, r.left + NAV_PAD + NAV_ARROW, cy + NAV_ARROW / 2 };
+    *next = { r.right - NAV_PAD - NAV_ARROW, cy - NAV_ARROW / 2, r.right - NAV_PAD, cy + NAV_ARROW / 2 };
+    *text = { prev->right + NAV_PAD, r.top, next->left - NAV_PAD, r.bottom };
+    return true;
+}
+
+void trace_nav()
+{
+    RECT p, t, n;
+    if (!g.trace || !g.opened || !nav_rects(&p, &t, &n)) return;
+    // in the frame's client coordinates (a script adds the client's place on the screen)
+    MapWindowPoints(g.status, g.wnd, (POINT*)&p, 2);
+    MapWindowPoints(g.status, g.wnd, (POINT*)&t, 2);
+    MapWindowPoints(g.status, g.wnd, (POINT*)&n, 2);
+    char b[128];
+    snprintf(b, sizeof b, "pagenav %d %d %d %d %d %d", (int)(p.left + p.right) / 2, (int)(p.top + p.bottom) / 2,
+             (int)(t.left + t.right) / 2, (int)(t.top + t.bottom) / 2, (int)(n.left + n.right) / 2, (int)(n.top + n.bottom) / 2);
+    static std::string last;
+    if (last != b) { last = b; trace("%s", b); }
+}
+
+// WM_DRAWITEM of the page part
+void draw_nav(const DRAWITEMSTRUCT* di)
+{
+    RECT p, t, n;
+    if (!nav_rects(&p, &t, &n)) return;
+    HDC dc = di->hDC;
+    bool on = g.opened;
+    bool can_prev = on && step_page(-1) >= 0, can_next = on && step_page(1) >= 0;
+    if (on) {
+        ImageList_Draw(g.glyphs, can_prev ? GL_PREV : GL_PREV_OFF, dc, p.left + (g.nav_pressed < 0), p.top + (g.nav_pressed < 0), ILD_NORMAL);
+        ImageList_Draw(g.glyphs, can_next ? GL_NEXT : GL_NEXT_OFF, dc, n.left + (g.nav_pressed > 0), n.top + (g.nav_pressed > 0), ILD_NORMAL);
+    }
+    if (g.page_edit && IsWindowVisible(g.page_edit)) return;
+    HGDIOBJ of = SelectObject(dc, g.status_font ? (HGDIOBJ)g.status_font : GetStockObject(DEFAULT_GUI_FONT));
+    SetBkMode(dc, TRANSPARENT);
+    SetTextColor(dc, GetSysColor(COLOR_BTNTEXT));
+    std::u16string w = W(g.status_text[1]);
+    DrawTextW(dc, (LPCWSTR)w.c_str(), -1, &t, DT_SINGLELINE | DT_VCENTER | DT_CENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
+    SelectObject(dc, of);
+    trace_nav();
+}
+
+// a click on the text: the page number as an edit over it
+void edit_page_number()
+{
+    RECT p, t, n;
+    if (!g.opened || !nav_rects(&p, &t, &n)) return;
+    if (!g.page_edit) {
+        g.page_edit = CreateWindowExW(0, L"EDIT", nullptr, WS_CHILD | WS_BORDER | ES_NUMBER | ES_CENTER | ES_AUTOHSCROLL, 0, 0, 10, 10,
+                                      g.status, (HMENU)(INT_PTR)ID_PAGE_EDIT, nullptr, nullptr);
+        if (!edit_base) edit_base = (WNDPROC)GetWindowLongPtrW(g.page_edit, GWLP_WNDPROC);
+        SetWindowLongPtrW(g.page_edit, GWLP_WNDPROC, (LONG_PTR)edit_proc);
+        if (g.status_font) SendMessageW(g.page_edit, WM_SETFONT, (WPARAM)g.status_font, FALSE);
+    }
+    int h = std::min((int)(t.bottom - t.top) - 2, 18), w = std::min((int)(t.right - t.left), 48);
+    MoveWindow(g.page_edit, (t.left + t.right - w) / 2, (t.top + t.bottom - h) / 2, w, h, FALSE);
+    SetWindowTextW(g.page_edit, WS(std::to_string(g.current + 1)));
+    ShowWindow(g.page_edit, SW_SHOW);
+    SetFocus(g.page_edit);
+    SendMessageW(g.page_edit, EM_SETSEL, 0, -1);
+    InvalidateRect(g.status, nullptr, FALSE);
+    trace("page edit");
+}
+
+WNDPROC status_base = nullptr;
+
+// the status bar's clicks on the page part
+LRESULT CALLBACK status_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
+{
+    RECT p, t, n;
+    POINT pt = { (short)LOWORD(lp), (short)HIWORD(lp) };
+    switch (msg) {
+    case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK:
+        if (g.opened && nav_rects(&p, &t, &n)) {
+            InflateRect(&p, NAV_PAD, NAV_PAD);
+            InflateRect(&n, NAV_PAD, NAV_PAD);
+            int dir = PtInRect(&p, pt) ? -1 : PtInRect(&n, pt) ? 1 : 0;
+            if (dir && step_page(dir) >= 0) {
+                g.nav_pressed = dir;
+                SetCapture(h);
+                InvalidateRect(h, nullptr, FALSE);
+                return 0;
+            }
+            if (PtInRect(&t, pt)) { edit_page_number(); return 0; }
+        }
+        break;
+    case WM_LBUTTONUP:
+        if (g.nav_pressed) {
+            int dir = g.nav_pressed;
+            g.nav_pressed = 0;
+            ReleaseCapture();
+            nav_rects(&p, &t, &n);
+            RECT r = dir < 0 ? p : n;
+            InflateRect(&r, NAV_PAD, NAV_PAD);
+            if (PtInRect(&r, pt)) {
+                trace("pagenav %s", dir < 0 ? "previous" : "next");
+                command(dir < 0 ? CMD_PREV : CMD_NEXT);
+            }
+            InvalidateRect(h, nullptr, FALSE);
+            return 0;
+        }
+        break;
+    case WM_CAPTURECHANGED:
+        if (g.nav_pressed) { g.nav_pressed = 0; InvalidateRect(h, nullptr, FALSE); }
+        break;
+    case WM_COMMAND:   // the page edit's notifications: nothing to do
+        if ((HWND)lp == g.page_edit) return 0;
+        break;
+    }
+    return CallWindowProcW(status_base, h, msg, wp, lp);
 }
 
 // ---- the Contents pane -------------------------------------------------------------------------------------------------
@@ -1772,6 +1893,7 @@ void layout_chrome()
         int w = rc.right;
         int parts[3] = { std::max(10, w - 220), std::max(20, w - 80), -1 };
         SendMessageW(g.status, SB_SETPARTS, 3, (LPARAM)parts);
+        if (g.page_edit && GetFocus() == g.page_edit) SetFocus(g.view);   // (the edit hides) the parts moved
     }
     int left = 0;
     bool pane = g.show_toc && !g.fullscreen;
@@ -1988,6 +2110,9 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case WM_INITMENUPOPUP:
         update_menu();
         return 0;
+    case WM_DRAWITEM:
+        if (wp == (WPARAM)ID_STATUS && ((DRAWITEMSTRUCT*)lp)->itemID == 1) { draw_nav((DRAWITEMSTRUCT*)lp); return TRUE; }
+        break;
     case WM_COMMAND:
         if (lp == 0 || (HWND)lp == g.toolbar) { command(LOWORD(wp)); return 0; }
         break;
@@ -2123,6 +2248,7 @@ int main(int argc, char** argv)
     make_toolbar(false);   // (sync_header puts it on the menu band's row under the Longhorn header)
     g.status = CreateWindowExW(0, STATUSCLASSNAMEW, nullptr, WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP, 0, 0, 0, 0, g.wnd,
                                (HMENU)(INT_PTR)ID_STATUS, nullptr, nullptr);
+    status_base = (WNDPROC)SetWindowLongPtrW(g.status, GWLP_WNDPROC, (LONG_PTR)status_proc);
     g.view = CreateWindowExW(WS_EX_CLIENTEDGE, L"mupf_view", nullptr, WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP,
                              0, 0, 10, 10, g.wnd, (HMENU)(INT_PTR)ID_VIEW, nullptr, nullptr);
     g.tree = CreateWindowExW(WS_EX_CLIENTEDGE, WC_TREEVIEWW, nullptr,
