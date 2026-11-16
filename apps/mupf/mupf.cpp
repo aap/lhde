@@ -4,9 +4,10 @@
 //   mupf [FILE]
 //
 // A window in the idiom of XP's programs: the menu bar (File, Edit, View, Go, Help), a toolbar of small buttons, the pages
-// on the application workspace colour, the status bar. XP had no PDF viewer of its own; Acrobat Reader 6 (2003) is what
-// one looked like there, and where mupf follows it (the page layouts, the keys, the grey around the pages, the black
-// frame and shadow of a page) the names say so; the toolbar's order and glyphs are mupf's taste, not a measured layout.
+// on mupdf's grey, the status bar. XP had no PDF viewer of its own; Acrobat Reader 6 (2003) is what one looked like
+// there, and where mupf follows it (the page layouts, the keys, the black frame and shadow of a page) the names say so;
+// where it follows mupdf (the grey, a page centred in the view) too; the toolbar's order and glyphs are mupf's taste, not
+// a measured layout.
 // Under the Longhorn themes the Explorer's header is above it all (shell/lhheader.h: "the Longhorn header" below).
 //
 // The window never waits on mupdf: the engine (engine.h) opens, renders and searches on its thread, and posts what it has;
@@ -54,6 +55,9 @@ const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_T
 const int PANE_TITLE = 22, SPLITTER = 4, PANE_MIN = 80, PANE_DEFAULT = 200;
 const UINT_PTR TIMER_RELOAD = 1;       // a Markdown file written: read again once the writes have settled
 const int RELOAD_DELAY = 150;
+// mupdf's grey around the pages: mupdf's X11 viewer (the `mupdf` command) clears its window to 0x707070 (measured: its
+// window beside a page, 112,112,112), darker than Acrobat 6's application workspace colour (128 under XP's styles)
+const uint32_t WORKSPACE = 0xff707070;
 
 // a place in the history: a document, its page and, for a place in another file, where the view was (-1: the page's top)
 struct Place { std::string path; int page = 0, sx = -1, sy = -1; };
@@ -533,8 +537,6 @@ void make_back()
     SelectObject(g.mem, g.back);
 }
 
-uint32_t px_of(COLORREF c) { return 0xff000000u | GetRValue(c) << 16 | GetGValue(c) << 8 | GetBValue(c); }
-
 void fill(int x, int y, int w, int h, uint32_t c)
 {
     int x0 = std::max(0, x), y0 = std::max(0, y), x1 = std::min(g.bw, x + w), y1 = std::min(g.bh, y + h);
@@ -620,8 +622,8 @@ void paint_hits(int page, int x, int y, const Box& b)
 void paint_view(HDC dc)
 {
     make_back();
-    // Acrobat's grey around the pages: the application workspace colour (128 grey under XP's styles and classic)
-    fill(0, 0, g.bw, g.bh, px_of(GetSysColor(COLOR_APPWORKSPACE)));
+    // mupdf's grey around the pages (WORKSPACE)
+    fill(0, 0, g.bw, g.bh, WORKSPACE);
     std::string shown;
     if (g.opened) {
         for (int p : pages_in_view(g.lay, g.sx, g.sy, g.vw, g.vh)) {
