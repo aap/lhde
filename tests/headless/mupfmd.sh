@@ -2,11 +2,13 @@
 # mupf on a Markdown file, under luxwm on Xvfb, driven with xdotool, what it shows read from MUPF_TRACE=1's lines (opened,
 # title, shown PAGE:X,Y,WxH, tocentry INDEX LEVEL PAGE Y TITLE, tocitem, linkrect PAGE X0 Y0 X1 Y1 URI). A README.md with
 # front matter, an H1, a paragraph with bold and a link to other.md, a table, a fenced code block, a task list and a
-# picture beside it (a magenta PNG): the title is the H1's; at Fit Page the H1's band of the page has ink, the table's band
-# its borders' grey, the picture's band magenta; the Contents pane (F4) lists the headings; a click on the link opens
-# other.md in the same window and Alt+Left comes back; a heading appended to the file is laid out without a key pressed.
-# Pixel bands come from the headings' places (tocentry: points down the page; the page 660 pt wide). Needs mupf (built when
-# MuPDF is installed), Xvfb, xdotool, python3 and ImageMagick; prints "skip: ..." and passes without them.
+# picture beside it (a magenta PNG): the title is the H1's; no page: the view white to its edges, the page as wide as the
+# view (laid out to it: "flow W", W points); at 50% (laid out again: "relaid") the H1's band of the page has ink, the
+# table's band its borders' grey, the picture's band magenta; the Contents pane (F4) lists the headings; a click on the link
+# opens other.md in the same window and Alt+Left comes back; a heading appended to the file is laid out without a key
+# pressed; the window made wider and narrower lays it out again to the view's width, at most 980 px. Pixel bands come from
+# the headings' places (tocentry: points down the page, the page FW points wide). Needs mupf (built when MuPDF is
+# installed), Xvfb, xdotool, python3 and ImageMagick; prints "skip: ..." and passes without them.
 # Usage: tests/headless/mupfmd.sh [:DISPLAY]
 D=${1:-:78}
 R=$(cd "$(dirname "$0")/../.." && pwd)
@@ -27,6 +29,7 @@ fails=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fails=$((fails + 1)); }
 check() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1: expected [$2] got [$3]"; fi; }
+px() { $IM "$1" -format '%[fx:int(255*p{'"$2"','"$3"'}.r)],%[fx:int(255*p{'"$2"','"$3"'}.g)],%[fx:int(255*p{'"$2"','"$3"'}.b)]' info:; }
 
 $IM -size 160x80 xc:'#ff00ff' $T/docs/pic.png
 cat > $T/docs/README.md <<'EOF'
@@ -92,7 +95,7 @@ print(sum(1 for i in range(0, len(d) - 2, 3) if abs(d[i] - r) <= t and abs(d[i +
 band() {
     y0=$(entry_y "$2"); y1=$(entry_y "$3")
     if [ -z "$y0" ] || [ -z "$y1" ] || [ -z "$PX" ]; then bad "$1: no place for $2 or $3"; return; fi
-    a=$(python3 -I -c "print(int($PY + $y0 * $PW_ / 660))"); b=$(python3 -I -c "print(int($PY + $y1 * $PW_ / 660))")
+    a=$(python3 -I -c "print(int($PY + $y0 * $PW_ / $FW))"); b=$(python3 -I -c "print(int($PY + $y1 * $PW_ / $FW))")
     n=$(count $T/shot.png $PX $a $((PX + PW_)) $b $4 $5 $6 $7)
     if [ "$n" -ge "$8" ]; then ok "$1: $n pixels in rows $a..$b"; else bad "$1: $n pixels in rows $a..$b, wanted $8"; fi
 }
@@ -110,22 +113,38 @@ else
     traced "^tocentry 0 0 1 [0-9.e+-]* Markdown Test$" && ok "the outline starts with the H1" || bad "no H1 in the outline"
     traced "front matter" && bad "the front matter is in the outline" || ok "no front matter in the outline"
     traced "^watch " && ok "the file's directory is followed" || bad "no watch"
-    # the whole page in view (Fit Page): bands of it between the headings' places
-    key ctrl+0
-    wait_for 10 traced "^zoom"
-    sleep .5
+    # no page: laid out to the view's width, white to the view's edges (no frame, no grey, no shadow)
     wait_for 10 traced "^shown 1:"
     sleep .5
+    set -- $(last view); VX=$1 VY=$2 VW=$3 VH=$4
+    set -- $(page_box 1)
+    check "the page as wide as the view" "$VW" "$3"
+    import -window root $T/shot0.png
+    for y in $((VY + 2)) $((VY + VH / 2)) $((VY + VH - 3)); do
+        check "white at the view's left edge (row $y)" 255,255,255 "$(px $T/shot0.png $VX $y)"
+        check "white at its right edge" 255,255,255 "$(px $T/shot0.png $((VX + VW - 1)) $y)"
+    done
+    # the whole page in view (50%: laid out again for it, the column 490 px wide): bands of it between the headings' places
+    n=$(grep -c '^relaid' $T/out.log)
+    key ctrl+minus ctrl+minus ctrl+minus
+    relaid() { [ "$(grep -c '^relaid' $T/out.log)" -gt "$n" ]; }
+    wait_for 10 relaid
+    check "50%: laid out again" 1 "$(grep -c '^relaid' $T/out.log)"
+    FW=$(last relaid | cut -d' ' -f3)
+    sleep 1
     set -- $(page_box 1)
     if [ $# = 4 ]; then
         PX=$1 PY=$2 PW_=$3 PH=$4
+        check "at 50%: the column 490 px wide" 490 "$PW_"
+        check "in the middle of the view" $((VX + (VW - 490) / 2)) "$PX"
         ok "the page shown at $3x$4"
         import -window root $T/shot.png
         band "the H1's ink" "Markdown Test" "Table" 31 35 40 60 40
-        band "the table's borders" "Table" "Code" 209 217 224 14 40
+        band "the table's borders" "Table" "Code" 209 217 224 14 24
         band "the code block's grey" "Code" "Tasks" 246 248 250 2 400
         band "the picture" "Picture" "End" 255 0 255 8 1000
-        n=$(count $T/shot.png $PX $(python3 -I -c "print(int($PY + $(entry_y Table) * $PW_ / 660))") $((PX + PW_)) $(python3 -I -c "print(int($PY + $(entry_y Picture) * $PW_ / 660))") 255 0 255 8)
+        n=$(count $T/shot.png $PX $(python3 -I -c "print(int($PY + $(entry_y Table) * $PW_ / $FW))") $((PX + PW_)) $(python3 -I -c "print(int($PY + $(entry_y Picture) * $PW_ / $FW))") 255 0 255 8)
+        check "no grey beside the column" 255,255,255 "$(px $T/shot.png $((VX + 2)) $((VY + VH / 2)))"
         check "no magenta between the table and the picture" 0 "$n"
     else bad "the page never shown"; fi
     # the Contents pane: the headings
@@ -140,7 +159,7 @@ else
     set -- $(grep '^linkrect 1 .* other.md$' $T/out.log | tail -1)
     set -- $(page_box 1) $3 $4 $5 $6
     if [ $# = 8 ]; then
-        LX=$(python3 -I -c "print(int($1 + ($5 + $7) / 2 * $3 / 660))"); LY=$(python3 -I -c "print(int($2 + ($6 + $8) / 2 * $3 / 660))")
+        LX=$(python3 -I -c "print(int($1 + ($5 + $7) / 2 * $3 / $FW))"); LY=$(python3 -I -c "print(int($2 + ($6 + $8) / 2 * $3 / $FW))")
         xdotool mousemove $LX $LY click 1
         wait_for 10 traced "^title Other File - mupf"
         check "the link opens other.md here" "Other File - mupf" "$(last title)"
@@ -154,6 +173,16 @@ else
     wait_for 10 traced "^tocentry [0-9]* 1 1 [0-9.e+-]* Appended Later$"
     traced "^tocentry [0-9]* 1 1 [0-9.e+-]* Appended Later$" && ok "a heading written to the file appears" || bad "the file's change not shown"
     check "the title stays" "Markdown Test - mupf" "$(last title)"
+    # the window wider, then narrower: laid out again to the view (Actual Size: at most GitHub's 980 px)
+    key ctrl+1; sleep .5
+    for w in 1180 700; do
+        n=$(grep -c '^relaid' $T/out.log)
+        xdotool windowsize --sync $W $w 640 2>/dev/null
+        wait_for 10 relaid; sleep .5
+        set -- $(last view)
+        want=$3; [ "$want" -gt 980 ] && want=980
+        traced "^rendered 1 ${want}x" && ok "$w px wide: rendered again $want px wide" || bad "$w px wide: no rendered line $want px wide ($(last rendered))"
+    done
     timeout 10 xdotool windowactivate --sync $W 2>/dev/null; xdotool key alt+F4
     for i in $(seq 100); do kill -0 $P 2>/dev/null || break; sleep .1; done
     if kill -0 $P 2>/dev/null; then kill $P; bad "mupf did not exit"; fi

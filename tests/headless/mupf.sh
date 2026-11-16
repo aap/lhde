@@ -6,7 +6,9 @@
 # Alt+Left back; the status bar's next arrow goes to page 2 and its number, clicked and typed, to page 1; the search for
 # "lantern" finds its 4 hits (Match 1 of 4), F3 goes to the second; F4 shows the Contents pane with both chapters and a click on "Chapter One" goes to page 1; the pane's choice is in mupf.ini after Alt+F4, and
 # the window comes back with the pane shown; a file that is not a document gives a message box, not a crash; a protected
-# copy (mutool's encryption, when mutool is installed) asks for its password, again after a wrong one, and opens. A HOME and
+# copy (mutool's encryption, when mutool is installed) asks for its password, again after a wrong one, and opens. The view
+# (view X Y W H, scroll SX SY PW PH): at 50% the page is in the middle of the view across; at the end the wheel and a drag
+# go no further; the middle button held and moved scrolls toward the pointer, clicked it stays on until a click. A HOME and
 # XDG directories of its own. Needs mupf (built when MuPDF is installed), Xvfb, xdotool, python3 and ImageMagick; prints
 # "skip: ..." and passes without them. Usage: tests/headless/mupf.sh [:DISPLAY]
 D=${1:-:79}
@@ -141,6 +143,53 @@ else
     run $T/docs/test.pdf
     wait_for 10 traced "^tocitem 0 "
     traced "^tocitem 0 " && ok "the next window shows the pane" || bad "the pane did not come back"
+    # 5b. the view: at 50% the page narrower than the view, in its middle (mupdf's); the scroll range the pages and their
+    # margin, so at the end the wheel and a drag go no further
+    key F4; wait_for 5 traced "^contents hidden"   # (the keys to the view, not to the pane's tree)
+    zooms() { [ "$(grep -c '^zoom' $T/out.log)" -ge "$1" ]; }
+    n=$(($(grep -c '^zoom' $T/out.log) + 3))
+    key ctrl+minus ctrl+minus ctrl+minus   # Fit Width (93%), 75%, 67%, 50%
+    wait_for 10 zooms $n
+    check "three steps out: 50%" "50%" "$(last zoom)"
+    sleep .5
+    set -- $(last view); VX=$1 VY=$2 VW=$3 VH=$4
+    set -- $(page_box 1)
+    if [ $# = 4 ] && [ -n "$VW" ]; then
+        want=$((VX + (VW - $3) / 2)); d=$(($1 - want)); [ $d -lt 0 ] && d=$((-d))
+        [ $d -le 1 ] && ok "centred: page 1 at x $1, (view width - page width) / 2 is $want" || bad "not centred: page 1 at x $1, wanted $want"
+    else bad "no view or page box at 50% ($*)"; fi
+    MX=$((VX + VW / 2)); MY=$((VY + VH / 2))
+    key End; sleep .5
+    S0=$(last scroll)
+    set -- $S0
+    check "End: at the bottom of the plane" $(($4 - VH)) "$2"
+    xdotool mousemove $MX $MY click 5 click 5 click 5; sleep .5
+    check "End, then the wheel down: no further" "$S0" "$(last scroll)"
+    xdotool mousemove $MX $MY mousedown 1; sleep .1; xdotool mousemove $((MX - 150)) $((MY - 200)); sleep .1
+    xdotool mousemove $((MX - 300)) $((MY - 250)); sleep .1; xdotool mouseup 1; sleep .5
+    check "a drag up and across past the edge: no further" "$S0" "$(last scroll)"
+    # the middle button: held and moved 60 px down, the view scrolls down until it comes up (Firefox's autoscroll)
+    key Home; sleep .5
+    y0=$(last scroll | cut -d' ' -f2)
+    xdotool mousemove $MX $MY mousedown 2; sleep .1; xdotool mousemove $MX $((MY + 30)); sleep .1
+    xdotool mousemove $MX $((MY + 60)); sleep .5; xdotool mouseup 2
+    wait_for 5 traced "^autoscroll off"; sleep .2
+    y1=$(last scroll | cut -d' ' -f2)
+    [ "$y1" -gt "$y0" ] 2>/dev/null && ok "the middle button held and moved down: scrolled from $y0 to $y1" || bad "autoscroll: from $y0 to $y1"
+    traced "^autoscroll sticky" && bad "a drag with the middle button left it on" || ok "the button up after a move ends it"
+    sleep .3; y2=$(last scroll | cut -d' ' -f2)
+    check "and nothing scrolls after it" "$y1" "$y2"
+    # clicked without moving: it stays on, the pointer steers it, a click ends it
+    key Home; sleep .5
+    xdotool mousemove $MX $MY click 2
+    wait_for 5 traced "^autoscroll sticky"
+    traced "^autoscroll sticky" && ok "a middle click: autoscroll stays on" || bad "a middle click did not leave autoscroll on"
+    y0=$(last scroll | cut -d' ' -f2)
+    xdotool mousemove $MX $((MY + 60)); sleep .5
+    y1=$(last scroll | cut -d' ' -f2)
+    [ "$y1" -gt "$y0" ] 2>/dev/null && ok "a later motion scrolls: from $y0 to $y1" || bad "the sticky autoscroll did not scroll: $y0 to $y1"
+    xdotool click 1; sleep .3
+    check "a click ends it" 2 "$(grep -c '^autoscroll off' $T/out.log)"
     quit
 fi
 
