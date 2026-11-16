@@ -16,6 +16,7 @@
 #define CMD_CLOSE       1002
 #define CMD_PROPERTIES  1003
 #define CMD_EXIT        1004
+#define CMD_RELOAD      1005
 #define CMD_FIND        1101
 #define CMD_FIND_NEXT   1102
 #define CMD_FIND_PREV   1103

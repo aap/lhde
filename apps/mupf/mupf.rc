@@ -5,7 +5,7 @@
  * Ctrl+0, Fit Width Ctrl+2, Full Screen Ctrl+L, Document Properties Ctrl+D, Find Ctrl+F, F4 for the navigation pane,
  * Back and Forward Alt+Left and Alt+Right). Go To Page is Ctrl+G (notepad's Go To, where Acrobat had Ctrl+N); Ctrl++ is
  * Ctrl+= or Ctrl+Shift+= alike, so rotating is Ctrl+] and Ctrl+[ (mupdf's ] and [) rather than Acrobat's Ctrl+Shift++ and
- * Ctrl+Shift+-; Show Cover Page is Acrobat 7's. The Go To Page dialog has notepad's Go To layout.
+ * Ctrl+Shift+-; Show Cover Page is Acrobat 7's; Reload is mupdf's r (Acrobat had none). The Go To Page dialog has notepad's Go To layout.
  * Build: make apps/mupf/mupf.res (mingw windres; the .res is checked in); embedded by mupf.cpp.
  */
 #include <windows.h>
@@ -22,6 +22,7 @@ BEGIN
     BEGIN
         MENUITEM "&Open...\tCtrl+O", CMD_OPEN
         MENUITEM "&Close\tCtrl+W", CMD_CLOSE
+        MENUITEM "&Reload\tR", CMD_RELOAD
         MENUITEM SEPARATOR
         MENUITEM "Document P&roperties...\tCtrl+D", CMD_PROPERTIES
         MENUITEM SEPARATOR

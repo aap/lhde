@@ -67,7 +67,8 @@ const uint32_t WORKSPACE = 0xff707070;
 // a place in the history: a document, its page and, for a place in another file, where the view was (-1: the page's top)
 struct Place { std::string path; int page = 0, sx = -1, sy = -1; };
 
-enum ZoomMode { Z_CUSTOM, Z_FIT_PAGE, Z_FIT_WIDTH };
+// Z_FIT_HEIGHT: mupdf's H, the page's height in the view whatever its width (no menu item: Fit Page is that or less)
+enum ZoomMode { Z_CUSTOM, Z_FIT_PAGE, Z_FIT_WIDTH, Z_FIT_HEIGHT };
 
 struct App {
     HWND wnd = nullptr, toolbar = nullptr, status = nullptr, view = nullptr;
@@ -158,6 +159,7 @@ struct App {
     POINT pan_at = {};
     int pan_sx = 0, pan_sy = 0;
     int wheel = 0;
+    int count = 0;                      // mupdf's count: the digits typed before g (123g: page 123)
     // the middle button's autoscroll (Firefox's): held and moved, or clicked and left on (sticky) until a click or a key
     bool autoscroll = false, auto_sticky = false, auto_moved = false;
     POINT auto_at = {}, auto_pt = {};   // where it began and where the pointer is, in the view
@@ -258,7 +260,7 @@ void load_state(int* x, int* y, int* w, int* h, bool* maxed)
     g.mode = m >= MODE_SINGLE && m <= MODE_CONTINUOUS_FACING ? (Mode)m : MODE_CONTINUOUS;
     g.cover = state_int(st, "view", "cover", 0) != 0;
     int z = state_int(st, "view", "zoom_mode", Z_FIT_WIDTH);
-    g.zmode = z >= Z_CUSTOM && z <= Z_FIT_WIDTH ? (ZoomMode)z : Z_FIT_WIDTH;
+    g.zmode = z >= Z_CUSTOM && z <= Z_FIT_HEIGHT ? (ZoomMode)z : Z_FIT_WIDTH;
     g.zoom = clamp_zoom(state_int(st, "view", "zoom", 1000) / 1000.0);
     if (st) lhde_ini_free(st);
 }
@@ -363,6 +365,7 @@ void compute_zoom()
     if (g.flow) { if (g.zmode != Z_CUSTOM) g.zoom = 1; }
     else if (g.zmode == Z_FIT_WIDTH) g.zoom = fit_width(g.sizes, g.rot, g.mode, g.cover, g.current, g.vw);
     else if (g.zmode == Z_FIT_PAGE) g.zoom = fit_page(g.sizes, g.rot, g.mode, g.cover, g.current, g.vw, g.vh);
+    else if (g.zmode == Z_FIT_HEIGHT) g.zoom = fit_page(g.sizes, g.rot, g.mode, g.cover, g.current, 1 << 20, g.vh);   // (no width to fit)
 }
 
 // the width in points a reflowable document is laid out at for the view: the view's width, at most GitHub's column
@@ -541,6 +544,22 @@ void scroll_lines(int dy)
         if (dy < 0 && g.sy <= 0) { next_page(-1, true); return; }
     }
     scroll_to(g.sx, g.sy + dy);
+}
+
+// Page Up and Down (and mupdf's , and .): the previous or next page or spread (Acrobat's); a reflowable document has no
+// pages to step through (a Markdown file is one tall page, an EPUB's chapter one): a screen up or down, as a browser's
+void page_key(int dir)
+{
+    if (g.lay.flow) scroll_screen(dir);
+    else next_page(dir);
+}
+
+// Home and End (mupdf's g and G): the first or last page; a reflowable document's top or bottom
+void go_end(int dir)
+{
+    if (!g.opened) return;
+    if (g.lay.flow) scroll_to(g.sx, dir < 0 ? 0 : g.lay.height);
+    else go_page(dir < 0 ? 0 : g.pages - 1);
 }
 
 void set_zoom(ZoomMode m, double z, const Anchor& a)
@@ -1264,7 +1283,7 @@ void update_menu()
     check(CMD_FIT_WIDTH, g.zmode == Z_FIT_WIDTH);
     check(CMD_FULLSCREEN, g.fullscreen);
     bool d = g.opened;
-    for (UINT id : { CMD_CLOSE, CMD_PROPERTIES, CMD_FIRST, CMD_LAST, CMD_GOTO, CMD_ZOOM_IN, CMD_ZOOM_OUT, CMD_ACTUAL,
+    for (UINT id : { CMD_CLOSE, CMD_RELOAD, CMD_PROPERTIES, CMD_FIRST, CMD_LAST, CMD_GOTO, CMD_ZOOM_IN, CMD_ZOOM_OUT, CMD_ACTUAL,
                      CMD_FIT_PAGE, CMD_FIT_WIDTH, CMD_ROT_CW, CMD_ROT_CCW })
         enable(id, d);
     enable(CMD_ROT_CW, d && !g.flow);
@@ -1316,6 +1335,7 @@ void command(int id)
         if (g.opened) shell::properties(g.wnd, { g.path });
         break;
     case CMD_EXIT: PostMessageW(g.wnd, WM_CLOSE, 0, 0); break;
+    case CMD_RELOAD: reload_doc(); break;
     case CMD_TOOLBAR: g.show_toolbar = !g.show_toolbar; layout_chrome(); break;
     case CMD_STATUSBAR: g.show_status = !g.show_status; layout_chrome(); break;
     case CMD_LARGE_HEADER:
@@ -2409,6 +2429,52 @@ void autoscroll_step(POINT screen)
     trace("autoscroll step %u %d,%d %d,%d", (unsigned)now, g.sx - sx, g.sy - sy, g.sx, g.sy);
 }
 
+// mupdf's keys (its viewer's, mupdf-gl and mupdf-x11 alike), which mupf takes as they are where they do not clash with
+// Acrobat's: , and . the previous and next page (< and > ten pages), W H Z fit width, height and page, + and - zoom, j k h
+// l a line down, up, left and right, g the first page (a number typed before it: that page) and G the last, / the Find
+// box, n N the next and previous match, r reload, q quit. In a reflowable document a page is a screen (page_key, go_end).
+bool char_key(WCHAR c)
+{
+    if (c >= '0' && c <= '9') {
+        g.count = std::min(g.count * 10 + (c - '0'), 1000000);
+        return true;
+    }
+    int count = g.count;
+    g.count = 0;
+    switch (c) {
+    case ',': page_key(-1); break;
+    case '.': page_key(1); break;
+    case '<': case '>':
+        if (g.lay.flow) for (int i = 0; i < 10; i++) scroll_screen(c == '<' ? -1 : 1);
+        else if (g.opened) go_page(std::max(0, std::min(g.pages - 1, g.current + (c == '<' ? -10 : 10))), 0, false);
+        break;
+    case 'W': command(CMD_FIT_WIDTH); break;
+    case 'Z': command(CMD_FIT_PAGE); break;
+    case 'H':
+        if (g.opened) { set_zoom(Z_FIT_HEIGHT, 0, top_anchor()); go_page(g.current, 0, false); }
+        break;
+    case '+': command(CMD_ZOOM_IN); break;
+    case '-': command(CMD_ZOOM_OUT); break;
+    case 'j': scroll_lines(LINE); break;
+    case 'k': scroll_lines(-LINE); break;
+    case 'h': scroll_to(g.sx - LINE, g.sy); break;
+    case 'l': scroll_to(g.sx + LINE, g.sy); break;
+    case 'g':
+        if (count > 0 && g.opened) go_page(std::min(count, g.pages) - 1);
+        else go_end(-1);
+        break;
+    case 'G': go_end(1); break;
+    case '/': command(CMD_FIND); break;
+    case 'n': command(CMD_FIND_NEXT); break;
+    case 'N': command(CMD_FIND_PREV); break;
+    case 'r': command(CMD_RELOAD); break;
+    case 'q': command(CMD_EXIT); break;
+    default: return false;
+    }
+    trace("key %c", (char)c);
+    return true;
+}
+
 LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
@@ -2544,22 +2610,27 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         switch (wp) {
         case VK_UP: scroll_lines(-LINE); break;
         case VK_DOWN: scroll_lines(LINE); break;
-        case VK_LEFT: if (hscroll) scroll_to(g.sx - LINE, g.sy); else next_page(-1); break;
-        case VK_RIGHT: if (hscroll) scroll_to(g.sx + LINE, g.sy); else next_page(1); break;
-        case VK_PRIOR: next_page(-1); break;
-        case VK_NEXT: next_page(1); break;
+        // a reflowable document's column is never wider than the view: Left and Right a screen, as Page Up and Down
+        case VK_LEFT: if (hscroll) scroll_to(g.sx - LINE, g.sy); else page_key(-1); break;
+        case VK_RIGHT: if (hscroll) scroll_to(g.sx + LINE, g.sy); else page_key(1); break;
+        case VK_PRIOR: page_key(-1); break;
+        case VK_NEXT: page_key(1); break;
         case VK_SPACE: scroll_screen(shift ? -1 : 1); break;
         case VK_BACK: scroll_screen(-1); break;
-        case VK_HOME: go_page(0); break;
-        case VK_END: go_page(g.pages - 1); break;
+        case VK_HOME: go_end(-1); break;
+        case VK_END: go_end(1); break;
         case VK_ESCAPE: if (g.fullscreen) set_fullscreen(false); break;
         default:
             (void)ctrl;
             return DefWindowProcW(hwnd, msg, wp, lp);
         }
+        g.count = 0;
         update_toolbar();
         return 0;
     }
+    case WM_CHAR:
+        if (char_key((WCHAR)wp)) { update_toolbar(); return 0; }
+        break;
     }
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
