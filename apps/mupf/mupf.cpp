@@ -78,6 +78,7 @@ struct App {
     bool in_layout = false;
     // chrome
     bool show_toolbar = true, show_status = true, fullscreen = false;
+    bool large_header = false;          // View > Large Header: the Explorer's size, else the Small one (sync_header)
     // the Contents pane: the document's outline in a tree
     HWND tree = nullptr;
     bool show_toc = false, splitting = false;
@@ -173,6 +174,7 @@ void save_state()
     put("view", "statusbar", g.show_status);
     put("view", "contents", g.show_toc);
     put("view", "contents_width", g.toc_w);
+    put("view", "large_header", g.large_header);
     put("view", "layout", g.mode);
     put("view", "cover", g.cover);
     put("view", "zoom_mode", g.zmode);
@@ -193,6 +195,7 @@ void load_state(int* x, int* y, int* w, int* h, bool* maxed)
     g.show_status = state_int(st, "view", "statusbar", 1) != 0;
     g.show_toc = state_int(st, "view", "contents", 0) != 0;
     g.toc_w = std::max(PANE_MIN, state_int(st, "view", "contents_width", PANE_DEFAULT));
+    g.large_header = state_int(st, "view", "large_header", 0) != 0;
     int m = state_int(st, "view", "layout", MODE_CONTINUOUS);
     g.mode = m >= MODE_SINGLE && m <= MODE_CONTINUOUS_FACING ? (Mode)m : MODE_CONTINUOUS;
     g.cover = state_int(st, "view", "cover", 0) != 0;
@@ -213,6 +216,7 @@ void set_status(int part, const std::string& text)
 }
 
 void update_header();
+void configure_header();
 void follow_toc();
 
 void update_page_box()
@@ -966,6 +970,8 @@ void update_menu()
     check(CMD_TOOLBAR, g.show_toolbar);
     check(CMD_STATUSBAR, g.show_status);
     check(CMD_CONTENTS, g.show_toc);
+    check(CMD_LARGE_HEADER, g.large_header);
+    enable(CMD_LARGE_HEADER, g.header != nullptr);   // (the XP themes have no header)
     CheckMenuRadioItem(m, CMD_SINGLE, CMD_CONT_FACING, CMD_SINGLE + g.mode, MF_BYCOMMAND);
     check(CMD_COVER, g.cover);
     enable(CMD_COVER, is_facing(g.mode));
@@ -1024,6 +1030,15 @@ void command(int id)
     case CMD_EXIT: PostMessageW(g.wnd, WM_CLOSE, 0, 0); break;
     case CMD_TOOLBAR: g.show_toolbar = !g.show_toolbar; layout_chrome(); break;
     case CMD_STATUSBAR: g.show_status = !g.show_status; layout_chrome(); break;
+    case CMD_LARGE_HEADER:
+        g.large_header = !g.large_header;
+        if (g.header) {
+            configure_header();
+            shell::lhheader::refit(g.wnd, layout_chrome);
+            RedrawWindow(g.wnd, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+        }
+        trace("large header %s", g.large_header ? "on" : "off");
+        break;
     case CMD_CONTENTS:
         g.show_toc = !g.show_toc;
         trace("contents %s", g.show_toc ? "shown" : "hidden");
@@ -1570,6 +1585,15 @@ void header_history(bool back, int x, int y)
 
 void layout_chrome();
 
+// The header's size: the Small one (4074's Toolbar Size > Small, the file dialog's: one row under the frame's caption,
+// which keeps the title) unless View > Large Header asks for the Explorer's (its header_size, else the theme's
+// Explorer.navbar_preset, else Medium); flxp.ini's mupf_header_size wins over both. Which mupf should have is not decided:
+// the toggle is there to compare them.
+void configure_header()
+{
+    shell::lhheader::configure("mupf_", g.large_header ? "" : "small");
+}
+
 // the header when the session theme wants the Longhorn chrome, none when not (at the start and on a theme switch)
 void sync_header()
 {
@@ -1577,7 +1601,7 @@ void sync_header()
     if (want == (g.header != nullptr)) return;
     if (want) {
         shell::lhheader::set_lhwm(shell::lhheader::lhwm_running());   // under another window manager: the Small size
-        shell::lhheader::configure("mupf_", "");                     // the Explorer's size unless mupf_header_size
+        configure_header();
         shell::lhheader::hide(shell::lhheader::SHOW_SEARCH);
         shell::lhheader::hide(shell::lhheader::SHOW_FAVORITES);
         shell::lhheader::Callbacks cb;
