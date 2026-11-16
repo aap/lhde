@@ -158,6 +158,8 @@ install-data:
 	chmod 644 $(DESTDIR)$(XSESSIONDIR)/lhde.desktop
 	install -m 644 share/themes/*.theme $(DESTDIR)$(DATADIR)/themes/
 	install -m 644 share/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
+	install -d $(DESTDIR)$(DATADIR)/firefox
+	install -m 644 share/firefox/userChrome.css.in $(DESTDIR)$(DATADIR)/firefox/
 	install -m 644 share/fonts/fontlink.ini $(DESTDIR)$(DATADIR)/fonts/
 	install -m 644 share/icons/*.theme share/icons/apps.ini $(DESTDIR)$(DATADIR)/icons/
 	install -d $(DESTDIR)$(DATADIR)/icons/flags
@@ -166,17 +168,17 @@ install-data:
 	for d in share/frames/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/frames/$$n; install -m 644 $$d*.ini $(DESTDIR)$(DATADIR)/frames/$$n/; done
 	for d in share/packs/*/; do n=$$(basename $$d); install -d $(DESTDIR)$(DATADIR)/packs/$$n; install -m 644 $$d*.lua $(DESTDIR)$(DATADIR)/packs/$$n/; done
 	install -m 755 session/lhde-session $(DESTDIR)$(BINDIR)/
-	install -m 755 tools/lhde-import tools/lhde-pack tools/lhde-schemes tools/lhde-mime $(DESTDIR)$(BINDIR)/
+	install -m 755 tools/lhde-import tools/lhde-pack tools/lhde-schemes tools/lhde-mime tools/lhde-firefox $(DESTDIR)$(BINDIR)/
 	cd session && install -m 644 $(SESSION_FILES) $(DESTDIR)$(PKGLIBDIR)/session/
 	chmod 755 $(addprefix $(DESTDIR)$(PKGLIBDIR)/session/,lab.sh theme-reload.sh theme-watch.sh capture.sh hovertest.sh)
 	ln -sf $(BINDIR)/lhde-session $(DESTDIR)$(PKGLIBDIR)/session/lhde-session
 	cd tools && install -m 644 $(TOOL_FILES) $(DESTDIR)$(PKGLIBDIR)/tools/
 uninstall-data:
 	rm -f $(DESTDIR)$(BINDIR)/lhde-session $(DESTDIR)$(BINDIR)/lhde-import $(DESTDIR)$(BINDIR)/lhde-pack $(DESTDIR)$(BINDIR)/lhde-schemes \
-	      $(DESTDIR)$(BINDIR)/lhde-mime $(DESTDIR)$(APPDIR)/lhde-mimeapps.list $(DESTDIR)$(XSESSIONDIR)/lhde.desktop \
+	      $(DESTDIR)$(BINDIR)/lhde-mime $(DESTDIR)$(BINDIR)/lhde-firefox $(DESTDIR)$(APPDIR)/lhde-mimeapps.list $(DESTDIR)$(XSESSIONDIR)/lhde.desktop \
 	      $(addprefix $(DESTDIR)$(THUMBNAILERDIR)/,$(notdir $(wildcard share/thumbnailers/lhde-*.thumbnailer)))
 	rm -rf $(DESTDIR)$(DATADIR)/frames $(DESTDIR)$(DATADIR)/packs $(DESTDIR)$(DATADIR)/themes $(DESTDIR)$(DATADIR)/navbar \
-	       $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources $(DESTDIR)$(DATADIR)/applications $(DESTDIR)$(DATADIR)/fonts \
+	       $(DESTDIR)$(DATADIR)/icons $(DESTDIR)$(DATADIR)/sources $(DESTDIR)$(DATADIR)/applications $(DESTDIR)$(DATADIR)/fonts $(DESTDIR)$(DATADIR)/firefox \
 	       $(DESTDIR)$(PKGLIBDIR)/session $(DESTDIR)$(PKGLIBDIR)/tools
 	-rmdir $(DESTDIR)$(PKGLIBDIR)
 

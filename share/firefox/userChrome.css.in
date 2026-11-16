@@ -1,0 +1,302 @@
+/* lhde's look for Firefox's own chrome (userChrome.css): the Longhorn Explorer header for the Longhorn themes, a plain XP
+   toolbar for the XP and classic ones. Template of tools/lhde-firefox, which writes the theme's values into the block of
+   custom properties below (from liblhde's resolver and the visual style through ut-dump) and keeps the sections for the
+   theme's family; docs/USAGE.md "Firefox". Firefox 160's element ids (browser.xhtml, browser/omni.ja).
+
+   Measured against flxp's header (flxp/shell/ui/lhheader.cpp, navbar.cpp: 4074's framelet geometry, 4051's navigation bar):
+   the band's height (the travel art's: 54 rows), its picture (the style's Navbar::Rebar BACKGROUND with its sizing margins),
+   the travel buttons (TravelBack/TravelFwd::AnimationButton, 38 + 27 x 54, 2 px from the left edge), where the address
+   starts (the breadcrumb's text x of the style's layout), the text colour (Navbar.TITLE), the face and size (the style's
+   breadcrumb face: Tahoma 11 px for Slate, Segoe UI 12 px for Jade and Aero), the search box (160 x 20, 8 px from the right
+   edge; vision: 180 x 21, 4 px). Firefox is not transparent on X11: where flxp's header is glass, the band is the style's
+   opaque navigation bar, as flxp draws it without composition.
+   Taste (Firefox's own parts, after Firefox 4's look): the address sits on the breadcrumb's row and shows as a field only
+   while hovered or focused, the reload button and the other toolbar buttons at the right of the band's lower row, the tabs
+   on a flat row below the band in its lower colour, the selected tab lighter and joined to the page, small close buttons. */
+
+/*@VARS@*/
+
+/* ---- both families ---------------------------------------------------------------------------------------------------- */
+#navigator-toolbox {
+  display: flex !important;
+  flex-direction: column !important;
+  font-family: var(--lhde-font) !important;
+  border-bottom: 0 !important;
+}
+#toolbar-menubar { order: 0; }
+#nav-bar { order: 1; }
+#TabsToolbar { order: 2; }
+#PersonalToolbar { order: 3; }
+
+/* things with no place in the period's header */
+#nav-bar toolbarspring,
+#nav-bar .titlebar-spacer,
+#TabsToolbar .titlebar-spacer,
+#sidebar-button,
+#firefox-view-button,
+#alltabs-button,
+#taskbar-tabs-favicon,
+#tracking-protection-icon-container,
+#urlbar .urlbar-go-button,
+#nav-bar-overflow-button:not([overflowedItem]) { display: none !important; }
+
+#nav-bar .toolbarbutton-1:not(#back-button, #forward-button) {
+  --toolbarbutton-inner-padding: 3px !important;
+  --toolbarbutton-outer-padding: 1px !important;
+  --toolbarbutton-border-radius: 2px !important;
+}
+
+/*@IF longhorn@*/
+/* ---- the Longhorn header band ----------------------------------------------------------------------------------------- */
+:root {
+  --toolbar-bgcolor: var(--lhde-band-low) !important;
+  --toolbar-color: var(--lhde-text) !important;
+  --toolbox-bgcolor: var(--lhde-band-low) !important;
+  --toolbox-bgcolor-inactive: var(--lhde-band-low) !important;
+  --toolbox-textcolor: var(--lhde-tab-text) !important;
+  --tabs-navbar-separator-style: none !important;
+  --toolbarbutton-icon-fill: var(--lhde-text) !important;
+  --urlbar-height: var(--lhde-field-h) !important;
+  --urlbar-container-height: var(--lhde-field-h) !important;
+  --toolbar-field-background-color: transparent !important;
+  --toolbar-field-color: var(--lhde-text) !important;
+  --toolbar-field-border-color: transparent !important;
+  --toolbar-field-focus-background-color: #ffffff !important;
+  --toolbar-field-focus-color: #000000 !important;
+  --toolbar-field-focus-border-color: var(--lhde-field-border) !important;
+  --urlbar-border-radius: 0px !important;
+  --urlbarview-border-radius: 0px !important;
+  --tab-border-radius: 0px !important;
+  --tab-min-height: var(--lhde-tab-h) !important;
+  --tab-block-margin: 0px !important;
+  --tab-margin-block: 0px !important;
+  --tab-shadow-max-size: 0px !important;
+  --tab-selected-shadow: none !important;
+  --tab-box-shadow-selected: none !important;
+  --tab-background-color: transparent !important;
+  --tab-background-color-hover: var(--lhde-tab-hover) !important;
+  --tab-background-color-selected: var(--lhde-tab-selected) !important;
+  --tab-selected-bgcolor: var(--lhde-tab-selected) !important;
+  --tab-border: none !important;
+  --tab-border-color: transparent !important;
+  --tab-border-color-selected: transparent !important;
+  --tab-text-color: var(--lhde-tab-text) !important;
+  --tab-text-color-hover: var(--lhde-tab-text) !important;
+  --tab-text-color-selected: var(--lhde-tab-selected-text) !important;
+}
+
+#nav-bar {
+  box-sizing: border-box !important;
+  height: var(--lhde-band-h) !important;
+  min-height: var(--lhde-band-h) !important;
+  max-height: var(--lhde-band-h) !important;
+  padding: 0 var(--lhde-search-right) 0 var(--lhde-nav-x) !important;
+  background-color: var(--lhde-band-color) !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-image-source: var(--lhde-band-image) !important;
+  border-image-slice: var(--lhde-band-slice) fill !important;
+  border-image-width: var(--lhde-band-border) !important;
+  border-image-repeat: stretch !important;
+  box-shadow: none !important;
+  color: var(--lhde-text) !important;
+  align-items: stretch !important;
+}
+:root:-moz-window-inactive #nav-bar {
+  border-image-source: var(--lhde-band-image-inactive) !important;
+  background-color: var(--lhde-band-color-inactive) !important;
+  color: var(--lhde-text-inactive) !important;
+}
+/* the travel buttons fill the band's height, the rest sits on the breadcrumb's row */
+#nav-bar-customization-target {
+  align-items: flex-end !important;
+  height: var(--lhde-band-h) !important;
+}
+#nav-bar-customization-target > * { margin-bottom: var(--lhde-row-bottom) !important; }
+
+/* the travel buttons: the style's TravelBack and TravelFwd art, the forward plate continuing the back plate */
+#back-button, #forward-button {
+  margin: 0 !important;
+  padding: 0 !important;
+  align-self: stretch !important;
+  height: var(--lhde-travel-h) !important;
+  margin-bottom: 0 !important;
+  background: var(--lhde-back-normal) no-repeat left top / 100% 100% !important;
+  width: var(--lhde-back-w) !important;
+  min-width: var(--lhde-back-w) !important;
+  border-radius: 0 !important;
+  list-style-image: var(--lhde-back-glyph) !important;
+  -moz-context-properties: fill !important;
+  fill: var(--lhde-text) !important;
+}
+#forward-button {
+  background-image: var(--lhde-fwd-normal) !important;
+  width: var(--lhde-fwd-w) !important;
+  min-width: var(--lhde-fwd-w) !important;
+  list-style-image: var(--lhde-fwd-glyph) !important;
+}
+#back-button > .toolbarbutton-icon, #forward-button > .toolbarbutton-icon {
+  background: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  width: var(--lhde-glyph-size) !important;
+  height: var(--lhde-glyph-size) !important;
+}
+#back-button[disabled] > .toolbarbutton-icon, #forward-button[disabled] > .toolbarbutton-icon { opacity: 1 !important; }
+#back-button:not([disabled]):hover { background-image: var(--lhde-back-hot) !important; }
+#back-button:not([disabled]):is(:hover:active, [open]) { background-image: var(--lhde-back-pressed) !important; }
+#back-button[disabled] { background-image: var(--lhde-back-disabled) !important; }
+#forward-button:not([disabled]):hover { background-image: var(--lhde-fwd-hot) !important; }
+#forward-button:not([disabled]):is(:hover:active, [open]) { background-image: var(--lhde-fwd-pressed) !important; }
+#forward-button[disabled] { background-image: var(--lhde-fwd-disabled) !important; }
+
+/* the address on the breadcrumb's row, from the crumbs' x; a field only while hovered or focused (flxp's address edit) */
+#stop-reload-button { order: 2; }
+#urlbar-container {
+  order: 1;
+  flex: 1 1 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  margin-inline: var(--lhde-crumb-gap) 6px !important;
+  padding: 0 !important;
+  height: var(--lhde-field-h) !important;
+  min-height: var(--lhde-field-h) !important;
+  --urlbar-container-padding-block: 0px !important;
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+}
+#urlbar {
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+  text-shadow: var(--lhde-text-shadow) !important;
+}
+#urlbar:not([focused], [open]):hover > .urlbar-background {
+  background-color: var(--lhde-field-hover) !important;
+  border: 1px solid var(--lhde-field-border) !important;
+}
+#urlbar:is([focused], [open]) { text-shadow: none !important; }
+#urlbar-input, #urlbar .urlbar-input { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
+#identity-box, #page-action-buttons, #star-button-box { opacity: 0.85; }
+
+/* the search box at the right, as flxp's */
+#search-container {
+  order: 3;
+  --toolbar-field-color: #000000 !important;
+  --toolbar-field-background-color: var(--lhde-search-bg) !important;
+  --toolbarbutton-icon-fill: #000000 !important;
+  color: #000000 !important;
+  text-shadow: none !important;
+  min-width: var(--lhde-search-w) !important;
+  max-width: var(--lhde-search-w) !important;
+  width: var(--lhde-search-w) !important;
+  margin-inline: 8px 0 !important;
+  height: var(--lhde-search-h) !important;
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+}
+#search-container .urlbar-background, #searchbar, #searchbar-new .urlbar-background {
+  background-color: var(--lhde-search-bg) !important;
+  border: 1px solid var(--lhde-field-border) !important;
+  border-radius: 0 !important;
+}
+#search-container .urlbar, #searchbar-new { --urlbar-height: var(--lhde-search-h) !important; min-height: var(--lhde-search-h) !important; }
+#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button,
+  #PanelUI-button, #library-button, #home-button, #stop-reload-button) { order: 4; }
+#PanelUI-button { margin-bottom: var(--lhde-row-bottom) !important; align-self: flex-end !important; }
+#PanelUI-menu-button, #unified-extensions-button, #fxa-toolbar-menu-button, #downloads-button { opacity: 0.9; }
+
+/* the tabs: a flat row below the band in its lower colour, the selected tab lighter and joined to the page */
+#TabsToolbar {
+  background: var(--lhde-band-low) !important;
+  border-top: 1px solid var(--lhde-band-line) !important;
+  border-bottom: 1px solid var(--lhde-tab-line) !important;
+  color: var(--lhde-tab-text) !important;
+  min-height: 0 !important;
+}
+#TabsToolbar .toolbar-items, #tabbrowser-tabs, #tabbrowser-arrowscrollbox { min-height: var(--lhde-tab-h) !important; }
+#tabbrowser-tabs { --tab-min-height: var(--lhde-tab-h) !important; padding-inline: 0 !important; border: 0 !important; }
+.tabbrowser-tab {
+  padding: 0 !important;
+  min-height: var(--lhde-tab-h) !important;
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+}
+.tabbrowser-tab + .tabbrowser-tab:not([visuallyselected]) .tab-background,
+.tabbrowser-tab:not([visuallyselected]) + .tabbrowser-tab .tab-background { border-left: 1px solid var(--lhde-tab-sep) !important; }
+.tab-background {
+  margin: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  min-height: var(--lhde-tab-h) !important;
+}
+.tab-background:is([selected], [multiselected]) {
+  background: var(--lhde-tab-selected) !important;
+  border-left: 1px solid var(--lhde-tab-line) !important;
+  border-right: 1px solid var(--lhde-tab-line) !important;
+}
+.tabbrowser-tab { color: var(--lhde-tab-text) !important; }
+.tabbrowser-tab[visuallyselected] { color: var(--lhde-tab-selected-text) !important; }
+.tab-content { padding-inline: 6px 2px !important; }
+.tab-label { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
+.tab-close-button {
+  width: 16px !important;
+  height: 16px !important;
+  padding: 3px !important;
+  margin-inline-end: 0 !important;
+}
+#tabs-newtab-button, #new-tab-button { --toolbarbutton-inner-padding: 3px !important; }
+#tabbrowser-tabs .tabbrowser-tab:not([visuallyselected]) .tab-label { opacity: 0.95; }
+/*@END@*/
+
+/*@IF xp@*/
+/* ---- the XP toolbar (Internet Explorer 6's): the band in the style's Rebar colour, Tahoma 8 pt, flat tabs ------------- */
+:root {
+  --toolbar-bgcolor: var(--lhde-xp-face) !important;
+  --toolbar-color: var(--lhde-xp-text) !important;
+  --toolbox-bgcolor: var(--lhde-xp-face) !important;
+  --toolbox-bgcolor-inactive: var(--lhde-xp-face) !important;
+  --toolbox-textcolor: var(--lhde-xp-text) !important;
+  --toolbarbutton-icon-fill: var(--lhde-xp-text) !important;
+  --toolbar-field-background-color: #ffffff !important;
+  --toolbar-field-color: #000000 !important;
+  --toolbar-field-border-color: var(--lhde-xp-field-border) !important;
+  --toolbar-field-focus-background-color: #ffffff !important;
+  --toolbar-field-focus-color: #000000 !important;
+  --toolbar-field-focus-border-color: var(--lhde-xp-field-border) !important;
+  --urlbar-height: 22px !important;
+  --urlbar-border-radius: 0px !important;
+  --urlbarview-border-radius: 0px !important;
+  --tab-border-radius: 0px !important;
+  --tab-min-height: 22px !important;
+  --tab-margin-block: 0px !important;
+  --tab-box-shadow-selected: none !important;
+  --tab-background-color-selected: var(--lhde-xp-tab-selected) !important;
+  --tab-background-color-hover: var(--lhde-xp-tab-hover) !important;
+  --tabs-navbar-separator-style: none !important;
+}
+#nav-bar, #TabsToolbar, #PersonalToolbar {
+  background: var(--lhde-xp-bg) !important;
+  color: var(--lhde-xp-text) !important;
+  border-bottom: 1px solid var(--lhde-xp-shadow) !important;
+  border-top: 1px solid var(--lhde-xp-light) !important;
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+}
+#urlbar-container { order: 1; }
+#stop-reload-button { order: 2; }
+#search-container { order: 3; }
+#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button, #library-button) { order: 4; }
+#urlbar, #urlbar-input, #searchbar, .tab-label { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
+#urlbar .urlbar-background { border-radius: 0 !important; }
+.tab-background {
+  margin: 2px 0 0 !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border: 1px solid var(--lhde-xp-shadow) !important;
+  border-bottom: 0 !important;
+}
+.tab-background:is([selected], [multiselected]) { margin-top: 0 !important; }
+.tab-close-button { width: 16px !important; height: 16px !important; padding: 3px !important; }
+/*@END@*/

@@ -1,0 +1,645 @@
+#!/usr/bin/env python3
+"""lhde-firefox: Firefox's own chrome in the lhde theme's look, through userChrome.css (docs/USAGE.md "Firefox").
+
+usage:
+  lhde-firefox generate [THEME] [-o FILE]   a userChrome.css for THEME (default: the current theme) on stdout or into FILE;
+                                            with -o the pieces of the visual style Firefox cannot read from a .msstyles
+                                            (the header band, the travel buttons) are rendered by ut-dump into
+                                            lhde-art/ beside FILE, the rest is referenced in the Windows tree by file:// URL
+  lhde-firefox install [THEME] [--profile DIR]
+                                            write it into the profile's chrome/userChrome.css (an existing one not ours is
+                                            kept as userChrome.css.lhde-backup), the prefs the look needs into user.js, and
+                                            once the search box into the toolbar layout (prefs.js); the profile must be
+                                            closed. DIR: a profile directory or a profile's name in profiles.ini; default:
+                                            the default profile
+  lhde-firefox remove [--profile DIR]       undo install: our userChrome.css and lhde-art/ out (the backup back), our block
+                                            out of user.js
+  lhde-firefox profiles                     the profiles profiles.ini lists, which is the default, which are in use
+
+The look: for a Longhorn theme (Explorer.chrome = longhorn) the Explorer header band of flxp (travel buttons, the address on
+the breadcrumb's row, the search box at the right) with the tabs below it; for the others a plain XP toolbar in the
+theme's colours. Colours, fonts and pictures come from liblhde's resolver (lhde-theme resolve --shell) and from the visual
+style through ut-dump; without the Windows tree (or with only the free ReactOS import) the CSS uses colours alone.
+Nothing of the Windows tree is copied: fonts and frame pictures are file:// URLs into it; only the parts that live inside a
+.msstyles are rendered into the profile.
+
+A theme switch could run `lhde-firefox install` again for a closed profile (or generate into it: Firefox reads
+userChrome.css at start only); that hook belongs beside session/theme-reload.sh and is not built.
+"""
+import os
+import re
+import shlex
+import shutil
+import struct
+import subprocess
+import sys
+import zlib
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+MARK = 'lhde-firefox'
+BEGIN = '// ---- lhde-firefox begin (lhde-firefox remove takes this block out) ----'
+END = '// ---- lhde-firefox end ----'
+
+
+def tool(name):
+    """lhde's programs: the build tree's build/bin, beside an installed tools/ (<prefix>/bin), PATH"""
+    for d in (os.path.join(HERE, '..', 'build', 'bin'), os.path.join(HERE, '..', '..', '..', 'bin'), HERE):
+        p = os.path.join(d, name)
+        if os.access(p, os.X_OK) and os.path.isfile(p):
+            return os.path.realpath(p)
+    return shutil.which(name)
+
+
+def run(args):
+    try:
+        r = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=60)
+    except OSError:
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+# ---- the theme --------------------------------------------------------------------------------------------------------
+
+def lhde_theme(*args):
+    lt = tool('lhde-theme')
+    if not lt:
+        sys.exit('lhde-firefox: needs lhde-theme (make, or an installed lhde)')
+    return run([lt] + list(args))
+
+
+def resolve(theme):
+    out = lhde_theme('resolve', theme, '--shell')
+    if out is None:
+        sys.exit('lhde-firefox: no theme %s (lhde-theme list)' % theme)
+    r = {}
+    for line in out.splitlines():
+        if '=' in line and line.startswith('lhde_'):
+            k, v = line.split('=', 1)
+            try:
+                r[k[5:]] = shlex.split(v)[0] if v else ''
+            except (ValueError, IndexError):
+                r[k[5:]] = ''
+    return r
+
+
+def current_theme():
+    out = lhde_theme('current')
+    return (out or '').strip().splitlines()[0] if out and out.strip() else 'classic'
+
+
+def template():
+    for p in ((lhde_theme('find', 'firefox/userChrome.css.in') or '').strip(),
+              os.path.join(HERE, '..', 'share', 'firefox', 'userChrome.css.in')):
+        if p and os.path.isfile(p):
+            with open(p) as f:
+                return f.read()
+    sys.exit('lhde-firefox: firefox/userChrome.css.in not found in lhde\'s data directories')
+
+
+# ---- the visual style through ut-dump ---------------------------------------------------------------------------------
+
+class Style:
+    def __init__(self, path, color='', size=''):
+        self.path = path if path and os.path.isfile(path) else ''
+        self.ut = tool('ut-dump') if self.path else None
+        self.opts = (['--color', color] if color else []) + (['--size', size] if size else [])
+        self._list = None
+
+    def ok(self):
+        return bool(self.path and self.ut)
+
+    def call(self, *args):
+        return run([self.ut, self.path] + self.opts + list(args)) if self.ok() else None
+
+    def listing(self):
+        if self._list is None:
+            self._list = self.call('--list') or ''
+        return self._list
+
+    def has(self, cls):
+        return ('[%s.' % cls) in self.listing() or ('[%s]' % cls) in self.listing()
+
+    def section(self, name):
+        """key = value lines of a [name] section of --list"""
+        out, on = {}, False
+        for line in self.listing().splitlines():
+            if line.startswith('['):
+                on = line.strip().lower() == '[%s]' % name.lower()
+            elif on and '=' in line:
+                k, v = line.split('=', 1)
+                out[k.strip().upper()] = v.strip()
+        return out
+
+    def get(self, cls, part, prop):
+        out = self.call('--get', cls, part, '0', prop)
+        return out.splitlines()[0].strip() if out else None
+
+    def colour(self, cls, part, prop='TEXTCOLOR'):
+        v = self.get(cls, part, prop)
+        m = re.match(r'(\d+),\s*(\d+),\s*(\d+)', v or '')
+        return tuple(int(x) for x in m.groups()) if m else None
+
+    def size_of(self, cls, part, state='NORMAL'):
+        out = self.call('--size-of', cls, part, state, 'true')
+        m = re.match(r'(\d+)x(\d+)', (out or '').strip())
+        return (int(m.group(1)), int(m.group(2))) if m else None
+
+    def render(self, cls, part, state, w, h, dest):
+        return self.call('--render', cls, part, state, '%dx%d' % (w, h), dest) is not None and os.path.isfile(dest)
+
+
+# ---- pixels: a PNG reader for sampling colours (8-bit RGB/RGBA, as ut-dump and lhde-import write them) -----------------
+
+def read_png(path):
+    with open(path, 'rb') as f:
+        data = f.read()
+    if data[:8] != b'\x89PNG\r\n\x1a\n':
+        return None
+    pos, idat, w = 8, b'', 0
+    while pos < len(data):
+        n, typ = struct.unpack('>I4s', data[pos:pos + 8])
+        body = data[pos + 8:pos + 8 + n]
+        if typ == b'IHDR':
+            w, h, depth, ctype, _, _, inter = struct.unpack('>IIBBBBB', body)
+            if depth != 8 or ctype not in (2, 6) or inter:
+                return None
+        elif typ == b'IDAT':
+            idat += body
+        pos += 12 + n
+    bpp = 4 if ctype == 6 else 3
+    raw, stride = zlib.decompress(idat), w * bpp
+    rows, prev = [], bytearray(stride)
+    for y in range(h):
+        ft = raw[y * (stride + 1)]
+        cur = bytearray(raw[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+        for i in range(stride):
+            a = cur[i - bpp] if i >= bpp else 0
+            b = prev[i]
+            c = prev[i - bpp] if i >= bpp else 0
+            if ft == 1:
+                cur[i] = (cur[i] + a) & 255
+            elif ft == 2:
+                cur[i] = (cur[i] + b) & 255
+            elif ft == 3:
+                cur[i] = (cur[i] + (a + b) // 2) & 255
+            elif ft == 4:
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                cur[i] = (cur[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        rows.append([tuple(cur[x * bpp:x * bpp + 3]) + ((cur[x * bpp + 3],) if bpp == 4 else (255,)) for x in range(w)])
+        prev = cur
+    return rows
+
+
+def average(rows, y0, y1, x0=0, x1=None):
+    t, n = [0, 0, 0], 0
+    for row in rows[y0:y1]:
+        for p in row[x0:x1]:
+            if p[3] > 128:
+                for i in range(3):
+                    t[i] += p[i]
+                n += 1
+    return tuple(v // n for v in t) if n else None
+
+
+def mix(a, b, k):
+    return tuple(int(round(a[i] + (b[i] - a[i]) * k)) for i in range(3))
+
+
+def lum(c):
+    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+
+
+def css(c):
+    return '#%02x%02x%02x' % c if c else 'transparent'
+
+
+def rgb(v):
+    m = re.match(r'\s*(\d+)\D+(\d+)\D+(\d+)', v or '')
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
+def url(path):
+    return 'url("file://%s")' % path
+
+
+# ---- fonts: the theme's font directory (the Windows tree), else fontconfig -------------------------------------------
+
+FONT_FILES = {'Tahoma': (['tahoma.ttf'], ['tahomabd.ttf']),
+              'Segoe UI': (['segoeui.ttf', 'seguibk.ttf'], ['segoeuib.ttf', 'seguibd.ttf']),
+              'Trebuchet MS': (['trebuc.ttf'], ['trebucbd.ttf'])}
+
+
+def font_faces(face, fontdir):
+    """@font-face rules for face from the theme's font directory, and the family list"""
+    rules = []
+    files = FONT_FILES.get(face)
+    if files and fontdir and os.path.isdir(fontdir):
+        have = {f.lower(): os.path.join(fontdir, f) for f in os.listdir(fontdir)}
+        for weight, names in (('normal', files[0]), ('bold', files[1])):
+            for n in names:
+                if n in have:
+                    rules.append('@font-face { font-family: "lhde %s"; font-weight: %s; src: %s; }'
+                                 % (face, weight, url(os.path.realpath(have[n]))))
+                    break
+    family = (['"lhde %s"' % face] if rules else []) + ['"%s"' % face, 'Tahoma', '"DejaVu Sans"', 'sans-serif']
+    return rules, ', '.join(family)
+
+
+# ---- the values --------------------------------------------------------------------------------------------------------
+
+# flxp's header geometry (flxp/shell/ui/lhheader.cpp, navbar.cpp's layouts): measured against the builds there
+NAV_X = 2                                     # the travel buttons' x
+LAYOUT = {   # crumb text x, crumb px, field height, field bottom gap, search w, h, right margin
+    'slate': dict(crumb_x=83, crumb_px=11, face='Tahoma', field_h=20, row_bottom=10, search_w=160, search_h=20, right=8),
+    'jade': dict(crumb_x=89, crumb_px=12, face='Segoe UI', field_h=20, row_bottom=5, search_w=160, search_h=20, right=8),
+    'vision': dict(crumb_x=83, crumb_px=12, face='Segoe UI', field_h=21, row_bottom=7, search_w=180, search_h=21, right=4,
+                   band_h=43),
+}
+# vision's band_h: flxp's vision header is 70 frame rows (aerovision, lab); luxwm gives Firefox its 27-row glass caption
+SEG_PAD = 6                                    # a breadcrumb segment's text inset: the field starts this much left of it
+
+
+def longhorn_vars(t, style, art):
+    """the custom properties of the Longhorn band; art: a directory for rendered pieces (None: colours only)"""
+    fam = t.get('style_family', '') or next((f for f in ('slate', 'jade', 'aero') if f in t.get('VisualStyle_style', '') + t.get('theme', '')), '')
+    nav = t.get('Explorer_navbar', '')
+    lay = dict(LAYOUT['vision' if nav == 'vision' else 'slate' if fam == 'slate' else 'jade'])
+    v = {}
+    # the band: Navbar::Rebar BACKGROUND (InactiveNavbar for an inactive window) with its sizing margins
+    band, band_in, rows = None, None, None
+    if style.ok() and style.has('Navbar::Rebar'):
+        size = style.size_of('Navbar::Rebar', 'BACKGROUND')
+        m = re.findall(r'-?\d+', style.get('Navbar::Rebar', 'BACKGROUND', 'SIZINGMARGINS') or '')
+        if size and len(m) == 4:
+            l, r, top, b = (int(x) for x in m)
+            tmp = art or os.path.join(os.environ.get('TMPDIR', '/tmp'), 'lhde-firefox-%d' % os.getpid())
+            os.makedirs(tmp, exist_ok=True)
+            p = os.path.join(tmp, 'band.png')
+            if style.render('Navbar::Rebar', 'BACKGROUND', 'NORMAL', size[0], size[1], p):
+                rows = read_png(p)
+                if art:
+                    band = p
+                    v['band-slice'] = '%d %d %d %d' % (top, r, b, l)
+                    v['band-border'] = '%dpx %dpx %dpx %dpx' % (top, r, b, l)
+                    pi = os.path.join(art, 'band-inactive.png')
+                    if style.has('InactiveNavbar::Rebar') and \
+                            style.render('InactiveNavbar::Rebar', 'BACKGROUND', 'NORMAL', size[0], size[1], pi):
+                        band_in = pi
+            if not art:
+                shutil.rmtree(tmp, ignore_errors=True)
+    title = style.colour('Navbar', 'TITLE') if style.ok() else None
+    title_in = style.colour('InactiveNavTitle::Navbar', 'TITLE') if style.ok() and style.has('InactiveNavTitle::Navbar') else None
+    if rows:
+        h = len(rows)
+        body = average(rows, 0, h)
+        low = average(rows, max(0, h - 4), h - 1) or body
+        line = average(rows, h - 1, h) or low
+    else:
+        # no style art (the free tree): the family's colours, measured on flxp's drawn Slate header (lhheader.cpp
+        # paint_slate) and on Jade's band
+        body = (150, 150, 150) if fam == 'slate' else (216, 225, 245)
+        low, line = (body, (33, 36, 36)) if fam == 'slate' else ((206, 216, 238), (120, 130, 160))
+    if not title:
+        title = (255, 255, 255) if fam == 'slate' or lum(body) < 150 else (0, 2, 92)
+    selected = mix(low, (255, 255, 255), 0.8)                      # taste: the selected tab lighter, near the page's white
+    v.update({
+        'band-h': '54px', 'nav-x': '%dpx' % NAV_X, 'travel-h': '54px',
+        'band-image': url(band) if band else 'none',
+        'band-image-inactive': url(band_in or band) if band else 'none',
+        'band-color': css(body), 'band-color-inactive': css(mix(body, (255, 255, 255), 0.2)),
+        'band-low': css(low), 'band-line': css(line),
+        'text': css(title), 'text-inactive': css(title_in or mix(title, body, 0.3)),
+        'text-shadow': '0 1px 1px rgba(0, 0, 0, 0.55)' if lum(title) > 160 else 'none',
+        'field-h': '%dpx' % lay['field_h'], 'row-bottom': '%dpx' % lay['row_bottom'],
+        'field-hover': 'rgba(255, 255, 255, 0.3)' if lum(title) > 160 else 'rgba(255, 255, 255, 0.55)',
+        'field-border': css(mix(line, body, 0.35)),
+        'search-w': '%dpx' % lay['search_w'], 'search-h': '%dpx' % lay['search_h'],
+        'search-right': '%dpx' % lay['right'], 'search-bg': '#ffffff',
+        'tab-h': '24px', 'tab-hover': css(mix(low, (255, 255, 255), 0.25)), 'tab-selected': css(selected),
+        'tab-text': '#ffffff' if lum(low) < 140 else '#000000', 'tab-selected-text': '#000000',
+        'tab-line': css(mix(line, low, 0.3)), 'tab-sep': css(mix(low, line, 0.35)),
+    })
+    v.setdefault('band-slice', '0 0 0 0')
+    v.setdefault('band-border', '0px')
+    # the travel buttons: TravelBack / TravelFwd::AnimationButton, states DISABLED NORMAL HOT PRESSED
+    back_w = fwd_w = 0
+    if art and style.ok() and style.has('TravelBack::AnimationButton') and style.has('TravelFwd::AnimationButton'):
+        bs = style.size_of('TravelBack::AnimationButton', 'ABBACKGROUND')
+        fs = style.size_of('TravelFwd::AnimationButton', 'ABBACKGROUND')
+        if bs and fs:
+            done = True
+            for name, cls, s in (('back', 'TravelBack', bs), ('fwd', 'TravelFwd', fs)):
+                for state in ('NORMAL', 'HOT', 'PRESSED', 'DISABLED'):
+                    p = os.path.join(art, '%s-%s.png' % (name, state.lower()))
+                    if style.render(cls + '::AnimationButton', 'ABBACKGROUND', state, s[0], s[1], p):
+                        v['%s-%s' % (name, state.lower())] = url(p)
+                    else:
+                        done = False
+            if done:
+                back_w, fwd_w = bs[0], fs[0]
+                v['travel-h'] = '%dpx' % bs[1]
+                v['band-h'] = '%dpx' % (bs[1] if bs[1] >= 52 else bs[1] + 4)   # navbar.cpp: the Medium band
+                if lay.get('band_h'):
+                    # the vision header: luxwm's frame deco is 15 rows over flxp's header, and Firefox has the whole
+                    # caption above its band; the band keeps flxp's header height, the art scaled down into it
+                    k = lay['band_h'] / bs[1]
+                    back_w, fwd_w = round(bs[0] * k), round(fs[0] * k)
+                    v['travel-h'] = v['band-h'] = '%dpx' % lay['band_h']
+    if back_w:
+        v.update({'back-w': '%dpx' % back_w, 'fwd-w': '%dpx' % fwd_w, 'glyph-size': '0px',
+                  'back-glyph': 'none', 'fwd-glyph': 'none'})
+    else:
+        # colours alone: Firefox's own arrows on the band, the buttons as wide as the art would be
+        back_w, fwd_w = 38, 27
+        for name in ('back', 'fwd'):
+            for state in ('normal', 'hot', 'pressed', 'disabled'):
+                v['%s-%s' % (name, state)] = 'none'
+        v.update({'back-w': '38px', 'fwd-w': '27px', 'glyph-size': '16px',
+                  'back-glyph': 'url("chrome://browser/skin/back.svg")', 'fwd-glyph': 'url("chrome://browser/skin/forward.svg")'})
+    v['crumb-gap'] = '%dpx' % max(0, lay['crumb_x'] - SEG_PAD - NAV_X - back_w - fwd_w)
+    return v, lay
+
+
+def xp_vars(t, style):
+    """the plain XP toolbar: the style's [sysmetrics] (Luna), else the theme's classic colours"""
+    sm = style.section('sysmetrics') if style.ok() else {}
+
+    def c(key, dflt):
+        return rgb(sm.get(key.upper())) or rgb(t.get('Colors_' + key.lower())) or dflt
+    face = c('btnface', (212, 208, 200))
+    light = c('light3d', mix(face, (255, 255, 255), 0.5))
+    shadow = c('btnshadow', (128, 128, 128))
+    text = c('btntext', (0, 0, 0))
+    font = (sm.get('MENUFONT') or t.get('Metrics_menufont') or 'Tahoma').split(',')[0].strip()
+    themed = bool(sm)
+    return {
+        # taste: under a visual style a light gradient from LIGHT3D to BTNFACE (Internet Explorer 6's toolbars under Luna
+        # are a plain BTNFACE band with light edges), the classic look flat BTNFACE
+        'xp-bg': 'linear-gradient(%s, %s)' % (css(light), css(face)) if themed else css(face),
+        'xp-face': css(face), 'xp-text': css(text), 'xp-light': css(c('btnhighlight', (255, 255, 255))),
+        'xp-shadow': css(shadow), 'xp-field-border': css(rgb(sm.get('EDGESHADOWCOLOR')) or (127, 157, 185) if themed else shadow),
+        'xp-tab-selected': css(mix(face, (255, 255, 255), 0.6)), 'xp-tab-hover': css(mix(face, (255, 255, 255), 0.3)),
+    }, font
+
+
+def generate(theme, out=None):
+    t = resolve(theme)
+    style = Style(t.get('path_style', ''), t.get('VisualStyle_color', ''), t.get('VisualStyle_size', ''))
+    longhorn = t.get('Explorer_chrome') == 'longhorn' and t.get('Explorer_navbar', 'none') != 'none'
+    art = None
+    if out:
+        art = os.path.join(os.path.dirname(os.path.abspath(out)), 'lhde-art')
+        shutil.rmtree(art, ignore_errors=True)
+        os.makedirs(art)
+    if longhorn:
+        v, lay = longhorn_vars(t, style, art)
+        face, px = lay['face'], lay['crumb_px']
+        if style.ok():
+            f = style.get('Navbar', 'TITLE', 'FONT') or ''
+            if f.startswith('Tahoma'):
+                face = 'Tahoma'
+    else:
+        v, face = xp_vars(t, style)
+        px = 11                                            # Tahoma 8 pt at 96 dpi
+    rules, family = font_faces(face, t.get('path_fonts', ''))
+    v['font'] = family
+    v['font-size'] = '%dpx' % px
+    if art and not os.listdir(art):
+        os.rmdir(art)
+    first = ('/* generated by lhde-firefox for the theme %s (%s, %s); do not edit: lhde-firefox generate writes it again */\n'
+             % (theme, t.get('Theme_name', theme), 'Longhorn header' if longhorn else 'XP toolbar'))
+    head = rules + [':root {\n' + ''.join('  --lhde-%s: %s;\n' % kv for kv in sorted(v.items())) + '}']
+    text = first + template().replace('/*@VARS@*/', '\n'.join(head))
+    keep = 'longhorn' if longhorn else 'xp'
+    text = re.sub(r'/\*@IF (\w+)@\*/\n(.*?)/\*@END@\*/\n',
+                  lambda m: m.group(2) if m.group(1) == keep else '', text, flags=re.S)
+    if out:
+        with open(out, 'w') as f:
+            f.write(text)
+    else:
+        sys.stdout.write(text)
+    return text
+
+
+# ---- profiles ----------------------------------------------------------------------------------------------------------
+
+def firefox_dirs():
+    xdg = os.environ.get('XDG_CONFIG_HOME') or os.path.expanduser('~/.config')
+    return [d for d in (os.path.join(xdg, 'mozilla', 'firefox'), os.path.expanduser('~/.mozilla/firefox'))
+            if os.path.isfile(os.path.join(d, 'profiles.ini'))]
+
+
+def read_ini(path):
+    secs, cur = {}, None
+    with open(path, errors='replace') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith('[') and line.endswith(']'):
+                cur = secs.setdefault(line[1:-1], {})
+            elif cur is not None and '=' in line:
+                k, v = line.split('=', 1)
+                cur[k.strip()] = v.strip()
+    return secs
+
+
+def profiles():
+    """[(name, path, is_default)] of every profiles.ini; the Install section's Default first, then Default=1"""
+    out = []
+    for base in firefox_dirs():
+        ini = read_ini(os.path.join(base, 'profiles.ini'))
+        installs = {s.get('Default') for n, s in ini.items() if n.startswith('Install')}
+        for n, s in ini.items():
+            if n.startswith('Profile') and 'Path' in s:
+                p = s['Path'] if s.get('IsRelative', '1') == '0' else os.path.join(base, s['Path'])
+                rank = 2 if s['Path'] in installs else 1 if s.get('Default') == '1' else 0
+                out.append((s.get('Name', s['Path']), os.path.normpath(p), rank))
+    best = max((r for _, _, r in out), default=0)
+    return [(n, p, best > 0 and r == best) for n, p, r in out]
+
+
+def in_use(prof):
+    """Firefox holds the profile: .parentlock is locked (fcntl), or the lock symlink (ADDRESS:+PID) names a live
+    process; a stale lock of a Firefox that crashed is not use"""
+    pl = os.path.join(prof, '.parentlock')
+    if os.path.exists(pl):
+        import fcntl
+        try:
+            with open(pl, 'r+') as f:
+                fcntl.lockf(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.lockf(f, fcntl.LOCK_UN)
+        except OSError:
+            return True
+    lock = os.path.join(prof, 'lock')
+    if os.path.islink(lock):
+        m = re.search(r':\+?(\d+)$', os.readlink(lock))
+        if m:
+            try:
+                os.kill(int(m.group(1)), 0)
+                return True
+            except ProcessLookupError:
+                pass
+            except PermissionError:
+                return True
+    return False
+
+
+def pick_profile(arg):
+    if arg:
+        if os.path.isdir(arg):
+            return os.path.abspath(arg)
+        for n, p, _ in profiles():
+            if n == arg:
+                return p
+        sys.exit('lhde-firefox: no profile %s (a directory, or a name of lhde-firefox profiles)' % arg)
+    for n, p, d in profiles():
+        if d:
+            return p
+    sys.exit('lhde-firefox: no default Firefox profile found (profiles.ini in %s); give --profile DIR'
+             % ' or '.join(['$XDG_CONFIG_HOME/mozilla/firefox', '~/.mozilla/firefox']))
+
+
+# the prefs the look needs, written to user.js (Firefox applies them at every start)
+PREFS = [
+    ('toolkit.legacyUserProfileCustomizations.stylesheets', 'true', 'Firefox reads chrome/userChrome.css'),
+    ('browser.tabs.inTitlebar', '0', 'the window manager (luxwm) draws the frame and the caption'),
+    ('browser.uidensity', '1', 'compact: the period\'s small toolbar buttons'),
+    ('browser.theme.toolbar-theme', '1', 'light chrome whatever the GTK theme says (the header sets its own colours)'),
+    ('browser.compactmode.show', 'true', 'compact density offered in Customize'),
+    ('sidebar.revamp', 'false', 'no sidebar button and launcher strip'),
+    ('sidebar.verticalTabs', 'false', 'the tabs in their row below the band'),
+    ('browser.search.widget.removeAfterDaysUnused', '36500', 'the search box is not taken away when unused'),
+]
+
+
+def js_value(v):
+    return v if v in ('true', 'false') or re.match(r'^-?\d+$', v) else '"%s"' % v
+
+
+def strip_block(text):
+    return re.sub(r'\n?' + re.escape(BEGIN) + r'.*?' + re.escape(END) + r'\n?', '\n', text, flags=re.S).strip('\n')
+
+
+def add_search_box(prof):
+    """once: the search box into the toolbar layout after the address (prefs.js's browser.uiCustomization.state), and the
+    bookmarks toolbar hidden unless shown (never shown by default); the user may move or show them afterwards"""
+    import json
+    pj = os.path.join(prof, 'prefs.js')
+    text = open(pj, errors='replace').read() if os.path.isfile(pj) else ''
+    lines = text.splitlines()
+    state, idx = None, None
+    for i, line in enumerate(lines):
+        m = re.match(r'user_pref\("browser\.uiCustomization\.state",\s*(".*")\);$', line)
+        if m:
+            try:
+                state, idx = json.loads(json.loads(m.group(1))), i
+            except ValueError:
+                pass
+    if state is None:
+        state = {'placements': {}, 'currentVersion': 0}
+    nav = state.setdefault('placements', {}).get('nav-bar')
+    if nav is None:
+        nav = ['back-button', 'forward-button', 'stop-reload-button', 'urlbar-container', 'downloads-button',
+               'fxa-toolbar-menu-button', 'unified-extensions-button']
+        state['placements']['nav-bar'] = nav
+    if any('search-container' in p for p in state['placements'].values()):
+        return False
+    nav.insert(nav.index('urlbar-container') + 1 if 'urlbar-container' in nav else len(nav), 'search-container')
+    line = 'user_pref("browser.uiCustomization.state", %s);' % json.dumps(json.dumps(state, separators=(',', ':')))
+    if idx is None:
+        lines.append(line)
+    else:
+        lines[idx] = line
+    if not any('"browser.toolbars.bookmarks.visibility"' in x for x in lines):
+        lines.append('user_pref("browser.toolbars.bookmarks.visibility", "never");')
+    if os.path.isfile(pj):
+        shutil.copy2(pj, pj + '.lhde-backup')
+    with open(pj, 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+    return True
+
+
+def install(theme, prof):
+    if in_use(prof):
+        sys.exit('lhde-firefox: the profile %s is in use: close Firefox first' % prof)
+    chrome = os.path.join(prof, 'chrome')
+    os.makedirs(chrome, exist_ok=True)
+    uc = os.path.join(chrome, 'userChrome.css')
+    if os.path.isfile(uc):
+        with open(uc, errors='replace') as f:
+            ours = 'generated by lhde-firefox' in f.read(400)
+        if not ours:
+            shutil.copy2(uc, uc + '.lhde-backup')
+            print('kept your userChrome.css as %s' % (uc + '.lhde-backup'))
+    generate(theme, uc)
+    uj = os.path.join(prof, 'user.js')
+    old = strip_block(open(uj, errors='replace').read()) if os.path.isfile(uj) else ''
+    block = [BEGIN, '// the prefs of lhde\'s Firefox look (docs/USAGE.md "Firefox")']
+    block += ['user_pref("%s", %s);  // %s' % (k, js_value(v), why) for k, v, why in PREFS]
+    block.append(END)
+    with open(uj, 'w') as f:
+        f.write((old + '\n\n' if old else '') + '\n'.join(block) + '\n')
+    added = add_search_box(prof)
+    print('installed the %s look into %s' % (theme, prof))
+    print('  %s, %s%s' % (uc, uj, ', the search box placed in prefs.js' if added else ''))
+
+
+def remove(prof):
+    if in_use(prof):
+        sys.exit('lhde-firefox: the profile %s is in use: close Firefox first' % prof)
+    chrome = os.path.join(prof, 'chrome')
+    uc = os.path.join(chrome, 'userChrome.css')
+    if os.path.isfile(uc):
+        with open(uc, errors='replace') as f:
+            if 'generated by lhde-firefox' in f.read(400):
+                os.remove(uc)
+    if os.path.isfile(uc + '.lhde-backup') and not os.path.exists(uc):
+        os.rename(uc + '.lhde-backup', uc)
+    shutil.rmtree(os.path.join(chrome, 'lhde-art'), ignore_errors=True)
+    uj = os.path.join(prof, 'user.js')
+    if os.path.isfile(uj):
+        rest = strip_block(open(uj, errors='replace').read())
+        if rest.strip():
+            with open(uj, 'w') as f:
+                f.write(rest + '\n')
+        else:
+            os.remove(uj)
+    print('removed lhde\'s look from %s (prefs.js keeps the toolbar layout; Firefox\'s Customize resets it)' % prof)
+
+
+def main(argv):
+    if not argv or argv[0] in ('-h', '--help', 'help'):
+        print(__doc__.strip())
+        return 0
+    cmd, rest = argv[0], argv[1:]
+    prof, out, theme = None, None, None
+    i = 0
+    while i < len(rest):
+        a = rest[i]
+        if a in ('--profile', '-o') and i + 1 < len(rest):
+            if a == '--profile':
+                prof = rest[i + 1]
+            else:
+                out = rest[i + 1]
+            i += 2
+            continue
+        if a.startswith('-'):
+            sys.exit('lhde-firefox: unknown option %s' % a)
+        theme = a
+        i += 1
+    if cmd == 'generate':
+        generate(theme or current_theme(), out)
+    elif cmd == 'install':
+        install(theme or current_theme(), pick_profile(prof))
+    elif cmd == 'remove':
+        remove(pick_profile(prof))
+    elif cmd == 'profiles':
+        for n, p, d in profiles():
+            print('%-24s %s%s%s' % (n, p, '  (default)' if d else '', '  (in use)' if in_use(p) else ''))
+    else:
+        sys.exit('lhde-firefox: unknown command %s (generate, install, remove, profiles)' % cmd)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
