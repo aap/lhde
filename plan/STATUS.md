@@ -65,7 +65,8 @@ Done and covered by `make check` unless a line says otherwise.
 - UTF-8 API: plan/UTF8-API.md, the conversion pair in; the UTF-8 functions and the move file by file not started.
 - Theming without Microsoft files: plan/THEMING.md, the ReactOS baseline in; nothing-imported points and the installer open.
 - mupf, the document viewer: plan/MUPF.md, the first version in (layouts, zoom, contents pane, find, a password prompt,
-  the Longhorn header from the shell layer with the outline as crumbs); text selection open, bookmarks dropped.
+  the Longhorn header from the shell layer with the outline as crumbs, Markdown through md4c and MuPDF's HTML layout with
+  live re-render); text selection and luxpad's preview pane (mupf's view as a component) open, bookmarks dropped.
 
 ## Next
 1. lhde-remote over ssh (one Python file, FreeBSD 13.1-safe) and flxp's provider, tested against indra and soma (step 3).
