@@ -222,7 +222,8 @@ dropped from flxp, ж and 😀 typed and drawn by linked faces (a crop that diff
 JPEG, the window up within 300 ms with the name in the title, the picture decoded at the window's size, the walk in Name order,
 three fast Rights, the zoom steps, Delete to the Trash, the slide show full screen and back, Alt+Enter's Properties, Actual Size
 decoding the picture whole and closing during a decode, the peak RSS under 80 MB at Best Fit and 200 MB after, the remembered
-size; XP's look under luna and 4051's under slate4051 and jade4074 at measured points), wux's MessageBoxW (its buttons per type,
+size; XP's look under luna and 4051's under slate4051 and jade4074 at measured points; the filmstrip's stand-ins before a
+network folder's thumbnails, then the thumbnails), wux's MessageBoxW (its buttons per type,
 the default, Enter and Escape, XP's 75x23 buttons 6 px apart under classic, luna and jade4074 with the text in the message font:
 tests/w32/msgbox), luxshot, luxattr: the Properties sheet's Metadata
 and Advanced views driven with xdotool and checked with getfattr, and a run with nothing imported and an empty HOME, flxp's

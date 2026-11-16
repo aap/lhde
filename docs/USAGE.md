@@ -1070,7 +1070,11 @@ too, so Next shows it at once; the two stay within 64 MB at the fitted size. Zoo
 larger (up to its own size, 32 megapixels at most; beyond that it is magnified); back at Best Fit a picture decoded larger
 than 64 MB is replaced by one of the window's size. The filmstrip's thumbnails are the Explorer's (the shared cache, else
 made and saved), asked for the cells on screen as they show; on a network mount those are read whole even past
-`thumbnails_network_budget`, which bounds what a folder view of thousands reads, not a strip of a dozen cells.
+`thumbnails_network_budget`, which bounds what a folder view of thousands reads, not a strip of a dozen cells. Until a
+cell's thumbnail is in (or when it has none) the cell shows a stand-in, as XP's Filmstrip view shows a file's icon in its
+thumbnail's place: the white frame a 4:3 thumbnail gets (46 x 34 inside 3 px of white), black inside, the file type's icon
+at 32 px in the middle, on the current picture's brown cell for that one; the cached, the EXIF and the full thumbnail then
+replace it in turn.
 
 - **Previous / Next**: Left / Right, Page Up / Page Down, the mouse wheel (as XP's), Backspace / Space; Home and End the first
   and the last picture. The walk wraps around at the ends.

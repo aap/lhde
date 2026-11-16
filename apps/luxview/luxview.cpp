@@ -99,6 +99,7 @@ struct App {
     uint32_t thumbs_gen = 0;
     std::map<std::string, gdi::Bitmap*> thumb;
     std::map<std::string, bool> thumb_asked;
+    std::map<std::string, gdi::Bitmap*> standin;   // the cells' stand-ins: the file type's icon at 32 px, by icon key
     size_t strip_first = 0;
     std::string title;
     bool trace = false;
@@ -848,6 +849,45 @@ void draw_selected_cell(int x0, int y0)
         }
 }
 
+// A cell whose thumbnail is not in (or that has none): the frame a 4:3 picture's thumbnail gets, its 3 px of white around
+// the thumbnail's box at the cell's centre, the strip's black inside, and the file type's icon at 32 px in the middle, as
+// XP's Filmstrip view shows a file's icon in its thumbnail's place until the thumbnail replaces it. The cache's, the
+// EXIF and the full thumbnail then take its place in turn.
+void fill_bits(int x0, int y0, int x1, int y1, uint32_t c)
+{
+    for (int y = std::max(y0, 0); y < std::min(y1, g.cy); y++)
+        for (int x = std::max(x0, 0); x < std::min(x1, g.cx); x++) g.bits[(size_t)y * g.cx + x] = c;
+}
+
+gdi::Bitmap* standin_icon(const std::string& key)
+{
+    auto it = g.standin.find(key);
+    if (it != g.standin.end()) return it->second;
+    std::vector<unsigned long> im = shell::key_icon(key, 32);
+    if (im.size() < 3 && key != "image") im = shell::key_icon("image", 32);
+    gdi::Bitmap* b = nullptr;
+    if (im.size() >= 3 && im.size() >= 2 + (size_t)(im[0] * im[1])) {   // { w, h, ARGB with straight alpha... }
+        b = gdi::create_bitmap((int)im[0], (int)im[1]);
+        for (int y = 0; y < b->height; y++)
+            for (int x = 0; x < b->width; x++) b->row(y)[x] = (uint32_t)im[2 + (size_t)y * b->width + x];
+    }
+    g.standin[key] = b;
+    return b;
+}
+
+void draw_standin(int cx0, int top, const std::string& path)
+{
+    int w, h;
+    luxview::fit_into(640, 480, 46, 46, &w, &h);   // (a 4:3 picture)
+    int tx = cx0 + 31 - w / 2, ty = top + 36 - h / 2;
+    fill_bits(tx - 3, ty - 3, tx + w + 3, ty + h + 3, 0xffffffffu);
+    fill_bits(tx, ty, tx + w, ty + h, 0xff000000u);
+    if (gdi::Bitmap* ic = standin_icon(shell::icon_key(shell::base_of(path), false))) {
+        RECT all = { 0, 0, g.cx, g.cy };
+        blit(ic, cx0 + 31 - ic->width / 2, top + 36 - ic->height / 2, ic->width, ic->height, all);
+    }
+}
+
 void draw_filmstrip(HDC dc)
 {
     if (!g.longhorn || !g.filmstrip || g.slideshow) return;
@@ -860,7 +900,7 @@ void draw_filmstrip(HDC dc)
         int cx0 = LH_CELL_X + k * LH_CELL_W;
         if (i == cur) draw_selected_cell(cx0, top);
         auto it = g.thumb.find(g.view->files()[i]);
-        if (it == g.thumb.end() || !it->second) continue;
+        if (it == g.thumb.end() || !it->second) { draw_standin(cx0, top, g.view->files()[i]); continue; }
         const gdi::Bitmap* t = it->second;
         // the thumbnail fitted into 46 x 46 around the cell's centre (31, 36), in a 3 px white frame
         int tx = cx0 + 31 - t->width / 2, ty = top + 36 - t->height / 2;
@@ -1200,6 +1240,8 @@ void loaded_notify(void*) { PostMessageW(g.wnd, WM_LOADED, 0, 0); }
 void theme_changed()
 {
     if (g.toolbar_theme) { CloseThemeData(g.toolbar_theme); g.toolbar_theme = nullptr; }
+    for (auto& kv : g.standin) if (kv.second) gdi::destroy_bitmap(kv.second);   // (the theme's icons)
+    g.standin.clear();
     // a Longhorn build's theme (Theme.build 4051, 4074, ...; XP's says xp)
     std::string build = shell::theme_build(shell::session_theme());
     bool lh = !build.empty() && build.find_first_not_of("0123456789") == std::string::npos;

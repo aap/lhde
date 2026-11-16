@@ -12,7 +12,8 @@
 # measured points: under luna XP's (the window colour around the picture, its grey frame, the toolbar band), under
 # slate4051 and jade4074 4051's (black, the box's 128 grey frame at 40, 31 grey inside, the filmstrip's selected cell); a
 # theme not imported is skipped. Then 4051's filmstrip on a network folder (tests/headless/slowfs.c) past
-# thumbnails_network_budget: every cell on screen gets its thumbnail. A HOME and XDG directories of its own. Needs Xvfb, xdotool, xprop, xwininfo and
+# thumbnails_network_budget: a cell whose file's server does not answer shows its stand-in (the file type's icon in the
+# thumbnail's white frame, on black), the current one's on its selected cell, then every cell on screen its thumbnail. A HOME and XDG directories of its own. Needs Xvfb, xdotool, xprop, xwininfo and
 # ImageMagick; prints "skip: ..." and passes without them. Usage: tests/headless/luxview.sh [:DISPLAY]
 D=${1:-:78}
 LIMIT_FIT_MB=80       # the folder walked at Best Fit (the 6000 x 4000 JPEG decoded at 1/4, resampled to the window)
@@ -214,7 +215,9 @@ done
 
 # 9. the filmstrip on a network folder: 40 pictures of 1.5 MB (one picture hard-linked) under tests/headless/slowfs.c, which
 # makes the folder an NFS mount to luxview, with thumbnails_network_budget = 1 (MB), no EXIF thumbnails, End: every one of the
-# 13 cells on screen gets its thumbnail (the strip reads what it shows whole, past the budget), the current one's too
+# 13 cells on screen gets its thumbnail (the strip reads what it shows whole, past the budget), the current one's too.
+# n39.jpg's server does not answer for HANG_MS a call (the shim's LHDE_SLOW_HANG_PREFIX): until it does, its cell (the
+# twelfth) and the current one's (n40, behind it in the strip's one loader) show their stand-ins
 SHIM=$R/build/tests/slowfs.so
 if have_style slate4051 && [ -f "$SHIM" ]; then
     theme slate4051; sleep .5
@@ -222,20 +225,33 @@ if have_style slate4051 && [ -f "$SHIM" ]; then
     $IM -size 1600x1200 xc:'rgb(220,60,60)' -attenuate 0.4 +noise Gaussian -quality 95 $T/net/n01.jpg
     for i in $(seq 2 40); do ln $T/net/n01.jpg $T/net/n$(printf %02d $i).jpg; done
     printf '[flxp]\nthumbnails_network_budget = 1\n' > $T/home/.config/lhde/flxp.ini
-    export LD_PRELOAD=$SHIM LHDE_SLOW_PREFIX=$T/net LHDE_SLOW_MS=1 LHDE_SLOW_REMOTE=1
+    export LD_PRELOAD=$SHIM LHDE_SLOW_PREFIX=$T/net LHDE_SLOW_MS=1 LHDE_SLOW_REMOTE=1 LHDE_SLOW_HANG_PREFIX=$T/net/n39.jpg \
+           LHDE_SLOW_HANG_MS=3000
     run $T/net/n01.jpg
-    unset LD_PRELOAD LHDE_SLOW_PREFIX LHDE_SLOW_MS LHDE_SLOW_REMOTE
+    unset LD_PRELOAD LHDE_SLOW_PREFIX LHDE_SLOW_MS LHDE_SLOW_REMOTE LHDE_SLOW_HANG_PREFIX LHDE_SLOW_HANG_MS
     if [ -z "$W" ]; then bad "filmstrip: no window"
     else
         xdotool windowsize $W 856 689; sleep .3
         wait_for 10 traced "^shown n01.jpg picture"
         key End; wait_for 10 traced "^shown n40.jpg picture"
+        # the stand-ins: cell 11 (n39) at x 2 + 62 * 11 = 684, the strip's top 689 - 97 = 592; the thumbnail's box 46 x 34
+        # at the cell's centre (715, 628), its white frame 3 px around it (x 689-691), black inside, the icon at 32 px
+        standins() {
+            import -window $W $T/strip.png 2>/dev/null || return 1
+            [ "$(px $T/strip.png 690 628)" = 255,255,255 ] && [ "$(px $T/strip.png 694 628)" = 0,0,0 ] &&
+            [ "$(px $T/strip.png 715 628)" != 0,0,0 ] &&
+            [ "$(px $T/strip.png 746 630)" = 124,88,49 ] && [ "$(px $T/strip.png 752 628)" = 255,255,255 ] &&
+            [ "$(px $T/strip.png 756 628)" = 0,0,0 ]
+        }
+        if wait_for 3 standins; then ok "filmstrip: before its thumbnail a cell shows the stand-in (icon in the white frame), the current one on its selected cell"
+        else bad "filmstrip: no stand-in before the thumbnail: n39's frame $(px $T/strip.png 690 628), inside $(px $T/strip.png 694 628), centre $(px $T/strip.png 715 628); n40's cell $(px $T/strip.png 746 630), frame $(px $T/strip.png 752 628), inside $(px $T/strip.png 756 628)"; fi
+        [ -n "$LV_KEEP" ] && cp $T/strip.png $T/standin.png   # (kept: the stand-ins as they were checked)
         reddish() { case "$1" in 2[0-9][0-9],[0-9],*|2[0-9][0-9],[0-9][0-9],*|1[5-9][0-9],[0-9],*|1[5-9][0-9],[0-9][0-9],*) return 0;; esac; return 1; }
         cells_full() {   # every cell's centre (2 + 62 k + 31, 689 - 97 + 36) the picture's red
             import -window $W $T/strip.png 2>/dev/null || return 1
             k=0; while [ $k -lt 13 ]; do reddish "$(px $T/strip.png $((33 + 62 * k)) 628)" || return 1; k=$((k + 1)); done
         }
-        if wait_for 20 cells_full; then ok "filmstrip on a network folder past its budget: all 13 cells show their thumbnails"
+        if wait_for 60 cells_full; then ok "filmstrip on a network folder past its budget: all 13 cells show their thumbnails, n39's after its stand-in"
         else
             k=0; got=""; while [ $k -lt 13 ]; do got="$got $(px $T/strip.png $((33 + 62 * k)) 628)"; k=$((k + 1)); done
             bad "filmstrip on a network folder past its budget: cells without a thumbnail (centres:$got)"
