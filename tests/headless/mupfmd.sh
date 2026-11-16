@@ -6,7 +6,9 @@
 # view (laid out to it: "flow W", W points); at 50% (laid out again: "relaid") the H1's band of the page has ink, the
 # table's band its borders' grey, the picture's band magenta; the Contents pane (F4) lists the headings; a click on the link
 # opens other.md in the same window and Alt+Left comes back; a heading appended to the file is laid out without a key
-# pressed; the window made wider and narrower lays it out again to the view's width, at most 980 px. Pixel bands come from
+# pressed; the window made wider and narrower lays it out again to the view's width, at most 980 px. A long file: Page
+# Down, Page Up, Down, Right, End, Home and mupdf's . j k , G g scroll it by a screen less a line, a line, to its ends,
+# pressed at once after the open (the view has the focus). Pixel bands come from
 # the headings' places (tocentry: points down the page, the page FW points wide). Needs mupf (built when MuPDF is
 # installed), Xvfb, xdotool, python3 and ImageMagick; prints "skip: ..." and passes without them.
 # Usage: tests/headless/mupfmd.sh [:DISPLAY]
@@ -187,6 +189,56 @@ else
     for i in $(seq 100); do kill -0 $P 2>/dev/null || break; sleep .1; done
     if kill -0 $P 2>/dev/null; then kill $P; bad "mupf did not exit"; fi
     wait $P 2>/dev/null; check "Alt+F4: mupf exits" 0 $?
+fi
+
+# the keys in a reflowable document (no page to step through: a screen, a line, the top and the bottom), at once after the
+# open, nothing clicked (the view has the focus); mupdf's , . j k g G as well
+python3 -I -c '
+import sys
+with open(sys.argv[1], "w") as f:
+    f.write("# A Long File\n\n")
+    for i in range(150): f.write("Paragraph %d of the long file, a line or two of text to make the column tall.\n\n" % i)' $T/docs/long.md
+: > $T/out.log
+"$B" $T/docs/long.md >> $T/out.log 2>$T/err.log & P=$!
+W=$(wait_window 10 --classname '^mupf$')
+if [ -z "$W" ]; then bad "long.md: no mupf window"
+else
+    timeout 10 xdotool windowactivate --sync $W 2>/dev/null
+    wait_for 10 traced "^shown 1:"
+    sleep .5
+    set -- $(last view); VH=$4
+    sy() { last scroll | cut -d' ' -f2; }
+    ph() { last scroll | cut -d' ' -f4; }
+    scrolled_to() { [ "$(sy)" = "$1" ]; }
+    check "at the top" 0 "$(sy)"
+    xdotool key Next; wait_for 5 scrolled_to $((VH - 40))
+    check "Page Down: a screen less a line ($VH - 40)" $((VH - 40)) "$(sy)"
+    xdotool key Next; wait_for 5 scrolled_to $((2 * (VH - 40)))
+    check "Page Down again" $((2 * (VH - 40))) "$(sy)"
+    xdotool key Prior; wait_for 5 scrolled_to $((VH - 40))
+    check "Page Up" $((VH - 40)) "$(sy)"
+    xdotool key Down; wait_for 5 scrolled_to $((VH))
+    check "Down: a line" $VH "$(sy)"
+    xdotool key Right; wait_for 5 scrolled_to $((2 * VH - 40))
+    check "Right: a screen" $((2 * VH - 40)) "$(sy)"
+    xdotool key End; wait_for 5 scrolled_to $(($(ph) - VH))
+    check "End: the bottom" $(($(ph) - VH)) "$(sy)"
+    xdotool key Home; wait_for 5 scrolled_to 0
+    check "Home: the top" 0 "$(sy)"
+    xdotool key period; wait_for 5 scrolled_to $((VH - 40))
+    check "mupdf's .: a screen" $((VH - 40)) "$(sy)"
+    xdotool key j; wait_for 5 scrolled_to $VH
+    check "j: a line down" $VH "$(sy)"
+    xdotool key k comma; wait_for 5 scrolled_to 0
+    check "k and ,: back to the top" 0 "$(sy)"
+    xdotool key G; wait_for 5 scrolled_to $(($(ph) - VH))
+    check "G: the bottom" $(($(ph) - VH)) "$(sy)"
+    xdotool key g; wait_for 5 scrolled_to 0
+    check "g: the top" 0 "$(sy)"
+    timeout 10 xdotool windowactivate --sync $W 2>/dev/null; xdotool key alt+F4
+    for i in $(seq 100); do kill -0 $P 2>/dev/null || break; sleep .1; done
+    kill -0 $P 2>/dev/null && { kill $P; bad "long.md: mupf did not exit"; }
+    wait $P 2>/dev/null
 fi
 
 kill $PW 2>/dev/null; wait $PW 2>/dev/null

@@ -14,7 +14,9 @@
 # slate4051 (MUPFHEADER_BEHAVIOUR=THEME, none): the header is flxp's Small height and View > Large Header makes it the large
 # one; the header's search box is the Find box (Ctrl+F, Return: "Match 1 of 4", F3 the next); the crumbs and the Contents
 # pane follow the page, a drop-down, Back and a segment go where they say; File > Open is the Longhorn dialog (from
-# flxp-filedialog: the header is mupf's). MUPFHEADER_KEEP=1 keeps the screenshots (the path is printed). Needs mupf (MuPDF), Xvfb, xdotool, xwininfo, python3 and ImageMagick, and an imported Longhorn style;
+# flxp-filedialog: the header is mupf's). The focus under the header: a Markdown file scrolls on Page Down with nothing
+# clicked; a middle click in the view starts the autoscroll (its mark drawn) with the focus in the header's search box or in
+# the Contents pane's tree. MUPFHEADER_KEEP=1 keeps the screenshots (the path is printed). Needs mupf (MuPDF), Xvfb, xdotool, xwininfo, python3 and ImageMagick, and an imported Longhorn style;
 # prints "skip: ..." and passes without them. Usage: tests/headless/mupfheader.sh [:DISPLAY]
 D=${1:-:78}
 R=$(cd "$(dirname "$0")/../.." && pwd)
@@ -213,6 +215,61 @@ if [ "$theme" != none ] && "$R/build/bin/lhde-theme" resolve "$theme" > /dev/nul
         grep -q '^large_header *= *1' "$XDG_STATE_HOME/lhde/mupf.ini" && ok "mupf.ini remembers the Large Header" ||
             bad "mupf.ini: $(grep large_header "$XDG_STATE_HOME/lhde/mupf.ini" 2>&1)"
     else bad "$theme: mupf has no window"; fi
+    kill $P 2>/dev/null; wait $P 2>/dev/null
+fi
+
+# the focus under the header: a Markdown file opened, Page Down scrolls with nothing clicked (the header's search box and the
+# address edit do not take the focus); with the focus in the header's search box (Ctrl+F) and then in the Contents pane's
+# tree (a row clicked), a middle click in the view starts the autoscroll, its mark drawn where the click was
+if [ "$theme" != none ] && "$R/build/bin/lhde-theme" resolve "$theme" > /dev/null 2>&1; then
+    python3 -I -c '
+import sys
+with open(sys.argv[1], "w") as f:
+    f.write("# A Long File\n\n")
+    for i in range(150):
+        if i % 50 == 0: f.write("## Part %d\n\n" % (i // 50 + 1))
+        f.write("Paragraph %d of the long file, a line or two of text to make the column tall.\n\n" % i)' "$T/docs/long.md"
+    L=$T/focus.log
+    "$B" "$T/docs/long.md" > $L 2>&1 & P=$!
+    W=$(wait_window 15 --classname '^mupf$')
+    traced() { grep -q "$1" $L; }
+    last() { grep "^$1 " $L | tail -1 | sed "s/^$1 //"; }
+    if [ -n "$W" ]; then
+        timeout 10 xdotool windowactivate --sync $W 2>/dev/null
+        wait_for 10 traced "^shown 1:"
+        sleep .5
+        set -- $(last view); VX=$1 VY=$2 VW=$3 VH=$4
+        sy() { last scroll | cut -d' ' -f2; }
+        scrolled_to() { [ "$(sy)" = "$1" ]; }
+        xdotool key Next; wait_for 5 scrolled_to $((VH - 40))
+        [ "$(sy)" = $((VH - 40)) ] && ok "focus: Page Down at once scrolls a screen ($(sy))" || bad "focus: Page Down at once: scroll $(last scroll)"
+        MX=$((VX + VW / 2)) MY=$((VY + VH / 2))
+        xdotool key ctrl+f; sleep .5
+        xdotool mousemove $MX $MY click 2
+        wait_for 5 traced "^autoscroll sticky"
+        traced "^autoscroll sticky" && ok "focus in the header's search box: a middle click in the view starts the autoscroll" ||
+            bad "focus in the header's search box: a middle click did nothing"
+        sleep .3; import -window root "$T/focus-mark.png"
+        got=$($IM "$T/focus-mark.png" -format "%[fx:int(255*p{$MX,$MY}.r)],%[fx:int(255*p{$MX,$MY}.g)],%[fx:int(255*p{$MX,$MY}.b)]" info:)
+        [ "$got" = 48,48,48 ] && ok "the autoscroll's mark where the click was" || bad "no autoscroll mark at ($MX,$MY): $got"
+        xdotool click 1; sleep .3
+        xdotool key F4
+        wait_for 10 traced "^tocitem 1 "
+        set -- $(grep '^tocitem 1 ' $L | tail -1)
+        if [ -n "$3" ]; then
+            xdotool mousemove $3 $4 click 1; sleep .5
+            set -- $(last view); MX=$(($1 + $3 / 2)) MY=$(($2 + $4 / 2))
+            n=$(grep -c "^autoscroll sticky" $L)
+            xdotool mousemove $MX $MY click 2
+            sticky() { [ "$(grep -c '^autoscroll sticky' $L)" -gt "$n" ]; }
+            wait_for 5 sticky
+            sticky && ok "focus in the Contents tree: a middle click in the view starts the autoscroll" ||
+                bad "focus in the Contents tree: a middle click did nothing"
+            xdotool click 1
+        else bad "the Contents pane shows no rows"; fi
+        timeout 10 xdotool windowactivate --sync $W 2>/dev/null; xdotool key alt+F4
+        for i in $(seq 100); do kill -0 $P 2>/dev/null || break; sleep .1; done
+    else bad "long.md: mupf has no window"; fi
     kill $P 2>/dev/null; wait $P 2>/dev/null
 fi
 

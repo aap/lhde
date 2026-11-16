@@ -2,15 +2,16 @@
 # mupf under luxwm on Xvfb, driven with xdotool, what it shows read from MUPF_TRACE=1's lines (mapped, opened, rendered,
 # shown PAGE:X,Y,WxH, status MESSAGE|PAGE|ZOOM, toc, tocitem INDEX X Y TITLE, match, exit). A PDF written by
 # tests/headless/mkpdf.py (two pages, an outline of two chapters, a link, a black box): the first page is rendered with
-# ink where the box is and white beside it; Page Down shows page 2; Home page 1; a click on the link goes to page 2 and
-# Alt+Left back; the status bar's next arrow goes to page 2 and its number, clicked and typed, to page 1; the search for
-# "lantern" finds its 4 hits (Match 1 of 4), F3 goes to the second; F4 shows the Contents pane with both chapters and a click on "Chapter One" goes to page 1; the pane's choice is in mupf.ini after Alt+F4, and
+# ink where the box is and white beside it; Page Down shows page 2; Home page 1; mupdf's keys (. , 2g g - W / n) do as
+# mupdf's; a click on the link goes to page 2 and Alt+Left back; the status bar's next arrow goes to page 2 and its number, clicked and typed, to page 1; the search for
+# "lantern" finds its 4 hits (Match 1 of 4), F3 goes to the second; the PDF written again is reloaded on its page; F4 shows the Contents pane with both chapters and a click on "Chapter One" goes to page 1; the pane's choice is in mupf.ini after Alt+F4, and
 # the window comes back with the pane shown; a file that is not a document gives a message box, not a crash; a protected
 # copy (mutool's encryption, when mutool is installed) asks for its password, again after a wrong one, and opens. The view
 # (view X Y W H, scroll SX SY PW PH): at 50% the page is in the middle of the view across; at the end the wheel and a drag
 # go no further; the middle button held and moved scrolls toward the pointer, clicked it stays on until a click, its origin
 # mark drawn where it began, in a step of a few pixels every 16 ms (none more than 50 ms apart), and Ctrl+G ends it without
-# opening Go To Page. A HOME and XDG directories of its own. Needs mupf (built when MuPDF is installed), Xvfb, xdotool,
+# opening Go To Page. A Typst source (when typst is installed) shows its PDF, a failed compile its diagnostics and the last good
+# PDF, the next good one reloads it on its page, and typst ends with mupf. A HOME and XDG directories of its own. Needs mupf (built when MuPDF is installed), Xvfb, xdotool,
 # python3 and ImageMagick; prints "skip: ..." and passes without them. Usage: tests/headless/mupf.sh [:DISPLAY]
 D=${1:-:79}
 R=$(cd "$(dirname "$0")/../.." && pwd)
@@ -94,6 +95,16 @@ else
     wait_for 10 traced "^shown.* 2:"
     traced "^rendered 2 " && ok "page 2 rendered" || bad "page 2 not rendered"
     key Home; wait_for 10 page_is "Page 1 of 2"; check "Home: page 1" "Page 1 of 2" "$(last status | cut -d'|' -f2)"
+    # mupdf's keys: . and , the next and previous page, 2g page 2, g page 1, - zoom out and W fit width again
+    zoom_now() { last status | cut -d'|' -f3; }
+    z0=$(zoom_now)
+    key period; wait_for 10 page_is "Page 2 of 2"; check "mupdf's .: page 2" "Page 2 of 2" "$(last status | cut -d'|' -f2)"
+    key comma; wait_for 10 page_is "Page 1 of 2"; check "mupdf's ,: page 1" "Page 1 of 2" "$(last status | cut -d'|' -f2)"
+    key 2 g; wait_for 10 page_is "Page 2 of 2"; check "mupdf's 2g: page 2" "Page 2 of 2" "$(last status | cut -d'|' -f2)"
+    key g; wait_for 10 page_is "Page 1 of 2"; check "mupdf's g: page 1" "Page 1 of 2" "$(last status | cut -d'|' -f2)"
+    key minus; sleep .5
+    [ "$(zoom_now)" != "$z0" ] && ok "mupdf's -: zoomed out to $(zoom_now)" || bad "mupdf's - did not zoom out ($z0)"
+    key W; sleep .5; check "mupdf's W: Fit Width again" "$z0" "$(zoom_now)"
     if [ -n "$LX" ]; then
         sleep .3
         xdotool mousemove $LX $LY click 1
@@ -124,6 +135,20 @@ else
     key F3; wait_for 10 message_is "Match 2 of 4"
     check "F3: the second" "Match 2 of 4" "$(last status | cut -d'|' -f1)"
     check "on page 2" "Page 2 of 2" "$(last status | cut -d'|' -f2)"
+    # mupdf's / focuses the Find box (a new word typed and Return searches for it), n the next match
+    key Escape; sleep .2; key slash; xdotool type --delay 20 page; xdotool key Return
+    wait_for 10 grep -q "^search page$" $T/out.log
+    traced "^search page$" && ok "mupdf's /: the Find box takes the word" || bad "/ did not focus the Find box"
+    key Escape; sleep .2
+    n=$(grep -c "^match " $T/out.log); key n; sleep .5
+    [ "$(grep -c "^match " $T/out.log)" -gt "$n" ] && ok "mupdf's n: the next match" || bad "n did not go to the next match"
+    # the file written again (as typst watch or latexmk write it): opened again on its own, the page kept
+    key 2 g; wait_for 10 page_is "Page 2 of 2"
+    sleep 1   # (a new mtime)
+    python3 -I "$R/tests/headless/mkpdf.py" $T/docs/test.pdf
+    wait_for 10 traced "^restored "
+    traced "^reload .*test.pdf" && ok "the PDF written again: reloaded" || bad "the PDF written again: no reload"
+    check "the reload keeps page 2" "page 2" "$(last restored | sed 's/.* page/page/')"
     # 4. the Contents pane
     key F4
     wait_for 10 traced "^tocitem 0 "
@@ -249,6 +274,37 @@ if command -v mutool >/dev/null 2>&1 && mutool clean -E aes-128 -U lantern -O ow
     fi
 else
     echo "skip the protected document: no mutool"
+fi
+
+# 8. a Typst source (when typst is installed): shown as the PDF typst watch makes of it; a compile that fails shows its
+# diagnostics and leaves the last good PDF; the next good one reloads it where the view was; the compiler ends with mupf
+if command -v typst >/dev/null 2>&1; then
+    printf '= Typst Test\n\n#lorem(300)\n\n#pagebreak()\n= Second\n\n#lorem(300)\n' > $T/docs/t.typ
+    run $T/docs/t.typ
+    if [ -n "$W" ]; then
+        wait_for 15 traced "^opened 2 pages"
+        traced "^compile typst " && ok "t.typ: typst watch runs" || bad "t.typ: no compiler ($(last compile))"
+        traced "^opened 2 pages" && ok "t.typ: its PDF shown" || bad "t.typ: no PDF opened"
+        check "the title is the source's" "t.typ - mupf" "$(last title)"
+        key Next; wait_for 10 page_is "Page 2 of 2"
+        printf '= Typst Test\n\n#lorem(300) #oops(\n' > $T/docs/t.typ
+        wait_for 10 traced "^compile failed "
+        traced "^compile failed " && ok "an error: the compile fails" || bad "an error: no failed compile"
+        wait_for 5 message_is "typst: compiled with errors (the last good document is shown)"
+        check "the status bar says so" "typst: compiled with errors (the last good document is shown)" "$(last status | cut -d'|' -f1)"
+        check "the last good PDF stays" "Page 2 of 2" "$(last status | cut -d'|' -f2)"
+        printf '= Typst Test\n\n#lorem(300)\n\n#pagebreak()\n= Second Again\n\n#lorem(300)\n' > $T/docs/t.typ
+        t0=$(date +%s%N)
+        wait_for 10 traced "^restored "
+        t1=$(date +%s%N)
+        traced "^restored .* page 2" && ok "fixed: reloaded at page 2 ($(( (t1 - t0) / 1000000 )) ms from the write)" || bad "fixed: not reloaded at page 2 ($(last restored))"
+        quit
+        sleep .3
+        pgrep -f "typst .*watch .*$T/docs/t.typ" > /dev/null && bad "typst watch outlived mupf" || ok "typst watch ended with mupf"
+        ls -d $XDG_STATE_HOME/lhde/mupf-* > /dev/null 2>&1 && bad "the compiler's directory stayed" || ok "the compiler's directory removed"
+    fi
+else
+    echo "skip the Typst source: no typst"
 fi
 
 kill $PW 2>/dev/null; wait $PW 2>/dev/null
