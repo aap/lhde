@@ -69,16 +69,27 @@ done
 echo "ok    free baseline: $n themes resolve with only the free pack imported ($W, from $(basename "$iso")${walls:+ and $walls})"
 [ -z "$nowall" ] || echo "      (without the free themes' photos: no FREE_WALLPAPERS directory beside the ISO, their wallpaper is missing)"
 # lhde-firefox's userChrome.css for every shipped theme from the free tree alone: the Longhorn themes' styles are absent, so
-# the CSS uses colours alone and must still be written (docs/USAGE.md "Firefox")
-nf=0
+# the CSS uses colours alone (and Firefox 4's pictures, which are lhde's to ship) and must still be written, in both looks
+# of the Longhorn themes: Firefox 4's (the default) and the Explorer band (--look explorer) (docs/USAGE.md "Firefox")
+nf=0 nx=0
 for f in share/themes/*.theme; do
 	t=$(basename "$f" .theme); nf=$((nf + 1)); mkdir -p "$B/firefox/$t"
 	if ! python3 -I tools/lhde-firefox generate "$t" -o "$B/firefox/$t/userChrome.css" > "$B/firefox/$t/log" 2>&1 ||
-	   ! grep -q -e '--lhde-band-low:' -e '--lhde-xp-face:' "$B/firefox/$t/userChrome.css"; then
+	   ! grep -q -e '--lhde-ff4-frame:' -e '--lhde-xp-face:' "$B/firefox/$t/userChrome.css"; then
 		echo "FAIL  free baseline: lhde-firefox generate $t"; cat "$B/firefox/$t/log"; exit 1
 	fi
+	if grep -q -e '--lhde-ff4-frame:' "$B/firefox/$t/userChrome.css"; then
+		if [ ! -f "$B/firefox/$t/lhde-art/ff4/tab.png" ]; then
+			echo "FAIL  free baseline: lhde-firefox generate $t: Firefox 4's pictures not copied beside it"; exit 1
+		fi
+		nx=$((nx + 1)); mkdir -p "$B/firefox/$t-explorer"
+		if ! python3 -I tools/lhde-firefox generate "$t" --look explorer -o "$B/firefox/$t-explorer/userChrome.css" \
+		       > "$B/firefox/$t-explorer/log" 2>&1 || ! grep -q -e '--lhde-band-low:' "$B/firefox/$t-explorer/userChrome.css"; then
+			echo "FAIL  free baseline: lhde-firefox generate $t --look explorer"; cat "$B/firefox/$t-explorer/log"; exit 1
+		fi
+	fi
 done
-echo "ok    free baseline: lhde-firefox writes a userChrome.css for the $nf themes"
+echo "ok    free baseline: lhde-firefox writes a userChrome.css for the $nf themes (and the Explorer band for the $nx Longhorn ones)"
 # and Firefox's own CSS parser takes every rule of them (one headless Firefox; skipped without firefox)
 rc=0; TMPDIR=$B python3 -I tests/firefox-css.py "$B"/firefox/*/userChrome.css > "$B/firefox/css.log" 2>&1 || rc=$?
 case $rc in
