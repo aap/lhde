@@ -4,8 +4,12 @@
 // (Default/Document/Music/... in slate.msstyles) or a drawn gradient - with
 // white text and the slate's ExplorerMenu::Toolbar button frames.
 #pragma once
-#include "w32/w32.h"
+// only the win32 headers (not w32/w32.h): an application on wux/wux.h includes this too (mupf's bar under the header)
 extern "C" {
+#include "windef.h"
+#include "winbase.h"
+#include "wingdi.h"
+#include "winuser.h"
 #include "commctrl.h"
 }
 

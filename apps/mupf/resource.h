@@ -22,6 +22,7 @@
 #define CMD_TOOLBAR     1201
 #define CMD_STATUSBAR   1202
 #define CMD_CONTENTS    1203
+#define CMD_LARGE_HEADER 1204
 #define CMD_ZOOM_IN     1211
 #define CMD_ZOOM_OUT    1212
 #define CMD_ACTUAL      1213

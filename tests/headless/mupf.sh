@@ -3,8 +3,8 @@
 # shown PAGE:X,Y,WxH, status MESSAGE|PAGE|ZOOM, toc, tocitem INDEX X Y TITLE, match, exit). A PDF written by
 # tests/headless/mkpdf.py (two pages, an outline of two chapters, a link, a black box): the first page is rendered with
 # ink where the box is and white beside it; Page Down shows page 2; Home page 1; a click on the link goes to page 2 and
-# Alt+Left back; the search for "lantern" finds its 4 hits (Match 1 of 4), F3 goes to the second; F4 shows the Contents
-# pane with both chapters and a click on "Chapter One" goes to page 1; the pane's choice is in mupf.ini after Alt+F4, and
+# Alt+Left back; the status bar's next arrow goes to page 2 and its number, clicked and typed, to page 1; the search for
+# "lantern" finds its 4 hits (Match 1 of 4), F3 goes to the second; F4 shows the Contents pane with both chapters and a click on "Chapter One" goes to page 1; the pane's choice is in mupf.ini after Alt+F4, and
 # the window comes back with the pane shown; a file that is not a document gives a message box, not a crash; a protected
 # copy (mutool's encryption, when mutool is installed) asks for its password, again after a wrong one, and opens. A HOME and
 # XDG directories of its own. Needs mupf (built when MuPDF is installed), Xvfb, xdotool, python3 and ImageMagick; prints
@@ -96,6 +96,23 @@ else
         wait_for 10 page_is "Page 2 of 2"; check "a click on the link: page 2" "Page 2 of 2" "$(last status | cut -d'|' -f2)"
         key alt+Left; wait_for 10 page_is "Page 1 of 2"; check "Alt+Left: back to page 1" "Page 1 of 2" "$(last status | cut -d'|' -f2)"
     fi
+    # the status bar's page part (pagenav PREVX PREVY TEXTX TEXTY NEXTX NEXTY from the window's top left): the next
+    # arrow goes to page 2, a click on the text makes the number an edit, 1 and Return go to page 1
+    geo=$(xwininfo -id $W)
+    CX=$(echo "$geo" | sed -n 's/.*Absolute upper-left X: *//p'); CY=$(echo "$geo" | sed -n 's/.*Absolute upper-left Y: *//p')
+    set -- $(grep '^pagenav [0-9]' $T/out.log | tail -1)
+    if [ $# = 7 ] && [ -n "$CX" ]; then
+        xdotool mousemove $((CX + $6)) $((CY + $7)) click 1
+        wait_for 10 page_is "Page 2 of 2"; check "the status bar's next arrow: page 2" "Page 2 of 2" "$(last status | cut -d'|' -f2)"
+        traced "^pagenav next" && ok "the arrow's trace" || bad "no pagenav next"
+        xdotool mousemove $((CX + $4)) $((CY + $5)) click 1
+        wait_for 10 traced "^page edit"
+        traced "^page edit" && ok "a click on the page part's text: the number as an edit" || bad "no page edit"
+        xdotool key ctrl+a; xdotool type 1; xdotool key Return
+        wait_for 10 page_is "Page 1 of 2"; check "1, Return in the page edit: page 1" "Page 1 of 2" "$(last status | cut -d'|' -f2)"
+        xdotool mousemove $((CX + $2)) $((CY + $3)) click 1; sleep .5   # page 1: the previous arrow is greyed and does nothing
+        check "the previous arrow at page 1: still page 1" "Page 1 of 2" "$(last status | cut -d'|' -f2)"
+    else bad "the status bar's page part: no pagenav trace ($*)"; fi
     # 3. the search
     key ctrl+f; xdotool type --delay 20 lantern; xdotool key Return
     wait_for 10 message_is "Match 1 of 4"

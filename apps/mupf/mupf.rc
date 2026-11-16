@@ -38,6 +38,7 @@ BEGIN
         MENUITEM "&Toolbar", CMD_TOOLBAR
         MENUITEM "Status &Bar", CMD_STATUSBAR
         MENUITEM "&Contents\tF4", CMD_CONTENTS
+        MENUITEM "Large &Header", CMD_LARGE_HEADER
         MENUITEM SEPARATOR
         MENUITEM "Zoom &In\tCtrl++", CMD_ZOOM_IN
         MENUITEM "Zoom &Out\tCtrl+-", CMD_ZOOM_OUT
