@@ -1699,7 +1699,9 @@ static bool next_message(Message& m, Window* filter, uint32_t min, uint32_t max,
         Message tm; memset(&tm, 0, sizeof tm);
         tm.w = t.w; tm.msg = WM_TIMER; tm.wp = t.id; tm.lp = (LParam)t.callback; tm.time = now; tm.pt = sys::pointer_pos();
         if (!matches(tm, filter, min, max)) continue;
-        if (remove) t.due = now + t.interval;
+        // the next one an interval from now, after the pointer's round trip: a server busy behind a compositor can hold it
+        // for longer than a short interval, and a due time from before it would fire the timer again at once
+        if (remove) t.due = sys::ticks() + t.interval;
         m = tm;
         return true;
     }
