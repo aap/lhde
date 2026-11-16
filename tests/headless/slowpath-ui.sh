@@ -1,10 +1,10 @@
 #!/bin/sh
 # flxp's UI thread on a slow network mount makes no round trips once the list is up (docs/USAGE.md "How the Explorer
-# lists a folder"): a folder like a photo share (150 subfolders of 30 small EXIF JPEGs each, and "pictures", a folder of
+# lists a folder"): a folder like a photo share (24 subfolders of 30 small EXIF JPEGs each; SLOWPATH_UI_FOLDERS=150 for the size of a real share, ten minutes, and "pictures", a folder of
 # 2000) under tests/headless/slowfs.c at 50 ms a round trip with LHDE_SLOW_REMOTE=1 (statfs says NFS), the shim's
 # LHDE_SLOW_MAIN_LOG writing every call from the main thread with its stack. Twice, with a cold thumbnail cache each time:
-#   - the Longhorn frame (FLXP_LHWM), Icons at 96 px with thumbnails: the folder pictures of the 150
-#   - the XP frame with the Folders pane, Thumbnails: the tree's 150 subfolders under the open one
+#   - the Longhorn frame (FLXP_LHWM), Icons at 96 px with thumbnails: the folder pictures of the subfolders
+#   - the XP frame with the Folders pane, Thumbnails: the tree's subfolders under the open one
 # Each time the list is scrolled to the end and back (keys and the wheel), an item hovered (its infotip) and one selected
 # (the task band, the task pane or the status bar), then "pictures" opened, scrolled, hovered and selected.
 # After the first paint ("list: 151 of 151") the main thread makes no stat, open, read, opendir or xattr call under the
@@ -17,7 +17,7 @@ D=${1:-:73}
 TOP=$(cd "$(dirname "$0")/../.." && pwd)
 B=$TOP/build/bin/flxp
 SHIM=$TOP/build/tests/slowfs.so
-FOLDERS=${SLOWPATH_UI_FOLDERS:-150}
+FOLDERS=${SLOWPATH_UI_FOLDERS:-24}
 EACH=30
 BIG=2000
 ALLOWED=40          # the known exceptions' calls in a run: opendir + readdir (one per 128 entries) of the folders opened
