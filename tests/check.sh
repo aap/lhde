@@ -17,7 +17,7 @@ fails=0
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 result() {   # NAME STATUS LOG
-    if [ "$2" = 0 ]; then echo "ok    $1"; else echo "FAIL  $1 (exit $2; log below)"; sed 's/^/      /' "$3" | tail -n 20; fails=$((fails + 1)); fi
+    if [ "$2" = 0 ]; then echo "ok    $1"; else echo "FAIL  $1 (exit $2; its FAIL lines, then the log's tail)"; grep -a '^ *FAIL' "$3" | sed 's/^/      /' | head -n 20; sed 's/^/      /' "$3" | tail -n 20; fails=$((fails + 1)); fi
 }
 skip() { echo "skip  $1: $2"; }
 have() { command -v "$1" >/dev/null 2>&1; }
