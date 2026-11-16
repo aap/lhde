@@ -90,7 +90,7 @@ comments, the order and the keys it does not know: it reads the whole file, chan
 [fonts]       smoothing = standard       ; off | standard | cleartype (flxp, luxwm's menus; luxshell uses fontconfig's)
 [effects]     menu_shadows = 1           ; XP's drop shadow under menus (wux's popup menus, luxwm's window menu, luxshell's menus)
               keyboard_cues = 0          ; 0: mnemonics underlined only after Alt (XP's default); 1: always
-[extend_frame] firefox = 0 0 52 0        ; luxwm extends the frame into an ARGB window of this WM_CLASS (lowercase class or instance): left right top bottom (docs/CLIENT-PROTOCOL.md "Extended frames"; lhde-firefox writes it)
+[extend_frame] firefox = 0 0 61 0        ; luxwm extends the frame into an ARGB window of this WM_CLASS (lowercase class or instance): left right top bottom (docs/CLIENT-PROTOCOL.md "Extended frames"; lhde-firefox writes it)
 ```
 
 **The terminal**, `[commands] terminal`, is a `/bin/sh` command line; `%d` in it is the directory, quoted. Every terminal of the

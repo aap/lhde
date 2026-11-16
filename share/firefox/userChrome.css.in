@@ -1,10 +1,13 @@
-/* lhde's look for Firefox's own chrome (userChrome.css): Firefox 4's look on Windows 7 for the Longhorn themes (the ff4
-   and ff4glass sections), or with --look explorer the Longhorn Explorer header (the longhorn section); Firefox 4's look on
-   XP for the XP and classic ones (xp). Template of tools/lhde-firefox, which writes the theme's values into the block of
-   custom properties below (from liblhde's resolver and the visual style through ut-dump) and keeps the sections for the
-   theme's family; docs/USAGE.md "Firefox". Firefox 160's element ids (browser.xhtml, browser/omni.ja).
+/* lhde's look for Firefox's own chrome (userChrome.css): for the Longhorn themes the Longhorn navigation (--look longhorn,
+   the default with glass: the longhorn section, with lhglass on the glass or lhopaque without it), Firefox 4's look on
+   Windows 7 (--look ff4, the default without glass, and the fallback of the Longhorn navigation under a glass theme while
+   there is no compositor: the ff4 and ff4glass sections) or the Longhorn Explorer header (--look explorer: the explorer
+   section); Firefox 4's look on XP for the XP and classic themes (xp). Template of tools/lhde-firefox, which writes the
+   theme's values into the block of custom properties below (from liblhde's resolver and the visual style through ut-dump)
+   and keeps the sections of the look, wrapping some in a media query; docs/USAGE.md "Firefox". Firefox 160's element ids
+   (browser.xhtml, browser/omni.ja).
 
-   The longhorn section, measured against flxp's header (flxp/shell/ui/lhheader.cpp, navbar.cpp: 4074's framelet geometry, 4051's navigation bar):
+   The explorer section, measured against flxp's header (flxp/shell/ui/lhheader.cpp, navbar.cpp: 4074's framelet geometry, 4051's navigation bar):
    the band's height (the travel art's: 54 rows), its picture (the style's Navbar::Rebar BACKGROUND with its sizing margins),
    the travel buttons (TravelBack/TravelFwd::AnimationButton, 38 + 27 x 54, 2 px from the left edge), where the address
    starts (the breadcrumb's text x of the style's layout), the text colour (Navbar.TITLE), the face and size (the style's
@@ -59,7 +62,7 @@
   --toolbarbutton-border-radius: 2px !important;
 }
 
-/*@IF longhorn@*/
+/*@IF explorer@*/
 /* ---- the Longhorn header band ----------------------------------------------------------------------------------------- */
 :root {
   --toolbar-bgcolor: var(--lhde-band-low) !important;
@@ -297,6 +300,376 @@
 }
 #tabs-newtab-button, #new-tab-button { --toolbarbutton-inner-padding: 3px !important; }
 #tabbrowser-tabs .tabbrowser-tab:not([visuallyselected]) .tab-label { opacity: 0.95; }
+/*@END@*/
+
+/*@IF longhorn@*/
+/* ---- the Longhorn navigation ----------------------------------------------------------------------------------------- */
+/* After the Longhorn browser concepts of 2004 (glass window, a round Back at the left, the page's title over the address,
+   which takes the width, a round refresh after it, the favourites star at the right, document tabs below that band, then
+   the page), built from flxp's Small header, the measured Longhorn header the file dialog and mupf use
+   (flxp/shell/ui/lhheader.cpp): luxwm's caption keeps the title (Firefox's window title, the page's: the concept's title
+   over the address), then the 36-row band with the travel art (SmallTravelBack, 27 x 36 at x 2, filling the band), the
+   address on the row of its disc (centre row 14), the star (SmallFavorites, 27 x 27 on the band's first row, 4 px from
+   the right edge). Under the glass themes the band and the tab row are luxwm's glass ([extend_frame] firefox = band + tab
+   row: lhde-firefox install); the tab row's last 2 rows are left to luxwm's inner edge lines, which then run on down the
+   sides: the outline the content sits in, as on flxp.
+   From the concept (its first picture: the address 21 rows with corners of 3 px, a dark top edge with a soft shade under
+   it, lighter sides and bottom, the fill hardly lighter than the glass; tabs 23 rows high, square-shouldered with 2 px
+   corners, a dark outer edge and a light inner one, a glossy fill lighter in its upper half, the selected one near white
+   and the others the glass lightened, dark grey text; all over the line the content starts below): the shapes and the
+   relations of the colours to the glass, as translucent fills, since the glass is the theme's and not the concept's peach.
+   Choices: no Forward button (the concept has none; Alt+Right and the Back button's history menu remain); the address
+   searches too, no search box (Firefox's Settings > Search can put it back); the hamburger and the other toolbar buttons
+   kept small between the refresh button and the star; the tab text in flxp's breadcrumb face and size (12 px Segoe UI,
+   the concept's 13 px at its own scale) and 16 px favicons (the concept's 13 px icons are drawn ones). The concept's large
+   title in the band is left out: luxwm's caption has it (a fixed ::after of the selected tab with attr(label) can show it
+   in the band, but a row of its own would be the Medium header's 54 rows of glass). */
+:root {
+  --toolbar-bgcolor: transparent !important;
+  --toolbar-color: #000000 !important;
+  --toolbox-textcolor: #000000 !important;
+  --toolbox-textcolor-inactive: #000000 !important;
+  --tabs-navbar-separator-style: none !important;
+  --toolbarbutton-icon-fill: #000000 !important;
+  --toolbarbutton-hover-background: rgba(255, 255, 255, 0.35) !important;
+  --toolbarbutton-active-background: rgba(0, 0, 0, 0.12) !important;
+  --toolbar-field-background-color: rgba(255, 255, 255, 0.35) !important;
+  --toolbar-field-color: #000000 !important;
+  --toolbar-field-border-color: transparent !important;
+  --toolbar-field-focus-background-color: #ffffff !important;
+  --toolbar-field-focus-color: #000000 !important;
+  --toolbar-field-focus-border-color: transparent !important;
+  --urlbar-height: 21px !important;
+  --urlbar-min-height: 21px !important;
+  --urlbar-container-height: 21px !important;
+  --urlbar-border-radius: 3px !important;
+  --urlbarview-border-radius: 0px !important;
+  --tab-border-radius: 0px !important;
+  --tab-min-height: var(--lhde-lh-tab-h) !important;
+  --tab-block-margin: 0px !important;
+  --tab-margin-block: 0px !important;
+  --tab-shadow-max-size: 0px !important;
+  --tab-selected-shadow: none !important;
+  --tab-box-shadow-selected: none !important;
+  --tab-background-color: transparent !important;
+  --tab-background-color-selected: transparent !important;
+  --tab-selected-bgcolor: transparent !important;
+  --tab-background-color-hover: transparent !important;
+  --tab-text-color: #45403d !important;
+  --tab-text-color-selected: #45403d !important;
+  --tab-border: none !important;
+  /* the content's top edge is luxwm's line (glass) or the toolbox's own (lhopaque): no separator of Firefox's under it */
+  --chrome-content-separator-color: transparent !important;
+  --content-area-shadow: none !important;
+}
+#nav-bar { order: 0; }
+#toolbar-menubar { order: 1; }
+#TabsToolbar { order: 2; }
+#navigator-toolbox { border-bottom: 0 !important; }
+.browserContainer { border-block-start: 0 !important; }
+#nav-bar, #TabsToolbar, #PersonalToolbar, #toolbar-menubar {
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+  box-shadow: none !important;
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* the band: the Small header's 36 rows; the travel art from x 2, everything else centred on its disc's row (14) */
+#nav-bar {
+  position: relative !important;
+  box-sizing: border-box !important;
+  height: var(--lhde-lh-band-h) !important;
+  min-height: var(--lhde-lh-band-h) !important;
+  max-height: var(--lhde-lh-band-h) !important;
+  padding: 0 calc(var(--lhde-lh-fav-w) + 17px) 0 var(--lhde-lh-travel-x) !important;
+  align-items: flex-start !important;
+  color: #000000 !important;
+  /* the separator before the star (the concept's: a dark line with a light one beside it, the address's height) */
+  background-image: linear-gradient(rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.28)),
+                    linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)) !important;
+  background-size: 1px 21px, 1px 21px !important;
+  background-position: right calc(var(--lhde-lh-fav-w) + 11px) top 4px, right calc(var(--lhde-lh-fav-w) + 10px) top 4px !important;
+  background-repeat: no-repeat !important;
+}
+#nav-bar-customization-target, #PanelUI-button {
+  height: 28px !important;
+  align-items: center !important;
+}
+#nav-bar-customization-target > *, #PanelUI-button { margin-block: 0 !important; }
+
+/* Back: the style's art (flxp's Small Back plate; Vista's TravelBand left half), or a drawn orb */
+#nav-bar #back-button {
+  align-self: flex-start !important;
+  box-sizing: border-box !important;
+  width: var(--lhde-lh-back-w) !important;
+  min-width: var(--lhde-lh-back-w) !important;
+  height: var(--lhde-lh-band-h) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: var(--lhde-lh-back-normal) no-repeat !important;
+  background-size: var(--lhde-lh-back-size) !important;
+  background-position: 0 var(--lhde-lh-back-top) !important;
+  list-style-image: var(--lhde-lh-back-glyph) !important;
+  -moz-context-properties: fill !important;
+  fill: #ffffff !important;
+  opacity: 1 !important;
+}
+#nav-bar #back-button:not([disabled]):hover { background-image: var(--lhde-lh-back-hot) !important; }
+#nav-bar #back-button:not([disabled]):is(:hover:active, [open]) { background-image: var(--lhde-lh-back-pressed) !important; }
+#nav-bar #back-button[disabled] { background-image: var(--lhde-lh-back-disabled) !important; }
+#nav-bar #back-button > .toolbarbutton-icon {
+  box-sizing: border-box !important;
+  width: var(--lhde-lh-orb-size) !important;
+  height: var(--lhde-lh-orb-size) !important;
+  min-height: 0 !important;
+  margin: calc(14px - var(--lhde-lh-orb-size) / 2) 0 0 3px !important;
+  padding: calc(var(--lhde-lh-orb-size) / 8) !important;
+  border-radius: 50% !important;
+  background: var(--lhde-lh-back-orb) !important;
+  box-shadow: var(--lhde-lh-back-edge) !important;
+  align-self: flex-start !important;
+}
+#nav-bar #back-button[disabled] > .toolbarbutton-icon { opacity: 1 !important; filter: saturate(0.2) !important; }
+#nav-bar #forward-button { display: none !important; }
+
+/* the address: in the breadcrumb row's place, from 8 px after the Back art to the refresh button; the concept's
+   shallow recessed field (21 rows, 3 px corners, the dark top edge and its shade) */
+#urlbar-container {
+  order: 1;
+  flex: 1 1 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  margin-inline: 8px 4px !important;
+  padding: 0 !important;
+  height: 21px !important;
+  min-height: 21px !important;
+  --urlbar-container-padding-block: 0px !important;
+}
+#urlbar, #urlbar-input, #urlbar .urlbar-input, .urlbar-input-box {
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+}
+#urlbar .urlbar-background, #search-container .urlbar-background, #searchbar-new .urlbar-background {
+  border-radius: 3px !important;
+  border: 1px solid !important;
+  border-color: rgba(0, 0, 0, 0.42) rgba(0, 0, 0, 0.3) rgba(0, 0, 0, 0.26) !important;
+  background-color: var(--lhde-lh-field) !important;
+  box-shadow: inset 0 1px rgba(0, 0, 0, 0.1) !important;
+  outline: none !important;
+}
+#urlbar:is([focused], [open]) .urlbar-background,
+:is(#search-container, #searchbar-new) :is([focused], [open]) .urlbar-background { background-color: #ffffff !important; }
+/* the search box, where Firefox's settings put it back: the address's field, flxp's vision search box's width */
+#search-container {
+  min-width: 180px !important;
+  max-width: 180px !important;
+  width: 180px !important;
+  height: 21px !important;
+  margin-inline: 0 4px !important;
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+}
+#search-container .urlbar, #searchbar-new { --urlbar-height: 21px !important; min-height: 21px !important; }
+#urlbar:not([focused], [open]) #urlbar-input { text-shadow: var(--lhde-lh-glow) !important; }
+#identity-box, #page-action-buttons, #star-button-box { opacity: 0.85; }
+
+/* refresh and stop: one small round button after the address (the concept's 20 px grey-blue ball), Firefox's glyphs */
+#nav-bar #stop-reload-button { order: 2; margin-inline: 0 4px !important; }
+#nav-bar #stop-reload-button > .toolbarbutton-1 { margin: 0 !important; padding: 0 !important; }
+#nav-bar #stop-reload-button > .toolbarbutton-1 > .toolbarbutton-icon {
+  box-sizing: border-box !important;
+  width: 20px !important;
+  height: 20px !important;
+  padding: 3px !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(60, 64, 90, 0.45) !important;
+  background: radial-gradient(circle at 50% 25%, #eef1f6 0, #a9b3c6 48%, #6d7891 100%) !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.7) !important;
+  -moz-context-properties: fill !important;
+  fill: #ffffff !important;
+  filter: drop-shadow(0 0 0 transparent) !important;
+}
+#nav-bar #stop-reload-button > .toolbarbutton-1:not([disabled]):hover > .toolbarbutton-icon {
+  background: radial-gradient(circle at 50% 25%, #f4f9ff 0, #8fb8e2 48%, #3f72b0 100%) !important;
+}
+#nav-bar #stop-reload-button > .toolbarbutton-1:not([disabled]):hover:active > .toolbarbutton-icon {
+  background: radial-gradient(circle at 50% 70%, #e8edf4 0, #a9b4c6 55%, #7b849c 100%) !important;
+}
+
+/* the other buttons small on the glass, then the star: the bookmarks menu button (flxp's favorites star) at the band's
+   right as flxp has it, the style's star art, or a drawn ball */
+#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button, #library-button,
+  #home-button, #search-container) { order: 3; }
+#nav-bar .toolbarbutton-1:not(#back-button, #reload-button, #stop-button, #bookmarks-menu-button) {
+  --toolbarbutton-inner-padding: 3px !important;
+  --toolbarbutton-outer-padding: 1px !important;
+  --toolbarbutton-border-radius: 3px !important;
+}
+#nav-bar #bookmarks-menu-button {
+  position: absolute !important;
+  top: 0 !important;
+  right: 4px !important;
+  width: var(--lhde-lh-fav-w) !important;
+  height: var(--lhde-lh-fav-h) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: var(--lhde-lh-fav-normal) no-repeat 0 0 / 100% 100% !important;
+  list-style-image: var(--lhde-lh-fav-glyph) !important;
+  -moz-context-properties: fill !important;
+  fill: #ffffff !important;
+}
+#nav-bar #bookmarks-menu-button:hover { background-image: var(--lhde-lh-fav-hot) !important; }
+#nav-bar #bookmarks-menu-button:is(:hover:active, [open]) { background-image: var(--lhde-lh-fav-pressed) !important; }
+#nav-bar #bookmarks-menu-button > .toolbarbutton-menu-dropmarker { display: none !important; }
+#nav-bar #bookmarks-menu-button > .toolbarbutton-icon {
+  box-sizing: border-box !important;
+  width: var(--lhde-lh-fav-orb-size) !important;
+  height: var(--lhde-lh-fav-orb-size) !important;
+  margin: calc(14px - var(--lhde-lh-fav-orb-size) / 2) 0 0 calc(13px - var(--lhde-lh-fav-orb-size) / 2) !important;
+  padding: calc(var(--lhde-lh-fav-orb-size) / 7) !important;
+  border-radius: 50% !important;
+  background: var(--lhde-lh-fav-orb) !important;
+  box-shadow: var(--lhde-lh-fav-edge) !important;
+}
+
+/* the menu bar (Alt, or View > Toolbars > Menu Bar) between the band and the tabs: flxp's menu band under its header
+   (flxp/explorer/lhbar.cpp: Slate's Document::Rebar strip, 22 rows, white menu-font text, ExplorerMenu::Toolbar.BUTTON
+   as the hot and pressed frames over the band's full height, the first frame 2 px from the left edge) */
+#toolbar-menubar:not([inactive]) {
+  height: var(--lhde-menu-h) !important;
+  min-height: var(--lhde-menu-h) !important;
+  max-height: var(--lhde-menu-h) !important;
+}
+#toolbar-menubar {
+  padding: 0 0 0 2px !important;
+  background-image: var(--lhde-menu-bg) !important;
+  box-shadow: inset 0 1px var(--lhde-menu-highlight) !important;
+  border-image-source: var(--lhde-menu-image) !important;
+  border-image-slice: 1 1 0 1 fill !important;
+  border-image-width: 1px 1px 0 1px !important;
+  border-image-repeat: stretch !important;
+  color: var(--lhde-menu-text) !important;
+}
+:root:-moz-window-inactive #toolbar-menubar { color: var(--lhde-menu-text-inactive) !important; }
+#toolbar-menubar > .toolbar-items, #menubar-items, #main-menubar { height: var(--lhde-menu-h) !important; align-items: stretch !important; }
+#main-menubar > menu { padding: 0 8px 0 9px !important; min-height: var(--lhde-menu-h) !important; }
+#main-menubar > menu:is([_moz-menuactive="true"], :hover) { border-image: var(--lhde-menu-hot) 5 fill / 5px stretch !important; }
+#main-menubar > menu[open] { border-image: var(--lhde-menu-pressed) 5 fill / 5px stretch !important; }
+
+/* the tab row: the concept's 23-row document tabs from the left edge, side by side, then the 2 rows of the line the
+   content starts below (luxwm's inner edge lines on the glass) */
+#TabsToolbar {
+  padding: 0 0 2px !important;
+  min-height: 0 !important;
+  height: var(--lhde-lh-tabs-h) !important;
+  max-height: var(--lhde-lh-tabs-h) !important;
+  color: #000000 !important;
+}
+#TabsToolbar :is(.toolbar-items, #TabsToolbar-customization-target), #tabbrowser-tabs, #tabbrowser-arrowscrollbox {
+  min-height: 0 !important;
+  height: var(--lhde-lh-tab-h) !important;
+  max-height: var(--lhde-lh-tab-h) !important;
+  align-items: stretch !important;
+}
+#tabbrowser-tabs { --tab-min-height: var(--lhde-lh-tab-h) !important; padding-inline: 0 !important; margin-inline: 0 !important; border: 0 !important; }
+.tabbrowser-tab {
+  padding: 0 !important;
+  min-height: 0 !important;
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+  color: #45403d !important;
+}
+.tabbrowser-tab:not([pinned]) { max-width: 200px !important; }
+.tabbrowser-tab + .tabbrowser-tab { margin-inline-start: -1px !important; }
+.tabbrowser-tab, .tab-stack, .tab-content { height: var(--lhde-lh-tab-h) !important; max-height: var(--lhde-lh-tab-h) !important; min-height: 0 !important; }
+.tab-stack { align-items: stretch !important; }
+.tab-background {
+  margin: 0 !important;
+  min-height: 0 !important;
+  border: 1px solid rgba(0, 0, 0, 0.36) !important;
+  border-bottom: 0 !important;
+  border-radius: 2px 2px 0 0 !important;
+  outline: none !important;
+  box-shadow: inset 1px 1px rgba(255, 255, 255, 0.55), inset -1px 0 rgba(255, 255, 255, 0.3) !important;
+  background: linear-gradient(rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0.06) 50%, rgba(0, 0, 0, 0.02)) !important;
+}
+.tabbrowser-tab:hover > .tab-stack > .tab-background:not([selected], [multiselected]) {
+  background: linear-gradient(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0.24) 50%, rgba(255, 255, 255, 0.16)) !important;
+}
+.tab-background:is([selected], [multiselected]) {
+  background: linear-gradient(rgba(251, 249, 247, 0.97), rgba(244, 240, 237, 0.95) 50%, rgba(224, 219, 215, 0.95) 50%, rgba(216, 211, 208, 0.95)) !important;
+  box-shadow: inset 1px 1px #ffffff, inset -1px 0 rgba(255, 255, 255, 0.6) !important;
+}
+.tab-content { padding-inline: 6px 3px !important; }
+.tab-label { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
+.tab-icon-image, .tab-throbber, .tab-icon-pending { margin-inline-end: 5px !important; }
+.tab-close-button {
+  width: 16px !important;
+  height: 16px !important;
+  padding: 3px !important;
+  margin-inline-end: 0 !important;
+  border-radius: 2px !important;
+}
+#tabs-newtab-button, #new-tab-button {
+  --toolbarbutton-inner-padding: 3px !important;
+  --toolbarbutton-outer-padding: 2px !important;
+  --toolbarbutton-border-radius: 3px !important;
+}
+#TabsToolbar .toolbarbutton-1 { align-self: center !important; }
+/*@END@*/
+
+/*@IF lhglass@*/
+/* the glass themes, composited: the band and the tab row are transparent in an ARGB window (mozilla.widget.use-argb-visuals)
+   over luxwm's glass plate (_LHWM_EXTEND_FRAME from settings.ini [extend_frame] firefox = 0 0 61 0: the band's 36 rows, the
+   tabs' 23 and luxwm's 2 lines; docs/CLIENT-PROTOCOL.md "Extended frames"); everything below them opaque. The menu bar,
+   shown, pushes the tabs below the glass: the tab row then gets the caption's colour behind it (flxp's look without glass) */
+:root, #main-window, body, #navigator-toolbox {
+  background: transparent !important;
+  appearance: none !important;
+}
+:root {
+  --toolbox-bgcolor: transparent !important;
+  --toolbox-bgcolor-inactive: transparent !important;
+  --lhde-lh-field: rgba(255, 255, 255, 0.4);
+  --lhde-lh-glow: 0 0 0.5em #ffffff, 0 0 0.5em #ffffff, 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+#browser, #navigator-toolbox ~ * { background-color: #ffffff !important; }
+#navigator-toolbox:has(#toolbar-menubar:not([inactive])) #TabsToolbar {
+  background-color: var(--lhde-ff4-frame) !important;
+  background-image: var(--lhde-ff4-frame-image) !important;
+  background-size: var(--lhde-ff4-frame-image-size) !important;
+  background-position: var(--lhde-ff4-frame-image-pos) !important;
+  background-repeat: no-repeat !important;
+}
+/*@END@*/
+
+/*@IF lhopaque@*/
+/* without glass (a theme without it, asked for with --look longhorn): the band and the tab row continue the caption luxwm
+   draws, its last row stretched as luxwm stretches the caption (as flxp's header shows luxwm's caption band continued) */
+:root {
+  --lhde-lh-field: rgba(255, 255, 255, 0.55);
+  --lhde-lh-glow: none;
+}
+#navigator-toolbox {
+  background-color: var(--lhde-ff4-frame) !important;
+  background-image: var(--lhde-ff4-frame-image) !important;
+  background-size: var(--lhde-ff4-frame-image-size) !important;
+  background-position: var(--lhde-ff4-frame-image-pos) !important;
+  background-repeat: no-repeat !important;
+  /* the line the content starts below, which luxwm draws on the glass */
+  box-shadow: inset 0 -1px var(--lhde-ff4-shadow), inset 0 -2px rgba(255, 255, 255, 0.4) !important;
+}
+:root:-moz-window-inactive #navigator-toolbox {
+  background-color: var(--lhde-ff4-frame-inactive) !important;
+  background-image: var(--lhde-ff4-frame-image-inactive) !important;
+  background-size: var(--lhde-ff4-frame-image-inactive-size) !important;
+  background-position: var(--lhde-ff4-frame-image-inactive-pos) !important;
+}
 /*@END@*/
 
 /*@IF ff4@*/
@@ -684,11 +1057,15 @@
 /* ---- the glass themes, composited: the menu bar and the tabs on luxwm's glass ----------------------------------------- */
 /* Firefox 4 on Windows 7 with glass extended the frame behind the menu bar and the tabs. Here luxwm does: Firefox runs with an
    ARGB window (user.js mozilla.widget.use-argb-visuals), leaves the top of its window transparent, and luxwm paints its glass
-   plate under it (_LHWM_EXTEND_FRAME, which luxwm sets on Firefox from settings.ini [extend_frame] firefox = 0 0 N 0:
-   lhde-firefox install writes N, the tab row's and the menu bar's rows; docs/CLIENT-PROTOCOL.md "Extended frames"). Only
-   while a compositor runs (-moz-gtk-csd-transparency-available; without one Firefox's window is opaque and the opaque rules
-   above stand). Firefox 4's own for glass (browser-aero.css, -moz-windows-compositor): no background on the tab row, its
-   shadow line moved to the navigation bar's top with 3.5 px corners, black text with a white glow on the glass. */
+   plate under it (_LHWM_EXTEND_FRAME, which luxwm sets on Firefox from settings.ini [extend_frame] firefox = 0 0 28 0:
+   lhde-firefox install writes the tab row's rows; docs/CLIENT-PROTOCOL.md "Extended frames"). Only while a compositor runs
+   (-moz-gtk-csd-transparency-available; without one Firefox's window is opaque and the opaque rules above stand). Firefox
+   4's own for glass (browser-aero.css, -moz-windows-compositor): no background on the tab row, black text with a white
+   glow on the glass. Its shadow line along the navigation bar's top is luxwm's here: the extension ends where the
+   navigation bar begins, so luxwm's inner edge lines run under the tab row and on down the sides of the opaque rows (the
+   frame's outline round the controls; an opaque row inside the extension has no edge at the sides, and the bar's rounded
+   corners left the plate's pixels out). The menu bar, shown, pushes the tab row below the glass: it then gets the caption's
+   colour behind it, as without glass. */
 @media (-moz-gtk-csd-transparency-available) {
   :root, #main-window, body, #navigator-toolbox, #titlebar {
     background: transparent !important;
@@ -708,11 +1085,13 @@
     text-shadow: 0 0 0.5em #ffffff, 0 0 0.5em #ffffff, 0 1px 0 rgba(255, 255, 255, 0.4) !important;
   }
   .tabbrowser-tab { text-shadow: none !important; }
-  #TabsToolbar { background: none !important; margin-bottom: -1px !important; position: relative !important; z-index: 1 !important; }
-  #nav-bar {
-    border-top: 1px solid rgba(26, 26, 26, 0.4) !important;
-    border-radius: 3.5px 3.5px 0 0 !important;
-    background-clip: padding-box !important;
+  #TabsToolbar { background: none !important; }
+  #navigator-toolbox:has(#toolbar-menubar:not([inactive])) #TabsToolbar {
+    background-color: var(--lhde-ff4-frame) !important;
+    background-image: var(--lhde-ff4-frame-image) !important;
+    background-size: var(--lhde-ff4-frame-image-size) !important;
+    background-position: var(--lhde-ff4-frame-image-pos) !important;
+    background-repeat: no-repeat !important;
   }
 }
 /*@END@*/
