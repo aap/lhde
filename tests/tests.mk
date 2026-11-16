@@ -58,7 +58,13 @@ $(SLOWFS): tests/headless/slowfs.c
 	@mkdir -p $(dir $@)
 	$(CC) -g -O1 -Wall -Wno-nonnull-compare -fPIC -shared -o $@ $< -pthread $(if $(filter Linux,$(shell uname -s)),-ldl,-lexecinfo)
 
-tests: $(TOOLKIT_TESTS) $(W32_TESTS) $(TEST_DATA) $(SLOWFS)
+# xcalls.so: the LD_PRELOAD shim that logs a program's X round trips and presents (tests/headless/xcalls.c, timerbusy.sh)
+XCALLS = build/tests/xcalls.so
+$(XCALLS): tests/headless/xcalls.c
+	@mkdir -p $(dir $@)
+	$(CC) -g -O1 -Wall -fPIC -shared -o $@ $< $(if $(filter Linux,$(shell uname -s)),-ldl,-lexecinfo)
+
+tests: $(TOOLKIT_TESTS) $(W32_TESTS) $(TEST_DATA) $(SLOWFS) $(XCALLS)
 w32test: $(W32_TESTS) $(TEST_DATA)
 check: all check-poison
 	tests/check.sh
