@@ -62,7 +62,7 @@ $(SLOWFS): tests/headless/slowfs.c
 XCALLS = build/tests/xcalls.so
 $(XCALLS): tests/headless/xcalls.c
 	@mkdir -p $(dir $@)
-	$(CC) -g -O1 -Wall -fPIC -shared -o $@ $< $(if $(filter Linux,$(shell uname -s)),-ldl,-lexecinfo)
+	$(CC) -g -O1 -Wall -fPIC -shared $(shell pkg-config --cflags x11 2>/dev/null) -o $@ $< $(if $(filter Linux,$(shell uname -s)),-ldl,-lexecinfo)
 
 tests: $(TOOLKIT_TESTS) $(W32_TESTS) $(TEST_DATA) $(SLOWFS) $(XCALLS)
 w32test: $(W32_TESTS) $(TEST_DATA)
