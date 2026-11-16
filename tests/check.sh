@@ -5,7 +5,7 @@
 #   ut-dump      the visual styles in $LHDE_STYLES (default: lhde-theme find styles, the
 #                Windows tree's index/styles)
 #   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, luxview.sh xprop, xwininfo and ImageMagick, luxfind.sh getfattr and setfattr, detailsrow.sh ImageMagick, filter.sh and runas.sh setfattr
-#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, luxview.sh xprop, xwininfo and ImageMagick, mupf.sh mupf (MuPDF), python3 and ImageMagick, detailsrow.sh ImageMagick, filter.sh and runas.sh setfattr
+#   headless/*   Xvfb and xdotool (clipboard.sh also xclip, luxshot.sh, luxattr.sh and properties.sh getfattr and setfattr, luxpad.sh python3, luxview.sh xprop, xwininfo and ImageMagick, mupf.sh mupf (MuPDF), python3 and ImageMagick, mupfheader.sh the same and xwininfo, an imported Longhorn style (picom for the glass), detailsrow.sh ImageMagick, filter.sh and runas.sh setfattr
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick, startmenu.sh xprop and python3, menushadow.sh
 #                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick, starticon.sh xprop and ImageMagick (luna when imported),
 #                thumbsmem.sh ImageMagick, slowpath.sh and slowpath-ui.sh python3 with PIL, thumbdocs.sh ImageMagick and pdftoppm or mutool (gs, ddjvu and c44 for its PS and DjVu), nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed, xsession.sh xprop and
@@ -213,6 +213,9 @@ else
     # mupf: a PDF written by mkpdf.py, ink on page 1, Page Down, the link, the search's hits, the Contents pane (skips without MuPDF)
     tests/headless/mupf.sh "$2" > "$T/mupf.log" 2>&1; rc=$?
     result "headless/mupf.sh$(grep -m1 '^skip' "$T/mupf.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/mupf.log"
+    # mupf's Longhorn header is the Explorer's: the bands of both windows identical but for the crumbs; the crumbs at work
+    tests/headless/mupfheader.sh "$3" > "$T/mupfheader.log" 2>&1; rc=$?
+    result "headless/mupfheader.sh$(grep -m1 '^skip' "$T/mupfheader.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/mupfheader.log"
     tests/headless/properties.sh "$3" > "$T/properties.log" 2>&1; rc=$?
     result "headless/properties.sh$(grep -m1 '^skip' "$T/properties.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/properties.log"
     # the window and program icons (lhde_app_icon): Open With, Properties' Opens with, luxshell's task buttons, Alt+Tab

@@ -236,7 +236,11 @@ the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
   scroll bars (Wine's user32 scroll bars, `SetScrollInfo` with `SIF_DISABLENOSCROLL`) drawing into its DIB section, a status
   bar of three parts, a dialog from the .rc (Go To Page), `GetOpenFileNameW`, `DragAcceptFiles`, `FlxpSetFullscreen`; from the
   shell layer `properties`, `spawn` (a link's web address through xdg-open), `message_box`, `set_window_icon_key`, and
-  liblhde's state file. `tests/headless/mupf.sh` drives it on a PDF written by `tests/headless/mkpdf.py`, what it shows read
+  liblhde's state file. Under the Longhorn themes it is the example of the Longhorn header (`shell/lhheader.h`): the
+  outline's path to the page as the crumbs, the leaf "Page N of M" changed alone as the pages scroll (`set_leaf`), the
+  drop-downs from the outline, its own history behind Back and Forward, the address edit for a page number, the search box
+  and the star hidden, the menu as a menu band below the header and the toolbar below that (`CCS_NOMOVEY`: it stays where
+  the layout puts it); `tests/headless/mupfheader.sh` compares its header with the Explorer's. `tests/headless/mupf.sh` drives it on a PDF written by `tests/headless/mkpdf.py`, what it shows read
   from `MUPF_TRACE=1`. What it had to work around: an Alt+key accelerator leaves DefWindowProc thinking Alt was pressed alone
   (releasing it opens the menu bar), so Alt+Left and Alt+Right go on to it from the loop; a strip drawn on a key colour into a
   `CreateCompatibleBitmap` and added with `ImageList_AddMasked` showed black where the key was in some cells, so the glyphs

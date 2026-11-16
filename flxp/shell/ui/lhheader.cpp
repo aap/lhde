@@ -328,6 +328,8 @@ int text_width(HDC dc, HFONT f, const std::string& s, int* ascent)
     return sz.cx;
 }
 
+RECT arrow_box(int i);
+
 void layout()
 {
     if (!g_wnd) return;
@@ -378,6 +380,15 @@ void layout()
         x += cw + step;
     }
     ReleaseDC(g_wnd, dc);
+    // LHHEADER_TRACE=1 (tests): each segment shown, its text box and its chevron's centre, in the header's coordinates
+    if (getenv("LHHEADER_TRACE"))
+        for (size_t i = 0; i < n; i++) {
+            const RECT& t = g_crumbs[i].text;
+            if (IsRectEmpty(&t)) continue;
+            RECT a = arrow_box((int)i);
+            fprintf(stderr, "lhheader crumb %zu %d %d %d %d chevron %d %d %s\n", i, (int)t.left, (int)t.top, (int)t.right, (int)t.bottom,
+                    (int)(a.left + a.right) / 2, (int)(a.top + a.bottom) / 2, g_crumbs[i].shown.c_str());
+        }
     // the tools: right to left from where the crumbs must end, on their row
     int tx = crumb_limit(R) + 12 + tools_width() - 8, ty = crumb_baseline() - 5 - TOOL_H / 2;
     for (int i = (int)g_tools.size() - 1; i >= 0; i--) {
