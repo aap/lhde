@@ -108,8 +108,8 @@ struct App {
     // chrome
     bool show_toolbar = true, show_status = true, fullscreen = false;
     bool large_header = false;          // View > Large Header: the Explorer's size, else the Small one (sync_header)
-    // [view] autoscroll: the middle button's autoscroll, on by default; 0 turns it off (for a TrackPoint whose middle
-    // button scrolls in the X server, libinput's button scrolling, and still delivers a click on release)
+    // flxp.ini's mupf_autoscroll: the middle button's autoscroll, on by default; 0 turns it off (for a TrackPoint whose
+    // middle button scrolls in the X server, libinput's button scrolling, and still delivers a click on release)
     bool autoscroll_on = true;
     // the Contents pane: the document's outline in a tree
     HWND tree = nullptr;
@@ -226,7 +226,7 @@ void save_state()
     put("window", "height", wp.rcNormalPosition.bottom - wp.rcNormalPosition.top);
     put("window", "maximized", wp.showCmd == SW_SHOWMAXIMIZED || (wp.flags & WPF_RESTORETOMAXIMIZED) ? 1 : 0);
     put("view", "toolbar", g.show_toolbar);
-    put("view", "autoscroll", g.autoscroll_on);
+    lhde_ini_set(s, "view", "autoscroll", nullptr);   // (the switch is flxp.ini's mupf_autoscroll: a choice, not a memory)
     put("view", "statusbar", g.show_status);
     put("view", "contents", g.show_toc);
     put("view", "contents_width", g.toc_w);
@@ -252,7 +252,8 @@ void load_state(int* x, int* y, int* w, int* h, bool* maxed)
     g.show_toc = state_int(st, "view", "contents", 0) != 0;
     g.toc_w = std::max(PANE_MIN, state_int(st, "view", "contents_width", PANE_DEFAULT));
     g.large_header = state_int(st, "view", "large_header", 0) != 0;
-    g.autoscroll_on = state_int(st, "view", "autoscroll", 1) != 0;
+    // (not mupf.ini's [view] autoscroll, which a build that had it off by default wrote into every mupf.ini it saved)
+    g.autoscroll_on = shell::setting_flag("mupf_autoscroll", true);
     int m = state_int(st, "view", "layout", MODE_CONTINUOUS);
     g.mode = m >= MODE_SINGLE && m <= MODE_CONTINUOUS_FACING ? (Mode)m : MODE_CONTINUOUS;
     g.cover = state_int(st, "view", "cover", 0) != 0;
@@ -1330,8 +1331,8 @@ void command(int id)
         g.show_toc = !g.show_toc;
         trace("contents %s", g.show_toc ? "shown" : "hidden");
         layout_chrome();
-        if (g.show_toc) SetFocus(g.tree);
-        else SetFocus(g.view);
+        // the keys stay with the pages: the tree takes the focus when it is clicked (or tabbed to), not when it is shown
+        if (!g.show_toc && GetFocus() == g.tree) SetFocus(g.view);
         break;
     case CMD_ZOOM_IN: if (g.opened) set_zoom(Z_CUSTOM, zoom_in(g.zoom), centre_anchor()); break;
     case CMD_ZOOM_OUT: if (g.opened) set_zoom(Z_CUSTOM, zoom_out(g.zoom), centre_anchor()); break;
