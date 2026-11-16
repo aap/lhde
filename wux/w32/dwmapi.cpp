@@ -162,6 +162,14 @@ HRESULT WINAPI FlxpDwmSetInputHole(HWND h, const RECT* rc)
     return S_OK;
 }
 
+HRESULT WINAPI FlxpDwmSetActiveDrawn(HWND h, INT state)
+{
+    win::Window* w = toplevel(h);
+    if (!w) return E_INVALIDARG;
+    win::set_active_drawn(w, state);
+    return S_OK;
+}
+
 HRESULT WINAPI FlxpDwmIsWindowActive(HWND h, BOOL* active)
 {
     win::Window* w = toplevel(h);

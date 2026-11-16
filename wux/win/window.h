@@ -193,6 +193,7 @@ std::string frame_theme();                      // the WM's _LHWM_THEME (luxwm's
 gdi::Bitmap* header_pixmap(Window* w);          // luxwm's _LHWM_HEADER_PIXMAP copied (caller destroys), null if none
 bool caption_rect(Window* w, Rect& r);          // _LHWM_CAPTION_RECT: luxwm's caption buttons, client coordinates
 void set_input_hole(Window* w, const Rect* r);  // clicks in r go through to the window manager (null: none)
+void set_active_drawn(Window* w, int state);    // _LHWM_ACTIVE_DRAWN: the activation state its header shows (-1: none)
 void set_shape(Window* w, const std::vector<Rect>* rects);   // a toplevel's shape (SetWindowRgn; null: rectangular)
 void set_drop_shadow(Window* w, int size, int (*alpha)(int, int, int, int));   // a popup's drop shadow (sys::set_drop_shadow)
 // SPI_GETDROPSHADOW / SPI_SETDROPSHADOW: XP's "Show shadows under menus" (on by default), for the popups created after it

@@ -152,7 +152,8 @@ int g_nav_hot = NONE, g_nav_pressed = NONE;
 enum Mode { GLASS, NAVBAR, PIXMAP };
 Mode g_mode = GLASS;
 bool g_active = true;
-HBITMAP g_pix;                       // luxwm's _LHWM_HEADER_PIXMAP, copied
+int g_drawn = -1;                    // the activation state last published as _LHWM_ACTIVE_DRAWN (-1: none; publish_drawn)
+HBITMAP g_pix;                     // luxwm's _LHWM_HEADER_PIXMAP, copied
 int g_pix_w, g_pix_h;
 bool g_pix_stale = true;
 bool g_search_open;                  // navigation bar: the search box is out
@@ -3035,6 +3036,8 @@ void destroy()
     if (vision()) vision_off();
     g_fixed_title.clear();
     set_tools({});
+    if (g_wnd && g_drawn >= 0) FlxpDwmSetActiveDrawn(GetAncestor(g_wnd, GA_ROOT), -1);   // no header follows the activation now
+    g_drawn = -1;
     if (g_wnd) DestroyWindow(g_wnd);      // the search box with it
     g_wnd = g_edit = g_addr = nullptr;
     g_editing = g_bar_hot = false;
@@ -3140,15 +3143,33 @@ void state_changed()
     if (g_wnd) InvalidateRect(g_wnd, nullptr, TRUE);
 }
 
+// docs/CLIENT-PROTOCOL.md "Activation in step". DWM composes the frame and the
+// client's extended header together, so on Windows both change in one frame.
+// luxwm paints its frame in a new activation state once the header says it
+// shows that state: the window is painted (the header, and whatever else the
+// activation invalidated: the menu band, the list's selection) and presented
+// now, then the state published.
+static void publish_drawn()
+{
+    if (!g_wnd || g_drawn == (int)g_active) return;
+    HWND top = GetAncestor(g_wnd, GA_ROOT);
+    RedrawWindow(top, nullptr, nullptr, RDW_UPDATENOW | RDW_ALLCHILDREN);
+    DwmFlush();
+    FlxpDwmSetActiveDrawn(top, g_active ? 1 : 0);
+    g_drawn = g_active;
+}
+
 void set_active(bool active)
 {
-    if (active == g_active) return;
-    g_active = active;
-    // the navigation bar's variant and the title colours change now; luxwm's
-    // pixmap variant arrives as WM_FLXP_DWMHEADERCHANGED (re-read then)
-    g_pix_stale = true;
-    if (vision() && g_wnd) vision_metrics();
-    if (g_wnd) InvalidateRect(g_wnd, nullptr, TRUE);
+    if (active != g_active) {
+        g_active = active;
+        // the navigation bar's variant and the title colours change now; luxwm's
+        // pixmap variant is published before the activation (re-read on the paint)
+        g_pix_stale = true;
+        if (vision() && g_wnd) vision_metrics();
+        if (g_wnd) InvalidateRect(g_wnd, nullptr, TRUE);
+    }
+    publish_drawn();
 }
 
 void pixmap_changed()
