@@ -2,10 +2,10 @@
 Type=Application
 Name=mupf
 GenericName=Document Viewer
-Comment=View PDF, XPS and EPUB documents the Windows XP way
+Comment=View PDF, XPS, EPUB documents and Markdown files the Windows XP way
 Exec=@BINDIR@/mupf %f
 TryExec=@BINDIR@/mupf
 Terminal=false
-MimeType=application/pdf;application/x-pdf;application/oxps;application/vnd.ms-xpsdocument;application/epub+zip;application/vnd.comicbook+zip;application/x-cbz;application/x-fictionbook+xml;application/x-mobipocket-ebook;
+MimeType=application/pdf;application/x-pdf;application/oxps;application/vnd.ms-xpsdocument;application/epub+zip;application/vnd.comicbook+zip;application/x-cbz;application/x-fictionbook+xml;application/x-mobipocket-ebook;text/markdown;
 Categories=Office;Viewer;
 StartupWMClass=mupf

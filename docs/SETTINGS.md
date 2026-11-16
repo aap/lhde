@@ -198,7 +198,8 @@ user's choice for a type beats the role file, the role file beats lhde's default
 `XDG_CURRENT_DESKTOP=lhde` (another session) lhde's file is not read.
 
 lhde's defaults: `inode/directory` = `flxp.desktop`, `text/plain` = `luxpad.desktop`, PNG, JPEG, BMP, WebP and ICO
-`luxview.desktop`, PDF, XPS (`application/oxps`, `application/vnd.ms-xpsdocument`) and EPUB `mupf.desktop` (a program not
+`luxview.desktop`, PDF, XPS (`application/oxps`, `application/vnd.ms-xpsdocument`), EPUB and Markdown (`text/markdown`: `.md`, `.markdown`,
+`.mkd`; a `README` without an extension is `text/plain`) `mupf.desktop` (a program not
 installed is passed over, the next file's default taken). A desktop-specific file holds
 `[Default Applications]` only: its Added and Removed Associations are not read (the spec; GLib warns about them, `lhde-mime
 check` reports them), so taking a program off a type is done in `mimeapps.list`.
@@ -246,7 +247,7 @@ over indented lines without `=`.
 
 | role | label | types | lhde's default |
 | --- | --- | --- | --- |
-| `editor` | Text editor | `text/plain` and every type below it, but other media (`image/*`, `audio/*`, `video/*`, `model/*`, `chemical/*`, `message/*`), word processors' documents (RTF, AbiWord, LyX, the flat OpenDocument files), launchers and shortcuts (`.desktop`, `.url`, JNLP, Flatpak refs), other programs' project files, fonts, signatures, bookmarks, playlists | `luxpad.desktop`, then the usual editors |
+| `editor` | Text editor | `text/plain` and every type below it, but other media (`image/*`, `audio/*`, `video/*`, `model/*`, `chemical/*`, `message/*`), word processors' documents (RTF, AbiWord, LyX, the flat OpenDocument files), launchers and shortcuts (`.desktop`, `.url`, JNLP, Flatpak refs), other programs' project files, fonts, signatures, bookmarks, playlists; Markdown (`text/markdown`), which is in no role: lhde's default gives it to mupf, and a role would give it to whatever document viewer or editor were chosen, which may not render it | `luxpad.desktop`, then the usual editors |
 | `images` | Image viewer | `image/*` but drawings (SVG, WMF, EMF, CGM, CAD, Xfig, Skencil), the page formats (EPS, DjVu), the editors' own files (XCF, GIMP brushes, Photoshop, OpenRaster), 3D scenes, cursors | `luxview.desktop`, then feh, nsxiv, sxiv, eog, Loupe, ristretto, ... |
 | `pdf` | Document viewer | PDF (and compressed), PostScript (and EPS), DjVu, XPS | mupf, mupdf, zathura, evince, ... |
 | `browser` | Web browser | `text/html`, `application/xhtml+xml`, `x-scheme-handler/http`, `https` | firefox, librewolf, chromium, ... |
