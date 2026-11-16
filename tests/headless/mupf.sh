@@ -215,12 +215,14 @@ else
     xdotool mousemove $MX $((MY + 60)); sleep .5
     y1=$(last scroll | cut -d' ' -f2)
     [ "$y1" -gt "$y0" ] 2>/dev/null && ok "a later motion scrolls: from $y0 to $y1" || bad "the sticky autoscroll did not scroll: $y0 to $y1"
-    # the origin mark where the button went down, its dark dot in the middle, gone when the mode ends
+    # the origin mark where the button went down, its dark dot in the middle, gone when the mode ends (the screenshot holds
+    # the X server for 50 ms or more, so the steps are judged before it: the marker line in the log)
+    echo "screenshot" >> $T/out.log
     import -window root $T/auto1.png
     expect "the origin mark's dot where the click was" $T/auto1.png $MX $MY 48,48,48
     # the steps (autoscroll step TICK DX,DY SX,SY): a step a timer tick (16 ms), none more than 50 ms after the one before,
     # a few pixels each (8 or 9 at 60 px from the mark), no leap
-    steps=$(sed -n '/^autoscroll sticky/,$p' $T/out.log | grep '^autoscroll step' | awk '
+    steps=$(sed -n '/^autoscroll sticky/,/^screenshot$/p' $T/out.log | grep '^autoscroll step' | awk '
         { split($4, d, ","); if (n++) { g = $3 - t; if (g > gap) gap = g; sum += g } t = $3; if (d[2] > big) big = d[2] }
         END { if (n > 1) printf "%d %d %d %d", n, sum / (n - 1), gap, big }')
     set -- $steps
