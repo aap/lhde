@@ -40,7 +40,10 @@ const UINT WM_ENGINE = WM_APP + 1;
 const int CACHE_BUDGET = 64 << 20;     // the rendered pages kept (layout.h's Cache)
 const int LINE = 40;                   // an arrow key's or a wheel notch's third, in pixels
 const int PREFETCH_AHEAD = 2, PREFETCH_BEHIND = 1;
-const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_PAGE_OF = 14;
+const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_PAGE_OF = 14, ID_TREE = 15;
+// the Contents pane: XP's Explorer bar (a title row with its close button over a tree, a splitter beside it); the sizes
+// are mupf's
+const int PANE_TITLE = 22, SPLITTER = 4, PANE_MIN = 80, PANE_DEFAULT = 200;
 
 enum ZoomMode { Z_CUSTOM, Z_FIT_PAGE, Z_FIT_WIDTH };
 
@@ -72,6 +75,12 @@ struct App {
     bool in_layout = false;
     // chrome
     bool show_toolbar = true, show_status = true, fullscreen = false;
+    // the Contents pane: the document's outline in a tree
+    HWND tree = nullptr;
+    bool show_toc = false, splitting = false;
+    int toc_w = PANE_DEFAULT;
+    std::vector<TocItem> toc;
+    RECT pane = {}, pane_close = {};
     // the back buffer
     HDC mem = nullptr;
     HBITMAP back = nullptr;
@@ -141,6 +150,8 @@ void save_state()
     put("window", "maximized", wp.showCmd == SW_SHOWMAXIMIZED || (wp.flags & WPF_RESTORETOMAXIMIZED) ? 1 : 0);
     put("view", "toolbar", g.show_toolbar);
     put("view", "statusbar", g.show_status);
+    put("view", "contents", g.show_toc);
+    put("view", "contents_width", g.toc_w);
     put("view", "layout", g.mode);
     put("view", "cover", g.cover);
     put("view", "zoom_mode", g.zmode);
@@ -159,6 +170,8 @@ void load_state(int* x, int* y, int* w, int* h, bool* maxed)
     *maxed = state_int(st, "window", "maximized", 0) != 0;
     g.show_toolbar = state_int(st, "view", "toolbar", 1) != 0;
     g.show_status = state_int(st, "view", "statusbar", 1) != 0;
+    g.show_toc = state_int(st, "view", "contents", 0) != 0;
+    g.toc_w = std::max(PANE_MIN, state_int(st, "view", "contents_width", PANE_DEFAULT));
     int m = state_int(st, "view", "layout", MODE_CONTINUOUS);
     g.mode = m >= MODE_SINGLE && m <= MODE_CONTINUOUS_FACING ? (Mode)m : MODE_CONTINUOUS;
     g.cover = state_int(st, "view", "cover", 0) != 0;
@@ -547,6 +560,8 @@ void paint_view(HDC dc)
 
 void engine_notify(void*) { PostMessageW(g.wnd, WM_ENGINE, 0, 0); }
 
+void fill_toc();
+
 void close_doc()
 {
     if (g.eng) g.eng->close();
@@ -555,6 +570,8 @@ void close_doc()
     g.pages = 0;
     g.sizes.clear();
     g.links.clear();
+    g.toc.clear();
+    fill_toc();
     g.title.clear();
     g.format.clear();
     g.error.clear();
@@ -592,6 +609,8 @@ void on_engine()
             g.sizes = e.sizes;
             g.title = e.title;
             g.format = e.format;
+            g.toc = std::move(e.toc);
+            fill_toc();
             g.current = 0;
             g.sx = g.sy = 0;
             set_status(0, "");
@@ -716,6 +735,7 @@ void update_menu()
     auto enable = [&](UINT id, bool on) { EnableMenuItem(m, id, MF_BYCOMMAND | (on ? MF_ENABLED : MF_GRAYED)); };
     check(CMD_TOOLBAR, g.show_toolbar);
     check(CMD_STATUSBAR, g.show_status);
+    check(CMD_CONTENTS, g.show_toc);
     CheckMenuRadioItem(m, CMD_SINGLE, CMD_CONT_FACING, CMD_SINGLE + g.mode, MF_BYCOMMAND);
     check(CMD_COVER, g.cover);
     enable(CMD_COVER, is_facing(g.mode));
@@ -773,6 +793,13 @@ void command(int id)
     case CMD_EXIT: PostMessageW(g.wnd, WM_CLOSE, 0, 0); break;
     case CMD_TOOLBAR: g.show_toolbar = !g.show_toolbar; layout_chrome(); break;
     case CMD_STATUSBAR: g.show_status = !g.show_status; layout_chrome(); break;
+    case CMD_CONTENTS:
+        g.show_toc = !g.show_toc;
+        trace("contents %s", g.show_toc ? "shown" : "hidden");
+        layout_chrome();
+        if (g.show_toc) SetFocus(g.tree);
+        else SetFocus(g.view);
+        break;
     case CMD_ZOOM_IN: if (g.opened) set_zoom(Z_CUSTOM, zoom_in(g.zoom), centre_anchor()); break;
     case CMD_ZOOM_OUT: if (g.opened) set_zoom(Z_CUSTOM, zoom_out(g.zoom), centre_anchor()); break;
     case CMD_ACTUAL: if (g.opened) set_zoom(Z_CUSTOM, 1.0, centre_anchor()); break;
@@ -1024,8 +1051,93 @@ void apply_font()
     ncm.cbSize = sizeof ncm;
     SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0);
     g.font = CreateFontIndirectW(&ncm.lfMessageFont);
-    for (HWND h : { g.page_edit, g.page_of })
+    for (HWND h : { g.page_edit, g.page_of, g.tree })
         if (h) SendMessageW(h, WM_SETFONT, (WPARAM)g.font, TRUE);
+}
+
+// ---- the Contents pane -------------------------------------------------------------------------------------------------
+
+// the outline into the tree: an item a row, its children under it, expanded when the document says so
+void fill_toc()
+{
+    if (!g.tree) return;
+    SendMessageW(g.tree, WM_SETREDRAW, FALSE, 0);
+    SendMessageW(g.tree, TVM_DELETEITEM, 0, (LPARAM)TVI_ROOT);
+    std::vector<HTREEITEM> parents, open;
+    for (size_t i = 0; i < g.toc.size(); i++) {
+        const TocItem& t = g.toc[i];
+        int level = std::min(t.level, (int)parents.size());
+        parents.resize(level);
+        std::u16string text = W(t.title);
+        TVINSERTSTRUCTW ins = {};
+        ins.hParent = parents.empty() ? TVI_ROOT : parents.back();
+        ins.hInsertAfter = TVI_LAST;
+        ins.item.mask = TVIF_TEXT | TVIF_PARAM;
+        ins.item.pszText = (LPWSTR)text.c_str();
+        ins.item.lParam = (LPARAM)i;
+        HTREEITEM h = (HTREEITEM)SendMessageW(g.tree, TVM_INSERTITEMW, 0, (LPARAM)&ins);
+        parents.push_back(h);
+        if (t.open) open.push_back(h);
+    }
+    for (HTREEITEM h : open) SendMessageW(g.tree, TVM_EXPAND, TVE_EXPAND, (LPARAM)h);   // once the children are in
+    SendMessageW(g.tree, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(g.tree, nullptr, TRUE);
+    trace("toc %zu", g.toc.size());
+}
+
+// the trace of the rows on screen: "tocitem INDEX X Y TITLE", the middle of each row's text in root coordinates
+void trace_toc()
+{
+    if (!g.trace || !g.tree || !IsWindowVisible(g.tree)) return;
+    for (HTREEITEM h = (HTREEITEM)SendMessageW(g.tree, TVM_GETNEXTITEM, TVGN_FIRSTVISIBLE, 0); h;
+         h = (HTREEITEM)SendMessageW(g.tree, TVM_GETNEXTITEM, TVGN_NEXTVISIBLE, (LPARAM)h)) {
+        RECT r;
+        *(HTREEITEM*)&r = h;
+        if (!SendMessageW(g.tree, TVM_GETITEMRECT, TRUE, (LPARAM)&r)) continue;
+        TVITEMW it = {};
+        it.mask = TVIF_PARAM;
+        it.hItem = h;
+        SendMessageW(g.tree, TVM_GETITEMW, 0, (LPARAM)&it);
+        POINT c = { (r.left + r.right) / 2, (r.top + r.bottom) / 2 };
+        ClientToScreen(g.tree, &c);
+        if (it.lParam >= 0 && (size_t)it.lParam < g.toc.size())
+            trace("tocitem %d %d %d %s", (int)it.lParam, (int)c.x, (int)c.y, g.toc[it.lParam].title.c_str());
+    }
+}
+
+void toc_go(HTREEITEM h)
+{
+    if (!h) return;
+    TVITEMW it = {};
+    it.mask = TVIF_PARAM;
+    it.hItem = h;
+    if (!SendMessageW(g.tree, TVM_GETITEMW, 0, (LPARAM)&it) || it.lParam < 0 || (size_t)it.lParam >= g.toc.size()) return;
+    const TocItem& t = g.toc[it.lParam];
+    trace("toc go %s page %d", t.title.c_str(), t.page + 1);
+    if (t.page >= 0) go_page(t.page, t.y);
+}
+
+// the pane's title row: the name on the face colour and the close button's cross (the two of XP's Explorer bar)
+void paint_pane(HDC dc)
+{
+    if (IsRectEmpty(&g.pane)) return;
+    RECT title = { g.pane.left, g.pane.top, g.pane.right, g.pane.top + PANE_TITLE };
+    FillRect(dc, &title, GetSysColorBrush(COLOR_3DFACE));
+    HGDIOBJ of = SelectObject(dc, g.font);
+    SetBkMode(dc, TRANSPARENT);
+    SetTextColor(dc, GetSysColor(COLOR_BTNTEXT));
+    RECT tr = { title.left + 6, title.top, g.pane_close.left - 4, title.bottom };
+    DrawTextW(dc, L"Contents", -1, &tr, DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | DT_NOPREFIX);
+    SelectObject(dc, of);
+    HPEN pen = CreatePen(PS_SOLID, 1, GetSysColor(COLOR_BTNTEXT));
+    HGDIOBJ op = SelectObject(dc, pen);
+    int cx = (g.pane_close.left + g.pane_close.right) / 2, cy = (g.pane_close.top + g.pane_close.bottom) / 2;
+    for (int d = 0; d < 2; d++) {
+        MoveToEx(dc, cx - 4 + d, cy - 4, nullptr); LineTo(dc, cx + 4 + d, cy + 4);
+        MoveToEx(dc, cx + 3 + d, cy - 4, nullptr); LineTo(dc, cx - 5 + d, cy + 4);
+    }
+    SelectObject(dc, op);
+    DeleteObject(pen);
 }
 
 // ---- the frame's layout ------------------------------------------------------------------------------------------------
@@ -1054,8 +1166,19 @@ void layout_chrome()
         SendMessageW(g.status, SB_SETPARTS, 3, (LPARAM)parts);
     }
     int left = 0;
+    bool pane = g.show_toc && !g.fullscreen;
+    ShowWindow(g.tree, pane ? SW_SHOW : SW_HIDE);
+    if (pane) {
+        int w = std::max(PANE_MIN, std::min(g.toc_w, (int)rc.right - PANE_MIN));
+        g.pane = { 0, top, w, bottom };
+        g.pane_close = { w - 4 - 16, top + (PANE_TITLE - 14) / 2, w - 4, top + (PANE_TITLE - 14) / 2 + 14 };
+        MoveWindow(g.tree, 0, top + PANE_TITLE, w, std::max(1, bottom - top - PANE_TITLE), TRUE);
+        left = w + SPLITTER;
+    } else g.pane = g.pane_close = {};
+    InvalidateRect(g.wnd, nullptr, TRUE);
     MoveWindow(g.view, left, top, std::max(1, (int)rc.right - left), std::max(1, bottom - top), TRUE);
     update_menu();
+    trace_toc();
 }
 
 // ---- the view's window -------------------------------------------------------------------------------------------------
@@ -1211,6 +1334,47 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case WM_SETFOCUS:
         if (g.view) SetFocus(g.view);
         return 0;
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC dc = BeginPaint(hwnd, &ps);
+        paint_pane(dc);
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+    case WM_SETCURSOR:
+        if ((HWND)wp == hwnd && LOWORD(lp) == HTCLIENT && !IsRectEmpty(&g.pane)) {
+            POINT p;
+            GetCursorPos(&p);
+            ScreenToClient(hwnd, &p);
+            if (p.x >= g.pane.right && p.x < g.pane.right + SPLITTER && p.y >= g.pane.top && p.y < g.pane.bottom) {
+                SetCursor(LoadCursorW(nullptr, (LPCWSTR)IDC_SIZEWE));
+                return TRUE;
+            }
+        }
+        break;
+    case WM_LBUTTONDOWN: {
+        POINT p = { (short)LOWORD(lp), (short)HIWORD(lp) };
+        if (PtInRect(&g.pane_close, p)) { command(CMD_CONTENTS); return 0; }
+        if (!IsRectEmpty(&g.pane) && p.x >= g.pane.right && p.x < g.pane.right + SPLITTER) {
+            g.splitting = true;
+            SetCapture(hwnd);
+        }
+        return 0;
+    }
+    case WM_MOUSEMOVE:
+        if (g.splitting) {
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            g.toc_w = std::max(PANE_MIN, std::min((int)(short)LOWORD(lp), (int)rc.right - PANE_MIN));
+            layout_chrome();
+        }
+        return 0;
+    case WM_LBUTTONUP:
+        if (g.splitting) { g.splitting = false; ReleaseCapture(); }
+        return 0;
+    case WM_CAPTURECHANGED:
+        g.splitting = false;
+        return 0;
     case WM_INITMENUPOPUP:
         update_menu();
         return 0;
@@ -1219,6 +1383,31 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         break;
     case WM_NOTIFY: {
         NMHDR* n = (NMHDR*)lp;
+        if (n->hwndFrom == g.tree) {
+            if (n->code == NM_CLICK) {   // a click on a row goes there, the row already selected or not
+                TVHITTESTINFO hit = {};
+                GetCursorPos(&hit.pt);
+                ScreenToClient(g.tree, &hit.pt);
+                HTREEITEM h = (HTREEITEM)SendMessageW(g.tree, TVM_HITTEST, 0, (LPARAM)&hit);
+                if (h && (hit.flags & TVHT_ONITEM)) {
+                    SendMessageW(g.tree, TVM_SELECTITEM, TVGN_CARET, (LPARAM)h);
+                    toc_go(h);
+                    update_toolbar();
+                }
+                return 0;
+            }
+            if (n->code == TVN_SELCHANGEDW && ((NMTREEVIEWW*)lp)->action == TVC_BYKEYBOARD) {
+                toc_go(((NMTREEVIEWW*)lp)->itemNew.hItem);
+                update_toolbar();
+                return 0;
+            }
+            if (n->code == TVN_KEYDOWN && ((NMTVKEYDOWN*)lp)->wVKey == VK_RETURN) {
+                toc_go((HTREEITEM)SendMessageW(g.tree, TVM_GETNEXTITEM, TVGN_CARET, 0));
+                SetFocus(g.view);
+                return 0;
+            }
+            if (n->code == TVN_ITEMEXPANDEDW) trace_toc();
+        }
         if (n->code == TTN_GETDISPINFOW) {
             NMTTDISPINFOW* d = (NMTTDISPINFOW*)lp;
             static std::u16string tip;
@@ -1305,6 +1494,9 @@ int main(int argc, char** argv)
                                (HMENU)(INT_PTR)ID_STATUS, nullptr, nullptr);
     g.view = CreateWindowExW(WS_EX_CLIENTEDGE, L"mupf_view", nullptr, WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP,
                              0, 0, 10, 10, g.wnd, (HMENU)(INT_PTR)ID_VIEW, nullptr, nullptr);
+    g.tree = CreateWindowExW(WS_EX_CLIENTEDGE, WC_TREEVIEWW, nullptr,
+                             WS_CHILD | WS_TABSTOP | TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS,
+                             0, 0, 10, 10, g.wnd, (HMENU)(INT_PTR)ID_TREE, nullptr, nullptr);
     apply_font();
     DragAcceptFiles(g.wnd, TRUE);
     g.eng = new Engine(engine_notify, nullptr);
