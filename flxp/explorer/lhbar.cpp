@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <string>
 #include <vector>
+#include "w32/w32.h"
 #include "lhbar.h"
 #include "shell/config.h"
 #include "shell/lhdata.h"

@@ -26,6 +26,7 @@
 #include <vector>
 #include "wux/wux.h"
 #include "shell/shell.h"
+#include "explorer/lhbar.h"   // the Explorer's 4051 command bar under the header (docs/APPLICATIONS.md "mupf")
 #include "lhde/settings.h"
 #include "engine.h"
 #include "layout.h"
@@ -119,6 +120,13 @@ struct App {
     std::string status_text[3], shown_trace;
 };
 App g;
+
+// the toolbar is a band on the menu band's row (under the Longhorn header: make_toolbar)
+bool in_band() { return g.toolbar && GetParent(g.toolbar) == g.rebar && g.rebar; }
+bool bar_drawn() { return in_band() && lhbar::enabled(); }   // lhbar draws the buttons (no TBSTATE_CHECKED: its dither)
+
+bool band_checked(int id) { return (id == CMD_FIT_PAGE && g.zmode == Z_FIT_PAGE) || (id == CMD_FIT_WIDTH && g.zmode == Z_FIT_WIDTH); }
+
 
 void trace(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
 void trace(const char* fmt, ...)
@@ -996,8 +1004,11 @@ void update_toolbar()
     en(CMD_PREV, d && step_page(-1) >= 0);
     en(CMD_NEXT, d && step_page(1) >= 0);
     for (int id : { CMD_ZOOM_IN, CMD_ZOOM_OUT, CMD_ACTUAL, CMD_FIT_PAGE, CMD_FIT_WIDTH }) en(id, d);
-    SendMessageW(g.toolbar, TB_CHECKBUTTON, CMD_FIT_PAGE, MAKELONG(g.zmode == Z_FIT_PAGE, 0));
-    SendMessageW(g.toolbar, TB_CHECKBUTTON, CMD_FIT_WIDTH, MAKELONG(g.zmode == Z_FIT_WIDTH, 0));
+    if (bar_drawn()) InvalidateRect(g.toolbar, nullptr, TRUE);   // band_checked
+    else {
+        SendMessageW(g.toolbar, TB_CHECKBUTTON, CMD_FIT_PAGE, MAKELONG(g.zmode == Z_FIT_PAGE, 0));
+        SendMessageW(g.toolbar, TB_CHECKBUTTON, CMD_FIT_WIDTH, MAKELONG(g.zmode == Z_FIT_WIDTH, 0));
+    }
     EnableWindow(g.page_edit, d);
     if (g.header) shell::lhheader::set_history(d && !g.back_pages.empty(), d && !g.fwd_pages.empty());
 }
@@ -1271,17 +1282,28 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 }
 
 // the toolbar (mupf's taste: Open | Previous, Next, the page box | Zoom Out, Zoom In | Actual Size, Fit Page, Fit Width |
-// the find box and Find Next, as Acrobat 6 had its Find box in the toolbar); CCS_NOMOVEY: it stays where layout_chrome puts
-// it, the top, or below the Longhorn header and the menu band
-void make_toolbar()
+// the find box and Find Next, as Acrobat 6 had its Find box in the toolbar). Under the XP themes a toolbar of its own at the
+// top (CCS_NOMOVEY: it stays where layout_chrome puts it); under the Longhorn header a band on the menu band's row, as the
+// Explorer's 4051 command bar (flxp/explorer/explorer.cpp, lhtool): a flat list toolbar in the rebar, no gripper, its band
+// header 30 px (4051's gap from Help to the first button), on the folder type's gradient (lhbar) with its frames.
+void make_toolbar(bool band)
 {
-    g.toolbar = CreateWindowExW(0, TOOLBARCLASSNAMEW, nullptr,
-                                WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS | CCS_NOMOVEY | CCS_NODIVIDER, 0, 0, 0, 0, g.wnd,
+    DWORD style = WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS | CCS_NODIVIDER;
+    style |= band ? WS_CLIPSIBLINGS | TBSTYLE_LIST | TBSTYLE_TRANSPARENT | CCS_NORESIZE | CCS_NOPARENTALIGN : CCS_NOMOVEY;
+    g.toolbar = CreateWindowExW(0, TOOLBARCLASSNAMEW, nullptr, style, 0, 0, 0, 0, band ? g.rebar : g.wnd,
                                 (HMENU)(INT_PTR)ID_TOOLBAR, nullptr, nullptr);
+    if (band && lhbar::enabled()) SetWindowTheme(g.toolbar, L"", L"");   // drawn by lhbar on the gradient
     SendMessageW(g.toolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
-    g.glyphs = make_glyphs();
+    if (band) {
+        SendMessageW(g.toolbar, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_MIXEDBUTTONS | TBSTYLE_EX_DRAWDDARROWS | TBSTYLE_EX_HIDECLIPPEDBUTTONS);
+        SendMessageW(g.toolbar, TB_SETMAXTEXTROWS, 1, 0);
+        SendMessageW(g.toolbar, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), FALSE);
+        SendMessageW(g.toolbar, TB_SETBITMAPSIZE, 0, MAKELONG(16, 16));
+    }
+    if (!g.glyphs) g.glyphs = make_glyphs();
     SendMessageW(g.toolbar, TB_SETIMAGELIST, 0, (LPARAM)g.glyphs);
     const BYTE E = TBSTATE_ENABLED;
+    const BYTE CHECK = band && lhbar::enabled() ? BTNS_BUTTON : BTNS_CHECK;
     TBBUTTON b[] = {
         { GL_OPEN, CMD_OPEN, E, BTNS_BUTTON, {0}, 0, -1 },
         { 8, 0, 0, BTNS_SEP, {0}, 0, -1 },
@@ -1293,13 +1315,23 @@ void make_toolbar()
         { GL_ZOOMIN, CMD_ZOOM_IN, E, BTNS_BUTTON, {0}, 0, -1 },
         { 8, 0, 0, BTNS_SEP, {0}, 0, -1 },
         { GL_ACTUAL, CMD_ACTUAL, E, BTNS_BUTTON, {0}, 0, -1 },
-        { GL_FITPAGE, CMD_FIT_PAGE, E, BTNS_CHECK, {0}, 0, -1 },
-        { GL_FITWIDTH, CMD_FIT_WIDTH, E, BTNS_CHECK, {0}, 0, -1 },
+        { GL_FITPAGE, CMD_FIT_PAGE, E, CHECK, {0}, 0, -1 },
+        { GL_FITWIDTH, CMD_FIT_WIDTH, E, CHECK, {0}, 0, -1 },
         { 8, 0, 0, BTNS_SEP, {0}, 0, -1 },
         { 150, ID_FIND_EDIT, 0, BTNS_SEP, {0}, 0, -1 },   // the find box goes over this
         { GL_FIND, CMD_FIND_NEXT, E, BTNS_BUTTON, {0}, 0, -1 },
     };
-    SendMessageW(g.toolbar, TB_ADDBUTTONSW, sizeof b / sizeof b[0], (LPARAM)b);
+    const int n = (int)(sizeof b / sizeof b[0]);
+    // on the bar the gaps are disabled empty buttons, as the Explorer's (a flat separator would draw its etch)
+    if (band) for (TBBUTTON& t : b) if (t.fsStyle == BTNS_SEP && !t.idCommand) { t.dwData = t.iBitmap; t.iBitmap = I_IMAGENONE; t.fsStyle = BTNS_BUTTON; }
+    SendMessageW(g.toolbar, TB_ADDBUTTONSW, n, (LPARAM)b);
+    if (band)
+        for (int i = 0; i < n; i++) {
+            if (b[i].iBitmap != I_IMAGENONE) continue;
+            TBBUTTONINFOW bi = {};
+            bi.cbSize = sizeof bi; bi.dwMask = TBIF_BYINDEX | TBIF_SIZE; bi.cx = (WORD)b[i].dwData;
+            SendMessageW(g.toolbar, TB_SETBUTTONINFOW, (WPARAM)i, (LPARAM)&bi);
+        }
     SendMessageW(g.toolbar, TB_AUTOSIZE, 0, 0);
     RECT r;
     SendMessageW(g.toolbar, TB_GETITEMRECT, 4, (LPARAM)&r);
@@ -1314,6 +1346,35 @@ void make_toolbar()
                                   r.right - r.left - 4, eh, g.toolbar, (HMENU)(INT_PTR)ID_FIND_EDIT, nullptr, nullptr);
     SendMessageW(g.find_edit, EM_SETCUEBANNER, FALSE, (LPARAM)L"Find");
     SetWindowLongPtrW(g.find_edit, GWLP_WNDPROC, (LONG_PTR)edit_proc);
+    if (g.font) for (HWND h : { g.page_edit, g.page_of, g.find_edit }) SendMessageW(h, WM_SETFONT, (WPARAM)g.font, TRUE);
+    if (!band) return;
+    // the band: as high as a button, after the menu band on its row
+    SIZE sz = {0, 0};
+    SendMessageW(g.toolbar, TB_GETMAXSIZE, 0, (LPARAM)&sz);
+    RECT item = {0, 0, 0, 0};
+    SendMessageW(g.toolbar, TB_GETITEMRECT, 0, (LPARAM)&item);
+    REBARBANDINFOW rb = {};
+    rb.cbSize = sizeof rb;
+    rb.fMask = RBBIM_STYLE | RBBIM_CHILD | RBBIM_CHILDSIZE | RBBIM_SIZE | RBBIM_ID | RBBIM_HEADERSIZE;
+    rb.fStyle = RBBS_NOGRIPPER | RBBS_USECHEVRON;      // the menu band's row
+    rb.hwndChild = g.toolbar;
+    rb.wID = ID_TOOLBAR;
+    rb.cxHeader = 30;                                  // the Explorer's: 4051's gap after Help
+    rb.cxMinChild = (UINT)sz.cx; rb.cyMinChild = (UINT)(item.bottom - item.top); rb.cyChild = rb.cyMinChild; rb.cx = (UINT)sz.cx;
+    SendMessageW(g.rebar, RB_INSERTBANDW, 1, (LPARAM)&rb);
+    trace("toolbar band %dx%d", (int)sz.cx, (int)(item.bottom - item.top));
+}
+
+void destroy_toolbar()
+{
+    if (!g.toolbar) return;
+    if (in_band()) {
+        int i = (int)SendMessageW(g.rebar, RB_IDTOINDEX, ID_TOOLBAR, 0);
+        if (i >= 0) SendMessageW(g.rebar, RB_DELETEBAND, (WPARAM)i, 0);
+    }
+    if (GetFocus() == g.find_edit || GetFocus() == g.page_edit) SetFocus(g.view);
+    DestroyWindow(g.toolbar);   // its edits with it
+    g.toolbar = g.page_edit = g.page_of = g.find_edit = nullptr;
 }
 
 void apply_font()
@@ -1594,6 +1655,8 @@ void configure_header()
     shell::lhheader::configure("mupf_", g.large_header ? "" : "small");
 }
 
+LRESULT menu_draw(NMTBCUSTOMDRAW* cd, bool active) { return lhbar::custom_draw(cd, active, nullptr); }
+
 // the header when the session theme wants the Longhorn chrome, none when not (at the start and on a theme switch)
 void sync_header()
 {
@@ -1615,14 +1678,22 @@ void sync_header()
         cb.command = [](int id) { command(id == shell::lhheader::TRAVEL_BACK ? CMD_BACK : CMD_FORWARD); };
         cb.history = header_history;
         g.header = shell::lhheader::create(g.wnd, cb);
-        // the menu below the header, in a rebar of its own as the Explorer's menu band
+        // the menu below the header and the toolbar on its row: the Explorer's rebar (its styles) with the menu band and,
+        // on the same row, the toolbar's band, on the 4051 command bar's gradient (lhbar)
         SetMenu(g.wnd, nullptr);
         g.rebar = CreateWindowExW(WS_EX_TOOLWINDOW, REBARCLASSNAMEW, nullptr,
-                                  WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | RBS_VARHEIGHT | RBS_AUTOSIZE |
-                                  CCS_NODIVIDER | CCS_NOPARENTALIGN, 0, 0, 0, 0, g.wnd, (HMENU)(INT_PTR)ID_REBAR, nullptr, nullptr);
+                                  WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | RBS_VARHEIGHT | RBS_BANDBORDERS |
+                                  RBS_AUTOSIZE | CCS_NODIVIDER | CCS_NOPARENTALIGN, 0, 0, 0, 0, g.wnd, (HMENU)(INT_PTR)ID_REBAR,
+                                  nullptr, nullptr);
         REBARINFO rbi = { sizeof rbi, 0, nullptr };
         SendMessageW(g.rebar, RB_SETBARINFO, 0, (LPARAM)&rbi);
         menuband::create(g.rebar, g.wnd, g.menu, ID_MENUBAND);
+        destroy_toolbar();
+        make_toolbar(true);
+        if (lhbar::enabled()) {
+            lhbar::attach(g.rebar);
+            menuband::set_custom_draw(menu_draw);
+        }
         shell::lhheader::extend_frame(g.wnd);
         shell::lhheader::set_active(shell::lhheader::frame_active(g.wnd, GetForegroundWindow() == g.wnd));
         g.crumbs_for.clear();
@@ -1631,9 +1702,13 @@ void sync_header()
     } else {
         shell::lhheader::destroy();
         g.header = nullptr;
+        destroy_toolbar();
+        lhbar::detach(g.rebar);
+        menuband::set_custom_draw(nullptr);
         DestroyWindow(g.rebar);
         g.rebar = nullptr;
         menuband::forget();
+        make_toolbar(false);
         if (!g.fullscreen) SetMenu(g.wnd, g.menu);
         shell::lhheader::unextend_frame(g.wnd);
         trace("header none");
@@ -1648,7 +1723,11 @@ void layout_chrome()
     RECT rc;
     GetClientRect(g.wnd, &rc);
     bool tb = g.show_toolbar && !g.fullscreen, sb = g.show_status && !g.fullscreen;
-    ShowWindow(g.toolbar, tb ? SW_SHOW : SW_HIDE);
+    bool band = in_band();
+    if (band) {
+        int i = (int)SendMessageW(g.rebar, RB_IDTOINDEX, ID_TOOLBAR, 0);
+        if (i >= 0) SendMessageW(g.rebar, RB_SHOWBAND, (WPARAM)i, g.show_toolbar);
+    } else ShowWindow(g.toolbar, tb ? SW_SHOW : SW_HIDE);
     ShowWindow(g.status, sb ? SW_SHOW : SW_HIDE);
     int top = 0, bottom = rc.bottom;
     if (g.header) {
@@ -1666,9 +1745,11 @@ void layout_chrome()
             int h = (int)SendMessageW(g.rebar, RB_GETBARHEIGHT, 0, 0);
             MoveWindow(g.rebar, 0, top, rc.right, h, TRUE);
             top += h;
+            static int traced = -1;     // the row's height (the menu band's and the toolbar's)
+            if (h != traced) trace("rebar %d rows", traced = h);
         }
     }
-    if (tb) {
+    if (tb && !band) {
         SetWindowPos(g.toolbar, nullptr, 0, top, rc.right, 10, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSIZE);
         SendMessageW(g.toolbar, TB_AUTOSIZE, 0, 0);
         RECT t;
@@ -1918,6 +1999,8 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             LRESULT r = menuband::on_notify(n, &handled);
             if (handled) return r;
         }
+        if (n->hwndFrom == g.toolbar && n->code == NM_CUSTOMDRAW && bar_drawn())
+            return lhbar::custom_draw((NMTBCUSTOMDRAW*)lp, menuband::active(), band_checked);
         if (n->hwndFrom == g.tree) {
             if (n->code == NM_CLICK) {   // a click on a row goes there, the row already selected or not
                 TVHITTESTINFO hit = {};
@@ -1958,6 +2041,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_THEMECHANGED: case WM_SETTINGCHANGE: case WM_SYSCOLORCHANGE:
         if (msg == WM_THEMECHANGED) {
+            lhbar::theme_changed();   // the theme's gradient, before a command bar is made for it
             sync_header();   // to or from a Longhorn theme
             if (g.rebar) menuband::fonts_changed();
         }
@@ -2028,7 +2112,7 @@ int main(int argc, char** argv)
                             nullptr, nullptr);
     if (!g.wnd) { fprintf(stderr, "mupf: no window\n"); return 1; }
     shell::set_window_icon_key(g.wnd, "pdf");
-    make_toolbar();
+    make_toolbar(false);   // (sync_header puts it on the menu band's row under the Longhorn header)
     g.status = CreateWindowExW(0, STATUSCLASSNAMEW, nullptr, WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP, 0, 0, 0, 0, g.wnd,
                                (HMENU)(INT_PTR)ID_STATUS, nullptr, nullptr);
     g.view = CreateWindowExW(WS_EX_CLIENTEDGE, L"mupf_view", nullptr, WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP,
