@@ -1,9 +1,10 @@
-/* lhde's look for Firefox's own chrome (userChrome.css): the Longhorn Explorer header for the Longhorn themes, Firefox 4's
-   look on XP for the XP and classic ones. Template of tools/lhde-firefox, which writes the theme's values into the block of
+/* lhde's look for Firefox's own chrome (userChrome.css): Firefox 4's look on Windows 7 for the Longhorn themes (the ff4
+   and ff4glass sections), or with --look explorer the Longhorn Explorer header (the longhorn section); Firefox 4's look on
+   XP for the XP and classic ones (xp). Template of tools/lhde-firefox, which writes the theme's values into the block of
    custom properties below (from liblhde's resolver and the visual style through ut-dump) and keeps the sections for the
    theme's family; docs/USAGE.md "Firefox". Firefox 160's element ids (browser.xhtml, browser/omni.ja).
 
-   Measured against flxp's header (flxp/shell/ui/lhheader.cpp, navbar.cpp: 4074's framelet geometry, 4051's navigation bar):
+   The longhorn section, measured against flxp's header (flxp/shell/ui/lhheader.cpp, navbar.cpp: 4074's framelet geometry, 4051's navigation bar):
    the band's height (the travel art's: 54 rows), its picture (the style's Navbar::Rebar BACKGROUND with its sizing margins),
    the travel buttons (TravelBack/TravelFwd::AnimationButton, 38 + 27 x 54, 2 px from the left edge), where the address
    starts (the breadcrumb's text x of the style's layout), the text colour (Navbar.TITLE), the face and size (the style's
@@ -296,6 +297,424 @@
 }
 #tabs-newtab-button, #new-tab-button { --toolbarbutton-inner-padding: 3px !important; }
 #tabbrowser-tabs .tabbrowser-tab:not([visuallyselected]) .tab-label { opacity: 0.95; }
+/*@END@*/
+
+/*@IF ff4@*/
+/* ---- Firefox 4's look under the Longhorn themes ---------------------------------------------------------------------- */
+/* Firefox 4's own: its Windows theme (browser/themes/winstripe/browser/browser.css and browser-aero.css of the 4.0 release,
+   Mozilla's, MPL 1.1/GPL 2.0/LGPL 2.1: the values below are its values unless said otherwise) as it drew itself on Windows
+   7 without glass ("Aero Basic"), with its pictures from share/firefox/ff4 (tab.png, Toolbar.png, close.png, newtab.png,
+   reload-stop-go.png; MANIFEST there) copied into the profile's lhde-art/ff4/. Its orange Firefox button is not imitated
+   (the menu stays Firefox's at the right).
+   lhde's: the window frame and caption are luxwm's. Firefox 4 extended the frame behind the menu bar and the tabs
+   (rgb(185,209,234) in Aero Basic); here the rows behind them continue the caption luxwm draws without glass: its last row
+   (the frames_classic style's Window CAPTION, rendered by ut-dump), stretched with the caption's sizing margins as luxwm
+   stretches it; measured in the lab at the seam under slate4051 and jade4074 (the caption's last row and the tab row's
+   first the same colour along the row). Under the glass themes, composited, the glass itself (the ff4glass section below).
+   The faces and sizes are the style's menu font, the toolbar colour under Slate the style's button face (a choice: Firefox
+   4's hsl(214,44%,87%) is blue, Slate is grey). Back and Forward are Firefox 4's keyhole (its large back button), reload
+   and stop at the address's end as Firefox 4 had them. */
+:root {
+  --toolbar-bgcolor: var(--lhde-ff4-toolbar) !important;
+  --toolbar-color: #000000 !important;
+  --toolbox-bgcolor: var(--lhde-ff4-frame) !important;
+  --toolbox-bgcolor-inactive: var(--lhde-ff4-frame-inactive) !important;
+  --toolbox-textcolor: var(--lhde-ff4-frame-text) !important;
+  --toolbox-textcolor-inactive: var(--lhde-ff4-frame-text) !important;
+  --tabs-navbar-separator-style: none !important;
+  --toolbarbutton-icon-fill: #000000 !important;
+  --toolbarbutton-hover-background: transparent !important;
+  --toolbarbutton-active-background: transparent !important;
+  --toolbar-field-background-color: #ffffff !important;
+  --toolbar-field-color: #000000 !important;
+  --toolbar-field-border-color: transparent !important;
+  --toolbar-field-focus-background-color: #ffffff !important;
+  --toolbar-field-focus-color: #000000 !important;
+  --toolbar-field-focus-border-color: transparent !important;
+  --urlbar-height: 24px !important;
+  --urlbar-min-height: 24px !important;
+  --urlbar-container-height: 24px !important;
+  --urlbar-border-radius: 3px !important;
+  --urlbarview-border-radius: 0px !important;
+  --tab-border-radius: 0px !important;
+  --tab-min-height: var(--lhde-ff4-tab-h) !important;
+  --tab-block-margin: 0px !important;
+  --tab-margin-block: 0px !important;
+  --tab-shadow-max-size: 0px !important;
+  --tab-selected-shadow: none !important;
+  --tab-box-shadow-selected: none !important;
+  --tab-background-color: transparent !important;
+  --tab-background-color-selected: transparent !important;
+  --tab-selected-bgcolor: transparent !important;
+  --tab-background-color-hover: transparent !important;
+  --tab-text-color: #000000 !important;
+  --tab-text-color-selected: #000000 !important;
+  --tab-border: none !important;
+}
+#navigator-toolbox {
+  background-color: var(--lhde-ff4-frame) !important;
+  background-image: var(--lhde-ff4-frame-image) !important;
+  background-size: var(--lhde-ff4-frame-image-size) !important;
+  background-position: var(--lhde-ff4-frame-image-pos) !important;
+  background-repeat: no-repeat !important;
+  color: var(--lhde-ff4-frame-text) !important;
+  /* #navigator-toolbox::after: the 1px ThreeDShadow line under the toolbars */
+  border-bottom: 1px solid var(--lhde-ff4-shadow) !important;
+}
+:root:-moz-window-inactive #navigator-toolbox {
+  background-color: var(--lhde-ff4-frame-inactive) !important;
+  background-image: var(--lhde-ff4-frame-image-inactive) !important;
+  background-size: var(--lhde-ff4-frame-image-inactive-size) !important;
+  background-position: var(--lhde-ff4-frame-image-inactive-pos) !important;
+}
+#toolbar-menubar { order: 0; }
+#TabsToolbar { order: 1; }
+#nav-bar { order: 2; }
+#nav-bar, #TabsToolbar, #PersonalToolbar, #toolbar-menubar {
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+  box-shadow: none !important;
+  border-top: 0 !important;
+}
+
+/* the menu bar: on the frame colour above the tabs (Firefox 4 put it there, in the title bar's colour); its items on a
+   strip of white at half opacity with 4 px corners (browser-aero.css, #main-menubar), the hot item Firefox 4's menu hot
+   frame (#aeccf1 over #fafbfd to #ebf3fd, its .splitmenu-menuitem[_moz-menuactive]) */
+#toolbar-menubar:not([inactive]) {
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  padding: 2px 4px 0 !important;
+}
+#toolbar-menubar {
+  border: 0 !important;
+  background: transparent !important;
+  color: #000000 !important;
+}
+#toolbar-menubar > .toolbar-items, #menubar-items { height: 22px !important; align-items: stretch !important; }
+#main-menubar {
+  height: 22px !important;
+  align-items: stretch !important;
+  background-color: rgba(255, 255, 255, 0.5) !important;
+  border-radius: 4px !important;
+}
+:root:-moz-window-inactive #main-menubar { background-color: transparent !important; }
+#main-menubar > menu {
+  padding: 0 6px !important;
+  border: 1px solid transparent !important;
+  border-radius: 3px !important;
+}
+#main-menubar > menu:is([_moz-menuactive="true"], :hover, [open]) {
+  border-color: #aeccf1 !important;
+  background: linear-gradient(#fafbfd, #ebf3fd) !important;
+}
+
+/* the tab row: the frame colour, Firefox 4's shadow line under the tabs (rgba(10%,10%,10%,.4)) with a faint shade above
+   it; 4 px at the sides as a restored window's tab row on Windows 7 */
+#TabsToolbar {
+  background: linear-gradient(to top, rgba(26, 26, 26, 0.4) 1px, rgba(0, 0, 0, 0.05) 1px, transparent 50%) !important;
+  color: var(--lhde-ff4-frame-text) !important;
+  padding: var(--lhde-ff4-tabs-top) 4px 0 !important;
+  min-height: 0 !important;
+  border-bottom: 0 !important;
+}
+#TabsToolbar :is(.toolbar-items, #TabsToolbar-customization-target), #tabbrowser-tabs, #tabbrowser-arrowscrollbox {
+  min-height: 0 !important;
+  height: var(--lhde-ff4-tab-h) !important;
+  max-height: var(--lhde-ff4-tab-h) !important;
+  align-items: stretch !important;
+}
+#tabbrowser-tabs { --tab-min-height: var(--lhde-ff4-tab-h) !important; padding-inline: 0 !important; border: 0 !important; }
+.tabbrowser-tab {
+  padding: 0 !important;
+  min-height: 0 !important;
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+  color: #000000 !important;
+}
+.tabbrowser-tab, .tab-stack, .tab-content { height: var(--lhde-ff4-tab-h) !important; max-height: var(--lhde-ff4-tab-h) !important; min-height: 0 !important; }
+.tab-stack { align-items: stretch !important; }
+/* a tab: tab.png as its border (6 3 4), the background inside it 1 px from the sides and 2 px from the top, the corners
+   7 px round; unselected: the toolbar colour under Firefox 4's darkening texture and the row's shadow line; hot: the
+   lighter texture; selected: white to half white over the toolbar colour, joined to the navigation bar */
+.tab-background {
+  margin: 0 !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 7px 7px 0 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-image: var(--lhde-ff4-tab) 6 3 4 / 6px 3px 4px repeat stretch !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(to top, rgba(26, 26, 26, 0.4) 1px, transparent 1px),
+                    linear-gradient(transparent, hsla(0, 0%, 45%, 0.1) 1px, hsla(0, 0%, 32%, 0.2) 80%, hsla(0, 0%, 0%, 0.2)),
+                    linear-gradient(var(--lhde-ff4-toolbar), var(--lhde-ff4-toolbar)) !important;
+  background-origin: border-box !important;
+  background-position: 1px 2px !important;
+  background-size: calc(100% - 2px) calc(100% - 2px) !important;
+  background-repeat: no-repeat !important;
+}
+.tabbrowser-tab:hover > .tab-stack > .tab-background:not([selected], [multiselected]) {
+  background-image: linear-gradient(to top, rgba(26, 26, 26, 0.4) 1px, transparent 1px),
+                    linear-gradient(hsla(0, 0%, 100%, 0.3) 1px, hsla(0, 0%, 75%, 0.2) 80%, hsla(0, 0%, 60%, 0.2)),
+                    linear-gradient(var(--lhde-ff4-toolbar), var(--lhde-ff4-toolbar)) !important;
+}
+.tab-background:is([selected], [multiselected]) {
+  background-image: linear-gradient(#ffffff, rgba(255, 255, 255, 0.5) 50%),
+                    linear-gradient(var(--lhde-ff4-toolbar), var(--lhde-ff4-toolbar)) !important;
+}
+.tab-content { padding-inline: 6px 4px !important; padding-top: 1px !important; }
+.tab-label { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
+.tab-icon-image, .tab-throbber { margin-inline: 2px 3px !important; }
+/* the close button: close.png, its four 16 px states (selected, hot, pressed, unselected) */
+.tab-close-button {
+  list-style-image: none !important;
+  width: 16px !important;
+  height: 16px !important;
+  padding: 0 !important;
+  margin-inline-end: 0 !important;
+  border-radius: 0 !important;
+  background: var(--lhde-ff4-close) no-repeat -48px 0 !important;
+  -moz-context-properties: none !important;
+}
+.tabbrowser-tab[visuallyselected] .tab-close-button { background-position: 0 0 !important; }
+.tab-close-button:hover { background-position: -16px 0 !important; }
+.tab-close-button:hover:active { background-position: -32px 0 !important; }
+/* the new tab button: a 30 px tab of its own (newtab.png) */
+#tabs-newtab-button, #new-tab-button {
+  appearance: none !important;
+  width: 30px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 7px 7px 0 0 !important;
+  border-image: var(--lhde-ff4-tab) 6 3 4 / 6px 3px 4px repeat stretch !important;
+  background-image: linear-gradient(to top, rgba(26, 26, 26, 0.4) 1px, transparent 1px),
+                    linear-gradient(transparent, hsla(0, 0%, 45%, 0.1) 1px, hsla(0, 0%, 32%, 0.2) 80%, hsla(0, 0%, 0%, 0.2)),
+                    linear-gradient(var(--lhde-ff4-toolbar), var(--lhde-ff4-toolbar)) !important;
+  background-origin: border-box !important;
+  background-position: 1px 2px !important;
+  background-size: calc(100% - 2px) calc(100% - 2px) !important;
+  background-repeat: no-repeat !important;
+}
+#tabs-newtab-button:hover, #new-tab-button:hover {
+  background-image: linear-gradient(to top, rgba(26, 26, 26, 0.4) 1px, transparent 1px),
+                    linear-gradient(hsla(0, 0%, 100%, 0.3) 1px, hsla(0, 0%, 75%, 0.2) 80%, hsla(0, 0%, 60%, 0.2)),
+                    linear-gradient(var(--lhde-ff4-toolbar), var(--lhde-ff4-toolbar)) !important;
+}
+:is(#tabs-newtab-button, #new-tab-button) > .toolbarbutton-icon {
+  list-style-image: none !important;
+  width: 16px !important;
+  height: 18px !important;
+  padding: 0 !important;
+  margin: 2px auto 0 !important;
+  border: 0 !important;
+  background: var(--lhde-ff4-newtab) no-repeat 0 0 !important;
+}
+:is(#tabs-newtab-button, #new-tab-button):hover:active > .toolbarbutton-icon { background-position: -16px 0 !important; }
+#TabsToolbar .toolbarbutton-1:not(#tabs-newtab-button, #new-tab-button) > .toolbarbutton-icon { background: none !important; }
+
+/* the navigation bar: the toolbar colour, white at half opacity fading out downwards; 4 px above and below the keyhole */
+#nav-bar {
+  background-color: var(--lhde-ff4-toolbar) !important;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0)) !important;
+  color: #000000 !important;
+  border-bottom: 0 !important;
+  padding: 4px 2px 4px 4px !important;
+  min-height: 0 !important;
+}
+#PersonalToolbar {
+  background: var(--lhde-ff4-toolbar) !important;
+  color: #000000 !important;
+  border-top: 0 !important;
+}
+#nav-bar-customization-target { align-items: center !important; }
+
+/* the toolbar buttons: Firefox 4's glassy frame (#nav-bar .toolbarbutton-1), drawn on the icon box; its icons from
+   Toolbar.png (18 px cells) where Firefox 4 had one for the button, Firefox's own icons for the rest */
+#nav-bar .toolbarbutton-1 {
+  padding: 0 !important;
+  margin: 0 2px !important;
+  --toolbarbutton-inner-padding: 0px !important;
+}
+#nav-bar .toolbarbutton-1 > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+  box-sizing: content-box !important;
+  width: 18px !important;
+  height: 18px !important;
+  padding: 1px 3px !important;
+  border: 1px solid !important;
+  border-color: rgba(0, 0, 0, 0.12) rgba(0, 0, 0, 0.19) rgba(0, 0, 0, 0.38) !important;
+  border-radius: 4.5px !important;
+  background: rgba(151, 152, 153, 0.05)
+              linear-gradient(rgba(251, 252, 253, 0.95), rgba(246, 247, 248, 0.47) 49%, rgba(231, 232, 233, 0.45) 51%, rgba(225, 226, 229, 0.3)) !important;
+  background-clip: padding-box !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3) inset, 0 0 0 2px rgba(255, 255, 255, 0.1) inset, 0 1px 0 rgba(0, 0, 0, 0.15) !important;
+}
+#nav-bar .toolbarbutton-1 > .toolbarbutton-badge-stack > .toolbarbutton-icon { width: 16px !important; height: 16px !important; padding: 1px !important; }
+#nav-bar .toolbarbutton-1:not([disabled]):not([open], :active):hover > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+  background-color: hsla(190, 60%, 70%, 0.5) !important;
+  border-color: hsla(190, 50%, 65%, 0.8) hsla(190, 50%, 50%, 0.8) hsla(190, 50%, 40%, 0.8) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3) inset, 0 0 0 1.5px rgba(255, 255, 255, 0.1) inset, 0 1px 0 rgba(0, 0, 0, 0.1),
+              0 0 3.5px hsl(190, 90%, 80%) !important;
+}
+#nav-bar .toolbarbutton-1:not([disabled]):is([open], [checked], :hover:active) > :is(.toolbarbutton-icon, .toolbarbutton-badge-stack) {
+  background-color: transparent !important;
+  border-color: rgba(0, 0, 0, 0.65) rgba(0, 0, 0, 0.55) rgba(0, 0, 0, 0.5) !important;
+  box-shadow: 0 0 6.5px rgba(0, 0, 0, 0.4) inset, 0 0 2px rgba(0, 0, 0, 0.4) inset, 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+}
+#nav-bar .toolbarbutton-1[disabled] > .toolbarbutton-icon { opacity: 0.5 !important; }
+#nav-bar :is(#home-button, #downloads-button, #reload-button, #stop-button, #forward-button, #back-button, #print-button,
+  #bookmarks-menu-button, #history-panelmenu, #new-window-button, #fullscreen-button) > .toolbarbutton-icon {
+  list-style-image: var(--lhde-ff4-toolbar-png) !important;
+  object-fit: none !important;
+  overflow: clip !important;
+  overflow-clip-margin: content-box !important;   /* the neighbouring cells stay out of the padding */
+  -moz-context-properties: none !important;
+}
+#forward-button > .toolbarbutton-icon { object-position: -18px 0 !important; }
+#stop-button > .toolbarbutton-icon { object-position: -36px 0 !important; }
+#reload-button > .toolbarbutton-icon { object-position: -54px 0 !important; }
+#home-button > .toolbarbutton-icon { object-position: -72px 0 !important; }
+#downloads-button > .toolbarbutton-badge-stack > .toolbarbutton-icon { list-style-image: var(--lhde-ff4-toolbar-png) !important; object-fit: none !important; overflow: clip !important; overflow-clip-margin: content-box !important; object-position: -90px 0 !important; -moz-context-properties: none !important; }
+#history-panelmenu > .toolbarbutton-icon { object-position: -108px 0 !important; }
+#bookmarks-menu-button > .toolbarbutton-icon { object-position: -126px 0 !important; }
+#print-button > .toolbarbutton-icon { object-position: -144px 0 !important; }
+#new-window-button > .toolbarbutton-icon { object-position: -180px 0 !important; }
+#fullscreen-button > .toolbarbutton-icon { object-position: -252px 0 !important; }
+
+/* the keyhole: Back a 30 px round button with the large arrow (Toolbar.png's second row, 20 px), Forward under it
+   cut by Firefox 4's mask (keyhole-forward-mask.svg: a circle at -46% of its width, radius 63%; hot: -35%, 58%) */
+#nav-bar #back-button { margin: -2px 0 -2px 0 !important; position: relative !important; z-index: 1 !important; }
+#nav-bar #back-button > .toolbarbutton-icon {
+  box-sizing: border-box !important;
+  width: 30px !important;
+  height: 30px !important;
+  padding: 5px !important;
+  border: 0 !important;
+  border-radius: 10000px !important;
+  object-position: 0 -18px !important;
+  background: linear-gradient(rgba(251, 252, 253, 0.97), rgba(246, 247, 248, 0.5) 49%, rgba(231, 232, 233, 0.45) 51%, rgba(225, 226, 229, 0.2)),
+              var(--lhde-ff4-toolbar) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3) inset, 0 0 0 2px rgba(255, 255, 255, 0.1) inset, 0 0 0 1px rgba(0, 0, 0, 0.15),
+              0 1px 0 rgba(0, 0, 0, 0.4), 0 1px 1px rgba(0, 0, 0, 0.3), 1px 2px 1px rgba(0, 0, 0, 0.2) !important;
+}
+#nav-bar #back-button:not([disabled]):not([open], :active):hover > .toolbarbutton-icon {
+  background-color: transparent !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3) inset, 0 0 0 2px rgba(255, 255, 255, 0.1) inset, 0 0 0 1px hsla(190, 50%, 40%, 0.3),
+              0 1px 0 rgba(0, 0, 0, 0.4), 0 1px 1px rgba(0, 0, 0, 0.3), 1px 2px 1px rgba(0, 0, 0, 0.2), 0 0 5px 1px hsl(190, 90%, 80%) !important;
+}
+#nav-bar #back-button:not([disabled]):is([open], :hover:active) > .toolbarbutton-icon {
+  box-shadow: 0 0 6.5px rgba(0, 0, 0, 0.4) inset, 0 0 2px rgba(0, 0, 0, 0.4) inset, 0 0 0 1px rgba(0, 0, 0, 0.65),
+              0 2px 0 rgba(255, 255, 255, 0.4) !important;
+}
+#nav-bar #back-button[disabled] > .toolbarbutton-icon { opacity: 1 !important; }
+#nav-bar #forward-button { margin-inline: -6px 2px !important; }
+#nav-bar #forward-button > .toolbarbutton-icon {
+  padding: 1px 3px 1px 7px !important;
+  border-left-style: none !important;
+  border-radius: 0 4.5px 4.5px 0 !important;
+  object-position: -18px 0 !important;
+  mask-image: radial-gradient(63% 63% at -46% 50%, transparent 99%, #000000 100%) !important;
+}
+#nav-bar #forward-button:not([disabled]):not(:active):hover > .toolbarbutton-icon {
+  mask-image: radial-gradient(58% 58% at -35% 50%, transparent 99%, #000000 100%) !important;
+}
+#nav-bar :is(#back-button, #forward-button)[disabled] > .toolbarbutton-icon { opacity: 1 !important; }
+
+/* the location bar and the search box: white, Firefox 4's borders (rgba(0,0,0,.25) .32 .37 from the top), 1 px inset
+   shade and the white line under it, 3 px between the bar's items */
+#urlbar-container { order: 1; flex: 1 1 auto !important; margin-inline: 3px 0 !important; padding: 0 !important; }
+#urlbar, #urlbar-input, #searchbar, .tab-label { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
+#urlbar .urlbar-background, #searchbar-new .urlbar-background, #search-container .urlbar-background, #searchbar {
+  border-radius: 3px !important;
+  border: 1px solid !important;
+  border-color: rgba(0, 0, 0, 0.25) rgba(0, 0, 0, 0.32) rgba(0, 0, 0, 0.37) !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1) inset, 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+  outline: none !important;
+}
+/* reload and stop at the location bar's end, as Firefox 4 had them in it: reload-stop-go.png's 14 px cells, the separator
+   rgba(0,0,0,.25), hot reload blue, stop red (its gradients) */
+#nav-bar #stop-reload-button { order: 2; margin-inline: -1px 0 !important; }
+#nav-bar #stop-reload-button > .toolbarbutton-1 { margin: 0 !important; }
+#nav-bar #stop-reload-button > .toolbarbutton-1 > .toolbarbutton-icon {
+  box-sizing: content-box !important;
+  width: 14px !important;
+  height: 14px !important;
+  padding: 4px 4px 4px 3px !important;
+  list-style-image: var(--lhde-ff4-reload) !important;
+  object-fit: none !important;
+  overflow: clip !important;
+  overflow-clip-margin: content-box !important;
+  object-position: 0 0 !important;
+  border: 1px solid !important;
+  border-color: rgba(0, 0, 0, 0.25) rgba(0, 0, 0, 0.32) rgba(0, 0, 0, 0.37) rgba(0, 0, 0, 0.25) !important;
+  border-radius: 0 3px 3px 0 !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1) inset !important;
+}
+#nav-bar #stop-reload-button #reload-button:not([disabled]):hover > .toolbarbutton-icon {
+  object-position: -14px 0 !important;
+  background: linear-gradient(rgb(162, 207, 241), rgb(111, 178, 225) 49%, rgb(91, 159, 217) 51%, rgb(62, 138, 200)) !important;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1) inset, -1px -1px 1px rgba(255, 255, 255, 0.25) inset !important;
+}
+#nav-bar #stop-reload-button #stop-button > .toolbarbutton-icon {
+  object-position: -28px 0 !important;
+  background: linear-gradient(rgb(231, 162, 140), rgb(209, 119, 100) 49%, rgb(193, 92, 78) 51%, rgb(173, 72, 58)) !important;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1) inset, -1px -1px 1px rgba(255, 255, 255, 0.25) inset !important;
+}
+#nav-bar #stop-reload-button #stop-button:not([disabled]):hover > .toolbarbutton-icon {
+  background: linear-gradient(rgb(244, 156, 128), rgb(215, 101, 77) 49%, rgb(194, 66, 48) 51%, rgb(170, 41, 23)) !important;
+}
+#urlbar-container:has(+ #stop-reload-button) #urlbar .urlbar-background { border-start-end-radius: 0 !important; border-end-end-radius: 0 !important; }
+#search-container {
+  order: 3;
+  min-width: var(--lhde-search-w) !important;
+  max-width: var(--lhde-search-w) !important;
+  width: var(--lhde-search-w) !important;
+  margin-inline: 6px 2px !important;
+  font-family: var(--lhde-font) !important;
+  font-size: var(--lhde-font-size) !important;
+}
+#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button, #library-button,
+  #home-button, #PanelUI-button) { order: 4; }
+/*@END@*/
+
+/*@IF ff4glass@*/
+/* ---- the glass themes, composited: the menu bar and the tabs on luxwm's glass ----------------------------------------- */
+/* Firefox 4 on Windows 7 with glass extended the frame behind the menu bar and the tabs. Here luxwm does: Firefox runs with an
+   ARGB window (user.js mozilla.widget.use-argb-visuals), leaves the top of its window transparent, and luxwm paints its glass
+   plate under it (_LHWM_EXTEND_FRAME, which luxwm sets on Firefox from settings.ini [extend_frame] firefox = 0 0 N 0:
+   lhde-firefox install writes N, the tab row's and the menu bar's rows; docs/CLIENT-PROTOCOL.md "Extended frames"). Only
+   while a compositor runs (-moz-gtk-csd-transparency-available; without one Firefox's window is opaque and the opaque rules
+   above stand). Firefox 4's own for glass (browser-aero.css, -moz-windows-compositor): no background on the tab row, its
+   shadow line moved to the navigation bar's top with 3.5 px corners, black text with a white glow on the glass. */
+@media (-moz-gtk-csd-transparency-available) {
+  :root, #main-window, body, #navigator-toolbox, #titlebar {
+    background: transparent !important;
+    appearance: none !important;
+  }
+  :root {
+    --toolbox-bgcolor: transparent !important;
+    --toolbox-bgcolor-inactive: transparent !important;
+    --toolbox-textcolor: #000000 !important;
+    --toolbox-textcolor-inactive: #000000 !important;
+  }
+  #navigator-toolbox, :root:-moz-window-inactive #navigator-toolbox { background: transparent !important; color: #000000 !important; }
+  /* everything under the toolbars opaque: only the extended rows may show the plate */
+  #browser, #navigator-toolbox ~ * { background-color: var(--lhde-ff4-toolbar) !important; }
+  #toolbar-menubar, #TabsToolbar {
+    color: #000000 !important;
+    text-shadow: 0 0 0.5em #ffffff, 0 0 0.5em #ffffff, 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+  }
+  .tabbrowser-tab { text-shadow: none !important; }
+  #TabsToolbar { background: none !important; margin-bottom: -1px !important; position: relative !important; z-index: 1 !important; }
+  #nav-bar {
+    border-top: 1px solid rgba(26, 26, 26, 0.4) !important;
+    border-radius: 3.5px 3.5px 0 0 !important;
+    background-clip: padding-box !important;
+  }
+}
 /*@END@*/
 
 /*@IF xp@*/
