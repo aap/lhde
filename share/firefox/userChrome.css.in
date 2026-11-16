@@ -321,7 +321,9 @@
    Choices: no Forward button (the concept has none; Alt+Right and the Back button's history menu remain); the address
    searches too, no search box (Firefox's Settings > Search can put it back); the hamburger and the other toolbar buttons
    kept small between the refresh button and the star; the tab text in flxp's breadcrumb face and size (12 px Segoe UI,
-   the concept's 13 px at its own scale) and 16 px favicons (the concept's 13 px icons are drawn ones). */
+   the concept's 13 px at its own scale) and 16 px favicons (the concept's 13 px icons are drawn ones). The concept's large
+   title in the band is left out: luxwm's caption has it (a fixed ::after of the selected tab with attr(label) can show it
+   in the band, but a row of its own would be the Medium header's 54 rows of glass). */
 :root {
   --toolbar-bgcolor: transparent !important;
   --toolbar-color: #000000 !important;

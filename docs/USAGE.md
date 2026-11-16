@@ -1329,25 +1329,55 @@ players for the others; nothing while none is installed). From a terminal: `lhde
 ## Firefox (lhde-firefox)
 
 `tools/lhde-firefox` gives Firefox's own chrome the theme's look through a userChrome.css. A Longhorn theme
-(`Explorer.chrome = longhorn`) gets Firefox 4's look as it was on Windows 7, drawn with Firefox 4's own pictures
-(`share/firefox/ff4`: its tab, toolbar icons, close and new-tab buttons, reload and stop; Mozilla's, docs/LICENSING.md) and
-the colours and gradients of its theme: the menu bar and the tabs on the frame below luxwm's caption, the selected tab white
-and joined to the light blue navigation bar (the style's button face under Slate, a choice), Back and Forward as Firefox 4's
-keyhole, the address with reload and stop at its end, the search box at the right, the toolbar buttons in Firefox 4's glassy
-frames, the menu bar's items on a half-white strip. Under the glass themes (aero4074, aero5048, aero5112, aerovision) with a
-compositor the menu bar and the tabs sit on luxwm's glass, as Firefox 4's did on Aero: Firefox's window is ARGB and
-transparent there, and luxwm extends its glass into those rows (settings.ini `[extend_frame] firefox`, docs/SETTINGS.md).
-Without glass (Jade 4074, Slate, Basic, or no compositor) those rows continue the caption luxwm draws: its last row,
-stretched as luxwm stretches the caption, so the seam does not show. `--look explorer` gives the earlier look instead:
-flxp's header band below luxwm's caption (the style's `Navbar::Rebar` picture, opaque, the style's travel buttons, the
-address on the breadcrumb's row, the tabs on a flat row below, flxp's menu band). The XP and classic themes get Firefox 4's look on XP in the
-theme's parts: the menu bar a plain row in the button-face colour with the rebar's etched line under it (flxp's menu band
-under Luna), the tabs on a button-face row as the style's tab items (Luna's rounded ones with their orange line; classic:
-Windows' tab control), the selected one joined to the navigation toolbar below, that toolbar light at the top and button
-face at the bottom, the style's toolbar button frames, and Firefox 4's round Back button with Forward against it (taste:
-Firefox 4's own, not XP's). Tahoma or Segoe UI come from the theme's font directory. Which parts are measured against flxp
-and which are taste is said in the template, `share/firefox/userChrome.css.in`. Menus, context menus and popups are GTK's
-and keep its theme.
+(`Explorer.chrome = longhorn`) has three looks (`--look longhorn|ff4|explorer`); `generate` and `install` pick the Longhorn
+navigation for a theme with glass (aero4074, aero5048, aero5112, aerovision), unless luxwm says the running session has no
+compositor (`_LHWM_COMPOSITED` 0, asked only for the session's own theme), and Firefox 4's look for the others (Jade 4074,
+Slate, Basic).
+
+**The Longhorn navigation** (`longhorn`) is the Longhorn browser of the 2004 concepts: a glass window, a round Back button
+at the left, the page's title over the address, which takes the width, a small round refresh button after it, the
+favourites star at the right, and document tabs below that band, the page under them. It is built on flxp's Small header,
+the measured Longhorn header of the file dialog and mupf (`flxp/shell/ui/lhheader.cpp`), and measured against a
+Small-header flxp in the lab: luxwm's caption keeps the title (Firefox's window title is the page's), then a 36-row band
+with the style's Small travel art (`SmallTravelBack`, 27 x 36 at x 2; Vista's TravelBand under 5048 and 5112, 4051's big
+art scaled), the address on the row of its disc and the style's Small star (`SmallFavorites`, on the bookmarks menu
+button) 4 px from the right edge, in the same rows and columns as flxp's. From the concept come the shapes and the colour
+relations: the address a shallow recessed field (21 rows, 3 px corners, a dark top edge with a soft shade under it), the
+tabs 23 rows high, square-shouldered, a dark outer and a light inner edge, a glossy fill lighter in its upper half, the
+selected one near white and the others the glass lightened, dark grey text, side by side from the window's left edge;
+their fills are translucent over the theme's glass rather than the concept's peach colours. Choices: no Forward button
+(the concept has none; Alt+Right and the Back button's history menu remain), no search box (the address searches as well;
+Firefox's Settings > Search puts it back, drawn as the address field), the other toolbar buttons and Firefox's menu
+button small between refresh and the star, the tabs' text in flxp's breadcrumb face and size, 16 px favicons. Under a
+glass theme the band and the tab row are luxwm's glass: Firefox's window is ARGB and transparent there, and luxwm extends
+its glass 61 rows into it (settings.ini `[extend_frame] firefox`: the band's 36, the tabs' 23 and the 2 rows of luxwm's
+inner edge lines, which run under the tabs and on down the sides, the outline the page sits in, as on flxp). The menu bar
+(Alt, or View > Toolbars) is flxp's menu band between the band and the tabs; it pushes the tabs below the glass, where
+they get the caption's colour behind them, since the extension is fixed. Without a compositor the same file is Firefox
+4's look (its sections are inside `@media (-moz-gtk-csd-transparency-available)` and its negation). Asked for under a
+theme without glass, the band and the tabs lie on luxwm's caption continued (its last row stretched as luxwm stretches
+the caption), as flxp's header shows it without composition.
+
+**Firefox 4's look** (`ff4`) is Firefox 4 as it was on Windows 7, drawn with its own pictures (`share/firefox/ff4`: its tab,
+toolbar icons, close and new-tab buttons, reload and stop; Mozilla's, docs/LICENSING.md) and the colours and gradients of
+its theme: the menu bar and the tabs on the frame below luxwm's caption, the selected tab white and joined to the light
+blue navigation bar (the style's button face under Slate, a choice), Back and Forward as Firefox 4's keyhole, the address
+with reload and stop at its end, the search box at the right, the toolbar buttons in Firefox 4's glassy frames, the menu
+bar's items on a half-white strip. Under a glass theme with a compositor the tabs sit on luxwm's glass, as Firefox 4's did
+on Aero (the menu bar, shown, takes the glass and pushes them onto the caption's colour); without glass those rows continue
+the caption luxwm draws, so the seam does not show.
+
+**The Explorer band** (`explorer`) is the first look: flxp's Medium header band below luxwm's caption (the style's
+`Navbar::Rebar` picture, opaque, the style's travel buttons, the address on the breadcrumb's row, the tabs on a flat row
+below, flxp's menu band).
+
+The XP and classic themes get Firefox 4's look on XP in the theme's parts: the menu bar a plain row in the button-face
+colour with the rebar's etched line under it (flxp's menu band under Luna), the tabs on a button-face row as the style's tab
+items (Luna's rounded ones with their orange line; classic: Windows' tab control), the selected one joined to the
+navigation toolbar below, that toolbar light at the top and button face at the bottom, the style's toolbar button frames,
+and Firefox 4's round Back button with Forward against it (taste: Firefox 4's own, not XP's). Tahoma or Segoe UI come from
+the theme's font directory. Which parts are measured against flxp, which are taken from the concept and which are taste is
+said in the template, `share/firefox/userChrome.css.in`. Menus, context menus and popups are GTK's and keep its theme.
 
 The window frame and caption are luxwm's in every look, with its window buttons, its shadow and its glass, the same as the
 other windows'. Firefox 4 drew the tabs into its own title bar on Vista and 7; here Firefox does not. With
@@ -1358,17 +1388,18 @@ with the real caption. `install` sets `browser.tabs.inTitlebar = 0`.
 
     lhde-firefox install                     the current theme into the default profile (Firefox closed)
     lhde-firefox install jade4074 --profile ~/.config/mozilla/firefox/xxxx.default-release
-    lhde-firefox install --look explorer     a Longhorn theme with flxp's header band instead of Firefox 4's look
+    lhde-firefox install --look ff4          a Longhorn theme with Firefox 4's look (explorer: flxp's header band)
     lhde-firefox remove                      undo it
-    lhde-firefox generate [THEME] [--look ff4|explorer] [-o FILE]
+    lhde-firefox generate [THEME] [--look longhorn|ff4|explorer] [-o FILE]
                                              only the CSS (stdout, or FILE with the pictures in lhde-art/ beside it)
     lhde-firefox profiles                    the profiles profiles.ini lists ($XDG_CONFIG_HOME/mozilla/firefox, ~/.mozilla/firefox)
 
 `install` refuses a profile that is in use (its `.parentlock` is held, or its `lock` names a live process): close Firefox
 first. It writes `chrome/userChrome.css` (a userChrome.css of your own is kept as `userChrome.css.lhde-backup` and put back
 by `remove`) and `chrome/lhde-art/`: Firefox 4's pictures copied from `share/firefox/ff4` into `lhde-art/ff4/`, and the
-parts rendered from your visual style by ut-dump, since Firefox cannot read a .msstyles (the caption's last row; for
-`--look explorer` and the XP themes the band, the travel buttons, the menu band, the tabs and the toolbar button frames).
+parts rendered from your visual style by ut-dump, since Firefox cannot read a .msstyles (the caption's last row; the Small
+Back and star and the menu band of the Longhorn navigation; for `--look explorer` and the XP themes the band, the travel
+buttons, the menu band, the tabs and the toolbar button frames).
 Fonts stay in the Windows tree and are referenced by `file://` URL. Without the Windows tree (or with only the free ReactOS
 import) the CSS uses colours and Firefox 4's pictures alone. Into `user.js`, in a marked block that `remove` takes out again:
 `toolkit.legacyUserProfileCustomizations.stylesheets = true` (Firefox reads userChrome.css),
@@ -1376,10 +1407,12 @@ import) the CSS uses colours and Firefox 4's pictures alone. Into `user.js`, in 
 `browser.theme.toolbar-theme = 1` (light chrome whatever GTK's theme), `browser.compactmode.show = true`,
 `sidebar.revamp = false`, `sidebar.verticalTabs = false`, `browser.search.widget.removeAfterDaysUnused = 36500`, and under a
 glass theme `mozilla.widget.use-argb-visuals = true` (the window can be transparent where the glass shows). Under a glass
-theme `install` also writes `[extend_frame] firefox = 0 0 28 0` into settings.ini (the tab row's 28 rows: the glass ends
-where the opaque navigation bar begins, so luxwm's inner edge lines outline it; the menu bar, shown, pushes the tabs below
-the glass and the caption's colour shows behind them), and takes it out again for a theme without glass and on `remove`. Once, into `prefs.js` (kept as `prefs.js.lhde-backup`), the search box is placed after the address
-and the bookmarks toolbar set to hidden unless shown; both are ordinary toolbar settings afterwards, and `remove` leaves them.
+theme `install` also writes `[extend_frame] firefox` into settings.ini, `0 0 61 0` for the Longhorn navigation and `0 0 28
+0` for Firefox 4's look (its tab row): the glass ends where the opaque rows begin, so luxwm's inner edge lines outline them
+(an opaque row inside the extension has no edge at the sides). It takes the key out again for a theme without glass and on
+`remove`. Once, into `prefs.js` (kept as `prefs.js.lhde-backup`), the look's widget is placed in the navigation bar (the
+search box after the address; for the Longhorn navigation the bookmarks menu button, its star) and the bookmarks toolbar set
+to hidden unless shown; both are ordinary toolbar settings afterwards, and `remove` leaves them.
 
 Firefox reads userChrome.css at start only, and nothing runs `lhde-firefox` on a theme switch yet: run `install` again after
 switching (the place for that hook is luxshell's `lh-theme` handler in runtime.lua, which sees every `_LH_THEME` change).
