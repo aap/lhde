@@ -108,6 +108,10 @@ struct App {
     // chrome
     bool show_toolbar = true, show_status = true, fullscreen = false;
     bool large_header = false;          // View > Large Header: the Explorer's size, else the Small one (sync_header)
+    // [view] autoscroll: the middle button's autoscroll. Off by default, as Firefox's is on Linux (general.autoScroll):
+    // with a TrackPoint or a touchpad the X server itself scrolls while the middle button is held (libinput's
+    // button scrolling), and the click it then delivers on release would leave the sticky mode on
+    bool autoscroll_on = false;
     // the Contents pane: the document's outline in a tree
     HWND tree = nullptr;
     bool show_toc = false, splitting = false;
@@ -223,6 +227,7 @@ void save_state()
     put("window", "height", wp.rcNormalPosition.bottom - wp.rcNormalPosition.top);
     put("window", "maximized", wp.showCmd == SW_SHOWMAXIMIZED || (wp.flags & WPF_RESTORETOMAXIMIZED) ? 1 : 0);
     put("view", "toolbar", g.show_toolbar);
+    put("view", "autoscroll", g.autoscroll_on);
     put("view", "statusbar", g.show_status);
     put("view", "contents", g.show_toc);
     put("view", "contents_width", g.toc_w);
@@ -248,6 +253,7 @@ void load_state(int* x, int* y, int* w, int* h, bool* maxed)
     g.show_toc = state_int(st, "view", "contents", 0) != 0;
     g.toc_w = std::max(PANE_MIN, state_int(st, "view", "contents_width", PANE_DEFAULT));
     g.large_header = state_int(st, "view", "large_header", 0) != 0;
+    g.autoscroll_on = state_int(st, "view", "autoscroll", 0) != 0;
     int m = state_int(st, "view", "layout", MODE_CONTINUOUS);
     g.mode = m >= MODE_SINGLE && m <= MODE_CONTINUOUS_FACING ? (Mode)m : MODE_CONTINUOUS;
     g.cover = state_int(st, "view", "cover", 0) != 0;
@@ -2342,10 +2348,12 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         break;
     case WM_MBUTTONDOWN:
         SetFocus(hwnd);
+        if (!g.autoscroll_on) return 0;
         if (g.autoscroll) autoscroll_stop();   // a click ends the sticky mode
         else autoscroll_start({ (short)LOWORD(lp), (short)HIWORD(lp) });
         return 0;
     case WM_MBUTTONUP:
+        if (!g.autoscroll_on) return 0;
         if (g.autoscroll && !g.auto_sticky) {
             if (g.auto_moved) autoscroll_stop();
             else { g.auto_sticky = true; trace("autoscroll sticky"); }   // a click: on until the next click or key

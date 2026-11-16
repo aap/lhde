@@ -39,6 +39,7 @@ expect() {   # expect NAME FILE X Y R,G,B
 python3 -I "$R/tests/headless/mkpdf.py" $T/docs/test.pdf || { echo "FAIL mkpdf.py could not write the PDF"; exit 1; }
 printf 'not a document\0\1\2\3' > $T/docs/broken.pdf
 
+mkdir -p $XDG_STATE_HOME/lhde; printf '[view]\nautoscroll = 1\n' > $XDG_STATE_HOME/lhde/mupf.ini   # the middle button's autoscroll is off by default
 start_xvfb $D -screen 0 1280x900x24 -nolisten tcp || { echo "FAIL Xvfb $D did not start"; stop_xvfb; exit 1; }
 "$R/build/bin/luxwm" > $T/luxwm.log 2>&1 & PW=$!
 wm_up() { xprop -root _NET_SUPPORTING_WM_CHECK 2>/dev/null | grep -q 'window id'; }

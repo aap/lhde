@@ -161,8 +161,9 @@ A drag moves a picture larger than the window.
 | Esc in the header's search box | clear the search |
 | Alt, F10, Alt+letter | the menu bar |
 
-A drag moves the pages; a click on a link follows it. The middle button scrolls as Firefox's autoscroll: held and moved,
-toward the pointer until it is let go; clicked, until the next click or key.
+A drag moves the pages; a click on a link follows it. With `autoscroll = 1` under `[view]` in mupf.ini (off by default, as
+Firefox's is on Linux) the middle button scrolls as Firefox's autoscroll: held and moved, toward the pointer until it is let
+go; clicked, until the next click or key.
 
 ## Every program built on wux (fixed)
 

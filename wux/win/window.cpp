@@ -1418,7 +1418,8 @@ static void dispatch_mouse(Window* t, const sys::Event& ev)
     }
     case sys::EventKind::Wheel: {
         Window* f = is_window(g_focus) ? g_focus : target;
-        post_full(f, WM_MOUSEWHEEL, (WParam)make_lparam((int32_t)mk, ev.wheel * 120), lparam_of(screen), ev.time, screen, nullptr);
+        // a sideways notch is WM_MOUSEHWHEEL, positive to the right (Windows since Vista; XP had no horizontal wheel message)
+        post_full(f, ev.hwheel ? WM_MOUSEHWHEEL : WM_MOUSEWHEEL, (WParam)make_lparam((int32_t)mk, ev.wheel * 120), lparam_of(screen), ev.time, screen, nullptr);
         break;
     }
     default: break;

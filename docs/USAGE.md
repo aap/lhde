@@ -1170,7 +1170,10 @@ above about 270%) is drawn as the part in view.
   bar's arrows and its page number (a click, type a number, Return) and Go To Page (Ctrl+G); Back and Forward (Alt+Left,
   Alt+Right) return over jumps (a page number, a contents entry, a link, Home, End). A drag moves the pages (Acrobat's hand); a click on a link follows it, to its
   page or, for a web address, with xdg-open. The wheel scrolls the system's wheel lines (three of 40 px a notch),
-  Shift+wheel across. The middle button is Firefox's autoscroll: held down and moved, the pages scroll toward the pointer,
+  Shift+wheel and a sideways wheel (a tilt wheel, a touchpad's horizontal scroll) across. The middle button's autoscroll
+  (Firefox's) is off unless `mupf.ini` has `autoscroll = 1` under `[view]`, as Firefox's is off on Linux: with a TrackPoint
+  or a touchpad the X server itself scrolls while the middle button is held, and the click it delivers afterwards would
+  leave the sticky mode on. Turned on: held down and moved, the pages scroll toward the pointer,
   the faster the farther it is from where the button went down (Firefox's speed: nothing within 12 px), until it comes
   up; clicked without moving, the same stays on, the pointer steering it, until the next click or key. Its cursor is the
   cursor theme's all-scroll, without Firefox's round mark where it began: XP's reader-mode cursors (user32's OCR_RDR*)
@@ -1213,7 +1216,7 @@ A password-protected document asks for its password (Acrobat 6's Password dialog
 Document Open Password.", again after a wrong one; Cancel leaves the window empty). There is no printing, no text selection
 and no bookmarks.
 What mupf remembers: `~/.local/state/lhde/mupf.ini` (`[window]` `x`, `y`, `width`, `height`, `maximized`; `[view]` `toolbar`,
-`statusbar`, `contents` and `contents_width`, `large_header`, `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
+`statusbar`, `contents` and `contents_width`, `large_header`, `autoscroll` (the middle button, 0), `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
 1 Fit Page, 2 Fit Width) and `zoom` in thousandths), written when it exits. `mupf.desktop` (installed with it) claims what MuPDF
 opens, lhde's defaults give it PDF, XPS, EPUB and Markdown, and it is the first choice of the document viewer's role. `MUPF_TRACE=1`
 prints what it opens, draws and shows on stdout (`opened 2 pages PDF 1.4`, `rendered 1 816x1056 of 816x1056 at 100%`,

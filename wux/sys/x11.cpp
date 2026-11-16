@@ -1685,10 +1685,11 @@ static bool translate(XEvent& x, Event& ev)
         ev.root = gdi::Point{x.xbutton.x_root, x.xbutton.y_root};
         ev.mods = mods_from_state(x.xbutton.state);
         ev.time = (uint32_t)x.xbutton.time;
-        if (x.xbutton.button == 4 || x.xbutton.button == 5) {
+        if (x.xbutton.button >= 4 && x.xbutton.button <= 7) {   // 4 up, 5 down, 6 left, 7 right
             if (x.type == ButtonRelease) return false;
             ev.kind = EventKind::Wheel;
-            ev.wheel = x.xbutton.button == 4 ? 1 : -1;
+            ev.hwheel = x.xbutton.button >= 6;
+            ev.wheel = x.xbutton.button == 4 || x.xbutton.button == 7 ? 1 : -1;
             return true;
         }
         if (x.xbutton.button > 3) return false;

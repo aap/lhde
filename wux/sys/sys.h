@@ -39,7 +39,8 @@ struct Event {
     gdi::Point pos;      // relative to the window's client area
     gdi::Point root;     // screen coords
     int button;          // 1 left, 2 middle, 3 right
-    int wheel;           // +1 away from user, -1 towards
+    int wheel;           // +1 away from user, -1 towards; with hwheel: +1 right, -1 left
+    bool hwheel;         // Wheel: a sideways notch (X buttons 6 and 7: a tilt wheel, a touchpad's horizontal scroll)
     uint32_t mods;       // Mod flags
     uint32_t keysym;     // X keysym for now
     char text[8];        // utf-8 text of a key press, or ""
