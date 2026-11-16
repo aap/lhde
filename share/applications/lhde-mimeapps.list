@@ -14,3 +14,7 @@ image/jpeg=luxview.desktop
 image/bmp=luxview.desktop
 image/webp=luxview.desktop
 image/vnd.microsoft.icon=luxview.desktop
+application/pdf=mupf.desktop
+application/oxps=mupf.desktop
+application/vnd.ms-xpsdocument=mupf.desktop
+application/epub+zip=mupf.desktop
