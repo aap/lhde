@@ -301,7 +301,9 @@ themes' photos from `FREE_WALLPAPERS`, and without that directory their missing 
 once into `build/free/windows`, and with that tree
 alone every shipped theme must resolve (`lhde-theme explain`, `explain --files`), classic and the ReactOS themes with
 nothing missing but what ReactOS stands in for, every icon key of the icon recipes and the class map has a picture in the
-free set (`lhde-theme icon --set reactos --key KEY`), and luxwm's classic frames render against a baseline of their own
+free set (`lhde-theme icon --set reactos --key KEY`), `lhde-firefox` writes a userChrome.css for every theme that Firefox's
+own parser takes without an error (`tests/firefox-css.py`: one headless Firefox over Marionette, the values of the
+`--lhde-*` properties also put in place; skipped without `firefox`), and luxwm's classic frames render against a baseline of their own
 (`build/luxwm/regress/baseline-free.sha256`; ReactOS's Tahoma and Marlett, so they differ from the normal run's).
 Nothing imported at all (`make check-bare`, `tests/check-bare.sh`, what a CI job runs): the whole `make check` with an empty
 Windows tree and empty config, data, state and cache homes and HOME (fresh temporary directories; no `LHDE_DATA`, no ReactOS

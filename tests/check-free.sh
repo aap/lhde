@@ -12,7 +12,8 @@
 #     not carry: the built-in Windows Standard);
 #   - every icon key of the icon set recipes (share/icons/*.theme) and every key the class map (share/icons/apps.ini) names
 #     has an image in the free set (lhde-theme icon --set reactos --key KEY: reactos itself, or Wine's for what ReactOS lacks);
-#   - lhde-firefox generate writes a userChrome.css for every shipped theme (colours alone where the styles are absent);
+#   - lhde-firefox generate writes a userChrome.css for every shipped theme (colours alone where the styles are absent), and
+#     Firefox's own CSS parser reports no error in them (tests/firefox-css.py: headless, skipped without firefox);
 #   - luxwm's Windows Classic frames render through the frame regression (regress.sh --classic-only, ReactOS's Tahoma and Marlett)
 #     against a baseline of their own, build/luxwm/regress/baseline-free.sha256 (written on the first run); whether they equal the
 #     normal run's classic renders (whose fonts are the imported build's) is reported, not required.
@@ -78,6 +79,13 @@ for f in share/themes/*.theme; do
 	fi
 done
 echo "ok    free baseline: lhde-firefox writes a userChrome.css for the $nf themes"
+# and Firefox's own CSS parser takes every rule of them (one headless Firefox; skipped without firefox)
+rc=0; TMPDIR=$B python3 -I tests/firefox-css.py "$B"/firefox/*/userChrome.css > "$B/firefox/css.log" 2>&1 || rc=$?
+case $rc in
+0) sed 's/^ok    /ok    free baseline: /' "$B/firefox/css.log" ;;
+77) echo "skip  free baseline: no firefox to parse lhde-firefox's CSS" ;;
+*) echo "FAIL  free baseline: Firefox rejects lhde-firefox's CSS:"; cat "$B/firefox/css.log"; exit 1 ;;
+esac
 keys=$(sed -n '/^\[icons\]/,/^\[/{s/^\([a-z_0-9]*\) *=.*/\1/p;}' share/icons/*.theme | sort -u)
 mapped=$(sed -n '/^\[classes\]/,/^\[/{s/^[^;[][^=]*= *\([a-z_0-9]*\) *$/\1/p;}' share/icons/apps.ini | sort -u)
 nk=0 bad=
