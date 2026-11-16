@@ -29,7 +29,7 @@ and Super alone when it binds neither Super key.
 | Super+1 .. Super+4 | desktop 1 .. 4 (with a window being moved: it goes along) | `workspace 0` .. `3` |
 | Alt+Tab, Super+Tab; with Shift backwards | the task switcher (below) | `cycle` |
 | Alt+Space | the window menu (below) | `sysmenu` |
-| Super+Shift+S, Super+Shift+F, Super+Shift+W | a screenshot of a dragged rectangle, of the screen, of the active window (luxshot) | `shell screenshot_region`, `shell screenshot`, `shell screenshot_window` |
+| Super+Shift+S, Super+Shift+F, Super+Shift+W | a screenshot of a dragged rectangle (a click instead: the whole screen; Shift+click: the window under the pointer with its frame), of the screen, of the active window (luxshot) | `shell screenshot_region`, `shell screenshot`, `shell screenshot_window` |
 
 Print is not bound (it may be the user's compose key); `Print shell screenshot` in the keys file binds it.
 

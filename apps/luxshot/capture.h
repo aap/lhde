@@ -15,10 +15,12 @@ struct Shot {
     std::vector<uint32_t> pixels;     // 0xFFRRGGBB, rows top down
     std::string what;                 // "Whole screen", the window's title, "Region"
     int x = 0, y = 0;                 // where it was on the screen
+    Mode picked = Mode::Screen;       // what it is (in Region mode a click is the screen, Shift+click a window)
 };
 
 // Waits delay seconds, then captures. frame: a window with its frame (_NET_FRAME_EXTENTS). False with *err a sentence
-// ("" when the user cancelled a region with Escape or the right button).
+// ("" when the user cancelled a region with Escape or the right button). In Region mode a click without a drag takes the
+// whole screen and Shift+click the top-level window under the pointer with its frame.
 bool take(Mode mode, bool frame, double delay, Shot& out, std::string* err);
 
 } // namespace capture

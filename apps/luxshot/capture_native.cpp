@@ -119,9 +119,71 @@ void band(Display* d, Window w, GC gc, int x0, int y0, int x1, int y1)
     if (bw && bh) XDrawRectangle(d, w, gc, x, y, bw - 1, bh - 1);
 }
 
+bool has_prop(Display* d, Window w, Atom prop)
+{
+    Atom type = None;
+    int format;
+    unsigned long n, after;
+    unsigned char* data = nullptr;
+    XGetWindowProperty(d, w, prop, 0, 0, False, AnyPropertyType, &type, &format, &n, &after, &data);
+    if (data) XFree(data);
+    return type != None;
+}
+
+// a window below w holding WM_STATE (a reparenting window manager's client), depth first
+bool has_client(Display* d, Window w, Atom wm_state, int depth)
+{
+    if (has_prop(d, w, wm_state)) return true;
+    if (depth == 0) return false;
+    Window r, p, *kids = nullptr;
+    unsigned n = 0;
+    bool found = false;
+    if (XQueryTree(d, w, &r, &p, &kids, &n))
+        for (unsigned i = 0; i < n && !found; i++) found = has_client(d, kids[i], wm_state, depth - 1);
+    if (kids) XFree(kids);
+    return found;
+}
+
+// the top-level window under (px, py) with its frame, skipping `self`: the top-most viewable child of the root that is
+// a client (WM_STATE) whose rectangle widened by _NET_FRAME_EXTENTS holds the point (luxwm does not reparent: the client
+// is a child of the root above its frame window), or a reparenting manager's frame holding a client (its own rectangle)
+bool window_at(Display* d, Window root, Window self, int px, int py, int& x, int& y, int& w, int& h, std::string& title)
+{
+    Atom wm_state = XInternAtom(d, "WM_STATE", False);
+    Window r, p, *kids = nullptr;
+    unsigned n = 0;
+    if (!XQueryTree(d, root, &r, &p, &kids, &n)) return false;
+    bool found = false;
+    for (unsigned i = n; i-- > 0 && !found;) {   // top of the stack first
+        Window k = kids[i];
+        XWindowAttributes wa;
+        if (k == self || !XGetWindowAttributes(d, k, &wa) || wa.map_state != IsViewable || wa.c_class != InputOutput) continue;
+        int kx = wa.x, ky = wa.y, kw = wa.width + 2 * wa.border_width, kh = wa.height + 2 * wa.border_width;
+        if (has_prop(d, k, wm_state)) {
+            long ext[4] = { 0, 0, 0, 0 };   // left, right, top, bottom
+            if (cardinals(d, k, "_NET_FRAME_EXTENTS", ext, 4)) {
+                kx -= (int)ext[0]; ky -= (int)ext[2]; kw += (int)(ext[0] + ext[1]); kh += (int)(ext[2] + ext[3]);
+            }
+        } else if (!has_client(d, k, wm_state, 3)) {
+            continue;   // a frame of luxwm's (its client is above it), a panel, a tooltip
+        }
+        if (px < kx || py < ky || px >= kx + kw || py >= ky + kh) continue;
+        x = kx; y = ky; w = kw; h = kh;
+        title = window_title(d, k);
+        found = true;
+    }
+    if (kids) XFree(kids);
+    return found;
+}
+
+enum class Pick { Cancel, Region, Screen, Window };
+
 // a rectangle dragged over the frozen screen: an override-redirect window showing the picture, the pointer and keyboard
-// grabbed (retried: luxwm still holds the key that started us), a crosshair, Escape or the right button cancel
-bool drag_region(Display* d, Window root, const Shot& screen, int& rx, int& ry, int& rw, int& rh, std::string* err)
+// grabbed (retried: luxwm still holds the key that started us), a crosshair, Escape or the right button cancel. A click
+// without a drag (2 pixels or less between press and release) is the whole screen, as XP's Print Screen; Shift+click the
+// top-level window under the pointer with its frame, as XP's Alt+Print Screen took the active one
+Pick drag_region(Display* d, Window root, const Shot& screen, int& rx, int& ry, int& rw, int& rh, std::string& title,
+                 std::string* err)
 {
     int scr = DefaultScreen(d);
     Visual* vis = DefaultVisual(d, scr);
@@ -168,8 +230,9 @@ bool drag_region(Display* d, Window root, const Shot& screen, int& rx, int& ry, 
     gv.line_width = 1;
     gv.subwindow_mode = IncludeInferiors;
     GC gc = XCreateGC(d, w, GCFunction | GCForeground | GCLineWidth | GCSubwindowMode, &gv);
-    bool done = false, cancelled = !grabbed, dragging = false;
+    bool done = false, cancelled = !grabbed, dragging = false, shift = false;
     int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    Pick pick = Pick::Region;
     if (!grabbed && err) *err = "Cannot grab the pointer to drag a rectangle.";
     while (!done && !cancelled) {
         XEvent ev;
@@ -179,7 +242,10 @@ bool drag_region(Display* d, Window root, const Shot& screen, int& rx, int& ry, 
             if (dragging && ev.xexpose.count == 0) band(d, w, gc, x0, y0, x1, y1);
             break;
         case ButtonPress:
-            if (ev.xbutton.button == Button1) { dragging = true; x0 = x1 = ev.xbutton.x; y0 = y1 = ev.xbutton.y; }
+            if (ev.xbutton.button == Button1) {
+                dragging = true; x0 = x1 = ev.xbutton.x; y0 = y1 = ev.xbutton.y;
+                shift = (ev.xbutton.state & ShiftMask) != 0;
+            }
             else if (ev.xbutton.button == Button3) cancelled = true;
             break;
         case MotionNotify:
@@ -194,7 +260,9 @@ bool drag_region(Display* d, Window root, const Shot& screen, int& rx, int& ry, 
             band(d, w, gc, x0, y0, x1, y1);
             x1 = ev.xbutton.x; y1 = ev.xbutton.y;
             dragging = false;
-            if (std::abs(x1 - x0) >= 2 && std::abs(y1 - y0) >= 2) done = true;   // a click is no rectangle: drag again
+            done = true;
+            if (std::abs(x1 - x0) <= 2 && std::abs(y1 - y0) <= 2) pick = shift ? Pick::Window : Pick::Screen;
+            else if (x1 == x0 || y1 == y0) done = false;   // a line is no rectangle: drag again
             break;
         case KeyPress: {
             KeySym k = XLookupKeysym(&ev.xkey, 0);
@@ -205,14 +273,26 @@ bool drag_region(Display* d, Window root, const Shot& screen, int& rx, int& ry, 
     }
     XUngrabKeyboard(d, CurrentTime);
     XUngrabPointer(d, CurrentTime);
+    if (!cancelled && pick == Pick::Window) {   // asked while our window is still up (window_at skips it)
+        int wx, wy, ww, wh;
+        if (window_at(d, root, w, x0, y0, wx, wy, ww, wh, title)) {
+            int cx0 = std::max(wx, 0), cy0 = std::max(wy, 0);   // on screen
+            int cx1 = std::min(wx + ww, screen.width), cy1 = std::min(wy + wh, screen.height);
+            rx = cx0; ry = cy0; rw = cx1 - cx0; rh = cy1 - cy0;
+            if (rw <= 0 || rh <= 0) pick = Pick::Screen;
+        } else {
+            pick = Pick::Screen;   // the desktop: the whole screen
+        }
+    }
     XFreeGC(d, gc);
     XDestroyWindow(d, w);
     XFreeCursor(d, cross);
     XFreePixmap(d, pm);
     XSync(d, False);
-    if (cancelled) return false;
-    rx = std::min(x0, x1); ry = std::min(y0, y1); rw = std::abs(x1 - x0); rh = std::abs(y1 - y0);
-    return true;
+    if (cancelled) return Pick::Cancel;
+    if (pick == Pick::Screen) { rx = 0; ry = 0; rw = screen.width; rh = screen.height; }
+    else if (pick == Pick::Region) { rx = std::min(x0, x1); ry = std::min(y0, y1); rw = std::abs(x1 - x0); rh = std::abs(y1 - y0); }
+    return pick;
 }
 
 } // namespace
@@ -229,6 +309,7 @@ bool take(Mode mode, bool frame, double delay, Shot& out, std::string* err)
     if (mode == Mode::Screen) {
         ok = grab(d, root, 0, 0, sw, sh, out);
         out.what = "Whole screen";
+        out.picked = Mode::Screen;
     } else if (mode == Mode::Window) {
         int x, y, w, h;
         std::string title;
@@ -237,16 +318,22 @@ bool take(Mode mode, bool frame, double delay, Shot& out, std::string* err)
             if (x1 > x0 && y1 > y0) ok = grab(d, root, x0, y0, x1 - x0, y1 - y0, out);
             else if (err) *err = "The active window is off the screen.";
             out.what = title.empty() ? std::string("Window") : title;
+            out.picked = Mode::Window;
         }
     } else {
         Shot screen;
-        int x, y, w, h;
-        if (grab(d, root, 0, 0, sw, sh, screen) && drag_region(d, root, screen, x, y, w, h, err)) {
+        int x = 0, y = 0, w = 0, h = 0;
+        std::string title;
+        Pick pick = Pick::Cancel;
+        if (grab(d, root, 0, 0, sw, sh, screen)) pick = drag_region(d, root, screen, x, y, w, h, title, err);
+        if (pick != Pick::Cancel) {   // cut from the frozen picture, what the user saw
             out.width = w; out.height = h; out.x = x; out.y = y;
             out.pixels.resize((size_t)w * h);
             for (int r = 0; r < h; r++)
                 memcpy(&out.pixels[(size_t)r * w], &screen.pixels[(size_t)(y + r) * sw + x], (size_t)w * 4);
-            out.what = "Region";
+            out.what = pick == Pick::Screen ? std::string("Whole screen") : pick == Pick::Region ? std::string("Region")
+                     : title.empty() ? std::string("Window") : title;
+            out.picked = pick == Pick::Screen ? Mode::Screen : pick == Pick::Window ? Mode::Window : Mode::Region;
             ok = true;
         }
     }

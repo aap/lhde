@@ -46,7 +46,8 @@ void usage(FILE* f)
     fputs("usage: luxshot [--screen | --window [--no-frame] | --region] [--delay S] [--desc TEXT] [--tags A,B] [FILE.png]\n"
           "  --screen        the whole screen (default)\n"
           "  --window        the active window with its frame; --no-frame: the window alone\n"
-          "  --region        a rectangle dragged with the mouse (Escape or the right button cancel)\n"
+          "  --region        a rectangle dragged with the mouse (Escape or the right button cancel);\n"
+          "                  a click: the whole screen, Shift+click: the window under the pointer with its frame\n"
           "  --delay S       wait S seconds first\n"
           "  --desc TEXT     the description (user.lux.desc), --tags A,B the tags (user.xdg.tags)\n"
           "  FILE.png        write FILE.png and exit, no window\n"
@@ -207,8 +208,8 @@ void browse(HWND dlg)
 std::string info_line()
 {
     std::string s = std::to_string(g.shot.width) + " x " + std::to_string(g.shot.height) + " pixels, ";
-    if (g.mode == capture::Mode::Screen) return s + "whole screen";
-    if (g.mode == capture::Mode::Region) return s + "region at " + std::to_string(g.shot.x) + ", " + std::to_string(g.shot.y);
+    if (g.shot.picked == capture::Mode::Screen) return s + "whole screen";
+    if (g.shot.picked == capture::Mode::Region) return s + "region at " + std::to_string(g.shot.x) + ", " + std::to_string(g.shot.y);
     return s + "window \"" + g.shot.what + "\"";
 }
 

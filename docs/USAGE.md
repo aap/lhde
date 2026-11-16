@@ -998,8 +998,11 @@ archive and sync tools by default, or git.
 
 Super+Shift+F takes the whole screen, Super+Shift+W the active window with its frame (luxwm's frame, from the window's
 `_NET_FRAME_EXTENTS`), Super+Shift+S a rectangle (Windows 10's snip key): the screen freezes, the pointer becomes a
-crosshair, drag the rectangle (Escape or the right button cancel). Print is left free (it may be your compose key); the keys
-file can bind it ("Keys in the session" above). A window comes up at once with the picture scaled to fit and its size, and:
+crosshair, drag the rectangle (Escape or the right button cancel). A click instead of a drag (the pointer moved 2 pixels or
+less) takes the whole screen, every monitor in one picture as XP's Print Screen did; Shift+click takes the window under the
+pointer with its frame, as XP's Alt+Print Screen took the active one (the desktop under the pointer: the whole screen). Print
+is left free (it may be your compose key); the keys file can bind it ("Keys in the session" above). A window comes up at once
+with the picture scaled to fit and its size, and:
 
 - **File name** `Screenshot YYYY-MM-DD HHMMSS.png` (" (2)" when that second has one already) and **Save in** your pictures
   folder (`XDG_PICTURES_DIR`, from `~/.config/user-dirs.dirs`, else `~/Pictures`; made when missing); **Browse...** is the Save As
