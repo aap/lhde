@@ -107,6 +107,11 @@ int main()
     check("cover: page 2 not shown with it", "-", box(fc.page[1]));
     Layout fc2 = make_layout(three, 0, 0.5, MODE_FACING, true, 2, 1000, 600);
     check("cover: page 3 shows with page 2", "87,36 408x528 505,36 408x528", box(fc2.page[1]) + " " + box(fc2.page[2]));
+    // a reflowable document's pages (laid out 600 pt wide, 800 px at 100%): no margin, no gap, the plane as wide as the view
+    std::vector<SizeF> flow = { { 600, 900 }, { 600, 300 } };
+    Layout fl = make_layout(flow, 0, 1.0, MODE_CONTINUOUS, false, 0, 800, 600, true);
+    check("flow: the pages abut from the top", "0,0 800x1200 0,1200 800x400", box(fl.page[0]) + " " + box(fl.page[1]));
+    check("flow: the plane", "800x1600", std::to_string(fl.width) + "x" + std::to_string(fl.height));
 
     // fits
     check("fit width: 800 px for 612 pt", "95", pct(fit_width(three, 0, MODE_CONTINUOUS, false, 0, 800)));
@@ -180,6 +185,18 @@ int main()
         k.put(tile(1, 1.0, 816, 1056), 1, 1.0);
         check("over the budget alone: the one just put", 1, (long long)k.count());
         check("and it is page 2", k.covered(1, 0, 1.0, { 0, 0, 816, 1056 }));
+        // a new generation (a reflowable document laid out again): the old tiles stale, drawn behind but covering nothing
+        k.clear();
+        k.set_budget(10u << 20);
+        k.put(tile(0, 1.0, 816, 1056), 0, 1.0);
+        k.set_gen(2);
+        check("stale: not covered", !k.covered(0, 0, 1.0, { 0, 0, 816, 1056 }));
+        check("stale: still drawn", 1, (long long)k.tiles_for(0, 0, 1.0).size());
+        Tile* fresh = tile(0, 1.0, 816, 900);
+        fresh->gen = 2;
+        k.put(fresh, 0, 1.0);
+        check("the new generation's tile replaces it", 1, (long long)k.count());
+        check("and covers", k.covered(0, 0, 1.0, { 0, 0, 816, 900 }));
     }
 
     printf("%d checks, %d failed\n", checks, fails);

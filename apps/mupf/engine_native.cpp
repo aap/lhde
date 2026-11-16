@@ -24,11 +24,12 @@ const size_t STORE_MAX = 64u << 20;    // mupdf's own store (fonts, decoded imag
 const int LISTS_KEPT = 8;              // the display lists kept: the pages last drawn
 const int SIZES_BATCH = 32;            // page sizes read between other work
 const int SEARCH_QUADS = 512;          // the rectangles one page's search reports at most
-// Markdown: laid out as one page this tall (in points), cut to its ink and the bottom margin below it; a longer file goes on
-// to more pages of this height
+// a reflowable document (Markdown, EPUB, ...): laid out as pages this tall (in points), each cut to its ink and the bottom
+// margin below it; a longer file or chapter goes on to more pages of this height
 const float MD_PAGE_H = 100000;
-const float MD_EM = 12;                // the default font size (16 px), the stylesheet's body size
+const float MD_EM = 12;                // the default font size (16 px), the Markdown stylesheet's body size
 const float MD_BOTTOM = 30;            // the margin below the last ink (the stylesheet's bottom padding)
+
 }   // namespace
 
 struct Engine::Impl {
@@ -39,8 +40,9 @@ struct Engine::Impl {
     std::thread th;
     // asked for (under mu)
     bool quit = false;
-    bool open_pending = false, close_pending = false;
+    bool open_pending = false, close_pending = false, layout_pending = false;
     std::string open_path, open_password;
+    float open_flow_w = 0, layout_w = 0;
     uint32_t gen = 0;
     std::vector<Job> jobs;
     bool search_pending = false;
@@ -64,6 +66,10 @@ struct Engine::Impl {
     std::deque<List> lists;             // most recent first
     std::set<int> links_sent;
     bool markdown = false;
+    bool reflowable = false;            // laid out by mupdf (fz_layout_document) flow_w points wide
+    float flow_w = 0;
+    std::string md_title;               // a Markdown file's first H1 and its headings (its outline after a new layout)
+    std::vector<md::Heading> md_headings;
     FontFiles font;                     // the faces installed (load_font)
     fz_font* fonts[4] = {};             // loaded from them
     // the search being done
@@ -74,7 +80,10 @@ struct Engine::Impl {
 
     void run();
     void push(Event&& e);
-    void do_open(const std::string& path, const std::string& password, uint32_t g);
+    void do_open(const std::string& path, const std::string& password, float w, uint32_t g);
+    void do_layout(float w, uint32_t g);
+    void opened(uint32_t g, bool relaid);
+    void lay_out(float w);
     void do_close();
     bool ensure_bound(int page);
     void read_sizes();
@@ -83,7 +92,7 @@ struct Engine::Impl {
     void search_step();
     void outline(fz_outline* o, int level, std::vector<TocItem>& out);
     int resolve(const char* uri, float* y);
-    fz_document* open_markdown(const std::string& path, std::vector<TocItem>* toc, std::string* title, const char** err);
+    fz_document* open_markdown(const std::string& path, const char** err);
     void drop_fonts();
 };
 
@@ -140,13 +149,30 @@ Engine::~Engine()
     delete d;
 }
 
-uint32_t Engine::open(const std::string& path, const std::string& password)
+uint32_t Engine::open(const std::string& path, const std::string& password, float flow_w)
 {
     std::lock_guard<std::mutex> lk(d->mu);
     d->open_pending = true;
     d->close_pending = false;
+    d->layout_pending = false;
     d->open_path = path;
     d->open_password = password;
+    d->open_flow_w = flow_w;
+    d->jobs.clear();
+    d->search_pending = false;
+    if (d->running) d->running->abort = 1;
+    for (Event& e : d->events) delete e.tile;
+    d->events.clear();
+    d->cv.notify_all();
+    return ++d->gen;
+}
+
+uint32_t Engine::layout(float flow_w)
+{
+    std::lock_guard<std::mutex> lk(d->mu);
+    if (d->open_pending) d->open_flow_w = flow_w;   // (not open yet: opened at this width)
+    else d->layout_pending = true;
+    d->layout_w = flow_w;
     d->jobs.clear();
     d->search_pending = false;
     if (d->running) d->running->abort = 1;
@@ -160,6 +186,7 @@ void Engine::close()
 {
     std::lock_guard<std::mutex> lk(d->mu);
     d->open_pending = false;
+    d->layout_pending = false;
     d->close_pending = true;
     d->jobs.clear();
     d->search_pending = false;
@@ -229,13 +256,14 @@ void Engine::Impl::run()
     std::unique_lock<std::mutex> lk(mu);
     for (;;) {
         cv.wait(lk, [&] {
-            return quit || open_pending || close_pending || !jobs.empty() || search_pending || (doc && sizes_next < pages) ||
-                   searching;
+            return quit || open_pending || close_pending || layout_pending || !jobs.empty() || search_pending ||
+                   (doc && sizes_next < pages) || searching;
         });
         if (quit) break;
         if (open_pending || close_pending) {
             bool opening = open_pending;
             std::string path = open_path, password = open_password;
+            float w = open_flow_w;
             uint32_t g = gen;
             open_pending = close_pending = false;
             searching = false;
@@ -246,7 +274,17 @@ void Engine::Impl::run()
                 drop_fonts();
                 font = f;
             }
-            if (opening) do_open(path, password, g);
+            if (opening) do_open(path, password, w, g);
+            lk.lock();
+            continue;
+        }
+        if (layout_pending) {
+            layout_pending = false;
+            float w = layout_w;
+            uint32_t g = gen;
+            searching = false;
+            lk.unlock();
+            do_layout(w, g);
             lk.lock();
             continue;
         }
@@ -317,6 +355,10 @@ void Engine::Impl::do_close()
     sizes_next = 0;
     searching = false;
     markdown = false;
+    reflowable = false;
+    flow_w = 0;
+    md_title.clear();
+    md_headings.clear();
 }
 
 void Engine::Impl::outline(fz_outline* o, int level, std::vector<TocItem>& out)
@@ -366,9 +408,8 @@ static float heading_top(float y, int level)
 }
 
 // the Markdown file as an HTML page (markdown.h) opened by mupdf with the file's directory as its archive, so a relative
-// <img src> and link resolve there; the headings H1 to H3 its outline
-fz_document* Engine::Impl::open_markdown(const std::string& path, std::vector<TocItem>* toc, std::string* title,
-                                         const char** err)
+// <img src> and link resolve there (lay_out gives it its width); its title and headings kept (md_title, md_headings)
+fz_document* Engine::Impl::open_markdown(const std::string& path, const char** err)
 {
     std::string text;
     FILE* f = fopen(path.c_str(), "rb");
@@ -380,7 +421,8 @@ fz_document* Engine::Impl::open_markdown(const std::string& path, std::vector<To
     md::Style st;
     if (!font.file[0].empty()) st.family = font.family;
     md::Page page = md::convert(text, st);
-    *title = page.title;
+    md_title = page.title;
+    md_headings = page.headings;
     size_t slash = path.rfind('/');
     std::string dir = slash == std::string::npos ? "." : slash == 0 ? "/" : path.substr(0, slash);
     fz_buffer* b = nullptr;
@@ -398,7 +440,6 @@ fz_document* Engine::Impl::open_markdown(const std::string& path, std::vector<To
         stm = fz_open_buffer(fz, b);
         arc = fz_open_directory(fz, dir.c_str());
         d = fz_open_document_with_stream_and_dir(fz, "text/html", stm, arc);
-        fz_layout_document(fz, d, md::PAGE_WIDTH_PT, MD_PAGE_H, MD_EM);
     }
     fz_always(fz) {
         fz_drop_stream(fz, stm);
@@ -410,23 +451,21 @@ fz_document* Engine::Impl::open_markdown(const std::string& path, std::vector<To
         d = nullptr;
         *err = "The Markdown file cannot be laid out.";
     }
-    if (!d) return nullptr;
-    doc = d;
-    for (const md::Heading& h : page.headings) {
-        if (h.level > 3) continue;
-        TocItem it;
-        it.title = h.text;
-        it.level = h.level - 1;
-        it.open = true;
-        it.page = resolve(("#" + h.id).c_str(), &it.y);
-        it.y = heading_top(it.y, h.level);
-        toc->push_back(std::move(it));
-    }
-    doc = nullptr;
     return d;
 }
 
-void Engine::Impl::do_open(const std::string& path, const std::string& password, uint32_t g)
+// a reflowable document laid out w points wide (the narrowest FLOW_MIN_PT), its pages counted
+void Engine::Impl::lay_out(float w)
+{
+    flow_w = std::max(FLOW_MIN_PT, w > 0 ? w : md::PAGE_WIDTH_PT);
+    fz_try(fz) {
+        fz_layout_document(fz, doc, flow_w, MD_PAGE_H, MD_EM);
+        pages = fz_count_pages(fz, doc);
+    }
+    fz_catch(fz) { pages = 0; }
+}
+
+void Engine::Impl::do_open(const std::string& path, const std::string& password, float w, uint32_t g)
 {
     Event e;
     e.gen = g;
@@ -434,15 +473,10 @@ void Engine::Impl::do_open(const std::string& path, const std::string& password,
     const char* err = nullptr;
     char msg[512] = "";
     bool locked = false;
-    std::vector<TocItem> md_toc;
-    std::string md_title;
     markdown = md::is_markdown(path);
     if (markdown) {
-        doc = open_markdown(path, &md_toc, &md_title, &err);
-        if (doc) {
-            fz_try(fz) { pages = fz_count_pages(fz, doc); }
-            fz_catch(fz) { pages = 0; }
-        }
+        doc = open_markdown(path, &err);
+        reflowable = doc != nullptr;
     }
     fz_var(err);
     fz_var(locked);
@@ -452,15 +486,18 @@ void Engine::Impl::do_open(const std::string& path, const std::string& password,
             if (fz_needs_password(fz, doc) && !fz_authenticate_password(fz, doc, password.c_str())) {
                 err = password.empty() ? "The document is protected by a password." : "The password is not right.";
                 locked = true;
-            } else {
-                pages = fz_count_pages(fz, doc);
-            }
+            } else reflowable = fz_is_document_reflowable(fz, doc);
         }
         fz_catch(fz) {
             snprintf(msg, sizeof msg, "%s", fz_caught_message(fz));
             err = msg;
         }
+        if (!err && !reflowable) {
+            fz_try(fz) { pages = fz_count_pages(fz, doc); }
+            fz_catch(fz) { pages = 0; }
+        }
     }
+    if (!err && reflowable) lay_out(w);
     if (!err && pages <= 0) err = "The document has no pages.";
     if (err) {
         do_close();
@@ -470,6 +507,35 @@ void Engine::Impl::do_open(const std::string& path, const std::string& password,
         push(std::move(e));
         return;
     }
+    opened(g, false);
+}
+
+// a reflowable document laid out again at another width: its pages, sizes and outline anew, as generation g
+void Engine::Impl::do_layout(float w, uint32_t g)
+{
+    if (!doc || !reflowable) return;
+    for (List& l : lists) fz_drop_display_list(fz, l.list);
+    lists.clear();
+    links_sent.clear();
+    lay_out(w);
+    if (pages <= 0) {   // (mupdf failed to lay it out: nothing to show)
+        Event e;
+        e.kind = Event::FAILED;
+        e.gen = g;
+        e.error = "The document cannot be laid out.";
+        do_close();
+        push(std::move(e));
+        return;
+    }
+    opened(g, true);
+}
+
+// OPENED for the document just opened or laid out again: its pages (every one the first one's size until they are read),
+// the title, the format, the outline (a Markdown file's: its headings H1 to H3, mupdf's HTML has none)
+void Engine::Impl::opened(uint32_t g, bool relaid)
+{
+    Event e;
+    e.gen = g;
     doc_gen = g;
     bounds.assign(pages, fz_empty_rect);
     known.assign(pages, 0);
@@ -477,12 +543,24 @@ void Engine::Impl::do_open(const std::string& path, const std::string& password,
     ensure_bound(0);
     e.kind = Event::OPENED;
     e.pages = pages;
+    e.reflowable = reflowable;
+    e.flow_w = reflowable ? flow_w : 0;
+    e.relaid = relaid;
     char buf[1024] = "";
     if (markdown) {
         e.markdown = true;
         e.title = md_title;
         e.format = "Markdown";
-        e.toc = std::move(md_toc);
+        for (const md::Heading& h : md_headings) {
+            if (h.level > 3) continue;
+            TocItem it;
+            it.title = h.text;
+            it.level = h.level - 1;
+            it.open = true;
+            it.page = resolve(("#" + h.id).c_str(), &it.y);
+            it.y = heading_top(it.y, h.level);
+            e.toc.push_back(std::move(it));
+        }
     }
     if (!markdown && fz_lookup_metadata(fz, doc, FZ_META_INFO_TITLE, buf, sizeof buf) > 0) e.title = buf;
     buf[0] = 0;
@@ -512,7 +590,7 @@ bool Engine::Impl::ensure_bound(int page)
     fz_page* p = nullptr;
     fz_device* dev = nullptr;
     fz_rect r = fz_empty_rect, ink = fz_empty_rect;
-    bool cut = markdown && page == pages - 1;   // the last page of a Markdown file: to its ink
+    bool cut = reflowable;   // a reflowable document's tall pages: to their ink
     fz_var(p);
     fz_var(r);
     fz_var(dev);

@@ -55,6 +55,10 @@ const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_T
 const int PANE_TITLE = 22, SPLITTER = 4, PANE_MIN = 80, PANE_DEFAULT = 200;
 const UINT_PTR TIMER_RELOAD = 1;       // a Markdown file written: read again once the writes have settled
 const int RELOAD_DELAY = 150;
+// the view's timer: a reflowable document laid out again once the window's size has settled (a drag-resize lays it out
+// once, not at every step)
+const UINT_PTR TIMER_REFLOW = 2;
+const int REFLOW_DELAY = 120;
 // mupdf's grey around the pages: mupdf's X11 viewer (the `mupdf` command) clears its window to 0x707070 (measured: its
 // window beside a page, 112,112,112), darker than Acrobat 6's application workspace colour (128 under XP's styles)
 const uint32_t WORKSPACE = 0xff707070;
@@ -92,6 +96,12 @@ struct App {
     double zoom = 1;
     Layout lay;
     int sx = 0, sy = 0, vw = 0, vh = 0;
+    // a reflowable document (Markdown, EPUB, ...): no page, white from edge to edge, laid out by the engine to the view's
+    // width (flow_w points, asked again when the view's width changes: TIMER_REFLOW), always continuous and upright
+    bool flow = false, relaying = false;
+    float flow_w = 0;
+    double flow_frac = 0;               // where the view was before a new layout, a fraction of the document's height
+    int mode_before_flow = -1;          // the page layout chosen, given back when a paged document opens
     int current = 0;
     bool in_layout = false;
     // chrome
@@ -211,7 +221,7 @@ void save_state()
     put("view", "contents", g.show_toc);
     put("view", "contents_width", g.toc_w);
     put("view", "large_header", g.large_header);
-    put("view", "layout", g.mode);
+    put("view", "layout", g.mode_before_flow >= 0 ? g.mode_before_flow : g.mode);
     put("view", "cover", g.cover);
     put("view", "zoom_mode", g.zmode);
     put("view", "zoom", lround(g.zoom * 1000));
@@ -318,24 +328,57 @@ void update_scrollbars()
     si.nPos = g.sy;
     SetScrollInfo(g.view, SB_VERT, &si, TRUE);
     si.fMask = SIF_ALL;
-    si.nMax = g.lay.width - 1;
+    si.nMax = (g.lay.flow ? g.vw : g.lay.width) - 1;   // a reflowable document never scrolls across: no bar
     si.nPage = g.vw;
-    si.nPos = g.sx;
+    si.nPos = g.lay.flow ? 0 : g.sx;
     SetScrollInfo(g.view, SB_HORZ, &si, TRUE);
     trace_where();
 }
 
-// the scroll position within the plane (the pages and their margin: a drag, the wheel or a key stops at their edge)
+// the scroll position within the plane (the pages and their margin: a drag, the wheel or a key stops at their edge); a
+// reflowable document's column centred (wider than the view only until it is laid out again for it)
 void clamp_scroll()
 {
+    if (g.lay.flow) g.sx = (g.lay.width - g.vw) / 2;
     g.sx = std::max(0, std::min(g.sx, g.lay.width - g.vw));
     g.sy = std::max(0, std::min(g.sy, g.lay.height - g.vh));
 }
 
+// a reflowable document has no page to fit: Fit Width and Fit Page are its text at 100%, a zoom of its own its text larger
+// or smaller (laid out again to the width, as a browser's zoom)
 void compute_zoom()
 {
-    if (g.zmode == Z_FIT_WIDTH) g.zoom = fit_width(g.sizes, g.rot, g.mode, g.cover, g.current, g.vw);
+    if (g.flow) { if (g.zmode != Z_CUSTOM) g.zoom = 1; }
+    else if (g.zmode == Z_FIT_WIDTH) g.zoom = fit_width(g.sizes, g.rot, g.mode, g.cover, g.current, g.vw);
     else if (g.zmode == Z_FIT_PAGE) g.zoom = fit_page(g.sizes, g.rot, g.mode, g.cover, g.current, g.vw, g.vh);
+}
+
+// the width in points a reflowable document is laid out at for the view: the view's width, at most GitHub's column
+// (md::MAX_WIDTH_PX, scaled by the zoom as a browser scales it), at least the engine's narrowest
+float flow_width()
+{
+    double z = g.zmode == Z_CUSTOM ? g.zoom : 1;
+    double col = std::min((double)g.vw, md::MAX_WIDTH_PX * z);
+    return (float)std::max((double)FLOW_MIN_PT, col / (z * PX_PER_PT));
+}
+
+// the view's width changed for a reflowable document: lay it out again when it has settled
+void want_flow()
+{
+    if (!g.flow || !g.opened || fabsf(flow_width() - g.flow_w) < 0.5f) return;
+    SetTimer(g.view, TIMER_REFLOW, REFLOW_DELAY, nullptr);
+}
+
+void reflow()
+{
+    KillTimer(g.view, TIMER_REFLOW);
+    float w = flow_width();
+    if (!g.flow || !g.opened || fabsf(w - g.flow_w) < 0.5f) return;
+    g.flow_frac = g.lay.height > 0 ? (double)g.sy / g.lay.height : 0;
+    g.flow_w = w;
+    g.gen = g.eng->layout(w);
+    g.relaying = true;   // (no renders asked until its pages come)
+    trace("reflow %g", w);
 }
 
 // the page under a point of the view and where on it, as fractions of the page box; false when none is
@@ -377,11 +420,11 @@ void relayout(const Anchor& anchor)
     if (a.centre) { a.vx = g.vw / 2; a.vy = g.vh / 2; }
     if (g.opened && a.page >= 0 && !is_continuous(g.mode)) g.current = a.page;
     compute_zoom();
-    g.lay = make_layout(g.sizes, g.rot, g.zoom, g.mode, g.cover, g.current, g.vw, g.vh);
+    g.lay = make_layout(g.sizes, g.rot, g.zoom, g.mode, g.cover, g.current, g.vw, g.vh, g.flow);
     update_scrollbars();
     view_size();   // a scroll bar shown or hidden
     if (g.zmode != Z_CUSTOM) compute_zoom();
-    g.lay = make_layout(g.sizes, g.rot, g.zoom, g.mode, g.cover, g.current, g.vw, g.vh);
+    g.lay = make_layout(g.sizes, g.rot, g.zoom, g.mode, g.cover, g.current, g.vw, g.vh, g.flow);
     if (a.page >= 0 && a.page < (int)g.lay.page.size() && !g.lay.page[a.page].empty()) {
         const Box& b = g.lay.page[a.page];
         g.sx = b.x + (int)lround(a.fx * b.w) - a.vx;
@@ -390,6 +433,7 @@ void relayout(const Anchor& anchor)
     clamp_scroll();
     update_scrollbars();
     g.in_layout = false;
+    want_flow();
     scrolled();
 }
 
@@ -435,7 +479,7 @@ void go_page(int p, float y_pt = 0, bool history = true)
     if (b.empty()) return;
     double px = 0, py = 0;
     page_to_px(0, y_pt, g.sizes[p], g.rot, g.zoom, &px, &py);
-    int top = y_pt > 0 && g.rot == 0 ? b.y + (int)py : b.y - PAGE_GAP / 2;
+    int top = y_pt > 0 && g.rot == 0 ? b.y + (int)py : b.y - (g.lay.flow ? 0 : PAGE_GAP / 2);
     if (!is_continuous(g.mode)) top = y_pt > 0 && g.rot == 0 ? (int)py : 0;
     g.sy = top;
     clamp_scroll();
@@ -505,7 +549,7 @@ Anchor top_anchor() { return anchor_at(g.vw / 2, 0); }
 // goes: ahead two, behind one) while the cache has room
 void request()
 {
-    if (!g.opened || !g.eng) return;
+    if (!g.opened || !g.eng || g.relaying) return;
     std::vector<Job> jobs;
     std::vector<int> in = pages_in_view(g.lay, g.sx, g.sy, g.vw, g.vh);
     size_t room = g.cache->budget();
@@ -567,12 +611,14 @@ void fill(int x, int y, int w, int h, uint32_t c)
     }
 }
 
-// a tile into the page box (bx, by, bw x bh in the view), scaled from its zoom to the box's (nearest pixel)
-void draw_tile(const Tile* t, int bx, int by, int bwid, int bhei, bool same_zoom)
+// a tile into the page box (bx, by, bw x bh in the view), scaled from its zoom to the box's (nearest pixel); a stale one (a
+// reflowable document's former layout) at the scale of the zoom alone, its lines where they were until the new ones come
+void draw_tile(const Tile* t, int bx, int by, int bwid, int bhei, bool same_zoom, bool stale)
 {
     if (t->full_w <= 0 || t->full_h <= 0) return;
-    bool exact = same_zoom || (bwid == t->full_w && bhei == t->full_h);   // the box and mupdf's may differ by a pixel
-    double kx = exact ? 1 : (double)bwid / t->full_w, ky = exact ? 1 : (double)bhei / t->full_h;
+    bool exact = same_zoom || (!stale && bwid == t->full_w && bhei == t->full_h);   // the box and mupdf's may differ by a pixel
+    double kx = exact ? 1 : stale ? g.zoom / t->zoom : (double)bwid / t->full_w;
+    double ky = exact ? 1 : stale ? g.zoom / t->zoom : (double)bhei / t->full_h;
     int dx0 = bx + (int)floor(t->x * kx), dy0 = by + (int)floor(t->y * ky);
     int dx1 = bx + (int)ceil((t->x + t->w) * kx), dy1 = by + (int)ceil((t->y + t->h) * ky);
     dx1 = std::min(dx1, bx + bwid);
@@ -643,28 +689,33 @@ void paint_hits(int page, int x, int y, const Box& b)
 void paint_view(HDC dc)
 {
     make_back();
-    // mupdf's grey around the pages (WORKSPACE)
-    fill(0, 0, g.bw, g.bh, WORKSPACE);
+    // mupdf's grey around the pages (WORKSPACE); a reflowable document white from edge to edge, as a browser shows a page
+    fill(0, 0, g.bw, g.bh, g.lay.flow ? 0xffffffff : WORKSPACE);
     std::string shown;
     if (g.opened) {
         for (int p : pages_in_view(g.lay, g.sx, g.sy, g.vw, g.vh)) {
             const Box& b = g.lay.page[p];
             int x = b.x - g.sx, y = b.y - g.sy;
-            // a page: white, a 1 px black frame, a 2 px shadow below and to the right (Acrobat's)
-            fill(x + 2, y + b.h, b.w, 2, 0xff404040);
-            fill(x + b.w, y + 2, 2, b.h, 0xff404040);
+            // a page: white, a 1 px black frame, a 2 px shadow below and to the right (Acrobat's); a reflowable
+            // document's pages are not pages: no frame, no shadow
+            if (!g.lay.flow) {
+                fill(x + 2, y + b.h, b.w, 2, 0xff404040);
+                fill(x + b.w, y + 2, 2, b.h, 0xff404040);
+            }
             fill(x, y, b.w, b.h, 0xffffffff);
             bool exact = false;
             for (const Tile* t : g.cache->tiles_for(p, g.rot, g.zoom)) {
-                bool same = t->same_zoom(g.zoom);
-                draw_tile(t, x, y, b.w, b.h, same);
+                bool fresh = g.cache->fresh(t), same = fresh && t->same_zoom(g.zoom);
+                draw_tile(t, x, y, b.w, b.h, same, !fresh);
                 exact = exact || same;
             }
             paint_hits(p, x, y, b);
-            fill(x - 1, y - 1, b.w + 2, 1, 0xff000000);
-            fill(x - 1, y + b.h, b.w + 2, 1, 0xff000000);
-            fill(x - 1, y, 1, b.h, 0xff000000);
-            fill(x + b.w, y, 1, b.h, 0xff000000);
+            if (!g.lay.flow) {
+                fill(x - 1, y - 1, b.w + 2, 1, 0xff000000);
+                fill(x - 1, y + b.h, b.w + 2, 1, 0xff000000);
+                fill(x - 1, y, 1, b.h, 0xff000000);
+                fill(x + b.w, y, 1, b.h, 0xff000000);
+            }
             if (exact && g.trace) {
                 POINT o = { x, y };
                 ClientToScreen(g.view, &o);
@@ -744,6 +795,10 @@ void close_doc()
     g.format.clear();
     g.error.clear();
     if (!g.reloading) unwatch_file();
+    g.flow = g.relaying = false;
+    g.flow_w = 0;
+    KillTimer(g.view, TIMER_REFLOW);
+    if (g.mode_before_flow >= 0) { g.mode = (Mode)g.mode_before_flow; g.mode_before_flow = -1; }
     g.current = 0;
     if (!g.keep_history) {
         g.back_pages.clear();
@@ -764,7 +819,10 @@ void open_doc(const std::string& path, const std::string& password = std::string
     g.password_tried = !password.empty();
     g.markdown = md::is_markdown(g.path);
     g.file_stamp = file_stamp(g.path);
-    g.gen = g.eng->open(g.path, password);
+    // (a reflowable document is laid out to the view at once: the width is asked of every document, used by those)
+    view_size();
+    g.gen = g.eng->open(g.path, password, flow_width());
+    g.cache->set_gen(g.gen);
     if (!g.reloading) {
         set_status(0, "Opening...");
         update_title();
@@ -817,6 +875,33 @@ Place here_place(bool position)
 }
 
 void take_hits(const Event& e);
+void start_search(const std::string& needle);
+
+// a reflowable document laid out again at the view's new width: its pages and outline anew, the view at the same fraction
+// of it; the tiles of the former layout drawn until the new ones come; the search done again
+void relaid(Event& e)
+{
+    g.relaying = false;
+    g.cache->set_gen(g.gen);
+    g.pages = e.pages;
+    g.sizes = e.sizes;
+    // the same entries (a Markdown file's headings): the tree as it is, expanded as it was; their places are new
+    bool same = e.toc.size() == g.toc.size();
+    for (size_t i = 0; same && i < e.toc.size(); i++) same = e.toc[i].title == g.toc[i].title && e.toc[i].level == g.toc[i].level;
+    g.toc = std::move(e.toc);
+    g.flow_w = e.flow_w;
+    g.links.clear();
+    if (!same) fill_toc();
+    g.current = std::min(g.current, g.pages - 1);
+    Anchor none;
+    relayout(none);
+    g.sy = (int)lround(g.flow_frac * g.lay.height);
+    clamp_scroll();
+    update_scrollbars();
+    scrolled();
+    trace("relaid %d pages %g", g.pages, g.flow_w);
+    if (!g.search.needle.empty()) start_search(g.search.needle);
+}
 
 void on_engine()
 {
@@ -826,6 +911,7 @@ void on_engine()
         if (e.gen != g.gen) { delete e.tile; continue; }
         switch (e.kind) {
         case Event::OPENED:
+            if (e.relaid) { relaid(e); break; }
             g.opened = true;
             g.pages = e.pages;
             g.sizes = e.sizes;
@@ -833,6 +919,13 @@ void on_engine()
             g.format = e.format;
             g.toc = std::move(e.toc);
             g.markdown = e.markdown;
+            g.flow = e.reflowable;
+            g.flow_w = e.flow_w;
+            if (g.flow) {   // a column of text: continuous and upright, the page layout chosen kept for the next PDF
+                if (g.mode != MODE_CONTINUOUS && g.mode_before_flow < 0) g.mode_before_flow = g.mode;
+                g.mode = MODE_CONTINUOUS;
+                g.rot = 0;
+            }
             fill_toc();
             g.current = 0;
             g.sx = g.sy = 0;
@@ -846,6 +939,7 @@ void on_engine()
                 relayout(none);
                 scroll_to((g.lay.width - g.vw) / 2, 0);   // a page wider than the view: its middle (mupdf centres it)
             }
+            if (g.flow) trace("flow %g", g.flow_w);   // laid out to the view: this many points wide
             if (g.markdown && !g.watch) watch_file();
             if (g.restore) {
                 g.restore = false;
@@ -1149,7 +1243,8 @@ void update_menu()
     enable(CMD_LARGE_HEADER, g.header != nullptr);   // (the XP themes have no header)
     CheckMenuRadioItem(m, CMD_SINGLE, CMD_CONT_FACING, CMD_SINGLE + g.mode, MF_BYCOMMAND);
     check(CMD_COVER, g.cover);
-    enable(CMD_COVER, is_facing(g.mode));
+    enable(CMD_COVER, is_facing(g.mode) && !g.flow);
+    for (UINT id : { CMD_SINGLE, CMD_CONTINUOUS, CMD_FACING, CMD_CONT_FACING }) enable(id, !g.flow);   // (a column of text)
     check(CMD_FIT_PAGE, g.zmode == Z_FIT_PAGE);
     check(CMD_FIT_WIDTH, g.zmode == Z_FIT_WIDTH);
     check(CMD_FULLSCREEN, g.fullscreen);
@@ -1157,6 +1252,8 @@ void update_menu()
     for (UINT id : { CMD_CLOSE, CMD_PROPERTIES, CMD_FIRST, CMD_LAST, CMD_GOTO, CMD_ZOOM_IN, CMD_ZOOM_OUT, CMD_ACTUAL,
                      CMD_FIT_PAGE, CMD_FIT_WIDTH, CMD_ROT_CW, CMD_ROT_CCW })
         enable(id, d);
+    enable(CMD_ROT_CW, d && !g.flow);
+    enable(CMD_ROT_CCW, d && !g.flow);
     enable(CMD_PREV, d && step_page(-1) >= 0);
     enable(CMD_NEXT, d && step_page(1) >= 0);
     enable(CMD_BACK, d && !g.back_pages.empty());
@@ -1227,10 +1324,12 @@ void command(int id)
     case CMD_ACTUAL: if (g.opened) set_zoom(Z_CUSTOM, 1.0, centre_anchor()); break;
     case CMD_FIT_PAGE: if (g.opened) { set_zoom(Z_FIT_PAGE, 0, top_anchor()); go_page(g.current, 0, false); } break;
     case CMD_FIT_WIDTH: if (g.opened) set_zoom(Z_FIT_WIDTH, 0, top_anchor()); break;
-    case CMD_SINGLE: case CMD_CONTINUOUS: case CMD_FACING: case CMD_CONT_FACING: set_mode((Mode)(id - CMD_SINGLE)); break;
-    case CMD_COVER: g.cover = !g.cover; set_mode(g.mode); break;
-    case CMD_ROT_CW: if (g.opened) rotate(90); break;
-    case CMD_ROT_CCW: if (g.opened) rotate(-90); break;
+    case CMD_SINGLE: case CMD_CONTINUOUS: case CMD_FACING: case CMD_CONT_FACING:
+        if (!g.flow) set_mode((Mode)(id - CMD_SINGLE));
+        break;
+    case CMD_COVER: if (!g.flow) { g.cover = !g.cover; set_mode(g.mode); } break;
+    case CMD_ROT_CW: if (g.opened && !g.flow) rotate(90); break;
+    case CMD_ROT_CCW: if (g.opened && !g.flow) rotate(-90); break;
     case CMD_FULLSCREEN: set_fullscreen(!g.fullscreen); break;
     case CMD_FIRST: go_page(0); break;
     case CMD_LAST: go_page(g.pages - 1); break;
@@ -2176,6 +2275,9 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case WM_SIZE:
         if (!g.in_layout) relayout(resize_anchor());
         return 0;
+    case WM_TIMER:
+        if (wp == TIMER_REFLOW) { reflow(); return 0; }
+        break;
     case WM_ERASEBKGND:
         return 1;
     case WM_PAINT: {
@@ -2266,7 +2368,7 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         break;
     case WM_KEYDOWN: {
         bool ctrl = GetKeyState(VK_CONTROL) < 0, shift = GetKeyState(VK_SHIFT) < 0;
-        bool hscroll = g.lay.width > g.vw;
+        bool hscroll = g.lay.width > g.vw && !g.lay.flow;
         switch (wp) {
         case VK_UP: scroll_lines(-LINE); break;
         case VK_DOWN: scroll_lines(LINE); break;

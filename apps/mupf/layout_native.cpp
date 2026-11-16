@@ -124,10 +124,11 @@ void spread_size(const std::vector<SizeF>& sizes, int s, int rot, double zoom, M
 }   // namespace
 
 Layout make_layout(const std::vector<SizeF>& sizes, int rot, double zoom, Mode m, bool cover, int current, int view_w,
-                   int view_h)
+                   int view_h, bool flow)
 {
     Layout l;
-    const int margin = PLANE_MARGIN;
+    l.flow = flow;
+    const int margin = flow ? 0 : PLANE_MARGIN, gap = flow ? 0 : PAGE_GAP;
     l.mode = m;
     l.cover = cover;
     l.rot = rot;
@@ -172,7 +173,7 @@ Layout make_layout(const std::vector<SizeF>& sizes, int rot, double zoom, Mode m
                 l.page[b] = { cx + (PAGE_GAP - half), y + (h - ph) / 2, pw, ph };
             }
         }
-        y += h + (s < last ? PAGE_GAP : 0);
+        y += h + (s < last ? gap : 0);
     }
     l.height = std::max(view_h, y + margin);
     // a spread shown alone and shorter than the view: in the middle of it, as mupdf shows a page
@@ -271,13 +272,13 @@ void Cache::put(Tile* t, int current, double zoom)
     const Tile* background = nullptr;
     if (!t->whole())
         for (const Tile* o : tiles_)
-            if (o->page == t->page && o->whole() && !(o->same_zoom(t->zoom) && o->rot == t->rot) &&
+            if (o->page == t->page && o->whole() && !(o->same_zoom(t->zoom) && o->rot == t->rot && o->gen == t->gen) &&
                 (!background || o->bytes() > background->bytes()))
                 background = o;
     for (size_t i = tiles_.size(); i-- > 0;) {
         const Tile* o = tiles_[i];
         if (o->page != t->page || o == background) continue;
-        if (t->whole() || o->rot != t->rot || !o->same_zoom(t->zoom) || !o->whole()) remove(i);
+        if (t->whole() || o->rot != t->rot || !o->same_zoom(t->zoom) || !o->whole() || o->gen != t->gen) remove(i);
     }
     tiles_.push_back(t);
     bytes_ += t->bytes();
@@ -293,7 +294,7 @@ void Cache::evict(int current, double zoom, const Tile* keep)
             const Tile* o = tiles_[i];
             if (o == keep) continue;
             // the farther the worse; a tile at another zoom counts as farther than any at the current one
-            long score = labs((long)o->page - current) + (o->same_zoom(zoom) ? 0 : 1000000L);
+            long score = labs((long)o->page - current) + (o->same_zoom(zoom) && fresh(o) ? 0 : 1000000L);
             if (score > worst_score) { worst = i; worst_score = score; }
         }
         if (worst == tiles_.size()) break;
@@ -308,7 +309,7 @@ std::vector<const Tile*> Cache::tiles_for(int page, int rot, double zoom) const
     std::vector<const Tile*> other, same;
     for (const Tile* t : tiles_) {
         if (t->page != page) continue;
-        if (t->rot == rot && t->same_zoom(zoom)) same.push_back(t);
+        if (t->rot == rot && t->same_zoom(zoom) && fresh(t)) same.push_back(t);
         else if (t->rot == rot) other.push_back(t);
     }
     other.insert(other.end(), same.begin(), same.end());
@@ -318,7 +319,7 @@ std::vector<const Tile*> Cache::tiles_for(int page, int rot, double zoom) const
 bool Cache::covered(int page, int rot, double zoom, const Box& need) const
 {
     for (const Tile* t : tiles_)
-        if (t->covers(page, rot, zoom, need)) return true;
+        if (fresh(t) && t->covers(page, rot, zoom, need)) return true;
     return false;
 }
 

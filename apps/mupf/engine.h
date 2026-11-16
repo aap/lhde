@@ -2,8 +2,10 @@
 // results, so it never waits on a document. No win32 and no mupdf types here: engine_native.cpp is the one file that
 // includes mupdf's headers.
 //
-// A Markdown file (markdown.h) is converted to an HTML page and opened as mupdf's HTML, its directory the page's base, laid
-// out at a width of mupf's and as one tall page cut to its ink (a README read as a column, not in sheets).
+// A Markdown file (markdown.h) is converted to an HTML page and opened as mupdf's HTML, its directory the page's base. It
+// and every other reflowable document (fz_is_document_reflowable: EPUB, FictionBook, MOBI, HTML) are laid out at the width
+// the window asks (its view's) as tall pages, each cut to its ink: read as a column, not in sheets. A new width lays the
+// document out again (layout) as a new generation.
 //
 // What the thread does, most urgent first: open a document (its page count, the first page's size, the outline, the
 // title); render the jobs the window wants, in its order (a job no longer wanted is abandoned: mupdf's cookie aborts
@@ -50,6 +52,9 @@ struct FontFiles {
     bool operator!=(const FontFiles& o) const { return !(*this == o); }
 };
 
+// the narrowest a reflowable document is laid out, in points
+const float FLOW_MIN_PT = 120;
+
 struct Job {
     int page = 0, rot = 0;
     double zoom = 1;
@@ -64,6 +69,9 @@ struct Event {
     std::string title, format;  // a Markdown file's title is its first H1's text, its format "Markdown"
     std::vector<TocItem> toc;   // a Markdown file's: its headings H1 to H3 (mupdf's HTML has no outline)
     bool markdown = false;
+    bool reflowable = false;    // laid out by mupdf to a width (fz_layout_document), flow_w points wide
+    float flow_w = 0;
+    bool relaid = false;        // the same document laid out again (layout): not a new one
     // OPENED, SIZES: the sizes of pages first .. first + sizes.size() - 1
     int first = 0;
     std::vector<SizeF> sizes;
@@ -92,7 +100,11 @@ public:
 
     // the new generation; its OPENED or FAILED follows. password: for a protected document (fz_authenticate_password: the
     // user's or the owner's)
-    uint32_t open(const std::string& path, const std::string& password = std::string());
+    // flow_w: the width in points a reflowable document is laid out at (0: md::PAGE_WIDTH_PT)
+    uint32_t open(const std::string& path, const std::string& password = std::string(), float flow_w = 0);
+    // a reflowable document laid out again at another width: the new generation, whose OPENED (relaid) has the pages,
+    // their sizes and the outline anew; nothing for a document that is not reflowable
+    uint32_t layout(float flow_w);
     void close();
     // the faces of Markdown's body text, for the documents opened from now on
     void set_font(const FontFiles& f);

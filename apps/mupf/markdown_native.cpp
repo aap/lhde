@@ -161,7 +161,8 @@ std::string body_html(const std::string& text, std::vector<Heading>* headings)
 // its link blue, the body in the theme's UI font instead of GitHub's system font stack. GitHub's sizes are CSS pixels
 // at 96 DPI, which mupdf takes for points; mupf draws a point as 4/3 of a pixel at 100%, so they are given here in points
 // (16 px = 12 pt). What mupdf's CSS does not do is left out: no border-radius, no rgba() colours (GitHub's translucent
-// greys as the opaque colour they give on white), no :nth-child for the table's striped rows, no max-width.
+// greys as the opaque colour they give on white), no :nth-child for the table's striped rows; the max-width is the width the
+// engine lays the page out at (markdown.h MAX_WIDTH_PX).
 std::string stylesheet(const Style& s)
 {
     std::string fam = s.family.empty() ? "sans-serif" : "\"" + s.family + "\", sans-serif";
