@@ -145,3 +145,4 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
 ## Repository
 - 2026-11-14 Publish the free pack: a GitHub release tagged `resources` with lhde-resources-free-3.zip (FREE_PACK_URL's default,
   FREE_PACK_SHA256 its hash).
+- 2026-11-16 tests: headless/menus.sh failed once in a full make check while two other builds ran on the machine (which check: not in the kept tail of the log; passed four times alone afterwards): likely a timing window in the desktop-submenu case (hover delays under load); check.sh should keep the whole log of a failed script, not its last lines.
