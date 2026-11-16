@@ -1123,7 +1123,8 @@ catalogue is the authority. Commit (the pane's button, File > Commit Pending Edi
 `lhde-cat diff NAME` shows the same list. Ctrl+F the name box, Ctrl+W closes; Alt and the underlined letter reaches a box.
 ## mupf, the document viewer
 
-`mupf FILE` opens a PDF, an XPS or OpenXPS document, an EPUB, a comic book (CBZ), FictionBook or MOBI file, drawn by MuPDF
+`mupf FILE` opens a PDF, an XPS or OpenXPS document, an EPUB, a comic book (CBZ), FictionBook or MOBI file, or a Markdown
+file (below), drawn by MuPDF
 (built when MuPDF's library is installed: docs/BUILDING.md); File > Open (Ctrl+O) is the Open dialog, and a file dropped on
 the window opens too. XP had no PDF viewer of its own: the window is in the idiom of XP's programs, and where a choice had
 a model it is Acrobat Reader 6's (2003): the menu bar (File, Edit, View, Go, Help) with Acrobat's items and keys, the pages
@@ -1172,15 +1173,32 @@ above about 270%) is drawn as the part in view.
 - **Full Screen** (Ctrl+L) shows the pages alone; Escape leaves it. **Document Properties** (Ctrl+D) is the Explorer's Properties
   sheet of the file.
 
+**Markdown** (`.md`, `.markdown`, `.mkd`; `text/markdown`, which lhde's defaults give to mupf; a `README` without an
+extension is text and stays with luxpad): `mupf README.md` reads a repository's README as GitHub shows it, without a browser.
+md4c (`apps/mupf/vendor/md4c`) converts it with GitHub's extensions (tables, strikethrough, task lists, bare web addresses
+as links, `#Heading` without the space; inline HTML such as `<img width="49%">` and `<p>` kept) and MuPDF lays the page out
+660 points wide as one tall page. The look is a choice, no program of the era rendered Markdown: GitHub's README stylesheet
+(its spacing and sizes, the headings with their rule under H1 and H2, code in a monospace block on light grey, tables with
+borders, a quote with a bar on its left, its link blue) with the body in the theme's UI font (Tahoma under XP, Segoe UI under
+Jade where imported), 16 px at 100%. Where it falls short of GitHub: no rounded corners, no striped table rows, a long code
+line wraps instead of scrolling, no syntax colours, no pictures from the web (only files beside it: a relative `<img src>` or
+`![](...)` is read from the file's directory), task boxes as the characters ☐ and ☑. A front matter block (`---` lines at the
+top) is left out. The window's title is the first H1 (else the file's name), the Contents pane the headings H1 to H3 (it
+follows the scroll), a link to another `.md` file opens it in the same window (Back returns to where you were; `other.md#part`
+to that heading), `#heading` goes to the heading, and a web address goes to xdg-open. The file is followed on disk: written
+by an editor beside it, it is laid out again within a moment, the view where it was, so a text editor and mupf side by side
+are an editor with a preview.
+
 A password-protected document asks for its password (Acrobat 6's Password dialog: "'NAME' is protected. Please enter a
 Document Open Password.", again after a wrong one; Cancel leaves the window empty). There is no printing, no text selection
 and no bookmarks.
 What mupf remembers: `~/.local/state/lhde/mupf.ini` (`[window]` `x`, `y`, `width`, `height`, `maximized`; `[view]` `toolbar`,
 `statusbar`, `contents` and `contents_width`, `large_header`, `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
 1 Fit Page, 2 Fit Width) and `zoom` in thousandths), written when it exits. `mupf.desktop` (installed with it) claims what MuPDF
-opens, lhde's defaults give it PDF, XPS and EPUB, and it is the first choice of the document viewer's role. `MUPF_TRACE=1`
+opens, lhde's defaults give it PDF, XPS, EPUB and Markdown, and it is the first choice of the document viewer's role. `MUPF_TRACE=1`
 prints what it opens, draws and shows on stdout (`opened 2 pages PDF 1.4`, `rendered 1 816x1056 of 816x1056 at 100%`,
-`shown 1:X,Y,WxH ...`, `status MESSAGE|Page 1 of 2|100%`, `pagenav PREVX PREVY TEXTX TEXTY NEXTX NEXTY` (the status bar's
+`shown 1:X,Y,WxH ...`, `tocentry INDEX LEVEL PAGE Y TITLE` (the outline's places, in points), `linkrect PAGE X0 Y0 X1 Y1
+TARGET` (a page's links), `watch DIR` and `reload FILE` (a Markdown file followed and read again), `status MESSAGE|Page 1 of 2|100%`, `pagenav PREVX PREVY TEXTX TEXTY NEXTX NEXTY` (the status bar's
 arrows and number, from the window's top left), `pagenav next`, `page edit`, `tocitem INDEX X Y TITLE`, `toc follows INDEX
 TITLE`, `header N rows`, `rebar N rows`, `large header on`, `find box header`, `crumbs A > B > Page 1 of 2`, `header go KEY`),
 for scripts.

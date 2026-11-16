@@ -2,7 +2,8 @@
 
 Status: the first version is in (apps/mupf; docs/USAGE.md "mupf", docs/KEYS.md, docs/APPLICATIONS.md): the engine on its own
 thread, the cache, the four page layouts, zoom, the Contents pane, the search, links, Back and Forward, the Longhorn header,
-the password prompt; tests/headless/mupf.sh, mupfheader.sh and tests/toolkit/mupftest.cpp. Open: the items below, in the
+the password prompt, Markdown files (md4c's HTML laid out by MuPDF, GitHub's look, followed on disk); tests/headless/mupf.sh,
+mupfheader.sh, mupfmd.sh and tests/toolkit/mupftest.cpp, mdtest.cpp. Open: the items below, in the
 order they would come.
 
 aap's brief: mupdf's rendering with a wux GUI, more responsive than mupdf (it should react at once); the TOC as a pane; view
@@ -25,6 +26,17 @@ row (the Explorer's 4051 command bar), the Small header with View > Large Header
 status bar under both looks, the Longhorn Open dialog (flxp-filedialog). Open: which size to keep (aap: "until it's
 decided"); under the header the toolbar holds the zoom and fit buttons alone, and whether it stays is aap's call; its glyphs
 are mupf's XP-coloured drawings on the bar's dark gradient.
+
+## Markdown
+
+In (docs/USAGE.md "mupf"). Next: luxpad's preview pane, mupf's view beside the editor. For that the view has to become a
+component: today it is mupf.cpp's globals (`App g`: the engine, the cache, the layout, the scroll position, the links, the
+history) and its window procedure, with the chrome (toolbar, status bar, pane, header) reaching into them. A `mupf::View`
+(a window class over one Engine and Cache, its own state, opened on a path or on a string of Markdown with a base
+directory, notifying its owner of the title, the outline, a link to another file and the page) would let mupf be its frame
+and luxpad embed it; the engine needs an open from text (luxpad's unsaved buffer) besides the path. Also open: the page
+width follows the window (GitHub reflows a README to a narrow window; mupf lays it out at 660 pt and zooms), syntax colours
+in code blocks, the theme's fixed font for code (MuPDF's Courier-like monospace today), pictures from the web.
 
 ## Smaller
 

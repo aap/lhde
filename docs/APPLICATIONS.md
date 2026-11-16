@@ -230,7 +230,12 @@ the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
 - **mupf** (`apps/mupf`): a document viewer on a library with a thread of its own. The engine (`engine.h`,
   `engine_native.cpp`: MuPDF's fz_* API, the only file that includes MuPDF's headers, built with the flags `apps/mupf/mupf.mk`
   finds) owns the document on its thread and posts what it has; the layout and the render cache (`layout.h`,
-  `layout_native.cpp`, driven by `tests/toolkit/mupftest.cpp`) are plain C++. A class menu and accelerators from its .rc, a
+  `layout_native.cpp`, driven by `tests/toolkit/mupftest.cpp`) are plain C++, as is the Markdown converter (`markdown.h`,
+  `markdown_native.cpp` over the vendored md4c in `apps/mupf/vendor/md4c`, compiled into it; `tests/toolkit/mdtest.cpp`), whose
+  HTML page the engine opens with the file's directory as its archive. For Markdown it reached for two things outside the
+  public headers: wux's `gdi::face_file` (`gdi/font.h`, from `uifont_native.cpp`: the theme's UI font's files, which MuPDF draws
+  the page's body with through its system font hook) and `sys::watch_fd` (`sys/sys.h`: the message loop reads the
+  `shell::DirWatch` of the file's directory, so a write lays the page out again). A class menu and accelerators from its .rc, a
   comctl32 toolbar with an image list of its own glyphs and an Edit control over a separator (the Find box with a cue banner,
   subclassed for Return), a status bar with an owner-drawn part (`SBT_OWNERDRAW`, `WM_DRAWITEM`: the page navigation, the
   status bar subclassed for its clicks, an Edit made over it for the number), a tree view in a pane with a splitter drawn by the frame, a view window with
@@ -281,4 +286,8 @@ What the first applications needed and the public surface lacks, the list of wha
 - **An Alt accelerator loses the next key**: wux's DefWindowProc takes the Alt key's release for the menu bar unless it saw
   the other key go down, and `TranslateAcceleratorW` keeps that key from it; luxfind passes an accelerator's WM_SYSKEYDOWN
   to DefWindowProcW as well.
+- **No file descriptor in the message loop**: a program that follows a file (mupf's Markdown, a `shell::DirWatch`) needs its
+  descriptor read between messages; mupf includes `sys/sys.h` for `sys::watch_fd`. A public `WuxWatchFd` would do.
+- **The session's font files**: a program drawing text with another engine (mupf's Markdown in MuPDF) asks wux's
+  `gdi::face_file` for the file of a family's face; the public surface has only `EnumFontFamiliesExW`, which gives no file.
 - **The X clipboard is not INCR**: typed data larger than the server's request size (16 MB with BIG-REQUESTS) is refused.
