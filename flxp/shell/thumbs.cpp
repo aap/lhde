@@ -34,24 +34,34 @@ namespace thumbs {
 
 // ---- where thumbnails are made -----------------------------------------------------
 
-// Asked for every item a view shows, on the UI thread: each answer is kept (statfs is a round trip on a network mount),
-// and a path inside a directory already known to be on one is on one too (a local mount under a network one aside)
+// (thumbs.h) A path inside a directory known to be on a network mount is on one too (a local mount under a network one
+// aside), and the directory is asked once; an entry of a local directory is asked itself, a mount point being one
 bool on_network(const std::string& path)
 {
     static std::mutex lock;
     static std::map<std::string, bool> known;
-    std::string parent = dir_of(path);
-    {
+    auto lookup = [&](const std::string& p, bool* remote) {
         std::lock_guard<std::mutex> l(lock);
-        auto k = known.find(path);
-        if (k != known.end()) return k->second;
-        k = known.find(parent);
-        if (k != known.end() && k->second) return true;
+        auto k = known.find(p);
+        if (k == known.end()) return false;
+        *remote = k->second;
+        return true;
+    };
+    auto remember = [&](const std::string& p, bool remote) {
+        std::lock_guard<std::mutex> l(lock);
+        if (known.size() > 4096) known.clear();
+        known[p] = remote;
+    };
+    bool remote;
+    if (lookup(path, &remote)) return remote;
+    std::string parent = dir_of(path);
+    if (!parent.empty() && parent != path && parent[0] == '/') {
+        bool up;
+        if (!lookup(parent, &up)) { up = lhde_fs_is_remote(parent.c_str()); remember(parent, up); }
+        if (up) { remember(path, true); return true; }
     }
-    bool remote = lhde_fs_is_remote(path.c_str());
-    std::lock_guard<std::mutex> l(lock);
-    if (known.size() > 4096) known.clear();
-    known[path] = remote;
+    remote = lhde_fs_is_remote(path.c_str());
+    remember(path, remote);
     return remote;
 }
 

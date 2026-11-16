@@ -79,7 +79,9 @@ int previews();                                             // EXIF thumbnails m
 // The current cached thumbnail at cache size (a larger one resampled), nothing else tried; null when there is none
 gdi::Bitmap* cached_thumbnail(const std::string& path, int cache_size);
 // A path on a network filesystem: NFS, SMB/CIFS, 9p, AFS, Ceph, Coda, or a FUSE mount
-// of sshfs, rclone, curlftpfs, gvfs, davfs2, s3fs and the like.
+// of sshfs, rclone, curlftpfs, gvfs, davfs2, s3fs and the like. Asked for every item a view shows, on the UI thread:
+// answered from what is known of the folder the path is in (one statfs per folder, the Folder's own slow() included:
+// a round trip on a network mount); only an entry of a local folder is asked about itself (a mount point under it).
 bool on_network(const std::string& path);
 // A picture's width and height from its header (PNG, JPEG, GIF, BMP, WebP), without decoding it
 bool picture_size(const std::string& path, int* w, int* h);

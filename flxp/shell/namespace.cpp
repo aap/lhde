@@ -11,6 +11,7 @@
 #include "namespace.h"
 #include "details.h"
 #include "mime.h"
+#include "thumbs.h"
 #include "util.h"
 
 namespace shell {
@@ -169,7 +170,7 @@ public:
     bool enumerate_names(std::vector<Item>& out, bool include_hidden) override { return list(out, include_hidden, slow()); }
     bool slow() const override
     {
-        if (slow_ < 0) slow_ = lhde_fs_is_remote(path_.c_str()) ? 1 : 0;
+        if (slow_ < 0) slow_ = thumbs::on_network(path_) ? 1 : 0;   // (known to the views' items after it)
         return slow_ > 0;
     }
 
