@@ -5,6 +5,8 @@ fixes it; an item found wrong or decided against leaves with a one-line reason i
 file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may already be done.
 
 ## Explorer (flxp)
+- 2026-11-16 flxp never sets NO_HEADER_PIXMAP (dwmapi's DWMWA_FLXP_FRAME_FLAGS masks bit 4 off), so under jade4074/slate4074 luxwm
+  renders a _LHWM_HEADER_PIXMAP for the navbar header, which draws itself, on every focus change and resize (CLIENT-PROTOCOL.md says it does).
 - 2026-11-16 aap: in Details only the area around an unselected row's text counts as the file (hover, click), a selected one's whole row
   does. Not reproduced headless (aerovision, jade4074, slate4051 Details: hover and click take every column; detailsrow.sh); case needed.
 - 2026-11-16 slate4051's menu band hot frame (ExplorerMenu::Toolbar.BUTTON, bitmap 340) composites darker in flxp (lhbar.cpp: 45 56 7f
