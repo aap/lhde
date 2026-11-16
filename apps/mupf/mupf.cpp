@@ -7,6 +7,7 @@
 // on the application workspace colour, the status bar. XP had no PDF viewer of its own; Acrobat Reader 6 (2003) is what
 // one looked like there, and where mupf follows it (the page layouts, the keys, the grey around the pages, the black
 // frame and shadow of a page) the names say so; the toolbar's order and glyphs are mupf's taste, not a measured layout.
+// Under the Longhorn themes the Explorer's header is above it all (shell/lhheader.h: "the Longhorn header" below).
 //
 // The window never waits on mupdf: the engine (engine.h) opens, renders and searches on its thread, and posts what it has;
 // the view draws what the cache (layout.h) holds, a page at another zoom scaled until its rendering at this one arrives,
@@ -40,7 +41,8 @@ const UINT WM_ENGINE = WM_APP + 1;
 const int CACHE_BUDGET = 64 << 20;     // the rendered pages kept (layout.h's Cache)
 const int LINE = 40;                   // an arrow key's or a wheel notch's third, in pixels
 const int PREFETCH_AHEAD = 2, PREFETCH_BEHIND = 1;
-const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_PAGE_OF = 14, ID_TREE = 15, ID_FIND_EDIT = 16;
+const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_PAGE_OF = 14, ID_TREE = 15, ID_FIND_EDIT = 16,
+          ID_REBAR = 17, ID_MENUBAND = 18;
 // the Contents pane: XP's Explorer bar (a title row with its close button over a tree, a splitter beside it); the sizes
 // are mupf's
 const int PANE_TITLE = 22, SPLITTER = 4, PANE_MIN = 80, PANE_DEFAULT = 200;
@@ -60,6 +62,7 @@ struct App {
     uint32_t gen = 0;
     bool opened = false;
     std::string path, title, format, error;
+    bool password_tried = false;        // the document was opened with a password (a FAILED one asks again)
     int pages = 0;
     std::vector<SizeF> sizes;
     std::map<int, std::vector<Link>> links;
@@ -80,6 +83,13 @@ struct App {
     bool show_toc = false, splitting = false;
     int toc_w = PANE_DEFAULT;
     std::vector<TocItem> toc;
+    std::vector<HTREEITEM> toc_items;   // the tree's row of each outline entry
+    int toc_at = -1;                    // the entry the crumbs show (-1: none)
+    int toc_sel = -2;                   // the entry selected in the pane (-1: none; -2: not yet)
+    // the Longhorn header (shell/lhheader.h) under the Longhorn themes, the toolbar below it; none under the XP themes
+    HWND header = nullptr;
+    HWND rebar = nullptr;               // under the header: the menu band (the menu bar would lie above the header)
+    std::string crumbs_for;             // what the crumbs were made of: the document and the outline entry
     RECT pane = {}, pane_close = {};
     // the search: its hits in page order, each a rectangle a line, the one shown
     HWND find_edit = nullptr;
@@ -202,6 +212,9 @@ void set_status(int part, const std::string& text)
     trace("status %s|%s|%s", g.status_text[0].c_str(), g.status_text[1].c_str(), g.status_text[2].c_str());
 }
 
+void update_header();
+void follow_toc();
+
 void update_page_box()
 {
     char b[64];
@@ -222,6 +235,8 @@ void update_page_box()
         else b[0] = 0;
         SetWindowTextW(g.page_of, WS(b));
     }
+    follow_toc();
+    update_header();
 }
 
 void update_title()
@@ -616,6 +631,7 @@ void engine_notify(void*) { PostMessageW(g.wnd, WM_ENGINE, 0, 0); }
 
 void fill_toc();
 void trace_toc();
+bool ask_password(std::string* pw);
 
 void close_doc()
 {
@@ -643,13 +659,14 @@ void close_doc()
     relayout(none);
 }
 
-void open_doc(const std::string& path)
+void open_doc(const std::string& path, const std::string& password = std::string())
 {
     close_doc();
     char* abs = realpath(path.c_str(), nullptr);
     g.path = abs ? abs : path;
     free(abs);
-    g.gen = g.eng->open(g.path);
+    g.password_tried = !password.empty();
+    g.gen = g.eng->open(g.path, password);
     set_status(0, "Opening...");
     update_title();
     trace("open %s", g.path.c_str());
@@ -687,6 +704,11 @@ void on_engine()
             set_status(0, "");
             update_title();
             trace("failed %s", e.error.c_str());
+            if (e.password) {   // asked for, as Acrobat does, again after a wrong one; Cancel leaves the window empty
+                std::string pw;
+                if (ask_password(&pw)) open_doc(g.path, pw);
+                break;
+            }
             std::string msg = "There was an error opening this document. " + e.error;
             shell::message_box(g.wnd, "mupf", msg, MB_OK | MB_ICONEXCLAMATION);
             break;
@@ -851,6 +873,36 @@ void open_dialog()
 
 void layout_chrome();
 
+// a protected document's password (IDD_PASSWORD): true with the text typed on OK
+INT_PTR CALLBACK password_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
+{
+    switch (msg) {
+    case WM_INITDIALOG: {
+        std::string t = "'" + base_of(g.path) + "' is protected. Please enter a Document Open Password.";
+        SetDlgItemTextW(dlg, IDC_PASSWORD_TEXT, WS(t));
+        SetDlgItemTextW(dlg, IDC_PASSWORD_NOTE, g.password_tried ? L"The password is not right. Please try again." : L"");
+        SetWindowLongPtrW(dlg, DWLP_USER, lp);
+        SetFocus(GetDlgItem(dlg, IDC_PASSWORD));
+        trace("password asked%s", g.password_tried ? " again" : "");
+        return FALSE;
+    }
+    case WM_COMMAND:
+        if (LOWORD(wp) == IDOK) {
+            *(std::string*)GetWindowLongPtrW(dlg, DWLP_USER) = WuxWindowText(GetDlgItem(dlg, IDC_PASSWORD));
+            EndDialog(dlg, 1);
+            return TRUE;
+        }
+        if (LOWORD(wp) == IDCANCEL) { EndDialog(dlg, 0); return TRUE; }
+        break;
+    }
+    return FALSE;
+}
+
+bool ask_password(std::string* pw)
+{
+    return DialogBoxParamW(g.res, MAKEINTRESOURCEW(IDD_PASSWORD), g.wnd, password_proc, (LPARAM)pw) == 1;
+}
+
 INT_PTR CALLBACK goto_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM)
 {
     switch (msg) {
@@ -900,7 +952,7 @@ void set_fullscreen(bool on)
     if (on == g.fullscreen) return;
     if (on) save_state();
     g.fullscreen = on;
-    SetMenu(g.wnd, on ? nullptr : g.menu);
+    if (!g.rebar) SetMenu(g.wnd, on ? nullptr : g.menu);   // (under the header the menu is the band's)
     FlxpSetFullscreen(g.wnd, on);
     layout_chrome();
     SetFocus(g.view);
@@ -941,6 +993,7 @@ void update_toolbar()
     SendMessageW(g.toolbar, TB_CHECKBUTTON, CMD_FIT_PAGE, MAKELONG(g.zmode == Z_FIT_PAGE, 0));
     SendMessageW(g.toolbar, TB_CHECKBUTTON, CMD_FIT_WIDTH, MAKELONG(g.zmode == Z_FIT_WIDTH, 0));
     EnableWindow(g.page_edit, d);
+    if (g.header) shell::lhheader::set_history(d && !g.back_pages.empty(), d && !g.fwd_pages.empty());
 }
 
 void set_mode(Mode m)
@@ -1203,11 +1256,12 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 }
 
 // the toolbar (mupf's taste: Open | Previous, Next, the page box | Zoom Out, Zoom In | Actual Size, Fit Page, Fit Width |
-// the find box and Find Next, as Acrobat 6 had its Find box in the toolbar)
+// the find box and Find Next, as Acrobat 6 had its Find box in the toolbar); CCS_NOMOVEY: it stays where layout_chrome puts
+// it, the top, or below the Longhorn header and the menu band
 void make_toolbar()
 {
     g.toolbar = CreateWindowExW(0, TOOLBARCLASSNAMEW, nullptr,
-                                WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS | CCS_TOP | CCS_NODIVIDER, 0, 0, 0, 0, g.wnd,
+                                WS_CHILD | WS_VISIBLE | TBSTYLE_FLAT | TBSTYLE_TOOLTIPS | CCS_NOMOVEY | CCS_NODIVIDER, 0, 0, 0, 0, g.wnd,
                                 (HMENU)(INT_PTR)ID_TOOLBAR, nullptr, nullptr);
     SendMessageW(g.toolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
     g.glyphs = make_glyphs();
@@ -1267,6 +1321,9 @@ void fill_toc()
     SendMessageW(g.tree, WM_SETREDRAW, FALSE, 0);
     SendMessageW(g.tree, TVM_DELETEITEM, 0, (LPARAM)TVI_ROOT);
     std::vector<HTREEITEM> parents, open;
+    g.toc_items.clear();
+    g.toc_at = -1;
+    g.toc_sel = -2;
     for (size_t i = 0; i < g.toc.size(); i++) {
         const TocItem& t = g.toc[i];
         int level = std::min(t.level, (int)parents.size());
@@ -1280,6 +1337,7 @@ void fill_toc()
         ins.item.lParam = (LPARAM)i;
         HTREEITEM h = (HTREEITEM)SendMessageW(g.tree, TVM_INSERTITEMW, 0, (LPARAM)&ins);
         parents.push_back(h);
+        g.toc_items.push_back(h);
         if (t.open) open.push_back(h);
     }
     for (HTREEITEM h : open) SendMessageW(g.tree, TVM_EXPAND, TVE_EXPAND, (LPARAM)h);   // once the children are in
@@ -1309,6 +1367,15 @@ void trace_toc()
     }
 }
 
+// to outline entry i: its page, the crumbs and the pane showing it (not another entry on the same page)
+void go_entry(int i)
+{
+    if (i < 0 || (size_t)i >= g.toc.size() || g.toc[(size_t)i].page < 0) return;
+    g.toc_at = i;
+    go_page(g.toc[(size_t)i].page, g.toc[(size_t)i].y);
+    update_page_box();    // (go_page did not when the page stayed)
+}
+
 void toc_go(HTREEITEM h)
 {
     if (!h) return;
@@ -1316,9 +1383,9 @@ void toc_go(HTREEITEM h)
     it.mask = TVIF_PARAM;
     it.hItem = h;
     if (!SendMessageW(g.tree, TVM_GETITEMW, 0, (LPARAM)&it) || it.lParam < 0 || (size_t)it.lParam >= g.toc.size()) return;
-    const TocItem& t = g.toc[it.lParam];
-    trace("toc go %s page %d", t.title.c_str(), t.page + 1);
-    if (t.page >= 0) go_page(t.page, t.y);
+    trace("toc go %s page %d", g.toc[it.lParam].title.c_str(), g.toc[it.lParam].page + 1);
+    g.toc_sel = (int)it.lParam;   // (the row is selected already)
+    go_entry((int)it.lParam);
 }
 
 // the pane's title row: the name on the face colour and the close button's cross (the two of XP's Explorer bar)
@@ -1344,6 +1411,212 @@ void paint_pane(HDC dc)
     DeleteObject(pen);
 }
 
+// ---- the Longhorn header -----------------------------------------------------------------------------------------------
+// Under the Longhorn themes the window has the Explorer's header (shell/lhheader.h): Back and Forward are mupf's history,
+// the breadcrumb the document's name, then the outline's path to the page shown (the entries above the current one:
+// "Part II > Chapter 4 > 4.2"), then the leaf "Page N of M"; a segment's drop-down lists the entries beside it and goes
+// there (the document's: the top level). The address edit takes a page number. The header's search box and favourites
+// star are hidden: mupf's Find box is in its toolbar, and it keeps no favourites (a choice, not Longhorn's: its viewers
+// had no header).
+
+// the outline entry covering page p: the last one in the outline's order that starts on p or before it; -1 when none
+int toc_entry_at(int p)
+{
+    int at = -1;
+    for (size_t i = 0; i < g.toc.size(); i++)
+        if (g.toc[i].page >= 0 && g.toc[i].page <= p) at = (int)i;
+    return at;
+}
+
+// entry i and the entries above it, the top first
+std::vector<int> toc_chain(int i)
+{
+    std::vector<int> out;
+    for (int j = i, level = i >= 0 ? g.toc[i].level + 1 : 0; j >= 0 && level > 0; j--)
+        if (g.toc[j].level < level) { out.insert(out.begin(), j); level = g.toc[j].level; }
+    return out;
+}
+
+// the entries at entry i's level under its parent (-1: the top level)
+std::vector<int> toc_siblings(int parent)
+{
+    std::vector<int> out;
+    int level = parent >= 0 ? g.toc[parent].level + 1 : 0;
+    for (size_t j = parent + 1; j < g.toc.size(); j++) {
+        if (g.toc[j].level < level) break;
+        if (g.toc[j].level == level) out.push_back((int)j);
+    }
+    return out;
+}
+
+int toc_parent(int i)
+{
+    for (int j = i - 1; j >= 0; j--) if (g.toc[j].level < g.toc[i].level) return j;
+    return -1;
+}
+
+std::string leaf_text()
+{
+    char b[64];
+    snprintf(b, sizeof b, "Page %d of %d", g.current + 1, g.pages);
+    return b;
+}
+
+// the Contents pane follows the page: the entry the page is in selected (Acrobat 7's), its parents opened. Of the
+// entries that start on the same page the one chosen (a row clicked, a drop-down entry: go_entry) stays.
+void follow_toc()
+{
+    int at = g.opened ? toc_entry_at(g.current) : -1;
+    if (at >= 0 && g.toc_at >= 0 && (size_t)g.toc_at < g.toc.size() && g.toc[(size_t)g.toc_at].page == g.toc[(size_t)at].page)
+        at = g.toc_at;
+    g.toc_at = at;
+    if (at == g.toc_sel) return;
+    g.toc_sel = at;
+    if (g.tree && at >= 0 && (size_t)at < g.toc_items.size()) {
+        SendMessageW(g.tree, TVM_SELECTITEM, TVGN_CARET, (LPARAM)g.toc_items[(size_t)at]);   // TVC_UNKNOWN: no jump
+        trace("toc follows %d %s", at, g.toc[(size_t)at].title.c_str());
+    } else if (g.tree) SendMessageW(g.tree, TVM_SELECTITEM, TVGN_CARET, 0);
+}
+
+void update_header()
+{
+    if (!g.header) return;
+    if (!g.opened) {
+        if (!g.crumbs_for.empty()) { g.crumbs_for.clear(); shell::lhheader::set_crumbs({}); }
+        return;
+    }
+    std::string name = base_of(g.path);
+    int at = g.toc_at;
+    std::string key = g.path + "\n" + std::to_string(at);
+    shell::lhheader::set_address(std::to_string(g.current + 1));
+    if (key == g.crumbs_for) {
+        shell::lhheader::set_leaf(leaf_text());
+    } else {
+        g.crumbs_for = key;
+        std::vector<shell::lhheader::Crumb> crumbs;
+        shell::lhheader::Crumb doc;
+        doc.text = name;
+        doc.key = "doc";
+        doc.icon = "pdf";
+        doc.dropdown = !g.toc.empty();
+        doc.tip = g.toc.empty() ? "" : "Contents";
+        crumbs.push_back(doc);
+        for (int i : toc_chain(at)) {
+            shell::lhheader::Crumb c;
+            c.text = g.toc[(size_t)i].title;
+            c.key = "toc:" + std::to_string(i);
+            c.tip = "Entries next to " + c.text;
+            crumbs.push_back(c);
+        }
+        shell::lhheader::Crumb leaf;
+        leaf.text = leaf_text();
+        leaf.key = "page";
+        leaf.dropdown = false;
+        crumbs.push_back(leaf);
+        shell::lhheader::set_crumbs(crumbs);
+        std::string shown;
+        for (const auto& c : crumbs) shown += (shown.empty() ? "" : " > ") + c.text;
+        trace("crumbs %s", shown.c_str());
+    }
+    shell::lhheader::set_title(g.title.empty() ? name : g.title);
+}
+
+// a crumb's drop-down: the entries beside it (the document's crumb: the top level), the one on the path bold; children:
+// the entries under it (vision's header_crumb_menu = children)
+std::vector<shell::lhheader::Entry> header_entries(int i, bool children)
+{
+    std::vector<int> chain = toc_chain(g.toc_at);
+    // crumb 0 the document, 1..chain.size() the outline's entries
+    int entry = i >= 1 && (size_t)i <= chain.size() ? chain[(size_t)i - 1] : -1;
+    int parent = children ? entry : entry >= 0 ? toc_parent(entry) : -1;
+    if (i == 0 && !children) parent = -1;
+    std::vector<int> list = toc_siblings(parent);
+    int bold = children ? ((size_t)i < chain.size() ? chain[(size_t)i] : -1) : i == 0 ? (chain.empty() ? -1 : chain[0]) : entry;
+    std::vector<shell::lhheader::Entry> out;
+    for (int j : list) {
+        shell::lhheader::Entry e;
+        e.text = g.toc[(size_t)j].title;
+        e.key = "toc:" + std::to_string(j);
+        e.bold = j == bold;
+        out.push_back(e);
+        if (out.size() >= 250) break;
+    }
+    return out;
+}
+
+void header_go(const std::string& key)
+{
+    trace("header go %s", key.c_str());
+    if (key == "doc") go_page(0);
+    else if (!key.compare(0, 4, "toc:")) go_entry(atoi(key.c_str() + 4));
+    update_toolbar();
+}
+
+// the history's drop-down (the Explorer's: the places, the nearest first): the pages Back or Forward would go to
+void header_history(bool back, int x, int y)
+{
+    std::vector<int>& from = back ? g.back_pages : g.fwd_pages;
+    HMENU m = CreatePopupMenu();
+    int n = 0;
+    for (int k = (int)from.size() - 1; k >= 0 && n < 12; k--, n++) {
+        int p = from[(size_t)k], at = toc_entry_at(p);
+        std::string t = "Page " + std::to_string(p + 1) + (at >= 0 ? " - " + g.toc[(size_t)at].title : "");
+        AppendMenuW(m, MF_STRING, (UINT)n + 1, WS(t));
+    }
+    int cmd = n ? TrackPopupMenu(m, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD, x, y, 0, g.wnd, nullptr) : 0;
+    DestroyMenu(m);
+    for (int k = 0; k < cmd; k++) command(back ? CMD_BACK : CMD_FORWARD);
+}
+
+void layout_chrome();
+
+// the header when the session theme wants the Longhorn chrome, none when not (at the start and on a theme switch)
+void sync_header()
+{
+    bool want = shell::lhheader::want_longhorn();
+    if (want == (g.header != nullptr)) return;
+    if (want) {
+        shell::lhheader::set_lhwm(shell::lhheader::lhwm_running());   // under another window manager: the Small size
+        shell::lhheader::configure("mupf_", "");                     // the Explorer's size unless mupf_header_size
+        shell::lhheader::hide(shell::lhheader::SHOW_SEARCH);
+        shell::lhheader::hide(shell::lhheader::SHOW_FAVORITES);
+        shell::lhheader::Callbacks cb;
+        cb.go = header_go;
+        cb.entries = header_entries;
+        cb.address = [](const std::string& text) {
+            int n = atoi(text.c_str());
+            if (n >= 1 && n <= g.pages) go_page(n - 1);
+            update_toolbar();
+        };
+        cb.command = [](int id) { command(id == shell::lhheader::TRAVEL_BACK ? CMD_BACK : CMD_FORWARD); };
+        cb.history = header_history;
+        g.header = shell::lhheader::create(g.wnd, cb);
+        // the menu below the header, in a rebar of its own as the Explorer's menu band
+        SetMenu(g.wnd, nullptr);
+        g.rebar = CreateWindowExW(WS_EX_TOOLWINDOW, REBARCLASSNAMEW, nullptr,
+                                  WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | RBS_VARHEIGHT | RBS_AUTOSIZE |
+                                  CCS_NODIVIDER | CCS_NOPARENTALIGN, 0, 0, 0, 0, g.wnd, (HMENU)(INT_PTR)ID_REBAR, nullptr, nullptr);
+        REBARINFO rbi = { sizeof rbi, 0, nullptr };
+        SendMessageW(g.rebar, RB_SETBARINFO, 0, (LPARAM)&rbi);
+        menuband::create(g.rebar, g.wnd, g.menu, ID_MENUBAND);
+        shell::lhheader::extend_frame(g.wnd);
+        shell::lhheader::set_active(shell::lhheader::frame_active(g.wnd, GetForegroundWindow() == g.wnd));
+        g.crumbs_for.clear();
+        update_header();
+        update_toolbar();
+    } else {
+        shell::lhheader::destroy();
+        g.header = nullptr;
+        DestroyWindow(g.rebar);
+        g.rebar = nullptr;
+        menuband::forget();
+        if (!g.fullscreen) SetMenu(g.wnd, g.menu);
+        shell::lhheader::unextend_frame(g.wnd);
+        trace("header none");
+    }
+    RedrawWindow(g.wnd, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+}
+
 // ---- the frame's layout ------------------------------------------------------------------------------------------------
 
 void layout_chrome()
@@ -1354,11 +1627,29 @@ void layout_chrome()
     ShowWindow(g.toolbar, tb ? SW_SHOW : SW_HIDE);
     ShowWindow(g.status, sb ? SW_SHOW : SW_HIDE);
     int top = 0, bottom = rc.bottom;
+    if (g.header) {
+        ShowWindow(g.header, g.fullscreen ? SW_HIDE : SW_SHOW);
+        if (!g.fullscreen) {
+            shell::lhheader::relayout(rc.right, shell::lhheader::height());
+            top = shell::lhheader::height();
+            static int traced = -1;     // the header's rows, on every change (the frame's caption decides them)
+            if (top != traced) trace("header %d rows", traced = top);
+        }
+    }
+    if (g.rebar) {
+        ShowWindow(g.rebar, g.fullscreen ? SW_HIDE : SW_SHOW);
+        if (!g.fullscreen) {
+            int h = (int)SendMessageW(g.rebar, RB_GETBARHEIGHT, 0, 0);
+            MoveWindow(g.rebar, 0, top, rc.right, h, TRUE);
+            top += h;
+        }
+    }
     if (tb) {
+        SetWindowPos(g.toolbar, nullptr, 0, top, rc.right, 10, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSIZE);
         SendMessageW(g.toolbar, TB_AUTOSIZE, 0, 0);
         RECT t;
         GetWindowRect(g.toolbar, &t);
-        top = t.bottom - t.top;
+        top += t.bottom - t.top;
     }
     if (sb) {
         SendMessageW(g.status, WM_SIZE, 0, 0);
@@ -1531,6 +1822,8 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
+    LRESULT hr;
+    if (g.header && shell::lhheader::frame_message(hwnd, msg, wp, lp, &hr, layout_chrome)) return hr;
     switch (msg) {
     case WM_SIZE:
         if (g.view) layout_chrome();
@@ -1585,8 +1878,22 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case WM_COMMAND:
         if (lp == 0 || (HWND)lp == g.toolbar) { command(LOWORD(wp)); return 0; }
         break;
+    case WM_MENUSELECT:
+        if (g.rebar) menuband::on_menuselect(wp, lp);
+        break;
+    case WM_SYSCOMMAND:
+        if (g.rebar && (wp & 0xfff0) == SC_KEYMENU && menuband::key_menu((WCHAR)lp)) return 0;   // Alt, Alt+F: the band
+        break;
+    case WM_ACTIVATE:
+        if (g.rebar) menuband::on_activate(LOWORD(wp) != WA_INACTIVE);
+        break;
     case WM_NOTIFY: {
         NMHDR* n = (NMHDR*)lp;
+        if (g.rebar) {
+            bool handled;
+            LRESULT r = menuband::on_notify(n, &handled);
+            if (handled) return r;
+        }
         if (n->hwndFrom == g.tree) {
             if (n->code == NM_CLICK) {   // a click on a row goes there, the row already selected or not
                 TVHITTESTINFO hit = {};
@@ -1626,6 +1933,10 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         update_toolbar();
         return 0;
     case WM_THEMECHANGED: case WM_SETTINGCHANGE: case WM_SYSCOLORCHANGE:
+        if (msg == WM_THEMECHANGED) {
+            sync_header();   // to or from a Longhorn theme
+            if (g.rebar) menuband::fonts_changed();
+        }
         apply_font();
         layout_chrome();
         InvalidateRect(g.view, nullptr, FALSE);
@@ -1704,6 +2015,7 @@ int main(int argc, char** argv)
     apply_font();
     DragAcceptFiles(g.wnd, TRUE);
     g.eng = new Engine(engine_notify, nullptr);
+    sync_header();
     layout_chrome();
     update_title();
     update_page_box();

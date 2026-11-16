@@ -4,8 +4,8 @@
 // of the Longhorn search/Filter boxes, Back/Forward history and the views
 // remembered per folder; plus the frame plumbing every Longhorn host needs:
 // which frame style the session asks for (the theme's Explorer.chrome,
-// luxwm), luxwm's glass extension under the header (header.h) and the caption
-// behaviour of the header's empty parts.
+// luxwm), luxwm's glass extension under the header and the caption behaviour of
+// the header's empty parts (the shell layer's: shell/lhheader.h).
 //
 // A host derives from Browser (the explorer's Explorer, the dialog's Dlg),
 // creates the list with create_list() and overrides the hooks it needs. The
@@ -26,6 +26,7 @@
 #include "shell/viewmodel.h"
 #include "w32/w32.h"
 #include "commands.h"
+#include "shell/lhheader.h"
 extern "C" {
 #include "commctrl.h"
 #include "w32/flxp_shell.h"
@@ -37,38 +38,21 @@ using shell::Item;
 
 // ---- the frame ---------------------------------------------------------------------
 
-// The session theme's Explorer.chrome (xp | longhorn | auto; Explorer.navbar =
-// none: xp; shell::theme_chrome).
-// auto: longhorn whenever luxwm runs, glass or not, else xp. longhorn under
-// another window manager or none: the 4051/4074 header without its title row
-// (header::set_lhwm: the Small size, the other caption has the title), the
-// vision header (its title and buttons are luxwm's frame) the XP chrome. `why`
-// says what decided.
-bool frame_auto();
-bool want_longhorn(std::string* why = nullptr);
-// luxwm runs: the root's _NET_SUPPORTING_WM_CHECK window is named "lhwm" (asked
-// once, again with refresh: on a change of that root property); FLXP_LHWM=1/0
-// answers instead (tests)
-bool lhwm_running(bool refresh = false);
-std::string wm_label();   // the window manager's name for messages ("no window manager")
-
-// luxwm's glass under the header: the extension by header::height(), the
-// NO_TITLE / NO_ICON (and on glass CLIENT_CAPTION) frame flags, the input hole
-// over luxwm's caption buttons; unextend_frame() is the way back to an ordinary
-// frame (luxwm's caption with title and icon).
-void extend_frame(HWND frame);
-void caption_hole(HWND frame);
-void unextend_frame(HWND frame);
-// The header's height follows the frame (glass: 76 rows less luxwm's caption)
-// or the theme's navigation bar; then the extension, the host's layout and
-// the header's look follow.
+// The frame plumbing every Longhorn host needs is the shell layer's (shell/lhheader.h: which frame the session theme
+// asks for, luxwm's glass under the header, the input hole over its caption buttons, the caption behaviour of the
+// header's empty parts), here under the names the hosts know.
+using shell::lhheader::frame_auto;
+using shell::lhheader::want_longhorn;
+using shell::lhheader::lhwm_running;
+using shell::lhheader::wm_label;
+using shell::lhheader::extend_frame;
+using shell::lhheader::caption_hole;
+using shell::lhheader::unextend_frame;
+using shell::lhheader::frame_active;
+// shell::lhheader::refit with the host's layout
 void header_refit(HWND frame, void (*layout)());
-// WM_NCHITTEST of a frame with a header: the header's empty parts (it answers
-// HTTRANSPARENT there) are the caption. False when the frame has no header.
+// shell::lhheader::hittest: the header's empty parts are the caption; false when the frame has no header
 bool header_hittest(HWND frame, LPARAM lp, LRESULT* result);
-// Active or inactive as the window manager draws the frame (_NET_ACTIVE_WINDOW
-// through luxwm), else the focus state the host tracks (WM_ACTIVATE).
-bool frame_active(HWND frame, bool focus_active);
 // The window's icon follows the folder (as 4051's does): the
 // icon theme's key at 16, 32 and 48 px as WM_SETICON (the shim publishes them
 // as _NET_WM_ICON for the window manager and the taskbar)

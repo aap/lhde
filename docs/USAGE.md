@@ -1123,6 +1123,15 @@ on the application workspace grey (128) with a black frame and a dark shadow, th
 toolbar. The toolbar's order and glyphs (Open | Previous Page, Next Page, the page box "N of M" | Zoom Out, Zoom In | Actual
 Size, Fit Page, Fit Width | the Find box, Find Next) are mupf's; there is no shot of Acrobat 6 to measure.
 
+Under the Longhorn themes (the session theme's `Explorer.chrome`, as for the Explorer) the window has the Explorer's header
+above the toolbar: the same band, title and breadcrumb, pixel for pixel, with Back and Forward as mupf's (their drop-downs
+list the pages they go to), the document's title as the title, and as the breadcrumb the file's name, the outline's entries
+down to the one the page is in ("Part II > Chapter 4 > 4.2") and "Page N of M". A segment's chevron lists the entries beside
+it (the file's: the outline's top level) and goes to the one chosen; a click on a segment goes to its entry (the file's: page
+1); a click on the breadcrumb's empty part is the address edit, which takes a page number. The header's search box and
+star are left out (the Find box is in the toolbar; mupf keeps no favourites), and the menu is a band below the header, as
+the Explorer's. Its size is the Explorer's (`header_size`) unless flxp.ini's `mupf_header_size` says otherwise.
+
 It never waits on a document: MuPDF opens, draws and searches on a thread of its own while the window scrolls and zooms
 with what is there; a page not drawn yet is white, a page drawn at another zoom is shown scaled until the new one comes,
 and a page scrolled past before it is drawn is dropped (its drawing stopped). The pages around the current one are kept
@@ -1140,20 +1149,24 @@ above about 270%) is drawn as the part in view.
   page box, a contents entry, a link, Home, End). A drag moves the pages (Acrobat's hand); a click on a link follows it, to its
   page or, for a web address, with xdg-open.
 - **Contents** (View > Contents, F4, the cross in its title closes it): the document's outline in a tree on the left, as XP's
-  Explorer bar; a click on an entry goes there, the arrow keys go as they select. The splitter beside it sizes it.
+  Explorer bar; a click on an entry goes there, the arrow keys go as they select, and as the pages move the entry they are in
+  is selected (Acrobat 7's). The splitter beside it sizes it.
 - **Find** (Ctrl+F: the toolbar's Find box): Return searches from the current page on (case does not matter) and shows the first
   hit; Return again, F3 or Find Next go to the next hit, Shift+Return and Shift+F3 back. Every hit is marked yellow, the one
   shown in the selection colour; the status bar says "Match 2 of 7" or "No matches were found.".
 - **Full Screen** (Ctrl+L) shows the pages alone; Escape leaves it. **Document Properties** (Ctrl+D) is the Explorer's Properties
   sheet of the file.
 
-A password-protected document is not opened yet (it says so); there is no printing, no text selection and no bookmarks.
+A password-protected document asks for its password (Acrobat 6's Password dialog: "'NAME' is protected. Please enter a
+Document Open Password.", again after a wrong one; Cancel leaves the window empty). There is no printing, no text selection
+and no bookmarks.
 What mupf remembers: `~/.local/state/lhde/mupf.ini` (`[window]` `x`, `y`, `width`, `height`, `maximized`; `[view]` `toolbar`,
 `statusbar`, `contents` and `contents_width`, `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
 1 Fit Page, 2 Fit Width) and `zoom` in thousandths), written when it exits. `mupf.desktop` (installed with it) claims what MuPDF
 opens, lhde's defaults give it PDF, XPS and EPUB, and it is the first choice of the document viewer's role. `MUPF_TRACE=1`
 prints what it opens, draws and shows on stdout (`opened 2 pages PDF 1.4`, `rendered 1 816x1056 of 816x1056 at 100%`,
-`shown 1:X,Y,WxH ...`, `status MESSAGE|Page 1 of 2|100%`, `tocitem INDEX X Y TITLE`), for scripts.
+`shown 1:X,Y,WxH ...`, `status MESSAGE|Page 1 of 2|100%`, `tocitem INDEX X Y TITLE`, `toc follows INDEX TITLE`, `header N rows`,
+`crumbs A > B > Page 1 of 2`, `header go KEY`), for scripts.
 
 ## File types and programs (lhde-mime)
 

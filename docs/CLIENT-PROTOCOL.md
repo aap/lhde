@@ -3,7 +3,8 @@
 The X properties and messages between luxwm and the programs that cooperate with it: the tall glassy Explorer header of 4074
 (the frame plate continued down behind the client's title, breadcrumb and search box, DWM blur and all), its opaque counterpart
 without composition, the vision header of luxnav (docs/NAVBAR.md), and a few desktop-wide states. This is the contract between
-the wux side (flxp, wux's `dwmapi` over it: `wux/sys/x11.cpp`, `wux/w32/dwmapi.cpp`, `flxp_dwmapi.h`) and the lux side (luxwm,
+the wux side (the shell layer's Longhorn header `flxp/shell/ui/lhheader.cpp`, which flxp and the applications use; wux's
+`dwmapi` under it: `wux/sys/x11.cpp`, `wux/w32/dwmapi.cpp`, `flxp_dwmapi.h`) and the lux side (luxwm,
 luxshell). The executable references are `examples/extendframe.c` (the extended frame, `-c` CLIENT_CAPTION, `-n`
 NO_HEADER_PIXMAP) and `examples/navdemo.c` (the vision header). The atom names and the WM name "lhwm" are stable.
 

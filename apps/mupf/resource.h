@@ -7,6 +7,10 @@
 #define IDD_ABOUT       120
 #define IDC_ABOUT_TEXT  121
 #define IDC_ABOUT_ICON  122
+#define IDD_PASSWORD    130
+#define IDC_PASSWORD_TEXT 131
+#define IDC_PASSWORD    132
+#define IDC_PASSWORD_NOTE 133
 
 #define CMD_OPEN        1001
 #define CMD_CLOSE       1002

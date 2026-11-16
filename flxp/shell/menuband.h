@@ -1,12 +1,11 @@
-// The menu band: XP's Explorer menu is a toolbar band in the rebar, not a
-// system menu bar. This is a compact re-interpretation:
+// menuband.h: the menu band (the shell layer's win32 part, flxp/shell/ui/menuband.cpp). XP's Explorer menu is a toolbar
+// band in the rebar, not a system menu bar; the Explorer has it under XP's chrome and under the Longhorn header, and an
+// application under the Longhorn header (shell/lhheader.h) puts its menu there too, since luxwm's glass continues from the
+// caption into the header and a menu bar would lie between them (mupf). This is a compact re-interpretation:
 // text buttons for the top-level items, popups tracked below them, hover and
-// arrow keys moving between menus, Alt/F10 keyboard access.
+// arrow keys moving between menus, Alt/F10 keyboard access. One band per process.
+// Include after the win32 headers and commctrl.h (wux/wux.h; w32/w32.h inside flxp); shell/shell.h does.
 #pragma once
-#include "w32/w32.h"
-extern "C" {
-#include "commctrl.h"
-}
 
 namespace menuband {
 
@@ -20,5 +19,7 @@ int height();                                                   // band height
 bool active();                                                  // the owner is active (as last told)
 // Longhorn's coloured bar: item drawing handed to fn (NM_CUSTOMDRAW of the band)
 void set_custom_draw(LRESULT (*fn)(NMTBCUSTOMDRAW* cd, bool active));
+// the band is gone (its rebar destroyed): the calls above do nothing until the next create
+void forget();
 
 }

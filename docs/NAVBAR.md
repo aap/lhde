@@ -322,7 +322,8 @@ preset and for flxp's faithful 4074 Slate header.
 
 ## flxp's header
 
-flxp's Explorer header (`flxp/explorer/header.cpp`) draws through luxnav in its vision mode. Which header draws: flxp.ini's
+The shell layer's Longhorn header (`flxp/shell/ui/lhheader.cpp`: flxp's Explorer, its file dialog, the applications) draws through luxnav
+in its vision mode. Which header draws: flxp.ini's
 `header_engine = lhnav | flxp` when set (a developer's choice), else the session theme's `Explorer.navbar` (`vision` = luxnav with
 `path.navbar`, `4051 | 4074` = flxp's own header); without a session theme luxnav when luxwm's frame set has a nav.ini. The
 preset: `header_preset`, else the theme's `Explorer.navbar_preset` (`auto` = none), else `small` for the Small header size, else
