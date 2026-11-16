@@ -160,6 +160,8 @@ install-data:
 	install -m 644 share/navbar/*.ini $(DESTDIR)$(DATADIR)/navbar/
 	install -d $(DESTDIR)$(DATADIR)/firefox
 	install -m 644 share/firefox/userChrome.css.in $(DESTDIR)$(DATADIR)/firefox/
+	install -d $(DESTDIR)$(DATADIR)/firefox/ff4
+	install -m 644 share/firefox/ff4/*.png share/firefox/ff4/MANIFEST share/firefox/ff4/LICENSE $(DESTDIR)$(DATADIR)/firefox/ff4/
 	install -m 644 share/fonts/fontlink.ini $(DESTDIR)$(DATADIR)/fonts/
 	install -m 644 share/icons/*.theme share/icons/apps.ini $(DESTDIR)$(DATADIR)/icons/
 	install -d $(DESTDIR)$(DATADIR)/icons/flags

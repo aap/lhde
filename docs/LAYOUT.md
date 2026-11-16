@@ -16,7 +16,7 @@ pack made by `lhde-pack`, an ISO, a WIM or a Windows directory; docs/USAGE.md "G
 from Windows files is derived there too, never committed: the aurora scenes' numbers come from the user's jade.msstyles and
 WCPClient.dll at import (`generated/aurora/`) and reach `build/examples/aurora_data.h` at build time. The icons in
 `flxp/res/icons` are Wine's (LGPL), the `.res` files in `wux/rc` are built from Wine's `.rc` sources, and Wine's vendored code
-stays in `wux/vendor/wine` with its MANIFEST and patches, md4c (mupf's Markdown) in `apps/mupf/vendor/md4c` the same way (docs/LICENSING.md). Tests compare against checksums of local renders, never against
+stays in `wux/vendor/wine` with its MANIFEST and patches, md4c (mupf's Markdown) in `apps/mupf/vendor/md4c` the same way, and Firefox 4's theme pictures (Mozilla's, for lhde-firefox) in `share/firefox/ff4` with their MANIFEST and licence (docs/LICENSING.md). Tests compare against checksums of local renders, never against
 reference images. Resource packs built in the tree (`lhde-resources-*`) are gitignored.
 
 ## The three trees (on disk)
