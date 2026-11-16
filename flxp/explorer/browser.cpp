@@ -333,6 +333,8 @@ static void tip_track(Browser& b, int x, int y)
 
 enum { WM_COLUMNS_DRAGGED = WM_APP + 0x3c1 };   // posted to the list after a header drag
 enum { WM_LISTED = WM_APP + 0x3c2, LIST_TIMER = 0x4c495354, LIST_PERIOD = 250 };   // a slow folder's entries (listed() below)
+enum { WM_READ = WM_APP + 0x3c3 };              // a slow folder's names (read_done() below)
+static void read_done(Browser& b);
 
 // Ctrl+wheel over the list: the zoom (the Longhorn hosts), as Vista's; the infotip; the header's menu
 // and the header's drag order
@@ -357,6 +359,7 @@ static LRESULT CALLBACK list_subclass(HWND h, UINT msg, WPARAM wp, LPARAM lp, UI
         PostMessageW(h, WM_COLUMNS_DRAGGED, 0, 0);
     if (msg == WM_COLUMNS_DRAGGED) { save_columns(b); return 0; }   // (take_layout reads the order)
     if (msg == WM_LISTED) { listed(b); return 0; }
+    if (msg == WM_READ) { read_done(b); return 0; }
     if (msg == WM_TIMER && wp == LIST_TIMER) { KillTimer(h, LIST_TIMER); b.list_timer = false; listed(b); return 0; }
     if (msg == WM_CONTEXTMENU && b.choose_columns && (HWND)wp == (HWND)SendMessageW(h, LVM_GETHEADER, 0, 0)) {
         column_menu(b, GetParent(h), (SHORT)LOWORD(lp), (SHORT)HIWORD(lp));
@@ -740,7 +743,7 @@ void fill_list(Browser& b)
     thumbview::fill(b.items);   // Thumbnails view: the squares instead of the icons
     if (!group_of.empty()) SendMessageW(b.list, LVM_ARRANGE, LVA_DEFAULT, 0);
     SendMessageW(b.list, WM_SETREDRAW, TRUE, 0);
-    if (!b.select_after_refresh.empty()) {
+    if (!b.select_after_refresh.empty() && !b.listing) {   // (a slow folder's: when its names are in)
         for (size_t i = 0; i < b.items.size(); i++) {
             if (b.items[i].path != b.select_after_refresh) continue;
             LVITEMW st = {}; st.stateMask = LVIS_SELECTED | LVIS_FOCUSED; st.state = st.stateMask;
@@ -843,24 +846,34 @@ bool set_filter(Browser& b, const std::string& text)
     return true;
 }
 
+static shell::Reader& reader_of(Browser& b);
+
 void refresh(Browser& b)
 {
     if (!b.folder) return;
-    b.all_items.clear();
     b.slow = b.folder->slow();
     if (b.lister) b.lister->cancel();
+    if (b.reading) { b.reader->cancel(b.reading); b.reading = 0; }
     if (b.slow) {
-        // a network folder: shown from readdir alone, its stats (and the stored properties a column
-        // needs) filled in by the lister, the top of the list first
-        b.folder->enumerate_names(b.all_items, b.show_hidden);
-        std::vector<Item> order = b.all_items;
-        shell::sort_items(order, b.sort, b.ascending);
-        lister_of(b).start(b.folder->path(), order, true, wants_stored(b));
+        // a network folder: its names read on a reader thread (whose opendir also says it still is a folder), shown
+        // when they are in (read_done), the stats and the stored properties a column needs filled in by the lister
+        // after; until then the list is empty, or keeps the rows it has when this is the folder it shows (F5)
+        b.listing = true;
+        b.reading_update = false;
+        b.reading = reader_of(b).read(b.folder->path(), b.show_hidden);
+        if (b.listed_path != b.folder->path()) {
+            b.all_items.clear();
+            b.listed_path.clear();
+            apply_filter(b);
+        } else b.filled();
     } else {
+        b.listing = false;
+        b.all_items.clear();
         b.folder->enumerate(b.all_items, b.show_hidden);
         read_stored(b, b.all_items);
+        b.listed_path = b.folder->path();
+        apply_filter(b);
     }
-    apply_filter(b);
     follow(b);
     b.shown();
 }
@@ -948,31 +961,40 @@ void unfollow(Browser& b)
 // the sort changes (a date sort when a file is written) refill instead, with
 // the selection, focus and scroll position put back.
 static void merge(Browser& b, std::vector<Item> all, bool keep_order);
+static void update_with(Browser& b, std::vector<Item> all);
 
-// A slow folder (b.slow) is listed again from readdir alone: the entries it had keep what
-// was known of them, the new ones (pending) get their stat and, when wanted, their stored properties
-// from the lister (F5, refresh(), reads every stat again)
+// A slow folder (b.slow) is listed again from readdir alone, on a reader thread (update_with when the names are in):
+// the entries it had keep what was known of them, the new ones (pending) get their stat and, when wanted, their
+// stored properties from the lister (F5, refresh(), reads every stat again)
 void update(Browser& b)
 {
     if (!b.folder || !b.list) return;
     std::vector<Item> all;
     if (b.slow) {
-        if (!b.folder->enumerate_names(all, b.show_hidden) && all.empty()) return;
-        std::map<std::string, const Item*> known;
-        for (const Item& it : b.all_items) known[it.path] = &it;
-        for (Item& it : all) {
-            auto k = known.find(it.path);
-            if (k != known.end()) it = *k->second;
-        }
-        std::vector<Item> order = all;
-        shell::sort_items(order, b.sort, b.ascending);
-        lister_of(b).add(order, true, false);   // (the pending ones)
-        read_stored(b, order);                  // (those not read yet, when a column wants them)
-    } else {
-        if (!b.folder->enumerate(all, b.show_hidden) && all.empty()) return;
-        read_stored(b, all);
+        if (b.listing) return;   // (the listing under way brings it all)
+        if (b.reading) b.reader->cancel(b.reading);
+        b.reading_update = true;
+        b.reading = reader_of(b).read(b.folder->path(), b.show_hidden);
+        return;
     }
-    merge(b, all, b.slow && lister_of(b).busy());
+    if (!b.folder->enumerate(all, b.show_hidden) && all.empty()) return;
+    read_stored(b, all);
+    merge(b, all, false);
+}
+
+static void update_with(Browser& b, std::vector<Item> all)
+{
+    std::map<std::string, const Item*> known;
+    for (const Item& it : b.all_items) known[it.path] = &it;
+    for (Item& it : all) {
+        auto k = known.find(it.path);
+        if (k != known.end()) it = *k->second;
+    }
+    std::vector<Item> order = all;
+    shell::sort_items(order, b.sort, b.ascending);
+    lister_of(b).add(order, true, false);   // (the pending ones)
+    read_stored(b, order);                  // (those not read yet, when a column wants them)
+    merge(b, all, lister_of(b).busy());
 }
 
 // all as the folder's items now, brought into the list in place (update() above). keep_order: the list's
@@ -1163,10 +1185,75 @@ void listed(Browser& b)
     }
 }
 
+// A folder on a network mount is not stat'ed here (a round trip on the window's thread, and a server that does not
+// answer would hang it): its listing says whether it is one (read_done). Anything else as the host resolves it.
+static std::shared_ptr<shell::Folder> resolve_now(Browser& b, const std::string& path)
+{
+    if (!path.empty() && path[0] == '/' && shell::thumbs::on_network(path)) return shell::folder_for(path, true);
+    return b.resolve(path);
+}
+
+// ---- a slow folder's names (shell::Reader) ------------------------------------------------------------------
+// The reader posts WM_READ to the list; the answer to the request wanted (b.reading) is the folder's list (refresh)
+// or what update() merges. A folder that could not be read (gone, not a folder, not allowed) sends the window back
+// where it came from, as navigate() to a folder that is not there does not leave it.
+
+static void reader_notify(void* ctx)   // a reader thread
+{
+    Browser* b = (Browser*)ctx;
+    if (b->list) PostMessageW(b->list, WM_READ, 0, 0);
+}
+
+static shell::Reader& reader_of(Browser& b)
+{
+    if (!b.reader) b.reader.reset(new shell::Reader(reader_notify, &b));
+    return *b.reader;
+}
+
+static void listing_failed(Browser& b, const std::string& path, int error)
+{
+    static bool trace = getenv("FLXP_TRACE_LIST") != nullptr;
+    if (trace) { fprintf(stderr, "read: %s failed (%s)\n", path.c_str(), strerror(error)); fflush(stderr); }
+    b.listing = false;
+    std::string from = b.returning ? "" : b.came_from;
+    std::vector<std::string> back = b.came_back, forward = b.came_forward;
+    b.not_listed(path, error);
+    b.returning = true;   // (where we came from failing as well: the Desktop)
+    bool ok = !from.empty() && from != path && navigate(b, from, false);
+    if (!ok) ok = navigate(b, "::desktop", false);
+    b.returning = false;
+    if (!ok) return;
+    while (!back.empty() && back.back() == from) back.pop_back();
+    while (!forward.empty() && forward.back() == from) forward.pop_back();
+    b.back = back;
+    b.forward = forward;
+    b.shown();   // (Back and Forward as they are now)
+}
+
+static void read_done(Browser& b)
+{
+    std::vector<shell::Reader::Result> got;
+    if (!b.reader || !b.reader->take(got)) return;
+    for (shell::Reader::Result& r : got) {
+        if (!r.ticket || r.ticket != b.reading || !b.folder || r.path != b.folder->path()) continue;   // (superseded)
+        b.reading = 0;
+        if (!r.ok) { if (!b.reading_update) listing_failed(b, r.path, r.error); return; }
+        if (b.reading_update) { update_with(b, std::move(r.items)); continue; }
+        b.listing = false;
+        b.listed_path = r.path;
+        b.all_items = std::move(r.items);
+        std::vector<Item> order = b.all_items;
+        shell::sort_items(order, b.sort, b.ascending);
+        lister_of(b).start(r.path, order, true, wants_stored(b));
+        apply_filter(b);
+    }
+}
+
 bool navigate(Browser& b, const std::string& path, bool record)
 {
-    auto f = b.resolve(path);
+    auto f = resolve_now(b, path);
     if (!f) return false;
+    if (!b.returning) { b.came_from = b.folder ? b.folder->path() : ""; b.came_back = b.back; b.came_forward = b.forward; }
     bool changed = !b.folder || b.folder->path() != f->path();
     if (record && b.folder && (changed || b.record_same)) { b.back.push_back(b.folder->path()); b.forward.clear(); }
     if (b.folder && changed && !b.filter.empty()) {
@@ -1228,7 +1315,7 @@ void history_menu(Browser& b, HWND owner, bool back, int x, int y)
     if (hist.empty()) return;
     HMENU m = CreatePopupMenu();
     for (size_t i = 0; i < hist.size() && i < 10; i++) {
-        auto f = b.resolve(hist[hist.size() - 1 - i]);
+        auto f = resolve_now(b, hist[hist.size() - 1 - i]);
         AppendMenuW(m, MF_STRING, 5000 + (UINT)i, WS(f ? f->name() : hist[hist.size() - 1 - i]));
     }
     int cmd = TrackPopupMenu(m, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD, x, y, 0, owner, nullptr);

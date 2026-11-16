@@ -11,6 +11,9 @@
  *   getxattr, lgetxattr, listxattr, llistxattr (Linux);
  *   extattr_get_file, extattr_get_link, extattr_list_file, extattr_list_link (FreeBSD)   one per call
  *
+ * Under $LHDE_SLOW_HANG_PREFIX (inside the slow tree) a server that does not answer: every one of those calls blocks for
+ * $LHDE_SLOW_HANG_MS milliseconds (default 20000) instead, and is logged as "hang CALL PATH" when it returns.
+ *
  * With LHDE_SLOW_REMOTE=1, statfs under the prefix answers as an NFS mount does (Linux's f_type 0x6969, FreeBSD's
  * f_fstypename "nfs"), so lhde_fs_is_remote() takes the tree for a network one. With $LHDE_SLOW_LOG every call is logged
  * there, one line each: milliseconds since the first call, the call, the path, for close the bytes read through the
@@ -56,7 +59,10 @@
 
 static const char *g_prefix;
 static size_t g_plen;
+static const char *g_hang;
+static size_t g_hlen;
 static long g_ms = 50;
+static long g_hang_ms = 20000;
 static int g_remote;
 static int g_log = -1;
 static int g_mainlog = -1;
@@ -84,6 +90,12 @@ static void init(void)
     while (g_plen > 1 && g_prefix[g_plen - 1] == '/') g_plen--;
     const char *ms = getenv("LHDE_SLOW_MS");
     if (ms && *ms) g_ms = atol(ms);
+    g_hang = getenv("LHDE_SLOW_HANG_PREFIX");
+    if (g_hang && !*g_hang) g_hang = NULL;
+    g_hlen = g_hang ? strlen(g_hang) : 0;
+    while (g_hlen > 1 && g_hang[g_hlen - 1] == '/') g_hlen--;
+    const char *hms = getenv("LHDE_SLOW_HANG_MS");
+    if (hms && *hms) g_hang_ms = atol(hms);
     const char *r = getenv("LHDE_SLOW_REMOTE");
     g_remote = r && atoi(r) > 0;
     clock_gettime(CLOCK_MONOTONIC, &g_t0);
@@ -163,10 +175,26 @@ static void say(const char *call, const char *path, long long n)
     }
 }
 
-static void trip(void)
+static int hung(const char *path)
 {
-    struct timespec d = { g_ms / 1000, (g_ms % 1000) * 1000000L };
+    if (!g_hang || !path) return 0;
+    return strncmp(path, g_hang, g_hlen) == 0 && (path[g_hlen] == '/' || path[g_hlen] == 0);
+}
+
+static void sleep_ms(long ms)
+{
+    struct timespec d = { ms / 1000, (ms % 1000) * 1000000L };
     while (nanosleep(&d, &d) != 0 && errno == EINTR) {}
+}
+
+/* a round trip about path; under the hang prefix the server's silence, then "hang CALL" in the log */
+static void trip_for(const char *call, const char *path)
+{
+    if (!hung(path)) { sleep_ms(g_ms); return; }
+    sleep_ms(g_hang_ms);
+    char c[64];
+    snprintf(c, sizeof c, "hang %s", call);
+    say(c, path, -1);
 }
 
 /* a call about path: logged and delayed when it is under the prefix */
@@ -175,7 +203,7 @@ static int slow(const char *call, const char *path)
     if (!under(path)) return 0;
     int e = errno;
     say(call, path, -1);
-    trip();
+    trip_for(call, path);
     errno = e;
     return 1;
 }
@@ -190,7 +218,7 @@ static int slow_at(const char *call, int dirfd, const char *path)
     char full[PATH_MAX];
     snprintf(full, sizeof full, "%s/%s", g_fds[dirfd].path, path ? path : "");
     say(call, full, -1);
-    trip();
+    trip_for(call, full);
     errno = e;
     return 1;
 }
@@ -228,7 +256,7 @@ static void before_read(int fd, int64_t off)
         if (w != g_fds[fd].window) { g_fds[fd].window = w; p = strdup(g_fds[fd].path); }
     }
     pthread_mutex_unlock(&g_lock);
-    if (p) { int e = errno; say("read", p, -1); trip(); errno = e; free(p); }
+    if (p) { int e = errno; say("read", p, -1); trip_for("read", p); errno = e; free(p); }
 }
 
 static void after_read(int fd, ssize_t n, int positioned)
@@ -490,7 +518,7 @@ static void dir_entry(DIR *d)
     int due = x && x->entries++ % 128 == 127;
     char *p = x && due ? strdup(x->path) : NULL;
     pthread_mutex_unlock(&g_lock);
-    if (p) { int e = errno; say("readdir", p, -1); trip(); errno = e; free(p); }
+    if (p) { int e = errno; say("readdir", p, -1); trip_for("readdir", p); errno = e; free(p); }
 }
 
 struct dirent *readdir(DIR *d) { REAL(struct dirent *, "readdir", (DIR *)); dir_entry(d); return real(d); }

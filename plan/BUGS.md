@@ -20,10 +20,11 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   rollout / 4051 band of the selection (setfattr in a terminal: old value until the selection changes).
 - 2026-11-01 The 4051 band's invitation colour and the Choose Details dialog's layout are unmeasured choices.
 - 2026-11-01 The property registry's defaults are not in a shipped data file with user overrides (the shape is there, no loading).
-- 2026-11-15 Network folder: readdir, folder_for's stat and the tree's listing of the parent still run on the UI thread (0.8 s for
-  2000 entries in slowpath.sh at 50 ms per 128-entry reply); a hung server still hangs the window. A worker readdir in batches would not.
 - 2026-11-15 Network folder: Tiles and the details leave out a picture's Dimensions, the infotip shows only the stored properties a
   column read; the lister could read the header (and the xattrs) for the items on screen.
+- 2026-11-16 Network folder: one that turns out not to be one (gone, typed wrong, not readable) beeps and goes back where the
+  window came from; XP says "... is not accessible" in a message box. A deleted one's watch still stats its parents on the UI thread.
+- 2026-11-16 Network folder: a lister thread stuck in a hung server's stat holds the 15 other entries of its chunk until it returns.
 - 2026-11-15 Network folder: what the user asks for still reads synchronously (Add Tag's selection_tags reads every selected
   file's xattrs, Open's mime_type stats and sniffs, Properties); 500 selected files = 500 round trips before the dialog.
 - 2026-11-15 Network folder: the task band shows "Add a description" for the moment (0.1-0.3 s) before the lister has read the

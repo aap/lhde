@@ -122,6 +122,19 @@ struct Browser {
     std::unique_ptr<shell::Lister> lister;
     long long listed_at = 0;                         // the last batch merged (ms, monotonic)
     bool list_timer = false;
+    // a slow folder's names are read by a reader thread (shell/lister.h Reader): navigate() and refresh() show the
+    // folder at once, its list when they are in (listing: not yet; a refresh of the folder shown keeps its rows until
+    // then); update() reads them the same way. reading: the request whose answer is wanted (an earlier one is
+    // cancelled, and a stuck one left behind)
+    std::unique_ptr<shell::Reader> reader;
+    uint32_t reading = 0;
+    bool reading_update = false;
+    bool listing = false;
+    std::string listed_path;                         // the folder whose names the list has
+    // where navigate() came from, for a slow folder that turns out not to be one (gone, not readable): back there
+    std::string came_from;
+    std::vector<std::string> came_back, came_forward;
+    bool returning = false;
     std::map<std::string, bool> collapsed;           // groups folded by the user, by title
     std::vector<std::string> group_titles;           // the list's groups as last filled (by id)
     // the Details columns: the layout (shell/columns.h: every known column in the user's
@@ -149,6 +162,7 @@ struct Browser {
     virtual void shown() {}                                  // after refresh (titles, address, header, tree)
     virtual void view_changed() {}                           // after set_view (menus, toolbar)
     virtual void filter_cleared() {}                         // navigate() emptied the filter (the boxes)
+    virtual void not_listed(const std::string&, int) { MessageBeep(0); }   // a slow folder could not be read (errno): back where we came from
     virtual std::string column_text(const Item&, int) { return ""; }   // a search's In Folder ("": the directory)
 };
 
@@ -200,19 +214,24 @@ void apply_filter(Browser& b);         // b.items from b.all_items, then fill_li
 bool set_filter(Browser& b, const std::string& text);   // the boxes' text (live): true if it changed the list
 bool passes(const Browser& b, const Item& it);          // visible() and the filter
 int unfiltered_count(const Browser& b);                 // the items the folder shows without the filter (visible())
-void refresh(Browser& b);              // enumerate the folder again, fill, then shown(); follow()
+// enumerate the folder again, fill, then shown(); follow(). A slow folder: its names asked of the reader (b.listing until
+// they are in, the list filled then)
+void refresh(Browser& b);
 // The folder shown is followed on disk (b.follow_disk): refresh() watches it with inotify,
 // changes come as update() 150 ms after the first of a burst, a deleted or moved folder
 // navigates to the nearest one above it that exists. unfollow: before the list goes.
 void follow(Browser& b);
 void unfollow(Browser& b);
-void update(Browser& b);               // enumerate again, change the list item by item (keeps selection, scroll)
+// enumerate again, change the list item by item (keeps selection, scroll); a slow folder's when its names are in
+void update(Browser& b);
 // A slow folder's entries filled in (WM_LISTED from the lister's threads, handled by the list's subclass):
 // merged in place, the list's order kept while more is coming, one re-sort with the last
 void listed(Browser& b);
 // The stored properties of items of a slow folder not read yet (the selection the details describe): asked of the
 // lister, they come in with listed() and then changed_on_disk(); true when some were asked for
 bool want_stored(Browser& b, const std::vector<Item>& items);
+// false when path is no folder; a folder on a network mount is taken as one and its listing says (not_listed() and back
+// where the window came from when it is not)
 bool navigate(Browser& b, const std::string& path, bool record = true);
 void go_back(Browser& b);
 void go_forward(Browser& b);

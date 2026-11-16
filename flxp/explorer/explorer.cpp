@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <list>
 #include <map>
+#include <set>
 #include <memory>
 #include <string>
 #include <vector>
@@ -717,6 +718,7 @@ static void update_status()
     } else {
         // the filter on: how many of the folder's items it leaves (the Filter box's own wording, ours)
         if (!g.filter.empty()) snprintf(buf, sizeof buf, "%d of %d items", (int)g.items.size(), browser::unfiltered_count(g));
+        else if (g.listing && g.items.empty()) snprintf(buf, sizeof buf, "Listing the folder...");   // (a network folder's names on their way)
         else snprintf(buf, sizeof buf, "%d object%s", (int)g.items.size(), g.items.size() == 1 ? "" : "s");
         text = buf;
         for (const Item& it : g.items) if (!it.is_folder()) bytes += it.size;
@@ -821,16 +823,9 @@ static HTREEITEM tree_insert(HTREEITEM parent, const std::string& name, const st
     return (HTREEITEM)SendMessageW(g.tree, TVM_INSERTITEMW, 0, (LPARAM)&ins);
 }
 
-// Populate a node's children on first expansion.
-static void tree_fill(HTREEITEM h)
+// a node's children: the folders among kids, by name
+static void tree_add(HTREEITEM h, std::vector<Item>& kids)
 {
-    if (SendMessageW(g.tree, TVM_GETNEXTITEM, TVGN_CHILD, (LPARAM)h)) return;   // already filled
-    const std::string* p = tree_path(h);
-    if (!p) return;
-    auto f = shell::folder_for(*p, true);   // (a node is a folder its parent's listing gave, or the root)
-    if (!f) return;
-    std::vector<Item> kids;
-    f->enumerate_names(kids, g.show_hidden);   // (folders by d_type: a network folder is not stat'ed entry by entry)
     shell::sort_items(kids, shell::SortBy::Name, true);
     int n = 0;
     for (const Item& it : kids) {
@@ -844,7 +839,63 @@ static void tree_fill(HTREEITEM h)
     }
 }
 
-// Expand the tree along the current folder's ancestry and select it.
+// A folder on a network mount is looked inside by a reader thread (shell/lister.h Reader), as the list's own folder
+// is: its node gets its children when the names are in (tree_read), opened then if it was opened meanwhile, and
+// sync_tree goes on from there. A node asked for is not asked again while it is read; a request for a node gone
+// since is dropped.
+enum { WM_APP_TREE_READ = WM_APP + 3 };
+static std::unique_ptr<shell::Reader> g_tree_reader;
+static std::map<uint32_t, std::string> g_tree_reading;   // ticket -> the node's path
+static std::set<std::string> g_tree_open;                // nodes opened before their children were in
+static bool g_tree_sync;                                 // sync_tree waits for a node's children
+static void tree_reader_notify(void*) { if (g.frame) PostMessageW(g.frame, WM_APP_TREE_READ, 0, 0); }
+
+// Populate a node's children on first expansion: false while they are read (a network folder's)
+static bool tree_fill(HTREEITEM h)
+{
+    if (SendMessageW(g.tree, TVM_GETNEXTITEM, TVGN_CHILD, (LPARAM)h)) return true;   // already filled
+    const std::string* p = tree_path(h);
+    if (!p) return true;
+    if ((*p)[0] == '/' && shell::thumbs::on_network(*p)) {
+        for (const auto& r : g_tree_reading) if (r.second == *p) return false;
+        if (!g_tree_reader) g_tree_reader.reset(new shell::Reader(tree_reader_notify, nullptr));
+        g_tree_reading[g_tree_reader->read(*p, g.show_hidden)] = *p;
+        return false;
+    }
+    auto f = shell::folder_for(*p, true);   // (a node is a folder its parent's listing gave, or the root)
+    if (!f) return true;
+    std::vector<Item> kids;
+    f->enumerate_names(kids, g.show_hidden);
+    tree_add(h, kids);
+    return true;
+}
+
+static HTREEITEM tree_find(HTREEITEM h, const std::string& path);
+static void sync_tree();
+
+static void tree_read()
+{
+    std::vector<shell::Reader::Result> got;
+    if (!g_tree_reader || !g_tree_reader->take(got)) return;
+    for (shell::Reader::Result& r : got) {
+        auto t = g_tree_reading.find(r.ticket);
+        if (t == g_tree_reading.end()) continue;
+        g_tree_reading.erase(t);
+        bool open = g_tree_open.erase(r.path) > 0;
+        HTREEITEM h = g.tree ? tree_find(g.tree_root, r.path) : nullptr;
+        if (!h || SendMessageW(g.tree, TVM_GETNEXTITEM, TVGN_CHILD, (LPARAM)h)) continue;
+        if (!r.ok) r.items.clear();   // (not readable: no [+])
+        bool syncing = g.syncing_tree;
+        g.syncing_tree = true;
+        tree_add(h, r.items);
+        if (open) SendMessageW(g.tree, TVM_EXPAND, TVE_EXPAND, (LPARAM)h);
+        g.syncing_tree = syncing;
+    }
+    if (g_tree_sync) sync_tree();
+}
+
+// Expand the tree along the current folder's ancestry and select it (as far as the nodes' children are in: the rest
+// when they are, tree_read)
 static void sync_tree()
 {
     if (!g.folder || !g.tree) return;
@@ -852,8 +903,9 @@ static void sync_tree()
     for (auto f = g.folder; f; f = f->parent()) chain.push_back(f->path());
     HTREEITEM node = g.tree_root;
     g.syncing_tree = true;
+    g_tree_sync = false;
     for (int i = (int)chain.size() - 2; i >= 0 && node; i--) {
-        tree_fill(node);
+        if (!tree_fill(node)) { g_tree_sync = true; node = nullptr; break; }
         SendMessageW(g.tree, TVM_EXPAND, TVE_EXPAND, (LPARAM)node);
         HTREEITEM c = (HTREEITEM)SendMessageW(g.tree, TVM_GETNEXTITEM, TVGN_CHILD, (LPARAM)node);
         HTREEITEM found = nullptr;
@@ -1514,7 +1566,10 @@ static void tree_reload(const std::string& path)
     TVITEMW tvi = {}; tvi.mask = TVIF_CHILDREN | TVIF_STATE; tvi.hItem = h; tvi.cChildren = 1;
     tvi.stateMask = TVIS_EXPANDEDONCE | TVIS_EXPANDED; tvi.state = 0;
     SendMessageW(g.tree, TVM_SETITEMW, 0, (LPARAM)&tvi);
-    if (expanded) { tree_fill(h); SendMessageW(g.tree, TVM_EXPAND, TVE_EXPAND, (LPARAM)h); }
+    if (expanded) {
+        if (tree_fill(h)) SendMessageW(g.tree, TVM_EXPAND, TVE_EXPAND, (LPARAM)h);
+        else g_tree_open.insert(path);
+    }
     g.syncing_tree = false;
     sync_tree();
 }
@@ -1596,7 +1651,8 @@ static void verb(int id)
 {
     if (id == ID_EXPAND) {
         HTREEITEM node = (HTREEITEM)g_ctx.node;
-        if (node) { tree_fill(node); SendMessageW(g.tree, TVM_EXPAND, TVE_TOGGLE, (LPARAM)node); }
+        if (node && tree_fill(node)) SendMessageW(g.tree, TVM_EXPAND, TVE_TOGGLE, (LPARAM)node);
+        else if (const std::string* p = node ? tree_path(node) : nullptr) g_tree_open.insert(*p);
         return;
     }
     verbs::run(id);
@@ -1843,7 +1899,8 @@ static LRESULT on_notify(NMHDR* nm)
             return 0;
         case TVN_ITEMEXPANDINGW: {
             NMTREEVIEWW* tv = (NMTREEVIEWW*)nm;
-            if (tv->action == TVE_EXPAND) tree_fill(tv->itemNew.hItem);
+            if (tv->action == TVE_EXPAND && !tree_fill(tv->itemNew.hItem))
+                if (const std::string* p = tree_path(tv->itemNew.hItem)) g_tree_open.insert(*p);
             return FALSE;
         }
         case TVN_KEYDOWN: {
@@ -2400,6 +2457,9 @@ static LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return drop_message(msg, (const FLXPDROP*)lp);
     case WM_APP_DETAILS:
         update_details();
+        return 0;
+    case WM_APP_TREE_READ:
+        tree_read();
         return 0;
     case WM_APP_REFRESH:
         refresh();

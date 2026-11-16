@@ -709,9 +709,16 @@ on its window's thread: the infotip shows what the list has read, the Tiles view
 Dimensions, the status bar and Open With take a file's type from its name, the folder tree and the breadcrumb's drop-downs know
 folders from the directory entries (every folder in the tree has its [+] until it is opened, as XP's tree has on a network
 share, rather than a look inside each), whether an entry is on a network mount is asked once for the folder, and the folder's
-inotify watch (which on FreeBSD looks up every entry) is added on a thread of its own. Opening a folder reads its names and
-checks that it is one on the window's thread. F5 reads the names and every stat again, a change
-seen on disk (inotify: what this machine changed) reads the names again and stats the new entries. What you ask
+inotify watch (which on FreeBSD looks up every entry) is added on a thread of its own. Opening a folder does not wait for it
+either, as XP's Explorer never blocks its window on a share: the window shows the folder at once (its title, address, Back,
+the tree) with an empty list and "Listing the folder..." in the status bar, a thread of its own reads the names (its opendir
+also says whether the folder is still there; when it is not, the window goes back where it came from, with a beep), and the
+list comes in when they are; the folder tree looks inside a folder the same way, its node getting its children when they
+are in. A folder whose server does not answer holds that thread and nothing else: the window, its menus and Back work, a
+later folder is read by another thread (four at most at once; a fifth waits for one of them), and what the stuck one reads
+when the server answers is dropped if the window has gone elsewhere. F5 reads the names and every stat again (the rows
+shown stay until the new list is in), a change seen on disk (inotify: what this machine changed) reads the names again and
+stats the new entries. What you ask
 for yourself (opening a file, Properties, Add Tag, copying) still reads the files it needs while you wait.
 `FLXP_TRACE_STALLS=MS` prints every message the window's thread spent MS milliseconds or more on (`stall: 123.4 ms message
 0x020a list`: a wheel turn on the list with the repaint it does at once; with 0, every message), and
