@@ -2615,10 +2615,12 @@ static bool loop_keys(MSG& msg)
         return true;
     }
     if (msg.message == WM_KEYDOWN && msg.wParam == VK_F5) { refresh(); return true; }
-    // Alt+Left and Alt+Right: Back and Forward wherever the focus is in the window (XP's accelerators)
-    if (msg.message == WM_SYSKEYDOWN && (msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT) && (msg.hwnd == g.frame || IsChild(g.frame, msg.hwnd))) {
+    // Alt+Left and Alt+Right: Back and Forward wherever the focus is in the window (XP's accelerators; the frame's own
+    // WM_SYSKEYDOWN does it when the frame has it). The key goes on to DefWindowProc as well, which then knows Alt was not
+    // pressed alone and does not open the menu bar when it is released.
+    if (msg.message == WM_SYSKEYDOWN && (msg.wParam == VK_LEFT || msg.wParam == VK_RIGHT) && msg.hwnd != g.frame &&
+        IsChild(g.frame, msg.hwnd)) {
         if (msg.wParam == VK_LEFT) go_back(); else go_forward();
-        return true;
     }
     if (g.header && msg.message == WM_KEYDOWN && msg.wParam == 'L' && (GetKeyState(VK_CONTROL) & 0x8000)) { header::edit_address(); return true; }
     if (g.zoomable && msg.message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000) && (focus == g.list || focus == g.frame) &&

@@ -11,8 +11,8 @@
 # the slow tree: the folders opened and the tree's are read by reader threads.
 # Then a server that stops answering (the shim's LHDE_SLOW_HANG_PREFIX on "stuck", every call there blocking
 # SLOWPATH_UI_HANG_MS, 12 s), XP frame, Details, no thumbnails, FLXP_TRACE_STALLS=100: "stuck" opened shows its name in the
-# title at once, the File menu opens, Back (Alt+Left) lists the share again, no message takes 100 ms or more, no call under "stuck"
-# is made from the main thread, and when the hang ends the listing of "stuck" is dropped ("read: ... dropped"): the
+# title at once, the File menu opens, Back (Alt+Left) lists the share again and the list takes keys after it, no message
+# takes 100 ms or more, no call under "stuck" is made from the main thread, and when the hang ends the listing of "stuck" is dropped ("read: ... dropped"): the
 # window stays on the share.
 # The calls found are printed with their stacks (addr2line names the frames where it is installed). A HOME and XDG
 # directories of its own. Needs Xvfb, xdotool and python3 with PIL; prints "skip: ..." and passes without them.
@@ -201,6 +201,11 @@ hang() {
     relisted() { [ "$(lists)" -gt "$l0" ]; }
     if wait_for 5 relisted && title_is photos; then ok "hang: Back lists the share again $(( $(now) - t1 )) ms after the key"
     else bad "hang: Back: the title is \"$(xdotool getwindowname $W 2>/dev/null)\", the share not listed again within 5 s"; fi
+    # the keys go to the list after Alt+Left (not to the menu bar): another folder opens, and Back again
+    sleep .5; xdotool key Home; sleep .3; xdotool type --delay 80 album_001; sleep .5; xdotool key Return
+    if wait_for 3 title_is album_001; then ok "hang: after Back the list takes the keys (album_001 opened)"
+    else bad "hang: after Back typing album_001 and Return left the title \"$(xdotool getwindowname $W 2>/dev/null)\""; fi
+    sleep .5; xdotool key alt+Left; wait_for 3 title_is photos
     # the hang ends: the listing of "stuck" comes back and is dropped
     left=$(( (HANG_MS - ($(now) - t0)) / 1000 + 10 ))
     if seen_at $left "^read: $F/stuck dropped" >/dev/null; then ok "hang: the listing of \"stuck\" dropped when its server answered"
