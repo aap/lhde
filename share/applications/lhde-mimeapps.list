@@ -19,3 +19,4 @@ application/oxps=mupf.desktop
 application/vnd.ms-xpsdocument=mupf.desktop
 application/epub+zip=mupf.desktop
 text/markdown=mupf.desktop
+text/x-typst=mupf.desktop

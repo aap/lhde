@@ -33,6 +33,7 @@
 #include "explorer/lhbar.h"   // the Explorer's 4051 command bar under the header (docs/APPLICATIONS.md "mupf")
 #include "lhde/settings.h"
 #include "sys/sys.h"     // sys::watch_fd: the message loop reads the Markdown file's DirWatch (docs/APPLICATIONS.md)
+#include "compile.h"
 #include "engine.h"
 #include "layout.h"
 #include "markdown.h"
@@ -50,7 +51,8 @@ const int CACHE_BUDGET = 64 << 20;     // the rendered pages kept (layout.h's Ca
 const int LINE = 40;                   // an arrow key's or a wheel notch's third, in pixels
 const int PREFETCH_AHEAD = 2, PREFETCH_BEHIND = 1;
 const int ID_TOOLBAR = 10, ID_STATUS = 11, ID_VIEW = 12, ID_PAGE_EDIT = 13, ID_TREE = 15, ID_FIND_EDIT = 16,
-          ID_REBAR = 17, ID_MENUBAND = 18;
+          ID_REBAR = 17, ID_MENUBAND = 18, ID_ERRORS = 19;
+const int ERROR_LINES = 9;             // the compiler's pane: this many lines of its diagnostics
 // the Contents pane: XP's Explorer bar (a title row with its close button over a tree, a splitter beside it); the sizes
 // are mupf's
 const int PANE_TITLE = 22, SPLITTER = 4, PANE_MIN = 80, PANE_DEFAULT = 200;
@@ -170,6 +172,13 @@ struct App {
     POINT auto_at = {}, auto_pt = {};   // where it began and where the pointer is, in the view
     DWORD auto_tick = 0;
     double auto_rx = 0, auto_ry = 0;    // the fractions of a pixel not scrolled yet
+    // a typesetting source (compile.h): the compiler's PDF shown, its diagnostics in a pane under the pages
+    Compiler comp;
+    std::string source;                 // the .typ or .tex file ("": the document is what it is)
+    std::string comp_out;               // the PDF, its real path
+    std::string comp_status;            // what the compiler said last (the status bar's message part)
+    HWND errors = nullptr;              // the pane (a read-only edit), shown while the last compile failed
+    bool errors_on = false;
     bool trace = false;
     std::string status_text[3], shown_trace, view_trace, scroll_trace;
 };
@@ -300,11 +309,14 @@ void update_page_box()
     update_header();
 }
 
+// the document's name: the file's, a compiled source's (not its PDF's)
+std::string doc_name() { return base_of(g.source.empty() ? g.path : g.source); }
+
 void update_title()
 {
     // a Markdown file's title is its first H1 (the page's own name, as a browser shows a README's), else the file's name
-    std::string name = g.markdown && !g.title.empty() ? g.title : base_of(g.path);
-    std::string t = g.opened || !g.path.empty() ? name + " - mupf" : "mupf";
+    std::string name = !g.source.empty() ? base_of(g.source) : g.markdown && !g.title.empty() ? g.title : base_of(g.path);
+    std::string t = g.opened || !g.path.empty() || !g.source.empty() ? name + " - mupf" : "mupf";
     SetWindowTextW(g.wnd, WS(t));
     trace("title %s", t.c_str());
 }
@@ -894,14 +906,122 @@ void reload_doc()
 }
 
 // another document from the history or a link, the history kept; to the place once it is open
+void stop_compile();
+
 void open_place(const Place& p, const std::string& anchor = std::string())
 {
+    if (!g.source.empty() && p.path != g.comp_out) stop_compile();
     g.restore = true;
     g.restore_at = p;
     g.restore_anchor = anchor;
     g.keep_history = true;
     open_doc(p.path);
     g.keep_history = false;
+}
+
+// ---- a typesetting source: its compiler's PDF -------------------------------------------------------------------------
+
+// the compiler's diagnostics in the pane under the pages ("": the pane hidden)
+void show_errors(const std::string& text)
+{
+    if (!g.errors) return;
+    std::string t;
+    for (char c : text) { if (c == '\n') t += '\r'; t += c; }   // (the edit's line ends)
+    bool want = !text.empty();
+    if (want) SetWindowTextW(g.errors, WS(t));
+    if (g.errors_on != want) {
+        g.errors_on = want;
+        layout_chrome();
+    }
+}
+
+void stop_compile()
+{
+    if (g.comp.fd() >= 0) sys::unwatch_fd(g.comp.fd());
+    if (g.comp.running()) trace("compiler stopped");
+    g.comp.stop();
+    g.source.clear();
+    g.comp_out.clear();
+    g.comp_status.clear();
+    show_errors("");
+}
+
+// the compiler said something: a compile done opens its PDF (again, the view kept); a failed one shows its diagnostics,
+// the last good PDF staying
+void on_compiler()
+{
+    int fd = g.comp.fd();
+    std::vector<Compiler::Result> rs = g.comp.take();
+    if (g.comp.fd() < 0 && fd >= 0) sys::unwatch_fd(fd);   // (it ended: take closed the pipe)
+    std::string prog = Compiler::program(g.comp.kind());
+    for (const Compiler::Result& r : rs) {
+        switch (r.what) {
+        case Compiler::Result::COMPILED: {
+            trace("compiled %s", r.summary.c_str());
+            show_errors("");
+            g.comp_status = prog + ": " + r.summary;
+            set_status(0, g.comp_status);
+            if (g.path != g.comp_out || (!g.opened && !g.reload)) open_doc(g.comp_out);
+            else if (file_stamp(g.comp_out) != g.file_stamp) reload_doc();
+            break;
+        }
+        case Compiler::Result::FAILED:
+            trace("compile failed %s", r.summary.c_str());
+            show_errors(r.text);
+            g.comp_status = prog + ": " + r.summary + (g.opened ? " (the last good document is shown)" : "");
+            set_status(0, g.comp_status);
+            break;
+        case Compiler::Result::ENDED:
+            trace("compiler ended %s", r.summary.c_str());
+            if (!r.text.empty()) show_errors(r.text);
+            g.comp_status = prog + " " + r.summary;
+            set_status(0, g.comp_status);
+            break;
+        }
+    }
+}
+
+// FILE.typ, FILE.tex: shown as the PDF their compiler makes of them (typst watch, latexmk -pvc: compile.h), into
+// mupf-PID in mupf's state directory; true when path is such a source (shown or, without its compiler, said so)
+bool open_source(const std::string& path)
+{
+    Compiler::Kind k = Compiler::kind_of(path);
+    if (k == Compiler::NONE) return false;
+    stop_compile();
+    close_doc();
+    char* abs = realpath(path.c_str(), nullptr);
+    g.source = abs ? abs : path;
+    free(abs);
+    g.path.clear();
+    char st[4096];
+    std::string parent = lhde_state_dir(st, sizeof st) ? st : "/tmp";
+    Compiler::sweep(parent, "mupf-");
+    std::string dir = parent + "/mupf-" + std::to_string((long)getpid());
+    std::string err;
+    if (!g.comp.start(k, g.source, dir, &err)) {
+        g.comp_status = "Cannot show " + base_of(g.source) + ": " + err;
+        set_status(0, g.comp_status);
+        trace("compile none %s", err.c_str());
+        update_title();
+        return true;
+    }
+    char* real = realpath(dir.c_str(), nullptr);
+    g.comp_out = (real ? std::string(real) : dir) + "/" + base_of(g.comp.output());
+    free(real);
+    sys::watch_fd(g.comp.fd(), [](int, void*) { on_compiler(); }, nullptr);
+    g.comp_status = std::string(Compiler::program(k)) + ": compiling...";
+    set_status(0, g.comp_status);
+    trace("compile %s %s", Compiler::program(k), g.comp_out.c_str());
+    update_title();
+    return true;
+}
+
+// a file to show (the command line, File > Open, a drop): a source through its compiler, anything else as it is
+void open_file(const std::string& path)
+{
+    if (open_source(path)) return;
+    stop_compile();
+    open_doc(path);
 }
 
 // to a place: in this document at once, another one opened
@@ -989,7 +1109,7 @@ void on_engine()
             // a reload: at the page it was on (a Single Page layout lays that page out alone)
             g.current = reload ? std::max(0, std::min(g.restore_at.page, g.pages - 1)) : 0;
             g.sx = g.sy = 0;
-            set_status(0, "");
+            set_status(0, g.source.empty() ? "" : g.comp_status);
             trace("opened %d pages %s", g.pages, g.format.c_str());
             for (size_t i = 0; g.trace && i < g.toc.size(); i++)   // the outline: where each entry goes, in points
                 trace("tocentry %zu %d %d %g %s", i, g.toc[i].level, g.toc[i].page + 1, g.toc[i].y, g.toc[i].title.c_str());
@@ -1000,7 +1120,7 @@ void on_engine()
                 scroll_to((g.lay.width - g.vw) / 2, 0);   // a page wider than the view: its middle (mupdf centres it)
             }
             if (g.flow) trace("flow %g", g.flow_w);   // laid out to the view: this many points wide
-            if (!g.watch) watch_file();
+            if (!g.watch && g.source.empty()) watch_file();   // (a compiler's PDF: opened again when it says so)
             if (g.restore) {
                 g.restore = false;
                 std::string anchor = g.restore_anchor;
@@ -1207,15 +1327,16 @@ void open_dialog()
     OPENFILENAMEW ofn = {};
     ofn.lStructSize = sizeof ofn;
     ofn.hwndOwner = g.wnd;
-    ofn.lpstrFilter = L"All Documents (*.pdf, *.xps, *.oxps, *.epub, *.cbz, *.fb2, *.mobi, *.md)\0*.pdf;*.xps;*.oxps;*.epub;*.cbz;*.fb2;*.mobi;*.md;*.markdown;*.mkd\0"
+    ofn.lpstrFilter = L"All Documents (*.pdf, *.xps, *.oxps, *.epub, *.cbz, *.fb2, *.mobi, *.md, *.typ, *.tex)\0*.pdf;*.xps;*.oxps;*.epub;*.cbz;*.fb2;*.mobi;*.md;*.markdown;*.mkd;*.typ;*.tex\0"
                       L"Adobe PDF Files (*.pdf)\0*.pdf\0XPS Documents (*.xps, *.oxps)\0*.xps;*.oxps\0"
-                      L"Markdown Files (*.md, *.markdown, *.mkd)\0*.md;*.markdown;*.mkd\0All Files (*.*)\0*.*\0";
+                      L"Markdown Files (*.md, *.markdown, *.mkd)\0*.md;*.markdown;*.mkd\0"
+                      L"Typst and LaTeX Sources (*.typ, *.tex)\0*.typ;*.tex\0All Files (*.*)\0*.*\0";
     ofn.lpstrFile = file;
     ofn.nMaxFile = sizeof file / sizeof file[0];
     ofn.lpstrTitle = L"Open";
     ofn.Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST;
     if (!GetOpenFileNameW(&ofn)) return;
-    open_doc(WuxUtf8(file));
+    open_file(WuxUtf8(file));
 }
 
 // ---- the window --------------------------------------------------------------------------------------------------------
@@ -1370,9 +1491,9 @@ void command(int id)
 {
     switch (id) {
     case CMD_OPEN: open_dialog(); break;
-    case CMD_CLOSE: close_doc(); g.path.clear(); update_title(); break;
+    case CMD_CLOSE: stop_compile(); close_doc(); g.path.clear(); update_title(); break;
     case CMD_PROPERTIES:
-        if (g.opened) shell::properties(g.wnd, { g.path });
+        if (g.opened) shell::properties(g.wnd, { g.source.empty() ? g.path : g.source });
         break;
     case CMD_EXIT: PostMessageW(g.wnd, WM_CLOSE, 0, 0); break;
     case CMD_RELOAD: reload_doc(); break;
@@ -2041,7 +2162,7 @@ void update_header()
         if (!g.crumbs_for.empty()) { g.crumbs_for.clear(); shell::lhheader::set_crumbs({}); }
         return;
     }
-    std::string name = base_of(g.path);
+    std::string name = doc_name();
     int at = g.toc_at;
     std::string key = g.path + "\n" + std::to_string(at);
     shell::lhheader::set_address(std::to_string(g.current + 1));
@@ -2257,6 +2378,20 @@ void layout_chrome()
         int parts[3] = { std::max(10, w - 220), std::max(20, w - 80), -1 };
         SendMessageW(g.status, SB_SETPARTS, 3, (LPARAM)parts);
         if (g.page_edit && GetFocus() == g.page_edit) SetFocus(g.view);   // (the edit hides) the parts moved
+    }
+    // the compiler's diagnostics: across the window under the pages, above the status bar
+    bool errs = g.errors && g.errors_on && !g.fullscreen;
+    if (g.errors) ShowWindow(g.errors, errs ? SW_SHOWNA : SW_HIDE);
+    if (errs) {
+        TEXTMETRICW tm = {};
+        HDC dc = GetDC(g.errors);
+        HGDIOBJ of = SelectObject(dc, GetStockObject(ANSI_FIXED_FONT));
+        GetTextMetricsW(dc, &tm);
+        SelectObject(dc, of);
+        ReleaseDC(g.errors, dc);
+        int h = std::min(ERROR_LINES * (int)std::max(8L, (long)tm.tmHeight) + 6, std::max(0, (bottom - top) / 2));
+        bottom -= h;
+        MoveWindow(g.errors, 0, bottom, rc.right, h, TRUE);
     }
     int left = 0;
     bool pane = g.show_toc && !g.fullscreen;
@@ -2815,7 +2950,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case WM_DROPFILES: {
         HDROP drop = (HDROP)wp;
         WCHAR file[4096];
-        if (DragQueryFileW(drop, 0, file, sizeof file / sizeof file[0])) open_doc(WuxUtf8(file));
+        if (DragQueryFileW(drop, 0, file, sizeof file / sizeof file[0])) open_file(WuxUtf8(file));
         DragFinish(drop);
         return 0;
     }
@@ -2832,8 +2967,9 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 void usage(FILE* f)
 {
     fputs("usage: mupf [FILE]\n"
-          "  A PDF, XPS, EPUB, CBZ, FB2 or MOBI document, or a Markdown file (.md), drawn by mupdf. MUPF_TRACE=1 prints what is opened, shown and\n"
-          "  rendered on stdout.\n", f);
+          "  A PDF, XPS, EPUB, CBZ, FB2 or MOBI document, or a Markdown file (.md), drawn by mupdf; a Typst (.typ) or LaTeX (.tex)\n"
+          "  source shown as the PDF that typst watch or latexmk -pvc makes of it, again on every save. The file is followed: a\n"
+          "  write shows it again. MUPF_TRACE=1 prints what is opened, shown and rendered on stdout.\n", f);
 }
 
 }   // namespace
@@ -2884,6 +3020,9 @@ int main(int argc, char** argv)
     g.tree = CreateWindowExW(WS_EX_CLIENTEDGE, WC_TREEVIEWW, nullptr,
                              WS_CHILD | WS_TABSTOP | TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS,
                              0, 0, 10, 10, g.wnd, (HMENU)(INT_PTR)ID_TREE, nullptr, nullptr);
+    g.errors = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", nullptr, WS_CHILD | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_READONLY |
+                               ES_AUTOVSCROLL | ES_AUTOHSCROLL, 0, 0, 10, 10, g.wnd, (HMENU)(INT_PTR)ID_ERRORS, nullptr, nullptr);
+    SendMessageW(g.errors, WM_SETFONT, (WPARAM)GetStockObject(ANSI_FIXED_FONT), FALSE);   // (typst's carets line up)
     apply_font();
     DragAcceptFiles(g.wnd, TRUE);
     g.eng = new Engine(engine_notify, nullptr);
@@ -2897,7 +3036,7 @@ int main(int argc, char** argv)
     UpdateWindow(g.wnd);
     SetFocus(g.view);
     trace("mapped");
-    if (!args.empty()) open_doc(args[0]);
+    if (!args.empty()) open_file(args[0]);
 
     MSG m;
     while (GetMessageW(&m, nullptr, 0, 0) > 0) {
@@ -2916,6 +3055,7 @@ int main(int argc, char** argv)
         TranslateMessage(&m);
         DispatchMessageW(&m);
     }
+    stop_compile();   // (the compiler and its directory)
     delete g.eng;   // ends the thread, an abandoned render with it
     g.eng = nullptr;
     delete g.cache;
