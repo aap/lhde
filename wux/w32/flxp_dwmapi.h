@@ -84,6 +84,14 @@ HRESULT WINAPI FlxpDwmSetInputHole(HWND hwnd, const RECT *rc);
    root property with FlxpWatchRootProperty("_NET_ACTIVE_WINDOW") to follow it. */
 HRESULT WINAPI FlxpDwmIsWindowActive(HWND hwnd, BOOL *active);
 
+/* The activation state hwnd's (a toplevel's) own header shows now, 1 active,
+   0 inactive, as _LHWM_ACTIVE_DRAWN; -1 removes it (no such header any more).
+   luxwm paints the frame in a new activation state once the header shows it
+   (docs/CLIENT-PROTOCOL.md "Activation in step"): set it after the header
+   has been painted and presented (DwmFlush) in the state of
+   FlxpDwmIsWindowActive. */
+HRESULT WINAPI FlxpDwmSetActiveDrawn(HWND hwnd, INT state);
+
 /* Make a toplevel ARGB (or opaque again) without touching the frame
    extension. E_FAIL if the X server has no 32-bit visual. */
 HRESULT WINAPI FlxpDwmEnableAlpha(HWND hwnd, BOOL enable);

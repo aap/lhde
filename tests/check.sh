@@ -9,7 +9,8 @@
 #                and the jade4074 style, alttab.sh xprop, xwininfo and ImageMagick, sidebar.sh xprop, xwininfo, xwd and ImageMagick, startmenu.sh xprop and python3, menushadow.sh
 #                xwininfo, xwd, xsetroot, xterm, python3 and ImageMagick, starticon.sh xprop and ImageMagick (luna when imported),
 #                thumbsmem.sh ImageMagick, slowpath.sh and slowpath-ui.sh python3 with PIL, thumbdocs.sh ImageMagick and pdftoppm or mutool (gs, ddjvu and c44 for its PS and DjVu), nowm.sh xprop, xwininfo and ImageMagick, fvwm2 when installed, xsession.sh xprop and
-#                dbus-daemon, picom when installed, fullscreen.sh xprop, xwininfo, xwd and ImageMagick, picom when installed, timerbusy.sh xwd, picom when installed); displays :71-:73,
+#                dbus-daemon, picom when installed, fullscreen.sh xprop, xwininfo, xwd and ImageMagick, picom when installed, timerbusy.sh xwd, picom when installed,
+#                activation.sh xprop, xwininfo, python3 and an imported Longhorn style, picom when installed); displays :71-:73,
 #                LHDE_TEST_DISPLAYS="A B C" for others
 cd "$(dirname "$0")/.." || exit 1
 fails=0
@@ -139,6 +140,9 @@ else
     result "headless/fullscreen.sh$(grep -m1 '^skip' "$T/fullscreen.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/fullscreen.log"
     tests/headless/timerbusy.sh "$2" > "$T/timerbusy.log" 2>&1; rc=$?
     result "headless/timerbusy.sh$(grep -m1 '^skip' "$T/timerbusy.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/timerbusy.log"
+    # a focus change: luxwm's frame and flxp's header each painted once, in step (docs/CLIENT-PROTOCOL.md "Activation in step")
+    tests/headless/activation.sh "$2" > "$T/activation.log" 2>&1; rc=$?
+    result "headless/activation.sh$(grep -m1 '^skip' "$T/activation.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/activation.log"
     tests/headless/filemanager1.sh "$1" > "$T/filemanager1.log" 2>&1; rc=$?
     result "headless/filemanager1.sh$(grep -m1 '^skip' "$T/filemanager1.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/filemanager1.log"
     tests/headless/typing.sh "$3" > "$T/typing.log" 2>&1; result headless/typing.sh $? "$T/typing.log"

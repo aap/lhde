@@ -163,5 +163,12 @@ extern unsigned long wm_frame_upload_serial;   /* request serial of the last wm_
 /* when set, the next wm_frame_paint_ex3 uploads to an offscreen pixmap, calls wm_frame_pre_upload(wm_frame_pre_upload_arg) (the caller's
    window resize), then sets the shape and copies the pixels into the window; reset by that paint (LUXWM.md "Resize without flicker") */
 extern void (*wm_frame_pre_upload)(void *); extern void *wm_frame_pre_upload_arg;
+/* a frame painted ahead and shown later (luxwm's activation in step, CLIENT-PROTOCOL.md): when wm_frame_stage_out is set, the next
+   wm_frame_paint_ex4 uploads to an offscreen pixmap and stops there, filling *wm_frame_stage_out (reset by that paint);
+   wm_frame_stage_show sets the window's shape and copies the pixels in (a short batch, no rendering), wm_frame_stage_drop frees it */
+struct wm_frame_stage { Pixmap pix; Window dec; int w, h, n, hx, hy, hw, hh; unsigned long sum; XRectangle rects[128]; };
+extern struct wm_frame_stage *wm_frame_stage_out;
+void wm_frame_stage_show(Display *dpy, struct wm_frame_stage *s);
+void wm_frame_stage_drop(Display *dpy, struct wm_frame_stage *s);
 extern double wm_frame_prof_ms[4];   /* LHWM_PROF: paint, shape, upload ms (accumulated), paint count */
 #endif

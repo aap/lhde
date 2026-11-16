@@ -31,6 +31,7 @@ the client needs to know only *where* the glass is, not how it is drawn.
 | `_LHWM_SELF_FRAMED` | client toplevel | client | CARDINAL 1 | the client draws its whole frame itself (luxshell's surfaces); luxwm adds none |
 | `_LHWM_HEADER_PIXMAP` | client toplevel | luxwm | PIXMAP | "Header background without composition" |
 | `_LHWM_CAPTION_RECT` | client toplevel | luxwm | CARDINAL[4] | "Client content over the caption rows" |
+| `_LHWM_ACTIVE_DRAWN` | client toplevel | client | CARDINAL 0/1 | "Activation in step" |
 | `_LHWM_DESKTOP_LAYER` | desktop window | client | CARDINAL | "Desktop windows" |
 | `_LH_DROP_SHADOW` | override-redirect window | client | CARDINAL | "Drop shadows" |
 | `_LHWM_SWITCHER` | luxwm's Alt+Tab switcher window | luxwm | CARDINAL[4] | "The task switcher window" |
@@ -228,6 +229,31 @@ leaving only the caption buttons to the frame. With the bit set:
   zone: it may start a top resize from its own top rows with `_NET_WM_MOVERESIZE` direction 1 (0/2 for the corners), ignored while
   maximised (`extendframe -c`: its top 4 rows outside the rect, `top_side` cursor; luxnav: `resize_rows`, 3).
 
+## Activation in step: `_LHWM_ACTIVE_DRAWN`
+
+A header that continues the frame changes with the activation too: the 4074 navigation bar's `Navbar::Rebar` / `InactiveNavbar`
+variant, the caption colours of the title, luxwm's header pixmap. On Windows the DWM composes the frame and the client's
+extended area together, so both change in the same frame. Here they are two windows of two programs, and the client hears of
+the change (`FocusIn`, `_NET_ACTIVE_WINDOW`) only after luxwm has made it; painted as soon as each can, the compositor shows the
+frame in the new state over a header still in the old one for as long as the client takes to repaint. So the frame waits for
+the header:
+
+- **The client** that draws such a header keeps `_LHWM_ACTIVE_DRAWN` (CARDINAL, on its toplevel) at the activation state its
+  header **shows**, 1 active, 0 inactive: on every change of its state (as it reads `_NET_ACTIVE_WINDOW`, "Without luxwm" for
+  other window managers) it paints the header, and whatever else the activation changed, presents it, and then sets the
+  property. It deletes the property when it no longer has such a header. A client without it is painted as before.
+- **luxwm**, when a client with the property changes state and the property says otherwise, publishes the header pixmap for the
+  new state at once, renders the frame in the new state into a pixmap (`draw_text`, `wm_frame_stage_out`), sets the focus and
+  `_NET_ACTIVE_WINDOW`, and copies the pixmap into the decoration window when the property says the new state (no rendering is
+  left then, so the compositor gets the header and the frame within a fraction of a millisecond), or after 200 ms
+  (`ACTIVE_WAIT_MS`; a client that is busy). Repaints meanwhile (an Expose) keep the state shown; the window menu opens only
+  after the wait; drags go on and paint the frame when the property comes.
+
+`_NET_ACTIVE_WINDOW` is replaced in one step, never deleted first (a moment without an active window would show every header
+inactive). Focusing the window that is already active, by a click or `_NET_ACTIVE_WINDOW` (xdotool and taskbars send
+`_NET_CURRENT_DESKTOP` for the current desktop first, which changes nothing), paints no frame. flxp's header (shell layer,
+`lhheader::set_active`, through `FlxpDwmSetActiveDrawn`) does this; `tests/headless/activation.sh` checks the sequence.
+
 ## Vision header
 
 The "Aero vision" frame set (`share/frames/aerovision`, theme `aerovision`) frames the concept-art navigation bar that luxnav
@@ -283,6 +309,7 @@ slate4074, jade4074, the luna and basic* themes, classic) keep `_LHWM_COMPOSITED
    none (another WM).
 4. Input in the header: "Caption behaviour in the client".
 5. Watch the root as in "Theme changes".
+6. A header that changes with the activation: `_LHWM_ACTIVE_DRAWN` ("Activation in step").
 
 ## Without luxwm
 

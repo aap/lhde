@@ -154,7 +154,12 @@ What luxshell and flxp rely on, all in `wm.c`:
 - `_NET_ACTIVE_WINDOW` messages switch to the window's desktop, restore, raise and focus it. When the focused window is minimised or
   closed, the focus goes to the most recently focused other window that is not minimised, else `_NET_ACTIVE_WINDOW` becomes None.
   Desktop switches do not discard the event queue (berry's `XSync(dpy, True)` dropped a pager's `_NET_ACTIVE_WINDOW` sent right after
-  `_NET_CURRENT_DESKTOP`).
+  `_NET_CURRENT_DESKTOP`). `_NET_CURRENT_DESKTOP` for the current desktop changes nothing, and a click switches desktops only when
+  the window is on another one: a switch focuses the desktop's top window first, which painted the active frame inactive and
+  active again before the clicked window took over. Focusing the active window again paints nothing.
+- `_NET_ACTIVE_WINDOW` (the root property) is replaced in one step. A client that keeps `_LHWM_ACTIVE_DRAWN` (its header follows
+  the activation, flxp) gets its frame in a new activation state only once the property says the header shows it, at most 200 ms
+  later; the frame is rendered ahead into a pixmap and copied in then (CLIENT-PROTOCOL.md "Activation in step").
 - Docks: unmanaged windows (`MANAGE_DOCK` false) are tracked from `MapNotify` on the root and from `manage_new_window` (which covers
   windows adopted at startup), with `PropertyChangeMask`; `UnmapNotify`/`DestroyNotify` drop them. Their `_NET_WM_STRUT_PARTIAL`
   (fallback `_NET_WM_STRUT`, the whole edge) make the work area: `strut_area()` cuts every strut that overlaps a rectangle out of it

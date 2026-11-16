@@ -42,6 +42,7 @@ struct NativeWindow {
     bool has_extend;        // _LHWM_EXTEND_FRAME set
     long extend[4];         // left right top bottom
     uint32_t frame_flags;   // _LHWM_FRAME_FLAGS (0 = property absent)
+    int active_drawn = -1;  // _LHWM_ACTIVE_DRAWN (-1 = property absent)
     WindowType type;
     // set_transient_for / set_min_size, put back when set_argb recreates the X window
     bool transient = false, transient_modal = false;
@@ -184,6 +185,8 @@ static void put_fixed_hints(NativeWindow* w, int cx, int cy)
     XSetWMNormalHints(dpy, w->xw, &hints);
 }
 
+static void put_active_drawn(NativeWindow* w);
+
 static void put_drop_shadow_mark(::Window xw, long v)
 {
     XChangeProperty(dpy, xw, XInternAtom(dpy, "_LH_DROP_SHADOW", False), XA_CARDINAL, 32, PropModeReplace, (const unsigned char*)&v, 1);
@@ -240,6 +243,7 @@ static void make_xwindow(NativeWindow* w)
     ch.res_class = (char*)"Flxp";
     XSetClassHint(dpy, w->xw, &ch);
     if (w->has_extend || w->frame_flags) put_frame_props(w);
+    if (w->active_drawn >= 0) put_active_drawn(w);
     if (w->type != WindowType::Normal) set_window_type(w, w->type);
     if (!w->popup) set_xdnd_aware(w->xw);   // every toplevel takes drops (win32: RegisterDragDrop per window)
     if (w->shadow_own) put_drop_shadow_mark(w->xw, 1);
@@ -427,6 +431,21 @@ bool caption_rect(NativeWindow* w, gdi::Rect& r)
     if (!window_cardinals(w, a_caption_rect, XA_CARDINAL, v, 4) || v[2] <= 0 || v[3] <= 0) return false;
     r = gdi::rect_xywh((int32_t)v[0], (int32_t)v[1], (int32_t)v[2], (int32_t)v[3]);
     return true;
+}
+
+static void put_active_drawn(NativeWindow* w)
+{
+    Atom a = XInternAtom(dpy, "_LHWM_ACTIVE_DRAWN", False);
+    if (w->active_drawn < 0) { XDeleteProperty(dpy, w->xw, a); return; }
+    long v = w->active_drawn;
+    XChangeProperty(dpy, w->xw, a, XA_CARDINAL, 32, PropModeReplace, (const unsigned char*)&v, 1);
+}
+
+void set_active_drawn(NativeWindow* w, int state)
+{
+    w->active_drawn = state < 0 ? -1 : state ? 1 : 0;
+    put_active_drawn(w);
+    XFlush(dpy);
 }
 
 void set_shape(NativeWindow* w, const std::vector<gdi::Rect>* rects)

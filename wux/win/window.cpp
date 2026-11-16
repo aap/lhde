@@ -1040,6 +1040,7 @@ std::string frame_theme() { return sys::frame_info().theme; }
 gdi::Bitmap* header_pixmap(Window* w) { return is_window(w) && w->top ? sys::header_pixmap(w->top->native) : nullptr; }
 bool caption_rect(Window* w, Rect& r) { return is_window(w) && w->top && sys::caption_rect(w->top->native, r); }
 void set_input_hole(Window* w, const Rect* r) { if (is_window(w) && w->top) sys::set_input_hole(w->top->native, r); }
+void set_active_drawn(Window* w, int state) { if (is_window(w) && w->top) sys::set_active_drawn(w->top->native, state); }
 void set_shape(Window* w, const std::vector<Rect>* rects) { if (is_window(w) && w->top) sys::set_shape(w->top->native, rects); }
 static bool g_drop_shadows = true;
 bool drop_shadows() { return g_drop_shadows; }

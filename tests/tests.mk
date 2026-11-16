@@ -64,7 +64,13 @@ $(XCALLS): tests/headless/xcalls.c
 	@mkdir -p $(dir $@)
 	$(CC) -g -O1 -Wall -fPIC -shared $(shell pkg-config --cflags x11 2>/dev/null) -o $@ $< $(if $(filter Linux,$(shell uname -s)),-ldl,-lexecinfo)
 
-tests: $(TOOLKIT_TESTS) $(W32_TESTS) $(TEST_DATA) $(SLOWFS) $(XCALLS)
+# activewatch: the pixels a focus change paints, read in a tight loop (tests/headless/activewatch.c, activation.sh)
+ACTIVEWATCH = build/tests/activewatch
+$(ACTIVEWATCH): tests/headless/activewatch.c
+	@mkdir -p $(dir $@)
+	$(CC) -O2 -Wall -Wextra -o $@ $< -lX11
+
+tests: $(TOOLKIT_TESTS) $(W32_TESTS) $(TEST_DATA) $(SLOWFS) $(XCALLS) $(ACTIVEWATCH)
 w32test: $(W32_TESTS) $(TEST_DATA)
 check: all check-poison
 	tests/check.sh

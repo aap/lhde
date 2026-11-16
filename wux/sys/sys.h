@@ -105,6 +105,8 @@ gdi::Bitmap* header_pixmap(NativeWindow* w);
 bool caption_rect(NativeWindow* w, gdi::Rect& r);
 // The input shape: the whole window minus hole (null = the whole window)
 void set_input_hole(NativeWindow* w, const gdi::Rect* hole);
+// _LHWM_ACTIVE_DRAWN: the activation state the window's own header shows now (1 active, 0 inactive; -1 deletes it)
+void set_active_drawn(NativeWindow* w, int state);
 // The window's shape (XShape bounding, SetWindowRgn): these rectangles, in window coordinates (null = rectangular)
 void set_shape(NativeWindow* w, const std::vector<gdi::Rect>* rects);
 // Hand a button press over to the window manager (_NET_WM_MOVERESIZE):
