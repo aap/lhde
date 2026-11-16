@@ -2,26 +2,29 @@
 """lhde-firefox: Firefox's own chrome in the lhde theme's look, through userChrome.css (docs/USAGE.md "Firefox").
 
 usage:
-  lhde-firefox generate [THEME] [-o FILE]   a userChrome.css for THEME (default: the current theme) on stdout or into FILE;
-                                            with -o the pieces of the visual style Firefox cannot read from a .msstyles
-                                            (the header band, the travel buttons) are rendered by ut-dump into
-                                            lhde-art/ beside FILE, the rest is referenced in the Windows tree by file:// URL
-  lhde-firefox install [THEME] [--profile DIR]
+  lhde-firefox generate [THEME] [--look ff4|explorer] [-o FILE]
+                                            a userChrome.css for THEME (default: the current theme) on stdout or into FILE;
+                                            with -o Firefox 4's pictures (share/firefox/ff4) are copied and the pieces of
+                                            the visual style Firefox cannot read from a .msstyles are rendered by ut-dump
+                                            into lhde-art/ beside FILE
+  lhde-firefox install [THEME] [--look ff4|explorer] [--profile DIR]
                                             write it into the profile's chrome/userChrome.css (an existing one not ours is
                                             kept as userChrome.css.lhde-backup), the prefs the look needs into user.js, and
-                                            once the search box into the toolbar layout (prefs.js); the profile must be
-                                            closed. DIR: a profile directory or a profile's name in profiles.ini; default:
-                                            the default profile
+                                            once the search box into the toolbar layout (prefs.js); under a glass theme
+                                            settings.ini [extend_frame] firefox for luxwm; the profile must be closed.
+                                            DIR: a profile directory or a profile's name in profiles.ini; default: the
+                                            default profile
   lhde-firefox remove [--profile DIR]       undo install: our userChrome.css and lhde-art/ out (the backup back), our block
-                                            out of user.js
+                                            out of user.js, the [extend_frame] key out of settings.ini
   lhde-firefox profiles                     the profiles profiles.ini lists, which is the default, which are in use
 
-The look: for a Longhorn theme (Explorer.chrome = longhorn) the Explorer header band of flxp (travel buttons, the address on
-the breadcrumb's row, the search box at the right) with the tabs and flxp's menu band below it; for the others Firefox 4's
-look on XP in the theme's colours and parts (its tabs, toolbar button frames). Colours, fonts and pictures come from liblhde's resolver (lhde-theme resolve --shell) and from the visual
-style through ut-dump; without the Windows tree (or with only the free ReactOS import) the CSS uses colours alone.
-Nothing of the Windows tree is copied: fonts and frame pictures are file:// URLs into it; only the parts that live inside a
-.msstyles are rendered into the profile.
+The look: for a Longhorn theme (Explorer.chrome = longhorn) Firefox 4's on Windows 7, with its own pictures, under luxwm's
+caption: the tabs on the caption's colour without glass, on luxwm's glass under the glass themes when composited
+(--look explorer: flxp's Explorer header band, with the tabs and flxp's menu band below it); for the others Firefox 4's
+look on XP in the theme's colours and parts (its tabs, toolbar button frames). Colours, fonts and pictures come from
+liblhde's resolver (lhde-theme resolve --shell) and from the visual style through ut-dump; without the Windows tree (or with
+only the free ReactOS import) the CSS uses colours (and Firefox 4's pictures) alone. Nothing of the Windows tree is copied:
+fonts are file:// URLs into it; only the parts that live inside a .msstyles are rendered into the profile.
 
 A theme switch could run `lhde-firefox install` again for a closed profile (or generate into it: Firefox reads
 userChrome.css at start only); that hook belongs beside session/theme-reload.sh and is not built.
@@ -496,7 +499,124 @@ def xp_vars(t, style, art):
     return v, font
 
 
-def generate(theme, out=None):
+# Firefox 4's pictures (share/firefox/ff4, Mozilla's: MANIFEST and LICENSE there), copied into the profile's lhde-art/ff4/
+FF4_FILES = {'tab': 'tab.png', 'toolbar-png': 'Toolbar.png', 'close': 'close.png', 'newtab': 'newtab.png',
+             'reload': 'reload-stop-go.png'}
+# Firefox 4's toolbar colour on Windows 7 (browser-aero.css: customToolbarColor hsl(214,44%,87%))
+FF4_TOOLBAR = (209, 221, 237)
+
+
+# the rows luxwm's glass is extended into Firefox's window under the glass themes ([extend_frame] firefox): the menu bar (24)
+# and the tab row (3 + 25), the template's; with the menu bar hidden the rest lies under the opaque navigation bar
+FF4_GLASS_ROWS = 24 + 3 + 25
+
+
+def theme_glass(t):
+    """the theme has glass frames (luxwm's DWM frames, composited unless Glass.composition = 0)"""
+    return bool(t.get('path_frames')) and t.get('Glass_composition', '') != '0'
+
+
+def ff4_dir():
+    for p in ((lhde_theme('find', 'firefox/ff4/MANIFEST') or '').strip(),
+              os.path.join(HERE, '..', 'share', 'firefox', 'ff4', 'MANIFEST')):
+        if p and os.path.isfile(p):
+            return os.path.dirname(os.path.realpath(p))
+    return None
+
+
+def caption_row(style, state, art):
+    """the caption's last row without glass, which the menu bar and the tab row continue: the style's Window CAPTION part
+    (what luxwm draws without a compositor, share/frames/*-classic) at its own size; with art its left and right sizing
+    margins and its middle as three one-row pictures (art/caption-STATE-l, -m, -r.png) to stretch as luxwm stretches the
+    caption. (average colour, {'l': url, 'm': url, 'r': url, 'lw': px, 'rw': px} or None)"""
+    if not style.ok() or not style.has('Window'):
+        return None, None
+    size = style.size_of('Window', 'CAPTION', state) or (320, 29)
+    w, h = size
+    tmp = os.path.join(os.environ.get('TMPDIR', '/tmp'), 'lhde-firefox-caption-%d.png' % os.getpid())
+    try:
+        rows = read_png(tmp) if style.render('Window', 'CAPTION', state, w, h, tmp) else None
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    if not rows:
+        return None, None
+    row = [p[:3] + (255,) for p in rows[-1]]
+    colour = average([row], 0, 1)
+    m = [int(x) for x in re.findall(r'-?\d+', style.get('Window', 'CAPTION', 'SIZINGMARGINS') or '')]
+    if not art or len(m) != 4 or m[0] + m[1] >= w:
+        return colour, None
+    l, r = max(1, m[0]), max(1, m[1])
+    pieces = {'lw': l, 'rw': r}
+    for k, part in (('l', row[:l]), ('m', row[l:w - r]), ('r', row[w - r:])):
+        p = os.path.join(art, 'caption-%s-%s.png' % (state.lower(), k))
+        write_png(p, [part])
+        pieces[k] = url(p)
+    return colour, pieces
+
+
+def ff4_vars(t, style, art):
+    """Firefox 4's look on Windows 7 without glass under luxwm's frame: the row behind the menu bar and the tabs in the
+    caption's colour, Firefox 4's toolbar colour (the style's button face under Slate), Firefox 4's pictures"""
+    fam = t.get('style_family', '') or next((f for f in ('slate', 'jade', 'aero') if f in t.get('VisualStyle_style', '') + t.get('theme', '')), '')
+    nav = t.get('Explorer_navbar', '')
+    lay = dict(LAYOUT['vision' if nav == 'vision' else 'slate' if fam == 'slate' else 'jade'])
+    sm = style.section('sysmetrics') if style.ok() else {}
+    # the caption luxwm draws without glass: the frame set frames_classic names (its msstyles: Jade's under the Aero themes),
+    # else the theme's own style
+    cap = style
+    fc = os.path.join(t.get('path_frames_classic', ''), 'theme.ini')
+    if os.path.isfile(fc):
+        ini = {}
+        with open(fc, errors='replace') as f:
+            for line in f:
+                if line.lstrip().startswith('['):
+                    break
+                if '=' in line and not line.lstrip().startswith(('#', ';')):
+                    k, val = line.split('=', 1)
+                    ini.setdefault(k.strip(), val.strip())
+        p = (lhde_theme('find', ini.get('msstyles', '')) or '').strip() if ini.get('msstyles') else ''
+        if p and os.path.isfile(p):
+            cs = Style(p, ini.get('color', ''), ini.get('size', ''))
+            if cs.ok():
+                cap = cs
+    frame, strip = caption_row(cap, 'ACTIVE', art)
+    frame_in, strip_in = caption_row(cap, 'INACTIVE', art)
+    if not frame:
+        # no style (the free tree): the theme's caption colour, else Firefox 4's Aero Basic frame (browser-aero.css)
+        frame = rgb(sm.get('ACTIVECAPTION')) or rgb(t.get('Colors_activecaption')) or (185, 209, 234)
+        frame_in = rgb(sm.get('INACTIVECAPTION')) or rgb(t.get('Colors_inactivecaption')) or (215, 228, 242)
+    frame_in = frame_in or mix(frame, (255, 255, 255), 0.3)
+    toolbar = FF4_TOOLBAR
+    if fam == 'slate':
+        toolbar = rgb(sm.get('BTNFACE')) or rgb(t.get('Colors_btnface')) or (225, 225, 225)
+    v = {
+        'ff4-frame': css(frame), 'ff4-frame-inactive': css(frame_in),
+        'ff4-frame-text': '#ffffff' if lum(frame) < 140 else '#000000',
+        'ff4-toolbar': css(toolbar),
+        'ff4-shadow': css(rgb(sm.get('BTNSHADOW')) or (160, 160, 160)),
+        'ff4-tab-h': '25px', 'ff4-tabs-top': '3px',
+        'search-w': '%dpx' % lay['search_w'],
+    }
+    # the caption's last row behind the menu bar and the tabs, its sizing margins kept at the sides as luxwm's caption has
+    # them (luxwm's classic frame is 1 px wider than the client at each side: the pictures start 1 px further in)
+    for key, s in (('ff4-frame-image', strip), ('ff4-frame-image-inactive', strip_in or strip)):
+        v[key] = ('%s, %s, %s' % (s['l'], s['r'], s['m'])) if s else 'none'
+        v[key + '-size'] = ('%dpx 100%%, %dpx 100%%, calc(100%% - %dpx) 100%%' % (s['lw'], s['rw'], s['lw'] + s['rw'] - 2)
+                            if s else 'auto')
+        v[key + '-pos'] = ('left -1px top, right -1px top, %dpx top' % (s['lw'] - 1)) if s else '0 0'
+    src = ff4_dir()
+    for key, name in FF4_FILES.items():
+        v['ff4-' + key] = 'none'
+        if art and src and os.path.isfile(os.path.join(src, name)):
+            os.makedirs(os.path.join(art, 'ff4'), exist_ok=True)
+            dest = os.path.join(art, 'ff4', name)
+            shutil.copyfile(os.path.join(src, name), dest)
+            v['ff4-' + key] = url(dest)
+    return v, lay
+
+
+def generate(theme, out=None, look=None):
     t = resolve(theme)
     style = Style(t.get('path_style', ''), t.get('VisualStyle_color', ''), t.get('VisualStyle_size', ''))
     longhorn = t.get('Explorer_chrome') == 'longhorn' and t.get('Explorer_navbar', 'none') != 'none'
@@ -505,7 +625,18 @@ def generate(theme, out=None):
         art = os.path.join(os.path.dirname(os.path.abspath(out)), 'lhde-art')
         shutil.rmtree(art, ignore_errors=True)
         os.makedirs(art)
+    keep = 'xp'
     if longhorn:
+        keep = 'longhorn' if look == 'explorer' else 'ff4'
+    blocks = {keep}
+    if keep == 'ff4':
+        v, lay = ff4_vars(t, style, art)
+        if theme_glass(t):
+            blocks.add('ff4glass')
+        # Firefox 4 drew its chrome in the system's menu font: the style's MENUFONT (Tahoma 11 px, Segoe UI 12 px)
+        face, px = menu_font(t, style, (lay['face'], lay['crumb_px']))
+        mface, mpx = face, px
+    elif longhorn:
         v, lay = longhorn_vars(t, style, art)
         v.update(longhorn_menu_vars(t, style, art))
         face, px = lay['face'], lay['crumb_px']
@@ -530,18 +661,17 @@ def generate(theme, out=None):
     if art and not os.listdir(art):
         os.rmdir(art)
     first = ('/* generated by lhde-firefox for the theme %s (%s, %s); do not edit: lhde-firefox generate writes it again */\n'
-             % (theme, t.get('Theme_name', theme), 'Longhorn header' if longhorn else 'XP toolbar'))
+             % (theme, t.get('Theme_name', theme), {'ff4': 'Firefox 4', 'longhorn': 'Longhorn header', 'xp': 'XP toolbar'}[keep]))
     head = rules + [':root {\n' + ''.join('  --lhde-%s: %s;\n' % kv for kv in sorted(v.items())) + '}']
     text = first + template().replace('/*@VARS@*/', '\n'.join(head))
-    keep = 'longhorn' if longhorn else 'xp'
     text = re.sub(r'/\*@IF (\w+)@\*/\n(.*?)/\*@END@\*/\n',
-                  lambda m: m.group(2) if m.group(1) == keep else '', text, flags=re.S)
+                  lambda m: m.group(2) if m.group(1) in blocks else '', text, flags=re.S)
     if out:
         with open(out, 'w') as f:
             f.write(text)
     else:
         sys.stdout.write(text)
-    return text
+    return text, ('ff4glass' in blocks)
 
 
 # ---- profiles ----------------------------------------------------------------------------------------------------------
@@ -681,7 +811,7 @@ def add_search_box(prof):
     return True
 
 
-def install(theme, prof):
+def install(theme, prof, look=None):
     if in_use(prof):
         sys.exit('lhde-firefox: the profile %s is in use: close Firefox first' % prof)
     chrome = os.path.join(prof, 'chrome')
@@ -693,17 +823,25 @@ def install(theme, prof):
         if not ours:
             shutil.copy2(uc, uc + '.lhde-backup')
             print('kept your userChrome.css as %s' % (uc + '.lhde-backup'))
-    generate(theme, uc)
+    _, glass = generate(theme, uc, look)
     uj = os.path.join(prof, 'user.js')
     old = strip_block(open(uj, errors='replace').read()) if os.path.isfile(uj) else ''
     block = [BEGIN, '// the prefs of lhde\'s Firefox look (docs/USAGE.md "Firefox")']
-    block += ['user_pref("%s", %s);  // %s' % (k, js_value(v), why) for k, v, why in PREFS]
+    prefs = PREFS + ([('mozilla.widget.use-argb-visuals', 'true',
+                       'an ARGB window: the tab row shows luxwm\'s glass under the glass themes')] if glass else [])
+    block += ['user_pref("%s", %s);  // %s' % (k, js_value(v), why) for k, v, why in prefs]
     block.append(END)
     with open(uj, 'w') as f:
         f.write((old + '\n\n' if old else '') + '\n'.join(block) + '\n')
     added = add_search_box(prof)
+    # luxwm extends its glass into Firefox's window for these rows (settings.ini [extend_frame]; docs/SETTINGS.md); a
+    # theme without glass takes the key out again
+    lt = tool('lhde-theme')
+    if lt:
+        run([lt, 'setting', 'extend_frame', 'firefox', '0 0 %d 0' % FF4_GLASS_ROWS if glass else '-'])
     print('installed the %s look into %s' % (theme, prof))
-    print('  %s, %s%s' % (uc, uj, ', the search box placed in prefs.js' if added else ''))
+    print('  %s, %s%s%s' % (uc, uj, ', the search box placed in prefs.js' if added else '',
+                            ', settings.ini [extend_frame] firefox' if glass else ''))
 
 
 def remove(prof):
@@ -726,6 +864,9 @@ def remove(prof):
                 f.write(rest + '\n')
         else:
             os.remove(uj)
+    lt = tool('lhde-theme')
+    if lt:
+        run([lt, 'setting', 'extend_frame', 'firefox', '-'])
     print('removed lhde\'s look from %s (prefs.js keeps the toolbar layout; Firefox\'s Customize resets it)' % prof)
 
 
@@ -734,13 +875,17 @@ def main(argv):
         print(__doc__.strip())
         return 0
     cmd, rest = argv[0], argv[1:]
-    prof, out, theme = None, None, None
+    prof, out, theme, look = None, None, None, None
     i = 0
     while i < len(rest):
         a = rest[i]
-        if a in ('--profile', '-o') and i + 1 < len(rest):
+        if a in ('--profile', '-o', '--look') and i + 1 < len(rest):
             if a == '--profile':
                 prof = rest[i + 1]
+            elif a == '--look':
+                look = rest[i + 1]
+                if look not in ('ff4', 'explorer'):
+                    sys.exit('lhde-firefox: --look ff4 or --look explorer')
             else:
                 out = rest[i + 1]
             i += 2
@@ -750,9 +895,9 @@ def main(argv):
         theme = a
         i += 1
     if cmd == 'generate':
-        generate(theme or current_theme(), out)
+        generate(theme or current_theme(), out, look)
     elif cmd == 'install':
-        install(theme or current_theme(), pick_profile(prof))
+        install(theme or current_theme(), pick_profile(prof), look)
     elif cmd == 'remove':
         remove(pick_profile(prof))
     elif cmd == 'profiles':

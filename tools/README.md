@@ -27,8 +27,10 @@
   interface, and reading the same text files again is less than wrapping it; `tests/mime.py` keeps the two in agreement.
 
 - `lhde-firefox`: Firefox's own chrome in the theme's look: a userChrome.css from `share/firefox/userChrome.css.in` with the
-  theme's colours and fonts (lhde-theme resolve --shell) and the style's band and travel buttons (ut-dump --render), installed
-  into a closed profile with the prefs it needs (`generate`, `install`, `remove`, `profiles`; docs/USAGE.md "Firefox").
+  theme's colours and fonts (lhde-theme resolve --shell), Firefox 4's look with its own pictures (`share/firefox/ff4`) under
+  the Longhorn themes, on luxwm's glass where the theme has it (`--look explorer`: the style's band and travel buttons,
+  ut-dump --render), installed into a closed profile with the prefs it needs (`generate`, `install`, `remove`, `profiles`;
+  docs/USAGE.md "Firefox").
   Standard library only; installed to `$PREFIX/bin`.
 
 - `start_icons.py`: lhde's own Start button pictures (`Shell.start_icon` = lhde, linux, freebsd: docs/THEME-FORMAT.md

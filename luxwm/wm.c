@@ -2168,6 +2168,34 @@ client_manage_focus(struct client *c)
     }
 }
 
+/* settings.ini [extend_frame] CLASS = left right top bottom: an extended frame for a program that cannot ask for one itself
+   (Firefox's tab row on the glass: lhde-firefox writes the key; docs/CLIENT-PROTOCOL.md "Extended frames"). For a 32-bit
+   (ARGB) client without its own _LHWM_EXTEND_FRAME, keyed by its WM_CLASS class or instance name (lowercase), luxwm sets the
+   property on the client as if the client had: the plate, picom's rule and every reader then see one protocol */
+static void
+extend_by_class(Window w, int depth, const char *cls, const char *name)
+{
+    if (depth != 32) return;
+    char key[128], buf[64]; const char *v = NULL;
+    for (int k = 0; k < 2 && !v; k++) {
+        const char *s = k ? name : cls;
+        if (!s || !*s) continue;
+        size_t i = 0;
+        for (; s[i] && i < sizeof key - 1; i++) key[i] = (s[i] >= 'A' && s[i] <= 'Z') ? s[i] + 32 : s[i];
+        key[i] = '\0';
+        v = lhde_settings_get("extend_frame", key, buf, sizeof buf);
+    }
+    unsigned long e[4];
+    if (!v || sscanf(v, "%lu %lu %lu %lu", &e[0], &e[1], &e[2], &e[3]) != 4) return;
+    Atom ty; int fmt; unsigned long n, after; unsigned char *d = NULL;
+    if (XGetWindowProperty(display, w, lhwm_ext_atom, 0, 4, False, XA_CARDINAL, &ty, &fmt, &n, &after, &d) == Success && d) {
+        XFree(d);
+        if (ty != None) return;                       /* the client's own wins */
+    }
+    XChangeProperty(display, w, lhwm_ext_atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)e, 4);
+    LOGP("client 0x%lx: [extend_frame] %s", w, v);
+}
+
 static void
 manage_new_window(Window w, XWindowAttributes *wa)
 {
@@ -2212,6 +2240,7 @@ manage_new_window(Window w, XWindowAttributes *wa)
     if (XGetClassHint(display, w, &ch) > Success) {
         LOGP("client has class %s", ch.res_class);
         LOGP("client has name %s", ch.res_name);
+        extend_by_class(w, wa->depth, ch.res_class, ch.res_name);
         if (ch.res_class)
             XFree(ch.res_class);
         if (ch.res_name)

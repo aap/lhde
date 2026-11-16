@@ -1,0 +1,18 @@
+# Firefox 4's own theme pictures (Windows, "winstripe"), unchanged, for lhde-firefox's Firefox 4 look (docs/USAGE.md
+# "Firefox"); Mozilla's, under the MPL 1.1 / GPL 2.0 / LGPL 2.1 tri-licence of that release (LICENSE beside this file),
+# shipped by lhde under the GPL 2 (docs/LICENSING.md).
+#
+# Source: mozilla-2.0, the release tag FIREFOX_4_0_RELEASE (changeset 6be9e31d01b4ea5b6d093df950a699cf8584285c), each file
+# fetched as https://hg.mozilla.org/releases/mozilla-2.0/raw-file/FIREFOX_4_0_RELEASE/<path in the tree> (hg.mozilla.org
+# serves no archive of the tag; the release's source tarball, archive.mozilla.org/pub/firefox/releases/4.0/, holds the
+# same files under mozilla-2.0/).
+#
+# sha256                                                            file here            path in the Firefox tree
+607856acf885ab79b17de00dca669da97e524fc12d85b0d6ea0467dbe25dcd8a  Toolbar.png          browser/themes/winstripe/browser/Toolbar.png
+2809294d830c24db74f943e0933c9c56a2659c3922643baafd0dea076022db75  reload-stop-go.png   browser/themes/winstripe/browser/reload-stop-go.png
+99aae5b336724845e00561db181ac786399e936e148f884f93b2499fbb8dd9c5  tab.png              browser/themes/winstripe/browser/tabbrowser/tab.png
+ef927d6eb9ac0d9bead4ed000068f7b86e5c02b88dd2c39497022f85ac0ad7b0  newtab.png           browser/themes/winstripe/browser/tabbrowser/newtab.png
+20b4d6cbf8bd5deb7e75ce39ed7023d2f353a78705e343ed458fa9e4bbb602cf  close.png            toolkit/themes/winstripe/global/icons/close.png
+#
+# Read, not shipped: browser/themes/winstripe/browser/browser.css, browser-aero.css, keyhole-forward-mask.svg, jar.mn; the
+# colours, gradients, sizes and the keyhole mask's circle of share/firefox/userChrome.css.in's Firefox 4 section are theirs.

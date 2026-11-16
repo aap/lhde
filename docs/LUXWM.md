@@ -17,6 +17,7 @@ What luxwm adds to berry:
 - input: hover/pressed button states, press-and-release-inside semantics, edge and corner resizing with cursors, caption double-click
   maximises (berry's monocle), minimise unmaps.
 - cooperating clients: `_MOTIF_WM_HINTS` with decorations off, or an `_LHWM_SELF_FRAMED` property, means no decoration window.
+- extended frames for programs that cannot ask: settings.ini `[extend_frame] CLASS` sets `_LHWM_EXTEND_FRAME` on an ARGB window of that class (`extend_by_class`; docs/CLIENT-PROTOCOL.md "Extended frames").
 - EWMH (below), the window menu, snap, the session theme, animations; existing windows are adopted at startup.
 - a berry bug fixed: events of extension types (>= 64) indexed past the handler table.
 

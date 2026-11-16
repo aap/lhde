@@ -90,6 +90,7 @@ comments, the order and the keys it does not know: it reads the whole file, chan
 [fonts]       smoothing = standard       ; off | standard | cleartype (flxp, luxwm's menus; luxshell uses fontconfig's)
 [effects]     menu_shadows = 1           ; XP's drop shadow under menus (wux's popup menus, luxwm's window menu, luxshell's menus)
               keyboard_cues = 0          ; 0: mnemonics underlined only after Alt (XP's default); 1: always
+[extend_frame] firefox = 0 0 52 0        ; luxwm extends the frame into an ARGB window of this WM_CLASS (lowercase class or instance): left right top bottom (docs/CLIENT-PROTOCOL.md "Extended frames"; lhde-firefox writes it)
 ```
 
 **The terminal**, `[commands] terminal`, is a `/bin/sh` command line; `%d` in it is the directory, quoted. Every terminal of the
@@ -144,7 +145,8 @@ Keys it does not know are kept for later readers and ignored.
 | flxp-desktop, the Explorer | Set as Desktop Background: the current layer's `Desktop.wallpaper` / `Desktop.mode` (and a `[desktop] wallpaper = none` cleared); outside lhde's files: the associations ("Associations" below) |
 | Default Programs (`flxp --default-programs`: Folder Options' File Types, All Programs' Set Program Access and Defaults) | `[programs]`, then the role file ("Default programs" below); `lhde-mime role` the same |
 | lhde-session | `_LH_THEME` only (`theme NAME`; luxshell then writes the file); without a luxshell, `taskbar KIND` through `lhde-theme set-key`, `set` and `setting` |
-| luxwm | nothing; it reads `[fonts] smoothing` and `[effects]` for its window menu, the theme through `_LH_THEME` |
+| luxwm | nothing; it reads `[fonts] smoothing` and `[effects]` for its window menu, `[extend_frame]` when it manages a window, the theme through `_LH_THEME` |
+| lhde-firefox (`install`, `remove`) | `[extend_frame] firefox` (through `lhde-theme setting`; no notification: luxwm reads the key when it next manages a Firefox window) |
 | flxp-taskbar, the start panel | `[taskbar] quicklaunch locked` (the taskbar menu); they read `[taskbar] start_menu hide_inactive start_icon` (start_icon live, as the Explorer's brand band at its next theme change), `[quicklaunch] dir`, `[start] pinned`, `[commands] logoff shutdown terminal` |
 
 ## Change notification

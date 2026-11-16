@@ -1328,14 +1328,19 @@ players for the others; nothing while none is installed). From a terminal: `lhde
 
 ## Firefox (lhde-firefox)
 
-`tools/lhde-firefox` gives Firefox's own chrome the theme's look through a userChrome.css. For a Longhorn theme
-(`Explorer.chrome = longhorn`) the top of the window becomes flxp's header band below luxwm's caption: the style's navigation
-bar picture (`Navbar::Rebar`, opaque: Firefox cannot be transparent on X11, so where flxp's header is glass the band is the
-one flxp draws without composition), Back and Forward as the style's travel buttons (TravelBack/TravelFwd), the address on
-the breadcrumb's row (a field only while hovered or focused), the search box at the right, and below the band the tabs on a
-flat row in its lower colour, the selected one lighter. The menu bar (Alt, or kept on) is flxp's menu band under the
-header: Slate's blue strip, white text in the menu font, the style's hot and pressed frames. Under Aero vision the band
-keeps flxp's header height and the travel art is scaled into it. The XP and classic themes get Firefox 4's look on XP in the
+`tools/lhde-firefox` gives Firefox's own chrome the theme's look through a userChrome.css. A Longhorn theme
+(`Explorer.chrome = longhorn`) gets Firefox 4's look as it was on Windows 7, drawn with Firefox 4's own pictures
+(`share/firefox/ff4`: its tab, toolbar icons, close and new-tab buttons, reload and stop; Mozilla's, docs/LICENSING.md) and
+the colours and gradients of its theme: the menu bar and the tabs on the frame below luxwm's caption, the selected tab white
+and joined to the light blue navigation bar (the style's button face under Slate, a choice), Back and Forward as Firefox 4's
+keyhole, the address with reload and stop at its end, the search box at the right, the toolbar buttons in Firefox 4's glassy
+frames, the menu bar's items on a half-white strip. Under the glass themes (aero4074, aero5048, aero5112, aerovision) with a
+compositor the menu bar and the tabs sit on luxwm's glass, as Firefox 4's did on Aero: Firefox's window is ARGB and
+transparent there, and luxwm extends its glass into those rows (settings.ini `[extend_frame] firefox`, docs/SETTINGS.md).
+Without glass (Jade 4074, Slate, Basic, or no compositor) those rows continue the caption luxwm draws: its last row,
+stretched as luxwm stretches the caption, so the seam does not show. `--look explorer` gives the earlier look instead:
+flxp's header band below luxwm's caption (the style's `Navbar::Rebar` picture, opaque, the style's travel buttons, the
+address on the breadcrumb's row, the tabs on a flat row below, flxp's menu band). The XP and classic themes get Firefox 4's look on XP in the
 theme's parts: the menu bar a plain row in the button-face colour with the rebar's etched line under it (flxp's menu band
 under Luna), the tabs on a button-face row as the style's tab items (Luna's rounded ones with their orange line; classic:
 Windows' tab control), the selected one joined to the navigation toolbar below, that toolbar light at the top and button
@@ -1344,31 +1349,41 @@ Firefox 4's own, not XP's). Tahoma or Segoe UI come from the theme's font direct
 and which are taste is said in the template, `share/firefox/userChrome.css.in`. Menus, context menus and popups are GTK's
 and keep its theme.
 
-The window frame and caption are luxwm's, as on XP they were the system's: Firefox 4 put its tabs into the title bar only on
-Vista and 7 with glass. Do not set `browser.tabs.inTitlebar = 1`: Firefox then draws its own flat border and window buttons
-at the right of the tab row, and luxwm's frame and caption are gone.
+The window frame and caption are luxwm's in every look, with its window buttons, its shadow and its glass, the same as the
+other windows'. Firefox 4 drew the tabs into its own title bar on Vista and 7; here Firefox does not. With
+`browser.tabs.inTitlebar = 1` (and client-side decorations, `MOZ_GTK_TITLEBAR_DECORATION=client`) Firefox asks for no frame,
+luxwm draws none, and Firefox puts GTK's round window buttons at the right of the tab row: no caption, no glass, no frame
+shadow, buttons that are not the theme's; luxwm's frame with its glass extended under the tabs gives Firefox 4's Aero look
+with the real caption. `install` sets `browser.tabs.inTitlebar = 0`.
 
     lhde-firefox install                     the current theme into the default profile (Firefox closed)
     lhde-firefox install jade4074 --profile ~/.config/mozilla/firefox/xxxx.default-release
+    lhde-firefox install --look explorer     a Longhorn theme with flxp's header band instead of Firefox 4's look
     lhde-firefox remove                      undo it
-    lhde-firefox generate [THEME] [-o FILE]  only the CSS (stdout, or FILE with the rendered pieces in lhde-art/ beside it)
+    lhde-firefox generate [THEME] [--look ff4|explorer] [-o FILE]
+                                             only the CSS (stdout, or FILE with the pictures in lhde-art/ beside it)
     lhde-firefox profiles                    the profiles profiles.ini lists ($XDG_CONFIG_HOME/mozilla/firefox, ~/.mozilla/firefox)
 
 `install` refuses a profile that is in use (its `.parentlock` is held, or its `lock` names a live process): close Firefox
 first. It writes `chrome/userChrome.css` (a userChrome.css of your own is kept as `userChrome.css.lhde-backup` and put back
-by `remove`) and `chrome/lhde-art/`: the band, the travel buttons, the menu band, the tabs and the toolbar button frames
-rendered from your visual style by ut-dump, since Firefox cannot read a .msstyles; fonts and everything else stay in the
-Windows tree and are referenced by `file://` URL. Without the Windows tree (or with only the free ReactOS import) the CSS
-uses colours alone. Into `user.js`, in a marked block that `remove` takes out again:
+by `remove`) and `chrome/lhde-art/`: Firefox 4's pictures copied from `share/firefox/ff4` into `lhde-art/ff4/`, and the
+parts rendered from your visual style by ut-dump, since Firefox cannot read a .msstyles (the caption's last row; for
+`--look explorer` and the XP themes the band, the travel buttons, the menu band, the tabs and the toolbar button frames).
+Fonts stay in the Windows tree and are referenced by `file://` URL. Without the Windows tree (or with only the free ReactOS
+import) the CSS uses colours and Firefox 4's pictures alone. Into `user.js`, in a marked block that `remove` takes out again:
 `toolkit.legacyUserProfileCustomizations.stylesheets = true` (Firefox reads userChrome.css),
 `browser.tabs.inTitlebar = 0` (luxwm draws the frame and caption), `browser.uidensity = 1` (compact),
 `browser.theme.toolbar-theme = 1` (light chrome whatever GTK's theme), `browser.compactmode.show = true`,
-`sidebar.revamp = false`, `sidebar.verticalTabs = false`, `browser.search.widget.removeAfterDaysUnused = 36500`. Once, into
-`prefs.js` (kept as `prefs.js.lhde-backup`), the search box is placed after the address and the bookmarks toolbar set to
-hidden unless shown; both are ordinary toolbar settings afterwards, and `remove` leaves them.
+`sidebar.revamp = false`, `sidebar.verticalTabs = false`, `browser.search.widget.removeAfterDaysUnused = 36500`, and under a
+glass theme `mozilla.widget.use-argb-visuals = true` (the window can be transparent where the glass shows). Under a glass
+theme `install` also writes `[extend_frame] firefox = 0 0 52 0` into settings.ini (the menu bar's 24 rows and the tab row's
+28; with the menu bar hidden the rest lies under the opaque navigation bar), and takes it out again for a theme without
+glass and on `remove`. Once, into `prefs.js` (kept as `prefs.js.lhde-backup`), the search box is placed after the address
+and the bookmarks toolbar set to hidden unless shown; both are ordinary toolbar settings afterwards, and `remove` leaves them.
 
 Firefox reads userChrome.css at start only, and nothing runs `lhde-firefox` on a theme switch yet: run `install` again after
 switching (the place for that hook is luxshell's `lh-theme` handler in runtime.lua, which sees every `_LH_THEME` change).
+After a switch from a glass theme to one without, until then, the tab row shows the blurred desktop instead of the frame.
 
 ## Start menu, taskbar autohide, sidebar modes (luxshell, docs/SHELL-DESIGN.md 6.4, 7.3, 13)
 

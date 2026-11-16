@@ -110,6 +110,13 @@ Painting while composited (`frame.c` `plate_ext`, `fog_band`):
   1:1, middle stretched, its 26-row profile stretched to the band height).
 - Maximised: the extension still applies (Explorer keeps its tall header); the maximised plates and square corners apply.
 
+A program that cannot set the property itself (Firefox, whose userChrome.css can make its window transparent but cannot write
+X properties) gets it from settings.ini: `[extend_frame] CLASS = left right top bottom` (CLASS the WM_CLASS class or instance
+name in lowercase, docs/SETTINGS.md). When luxwm manages a 32-bit (ARGB) window without `_LHWM_EXTEND_FRAME` whose class or
+instance has such a key, it writes the property on the client itself, and from there on everything is as if the client had
+(the plate, the picom rule below, the header pixmap). A 24-bit window is left alone: it cannot show the plate. `lhde-firefox
+install` writes `firefox = 0 0 52 0` under the glass themes (docs/USAGE.md "Firefox").
+
 picom (`session/picom-glass.conf`, rule `_LHWM_EXTEND_FRAME@`): such clients get no `blur-background` (the dec window under them
 is blurred already; blurring the client would blur the plate twice) and no shadow (the dec window casts the frame's; the client's
 showed as a dark seam across the glass along its top edge).
