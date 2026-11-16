@@ -165,3 +165,4 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
 - 2026-11-14 Publish the free pack: a GitHub release tagged `resources` with lhde-resources-free-3.zip (FREE_PACK_URL's default,
   FREE_PACK_SHA256 its hash).
 - 2026-11-16 tests: headless/menus.sh failed once in a full make check while two other builds ran on the machine (which check: not in the kept tail of the log; passed four times alone afterwards): likely a timing window in the desktop-submenu case (hover delays under load); check.sh should keep the whole log of a failed script, not its last lines.
+- 2026-11-17 FreeBSD (soma): tests/headless/timerbusy.sh sees 4 X replies waited for during 149 ticks (one XQueryPointer) where Linux sees 0, and mupf.sh's "the outline's entries" check gets an empty tree although MUPF_TRACE shows both tocentry lines: both after the presentation rework (8c43b88); find the FreeBSD-only reply and the tree timing.
