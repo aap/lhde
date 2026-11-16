@@ -51,6 +51,7 @@ struct Event {
     std::vector<SizeF> sizes;
     // FAILED
     std::string error;
+    bool password = false;      // the document is protected and the password given (none, or another) does not open it
     // RENDERED
     Tile* tile = nullptr;       // the receiver takes it
     // LINKS, HITS: a page's links, a page's hits
@@ -71,7 +72,9 @@ public:
     Engine(const Engine&) = delete;
     Engine& operator=(const Engine&) = delete;
 
-    uint32_t open(const std::string& path); // the new generation; its OPENED or FAILED follows
+    // the new generation; its OPENED or FAILED follows. password: for a protected document (fz_authenticate_password: the
+    // user's or the owner's)
+    uint32_t open(const std::string& path, const std::string& password = std::string());
     void close();
     // the jobs to do now, most wanted first; what was asked before and is not here is dropped
     void want(const std::vector<Job>& jobs);

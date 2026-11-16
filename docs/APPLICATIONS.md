@@ -234,7 +234,7 @@ the window; `tests/headless/luxshot.sh` is one) and into `tests/check.sh`.
   comctl32 toolbar with an image list of its own glyphs and two Edit controls over separators (the page box, the Find box with
   a cue banner, both subclassed for Return), a tree view in a pane with a splitter drawn by the frame, a view window with
   scroll bars (Wine's user32 scroll bars, `SetScrollInfo` with `SIF_DISABLENOSCROLL`) drawing into its DIB section, a status
-  bar of three parts, a dialog from the .rc (Go To Page), `GetOpenFileNameW`, `DragAcceptFiles`, `FlxpSetFullscreen`; from the
+  bar of three parts, dialogs from the .rc (Go To Page, Password), `GetOpenFileNameW`, `DragAcceptFiles`, `FlxpSetFullscreen`; from the
   shell layer `properties`, `spawn` (a link's web address through xdg-open), `message_box`, `set_window_icon_key`, and
   liblhde's state file. Under the Longhorn themes it is the example of the Longhorn header (`shell/lhheader.h`): the
   outline's path to the page as the crumbs, the leaf "Page N of M" changed alone as the pages scroll (`set_leaf`), the

@@ -33,7 +33,7 @@ struct Engine::Impl {
     // asked for (under mu)
     bool quit = false;
     bool open_pending = false, close_pending = false;
-    std::string open_path;
+    std::string open_path, open_password;
     uint32_t gen = 0;
     std::vector<Job> jobs;
     bool search_pending = false;
@@ -63,7 +63,7 @@ struct Engine::Impl {
 
     void run();
     void push(Event&& e);
-    void do_open(const std::string& path, uint32_t g);
+    void do_open(const std::string& path, const std::string& password, uint32_t g);
     void do_close();
     bool ensure_bound(int page);
     void read_sizes();
@@ -99,12 +99,13 @@ Engine::~Engine()
     delete d;
 }
 
-uint32_t Engine::open(const std::string& path)
+uint32_t Engine::open(const std::string& path, const std::string& password)
 {
     std::lock_guard<std::mutex> lk(d->mu);
     d->open_pending = true;
     d->close_pending = false;
     d->open_path = path;
+    d->open_password = password;
     d->jobs.clear();
     d->search_pending = false;
     if (d->running) d->running->abort = 1;
@@ -183,13 +184,13 @@ void Engine::Impl::run()
         if (quit) break;
         if (open_pending || close_pending) {
             bool opening = open_pending;
-            std::string path = open_path;
+            std::string path = open_path, password = open_password;
             uint32_t g = gen;
             open_pending = close_pending = false;
             searching = false;
             lk.unlock();
             do_close();
-            if (opening) do_open(path, g);
+            if (opening) do_open(path, password, g);
             lk.lock();
             continue;
         }
@@ -298,18 +299,22 @@ int Engine::Impl::resolve(const char* uri, float* y)
     return n;
 }
 
-void Engine::Impl::do_open(const std::string& path, uint32_t g)
+void Engine::Impl::do_open(const std::string& path, const std::string& password, uint32_t g)
 {
     Event e;
     e.gen = g;
     if (!fz) { e.kind = Event::FAILED; e.error = "mupdf could not start"; push(std::move(e)); return; }
     const char* err = nullptr;
     char msg[512] = "";
+    bool locked = false;
     fz_var(err);
+    fz_var(locked);
     fz_try(fz) {
         doc = fz_open_document(fz, path.c_str());
-        if (fz_needs_password(fz, doc) && !fz_authenticate_password(fz, doc, "")) err = "The document is protected by a password.";
-        else {
+        if (fz_needs_password(fz, doc) && !fz_authenticate_password(fz, doc, password.c_str())) {
+            err = password.empty() ? "The document is protected by a password." : "The password is not right.";
+            locked = true;
+        } else {
             pages = fz_count_pages(fz, doc);
         }
     }
@@ -322,6 +327,7 @@ void Engine::Impl::do_open(const std::string& path, uint32_t g)
         do_close();
         e.kind = Event::FAILED;
         e.error = err;
+        e.password = locked;
         push(std::move(e));
         return;
     }

@@ -5,7 +5,8 @@
 # ink where the box is and white beside it; Page Down shows page 2; Home page 1; a click on the link goes to page 2 and
 # Alt+Left back; the search for "lantern" finds its 4 hits (Match 1 of 4), F3 goes to the second; F4 shows the Contents
 # pane with both chapters and a click on "Chapter One" goes to page 1; the pane's choice is in mupf.ini after Alt+F4, and
-# the window comes back with the pane shown; a file that is not a document gives a message box, not a crash. A HOME and
+# the window comes back with the pane shown; a file that is not a document gives a message box, not a crash; a protected
+# copy (mutool's encryption, when mutool is installed) asks for its password, again after a wrong one, and opens. A HOME and
 # XDG directories of its own. Needs mupf (built when MuPDF is installed), Xvfb, xdotool, python3 and ImageMagick; prints
 # "skip: ..." and passes without them. Usage: tests/headless/mupf.sh [:DISPLAY]
 D=${1:-:79}
@@ -136,6 +137,29 @@ if [ -n "$W" ]; then
     [ -n "$MB" ] && { timeout 10 xdotool windowactivate --sync $MB 2>/dev/null; xdotool key Return; }
     kill -0 $P 2>/dev/null && ok "mupf still running" || bad "mupf ended"
     quit
+fi
+
+# 7. a protected document (mutool's encryption, when mutool is there): the Password dialog, a wrong one asks again, the
+# right one opens it
+if command -v mutool >/dev/null 2>&1 && mutool clean -E aes-128 -U lantern -O owner $T/docs/test.pdf $T/docs/locked.pdf 2>/dev/null; then
+    run $T/docs/locked.pdf
+    if [ -n "$W" ]; then
+        wait_for 10 traced "^password asked"
+        traced "^password asked" && ok "a protected document asks for its password" || bad "no Password dialog"
+        PD=$(wait_window 10 --name '^Password$')
+        if [ -n "$PD" ]; then
+            timeout 10 xdotool windowactivate --sync $PD 2>/dev/null; xdotool type x; xdotool key Return
+            wait_for 10 traced "^password asked again"
+            traced "^password asked again" && ok "a wrong password asks again" || bad "a wrong password did not ask again"
+            PD=$(wait_window 10 --name '^Password$')
+            timeout 10 xdotool windowactivate --sync $PD 2>/dev/null; xdotool type lantern; xdotool key Return
+            wait_for 10 traced "^opened 2 pages"
+            traced "^opened 2 pages" && ok "the right password opens it" || bad "the password did not open it"
+        else bad "no Password window"; fi
+        quit
+    fi
+else
+    echo "skip the protected document: no mutool"
 fi
 
 kill $PW 2>/dev/null; wait $PW 2>/dev/null

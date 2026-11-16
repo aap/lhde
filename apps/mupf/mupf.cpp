@@ -62,6 +62,7 @@ struct App {
     uint32_t gen = 0;
     bool opened = false;
     std::string path, title, format, error;
+    bool password_tried = false;        // the document was opened with a password (a FAILED one asks again)
     int pages = 0;
     std::vector<SizeF> sizes;
     std::map<int, std::vector<Link>> links;
@@ -630,6 +631,7 @@ void engine_notify(void*) { PostMessageW(g.wnd, WM_ENGINE, 0, 0); }
 
 void fill_toc();
 void trace_toc();
+bool ask_password(std::string* pw);
 
 void close_doc()
 {
@@ -657,13 +659,14 @@ void close_doc()
     relayout(none);
 }
 
-void open_doc(const std::string& path)
+void open_doc(const std::string& path, const std::string& password = std::string())
 {
     close_doc();
     char* abs = realpath(path.c_str(), nullptr);
     g.path = abs ? abs : path;
     free(abs);
-    g.gen = g.eng->open(g.path);
+    g.password_tried = !password.empty();
+    g.gen = g.eng->open(g.path, password);
     set_status(0, "Opening...");
     update_title();
     trace("open %s", g.path.c_str());
@@ -701,6 +704,11 @@ void on_engine()
             set_status(0, "");
             update_title();
             trace("failed %s", e.error.c_str());
+            if (e.password) {   // asked for, as Acrobat does, again after a wrong one; Cancel leaves the window empty
+                std::string pw;
+                if (ask_password(&pw)) open_doc(g.path, pw);
+                break;
+            }
             std::string msg = "There was an error opening this document. " + e.error;
             shell::message_box(g.wnd, "mupf", msg, MB_OK | MB_ICONEXCLAMATION);
             break;
@@ -864,6 +872,36 @@ void open_dialog()
 // ---- the window --------------------------------------------------------------------------------------------------------
 
 void layout_chrome();
+
+// a protected document's password (IDD_PASSWORD): true with the text typed on OK
+INT_PTR CALLBACK password_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
+{
+    switch (msg) {
+    case WM_INITDIALOG: {
+        std::string t = "'" + base_of(g.path) + "' is protected. Please enter a Document Open Password.";
+        SetDlgItemTextW(dlg, IDC_PASSWORD_TEXT, WS(t));
+        SetDlgItemTextW(dlg, IDC_PASSWORD_NOTE, g.password_tried ? L"The password is not right. Please try again." : L"");
+        SetWindowLongPtrW(dlg, DWLP_USER, lp);
+        SetFocus(GetDlgItem(dlg, IDC_PASSWORD));
+        trace("password asked%s", g.password_tried ? " again" : "");
+        return FALSE;
+    }
+    case WM_COMMAND:
+        if (LOWORD(wp) == IDOK) {
+            *(std::string*)GetWindowLongPtrW(dlg, DWLP_USER) = WuxWindowText(GetDlgItem(dlg, IDC_PASSWORD));
+            EndDialog(dlg, 1);
+            return TRUE;
+        }
+        if (LOWORD(wp) == IDCANCEL) { EndDialog(dlg, 0); return TRUE; }
+        break;
+    }
+    return FALSE;
+}
+
+bool ask_password(std::string* pw)
+{
+    return DialogBoxParamW(g.res, MAKEINTRESOURCEW(IDD_PASSWORD), g.wnd, password_proc, (LPARAM)pw) == 1;
+}
 
 INT_PTR CALLBACK goto_proc(HWND dlg, UINT msg, WPARAM wp, LPARAM)
 {

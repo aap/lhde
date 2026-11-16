@@ -1146,7 +1146,9 @@ above about 270%) is drawn as the part in view.
 - **Full Screen** (Ctrl+L) shows the pages alone; Escape leaves it. **Document Properties** (Ctrl+D) is the Explorer's Properties
   sheet of the file.
 
-A password-protected document is not opened yet (it says so); there is no printing, no text selection and no bookmarks.
+A password-protected document asks for its password (Acrobat 6's Password dialog: "'NAME' is protected. Please enter a
+Document Open Password.", again after a wrong one; Cancel leaves the window empty). There is no printing, no text selection
+and no bookmarks.
 What mupf remembers: `~/.local/state/lhde/mupf.ini` (`[window]` `x`, `y`, `width`, `height`, `maximized`; `[view]` `toolbar`,
 `statusbar`, `contents` and `contents_width`, `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
 1 Fit Page, 2 Fit Width) and `zoom` in thousandths), written when it exits. `mupf.desktop` (installed with it) claims what MuPDF
