@@ -924,7 +924,7 @@ void follow(Browser& b)
     if (!b.dirwatch) b.dirwatch.reset(new shell::DirWatch);
     g_following[b.list] = &b;
     bool fs = b.folder && b.folder->is_filesystem();
-    if (!fs || !b.dirwatch->watch(b.folder->path())) b.dirwatch->clear();
+    if (!fs || !b.dirwatch->watch(b.folder->path(), b.slow)) b.dirwatch->clear();
     if (b.dirwatch->fd() >= 0) sys::watch_fd(b.dirwatch->fd(), follow_ready, &b);
 }
 

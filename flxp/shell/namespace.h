@@ -63,8 +63,9 @@ public:
     virtual bool has_subfolders_hint() const { return true; }        // for tree "+" buttons
 };
 
-// Resolve any path (filesystem or virtual) to a folder; null if it isn't one.
-std::shared_ptr<Folder> folder_for(const std::string& path);
+// Resolve any path (filesystem or virtual) to a folder; null if it isn't one. known_folder: the path is a folder a
+// listing gave (the tree's nodes), not stat'ed again (a round trip on a network mount)
+std::shared_ptr<Folder> folder_for(const std::string& path, bool known_folder = false);
 std::shared_ptr<Folder> desktop();           // the root of the namespace
 std::shared_ptr<Folder> home();
 

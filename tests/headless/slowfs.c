@@ -2,7 +2,8 @@
  * behaves on one (tests/headless/slowpath.sh). Every call about a path under $LHDE_SLOW_PREFIX waits $LHDE_SLOW_MS
  * milliseconds (default 50) before it is made, as a round trip to a file server would:
  *
- *   stat, lstat, fstatat, statx, access, faccessat, realpath          one round trip per call
+ *   stat, lstat, fstatat, statx, access, faccessat, realpath,         one round trip per call (inotify_add_watch: at
+ *   inotify_add_watch                                                 least one; FreeBSD's looks up every entry)
  *   open, openat, fopen (and their 64 forms), opendir                 one per call
  *   read, pread, fread on a descriptor or FILE opened under it        one per new 1 MiB window of the file (the client
  *                                                                     reads ahead in rsize blocks), the first included
@@ -12,10 +13,16 @@
  *
  * With LHDE_SLOW_REMOTE=1, statfs under the prefix answers as an NFS mount does (Linux's f_type 0x6969, FreeBSD's
  * f_fstypename "nfs"), so lhde_fs_is_remote() takes the tree for a network one. With $LHDE_SLOW_LOG every call is logged
- * there, one line each: milliseconds since the first call, the call, the path, and for close the bytes read through the
- * descriptor ("123.4 close /p/x.jpg 65536"). Calls libc makes inside itself are not seen (an LD_PRELOAD sees only the
- * program's own calls), which is why fopen, opendir and realpath are wrapped as a whole. Portable to FreeBSD:
- * dlsym(RTLD_NEXT) only, no /proc. */
+ * there, one line each: milliseconds since the first call, the call, the path, for close the bytes read through the
+ * descriptor, and "main" at the end when the call came from the program's main thread (its UI thread: the thread that
+ * loaded the shim): "123.4 close /p/x.jpg 65536", "130.2 stat /p/y.jpg main". A read that costs a round trip (a new
+ * window) is logged as "read". With $LHDE_SLOW_MAIN_LOG every call under the prefix from the main thread is written
+ * there as well, the same line after "MAIN " and then its call stack, one frame a line as
+ * "  #N module+0xOFFSET 0xADDRESS symbol" (addr2line -f -C -e module names a frame the symbol table does not: from its
+ * offset in a position-independent program, its address in one that is not), so a test can count them and a person can
+ * see who made them. Calls libc makes inside itself are not seen (an LD_PRELOAD sees only the program's own calls),
+ * which is why fopen, opendir and realpath are wrapped as a whole. Portable to FreeBSD: dlsym(RTLD_NEXT), dladdr and
+ * <execinfo.h> (libexecinfo there) only, no /proc. */
 #define _GNU_SOURCE
 #include <dirent.h>
 #include <dlfcn.h>
@@ -33,6 +40,10 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#if __has_include(<execinfo.h>)
+#include <execinfo.h>
+#define HAVE_BACKTRACE 1
+#endif
 #if defined(__linux__)
 #include <sys/statfs.h>
 #include <sys/xattr.h>
@@ -48,6 +59,9 @@ static size_t g_plen;
 static long g_ms = 50;
 static int g_remote;
 static int g_log = -1;
+static int g_mainlog = -1;
+static pthread_t g_main;
+static __thread int g_inside;     /* the shim's own calls (backtrace loading its unwinder) */
 static struct timespec g_t0;
 static pthread_once_t g_once = PTHREAD_ONCE_INIT;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -78,6 +92,47 @@ static void init(void)
         REAL(int, "open", (const char *, int, ...));
         g_log = real(log, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
     }
+    const char *mlog = getenv("LHDE_SLOW_MAIN_LOG");
+    if (mlog && *mlog) {
+        REAL(int, "open", (const char *, int, ...));
+        g_mainlog = real(mlog, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+    }
+}
+
+/* the thread that loads the shim is the program's main thread */
+__attribute__((constructor)) static void loaded(void)
+{
+    g_main = pthread_self();
+    pthread_once(&g_once, init);
+}
+
+static int on_main(void) { return pthread_equal(pthread_self(), g_main); }
+
+/* the main thread's call stack, under its line in the main log */
+static void stack(char *buf, size_t size)
+{
+    size_t k = strlen(buf);
+#ifdef HAVE_BACKTRACE
+    void *frames[32];
+    g_inside++;
+    int n = backtrace(frames, 32);
+    g_inside--;
+    Dl_info self;
+    if (!dladdr((void *)stack, &self)) self.dli_fbase = NULL;
+    int j = 0;
+    for (int i = 0; i < n && k + PATH_MAX / 2 < size; i++) {
+        Dl_info di;
+        int known = dladdr(frames[i], &di) && di.dli_fname;
+        if (known && di.dli_fbase == self.dli_fbase) continue;   /* the shim's own frames */
+        if (known) {
+            const char *m = strrchr(di.dli_fname, '/');
+            k += (size_t)snprintf(buf + k, size - k, "  #%d %s+0x%lx %p %s\n", j++, m ? m + 1 : di.dli_fname,
+                                  (unsigned long)((char *)frames[i] - (char *)di.dli_fbase), frames[i],
+                                  di.dli_sname ? di.dli_sname : "");
+        } else k += (size_t)snprintf(buf + k, size - k, "  #%d %p\n", j++, frames[i]);
+    }
+#endif
+    if (k < size) { ssize_t w = write(g_mainlog, buf, k); (void)w; }
 }
 
 static int under(const char *path)
@@ -89,14 +144,23 @@ static int under(const char *path)
 
 static void say(const char *call, const char *path, long long n)
 {
-    if (g_log < 0) return;
+    if (g_log < 0 && g_mainlog < 0) return;
+    int m = on_main();
     struct timespec t;
     clock_gettime(CLOCK_MONOTONIC, &t);
     double ms = (double)(t.tv_sec - g_t0.tv_sec) * 1000 + (double)(t.tv_nsec - g_t0.tv_nsec) / 1e6;
     char line[PATH_MAX + 96];
-    int k = n >= 0 ? snprintf(line, sizeof line, "%.1f %s %s %lld\n", ms, call, path, n)
-                   : snprintf(line, sizeof line, "%.1f %s %s\n", ms, call, path);
-    if (k > 0) { ssize_t w = write(g_log, line, (size_t)k < sizeof line ? (size_t)k : sizeof line - 1); (void)w; }
+    int k = n >= 0 ? snprintf(line, sizeof line, "%.1f %s %s %lld%s\n", ms, call, path, n, m ? " main" : "")
+                   : snprintf(line, sizeof line, "%.1f %s %s%s\n", ms, call, path, m ? " main" : "");
+    if (k <= 0) return;
+    if ((size_t)k >= sizeof line) k = sizeof line - 1;
+    if (g_log >= 0) { ssize_t w = write(g_log, line, (size_t)k); (void)w; }
+    /* close is no round trip; the main log has the calls that are */
+    if (g_mainlog >= 0 && m && strcmp(call, "close") != 0 && !g_inside) {
+        char buf[8192];
+        snprintf(buf, sizeof buf, "MAIN %s", line);
+        stack(buf, sizeof buf);
+    }
 }
 
 static void trip(void)
@@ -158,13 +222,13 @@ static void before_read(int fd, int64_t off)
 {
     if (fd < 0 || fd >= MAXFD) return;
     pthread_mutex_lock(&g_lock);
-    int due = 0;
+    char *p = NULL;
     if (g_fds[fd].path) {
         int64_t w = (int64_t)((off < 0 ? g_fds[fd].pos : (uint64_t)off) / WINDOW);
-        if (w != g_fds[fd].window) { g_fds[fd].window = w; due = 1; }
+        if (w != g_fds[fd].window) { g_fds[fd].window = w; p = strdup(g_fds[fd].path); }
     }
     pthread_mutex_unlock(&g_lock);
-    if (due) { int e = errno; trip(); errno = e; }
+    if (p) { int e = errno; say("read", p, -1); trip(); errno = e; free(p); }
 }
 
 static void after_read(int fd, ssize_t n, int positioned)
@@ -197,6 +261,13 @@ char *realpath(const char *p, char *out)
     REAL(char *, "realpath", (const char *, char *));
     slow("realpath", p);
     return real(p, out);
+}
+int inotify_add_watch(int fd, const char *p, uint32_t mask)
+{
+    REAL(int, "inotify_add_watch", (int, const char *, uint32_t));
+    if (!real) { errno = ENOSYS; return -1; }
+    slow("inotify_add_watch", p);
+    return real(fd, p, mask);
 }
 
 #if defined(__linux__)

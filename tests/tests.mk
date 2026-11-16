@@ -55,7 +55,7 @@ TEST_DATA = build/tests/w32/test.res build/tests/w32/comdlg32.res
 SLOWFS = build/tests/slowfs.so
 $(SLOWFS): tests/headless/slowfs.c
 	@mkdir -p $(dir $@)
-	$(CC) -g -O1 -Wall -Wno-nonnull-compare -fPIC -shared -o $@ $< -pthread $(if $(filter Linux,$(shell uname -s)),-ldl)
+	$(CC) -g -O1 -Wall -Wno-nonnull-compare -fPIC -shared -o $@ $< -pthread $(if $(filter Linux,$(shell uname -s)),-ldl,-lexecinfo)
 
 tests: $(TOOLKIT_TESTS) $(W32_TESTS) $(TEST_DATA) $(SLOWFS)
 w32test: $(W32_TESTS) $(TEST_DATA)

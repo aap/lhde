@@ -11,6 +11,7 @@
 #include "namespace.h"
 #include "details.h"
 #include "mime.h"
+#include "thumbs.h"
 #include "util.h"
 
 namespace shell {
@@ -179,7 +180,7 @@ public:
     bool enumerate_names(std::vector<Item>& out, bool include_hidden) override { return list(out, include_hidden, slow()); }
     bool slow() const override
     {
-        if (slow_ < 0) slow_ = lhde_fs_is_remote(path_.c_str()) ? 1 : 0;
+        if (slow_ < 0) slow_ = thumbs::on_network(path_) ? 1 : 0;   // (known to the views' items after it)
         return slow_ > 0;
     }
 
@@ -339,12 +340,12 @@ std::shared_ptr<Folder> FsFolder::parent()
     return std::make_shared<FsFolder>(i == 0 ? "/" : path_.substr(0, i));
 }
 
-std::shared_ptr<Folder> folder_for(const std::string& path)
+std::shared_ptr<Folder> folder_for(const std::string& path, bool known_folder)
 {
     if (path == "::desktop" || path.empty()) return desktop();
     if (path == "::computer") { static std::shared_ptr<Folder> c; if (!c) c = make_my_computer(); return c; }
     struct stat st;
-    if (stat(path.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) return nullptr;
+    if (known_folder ? path[0] != '/' : stat(path.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) return nullptr;
     std::string p = path;
     while (p.size() > 1 && p.back() == '/') p.pop_back();
     return std::make_shared<FsFolder>(p);

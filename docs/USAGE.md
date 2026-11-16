@@ -707,9 +707,15 @@ while the data comes in and is sorted once when the last of it is in, so it move
 the entries at once and adds up their sizes as they come. Nothing the Explorer does on its own reads an entry of such a folder
 on its window's thread: the infotip shows what the list has read, the Tiles view and the details leave out a picture's
 Dimensions, the status bar and Open With take a file's type from its name, the folder tree and the breadcrumb's drop-downs know
-folders from the directory entries; F5 reads the names and every stat again, a change
+folders from the directory entries (every folder in the tree has its [+] until it is opened, as XP's tree has on a network
+share, rather than a look inside each), whether an entry is on a network mount is asked once for the folder, and the folder's
+inotify watch (which on FreeBSD looks up every entry) is added on a thread of its own. Opening a folder reads its names and
+checks that it is one on the window's thread. F5 reads the names and every stat again, a change
 seen on disk (inotify: what this machine changed) reads the names again and stats the new entries. What you ask
 for yourself (opening a file, Properties, Add Tag, copying) still reads the files it needs while you wait.
+`FLXP_TRACE_STALLS=MS` prints every message the window's thread spent MS milliseconds or more on (`stall: 123.4 ms message
+0x020a list`: a wheel turn on the list with the repaint it does at once; with 0, every message), and
+tests/headless/slowpath-ui.sh counts what the window's thread asks a slow folder.
 
 ## The Explorer's views (flxp)
 

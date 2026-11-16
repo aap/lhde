@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include <algorithm>
 #include <list>
@@ -826,7 +827,7 @@ static void tree_fill(HTREEITEM h)
     if (SendMessageW(g.tree, TVM_GETNEXTITEM, TVGN_CHILD, (LPARAM)h)) return;   // already filled
     const std::string* p = tree_path(h);
     if (!p) return;
-    auto f = shell::folder_for(*p);
+    auto f = shell::folder_for(*p, true);   // (a node is a folder its parent's listing gave, or the root)
     if (!f) return;
     std::vector<Item> kids;
     f->enumerate_names(kids, g.show_hidden);   // (folders by d_type: a network folder is not stat'ed entry by entry)
@@ -2719,11 +2720,24 @@ int main(int argc, char** argv)
     if (!open_err.empty()) error_box(open_err);
     if (quit_ms) SetTimer(frame, 1, (UINT)quit_ms, quit_timer);
     fileopui::set_message_filter(loop_keys);   // the same keys while a copy runs
+    // FLXP_TRACE_STALLS=MS: every message the UI thread took MS ms or more over, "stall: 123.4 ms message 0x000f"
+    // (0x000f WM_PAINT, 0x020a a wheel turn with the repaint it does at once; with 0, every message: a scroll's cost)
+    const char* stalls = getenv("FLXP_TRACE_STALLS");
+    double stall_ms = stalls && *stalls ? atof(stalls) : -1;
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0)) {
         if (loop_keys(msg)) continue;
+        struct timespec t0, t1;
+        if (stall_ms >= 0) clock_gettime(CLOCK_MONOTONIC, &t0);
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
+        if (stall_ms < 0) continue;
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        double ms = (double)(t1.tv_sec - t0.tv_sec) * 1000 + (double)(t1.tv_nsec - t0.tv_nsec) / 1e6;
+        if (ms >= stall_ms) {
+            fprintf(stderr, "stall: %.1f ms message 0x%04x%s\n", ms, msg.message, msg.hwnd == g.list ? " list" : "");
+            fflush(stderr);
+        }
     }
     return 0;
 }
