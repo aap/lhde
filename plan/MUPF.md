@@ -43,7 +43,7 @@ narrower padding in a narrow window (15 px under 768 px; mupf keeps 32), syntax 
 
 - Show the pane at open when the PDF asks for it (/PageMode /UseOutlines), as Acrobat does.
 - Printing waits for wux's (APPLICATIONS.md "No printing").
-- The autoscroll's mark where it began (Firefox's round compass, IE's): a small layered window at the press point; and the
-  reader-mode cursors (OCR_RDR2DIM, OCR_RDRNORTH ...) if wux gets cursors beyond the theme's named ones.
+- The autoscroll's reader-mode cursors (OCR_RDR2DIM, OCR_RDRNORTH ...) if wux gets cursors beyond the theme's named ones;
+  its mark is drawn in the view and so stays inside it (Firefox's is a popup over everything).
 - A reflowable document's layout is mupdf's tall page cut to its ink: an EPUB chapter is one such page, laid out again
   whole at every width (a long book takes its time on the engine's thread; the window does not wait).

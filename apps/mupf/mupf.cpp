@@ -108,10 +108,9 @@ struct App {
     // chrome
     bool show_toolbar = true, show_status = true, fullscreen = false;
     bool large_header = false;          // View > Large Header: the Explorer's size, else the Small one (sync_header)
-    // [view] autoscroll: the middle button's autoscroll. Off by default, as Firefox's is on Linux (general.autoScroll):
-    // with a TrackPoint or a touchpad the X server itself scrolls while the middle button is held (libinput's
-    // button scrolling), and the click it then delivers on release would leave the sticky mode on
-    bool autoscroll_on = false;
+    // [view] autoscroll: the middle button's autoscroll, on by default; 0 turns it off (for a TrackPoint whose middle
+    // button scrolls in the X server, libinput's button scrolling, and still delivers a click on release)
+    bool autoscroll_on = true;
     // the Contents pane: the document's outline in a tree
     HWND tree = nullptr;
     bool show_toc = false, splitting = false;
@@ -253,7 +252,7 @@ void load_state(int* x, int* y, int* w, int* h, bool* maxed)
     g.show_toc = state_int(st, "view", "contents", 0) != 0;
     g.toc_w = std::max(PANE_MIN, state_int(st, "view", "contents_width", PANE_DEFAULT));
     g.large_header = state_int(st, "view", "large_header", 0) != 0;
-    g.autoscroll_on = state_int(st, "view", "autoscroll", 0) != 0;
+    g.autoscroll_on = state_int(st, "view", "autoscroll", 1) != 0;
     int m = state_int(st, "view", "layout", MODE_CONTINUOUS);
     g.mode = m >= MODE_SINGLE && m <= MODE_CONTINUOUS_FACING ? (Mode)m : MODE_CONTINUOUS;
     g.cover = state_int(st, "view", "cover", 0) != 0;
@@ -698,6 +697,8 @@ void paint_hits(int page, int x, int y, const Box& b)
     }
 }
 
+void paint_autoscroll_mark();
+
 void paint_view(HDC dc)
 {
     make_back();
@@ -737,6 +738,7 @@ void paint_view(HDC dc)
             }
         }
     }
+    paint_autoscroll_mark();
     BitBlt(dc, 0, 0, g.bw, g.bh, g.mem, 0, 0, SRCCOPY);
     if (g.trace && shown != g.shown_trace) {
         g.shown_trace = shown;
@@ -2287,8 +2289,11 @@ void follow(const Link& l)
 // down, until the button comes up; clicked without moving, the same stays on (the pointer steers it) until the next click
 // or key. The speed is after Firefox's (AutoScrollChild's accelerate()): a distance of d pixels scrolls
 // (d/12)^1.5 - 1 pixels every 20 ms, nothing within 12 pixels. Across too when the pages are wider than the view.
-// The pointer is the cursor theme's all-scroll (IDC_SIZEALL), not XP's: the reader-mode cursors (user32's OCR_RDR2DIM,
-// OCR_RDRNORTH ...) are not among wux's cursors, and no origin mark is drawn (Firefox's and IE's round compass).
+// The pointer is read at every step (the timer message's GetMessagePos), not from WM_MOUSEMOVE alone: as in Firefox it
+// steers from anywhere on the screen, beyond the window's edge and over another window too, where the sticky mode (no
+// button held, so no implicit grab) gets no motion events. The pointer is the cursor theme's all-scroll (IDC_SIZEALL; wux falls back to the core
+// cursor font's fleur when the theme has none), not XP's reader-mode cursors (user32's OCR_RDR2DIM, OCR_RDRNORTH ...),
+// which are not among wux's cursors; where the mode began, the origin mark (paint_autoscroll_mark).
 
 double autoscroll_speed(int d)
 {
@@ -2298,16 +2303,68 @@ double autoscroll_speed(int d)
     return 0;
 }
 
-void autoscroll_stop()
+bool autoscroll_across() { return !g.lay.flow && g.lay.width > g.vw; }
+
+// The origin mark, where the button went down, over the pages while the mode is on: IE's and Firefox's round grey mark with
+// its arrow heads, after XP's reader-mode origin (user32 draws one at the click). The bitmap is not ours to copy, so it is
+// drawn here into the back buffer, antialiased (4x4 samples a pixel). The look is a choice: 28 px across, a near-white fill
+// at 90% (Firefox's mark is translucent too), a 1 px grey edge, a dark dot in the middle and dark arrow heads up and down,
+// left and right as well when the view scrolls across.
+const int MARK_R = 14;
+
+RECT autoscroll_mark_rect()
+{
+    return { g.auto_at.x - MARK_R - 1, g.auto_at.y - MARK_R - 1, g.auto_at.x + MARK_R + 2, g.auto_at.y + MARK_R + 2 };
+}
+
+void paint_autoscroll_mark()
+{
+    if (!g.autoscroll || !g.bits) return;
+    bool across = autoscroll_across();
+    const double r = MARK_R, edge = 1.25;
+    // an arrow head pointing up, its tip 11 px from the middle, 9 px wide at its base 4.5 px nearer (in its own frame)
+    auto head = [](double x, double y) { return y >= -11 && y <= -6.5 && fabs(x) <= y + 11; };
+    RECT b = autoscroll_mark_rect();
+    for (int y = std::max(0, (int)b.top); y < std::min(g.bh, (int)b.bottom); y++)
+        for (int x = std::max(0, (int)b.left); x < std::min(g.bw, (int)b.right); x++) {
+            double cr = 0, cg = 0, cb = 0, ca = 0;   // premultiplied, summed over the samples
+            for (int sy = 0; sy < 4; sy++)
+                for (int sx = 0; sx < 4; sx++) {
+                    double dx = x + (sx + .5) / 4 - (g.auto_at.x + .5), dy = y + (sy + .5) / 4 - (g.auto_at.y + .5);
+                    double d = sqrt(dx * dx + dy * dy);
+                    if (d > r) continue;
+                    bool dark = d <= 1.75 || head(dx, dy) || head(dx, -dy) || (across && (head(dy, dx) || head(dy, -dx)));
+                    uint32_t c = dark ? 0x303030 : d > r - edge ? 0x808080 : 0xf8f8f8;
+                    double a = dark || d > r - edge ? 1 : .9;
+                    cr += a * (c >> 16 & 255);
+                    cg += a * (c >> 8 & 255);
+                    cb += a * (c & 255);
+                    ca += a;
+                }
+            if (ca <= 0) continue;
+            cr /= 16; cg /= 16; cb /= 16; ca /= 16;
+            uint32_t& px = g.bits[(size_t)y * g.bw + x];
+            int nr = (int)((px >> 16 & 255) * (1 - ca) + cr + .5), ng = (int)((px >> 8 & 255) * (1 - ca) + cg + .5),
+                nb = (int)((px & 255) * (1 - ca) + cb + .5);
+            px = 0xff000000u | (uint32_t)nr << 16 | (uint32_t)ng << 8 | (uint32_t)nb;
+        }
+}
+
+// the mode ends: by a click, a key, the button up after a move, the wheel, or the capture taken away (release: false)
+void autoscroll_end(bool release)
 {
     if (!g.autoscroll) return;
     g.autoscroll = g.auto_sticky = false;
     KillTimer(g.view, TIMER_AUTOSCROLL);
-    if (GetCapture() == g.view) ReleaseCapture();
+    RECT m = autoscroll_mark_rect();
+    InvalidateRect(g.view, &m, FALSE);
+    if (release && GetCapture() == g.view) ReleaseCapture();
     SetCursor(LoadCursorW(nullptr, (LPCWSTR)IDC_ARROW));
     update_toolbar();
     trace("autoscroll off %d,%d", g.sx, g.sy);
 }
+
+void autoscroll_stop() { autoscroll_end(true); }
 
 void autoscroll_start(POINT at)
 {
@@ -2319,21 +2376,36 @@ void autoscroll_start(POINT at)
     SetCapture(g.view);
     SetTimer(g.view, TIMER_AUTOSCROLL, AUTOSCROLL_TICK, nullptr);
     SetCursor(LoadCursorW(nullptr, (LPCWSTR)IDC_SIZEALL));
+    RECT m = autoscroll_mark_rect();
+    InvalidateRect(g.view, &m, FALSE);
     trace("autoscroll on %d,%d", g.sx, g.sy);
 }
 
-void autoscroll_step()
+// the pointer at p (in the view): where the mode steers to; a move of more than 3 px makes the button's release end it
+void autoscroll_pointer(POINT p)
 {
+    g.auto_pt = p;
+    if (abs(p.x - g.auto_at.x) + abs(p.y - g.auto_at.y) > 3) g.auto_moved = true;
+}
+
+// a step, the pointer where it is on the screen: the distance scrolled; traced as "autoscroll step TICK DX,DY SX,SY" (TICK
+// GetTickCount's)
+void autoscroll_step(POINT screen)
+{
+    ScreenToClient(g.view, &screen);
+    autoscroll_pointer(screen);
     DWORD now = GetTickCount();
     double frames = std::min(5.0, (now - g.auto_tick) / 20.0);   // Firefox's time compensation, a step a 20 ms
     g.auto_tick = now;
-    bool across = !g.lay.flow && g.lay.width > g.vw;
+    bool across = autoscroll_across();
     g.auto_rx += across ? autoscroll_speed(g.auto_pt.x - g.auto_at.x) * frames : 0;
     g.auto_ry += autoscroll_speed(g.auto_pt.y - g.auto_at.y) * frames;
     int dx = (int)g.auto_rx, dy = (int)g.auto_ry;
     g.auto_rx -= dx;
     g.auto_ry -= dy;
+    int sx = g.sx, sy = g.sy;
     if (dx || dy) scroll_to(g.sx + dx, g.sy + dy);
+    trace("autoscroll step %u %d,%d %d,%d", (unsigned)now, g.sx - sx, g.sy - sy, g.sx, g.sy);
 }
 
 LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
@@ -2344,7 +2416,11 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_TIMER:
         if (wp == TIMER_REFLOW) { reflow(); return 0; }
-        if (wp == TIMER_AUTOSCROLL) { if (g.autoscroll) autoscroll_step(); return 0; }
+        if (wp == TIMER_AUTOSCROLL) {
+            DWORD at = GetMessagePos();
+            if (g.autoscroll) autoscroll_step({ (short)LOWORD(at), (short)HIWORD(at) });
+            return 0;
+        }
         break;
     case WM_MBUTTONDOWN:
         SetFocus(hwnd);
@@ -2428,11 +2504,7 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         SetCapture(hwnd);
         return 0;
     case WM_MOUSEMOVE:
-        if (g.autoscroll) {
-            g.auto_pt = { (short)LOWORD(lp), (short)HIWORD(lp) };
-            if (abs(g.auto_pt.x - g.auto_at.x) + abs(g.auto_pt.y - g.auto_at.y) > 3) g.auto_moved = true;
-            return 0;
-        }
+        if (g.autoscroll) { autoscroll_pointer({ (short)LOWORD(lp), (short)HIWORD(lp) }); return 0; }
         if (g.panning) {
             int dx = (short)LOWORD(lp) - g.pan_at.x, dy = (short)HIWORD(lp) - g.pan_at.y;
             if (abs(dx) + abs(dy) > 3) g.pan_moved = true;
@@ -2452,11 +2524,7 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_CAPTURECHANGED:
         g.panning = false;
-        if (g.autoscroll && (HWND)lp != hwnd) {
-            g.autoscroll = g.auto_sticky = false;
-            KillTimer(hwnd, TIMER_AUTOSCROLL);
-            trace("autoscroll off %d,%d", g.sx, g.sy);
-        }
+        if (g.autoscroll && (HWND)lp != hwnd) autoscroll_end(false);
         return 0;
     case WM_SETCURSOR:
         if (g.autoscroll) { SetCursor(LoadCursorW(nullptr, (LPCWSTR)IDC_SIZEALL)); return TRUE; }
@@ -2470,7 +2538,6 @@ LRESULT CALLBACK view_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         }
         break;
     case WM_KEYDOWN: {
-        if (g.autoscroll) { autoscroll_stop(); return 0; }   // a key ends it, and does nothing else (Firefox's)
         bool ctrl = GetKeyState(VK_CONTROL) < 0, shift = GetKeyState(VK_SHIFT) < 0;
         bool hscroll = g.lay.width > g.vw && !g.lay.flow;
         switch (wp) {
@@ -2721,6 +2788,13 @@ int main(int argc, char** argv)
 
     MSG m;
     while (GetMessageW(&m, nullptr, 0, 0) > 0) {
+        // a key ends the middle button's autoscroll and does nothing else (Firefox's), whatever has the focus and before the
+        // accelerators see it; Shift, Ctrl and Alt alone do not (Alt's release alone would open the menu bar)
+        if (g.autoscroll && (m.message == WM_KEYDOWN || m.message == WM_SYSKEYDOWN) && m.wParam != VK_SHIFT &&
+            m.wParam != VK_CONTROL && m.wParam != VK_MENU) {
+            autoscroll_stop();
+            continue;
+        }
         // Alt+Left and Alt+Right (Back, Forward) go on to DefWindowProc as well, which then knows Alt was not pressed alone
         // and does not open the menu bar when it is released (an accelerator's key never reaches it)
         if (m.message == WM_SYSKEYDOWN && (m.wParam == VK_LEFT || m.wParam == VK_RIGHT) && (HIWORD(m.lParam) & KF_ALTDOWN))

@@ -1170,14 +1170,15 @@ above about 270%) is drawn as the part in view.
   bar's arrows and its page number (a click, type a number, Return) and Go To Page (Ctrl+G); Back and Forward (Alt+Left,
   Alt+Right) return over jumps (a page number, a contents entry, a link, Home, End). A drag moves the pages (Acrobat's hand); a click on a link follows it, to its
   page or, for a web address, with xdg-open. The wheel scrolls the system's wheel lines (three of 40 px a notch),
-  Shift+wheel and a sideways wheel (a tilt wheel, a touchpad's horizontal scroll) across. The middle button's autoscroll
-  (Firefox's) is off unless `mupf.ini` has `autoscroll = 1` under `[view]`, as Firefox's is off on Linux: with a TrackPoint
-  or a touchpad the X server itself scrolls while the middle button is held, and the click it delivers afterwards would
-  leave the sticky mode on. Turned on: held down and moved, the pages scroll toward the pointer,
-  the faster the farther it is from where the button went down (Firefox's speed: nothing within 12 px), until it comes
-  up; clicked without moving, the same stays on, the pointer steering it, until the next click or key. Its cursor is the
-  cursor theme's all-scroll, without Firefox's round mark where it began: XP's reader-mode cursors (user32's OCR_RDR*)
-  are not among wux's cursors.
+  Shift+wheel and a sideways wheel (a tilt wheel, a touchpad's horizontal scroll) across. The middle button is Firefox's
+  autoscroll: held down and moved, the pages scroll toward the pointer, the faster the farther it is from where the button
+  went down (Firefox's speed: nothing within 12 px), until it comes up; clicked without moving, the same stays on, the
+  pointer steering it from anywhere on the screen (beyond the window's edge too), until the next click or key (an
+  accelerator's too; Shift, Ctrl and Alt alone do not end it). Where it began, a round grey mark with arrow heads (up and
+  down, left and right too when the pages are wider than the view) is drawn over the pages, IE's and Firefox's; its look is
+  a choice, XP's reader-mode bitmaps not being ours to copy. Its cursor is the cursor theme's all-scroll (the core cursor
+  font's fleur without one). `autoscroll = 0` under `[view]` in `mupf.ini` turns it off: for a TrackPoint whose middle
+  button scrolls in the X server (libinput's button scrolling) and still delivers a click when let go.
 - **Contents** (View > Contents, F4, the cross in its title closes it): the document's outline in a tree on the left, as XP's
   Explorer bar; a click on an entry goes there, the arrow keys go as they select, and as the pages move the entry they are in
   is selected (Acrobat 7's). The splitter beside it sizes it.
@@ -1216,13 +1217,13 @@ A password-protected document asks for its password (Acrobat 6's Password dialog
 Document Open Password.", again after a wrong one; Cancel leaves the window empty). There is no printing, no text selection
 and no bookmarks.
 What mupf remembers: `~/.local/state/lhde/mupf.ini` (`[window]` `x`, `y`, `width`, `height`, `maximized`; `[view]` `toolbar`,
-`statusbar`, `contents` and `contents_width`, `large_header`, `autoscroll` (the middle button, 0), `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
+`statusbar`, `contents` and `contents_width`, `large_header`, `autoscroll` (the middle button, 1), `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
 1 Fit Page, 2 Fit Width) and `zoom` in thousandths), written when it exits. `mupf.desktop` (installed with it) claims what MuPDF
 opens, lhde's defaults give it PDF, XPS, EPUB and Markdown, and it is the first choice of the document viewer's role. `MUPF_TRACE=1`
 prints what it opens, draws and shows on stdout (`opened 2 pages PDF 1.4`, `rendered 1 816x1056 of 816x1056 at 100%`,
 `shown 1:X,Y,WxH ...`, `view X Y W H` (the view in root coordinates), `scroll SX SY PW PH` (where the view is in the
 plane of the pages, and the plane's size), `flow W`, `reflow W` and `relaid N pages W` (a reflowable document laid out W
-points wide), `autoscroll on X,Y`, `autoscroll sticky`, `autoscroll off X,Y`, `tocentry INDEX LEVEL PAGE Y TITLE` (the outline's places, in points), `linkrect PAGE X0 Y0 X1 Y1
+points wide), `autoscroll on X,Y`, `autoscroll sticky`, `autoscroll step TICK DX,DY SX,SY` (a step: GetTickCount's milliseconds, the pixels scrolled, where the view is), `autoscroll off X,Y`, `tocentry INDEX LEVEL PAGE Y TITLE` (the outline's places, in points), `linkrect PAGE X0 Y0 X1 Y1
 TARGET` (a page's links), `watch DIR` and `reload FILE` (a Markdown file followed and read again), `status MESSAGE|Page 1 of 2|100%`, `pagenav PREVX PREVY TEXTX TEXTY NEXTX NEXTY` (the status bar's
 arrows and number, from the window's top left), `pagenav next`, `page edit`, `tocitem INDEX X Y TITLE`, `toc follows INDEX
 TITLE`, `header N rows`, `rebar N rows`, `large header on`, `find box header`, `crumbs A > B > Page 1 of 2`, `header go KEY`),
