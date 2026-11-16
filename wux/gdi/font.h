@@ -61,6 +61,11 @@ void set_shell_dlg_face(const char* family);
 const char* shell_dlg_face();
 // a face of this family is installed (in the font directories or the system's), not a fallback to another family
 bool have_family(const char* family);
+// the file (and the face's index in it) of the face of this family closest to weight and slant, from the same sources
+// in the same order as create_font (the theme's directory, the add_font_dir ones, the fallback ones, the system's); false
+// when no source has the family (no fallback to another one). For a program that draws text with another engine in the
+// session's faces (mupf's Markdown in mupdf).
+bool face_file(const char* family, int32_t weight, bool italic, std::string* file, int* index);
 // The installed scalable faces (the theme's directory, the add_font_dir ones, the system's), one entry per family and
 // style, sorted by family (case ignored) then weight and slant; a family that several sources have is listed once, from
 // the first. What EnumFontFamiliesEx enumerates.

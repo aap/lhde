@@ -253,6 +253,17 @@ static bool find_face(const char* family, int32_t weight, bool italic, std::stri
     return ok;
 }
 
+bool face_file(const char* family, int32_t weight, bool italic, std::string* file, int* index)
+{
+    if (!family || !*family || !init_freetype()) return false;
+    std::string f;
+    int i = 0;
+    if (!find_face(alias(family), weight ? weight : 400, italic, f, i, true)) return false;
+    if (file) *file = f;
+    if (index) *index = i;
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Size selection and metrics
 
