@@ -212,7 +212,7 @@ void load_aurora()
 struct Task { int id; const char* text; const char* icon; };
 const Task FOLDER_TASKS[] = {
     { ID_NEW_FOLDER, "Make a new folder", "folder" },
-    { ID_SEARCH, "Search for files or folders", "search" },
+    { ID_FIND_FILES, "Search for files or folders", "search" },
     { ID_TERMINAL, "Open a terminal here", "run" },
     { ID_ADD_BOOKMARK, "Add this folder to Bookmarks", "favorites" },
     { ID_PROPERTIES, "View folder properties", "settings" },

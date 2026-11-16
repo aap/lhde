@@ -392,6 +392,16 @@ void open_folder(const std::string& path)
     if (!shell::spawn({ bin, path }, path[0] == '/' ? path : home(), &err)) report("Cannot open " + path, err);
 }
 
+void find_files(const std::string& dir)
+{
+    std::string bin = executable(self_dir() + "/luxfind") ? self_dir() + "/luxfind" : find_in_path("luxfind");
+    if (bin.empty()) { open_folder(dir.empty() ? home() : dir); return; }   // (luxfind not installed: the folder, as before)
+    std::vector<std::string> argv = { bin };
+    if (!dir.empty()) argv.push_back(dir);
+    std::string err;
+    if (!shell::spawn(argv, home(), &err)) report("Cannot open Search", err);
+}
+
 void run_dialog()
 {
     if (run_wnd) { SetForegroundWindow(run_wnd); return; }

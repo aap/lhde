@@ -2006,6 +2006,14 @@ static void on_command(int id)
         break;
     case ID_DETAILS_TOGGLE: on_command(ID_VIEW_PREVIEW); break;   // the 4051 bar's preview pane button
     case ID_STOP: thumbview::stop(); lhtool::changed(); break;
+    case ID_FIND_FILES: {   // the band's Search for files or folders: the query window over the catalogues, here
+        std::string bin = shell::exe_dir() + "/luxfind", dir = current_dir(), err;
+        if (access(bin.c_str(), X_OK) != 0) bin = "luxfind";
+        std::vector<std::string> argv = { bin };
+        if (!dir.empty()) argv.push_back(dir);
+        if (!shell::spawn(argv, dir.empty() ? shell::home_dir() : dir, &err)) verbs::error_box("Search could not start: " + err);
+        break;
+    }
     case ID_FORWARD: go_forward(); break;
     case ID_UP: go_up(); break;
     case ID_FOLDERS:

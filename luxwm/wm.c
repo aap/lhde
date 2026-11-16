@@ -4658,6 +4658,7 @@ struct keybind { unsigned mods; KeySym sym; char action[16]; char arg[240]; };
 static struct keybind keys[64]; static int nkeys = 0;
 static const char *default_keys[] = {
     "Mod4+Return terminal", "Mod4+t exec xterm", "Mod4+e exec if command -v flxp >/dev/null; then exec flxp; else exec rox; fi",
+    "Mod4+f exec luxfind",
     "Mod4+r shell run", "Mod4+d showdesktop", "Mod4+s shell sidebar-stacking toggle", "Mod4+h shell sidebar-mode toggle",
     "Mod4+Shift+f shell screenshot", "Mod4+Shift+w shell screenshot_window", "Mod4+Shift+s shell screenshot_region",
     "Mod4+q close", "Mod1+F4 close", "Mod1+space sysmenu", "Mod4+Tab cycle", "Mod1+Tab cycle", "Mod4+Shift+Tab cycle", "Mod1+Shift+Tab cycle", "Mod4+Up maximize", "Mod4+Down minimize",

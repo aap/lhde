@@ -18,6 +18,7 @@ and Super alone when it binds neither Super key.
 | Super (pressed and released alone) | the start menu (again: closes it) | `Super_L start`, `Super_R start` |
 | Super+R | Run: the start menu's Run dialog, as Start > Run... (settings.ini `[commands] run` runs another program instead) | `shell run` |
 | Super+E | the Explorer (flxp; rox without it) | `exec ...` |
+| Super+F | Search: luxfind, the query window over the catalogues, looking in every root (the Explorer's Search for files or folders looks in its folder) | `exec luxfind` |
 | Super+D | show desktop: the visible windows minimised; again brings exactly those back if nothing changed meanwhile | `showdesktop` |
 | Super+S | the sidebar under the windows / on top of them | `shell sidebar-stacking toggle` |
 | Super+H | hide the sidebar / show it again: minimized into the taskbar and back, at once (the taskbar's sidebar toggle, 4074's) | `shell sidebar-mode toggle` |
@@ -43,16 +44,16 @@ accepts, Esc puts the window back.
 
 ### Which Super combinations are free
 
-In use by default: Super alone, Super+R, E, D, S, H, T, Q, Return, Up, Down, 1-4, Tab, Shift+Tab, Shift+S, Shift+F, Shift+W.
+In use by default: Super alone, Super+R, E, F, D, S, H, T, Q, Return, Up, Down, 1-4, Tab, Shift+Tab, Shift+S, Shift+F, Shift+W.
 
 | | used | free |
 | --- | --- | --- |
-| letters | D E H Q R S T | A B C F G I J K L M N O P U V W X Y Z |
+| letters | D E F H Q R S T | A B C G I J K L M N O P U V W X Y Z |
 | digits | 1 2 3 4 | 5 6 7 8 9 0 |
 | others | Return, Tab, Up, Down | Space, Left, Right, Home, End, Page Up/Down, Escape, BackSpace, Delete, F1-F12, comma, period, slash, minus, equal |
 | with Shift | Shift+S, Shift+F, Shift+W, Shift+Tab | every other |
 
-What the Windows of the time gave the free ones, to keep in mind when choosing: XP Super+F Search, Super+M and
+What the Windows of the time gave the free ones, to keep in mind when choosing: Super+M and
 Super+Shift+M minimise all and undo it, Super+L lock, Super+U Utility Manager, Super+F1 Help, Super+Break System Properties,
 Ctrl+Super+F Find Computers; Vista's Sidebar Super+Space (the Sidebar to the front) and Super+G (cycle its gadgets).
 

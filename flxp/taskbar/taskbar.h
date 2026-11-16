@@ -72,6 +72,7 @@ void close();                               // EndMenu if it is open
 void run_dialog();
 bool dialog_message(MSG* m);                // IsDialogMessage for the Run dialog
 void open_folder(const std::string& path);  // a new explorer window (flxp PATH)
+void find_files(const std::string& dir);     // Search: luxfind (looking in dir; "" every root), else the folder
 void window_menu(uint64_t id, const xwm::Task& t, POINT pt);
 // shared with the start panel
 HMENU programs_popup();                     // Programs: the .desktop applications by category

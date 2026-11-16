@@ -1144,9 +1144,10 @@ void run(const Item& it)
         }
         break;
     }
-    case KExplorer: case KDocuments: case KPictures: case KComputer: case KSearch:
+    case KExplorer: case KDocuments: case KPictures: case KComputer:
         startmenu::open_folder(it.arg);
         break;
+    case KSearch: startmenu::find_files(""); break;   // XP's Search: the query window (luxfind), every root
     case KRun: startmenu::run_dialog(); break;
     case KLogOff: startmenu::log_off(); break;
     case KTurnOff: startmenu::shut_down(); break;
