@@ -2,7 +2,9 @@
 
 Status: the first version is in (apps/mupf; docs/USAGE.md "mupf", docs/KEYS.md, docs/APPLICATIONS.md): the engine on its own
 thread, the cache, the four page layouts, zoom, the Contents pane, the search, links, Back and Forward, the Longhorn header,
-the password prompt, Markdown files (md4c's HTML laid out by MuPDF, GitHub's look, followed on disk); tests/headless/mupf.sh,
+the password prompt, Markdown files (md4c's HTML laid out by MuPDF, GitHub's look, followed on disk), the view as mupdf's
+(its grey, the page centred, the scroll range stopping at the pages' edge), reflowable documents (Markdown, EPUB) laid
+out to the window's width without a page, Firefox's middle-button autoscroll; tests/headless/mupf.sh,
 mupfheader.sh, mupfmd.sh and tests/toolkit/mupftest.cpp, mdtest.cpp. Open: the items below, in the
 order they would come.
 
@@ -34,11 +36,14 @@ component: today it is mupf.cpp's globals (`App g`: the engine, the cache, the l
 history) and its window procedure, with the chrome (toolbar, status bar, pane, header) reaching into them. A `mupf::View`
 (a window class over one Engine and Cache, its own state, opened on a path or on a string of Markdown with a base
 directory, notifying its owner of the title, the outline, a link to another file and the page) would let mupf be its frame
-and luxpad embed it; the engine needs an open from text (luxpad's unsaved buffer) besides the path. Also open: the page
-width follows the window (GitHub reflows a README to a narrow window; mupf lays it out at 660 pt and zooms), syntax colours
-in code blocks, the theme's fixed font for code (MuPDF's Courier-like monospace today), pictures from the web.
+and luxpad embed it; the engine needs an open from text (luxpad's unsaved buffer) besides the path. Also open: GitHub's
+narrower padding in a narrow window (15 px under 768 px; mupf keeps 32), syntax colours in code blocks, the theme's fixed font for code (MuPDF's Courier-like monospace today), pictures from the web.
 
 ## Smaller
 
 - Show the pane at open when the PDF asks for it (/PageMode /UseOutlines), as Acrobat does.
 - Printing waits for wux's (APPLICATIONS.md "No printing").
+- The autoscroll's mark where it began (Firefox's round compass, IE's): a small layered window at the press point; and the
+  reader-mode cursors (OCR_RDR2DIM, OCR_RDRNORTH ...) if wux gets cursors beyond the theme's named ones.
+- A reflowable document's layout is mupdf's tall page cut to its ink: an EPUB chapter is one such page, laid out again
+  whole at every width (a long book takes its time on the engine's thread; the window does not wait).

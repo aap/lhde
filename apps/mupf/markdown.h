@@ -32,8 +32,10 @@ struct Style {
     int body_px = 16;
 };
 
-// the page's width in points that mupf lays Markdown out at (GitHub's README column: 980 px less its padding)
-const float PAGE_WIDTH_PT = 660;
+// the widest a Markdown page is laid out, in CSS pixels: GitHub's README column (.markdown-body's max-width, its padding
+// inside); narrower windows lay it out to their width (the window asks the engine for the width, engine.h)
+const int MAX_WIDTH_PX = 980;
+const float PAGE_WIDTH_PT = MAX_WIDTH_PX * 0.75f;   // the same in points, the width when none is asked
 
 // md4c's HTML for the text (GitHub's dialect: tables, strikethrough, task lists, autolinks, ATX headings without the space),
 // the headings given ids and the task boxes made characters; the front matter (a first line "---" up to the next "---" or

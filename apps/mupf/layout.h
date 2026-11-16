@@ -60,14 +60,18 @@ struct Layout {
     std::vector<Box> page;      // each page's box in the plane; empty for a page the mode does not show now
     int width = 0, height = 0;  // the plane
     int shown_spread = 0;       // the non-continuous modes: the spread shown
+    bool flow = false;          // a reflowable document's: no margin, no gap, no frame
 };
 // the gap between pages and spreads, and around the plane's edge (Acrobat's grey around the pages; mupf's measure)
 const int PAGE_GAP = 10, PLANE_MARGIN = 10;
 
 // the layout of a document's pages; the non-continuous modes show current's spread alone. The plane is at least the view's
-// size; narrower spreads are centred.
+// size and is the scroll range: the pages and PLANE_MARGIN around them, so a drag stops at their edge. A spread narrower
+// than the view is centred across it (mupdf's and Acrobat's); in the non-continuous modes a spread shorter than the view is
+// centred down it too (mupdf's single page), while the continuous modes start at the top (Acrobat's). flow: a reflowable
+// document's pages (laid out to the view's width by the engine) abut, with no margin and no gap.
 Layout make_layout(const std::vector<SizeF>& sizes, int rot, double zoom, Mode m, bool cover, int current, int view_w,
-                   int view_h);
+                   int view_h, bool flow = false);
 // the zoom at which current's spread fills the view's width (Fit Width), or fits in the view whole (Fit Page)
 double fit_width(const std::vector<SizeF>& sizes, int rot, Mode m, bool cover, int current, int view_w);
 double fit_page(const std::vector<SizeF>& sizes, int rot, Mode m, bool cover, int current, int view_w, int view_h);
@@ -101,7 +105,9 @@ const size_t WHOLE_TILE_MAX = 24u << 20;
 // The tiles kept: at most budget bytes, the tile just put always kept. Putting a page's tile drops the tiles of that page it
 // makes useless: a whole tile all others of its page; a part the other parts at its zoom and every tile at another zoom but
 // the largest whole one (kept as the background drawn scaled while the part covers only the view). Over the budget the
-// tiles farthest from the current page go first, tiles at another zoom than the current before tiles at it.
+// tiles farthest from the current page go first, tiles at another zoom than the current before tiles at it. A tile of
+// another generation than the cache's (a reflowable document laid out again at another width) is stale: drawn only behind,
+// as one at another zoom is, never covering a need.
 class Cache {
 public:
     explicit Cache(size_t budget) : budget_(budget) {}
@@ -109,8 +115,10 @@ public:
     Cache(const Cache&) = delete;
     Cache& operator=(const Cache&) = delete;
     void put(Tile* t, int current, double zoom);    // takes it
-    // the tiles of a page to draw, back to front: those at another zoom (drawn scaled) before those at zoom
+    // the tiles of a page to draw, back to front: those at another zoom or stale (drawn scaled) before those at zoom
     std::vector<const Tile*> tiles_for(int page, int rot, double zoom) const;
+    void set_gen(uint32_t g) { gen_ = g; }
+    bool fresh(const Tile* t) const { return t->gen == gen_; }
     bool covered(int page, int rot, double zoom, const Box& need) const;
     void trim(int current, double zoom);            // over the budget (after a budget change): evict
     void clear();
@@ -125,6 +133,7 @@ private:
     void remove(size_t i);
     std::vector<Tile*> tiles_;
     size_t budget_ = 0, bytes_ = 0;
+    uint32_t gen_ = 0;
 };
 
 // The part of a page to render for a view: the whole page when it costs at most WHOLE_TILE_MAX, else what is in view with

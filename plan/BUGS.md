@@ -67,6 +67,8 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   start_compose) would let them follow Shell.start_icon.
 
 ## Dialogs and wux
+- 2026-11-16 wux drops X buttons 6 and 7 (sys/x11.cpp keeps 4 and 5 only), so a touchpad's or tilt wheel's sideways scroll never
+  becomes WM_MOUSEHWHEEL; programs scroll across with Shift+wheel alone.
 - 2026-11-16 An Alt accelerator (TranslateAcceleratorW) loses the next key: DefWindowProc never sees the other key go down, so the
   Alt release enters the menu bar (wux/w32/defwnd.cpp g_menu_sys_key); luxfind passes the WM_SYSKEYDOWN on as a workaround.
 - 2026-11-01 Appearance's style list shows a DisplayName outside Latin-1 as '?' (zxbiyao's 诛仙主题之碧瑶版(绿色) as
@@ -120,6 +122,8 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
 ## Applications and file types
 - 2026-11-16 roles.ini's pdf role hands its PostScript, EPS and DjVu types to the role's program whatever it opens: mupf (and
   mupdf before it) open neither; the role wants a per-type fallback to a program that claims the type.
+- 2026-11-16 mupf: before its window is shown the view's client width reads 37519616 (MUPF_TRACE's first `view` lines, from
+  layout_chrome on the unsized frame); harmless, the size is right once mapped, the cause not looked for.
 
 ## Catalogue
 - 2026-11-16 luxfind: the Properties sheet on a root that cannot be reached is refused (its General page stats the file); the
