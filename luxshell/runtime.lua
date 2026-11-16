@@ -1414,8 +1414,9 @@ end
 -- and the taskbar's width change in this one callback, painted in the same pass; windows are not moved (luxwm refits maximised
 -- ones to the new work area as for any strut change). A running mode animation is finished at once. The order keeps every
 -- in-between state the compositor might catch invisible: to bottom the taskbar first runs the full width (under the sidebar's
--- corner), to top the sidebar first runs the full height (under the taskbar); the restack comes last. No server grab around
--- it: picom (xrender) would freeze halfway through a repaint, which shows for ~180 ms.
+-- corner), to top the sidebar first runs the full height (under the taskbar); the restack comes last. Each bar is painted
+-- right after it is placed, and a resize keeps a bar's pixels (the surfaces' NorthWest bit gravity), so neither bar is ever
+-- blank. No server grab around it: picom (xrender) would freeze halfway through a repaint, which shows for ~180 ms.
 -- switch the virtual desktop through the WM (EWMH _NET_CURRENT_DESKTOP request): a 0-based index, "next" or "prev" (wrapping
 -- at _NET_NUMBER_OF_DESKTOPS); for _LHSHELL_COMMAND "desktop ..." and a future sidebar tile
 function lh.switch_desktop(v)
@@ -1433,8 +1434,10 @@ function lh.set_sidebar_stacking(v)
   cfg.sb_bottom = on
   if sb.anim then lh.cancel(sb.anim); sb.anim = nil end
   sb.yield = sb_yield()
-  local function sidebar() build_sidebar(); build_tiles(); after_tiles(); place_sidebar() end
-  local function taskbar() build_tb_tiles(); place_taskbar(); rebuild_tasks() end
+  -- each bar painted as soon as it is placed (as set_mode does), before the other one changes: painted at the end of the callback,
+  -- the first bar showed blank (cleared by its resize) while the second was rebuilt, ~40 ms
+  local function sidebar() build_sidebar(); build_tiles(); after_tiles(); place_sidebar(); sb.surface:paint() end
+  local function taskbar() build_tb_tiles(); place_taskbar(); rebuild_tasks(); tb.surface:paint() end
   if on then taskbar(); sidebar() else sidebar(); taskbar() end
   sb.surface:set_layer(sb_layer())
   if mode ~= "minimized" and not sb_hidden() then sb_stack() end   -- top: raised over the taskbar at the corner; bottom: lowered

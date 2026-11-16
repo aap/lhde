@@ -2,7 +2,8 @@
 # The sidebar's hide / unhide and stacking keys: luxwm's default Super+H ("shell sidebar-mode toggle") minimizes the sidebar into
 # the taskbar at once (its window unmapped, the taskbar the full width, two screenshots 50 ms apart identical) and brings it
 # back (mapped, the taskbar ending at its edge); Super+S ("shell sidebar-stacking toggle") puts it under the windows
-# (_NET_WM_STATE_BELOW on luxshell-sidebar) and back (_NET_WM_STATE_ABOVE); the minimized state and the mode it restores
+# (_NET_WM_STATE_BELOW on luxshell-sidebar) and back (_NET_WM_STATE_ABOVE) with neither bar blank in any of ten screenshots
+# taken across each flip (with the pack's images); the minimized state and the mode it restores
 # (luxshell-state.ini [sidebar] restore: pinned here) survive a luxshell restart; with [sidebar] animate = 1 both bars slide
 # (screenshots over 200 ms differ, the taskbar's width passes between its two values). luxwm and luxshell on Xvfb with a
 # scratch HOME (LHDE_WINDOWS, when set, gives the pack its images). Needs Xvfb, xdotool, xprop, xwininfo, xwd and ImageMagick.
@@ -105,10 +106,31 @@ st() { xprop -id "$SB" _NET_WM_STATE 2>/dev/null; }
 below() { st | grep -q _NET_WM_STATE_BELOW; }
 above() { st | grep -q _NET_WM_STATE_ABOVE; }
 above && ok "stacking top: _NET_WM_STATE_ABOVE" || bad "the sidebar's state at startup: $(st)"
-xdotool key super+s
+# flip NAME: Super+S with ten screenshots in a tight loop across it (with the pack's images: without them both bars are mostly
+# black anyway); in none may the taskbar or the sidebar be blank, i.e. black where the bar is drawn: at most 30 % black
+# pixels in the taskbar's row (drawn: 0..6 %) and 70 % in the sidebar's column (drawn: 47 %). xwd now and then fails on a
+# shot (BadMatch) while the bars restack; those are skipped, six of ten must be read.
+blackness() { magick xwd:"$1" -crop $2 +repage -fill white +opaque black -fill black -opaque black -format '%[fx:round(100 * (1 - mean))]' info: 2>/dev/null; }
+flip() {
+    if [ ! -e "${LHDE_WINDOWS:-/nonexistent}/generated/packs/4074/imageres/1107.png" ]; then xdotool key super+s; return; fi
+    ( for i in 1 2 3 4 5 6 7 8 9 10; do xwd -root -silent > $T/f$i.xwd 2>/dev/null; done ) & _l=$!
+    sleep .03; xdotool key super+s; wait $_l
+    _n=0; _blank=
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        _t=$(blackness $T/f$i.xwd ${SW}x30+0+738); _s=$(blackness $T/f$i.xwd 150x738+$((SW - 150))+0)
+        [ -n "$_t" ] && [ -n "$_s" ] || continue
+        _n=$((_n + 1))
+        [ "$_t" -le 30 ] && [ "$_s" -le 70 ] || _blank="$_blank shot $i: taskbar $_t %, sidebar $_s % black;"
+    done
+    if [ $_n -lt 6 ]; then bad "$1: only $_n of 10 screenshots could be read"
+    elif [ -z "$_blank" ]; then ok "$1: both bars drawn in all $_n screenshots across the flip"
+    else bad "$1: a bar is blank:$_blank"; fi
+}
+flip "Super+S"
 wait_for 2 below && ok "Super+S: _NET_WM_STATE_BELOW (under the windows)" || bad "Super+S: $(st)"
 grep -q '^stacking *= *bottom' $INI && ok "settings.ini [sidebar] stacking = bottom" || bad "settings.ini has no stacking = bottom"
-xdotool key super+s
+sleep .3
+flip "Super+S again"
 wait_for 2 above && ok "Super+S again: _NET_WM_STATE_ABOVE" || bad "Super+S again: $(st)"
 
 # the state survives a restart: pinned, minimized, restart, still minimized, Super+H gives pinned back

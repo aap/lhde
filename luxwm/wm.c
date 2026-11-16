@@ -203,6 +203,7 @@ static void client_close(struct client *c);
 static void client_kill(struct client *c);
 static void client_decorations_create(struct client *c);
 static void client_decorations_destroy(struct client *c);
+static void client_decorations_park(struct client *c, int x, int y);
 static void client_delete(struct client *c);
 static void client_fullscreen(struct client *c, bool toggle, bool fullscreen, bool max);
 static void client_hide(struct client *c);
@@ -470,6 +471,7 @@ close_wm(void)
                 XDeleteProperty(display, c->window, lhwm_deco_atom);
                 XDestroyWindow(display, c->dec);
             }
+            if (c->fs_dec != None) XDestroyWindow(display, c->fs_dec);
             XDeleteProperty(display, c->window, net_atom[NetWMFrameExtents]);
             if (c->hdr_pix) { XDeleteProperty(display, c->window, lhwm_hdrpix_atom); XFreePixmap(display, c->hdr_pix); c->hdr_pix = None; }
             if (c->cap_rect_set) XDeleteProperty(display, c->window, lhwm_caprect_atom);
@@ -774,17 +776,27 @@ client_decorations_create(struct client *c)
     XSetWindowAttributes a = { .colormap = argb_cmap, .border_pixel = 0, .background_pixmap = None, .bit_gravity = NorthWestGravity,
         .event_mask = ExposureMask|EnterWindowMask|LeaveWindowMask|PointerMotionMask|ButtonPressMask|ButtonReleaseMask };
     c->decorated = true;
+    bool reuse = c->fs_dec != None;
+    if (reuse) {   /* back from fullscreen: the same window, still mapped (client_decorations_park), shown again */
+        c->dec = c->fs_dec; c->fs_dec = None;
+        if (c->unmapped) XUnmapWindow(display, c->dec);   /* minimised while fullscreen: unmapped like the client */
+        XMoveResizeWindow(display, c->dec, c->geom.x, c->geom.y, MAX(c->geom.width, 1), MAX(c->geom.height, 1));
+        XShapeCombineMask(display, c->dec, ShapeBounding, 0, 0, None, ShapeSet);
+        XShapeCombineMask(display, c->dec, ShapeInput, 0, 0, None, ShapeSet);
+    }
     {   /* _LHWM_DECORATED on the client (set before dec or client is mapped): picom's shadow-exclude "_LHWM_DECORATED@" then leaves the
            client without a shadow of its own; the decoration window (the ARGB plate) casts the only one */
         long one = 1;
         XChangeProperty(display, c->window, lhwm_deco_atom, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&one, 1);
     }
-    c->dec = XCreateWindow(display, root, c->geom.x, c->geom.y, MAX(c->geom.width, 1), MAX(c->geom.height, 1), 0,
-                           argb_depth, InputOutput, argb_visual, CWColormap|CWBorderPixel|CWEventMask
-                           | CWBitGravity | CWBackPixmap, &a);
-    LOGP("created decoration window 0x%lx depth %d for client 0x%lx (%dx%d at %d,%d)", c->dec, argb_depth, c->window, c->geom.width, c->geom.height, c->geom.x, c->geom.y);
+    if (!reuse) {
+        c->dec = XCreateWindow(display, root, c->geom.x, c->geom.y, MAX(c->geom.width, 1), MAX(c->geom.height, 1), 0,
+                               argb_depth, InputOutput, argb_visual, CWColormap|CWBorderPixel|CWEventMask
+                               | CWBitGravity | CWBackPixmap, &a);
+        LOGP("created decoration window 0x%lx depth %d for client 0x%lx (%dx%d at %d,%d)", c->dec, argb_depth, c->window, c->geom.width, c->geom.height, c->geom.x, c->geom.y);
+        XGrabButton(display, 1, AnyModifier, c->dec, True, ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
+    }
     anim_mark(c, c->anim_until > 0 ? ANIM_BUSY : anim_style);   /* the new decoration window gets _LHWM_ANIMATE too */
-    XGrabButton(display, 1, AnyModifier, c->dec, True, ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
     draw_text(c, client_active(c));
     ewmh_set_frame_extents(c);
     client_set_status(c);
@@ -800,6 +812,26 @@ client_decorations_destroy(struct client *c)
     header_update(c, false);   /* undecorated: no header pixmap, no caption rect */
     XUnmapWindow(display, c->dec);
     XDestroyWindow(display, c->dec);
+    ewmh_set_frame_extents(c);
+    client_set_status(c);
+}
+
+/* Entering fullscreen: the frame goes, but its window stays mapped, shaped empty (nothing shown, no input) and shrunk to 1 x 1
+   at (x, y), the monitor's corner under the fullscreen client, so neither a shadow nor a blur of it shows. Leaving fullscreen
+   (client_decorations_create) takes it back without a map, so the compositor runs no "open" animation or fade-in on it (a new
+   window would get picom's 350 ms one): the frame is there in the first composited frame, as on XP when a fullscreen program
+   returns */
+static void
+client_decorations_park(struct client *c, int x, int y)
+{
+    LOGN("Parking decorations");
+    c->decorated = false;
+    XDeleteProperty(display, c->window, lhwm_deco_atom);
+    header_update(c, false);   /* undecorated: no header pixmap, no caption rect */
+    XShapeCombineRectangles(display, c->dec, ShapeBounding, 0, 0, NULL, 0, ShapeSet, Unsorted);
+    XShapeCombineRectangles(display, c->dec, ShapeInput, 0, 0, NULL, 0, ShapeSet, Unsorted);
+    XMoveResizeWindow(display, c->dec, x, y, 1, 1);
+    c->fs_dec = c->dec; c->dec = None;
     ewmh_set_frame_extents(c);
     client_set_status(c);
 }
@@ -887,8 +919,8 @@ client_fullscreen(struct client *c, bool toggle, bool fullscreen, bool max)
     // TODO: FACTOR THIS SHIT
     if (to_fs) {
         ewmh_set_fullscreen(c, true);
-        if (c->decorated && conf.fs_remove_dec) { //
-            client_decorations_destroy(c);
+        if (c->decorated && conf.fs_remove_dec) {
+            client_decorations_park(c, m_list[mon].x, m_list[mon].y);
             c->was_fs = true;
         }
         if (conf.fs_max) {
@@ -902,12 +934,15 @@ client_fullscreen(struct client *c, bool toggle, bool fullscreen, bool max)
         }
         c->fullscreen = true;
     } else {
+        /* with a compositor in one step under a server grab, as a maximise (client_geom_max): picom composes no frame with the
+           client back at its size and the frame not yet there */
+        if (compositor) XGrabServer(display);
         ewmh_set_fullscreen(c, false);
         if (max) {
             client_move_absolute(c, c->prev.x, c->prev.y);
             client_resize_absolute(c, c->prev.width, c->prev.height);
         }
-        if (!c->decorated && conf.fs_remove_dec && c->was_fs) { //
+        if (!c->decorated && conf.fs_remove_dec && c->was_fs) {
             client_decorations_create(c);
             if (!c->unmapped) XMapWindow(display, c->dec);
             client_refresh(c);
@@ -919,6 +954,7 @@ client_fullscreen(struct client *c, bool toggle, bool fullscreen, bool max)
         c->fullscreen = false;
         c->was_fs = false;
         client_refresh(c);
+        if (compositor) { XUngrabServer(display); XFlush(display); }
     }
 
     docks_raise();   /* entering fullscreen with the focus: above the docks; leaving it: the docks back on top */
@@ -1610,6 +1646,7 @@ client_forget(struct client *c)
         focus_after(c);
     if (c->decorated)
         client_decorations_destroy(c);
+    if (c->fs_dec != None) { XDestroyWindow(display, c->fs_dec); c->fs_dec = None; }
     client_delete(c);
     if (f_client == c)
         f_client = NULL;

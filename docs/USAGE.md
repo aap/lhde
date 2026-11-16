@@ -998,8 +998,11 @@ archive and sync tools by default, or git.
 
 Super+Shift+F takes the whole screen, Super+Shift+W the active window with its frame (luxwm's frame, from the window's
 `_NET_FRAME_EXTENTS`), Super+Shift+S a rectangle (Windows 10's snip key): the screen freezes, the pointer becomes a
-crosshair, drag the rectangle (Escape or the right button cancel). Print is left free (it may be your compose key); the keys
-file can bind it ("Keys in the session" above). A window comes up at once with the picture scaled to fit and its size, and:
+crosshair, drag the rectangle (Escape or the right button cancel). A click instead of a drag (the pointer moved 2 pixels or
+less) takes the whole screen, every monitor in one picture as XP's Print Screen did; Shift+click takes the window under the
+pointer with its frame, as XP's Alt+Print Screen took the active one (the desktop under the pointer: the whole screen). Print
+is left free (it may be your compose key); the keys file can bind it ("Keys in the session" above). A window comes up at once
+with the picture scaled to fit and its size, and:
 
 - **File name** `Screenshot YYYY-MM-DD HHMMSS.png` (" (2)" when that second has one already) and **Save in** your pictures
   folder (`XDG_PICTURES_DIR`, from `~/.config/user-dirs.dirs`, else `~/Pictures`; made when missing); **Browse...** is the Save As
@@ -1347,7 +1350,8 @@ with one key when you want to look at it.
   runs the full height and is above the taskbar at the corner, which is shortened by its width (4074); its strut keeps maximised
   windows clear (full 1099x770 with a 181 px sidebar, pinned 1280x662).
 - **Super+s** toggles between the two **instantly**: no animation or fade; the sidebar's window state, strut, geometry and place
-  in the stack and the taskbar's width change in one callback and one repaint. Windows are not moved; luxwm refits maximised
+  in the stack and the taskbar's width change in one callback, each bar repainted as soon as it is placed, so neither is ever
+  blank on the way (as with Super+h). Windows are not moved; luxwm refits maximised
   windows to the new work area as for any strut change (in the same composited frame on the lab). The key is luxwm's default
   `Mod4+s shell sidebar-stacking toggle` (added to a user keys file where Mod4+s is unbound); luxshell takes
   `sidebar-stacking toggle|top|bottom` on `_LHSHELL_COMMAND` (e.g. `xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND
