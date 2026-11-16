@@ -112,6 +112,7 @@ include apps/luxattr/luxattr.mk
 include apps/luxpad/luxpad.mk
 include apps/luxview/luxview.mk
 include apps/luxfind/luxfind.mk
+include apps/mupf/mupf.mk
 
 all: libs programs tests liblhde liblhcat luxwm luxshell examples
 libs: $(WUXA) $(UTA) $(UTSO) $(UTPC) $(LHDEA) $(LHDESO) $(LHDEPC) $(LHCATA) $(LUXNAVA) $(LUXNAVSO) $(LUXNAVPC)

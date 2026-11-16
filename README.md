@@ -110,6 +110,7 @@ Incomplete, and in no particular order:
 ## Dependencies
 
 A C and C++17 compiler, GNU make, Python 3, pkg-config with x11, xext, xfixes, xinerama, xft, freetype2, fontconfig,
-libpng, libjpeg, dbus-1, cairo, pangocairo and Lua 5.4. At run time picom (composition: the glass frames), feh, xprop,
+libpng, libjpeg, dbus-1, cairo, pangocairo and Lua 5.4; MuPDF's library for mupf, the document viewer (left out without
+it). At run time picom (composition: the glass frames), feh, xprop,
 xsetroot, dbus-daemon, startx or Xephyr. The import needs Python 3 with Pillow, 7z and tar with xz. One `xbps-install`
 line for Void Linux and the equivalents for other distributions are in [docs/BUILDING.md](docs/BUILDING.md).

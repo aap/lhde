@@ -197,7 +197,9 @@ user's choice for a type beats the role file, the role file beats lhde's default
 `XDG_DATA_DIRS` (`/usr/local/share` before `/usr/share`, the default) or is the data home (`PREFIX=~/.local`). Without
 `XDG_CURRENT_DESKTOP=lhde` (another session) lhde's file is not read.
 
-lhde's defaults: `inode/directory` = `flxp.desktop`, `text/plain` = `luxpad.desktop`. A desktop-specific file holds
+lhde's defaults: `inode/directory` = `flxp.desktop`, `text/plain` = `luxpad.desktop`, PNG, JPEG, BMP, WebP and ICO
+`luxview.desktop`, PDF, XPS (`application/oxps`, `application/vnd.ms-xpsdocument`) and EPUB `mupf.desktop` (a program not
+installed is passed over, the next file's default taken). A desktop-specific file holds
 `[Default Applications]` only: its Added and Removed Associations are not read (the spec; GLib warns about them, `lhde-mime
 check` reports them), so taking a program off a type is done in `mimeapps.list`.
 
@@ -246,7 +248,7 @@ over indented lines without `=`.
 | --- | --- | --- | --- |
 | `editor` | Text editor | `text/plain` and every type below it, but other media (`image/*`, `audio/*`, `video/*`, `model/*`, `chemical/*`, `message/*`), word processors' documents (RTF, AbiWord, LyX, the flat OpenDocument files), launchers and shortcuts (`.desktop`, `.url`, JNLP, Flatpak refs), other programs' project files, fonts, signatures, bookmarks, playlists | `luxpad.desktop`, then the usual editors |
 | `images` | Image viewer | `image/*` but drawings (SVG, WMF, EMF, CGM, CAD, Xfig, Skencil), the page formats (EPS, DjVu), the editors' own files (XCF, GIMP brushes, Photoshop, OpenRaster), 3D scenes, cursors | `luxview.desktop`, then feh, nsxiv, sxiv, eog, Loupe, ristretto, ... |
-| `pdf` | Document viewer | PDF (and compressed), PostScript (and EPS), DjVu, XPS | mupdf, zathura, evince, ... |
+| `pdf` | Document viewer | PDF (and compressed), PostScript (and EPS), DjVu, XPS | mupf, mupdf, zathura, evince, ... |
 | `browser` | Web browser | `text/html`, `application/xhtml+xml`, `x-scheme-handler/http`, `https` | firefox, librewolf, chromium, ... |
 | `mail` | E-mail program | `x-scheme-handler/mailto`, `message/rfc822` | thunderbird, claws-mail, evolution, sylpheed |
 | `audio` | Music player | `audio/*` | audacious, deadbeef, qmmp, ... |
