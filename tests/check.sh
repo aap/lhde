@@ -167,7 +167,7 @@ else
     # one start-menu provider under luxshell, also when its command name is flxp-taskbar (FreeBSD's for the flxp-startmenu symlink)
     tests/headless/startmenu.sh "$2" > "$T/startmenu.log" 2>&1; rc=$?
     result "headless/startmenu.sh$(grep -m1 '^skip' "$T/startmenu.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/startmenu.log"
-    # Super+H hides and shows the sidebar at once, Super+S flips its stacking, the state survives a restart; [sidebar] animate = 1
+    # Super+H hides and shows the sidebar at once, Super+S flips its stacking (neither bar blank), the state survives a restart; [sidebar] animate = 1
     tests/headless/sidebar.sh "$2" > "$T/sidebar.log" 2>&1; rc=$?
     result "headless/sidebar.sh$(grep -m1 '^skip' "$T/sidebar.log" | sed 's/^/ (/; s/$/)/')" $rc "$T/sidebar.log"
     # luxshell's menu shadow is luxwm's (XP's 5 px, ut_menu_shadow_alpha), none with [effects] menu_shadows = 0

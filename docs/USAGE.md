@@ -1332,7 +1332,8 @@ with one key when you want to look at it.
   runs the full height and is above the taskbar at the corner, which is shortened by its width (4074); its strut keeps maximised
   windows clear (full 1099x770 with a 181 px sidebar, pinned 1280x662).
 - **Super+s** toggles between the two **instantly**: no animation or fade; the sidebar's window state, strut, geometry and place
-  in the stack and the taskbar's width change in one callback and one repaint. Windows are not moved; luxwm refits maximised
+  in the stack and the taskbar's width change in one callback, each bar repainted as soon as it is placed, so neither is ever
+  blank on the way (as with Super+h). Windows are not moved; luxwm refits maximised
   windows to the new work area as for any strut change (in the same composited frame on the lab). The key is luxwm's default
   `Mod4+s shell sidebar-stacking toggle` (added to a user keys file where Mod4+s is unbound); luxshell takes
   `sidebar-stacking toggle|top|bottom` on `_LHSHELL_COMMAND` (e.g. `xprop -root -f _LHSHELL_COMMAND 8u -set _LHSHELL_COMMAND

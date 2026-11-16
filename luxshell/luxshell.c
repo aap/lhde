@@ -246,9 +246,12 @@ static int l_surface(lua_State *L) {
        skips blurring behind it and everything it covers (picom treats every ARGB window as translucent) */
     lua_getfield(L, 1, "opaque"); bool opaque = lua_toboolean(L, -1); lua_pop(L, 1);
     Visual *vis = opaque ? DefaultVisual(dpy, screen) : argb; int dep = opaque ? DefaultDepth(dpy, screen) : depth;
+    /* NorthWest bit gravity: a resize keeps the pixels the window has (only a new strip is cleared) instead of clearing all of it
+       until the next paint (X's default ForgetGravity), so a bar that changes size never shows blank (the sidebar stacking flip) */
     XSetWindowAttributes a = { .colormap = opaque ? DefaultColormap(dpy, screen) : cmap, .border_pixel = 0, .background_pixel = 0, .override_redirect = popup,
+        .bit_gravity = NorthWestGravity,
         .event_mask = ExposureMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | LeaveWindowMask | EnterWindowMask | StructureNotifyMask | KeyPressMask | KeyReleaseMask };
-    s->win = XCreateWindow(dpy, root, s->x, s->y, s->w, s->h, 0, dep, InputOutput, vis, CWColormap | CWBorderPixel | CWBackPixel | CWEventMask | CWOverrideRedirect, &a);
+    s->win = XCreateWindow(dpy, root, s->x, s->y, s->w, s->h, 0, dep, InputOutput, vis, CWColormap | CWBorderPixel | CWBackPixel | CWBitGravity | CWEventMask | CWOverrideRedirect, &a);
     s->xs = cairo_xlib_surface_create(dpy, s->win, vis, s->w, s->h);
     lua_getfield(L, 1, "name"); const char *name = lua_tostring(L, -1); if (!name) name = "luxshell";
     XStoreName(dpy, s->win, name); XClassHint ch = { (char *)name, "luxshell" }; XSetClassHint(dpy, s->win, &ch); lua_pop(L, 1);
