@@ -119,8 +119,7 @@ if [ "$theme" != none ] && "$R/build/bin/lhde-theme" resolve "$theme" > /dev/nul
         wait_for 10 traced "^crumbs My Computer > Chapter One > Page 1 of 2"
         traced "^crumbs My Computer > Chapter One > Page 1 of 2" && ok "the crumbs: the document, the outline's entry, the page" ||
             bad "crumbs on page 1: $(grep '^crumbs' $L | tail -1)"
-        xdotool key F4; sleep .5
-        xdotool click --window $W 1 2>/dev/null; xdotool key Next
+        xdotool key Next      # (the view has the focus; the pane follows shown or not)
         wait_for 10 traced "^crumbs My Computer > Chapter Two > Page 2 of 2"
         traced "^crumbs My Computer > Chapter Two > Page 2 of 2" && ok "Page Down: the crumbs follow" || bad "crumbs on page 2: $(grep '^crumbs' $L | tail -1)"
         traced "^toc follows 1 Chapter Two" && ok "the Contents pane follows the page" || bad "the pane did not select Chapter Two"
