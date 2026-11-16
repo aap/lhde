@@ -1404,10 +1404,14 @@ void trace_nav()
 {
     RECT p, t, n;
     if (!g.trace || !g.opened || !nav_rects(&p, &t, &n)) return;
-    // in the frame's client coordinates (a script adds the client's place on the screen)
-    MapWindowPoints(g.status, g.wnd, (POINT*)&p, 2);
-    MapWindowPoints(g.status, g.wnd, (POINT*)&t, 2);
-    MapWindowPoints(g.status, g.wnd, (POINT*)&n, 2);
+    // from the window's top left corner (its X window's, the menu bar under the XP themes included: a script adds where
+    // that is on the screen), which a move of the window does not change
+    RECT wr;
+    GetWindowRect(g.wnd, &wr);
+    for (RECT* r : { &p, &t, &n }) {
+        MapWindowPoints(g.status, nullptr, (POINT*)r, 2);
+        OffsetRect(r, -wr.left, -wr.top);
+    }
     char b[128];
     snprintf(b, sizeof b, "pagenav %d %d %d %d %d %d", (int)(p.left + p.right) / 2, (int)(p.top + p.bottom) / 2,
              (int)(t.left + t.right) / 2, (int)(t.top + t.bottom) / 2, (int)(n.left + n.right) / 2, (int)(n.top + n.bottom) / 2);
@@ -1909,6 +1913,7 @@ void layout_chrome()
     MoveWindow(g.view, left, top, std::max(1, (int)rc.right - left), std::max(1, bottom - top), TRUE);
     update_menu();
     trace_toc();
+    trace_nav();   // (the status bar may have moved without being drawn again)
 }
 
 // ---- the view's window -------------------------------------------------------------------------------------------------
