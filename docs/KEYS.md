@@ -137,6 +137,30 @@ The text keys are the Edit control's (below).
 
 A drag moves a picture larger than the window.
 
+## mupf (fixed, Acrobat Reader 6's where it had one)
+
+| Keys | Action |
+| --- | --- |
+| Ctrl+O, Ctrl+W, Ctrl+D, Ctrl+Q | open, close the document, Document Properties, exit |
+| Page Up, Page Down | the previous / next page (with facing: pair) |
+| Left, Right | the previous / next page; scroll sideways when the page is wider than the window |
+| Up, Down; the wheel; Shift+wheel | scroll (Single Page: past the page's end to the next) |
+| Space, Shift+Space, Backspace | a screen down / up |
+| Home, End | the first / last page |
+| Ctrl+G | Go To Page |
+| Alt+Left, Alt+Right | back, forward over jumps |
+| Ctrl++, Ctrl+-; Ctrl+wheel | zoom in / out (about the pointer with the wheel) |
+| Ctrl+1, Ctrl+0, Ctrl+2 | Actual Size, Fit Page, Fit Width |
+| Ctrl+], Ctrl+[ | rotate the view clockwise / counterclockwise |
+| Ctrl+F | the Find box |
+| Return, Shift+Return in the Find box; F3, Shift+F3 | search, the next / previous hit |
+| F4 | the Contents pane |
+| Ctrl+L | Full Screen (Esc leaves it) |
+| Return, Esc in the page box | go to the page typed, back to the pages |
+| Alt, F10, Alt+letter | the menu bar |
+
+A drag moves the pages; a click on a link follows it.
+
 ## Every program built on wux (fixed)
 
 **The Edit control** (luxpad's text, the address bar, the Filter and search boxes, every dialog field):

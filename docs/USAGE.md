@@ -1084,6 +1084,48 @@ the images role ("File types and programs"), so a double click on a picture open
 `LUXVIEW_TRACE=1` prints what it shows and draws on stdout (`title ...`, `shown NAME picture 784x523 of 6000x4000 rss ...`,
 `drawn 733x550 zoom 46%`), for scripts.
 
+## mupf, the document viewer
+
+`mupf FILE` opens a PDF, an XPS or OpenXPS document, an EPUB, a comic book (CBZ), FictionBook or MOBI file, drawn by MuPDF
+(built when MuPDF's library is installed: docs/BUILDING.md); File > Open (Ctrl+O) is the Open dialog, and a file dropped on
+the window opens too. XP had no PDF viewer of its own: the window is in the idiom of XP's programs, and where a choice had
+a model it is Acrobat Reader 6's (2003): the menu bar (File, Edit, View, Go, Help) with Acrobat's items and keys, the pages
+on the application workspace grey (128) with a black frame and a dark shadow, the page layouts, the Find box in the
+toolbar. The toolbar's order and glyphs (Open | Previous Page, Next Page, the page box "N of M" | Zoom Out, Zoom In | Actual
+Size, Fit Page, Fit Width | the Find box, Find Next) are mupf's; there is no shot of Acrobat 6 to measure.
+
+It never waits on a document: MuPDF opens, draws and searches on a thread of its own while the window scrolls and zooms
+with what is there; a page not drawn yet is white, a page drawn at another zoom is shown scaled until the new one comes,
+and a page scrolled past before it is drawn is dropped (its drawing stopped). The pages around the current one are kept
+drawn within 64 MB, two ahead and one behind drawn before you get there; a page too large to draw whole (past 24 MB: Letter
+above about 270%) is drawn as the part in view.
+
+- **Page Layout** (View): Single Page (one page at a time; Page Down, Space at its bottom, the wheel past it go to the next),
+  Continuous (the pages in a column, the default), Facing and Continuous - Facing (two pages side by side), Show Cover Page (with
+  facing: the first page alone on the right, then 2-3, 4-5, as a book opens).
+- **Zoom**: Zoom In and Out (Ctrl++ and Ctrl+-, Ctrl+wheel about the pointer) go by Acrobat's steps, 8.33% to 1600%; Actual Size
+  (Ctrl+1) is 100%, 96 pixels to the inch; Fit Page (Ctrl+0) and Fit Width (Ctrl+2) follow the window's size. Rotate
+  Clockwise and Counterclockwise (Ctrl+], Ctrl+[) turn the view, not the file.
+- **Pages**: Page Up and Page Down, Left and Right when the page fits the width, Home and End; Space scrolls a screen; the page box
+  in the toolbar (type a number, Return) and Go To Page (Ctrl+G); Back and Forward (Alt+Left, Alt+Right) return over jumps (a
+  page box, a contents entry, a link, Home, End). A drag moves the pages (Acrobat's hand); a click on a link follows it, to its
+  page or, for a web address, with xdg-open.
+- **Contents** (View > Contents, F4, the cross in its title closes it): the document's outline in a tree on the left, as XP's
+  Explorer bar; a click on an entry goes there, the arrow keys go as they select. The splitter beside it sizes it.
+- **Find** (Ctrl+F: the toolbar's Find box): Return searches from the current page on (case does not matter) and shows the first
+  hit; Return again, F3 or Find Next go to the next hit, Shift+Return and Shift+F3 back. Every hit is marked yellow, the one
+  shown in the selection colour; the status bar says "Match 2 of 7" or "No matches were found.".
+- **Full Screen** (Ctrl+L) shows the pages alone; Escape leaves it. **Document Properties** (Ctrl+D) is the Explorer's Properties
+  sheet of the file.
+
+A password-protected document is not opened yet (it says so); there is no printing, no text selection and no bookmarks.
+What mupf remembers: `~/.local/state/lhde/mupf.ini` (`[window]` `x`, `y`, `width`, `height`, `maximized`; `[view]` `toolbar`,
+`statusbar`, `contents` and `contents_width`, `layout` (0 Single Page .. 3 Continuous - Facing), `cover`, `zoom_mode` (0 a zoom,
+1 Fit Page, 2 Fit Width) and `zoom` in thousandths), written when it exits. `mupf.desktop` (installed with it) claims what MuPDF
+opens, lhde's defaults give it PDF, XPS and EPUB, and it is the first choice of the document viewer's role. `MUPF_TRACE=1`
+prints what it opens, draws and shows on stdout (`opened 2 pages PDF 1.4`, `rendered 1 816x1056 of 816x1056 at 100%`,
+`shown 1:X,Y,WxH ...`, `status MESSAGE|Page 1 of 2|100%`, `tocitem INDEX X Y TITLE`), for scripts.
+
 ## File types and programs (lhde-mime)
 
 Which program opens a file comes from the freedesktop files every program reads (docs/SETTINGS.md "Associations" has the

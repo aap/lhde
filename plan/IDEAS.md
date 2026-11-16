@@ -41,7 +41,6 @@ becomes a plan file (plan/NAME.md, with a status line) when work on it starts, a
 ## Programs
 - 2026-11-12 aap: luxpad++ on SciTE: Scintilla's win32 variant on wux's GDI and the SciTEWin frontend (needs RegisterClipboardFormat,
   more GDI, CreateProcess/CreatePipe shims); the test of wux's drawing at volume. Scintilla and Lexilla are not in ~/othersrc yet.
-- 2026-10-31 aap: mupf, a PDF viewer on mupdf with a simple GUI for the TOC and bookmarks (the name is decided).
 - 2026-11-01 aap: a more elaborate calendar to supplement the sidebar's.
 - 2026-11-14 aap: ood, a binary editor after xvi32 with the focus on octal, for PDPs: 8-bit bytes, 16/18/36-bit words, encodings
   (larsb's pdp10-its-disassembler), ascii, FIODEC, flexowriter, squoze/radix50, sixbit.

@@ -79,6 +79,8 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
 - 2026-11-14 Ctrl+digit posts WM_CHAR of the digit (Ctrl+1 gives 0x31); Windows gives none for Ctrl+1..9.
 - 2026-11-16 An Alt+key accelerator (TranslateAcceleratorW eats the WM_SYSKEYDOWN) leaves defwnd.cpp's Alt-alone flag set, so releasing
   Alt enters the menu bar's keyboard mode; Windows does not. mupf passes its Alt+Left/Right on to DefWindowProc instead.
+- 2026-11-16 (check) ImageList_AddMasked of a 32 bpp CreateCompatibleBitmap strip drawn with GDI on magenta: some cells came out with a
+  black background instead of transparent (mupf's first toolbar glyphs: the magnifiers, the page glyphs; the folder and arrows were right).
 - 2026-11-01 flxp-filedialog: a right click right after the pointer arrives opens the context menu and closes it at once (Xvfb,
   xdotool's burst press+release past a synchronous grab, as menus.sh works around) (check with a real mouse).
 
@@ -111,6 +113,10 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
 - 2026-10-31 The ReactOS styles' start panel user pane is a blank white band (no StartPanel UserPane art?): compare with ReactOS.
 - 2026-11-01 lhde-import annotates every source's files author = microsoft (lhdetree.py's xput), ReactOS's and the Pexels photos
   too: a source ini key (author = reactos, ...) would say whose they are.
+
+## Applications and file types
+- 2026-11-16 roles.ini's pdf role hands its PostScript, EPS and DjVu types to the role's program whatever it opens: mupf (and
+  mupdf before it) open neither; the role wants a per-type fallback to a program that claims the type.
 
 ## Catalogue
 - 2026-11-15 lhde-cat: relations cannot be confirmed from the command line; resolve applies every conflicting op, not the winner only.
