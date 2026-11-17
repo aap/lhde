@@ -6,6 +6,10 @@
    theme's values into the block of custom properties below (from liblhde's resolver and the visual style through ut-dump)
    and keeps the sections of the look, wrapping some in a media query; docs/USAGE.md "Firefox". Firefox 160's element ids
    (browser.xhtml, browser/omni.ja).
+   Customize mode: the layout sections (common, explorer, longhorn, ff4, xp) are nested in
+   :where(:root:not([customizing])) by lhde-firefox (CSS nesting; a rule's own `:root` there is written `&:root`), so that
+   Firefox's Customize Toolbar shows its own plain layout, its palette and drop targets, and the look comes back when it is
+   left; the colours and the glass (lhglass, lhopaque, ff4glass) stay. :where keeps every rule's specificity as written.
 
    The explorer section, measured against flxp's header (flxp/shell/ui/lhheader.cpp, navbar.cpp: 4074's framelet geometry, 4051's navigation bar):
    the band's height (the travel art's: 54 rows), its picture (the style's Navbar::Rebar BACKGROUND with its sizing margins),
@@ -20,6 +24,7 @@
 
 /*@VARS@*/
 
+/*@IF common@*/
 /* ---- both families ---------------------------------------------------------------------------------------------------- */
 #navigator-toolbox {
   display: flex !important;
@@ -61,6 +66,24 @@
   --toolbarbutton-outer-padding: 1px !important;
   --toolbarbutton-border-radius: 2px !important;
 }
+
+/* the navigation bar's order, whatever the user's layout (browser.uiCustomization.state) holds and whatever is pinned to
+   it: Back, Forward, the address, reload and stop, the search box, then every other item at the right, so that an item
+   the user or an extension adds lands there too (flex order on the customizable target's children, not places in the
+   layout): the other buttons in the layout's order, downloads, the account, the extensions' own buttons (pinned
+   extension actions), the extensions menu; Firefox's menu button follows outside the target. A choice, after Firefox's
+   own default order of the buttons at the right */
+#nav-bar-customization-target > * { order: 10; }
+#nav-bar-customization-target > #back-button { order: 0; }
+#nav-bar-customization-target > #forward-button { order: 1; }
+#nav-bar-customization-target > #urlbar-container { order: 2; }
+#nav-bar-customization-target > #stop-reload-button { order: 3; }
+#nav-bar-customization-target > #search-container { order: 4; }
+#nav-bar-customization-target > #downloads-button { order: 11; }
+#nav-bar-customization-target > #fxa-toolbar-menu-button { order: 12; }
+#nav-bar-customization-target > :is(.unified-extensions-item, .webextension-browser-action) { order: 13; }
+#nav-bar-customization-target > #unified-extensions-button { order: 14; }
+/*@END@*/
 
 /*@IF explorer@*/
 /* ---- the Longhorn header band ----------------------------------------------------------------------------------------- */
@@ -202,9 +225,7 @@
 #forward-button[disabled] { background-image: var(--lhde-fwd-disabled) !important; }
 
 /* the address on the breadcrumb's row, from the crumbs' x; a field only while hovered or focused (flxp's address edit) */
-#stop-reload-button { order: 2; }
 #urlbar-container {
-  order: 1;
   flex: 1 1 auto !important;
   width: auto !important;
   max-width: none !important;
@@ -231,7 +252,6 @@
 
 /* the search box at the right, as flxp's */
 #search-container {
-  order: 3;
   --toolbar-field-color: #000000 !important;
   --toolbar-field-background-color: var(--lhde-search-bg) !important;
   --toolbarbutton-icon-fill: #000000 !important;
@@ -251,8 +271,7 @@
   border-radius: 0 !important;
 }
 #search-container .urlbar, #searchbar-new { --urlbar-height: var(--lhde-search-h) !important; min-height: var(--lhde-search-h) !important; }
-#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button,
-  #PanelUI-button, #library-button, #home-button, #stop-reload-button) { order: 4; }
+#nav-bar-customization-target > #stop-reload-button { order: 5; }    /* reload with the buttons after the search box */
 #PanelUI-button { margin-bottom: var(--lhde-row-bottom) !important; align-self: flex-end !important; }
 #PanelUI-menu-button, #unified-extensions-button, #fxa-toolbar-menu-button, #downloads-button { opacity: 0.9; }
 
@@ -308,8 +327,8 @@
    which takes the width, a round refresh after it, the favourites star at the right, document tabs below that band, then
    the page), built from flxp's Small header, the measured Longhorn header the file dialog and mupf use
    (flxp/shell/ui/lhheader.cpp): luxwm's caption keeps the title (Firefox's window title, the page's: the concept's title
-   over the address), then the 36-row band with the travel art (SmallTravelBack, 27 x 36 at x 2, filling the band), the
-   address on the row of its disc (centre row 14), the star (SmallFavorites, 27 x 27 on the band's first row, 4 px from
+   over the address), then the 36-row band with the travel pair (SmallTravelBack, 27 x 36 at x 2, filling the band, and
+   SmallTravelFwd right after it), the address on the row of their discs (centre row 14), the star (SmallFavorites, 27 x 27 on the band's first row, 4 px from
    the right edge). Under the glass themes the band and the tab row are luxwm's glass ([extend_frame] firefox = band + tab
    row: lhde-firefox install); the tab row's last 2 rows are left to luxwm's inner edge lines, which then run on down the
    sides: the outline the content sits in, as on flxp.
@@ -318,10 +337,10 @@
    corners, a dark outer edge and a light inner one, a glossy fill lighter in its upper half, the selected one near white
    and the others the glass lightened, dark grey text; all over the line the content starts below): the shapes and the
    relations of the colours to the glass, as translucent fills, since the glass is the theme's and not the concept's peach.
-   Choices: no Forward button (the concept has none; Alt+Right and the Back button's history menu remain); the address
-   searches too, no search box (Firefox's Settings > Search can put it back); the hamburger and the other toolbar buttons
-   kept small between the refresh button and the star; the tab text in flxp's breadcrumb face and size (12 px Segoe UI,
-   the concept's 13 px at its own scale) and 16 px favicons (the concept's 13 px icons are drawn ones). The concept's large
+   Choices: Forward beside Back as flxp's Small header has it (the concept shows Back alone); the address searches too,
+   no search box (Firefox's Settings > Search can put it back); the hamburger, the extensions' buttons and the other
+   toolbar buttons kept small between the refresh button and the star, in the order of the "both families" section; the
+   tab text in flxp's breadcrumb face and size (12 px Segoe UI, the concept's 13 px at its own scale) and 16 px favicons (the concept's 13 px icons are drawn ones). The concept's large
    title in the band is left out: luxwm's caption has it (a fixed ::after of the selected tab with attr(label) can show it
    in the band, but a row of its own would be the Medium header's 54 rows of glass). */
 :root {
@@ -400,46 +419,73 @@
 }
 #nav-bar-customization-target > *, #PanelUI-button { margin-block: 0 !important; }
 
-/* Back: the style's art (flxp's Small Back plate; Vista's TravelBand left half), or a drawn orb */
-#nav-bar #back-button {
+/* Back and Forward: the style's pair as flxp's Small header draws it (SmallTravelBack 27 x 36 at x 2, SmallTravelFwd at
+   its ANIMATIONBUTTONRECT's left, 27: right after it, both filling the band; Vista's TravelBand halves side by side; 4051's
+   big pair scaled), Back's plate over Forward's where a style overlaps them, or drawn orbs. Firefox's history menus stay
+   on both (right-click, or hold the button) */
+#nav-bar #back-button, #nav-bar #forward-button {
   align-self: flex-start !important;
   box-sizing: border-box !important;
-  width: var(--lhde-lh-back-w) !important;
-  min-width: var(--lhde-lh-back-w) !important;
   height: var(--lhde-lh-band-h) !important;
-  margin: 0 !important;
   padding: 0 !important;
   border-radius: 0 !important;
-  background: var(--lhde-lh-back-normal) no-repeat !important;
-  background-size: var(--lhde-lh-back-size) !important;
-  background-position: 0 var(--lhde-lh-back-top) !important;
-  list-style-image: var(--lhde-lh-back-glyph) !important;
   -moz-context-properties: fill !important;
   fill: #ffffff !important;
   opacity: 1 !important;
 }
+#nav-bar #back-button {
+  position: relative !important;
+  z-index: 1 !important;
+  width: var(--lhde-lh-back-w) !important;
+  min-width: var(--lhde-lh-back-w) !important;
+  margin: 0 !important;
+  background: var(--lhde-lh-back-normal) no-repeat !important;
+  background-size: var(--lhde-lh-back-size) !important;
+  background-position: var(--lhde-lh-back-pos) var(--lhde-lh-back-top) !important;
+  list-style-image: var(--lhde-lh-back-glyph) !important;
+}
+#nav-bar #forward-button {
+  width: var(--lhde-lh-fwd-w) !important;
+  min-width: var(--lhde-lh-fwd-w) !important;
+  margin: 0 0 0 var(--lhde-lh-fwd-dx) !important;
+  background: var(--lhde-lh-fwd-normal) no-repeat !important;
+  background-size: var(--lhde-lh-fwd-size) !important;
+  background-position: var(--lhde-lh-fwd-pos) var(--lhde-lh-fwd-top) !important;
+  list-style-image: var(--lhde-lh-fwd-glyph) !important;
+}
 #nav-bar #back-button:not([disabled]):hover { background-image: var(--lhde-lh-back-hot) !important; }
 #nav-bar #back-button:not([disabled]):is(:hover:active, [open]) { background-image: var(--lhde-lh-back-pressed) !important; }
 #nav-bar #back-button[disabled] { background-image: var(--lhde-lh-back-disabled) !important; }
-#nav-bar #back-button > .toolbarbutton-icon {
+#nav-bar #forward-button:not([disabled]):hover { background-image: var(--lhde-lh-fwd-hot) !important; }
+#nav-bar #forward-button:not([disabled]):is(:hover:active, [open]) { background-image: var(--lhde-lh-fwd-pressed) !important; }
+#nav-bar #forward-button[disabled] { background-image: var(--lhde-lh-fwd-disabled) !important; }
+#nav-bar :is(#back-button, #forward-button) > .toolbarbutton-icon {
   box-sizing: border-box !important;
-  width: var(--lhde-lh-orb-size) !important;
-  height: var(--lhde-lh-orb-size) !important;
   min-height: 0 !important;
-  margin: calc(14px - var(--lhde-lh-orb-size) / 2) 0 0 3px !important;
-  padding: calc(var(--lhde-lh-orb-size) / 8) !important;
   border-radius: 50% !important;
-  background: var(--lhde-lh-back-orb) !important;
-  box-shadow: var(--lhde-lh-back-edge) !important;
   align-self: flex-start !important;
 }
-#nav-bar #back-button[disabled] > .toolbarbutton-icon { opacity: 1 !important; filter: saturate(0.2) !important; }
-#nav-bar #forward-button { display: none !important; }
+#nav-bar #back-button > .toolbarbutton-icon {
+  width: var(--lhde-lh-back-orb-size) !important;
+  height: var(--lhde-lh-back-orb-size) !important;
+  margin: calc(14px - var(--lhde-lh-back-orb-size) / 2) 0 0 3px !important;
+  padding: calc(var(--lhde-lh-back-orb-size) / 8) !important;
+  background: var(--lhde-lh-back-orb) !important;
+  box-shadow: var(--lhde-lh-back-edge) !important;
+}
+#nav-bar #forward-button > .toolbarbutton-icon {
+  width: var(--lhde-lh-fwd-orb-size) !important;
+  height: var(--lhde-lh-fwd-orb-size) !important;
+  margin: calc(14px - var(--lhde-lh-fwd-orb-size) / 2) 0 0 3px !important;
+  padding: calc(var(--lhde-lh-fwd-orb-size) / 8) !important;
+  background: var(--lhde-lh-fwd-orb) !important;
+  box-shadow: var(--lhde-lh-fwd-edge) !important;
+}
+#nav-bar :is(#back-button, #forward-button)[disabled] > .toolbarbutton-icon { opacity: 1 !important; filter: saturate(0.2) !important; }
 
-/* the address: in the breadcrumb row's place, from 8 px after the Back art to the refresh button; the concept's
+/* the address: in the breadcrumb row's place, from 8 px after the travel art to the refresh button; the concept's
    shallow recessed field (21 rows, 3 px corners, the dark top edge and its shade) */
 #urlbar-container {
-  order: 1;
   flex: 1 1 auto !important;
   width: auto !important;
   max-width: none !important;
@@ -478,7 +524,7 @@
 #identity-box, #page-action-buttons, #star-button-box { opacity: 0.85; }
 
 /* refresh and stop: one small round button after the address (the concept's 20 px grey-blue ball), Firefox's glyphs */
-#nav-bar #stop-reload-button { order: 2; margin-inline: 0 4px !important; }
+#nav-bar #stop-reload-button { margin-inline: 0 4px !important; }
 #nav-bar #stop-reload-button > .toolbarbutton-1 { margin: 0 !important; padding: 0 !important; }
 #nav-bar #stop-reload-button > .toolbarbutton-1 > .toolbarbutton-icon {
   box-sizing: border-box !important;
@@ -502,9 +548,7 @@
 
 /* the other buttons small on the glass, then the star: the bookmarks menu button (flxp's favorites star) at the band's
    right as flxp has it, the style's star art, or a drawn ball */
-#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button, #library-button,
-  #home-button, #search-container) { order: 3; }
-#nav-bar .toolbarbutton-1:not(#back-button, #reload-button, #stop-button, #bookmarks-menu-button) {
+#nav-bar .toolbarbutton-1:not(#back-button, #forward-button, #reload-button, #stop-button, #bookmarks-menu-button) {
   --toolbarbutton-inner-padding: 3px !important;
   --toolbarbutton-outer-padding: 1px !important;
   --toolbarbutton-border-radius: 3px !important;
@@ -996,7 +1040,7 @@
 
 /* the location bar and the search box: white, Firefox 4's borders (rgba(0,0,0,.25) .32 .37 from the top), 1 px inset
    shade and the white line under it, 3 px between the bar's items */
-#urlbar-container { order: 1; flex: 1 1 auto !important; margin-inline: 3px 0 !important; padding: 0 !important; }
+#urlbar-container { flex: 1 1 auto !important; margin-inline: 3px 0 !important; padding: 0 !important; }
 #urlbar, #urlbar-input, #searchbar, .tab-label { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
 #urlbar .urlbar-background, #searchbar-new .urlbar-background, #search-container .urlbar-background, #searchbar {
   border-radius: 3px !important;
@@ -1008,7 +1052,7 @@
 }
 /* reload and stop at the location bar's end, as Firefox 4 had them in it: reload-stop-go.png's 14 px cells, the separator
    rgba(0,0,0,.25), hot reload blue, stop red (its gradients) */
-#nav-bar #stop-reload-button { order: 2; margin-inline: -1px 0 !important; }
+#nav-bar #stop-reload-button { margin-inline: -1px 0 !important; }
 #nav-bar #stop-reload-button > .toolbarbutton-1 { margin: 0 !important; }
 #nav-bar #stop-reload-button > .toolbarbutton-1 > .toolbarbutton-icon {
   box-sizing: content-box !important;
@@ -1041,7 +1085,6 @@
 }
 #urlbar-container:has(+ #stop-reload-button) #urlbar .urlbar-background { border-start-end-radius: 0 !important; border-end-end-radius: 0 !important; }
 #search-container {
-  order: 3;
   min-width: var(--lhde-search-w) !important;
   max-width: var(--lhde-search-w) !important;
   width: var(--lhde-search-w) !important;
@@ -1049,8 +1092,6 @@
   font-family: var(--lhde-font) !important;
   font-size: var(--lhde-font-size) !important;
 }
-#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button, #library-button,
-  #home-button, #PanelUI-button) { order: 4; }
 /*@END@*/
 
 /*@IF ff4glass@*/
@@ -1248,10 +1289,6 @@
   background: var(--lhde-xp-face) !important;
   border-bottom: 1px solid var(--lhde-xp-shadow) !important;
 }
-#urlbar-container { order: 1; }
-#stop-reload-button { order: 2; }
-#search-container { order: 3; }
-#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button, #library-button) { order: 4; }
 #urlbar, #urlbar-input, #searchbar, .tab-label { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
 #urlbar .urlbar-background, #searchbar-new .urlbar-background, #search-container .urlbar-background {
   border-radius: 0 !important;

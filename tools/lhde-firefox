@@ -146,6 +146,11 @@ class Style:
         m = re.match(r'(\d+)[,\s]+(\d+)[,\s]+(\d+)', v or '')        # "216, 210, 189" (v4) or "216 210 189" (XP)
         return tuple(int(x) for x in m.groups()) if m else None
 
+    def rect(self, cls, part, prop):
+        """a RECT property as (left, top, right, bottom), None where the style has none"""
+        m = re.match(r'(-?\d+)[,\s]+(-?\d+)[,\s]+(-?\d+)[,\s]+(-?\d+)', self.get(cls, part, prop) or '')
+        return tuple(int(x) for x in m.groups()) if m else None
+
     def size_of(self, cls, part, state='NORMAL'):
         out = self.call('--size-of', cls, part, state, 'true')
         m = re.match(r'(\d+)x(\d+)', (out or '').strip())
@@ -526,6 +531,8 @@ LH_GLASS_ROWS = LH_BAND + LH_TAB + 2
 # under a glass theme stands while Firefox's window can be transparent (a compositor runs), Firefox 4's look otherwise
 LOOKS = ('longhorn', 'ff4', 'explorer')
 LOOK_NAMES = {'longhorn': 'Longhorn navigation', 'ff4': 'Firefox 4', 'explorer': 'Longhorn Explorer band', 'xp': 'XP toolbar'}
+# the sections that lay the chrome out, left to Firefox while it customizes (scoped()); the colour and glass ones stay
+SCOPED = ('common', 'explorer', 'longhorn', 'ff4', 'xp')
 TRANSPARENT = '(-moz-gtk-csd-transparency-available)'
 OPAQUE = 'not (-moz-gtk-csd-transparency-available)'
 
@@ -647,7 +654,8 @@ def ff4_vars(t, style, art):
 
 def lh_vars(style, art):
     """the Longhorn navigation (--look longhorn): flxp's Small header (flxp/shell/ui/lhheader.cpp: the travel art
-    SmallTravelBack::AnimationButton 27x36 at x 2 filling the 36-row band, its disc's centre on row 14, the star
+    SmallTravelBack::AnimationButton 27x36 at x 2 filling the 36-row band, SmallTravelFwd beside it at its
+    ANIMATIONBUTTONRECT's left (27), the discs' centres on row 14, the star
     SmallFavorites 27x27 on the band's top row 4 px from the right edge) with the tabs of the 2004 browser concept below
     it; Vista's TravelBand (5048, 5112: what luxnav draws there) where the style has no AnimationButton art, orbs drawn
     after the concept without a style"""
@@ -655,26 +663,41 @@ def lh_vars(style, art):
          'lh-travel-x': '%dpx' % NAV_X}
     states = ('normal', 'hot', 'pressed', 'disabled')
     edge = '0 0 0 1px rgba(0, 0, 0, 0.25), inset 0 1px rgba(255, 255, 255, 0.6)'   # a drawn orb's edge
-    back = fav = None
+    travel = fav = None
     if art and style.ok():
-        if style.has('SmallTravelBack::AnimationButton'):
-            # 4074's styles and RealAero: the even Small pair (flxp's header_small_buttons auto); the Back plate alone
-            s = style.size_of('SmallTravelBack::AnimationButton', 'ABBACKGROUND')
-            if s:
-                back = {'cls': 'SmallTravelBack::AnimationButton', 'part': 'ABBACKGROUND', 'w': s[0], 'h': s[1], 'img': s, 'top': 0}
-        elif style.has('TravelBack::AnimationButton'):
-            # 4051's: the big Back art scaled to the band (flxp box-filters the pair to it: header_small_buttons uneven)
-            s = style.size_of('TravelBack::AnimationButton', 'ABBACKGROUND')
-            if s:
-                back = {'cls': 'TravelBack::AnimationButton', 'part': 'ABBACKGROUND', 'w': round(s[0] * LH_BAND / s[1]),
-                        'h': LH_BAND, 'img': s, 'top': 0}
+        ab = 'ANIMATIONBUTTONRECT'
+        if style.has('SmallTravelBack::AnimationButton') and style.has('SmallTravelFwd::AnimationButton'):
+            # 4074's styles and RealAero: the even Small pair (flxp's header_small_buttons auto); Forward at its
+            # ANIMATIONBUTTONRECT's left (navbar.cpp sfwd_x: 27 under 4074, right after Back's 27 x 36), else Back's width
+            b = style.size_of('SmallTravelBack::AnimationButton', 'ABBACKGROUND')
+            f = style.size_of('SmallTravelFwd::AnimationButton', 'ABBACKGROUND')
+            if b and f:
+                r = style.rect('SmallTravelFwd::AnimationButton', 'ABBACKGROUND', ab)
+                travel = [{'cls': 'SmallTravelBack::AnimationButton', 'part': 'ABBACKGROUND', 'w': b[0], 'h': b[1], 'img': b,
+                           'top': 0, 'pos': 0, 'dx': 0},
+                          {'cls': 'SmallTravelFwd::AnimationButton', 'part': 'ABBACKGROUND', 'w': f[0], 'h': f[1], 'img': f,
+                           'top': 0, 'pos': 0, 'dx': r[0] if r and r[0] > 0 else b[0]}]
+        elif style.has('TravelBack::AnimationButton') and style.has('TravelFwd::AnimationButton'):
+            # 4051's: the big pair scaled to the band (flxp box-filters it: header_small_buttons uneven), Forward at
+            # TravelFwd's ANIMATIONBUTTONRECT left scaled (lhheader.cpp shrunk().fwd_x), else at Back's scaled width
+            b = style.size_of('TravelBack::AnimationButton', 'ABBACKGROUND')
+            f = style.size_of('TravelFwd::AnimationButton', 'ABBACKGROUND')
+            if b and f:
+                k = LH_BAND / b[1]
+                r = style.rect('TravelFwd::AnimationButton', 'ABBACKGROUND', ab)
+                travel = [{'cls': 'TravelBack::AnimationButton', 'part': 'ABBACKGROUND', 'w': round(b[0] * k), 'h': LH_BAND,
+                           'img': b, 'top': 0, 'pos': 0, 'dx': 0},
+                          {'cls': 'TravelFwd::AnimationButton', 'part': 'ABBACKGROUND', 'w': round(f[0] * k),
+                           'h': round(f[1] * k), 'img': f, 'top': 0, 'pos': 0,
+                           'dx': round((r[0] if r and r[0] > 0 else b[0]) * k)}]
         elif style.has('TravelBand'):
-            # Vista's (5048, 5112): TRAVELBUTTONS is Back | Forward, one picture per state; Back is its left half, the orb
-            # centred on the Small band's disc row (14), as luxnav centres it on its orb row
+            # Vista's (5048, 5112): TRAVELBUTTONS is Back | Forward, one picture per state; Back its left half, Forward
+            # its right half beside it, the orbs centred on the Small band's disc row (14), as luxnav centres them
             s = style.size_of('TravelBand', 'TRAVELBUTTONS')
             if s:
-                back = {'cls': 'TravelBand', 'part': 'TRAVELBUTTONS', 'w': s[0] // 2, 'h': s[1], 'img': s,
-                        'top': max(0, 14 - s[1] // 2)}
+                half = {'cls': 'TravelBand', 'part': 'TRAVELBUTTONS', 'w': s[0] // 2, 'h': s[1], 'img': s,
+                        'top': max(0, 14 - s[1] // 2), 'size': s}
+                travel = [dict(half, pos=0, dx=0), dict(half, pos=-(s[0] // 2), dx=s[0] // 2)]
         for cls in ('SmallFavorites::AnimationButton', 'Favorites::AnimationButton'):
             if style.has(cls):
                 s = style.size_of(cls, 'ABBACKGROUND')
@@ -682,27 +705,37 @@ def lh_vars(style, art):
                     k = 27 / s[1] if s[1] > 27 else 1           # the normal star at the small one's height (flxp: two thirds)
                     fav = {'cls': cls, 'w': round(s[0] * k), 'h': round(s[1] * k), 'img': s}
                 break
-    if back:
+    for name, b in zip(('back', 'fwd'), travel or ()):
         for st in states:
-            p = os.path.join(art, 'lh-back-%s.png' % st)
-            if not style.render(back['cls'], back['part'], st.upper(), back['img'][0], back['img'][1], p):
-                back = None
+            p = os.path.join(art, 'lh-%s-%s.png' % (name, st))
+            if not style.render(b['cls'], b['part'], st.upper(), b['img'][0], b['img'][1], p):
+                travel = None
                 break
-            v['lh-back-' + st] = url(p)
-    if back:
-        v.update({'lh-back-w': '%dpx' % back['w'], 'lh-back-h': '%dpx' % back['h'], 'lh-back-top': '%dpx' % back['top'],
-                  'lh-back-size': '%dpx %dpx' % ((back['w'] * 2, back['h']) if back['cls'] == 'TravelBand' else (back['w'], back['h'])),
-                  'lh-back-glyph': 'none', 'lh-back-orb': 'none', 'lh-orb-size': '0px',
-                  'lh-back-edge': 'none'})
+            v['lh-%s-%s' % (name, st)] = url(p)
+        if not travel:
+            break
+    if travel:
+        for name, b in zip(('back', 'fwd'), travel):
+            sw, sh = b.get('size', (b['w'], b['h']))
+            v.update({'lh-%s-w' % name: '%dpx' % b['w'], 'lh-%s-h' % name: '%dpx' % b['h'],
+                      'lh-%s-top' % name: '%dpx' % b['top'], 'lh-%s-pos' % name: '%dpx' % b['pos'],
+                      'lh-%s-size' % name: '%dpx %dpx' % (sw, sh), 'lh-%s-glyph' % name: 'none',
+                      'lh-%s-orb' % name: 'none', 'lh-%s-orb-size' % name: '0px', 'lh-%s-edge' % name: 'none'})
+        # Forward's left from Back's right: flxp draws it at travel_x + fwd_dx, under Back's plate where they overlap
+        v['lh-fwd-dx'] = '%dpx' % (travel[1]['dx'] - travel[0]['w'])
     else:
-        # no art: a glass ball after the concept's green Back (30 px there; 21 here, the Small art's disc) with Firefox's
-        # arrow; taste
+        # no art: glass balls after the concept's green Back (30 px there; 21 here, the Small art's disc) with Firefox's
+        # arrows, a smaller Forward tucked against it as flxp's drawn pair has it (lhheader.cpp draw_button: the forward
+        # disc 10.5 to Back's 16.5, so 14 px to 21); taste
         for st in states:
-            v['lh-back-' + st] = 'none'
-        v.update({'lh-back-w': '27px', 'lh-back-h': '27px', 'lh-back-top': '3px', 'lh-back-size': 'auto', 'lh-orb-size': '21px',
-                  'lh-back-edge': edge,
-                  'lh-back-glyph': 'url("chrome://browser/skin/back.svg")',
-                  'lh-back-orb': 'radial-gradient(circle at 50% 28%, #e4f8d8 0, #6cc94a 42%, #23831d 78%, #155e12 100%)'})
+            v['lh-back-' + st] = v['lh-fwd-' + st] = 'none'
+        orb = 'radial-gradient(circle at 50% 28%, #e4f8d8 0, #6cc94a 42%, #23831d 78%, #155e12 100%)'
+        v.update({'lh-back-w': '27px', 'lh-back-h': '27px', 'lh-back-top': '3px', 'lh-back-pos': '0px',
+                  'lh-back-size': 'auto', 'lh-back-orb-size': '21px', 'lh-back-edge': edge,
+                  'lh-back-glyph': 'url("chrome://browser/skin/back.svg")', 'lh-back-orb': orb,
+                  'lh-fwd-w': '18px', 'lh-fwd-h': '27px', 'lh-fwd-top': '3px', 'lh-fwd-pos': '0px', 'lh-fwd-dx': '-2px',
+                  'lh-fwd-size': 'auto', 'lh-fwd-orb-size': '14px', 'lh-fwd-edge': edge,
+                  'lh-fwd-glyph': 'url("chrome://browser/skin/forward.svg")', 'lh-fwd-orb': orb})
     if fav:
         for st in states:
             p = os.path.join(art, 'lh-fav-%s.png' % st)
@@ -730,6 +763,15 @@ def composited():
     out = run(['xprop', '-root', '_LHWM_COMPOSITED'])
     m = re.search(r'=\s*(\d+)', out or '')
     return m.group(1) == '1' if m else None
+
+
+def scoped(css):
+    """a layout section nested in :where(:root:not([customizing])): none of it applies while Firefox's Customize Toolbar
+    is open (the root's [customizing]), so its palette, its wrapped items and drop targets are Firefox's own layout. A
+    nested rule is the scope's descendant; one of the root itself (a selector starting with :root) is &:root. :where adds
+    no specificity, so the cascade between the sections stays as written"""
+    css = re.sub(r'(?m)(^|,\s*):root\b', r'\1&:root', css)
+    return ':where(:root:not([customizing])) {\n%s}\n' % css
 
 
 def generate(theme, out=None, look=None):
@@ -800,11 +842,15 @@ def generate(theme, out=None, look=None):
     head = rules + [':root {\n' + ''.join('  --lhde-%s: %s;\n' % kv for kv in sorted(v.items())) + '}']
     text = first + template().replace('/*@VARS@*/', '\n'.join(head))
 
+    blocks['common'] = ''
+
     def section(m):
         if m.group(1) not in blocks:
             return ''
-        cond = blocks[m.group(1)]
-        return '@media %s {\n%s}\n' % (cond, m.group(2)) if cond else m.group(2)
+        cond, body = blocks[m.group(1)], m.group(2)
+        if m.group(1) in SCOPED:
+            body = scoped(body)
+        return '@media %s {\n%s}\n' % (cond, body) if cond else body
     text = re.sub(r'/\*@IF (\w+)@\*/\n(.*?)/\*@END@\*/\n', section, text, flags=re.S)
     if out:
         with open(out, 'w') as f:
@@ -912,6 +958,25 @@ def strip_block(text):
     return re.sub(r'\n?' + re.escape(BEGIN) + r'.*?' + re.escape(END) + r'\n?', '\n', text, flags=re.S).strip('\n')
 
 
+def ui_version():
+    """the toolbar layout's version of the installed Firefox (CustomizableUI's kVersion, 28 in Firefox 160), read from its
+    omni.ja; 28 when it cannot be found"""
+    import zipfile
+    fx = shutil.which('firefox')
+    base = os.path.dirname(os.path.realpath(fx)) if fx else ''
+    for ja in (os.path.join(base, 'omni.ja'), os.path.join(base, 'browser', 'omni.ja')):
+        try:
+            with zipfile.ZipFile(ja) as z:
+                for n in z.namelist():
+                    if n.endswith(('/CustomizableUI.sys.mjs', '/CustomizableUI.jsm')):
+                        m = re.search(rb'\bkVersion = (\d+);', z.read(n))
+                        if m:
+                            return int(m.group(1))
+        except (OSError, zipfile.BadZipFile):
+            pass
+    return 28
+
+
 def place_widget(prof, widget):
     """once: a widget into the navigation bar (prefs.js's browser.uiCustomization.state): the search box after the address
     (Firefox 4's look, the Explorer band), the bookmarks menu button at the end (the Longhorn navigation's star: flxp's
@@ -930,7 +995,11 @@ def place_widget(prof, widget):
             except ValueError:
                 pass
     if state is None:
-        state = {'placements': {}, 'currentVersion': 0}
+        # a profile Firefox has not saved a layout in yet (never started, or never customized): the state is marked as
+        # of this Firefox's layout version, else Firefox takes it for one of before 2014 at its next start and migrates
+        # it, and its version 9 step swaps the bookmarks menu button for the library button (which its Proton step then
+        # takes away as unused)
+        state = {'placements': {}, 'currentVersion': ui_version()}
     nav = state.setdefault('placements', {}).get('nav-bar')
     if nav is None:
         nav = ['back-button', 'forward-button', 'stop-reload-button', 'urlbar-container', 'downloads-button',
