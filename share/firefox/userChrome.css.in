@@ -628,8 +628,11 @@
   font-size: var(--lhde-font-size) !important;
   color: #45403d !important;
 }
-.tabbrowser-tab:not([pinned]) { max-width: 200px !important; }
-.tabbrowser-tab + .tabbrowser-tab { margin-inline-start: -1px !important; }
+/* the tabs' widest through Firefox's own variable: its max-width rule for a tab gives way to its own closing rule (a tab
+   being closed loses [fadein] and goes to max-width 0.1px, then is removed when that transition ends, or after 3 s if
+   its max-width is 0.1px); a max-width set on the tab itself kept the closed tab's space open, and the tab, for good */
+#tabbrowser-tabs { --tab-max-width: 200px !important; }
+.tabbrowser-tab[fadein] + .tabbrowser-tab { margin-inline-start: -1px !important; }
 .tabbrowser-tab, .tab-stack, .tab-content { height: var(--lhde-lh-tab-h) !important; max-height: var(--lhde-lh-tab-h) !important; min-height: 0 !important; }
 .tab-stack { align-items: stretch !important; }
 .tab-background {
