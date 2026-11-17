@@ -116,7 +116,7 @@ X properties) gets it from settings.ini: `[extend_frame] CLASS = left right top 
 name in lowercase, docs/SETTINGS.md). When luxwm manages a 32-bit (ARGB) window without `_LHWM_EXTEND_FRAME` whose class or
 instance has such a key, it writes the property on the client itself, and from there on everything is as if the client had
 (the plate, the picom rule below, the header pixmap). A 24-bit window is left alone: it cannot show the plate. `lhde-firefox
-install` writes `firefox = 0 0 61 0` under the glass themes (the Longhorn navigation's band and tab row; 28, the tab row, for
+install` writes `firefox = 0 0 69 0` under the glass themes (the Longhorn navigation's band and tab row; 28, the tab row, for
 Firefox 4's look; docs/USAGE.md "Firefox").
 
 picom (`session/picom-glass.conf`, rule `_LHWM_EXTEND_FRAME@`): such clients get no `blur-background` (the dec window under them

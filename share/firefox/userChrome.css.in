@@ -323,26 +323,32 @@
 
 /*@IF longhorn@*/
 /* ---- the Longhorn navigation ----------------------------------------------------------------------------------------- */
-/* After the Longhorn browser concepts of 2004 (glass window, a round Back at the left, the page's title over the address,
-   which takes the width, a round refresh after it, the favourites star at the right, document tabs below that band, then
-   the page), built from flxp's Small header, the measured Longhorn header the file dialog and mupf use
-   (flxp/shell/ui/lhheader.cpp): luxwm's caption keeps the title (Firefox's window title, the page's: the concept's title
-   over the address), then the 36-row band with the travel pair (SmallTravelBack, 27 x 36 at x 2, filling the band, and
-   SmallTravelFwd right after it), the address on the row of their discs (centre row 14), the star (SmallFavorites, 27 x 27 on the band's first row, 4 px from
-   the right edge). Under the glass themes the band and the tab row are luxwm's glass ([extend_frame] firefox = band + tab
-   row: lhde-firefox install); the tab row's last 2 rows are left to luxwm's inner edge lines, which then run on down the
-   sides: the outline the content sits in, as on flxp.
+/* After the Longhorn browser concepts of 2004 (glass window, a big round Back at the left with a small Forward tucked
+   against it, the page's title over the address, which takes the width, a round refresh after it, the favourites star at
+   the right, document tabs below that band, then the page), built from flxp's Longhorn header (flxp/shell/ui/lhheader.cpp):
+   luxwm's caption keeps the title (Firefox's window title, the page's: the concept's title over the address), then the
+   band with the travel pair of flxp's Medium and Large headers at its own size, measured in the lab against a Large-header
+   flxp under aero4074 (TravelBack 38 x 54 at x 2 and TravelFwd 27 x 54 right after it at its ANIMATIONBUTTONRECT's left,
+   38, both from the band's first row; the Back disc 30 px on columns 8..37 and rows 7..35, Forward's 19 px on columns
+   42..60 and rows 12..30, both centred on row 21), the band as tall as the pair's button part, the rows above its history
+   drop-down (TravelBack's CUSTOMSPLITRECT top: 44 under 4074's styles; flxp's Large band is the art's 54, and Firefox has
+   the history menu on a right-click or a held click instead), the address and the star (SmallFavorites 27 x 27, the
+   Large header's small star, 4 px from the right edge) centred on the discs' row: the concept's arrangement, a choice
+   where flxp's Large header has the title and the crumbs there and the star at its foot. Under the glass themes the band
+   and the tab row are luxwm's glass ([extend_frame] firefox = band + tab row: lhde-firefox install); the tab row's last
+   2 rows are left to luxwm's inner edge lines, which then run on down the sides: the outline the content sits in, as on
+   flxp.
    From the concept (its first picture: the address 21 rows with corners of 3 px, a dark top edge with a soft shade under
    it, lighter sides and bottom, the fill hardly lighter than the glass; tabs 23 rows high, square-shouldered with 2 px
    corners, a dark outer edge and a light inner one, a glossy fill lighter in its upper half, the selected one near white
    and the others the glass lightened, dark grey text; all over the line the content starts below): the shapes and the
    relations of the colours to the glass, as translucent fills, since the glass is the theme's and not the concept's peach.
-   Choices: Forward beside Back as flxp's Small header has it (the concept shows Back alone); the address searches too,
-   no search box (Firefox's Settings > Search can put it back); the hamburger, the extensions' buttons and the other
-   toolbar buttons kept small between the refresh button and the star, in the order of the "both families" section; the
-   tab text in flxp's breadcrumb face and size (12 px Segoe UI, the concept's 13 px at its own scale) and 16 px favicons (the concept's 13 px icons are drawn ones). The concept's large
-   title in the band is left out: luxwm's caption has it (a fixed ::after of the selected tab with attr(label) can show it
-   in the band, but a row of its own would be the Medium header's 54 rows of glass). */
+   Choices: the address searches too, no search box (Firefox's Settings > Search can put it back); the hamburger, the
+   extensions' buttons and the other toolbar buttons kept small between the refresh button and the star, in the order of
+   the "both families" section; the tab text in flxp's breadcrumb face and size (12 px Segoe UI, the concept's 13 px at
+   its own scale) and 16 px favicons (the concept's 13 px icons are drawn ones). The concept's large title in the band is
+   left out: luxwm's caption has it (a fixed ::after of the selected tab with attr(label) can show it in the band, but a
+   row of its own would be more glass where less was asked for). */
 :root {
   --toolbar-bgcolor: transparent !important;
   --toolbar-color: #000000 !important;
@@ -396,7 +402,7 @@
   background-image: none !important;
 }
 
-/* the band: the Small header's 36 rows; the travel art from x 2, everything else centred on its disc's row (14) */
+/* the band: the travel pair's button rows; the travel art from x 2, everything else centred on its discs' row */
 #nav-bar {
   position: relative !important;
   box-sizing: border-box !important;
@@ -410,19 +416,21 @@
   background-image: linear-gradient(rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.28)),
                     linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)) !important;
   background-size: 1px 21px, 1px 21px !important;
-  background-position: right calc(var(--lhde-lh-fav-w) + 11px) top 4px, right calc(var(--lhde-lh-fav-w) + 10px) top 4px !important;
+  background-position: right calc(var(--lhde-lh-fav-w) + 11px) top calc(var(--lhde-lh-disc-cy) - 10px),
+                       right calc(var(--lhde-lh-fav-w) + 10px) top calc(var(--lhde-lh-disc-cy) - 10px) !important;
   background-repeat: no-repeat !important;
 }
 #nav-bar-customization-target, #PanelUI-button {
-  height: 28px !important;
+  height: calc(var(--lhde-lh-disc-cy) * 2) !important;
   align-items: center !important;
 }
 #nav-bar-customization-target > *, #PanelUI-button { margin-block: 0 !important; }
 
-/* Back and Forward: the style's pair as flxp's Small header draws it (SmallTravelBack 27 x 36 at x 2, SmallTravelFwd at
-   its ANIMATIONBUTTONRECT's left, 27: right after it, both filling the band; Vista's TravelBand halves side by side; 4051's
-   big pair scaled), Back's plate over Forward's where a style overlaps them, or drawn orbs. Firefox's history menus stay
-   on both (right-click, or hold the button) */
+/* Back and Forward: the style's pair as flxp's Medium and Large headers draw it (TravelBack 38 x 54 at x 2, TravelFwd
+   at its ANIMATIONBUTTONRECT's left, 38: right after it, cut at the band's foot, where their drop-down begins; Vista's
+   TravelBand halves side by side), Back's plate over Forward's where a style overlaps them, or drawn orbs on flxp's
+   cells for its drawn pair. Firefox's history menus stay on both (right-click, or hold the button); the hot and pressed
+   pictures show the top of their drop-down's frame at the band's foot, as the art has it */
 #nav-bar #back-button, #nav-bar #forward-button {
   align-self: flex-start !important;
   box-sizing: border-box !important;
@@ -468,7 +476,7 @@
 #nav-bar #back-button > .toolbarbutton-icon {
   width: var(--lhde-lh-back-orb-size) !important;
   height: var(--lhde-lh-back-orb-size) !important;
-  margin: calc(14px - var(--lhde-lh-back-orb-size) / 2) 0 0 3px !important;
+  margin: calc(var(--lhde-lh-disc-cy) - var(--lhde-lh-back-orb-size) / 2) 0 0 var(--lhde-lh-back-orb-x) !important;
   padding: calc(var(--lhde-lh-back-orb-size) / 8) !important;
   background: var(--lhde-lh-back-orb) !important;
   box-shadow: var(--lhde-lh-back-edge) !important;
@@ -476,7 +484,7 @@
 #nav-bar #forward-button > .toolbarbutton-icon {
   width: var(--lhde-lh-fwd-orb-size) !important;
   height: var(--lhde-lh-fwd-orb-size) !important;
-  margin: calc(14px - var(--lhde-lh-fwd-orb-size) / 2) 0 0 3px !important;
+  margin: calc(var(--lhde-lh-disc-cy) - var(--lhde-lh-fwd-orb-size) / 2) 0 0 var(--lhde-lh-fwd-orb-x) !important;
   padding: calc(var(--lhde-lh-fwd-orb-size) / 8) !important;
   background: var(--lhde-lh-fwd-orb) !important;
   box-shadow: var(--lhde-lh-fwd-edge) !important;
@@ -555,7 +563,7 @@
 }
 #nav-bar #bookmarks-menu-button {
   position: absolute !important;
-  top: 0 !important;
+  top: calc(var(--lhde-lh-disc-cy) - var(--lhde-lh-fav-h) / 2) !important;
   right: 4px !important;
   width: var(--lhde-lh-fav-w) !important;
   height: var(--lhde-lh-fav-h) !important;
@@ -574,7 +582,7 @@
   box-sizing: border-box !important;
   width: var(--lhde-lh-fav-orb-size) !important;
   height: var(--lhde-lh-fav-orb-size) !important;
-  margin: calc(14px - var(--lhde-lh-fav-orb-size) / 2) 0 0 calc(13px - var(--lhde-lh-fav-orb-size) / 2) !important;
+  margin: calc((var(--lhde-lh-fav-h) - var(--lhde-lh-fav-orb-size)) / 2) 0 0 calc((var(--lhde-lh-fav-w) - var(--lhde-lh-fav-orb-size)) / 2) !important;
   padding: calc(var(--lhde-lh-fav-orb-size) / 7) !important;
   border-radius: 50% !important;
   background: var(--lhde-lh-fav-orb) !important;
@@ -672,9 +680,10 @@
 
 /*@IF lhglass@*/
 /* the glass themes, composited: the band and the tab row are transparent in an ARGB window (mozilla.widget.use-argb-visuals)
-   over luxwm's glass plate (_LHWM_EXTEND_FRAME from settings.ini [extend_frame] firefox = 0 0 61 0: the band's 36 rows, the
-   tabs' 23 and luxwm's 2 lines; docs/CLIENT-PROTOCOL.md "Extended frames"); everything below them opaque. The menu bar,
-   shown, pushes the tabs below the glass: the tab row then gets the caption's colour behind it (flxp's look without glass) */
+   over luxwm's glass plate (_LHWM_EXTEND_FRAME from settings.ini [extend_frame] firefox = 0 0 69 0 under 4074's styles:
+   the band's 44 rows, the tabs' 23 and luxwm's 2 lines; docs/CLIENT-PROTOCOL.md "Extended frames"); everything below
+   them opaque. The menu bar, shown, pushes the tabs below the glass: the tab row then gets the caption's colour behind it
+   (flxp's look without glass) */
 :root, #main-window, body, #navigator-toolbox {
   background: transparent !important;
   appearance: none !important;

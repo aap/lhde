@@ -133,7 +133,9 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
 - 2026-11-16 lhde-firefox, glass themes: [extend_frame] is fixed, so the menu bar, shown (Alt), pushes the tab row below luxwm's glass
   (the caption's colour behind it then) and lies in the glass without luxwm's side lines; luxwm could follow _NET_WM_OPAQUE_REGION.
 - 2026-11-16 lhde-firefox's Longhorn navigation: Back, Forward and the star keep the active art in an inactive window (flxp takes the
-  style's Inactive variants, Jade's SmallInactiveTravelBack); Firefox's CSS can switch on :-moz-window-inactive.
+  style's Inactive variants, Jade's InactiveTravelBack); Firefox's CSS can switch on :-moz-window-inactive.
+- 2026-11-17 lhde-firefox's Longhorn navigation: hot or pressed, the big travel pair shows the top of its drop-down's frame cut at the
+  band's foot (rows 33..43 of the art; the band ends where the drop-down begins); flxp shows the whole drop-down.
 - 2026-11-16 lhde-firefox: the search box's engine button (Firefox 160's moz-button .searchmode-switcher) keeps its grey pill; neither
   ::part(button) nor --button-background-color from userChrome.css reaches it (Firefox 4's engine icon sat on the field).
 - 2026-11-17 lhde-firefox, ff4 look: the address squares its right corners for reload by DOM adjacency
