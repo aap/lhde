@@ -308,8 +308,8 @@
    which takes the width, a round refresh after it, the favourites star at the right, document tabs below that band, then
    the page), built from flxp's Small header, the measured Longhorn header the file dialog and mupf use
    (flxp/shell/ui/lhheader.cpp): luxwm's caption keeps the title (Firefox's window title, the page's: the concept's title
-   over the address), then the 36-row band with the travel art (SmallTravelBack, 27 x 36 at x 2, filling the band), the
-   address on the row of its disc (centre row 14), the star (SmallFavorites, 27 x 27 on the band's first row, 4 px from
+   over the address), then the 36-row band with the travel pair (SmallTravelBack, 27 x 36 at x 2, filling the band, and
+   SmallTravelFwd right after it), the address on the row of their discs (centre row 14), the star (SmallFavorites, 27 x 27 on the band's first row, 4 px from
    the right edge). Under the glass themes the band and the tab row are luxwm's glass ([extend_frame] firefox = band + tab
    row: lhde-firefox install); the tab row's last 2 rows are left to luxwm's inner edge lines, which then run on down the
    sides: the outline the content sits in, as on flxp.
@@ -318,10 +318,10 @@
    corners, a dark outer edge and a light inner one, a glossy fill lighter in its upper half, the selected one near white
    and the others the glass lightened, dark grey text; all over the line the content starts below): the shapes and the
    relations of the colours to the glass, as translucent fills, since the glass is the theme's and not the concept's peach.
-   Choices: no Forward button (the concept has none; Alt+Right and the Back button's history menu remain); the address
-   searches too, no search box (Firefox's Settings > Search can put it back); the hamburger and the other toolbar buttons
-   kept small between the refresh button and the star; the tab text in flxp's breadcrumb face and size (12 px Segoe UI,
-   the concept's 13 px at its own scale) and 16 px favicons (the concept's 13 px icons are drawn ones). The concept's large
+   Choices: Forward beside Back as flxp's Small header has it (the concept shows Back alone); the address searches too,
+   no search box (Firefox's Settings > Search can put it back); the hamburger, the extensions' buttons and the other
+   toolbar buttons kept small between the refresh button and the star, in the order of the "both families" section; the
+   tab text in flxp's breadcrumb face and size (12 px Segoe UI, the concept's 13 px at its own scale) and 16 px favicons (the concept's 13 px icons are drawn ones). The concept's large
    title in the band is left out: luxwm's caption has it (a fixed ::after of the selected tab with attr(label) can show it
    in the band, but a row of its own would be the Medium header's 54 rows of glass). */
 :root {
@@ -400,43 +400,71 @@
 }
 #nav-bar-customization-target > *, #PanelUI-button { margin-block: 0 !important; }
 
-/* Back: the style's art (flxp's Small Back plate; Vista's TravelBand left half), or a drawn orb */
-#nav-bar #back-button {
+/* Back and Forward: the style's pair as flxp's Small header draws it (SmallTravelBack 27 x 36 at x 2, SmallTravelFwd at
+   its ANIMATIONBUTTONRECT's left, 27: right after it, both filling the band; Vista's TravelBand halves side by side; 4051's
+   big pair scaled), Back's plate over Forward's where a style overlaps them, or drawn orbs. Firefox's history menus stay
+   on both (right-click, or hold the button) */
+#nav-bar #back-button, #nav-bar #forward-button {
   align-self: flex-start !important;
   box-sizing: border-box !important;
-  width: var(--lhde-lh-back-w) !important;
-  min-width: var(--lhde-lh-back-w) !important;
   height: var(--lhde-lh-band-h) !important;
-  margin: 0 !important;
   padding: 0 !important;
   border-radius: 0 !important;
-  background: var(--lhde-lh-back-normal) no-repeat !important;
-  background-size: var(--lhde-lh-back-size) !important;
-  background-position: 0 var(--lhde-lh-back-top) !important;
-  list-style-image: var(--lhde-lh-back-glyph) !important;
   -moz-context-properties: fill !important;
   fill: #ffffff !important;
   opacity: 1 !important;
 }
+#nav-bar #back-button {
+  position: relative !important;
+  z-index: 1 !important;
+  width: var(--lhde-lh-back-w) !important;
+  min-width: var(--lhde-lh-back-w) !important;
+  margin: 0 !important;
+  background: var(--lhde-lh-back-normal) no-repeat !important;
+  background-size: var(--lhde-lh-back-size) !important;
+  background-position: var(--lhde-lh-back-pos) var(--lhde-lh-back-top) !important;
+  list-style-image: var(--lhde-lh-back-glyph) !important;
+}
+#nav-bar #forward-button {
+  width: var(--lhde-lh-fwd-w) !important;
+  min-width: var(--lhde-lh-fwd-w) !important;
+  margin: 0 0 0 var(--lhde-lh-fwd-dx) !important;
+  background: var(--lhde-lh-fwd-normal) no-repeat !important;
+  background-size: var(--lhde-lh-fwd-size) !important;
+  background-position: var(--lhde-lh-fwd-pos) var(--lhde-lh-fwd-top) !important;
+  list-style-image: var(--lhde-lh-fwd-glyph) !important;
+}
 #nav-bar #back-button:not([disabled]):hover { background-image: var(--lhde-lh-back-hot) !important; }
 #nav-bar #back-button:not([disabled]):is(:hover:active, [open]) { background-image: var(--lhde-lh-back-pressed) !important; }
 #nav-bar #back-button[disabled] { background-image: var(--lhde-lh-back-disabled) !important; }
-#nav-bar #back-button > .toolbarbutton-icon {
+#nav-bar #forward-button:not([disabled]):hover { background-image: var(--lhde-lh-fwd-hot) !important; }
+#nav-bar #forward-button:not([disabled]):is(:hover:active, [open]) { background-image: var(--lhde-lh-fwd-pressed) !important; }
+#nav-bar #forward-button[disabled] { background-image: var(--lhde-lh-fwd-disabled) !important; }
+#nav-bar :is(#back-button, #forward-button) > .toolbarbutton-icon {
   box-sizing: border-box !important;
-  width: var(--lhde-lh-orb-size) !important;
-  height: var(--lhde-lh-orb-size) !important;
   min-height: 0 !important;
-  margin: calc(14px - var(--lhde-lh-orb-size) / 2) 0 0 3px !important;
-  padding: calc(var(--lhde-lh-orb-size) / 8) !important;
   border-radius: 50% !important;
-  background: var(--lhde-lh-back-orb) !important;
-  box-shadow: var(--lhde-lh-back-edge) !important;
   align-self: flex-start !important;
 }
-#nav-bar #back-button[disabled] > .toolbarbutton-icon { opacity: 1 !important; filter: saturate(0.2) !important; }
-#nav-bar #forward-button { display: none !important; }
+#nav-bar #back-button > .toolbarbutton-icon {
+  width: var(--lhde-lh-back-orb-size) !important;
+  height: var(--lhde-lh-back-orb-size) !important;
+  margin: calc(14px - var(--lhde-lh-back-orb-size) / 2) 0 0 3px !important;
+  padding: calc(var(--lhde-lh-back-orb-size) / 8) !important;
+  background: var(--lhde-lh-back-orb) !important;
+  box-shadow: var(--lhde-lh-back-edge) !important;
+}
+#nav-bar #forward-button > .toolbarbutton-icon {
+  width: var(--lhde-lh-fwd-orb-size) !important;
+  height: var(--lhde-lh-fwd-orb-size) !important;
+  margin: calc(14px - var(--lhde-lh-fwd-orb-size) / 2) 0 0 3px !important;
+  padding: calc(var(--lhde-lh-fwd-orb-size) / 8) !important;
+  background: var(--lhde-lh-fwd-orb) !important;
+  box-shadow: var(--lhde-lh-fwd-edge) !important;
+}
+#nav-bar :is(#back-button, #forward-button)[disabled] > .toolbarbutton-icon { opacity: 1 !important; filter: saturate(0.2) !important; }
 
-/* the address: in the breadcrumb row's place, from 8 px after the Back art to the refresh button; the concept's
+/* the address: in the breadcrumb row's place, from 8 px after the travel art to the refresh button; the concept's
    shallow recessed field (21 rows, 3 px corners, the dark top edge and its shade) */
 #urlbar-container {
   order: 1;
