@@ -1334,21 +1334,22 @@ navigation for a theme with glass (aero4074, aero5048, aero5112, aerovision), un
 compositor (`_LHWM_COMPOSITED` 0, asked only for the session's own theme), and Firefox 4's look for the others (Jade 4074,
 Slate, Basic).
 
-**The Longhorn navigation** (`longhorn`) is the Longhorn browser of the 2004 concepts: a glass window, a round Back button
-at the left, the page's title over the address, which takes the width, a small round refresh button after it, the
-favourites star at the right, and document tabs below that band, the page under them. It is built on flxp's Small header,
-the measured Longhorn header of the file dialog and mupf (`flxp/shell/ui/lhheader.cpp`), and measured against a
+**The Longhorn navigation** (`longhorn`) is the Longhorn browser of the 2004 concepts: a glass window, round Back and
+Forward buttons at the left, the page's title over the address, which takes the width, a small round refresh button after
+it, the favourites star at the right, and document tabs below that band, the page under them. It is built on flxp's Small
+header, the measured Longhorn header of the file dialog and mupf (`flxp/shell/ui/lhheader.cpp`), and measured against a
 Small-header flxp in the lab: luxwm's caption keeps the title (Firefox's window title is the page's), then a 36-row band
-with the style's Small travel art (`SmallTravelBack`, 27 x 36 at x 2; Vista's TravelBand under 5048 and 5112, 4051's big
-art scaled), the address on the row of its disc and the style's Small star (`SmallFavorites`, on the bookmarks menu
+with the style's Small travel pair (`SmallTravelBack`, 27 x 36 at x 2, and `SmallTravelFwd` right after it, at its
+`ANIMATIONBUTTONRECT`'s left; Vista's TravelBand halves under 5048 and 5112, 4051's big pair scaled, smaller drawn orbs
+without a style), the address on the row of their discs and the style's Small star (`SmallFavorites`, on the bookmarks menu
 button) 4 px from the right edge, in the same rows and columns as flxp's. From the concept come the shapes and the colour
 relations: the address a shallow recessed field (21 rows, 3 px corners, a dark top edge with a soft shade under it), the
 tabs 23 rows high, square-shouldered, a dark outer and a light inner edge, a glossy fill lighter in its upper half, the
 selected one near white and the others the glass lightened, dark grey text, side by side from the window's left edge;
-their fills are translucent over the theme's glass rather than the concept's peach colours. Choices: no Forward button
-(the concept has none; Alt+Right and the Back button's history menu remain), no search box (the address searches as well;
-Firefox's Settings > Search puts it back, drawn as the address field), the other toolbar buttons and Firefox's menu
-button small between refresh and the star, the tabs' text in flxp's breadcrumb face and size, 16 px favicons. Under a
+their fills are translucent over the theme's glass rather than the concept's peach colours. Choices: Forward beside Back
+as flxp has it (the concept shows Back alone; both keep Firefox's history menu on a right-click or a held click), no
+search box (the address searches as well; Firefox's Settings > Search puts it back, drawn as the address field), the
+other toolbar buttons and Firefox's menu button small between refresh and the star, the tabs' text in flxp's breadcrumb face and size, 16 px favicons. Under a
 glass theme the band and the tab row are luxwm's glass: Firefox's window is ARGB and transparent there, and luxwm extends
 its glass 61 rows into it (settings.ini `[extend_frame] firefox`: the band's 36, the tabs' 23 and the 2 rows of luxwm's
 inner edge lines, which run under the tabs and on down the sides, the outline the page sits in, as on flxp). The menu bar
@@ -1379,6 +1380,15 @@ and Firefox 4's round Back button with Forward against it (taste: Firefox 4's ow
 the theme's font directory. Which parts are measured against flxp, which are taken from the concept and which are taste is
 said in the template, `share/firefox/userChrome.css.in`. Menus, context menus and popups are GTK's and keep its theme.
 
+In every look the navigation bar keeps one order whatever its layout holds: Back, Forward, the address, reload and stop,
+the search box where there is one, then everything else at the right: the other buttons in the layout's order, downloads,
+the account, the extensions' own buttons (pinned ones such as uBlock Origin's), the extensions menu, Firefox's menu button
+(and under the Longhorn navigation the star last). It is flex order on the toolbar's items, not a layout of its own, so a
+button pinned or dragged anywhere in the bar lands in that group. Firefox's Customize Toolbar (right-click a toolbar, or
+View > Toolbars > Customize) works as usual: while it is open the look's layout steps aside (the colours and the glass
+stay), the palette and the drop targets are Firefox's own, and the look comes back with Done; what was moved keeps its
+place in the layout, ordered as above.
+
 The window frame and caption are luxwm's in every look, with its window buttons, its shadow and its glass, the same as the
 other windows'. Firefox 4 drew the tabs into its own title bar on Vista and 7; here Firefox does not. With
 `browser.tabs.inTitlebar = 1` (and client-side decorations, `MOZ_GTK_TITLEBAR_DECORATION=client`) Firefox asks for no frame,
@@ -1398,7 +1408,7 @@ with the real caption. `install` sets `browser.tabs.inTitlebar = 0`.
 first. It writes `chrome/userChrome.css` (a userChrome.css of your own is kept as `userChrome.css.lhde-backup` and put back
 by `remove`) and `chrome/lhde-art/`: Firefox 4's pictures copied from `share/firefox/ff4` into `lhde-art/ff4/`, and the
 parts rendered from your visual style by ut-dump, since Firefox cannot read a .msstyles (the caption's last row; the Small
-Back and star and the menu band of the Longhorn navigation; for `--look explorer` and the XP themes the band, the travel
+Back, Forward and star and the menu band of the Longhorn navigation; for `--look explorer` and the XP themes the band, the travel
 buttons, the menu band, the tabs and the toolbar button frames).
 Fonts stay in the Windows tree and are referenced by `file://` URL. Without the Windows tree (or with only the free ReactOS
 import) the CSS uses colours and Firefox 4's pictures alone. Into `user.js`, in a marked block that `remove` takes out again:
@@ -1412,7 +1422,11 @@ theme `install` also writes `[extend_frame] firefox` into settings.ini, `0 0 61 
 (an opaque row inside the extension has no edge at the sides). It takes the key out again for a theme without glass and on
 `remove`. Once, into `prefs.js` (kept as `prefs.js.lhde-backup`), the look's widget is placed in the navigation bar (the
 search box after the address; for the Longhorn navigation the bookmarks menu button, its star) and the bookmarks toolbar set
-to hidden unless shown; both are ordinary toolbar settings afterwards, and `remove` leaves them.
+to hidden unless shown; both are ordinary toolbar settings afterwards (Customize moves or removes them, and `install`
+does not place a widget again that is anywhere already), and `remove` leaves them. In a profile Firefox has not saved a
+layout in yet, a new never-started one too, the layout is written as of the installed Firefox's layout version (read from
+its `omni.ja`), so that Firefox's first start keeps it rather than migrating it as an old one. It goes into `prefs.js` and
+not `user.js` on purpose: `user.js` is applied at every start and would undo what the user customizes.
 
 Firefox reads userChrome.css at start only, and nothing runs `lhde-firefox` on a theme switch yet: run `install` again after
 switching (the place for that hook is luxshell's `lh-theme` handler in runtime.lua, which sees every `_LH_THEME` change).
