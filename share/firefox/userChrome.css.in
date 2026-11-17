@@ -62,6 +62,22 @@
   --toolbarbutton-border-radius: 2px !important;
 }
 
+/* the navigation bar's order, whatever the user's layout (browser.uiCustomization.state) holds and whatever is pinned to
+   it: Back, Forward, the address, reload and stop, the search box, then every other item at the right, so that an item
+   the user or an extension adds lands there too (flex order on the customizable target's children, not places in the
+   layout): the other buttons in the layout's order, downloads, the account, the extensions' own buttons (pinned
+   extension actions), the extensions menu; Firefox's menu button follows outside the target. A choice, after Firefox's
+   own default order of the buttons at the right */
+#nav-bar-customization-target > * { order: 10; }
+#nav-bar-customization-target > #back-button { order: 0; }
+#nav-bar-customization-target > #forward-button { order: 1; }
+#nav-bar-customization-target > #urlbar-container { order: 2; }
+#nav-bar-customization-target > #stop-reload-button { order: 3; }
+#nav-bar-customization-target > #search-container { order: 4; }
+#nav-bar-customization-target > #downloads-button { order: 11; }
+#nav-bar-customization-target > #fxa-toolbar-menu-button { order: 12; }
+#nav-bar-customization-target > :is(.unified-extensions-item, .webextension-browser-action) { order: 13; }
+#nav-bar-customization-target > #unified-extensions-button { order: 14; }
 /*@IF explorer@*/
 /* ---- the Longhorn header band ----------------------------------------------------------------------------------------- */
 :root {
@@ -202,9 +218,7 @@
 #forward-button[disabled] { background-image: var(--lhde-fwd-disabled) !important; }
 
 /* the address on the breadcrumb's row, from the crumbs' x; a field only while hovered or focused (flxp's address edit) */
-#stop-reload-button { order: 2; }
 #urlbar-container {
-  order: 1;
   flex: 1 1 auto !important;
   width: auto !important;
   max-width: none !important;
@@ -231,7 +245,6 @@
 
 /* the search box at the right, as flxp's */
 #search-container {
-  order: 3;
   --toolbar-field-color: #000000 !important;
   --toolbar-field-background-color: var(--lhde-search-bg) !important;
   --toolbarbutton-icon-fill: #000000 !important;
@@ -251,8 +264,7 @@
   border-radius: 0 !important;
 }
 #search-container .urlbar, #searchbar-new { --urlbar-height: var(--lhde-search-h) !important; min-height: var(--lhde-search-h) !important; }
-#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button,
-  #PanelUI-button, #library-button, #home-button, #stop-reload-button) { order: 4; }
+#nav-bar-customization-target > #stop-reload-button { order: 5; }    /* reload with the buttons after the search box */
 #PanelUI-button { margin-bottom: var(--lhde-row-bottom) !important; align-self: flex-end !important; }
 #PanelUI-menu-button, #unified-extensions-button, #fxa-toolbar-menu-button, #downloads-button { opacity: 0.9; }
 
@@ -467,7 +479,6 @@
 /* the address: in the breadcrumb row's place, from 8 px after the travel art to the refresh button; the concept's
    shallow recessed field (21 rows, 3 px corners, the dark top edge and its shade) */
 #urlbar-container {
-  order: 1;
   flex: 1 1 auto !important;
   width: auto !important;
   max-width: none !important;
@@ -506,7 +517,7 @@
 #identity-box, #page-action-buttons, #star-button-box { opacity: 0.85; }
 
 /* refresh and stop: one small round button after the address (the concept's 20 px grey-blue ball), Firefox's glyphs */
-#nav-bar #stop-reload-button { order: 2; margin-inline: 0 4px !important; }
+#nav-bar #stop-reload-button { margin-inline: 0 4px !important; }
 #nav-bar #stop-reload-button > .toolbarbutton-1 { margin: 0 !important; padding: 0 !important; }
 #nav-bar #stop-reload-button > .toolbarbutton-1 > .toolbarbutton-icon {
   box-sizing: border-box !important;
@@ -530,9 +541,7 @@
 
 /* the other buttons small on the glass, then the star: the bookmarks menu button (flxp's favorites star) at the band's
    right as flxp has it, the style's star art, or a drawn ball */
-#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button, #library-button,
-  #home-button, #search-container) { order: 3; }
-#nav-bar .toolbarbutton-1:not(#back-button, #reload-button, #stop-button, #bookmarks-menu-button) {
+#nav-bar .toolbarbutton-1:not(#back-button, #forward-button, #reload-button, #stop-button, #bookmarks-menu-button) {
   --toolbarbutton-inner-padding: 3px !important;
   --toolbarbutton-outer-padding: 1px !important;
   --toolbarbutton-border-radius: 3px !important;
@@ -1024,7 +1033,7 @@
 
 /* the location bar and the search box: white, Firefox 4's borders (rgba(0,0,0,.25) .32 .37 from the top), 1 px inset
    shade and the white line under it, 3 px between the bar's items */
-#urlbar-container { order: 1; flex: 1 1 auto !important; margin-inline: 3px 0 !important; padding: 0 !important; }
+#urlbar-container { flex: 1 1 auto !important; margin-inline: 3px 0 !important; padding: 0 !important; }
 #urlbar, #urlbar-input, #searchbar, .tab-label { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
 #urlbar .urlbar-background, #searchbar-new .urlbar-background, #search-container .urlbar-background, #searchbar {
   border-radius: 3px !important;
@@ -1036,7 +1045,7 @@
 }
 /* reload and stop at the location bar's end, as Firefox 4 had them in it: reload-stop-go.png's 14 px cells, the separator
    rgba(0,0,0,.25), hot reload blue, stop red (its gradients) */
-#nav-bar #stop-reload-button { order: 2; margin-inline: -1px 0 !important; }
+#nav-bar #stop-reload-button { margin-inline: -1px 0 !important; }
 #nav-bar #stop-reload-button > .toolbarbutton-1 { margin: 0 !important; }
 #nav-bar #stop-reload-button > .toolbarbutton-1 > .toolbarbutton-icon {
   box-sizing: content-box !important;
@@ -1069,7 +1078,6 @@
 }
 #urlbar-container:has(+ #stop-reload-button) #urlbar .urlbar-background { border-start-end-radius: 0 !important; border-end-end-radius: 0 !important; }
 #search-container {
-  order: 3;
   min-width: var(--lhde-search-w) !important;
   max-width: var(--lhde-search-w) !important;
   width: var(--lhde-search-w) !important;
@@ -1077,8 +1085,6 @@
   font-family: var(--lhde-font) !important;
   font-size: var(--lhde-font-size) !important;
 }
-#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button, #library-button,
-  #home-button, #PanelUI-button) { order: 4; }
 /*@END@*/
 
 /*@IF ff4glass@*/
@@ -1276,10 +1282,6 @@
   background: var(--lhde-xp-face) !important;
   border-bottom: 1px solid var(--lhde-xp-shadow) !important;
 }
-#urlbar-container { order: 1; }
-#stop-reload-button { order: 2; }
-#search-container { order: 3; }
-#nav-bar-customization-target > :is(#downloads-button, #unified-extensions-button, #fxa-toolbar-menu-button, #library-button) { order: 4; }
 #urlbar, #urlbar-input, #searchbar, .tab-label { font-family: var(--lhde-font) !important; font-size: var(--lhde-font-size) !important; }
 #urlbar .urlbar-background, #searchbar-new .urlbar-background, #search-container .urlbar-background {
   border-radius: 0 !important;
