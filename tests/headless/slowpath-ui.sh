@@ -88,6 +88,14 @@ seen_at() {   # SECS PATTERN
     done
     return 1
 }
+# flxp's list did not come: whether flxp still runs (else how it ended: its exit status, 128 + a signal's number) and
+# the X server still answers, with the end of flxp's output; flxp is stopped after
+no_list() {   # NAME
+    if kill -0 $P 2>/dev/null; then _how="flxp still running"; kill $P 2>/dev/null; wait $P 2>/dev/null
+    else wait $P 2>/dev/null; _how="flxp gone before (exit status $?)"; fi
+    if _answers $D; then _how="$_how, the X server answers"; else _how="$_how, the X server $D does not answer"; fi
+    bad "$1: no list of $n within 30 s: $_how; flxp's last lines: $(tail -n 5 $T/out | tr '\n' '|')"
+}
 # until no thumbnail or listing line came for 2 s (or 40 s)
 settle() {
     _i=0; _m=-1
@@ -119,7 +127,7 @@ run() {   # NAME LIST-X LIST-Y (a point over the first item)
         "$B" --geometry 1100x900+0+0 "$F" > $T/out 2>&1 & P=$!
     W=$(wait_window 30 --class Flxp)
     n=$((FOLDERS + 2))
-    if ! t=$(seen_at 30 "^list: $n of $n"); then bad "$name: no list of $n within 30 s"; kill $P; wait $P 2>/dev/null; return; fi
+    if ! t=$(seen_at 30 "^list: $n of $n"); then no_list $name; return; fi
     paint=$((t - T0))
     ok "$name: the list of $n painted $paint ms after the start"
     xdotool windowfocus $W 2>/dev/null; sleep .3
@@ -176,7 +184,7 @@ hang() {
         "$B" --geometry 900x700+0+0 "$F" > $T/out 2>&1 & P=$!
     W=$(wait_window 30 --class Flxp)
     n=$((FOLDERS + 2))
-    if ! t=$(seen_at 30 "^list: $n of $n"); then bad "hang: no list of $n within 30 s"; kill $P; wait $P 2>/dev/null; return; fi
+    if ! t=$(seen_at 30 "^list: $n of $n"); then no_list hang; return; fi
     paint=$((t - T0))
     sleep 1
     mark=$(wc -l < $T/out)

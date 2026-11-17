@@ -164,6 +164,8 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   ~10 frames a second, and its glx backend on Xvfb does not show an ARGB window's new contents at all. The real session's
   picom glx frame time during a scroll (blur re-done over the whole screen each frame) is unmeasured; if mupf's autoscroll is
   still uneven there, time picom's frames (its --log-level=debug) before touching picom-glass.conf.
+- 2026-11-17 slowpath-ui.sh's hang case failed once in make check (2026-11-16) with "no list of 26": flxp was already gone at its
+  start (`kill: No such process`), no core file left, so killed or its X server gone; not reproduced in 34 runs under load. It now says how.
 - 2026-11-16 mupfheader.sh's behaviour part (MUPFHEADER_BEHAVIOUR) assumes the flxp header: under aerovision (lhnav draws it)
   no `lhheader crumb` lines are traced, so its drop-down, Back and first-segment checks fail (3 FAILs); slate4051, the default, passes.
 
