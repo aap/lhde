@@ -136,6 +136,9 @@ file (plan/*.md); wishes are plan/IDEAS.md. "(check)" marks an item that may alr
   style's Inactive variants, Jade's SmallInactiveTravelBack); Firefox's CSS can switch on :-moz-window-inactive.
 - 2026-11-16 lhde-firefox: the search box's engine button (Firefox 160's moz-button .searchmode-switcher) keeps its grey pill; neither
   ::part(button) nor --button-background-color from userChrome.css reaches it (Firefox 4's engine icon sat on the field).
+- 2026-11-17 lhde-firefox, ff4 look: the address squares its right corners for reload by DOM adjacency
+  (#urlbar-container:has(+ #stop-reload-button)); with another item between them in the layout, reload still follows the
+  address by flex order but the corners stay round.
 
 ## Catalogue
 - 2026-11-16 luxfind: the Properties sheet on a root that cannot be reached is refused (its General page stats the file); the
