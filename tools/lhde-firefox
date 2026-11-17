@@ -531,6 +531,8 @@ LH_GLASS_ROWS = LH_BAND + LH_TAB + 2
 # under a glass theme stands while Firefox's window can be transparent (a compositor runs), Firefox 4's look otherwise
 LOOKS = ('longhorn', 'ff4', 'explorer')
 LOOK_NAMES = {'longhorn': 'Longhorn navigation', 'ff4': 'Firefox 4', 'explorer': 'Longhorn Explorer band', 'xp': 'XP toolbar'}
+# the sections that lay the chrome out, left to Firefox while it customizes (scoped()); the colour and glass ones stay
+SCOPED = ('common', 'explorer', 'longhorn', 'ff4', 'xp')
 TRANSPARENT = '(-moz-gtk-csd-transparency-available)'
 OPAQUE = 'not (-moz-gtk-csd-transparency-available)'
 
@@ -763,6 +765,15 @@ def composited():
     return m.group(1) == '1' if m else None
 
 
+def scoped(css):
+    """a layout section nested in :where(:root:not([customizing])): none of it applies while Firefox's Customize Toolbar
+    is open (the root's [customizing]), so its palette, its wrapped items and drop targets are Firefox's own layout. A
+    nested rule is the scope's descendant; one of the root itself (a selector starting with :root) is &:root. :where adds
+    no specificity, so the cascade between the sections stays as written"""
+    css = re.sub(r'(?m)(^|,\s*):root\b', r'\1&:root', css)
+    return ':where(:root:not([customizing])) {\n%s}\n' % css
+
+
 def generate(theme, out=None, look=None):
     t = resolve(theme)
     style = Style(t.get('path_style', ''), t.get('VisualStyle_color', ''), t.get('VisualStyle_size', ''))
@@ -831,11 +842,15 @@ def generate(theme, out=None, look=None):
     head = rules + [':root {\n' + ''.join('  --lhde-%s: %s;\n' % kv for kv in sorted(v.items())) + '}']
     text = first + template().replace('/*@VARS@*/', '\n'.join(head))
 
+    blocks['common'] = ''
+
     def section(m):
         if m.group(1) not in blocks:
             return ''
-        cond = blocks[m.group(1)]
-        return '@media %s {\n%s}\n' % (cond, m.group(2)) if cond else m.group(2)
+        cond, body = blocks[m.group(1)], m.group(2)
+        if m.group(1) in SCOPED:
+            body = scoped(body)
+        return '@media %s {\n%s}\n' % (cond, body) if cond else body
     text = re.sub(r'/\*@IF (\w+)@\*/\n(.*?)/\*@END@\*/\n', section, text, flags=re.S)
     if out:
         with open(out, 'w') as f:

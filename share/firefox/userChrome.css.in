@@ -6,6 +6,10 @@
    theme's values into the block of custom properties below (from liblhde's resolver and the visual style through ut-dump)
    and keeps the sections of the look, wrapping some in a media query; docs/USAGE.md "Firefox". Firefox 160's element ids
    (browser.xhtml, browser/omni.ja).
+   Customize mode: the layout sections (common, explorer, longhorn, ff4, xp) are nested in
+   :where(:root:not([customizing])) by lhde-firefox (CSS nesting; a rule's own `:root` there is written `&:root`), so that
+   Firefox's Customize Toolbar shows its own plain layout, its palette and drop targets, and the look comes back when it is
+   left; the colours and the glass (lhglass, lhopaque, ff4glass) stay. :where keeps every rule's specificity as written.
 
    The explorer section, measured against flxp's header (flxp/shell/ui/lhheader.cpp, navbar.cpp: 4074's framelet geometry, 4051's navigation bar):
    the band's height (the travel art's: 54 rows), its picture (the style's Navbar::Rebar BACKGROUND with its sizing margins),
@@ -20,6 +24,7 @@
 
 /*@VARS@*/
 
+/*@IF common@*/
 /* ---- both families ---------------------------------------------------------------------------------------------------- */
 #navigator-toolbox {
   display: flex !important;
@@ -78,6 +83,8 @@
 #nav-bar-customization-target > #fxa-toolbar-menu-button { order: 12; }
 #nav-bar-customization-target > :is(.unified-extensions-item, .webextension-browser-action) { order: 13; }
 #nav-bar-customization-target > #unified-extensions-button { order: 14; }
+/*@END@*/
+
 /*@IF explorer@*/
 /* ---- the Longhorn header band ----------------------------------------------------------------------------------------- */
 :root {
