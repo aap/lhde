@@ -958,6 +958,25 @@ def strip_block(text):
     return re.sub(r'\n?' + re.escape(BEGIN) + r'.*?' + re.escape(END) + r'\n?', '\n', text, flags=re.S).strip('\n')
 
 
+def ui_version():
+    """the toolbar layout's version of the installed Firefox (CustomizableUI's kVersion, 28 in Firefox 160), read from its
+    omni.ja; 28 when it cannot be found"""
+    import zipfile
+    fx = shutil.which('firefox')
+    base = os.path.dirname(os.path.realpath(fx)) if fx else ''
+    for ja in (os.path.join(base, 'omni.ja'), os.path.join(base, 'browser', 'omni.ja')):
+        try:
+            with zipfile.ZipFile(ja) as z:
+                for n in z.namelist():
+                    if n.endswith(('/CustomizableUI.sys.mjs', '/CustomizableUI.jsm')):
+                        m = re.search(rb'\bkVersion = (\d+);', z.read(n))
+                        if m:
+                            return int(m.group(1))
+        except (OSError, zipfile.BadZipFile):
+            pass
+    return 28
+
+
 def place_widget(prof, widget):
     """once: a widget into the navigation bar (prefs.js's browser.uiCustomization.state): the search box after the address
     (Firefox 4's look, the Explorer band), the bookmarks menu button at the end (the Longhorn navigation's star: flxp's
@@ -976,7 +995,11 @@ def place_widget(prof, widget):
             except ValueError:
                 pass
     if state is None:
-        state = {'placements': {}, 'currentVersion': 0}
+        # a profile Firefox has not saved a layout in yet (never started, or never customized): the state is marked as
+        # of this Firefox's layout version, else Firefox takes it for one of before 2014 at its next start and migrates
+        # it, and its version 9 step swaps the bookmarks menu button for the library button (which its Proton step then
+        # takes away as unused)
+        state = {'placements': {}, 'currentVersion': ui_version()}
     nav = state.setdefault('placements', {}).get('nav-bar')
     if nav is None:
         nav = ['back-button', 'forward-button', 'stop-reload-button', 'urlbar-container', 'downloads-button',
