@@ -1,9 +1,0 @@
-title: A Unix desktop
-tags: vision
-created: 202611151855
-modified: 202611151855
-modifier: claude
-
-§§ lhde is meant as a serious Unix desktop environment, not a Linux-only curiosity.  It builds and runs on FreeBSD 15 with the same tests, the hardware controls have a back end per system behind one interface, scripts avoid /proc and GNU-only tools, and portability is one compatibility header, not ifdefs.
-
-§§ Wayland is a different story and a later one; the X-specific code is confined to a few files, which keeps it possible.  Fedora on the second laptop is where that experiment would start.

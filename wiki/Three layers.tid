@@ -1,9 +1,0 @@
-title: Three layers
-tags: vision
-created: 202611151855
-modified: 202611151855
-modifier: claude
-
-§§ wux gives windows, controls, drawing, input, menus, dialogs and the clipboard: a Win32 API implemented on X11 with Wine's controls, for programs built from source, never for Windows executables.  The shell layer (flxp/shell) gives file dialogs, icons, thumbnails, file operations, properties and launching.  flxp is the Explorer on top.
-
-§§ A second application must get by with the first two and a documented entry point (docs/APPLICATIONS.md).  Every program written so far ([[Applications]]) listed what it still had to reach for, and that list is the work on wux.  The review that set this direction: a second real application reveals where the foundation is weak better than more control demos.

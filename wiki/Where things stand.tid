@@ -1,9 +1,0 @@
-title: Where things stand
-tags: meta status
-created: 202611151855
-modified: 202611151855
-modifier: claude
-
-§§ Status lives in tags, not in a page that someone rewrites.  The folders ''next'', ''inprogress'', ''decided'' and ''done'' on the left list the notes carrying those tags; a note moves between them by retagging, its text mostly stays.  Bugs are notes tagged ''bug'', one each, short; wishes are ''idea''.
-
-§§ The repository's plan/STATUS.md is the dense version of the same information for agents; this wiki is the one for reading.  Tagged next right now: <<ListTagged next>>; in progress: <<ListTagged inprogress>>.

@@ -1,9 +1,0 @@
-title: The PDC 2003 demo
-tags: vision
-created: 202611151855
-modified: 202611151855
-modifier: claude
-
-§§ The Longhorn goal is Hillel Cooperman's interface demo of build 4050 at PDC 2003: the Slate explorer with its task band, the sidebar, the photo views, the aurora.  WinFS and the platform side are out of scope on purpose.
-
-§§ Most of it exists: the 4051 chrome and band, the sidebar and tiles, the icon views.  The aurora is decoded from the original files and plays in a demo; putting it into the Explorer's task pane is the last piece.

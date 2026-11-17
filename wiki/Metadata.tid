@@ -1,9 +1,0 @@
-title: Metadata
-tags: vision component
-created: 202611151855
-modified: 202611151855
-modifier: claude
-
-§§ Files carry their own descriptions, tags, comments, colour and a run-as command as extended attributes, so they travel with the file: cp -a, rsync -X, tar --xattrs, and flxp's own copy and move.  The Explorer shows them as columns, in the infotip, in 4051's task band, and edits them in the Properties sheet's Metadata tab; the Filter box narrows a folder by them.
-
-§§ Haiku's lesson stands behind it: People, Mail and bookmarks there are attributed files that the file manager queries.  Where this leads: the [[Catalogue]].  The design: plan/METADATA.md; the attribute names: docs/ANNOTATIONS.md.

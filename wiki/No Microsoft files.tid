@@ -1,9 +1,0 @@
-title: No Microsoft files
-tags: vision
-created: 202611151855
-modified: 202611151855
-modifier: claude
-
-§§ Nothing of Microsoft's is in the repository: no styles, DLLs, fonts, wallpapers, extracted bitmaps, concept art or screenshots of the real builds.  Recipes say which files to take from the user's own ISOs and installs; lhde-import puts them in a Windows tree under the user's home; the programs read the art from there at run time.
-
-§§ A complete desktop works with nothing of Microsoft's at all: ReactOS's styles and fonts and ten Pexels photos, shipped as the free pack.  The Windows themes are an import away.  Screenshots of lhde itself are fine; the many screenshots of Windows around make that an easy line.

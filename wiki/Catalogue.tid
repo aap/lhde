@@ -1,9 +1,0 @@
-title: Catalogue
-tags: vision plan inprogress
-created: 202611151855
-modified: 202611151855
-modifier: claude
-
-§§ A catalogue per root: every file's identity, attributes, picture facts and thumbnail in SQLite, seeded from a cheap listing, enriched lazily, queried in milliseconds.  Which of the two is the truth, the files or the catalogue, is a policy per root, because every edit is an operation with a revision in a journal; for a photo collection edited locally and committed to a remote machine later, the catalogue can be the truth.
-
-§§ Three catalogues exist: this machine (2.5 million objects), and indra's home and stash seeded from listings.  Next: [[Remote browsing]] and the query window luxfind.  The reviewed design is plan/CATALOGUE-PROPOSAL.md; the working plan plan/CATALOGUE-REMOTE-PHOTOS.md; how it works, docs/CATALOGUE.md.
