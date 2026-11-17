@@ -39,8 +39,18 @@ Done and covered by `make check` unless a line says otherwise.
 - wuxtheme reads and draws v3 and v4 msstyles; Display Properties (Themes, Desktop, Appearance, icon sets); font linking.
 
 **Applications**
-- luxpad (Notepad, from ReactOS's), luxview (the Picture and Fax Viewer), luxshot (screenshots), luxattr (the Properties sheet
-  without a session); the application entry point (wux/wux.h, shell/shell.h; docs/APPLICATIONS.md).
+- luxpad (Notepad, from ReactOS's), luxview (the Picture and Fax Viewer; the filmstrip with stand-ins), luxshot (screenshots:
+  a drag, a click for the screen, Shift+click for a window), luxattr (the Properties sheet without a session), luxfind (the
+  query window over the catalogue), mupf (the document viewer: PDF/XPS/EPUB and Markdown, mupdf's keys, reload on change,
+  typst watch and latexmk as a writing environment); the application entry point (wux/wux.h, shell/shell.h;
+  docs/APPLICATIONS.md) with the Longhorn header from the shell layer (shell::lhheader) and the Longhorn file dialog out of
+  process when a window owns the header.
+- Firefox in the desktop's look through `lhde-firefox` (userChrome.css generated from the theme: the Longhorn navigation
+  look on luxwm's glass under the glass themes, Firefox 4's look as the fallback, an XP look under luna/classic; luxwm's
+  `[extend_frame]` rule paints its glass plate under a window class; docs/USAGE.md "Firefox").
+- The toolkit's presentation (2026-11-16): no synchronous X round trips in wux's message loop or per frame (cached pointer
+  and window state, MIT-SHM presents, ScrollWindowEx as a server-side copy under a compositor), so scrolling under picom
+  is smooth; luxwm and a header client change activation state in step (`_LHWM_ACTIVE_DRAWN`, docs/CLIENT-PROTOCOL.md).
 
 **Metadata and catalogue**
 - Descriptions, comments, tags, colour and Run as as extended attributes: Details columns, infotip, the band's editable rows,

@@ -7,10 +7,22 @@ WIP
 I wanted an accurate Windows Explorer for Linux.
 This endeavour spiraled into an actually usable native Windows-like desktop for X11,
 and a the same time a rather complete UI museum of Windows up to Longhorn.
+It is currently working under Linux and FreeBSD.
 
 The Win32 UI core comes from the Wine and ReactOS projects,
 a team of Claude agents (Fable, Opus, Sonnet) did the actual engineering and reverse engineering,
 under my chaotic supervision. Code review and feedback from GPT Astra.
+
+## Applications
+
+* flxp - file explorer
+* luxshot - take screenshots
+* luxpad - text editor
+* luxview - image viewer
+* mupf - PDF and markdown viewer
+* luxfind - distributed filesystem index
+
+TODO: individual screenshots
 
 ## Screenshots
 
@@ -55,6 +67,8 @@ The sidebar's Start, Super+Shift+S for a screenshot (`luxshot`), `flxp DIR` for 
 
 ### Installing Windows themes
 
+TODO: simplify this explanation
+
 This repo does not contain original MS resources. The Longhorn and XP themes need the user's own copies: an ISO, a WIM,
 an installed Windows directory, or a resource pack made from them with `lhde-pack`. `lhde-import` takes what the recipes in
 `share/sources/*.ini` name (visual styles, DLLs for icons and art, fonts, wallpapers) into the Windows tree, and generates
@@ -93,14 +107,12 @@ This repo is the result.
 
 ## Roadmap
 
-Incomplete, and in no particular order:
+Incomplete, not terribly up to date, and in no particular order:
 
 * battle test and polish flxp and wux in particular
 * experiment with xattrs and WinFS visions
 * implement useful sidebar tiles
 * more applications:
-	* image viewer
-	* text editor
 	* hex editor
 	* calendar
 	* ...
@@ -109,8 +121,8 @@ Incomplete, and in no particular order:
 
 ## Dependencies
 
-A C and C++17 compiler, GNU make, Python 3, pkg-config with x11, xext, xfixes, xinerama, xft, freetype2, fontconfig,
-libpng, libjpeg, dbus-1, cairo, pangocairo and Lua 5.4; MuPDF's library for mupf, the document viewer (left out without
+A C and C++17 compiler, GNU make, Python 3, pkg-config with x11, x11-xcb, xcb, xext, xfixes, xinerama, xft, freetype2,
+fontconfig, libpng, libjpeg, dbus-1, cairo, pangocairo and Lua 5.4; MuPDF's library for mupf, the document viewer (left out without
 it). At run time picom (composition: the glass frames), feh, xprop,
 xsetroot, dbus-daemon, startx or Xephyr. The import needs Python 3 with Pillow, 7z and tar with xz. One `xbps-install`
 line for Void Linux and the equivalents for other distributions are in [docs/BUILDING.md](docs/BUILDING.md).
