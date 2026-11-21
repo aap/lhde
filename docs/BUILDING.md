@@ -478,6 +478,27 @@ console only: `service lightdm stop` (from a text console or ssh; it ends the gr
 `sysrc lightdm_enable=NO`, so it does not start at boot. A user who logs in for the first time gets the system tree's themes:
 `pw useradd -n guest -m -G video -s /bin/sh && passwd guest` makes one to try the out-of-the-box session with.
 
+### NixOS
+
+The flake in the repository root builds lhde (`nix build`), and its NixOS module installs it for every user as above: the
+session entry for the display manager, flxp's D-Bus services, and a system Windows tree in the system profile
+(`/run/current-system/sw/share/lhde-windows`, on `XDG_DATA_DIRS`), made with lhde-import at build time from the free pack and
+from any packs and styles the machine's owner names:
+
+    inputs.lhde.url = "github:aap/lhde";
+
+    imports = [ inputs.lhde.nixosModules.default ];
+    services.xserver.desktopManager.lhde.enable = true;
+    services.xserver.displayManager.lightdm.enable = true;
+    services.xserver.desktopManager.lhde.resources.packs = [ ./lhde_winthemes.zip ];     # optional: Windows files
+    services.xserver.desktopManager.lhde.resources.styles.realaero = ./aero.msstyles;    # optional: aero4074, aerovision
+
+A tree with packs or styles is unfree (`nixpkgs.config.allowUnfree`) and stays in that machine's store. The flake imports
+free pack version 1 (`nix/windows-tree.nix`) until `FREE_PACK_VERSION`'s is published. `nix run github:aap/lhde` starts the
+module in a QEMU VM (`nix/vm.nix`; its disk `lhde.qcow2` in the current directory), logged in as `demo` (password `demo`) with
+the `lunar` theme; picom runs there with `LHDE_PICOM_BACKEND=xrender`, as its glx backend stops repainting on QEMU's software
+OpenGL.
+
 ## Settings that point at your Windows files
 
 flxp needs none: it finds the imported art through the lookup above (`flxp/shell/lhdata.h` over

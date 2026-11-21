@@ -18,3 +18,6 @@ examples/aurora_data.h
 /lhde_winthemes
 /lhde_winthemes.zip
 wiki/
+# nix build's links and the demo VM's disk (nix run .#vm)
+/result*
+/lhde.qcow2
