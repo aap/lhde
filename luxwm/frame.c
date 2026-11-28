@@ -1,4 +1,5 @@
 /* luxwm frame painting: the DWM's plate/overlay/button textures, 9-sliced with cairo */
+#define _DEFAULT_SOURCE 1   /* strtok_r, clock_gettime: -std=c99 hides them in glibc */
 #include "frame.h"
 #include <lhde/data.h>
 #include "frame_ut.h"
